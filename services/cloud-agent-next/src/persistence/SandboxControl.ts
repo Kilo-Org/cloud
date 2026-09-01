@@ -20,13 +20,13 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { Env } from '../types.js';
+import { resolveSecret } from '../auth.js';
 import {
   getSandboxProvider,
   requiresContainmentSandbox,
   type SessionMetadata,
 } from './session-metadata.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
-import { logger } from '../logger.js';
 import {
   createSandboxControlSocketHandler,
   type SandboxControlConnectionIdentity,
@@ -125,7 +125,14 @@ import {
   type SessionCredentialGrant,
 } from '../sandbox-control/session-credentials.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
-import { withDORetry } from '../utils/do-retry.js';
+import {
+  diagnosticCause,
+  diagnosticConnection,
+  diagnosticEventType,
+  logControlDiagnostic,
+  withControlDORetry as withDORetry,
+  type ControlDiagnosticFields,
+} from '../sandbox-control/diagnostics.js';
 import type {
   ProviderAdapter,
   ProviderObservation,
@@ -247,6 +254,17 @@ export class SandboxControl extends DurableObject<Env> {
   private readyConnectionId: string | null = null;
   private providerKind: AgentSandboxProvider = 'cloudflare';
   private readonly sessionForwardChains = new Map<string, Promise<void>>();
+  private readonly forwarding = {
+    enqueued: 0,
+    settled: 0,
+    waiting: 0,
+    inFlight: 0,
+    highWater: 0,
+    dropped: 0,
+    notApplied: 0,
+    failed: 0,
+  };
+  private lastAcceptedHeartbeat: { connectionId: string; at: number } | null = null;
   private credentialUpdates: Promise<void> = Promise.resolve();
   private provider: ProviderAdapter;
   private stopAttemptInFlight: {
@@ -338,7 +356,7 @@ export class SandboxControl extends DurableObject<Env> {
 
     const authorized = await this.authorizeWrapper(request);
     if (!authorized) {
-      logger.withFields({ sandboxId: this.sandboxId }).warn('Sandbox control rejected credential');
+      this.logDiagnostic('socket_auth', { result: 'rejected' }, 'warn');
       return new Response('Unauthorized', { status: 401 });
     }
 
@@ -379,6 +397,20 @@ export class SandboxControl extends DurableObject<Env> {
     for (const id of dueDeadlines(deadlines, now)) {
       const before = await loadDeadlines(this.ctx.storage);
       if (before[id] === undefined || before[id] > now) continue;
+      this.logDiagnostic('deadline_fired', {
+        deadlineId: id,
+        deadlineAt: before[id],
+        latenessMs: Math.max(0, now - before[id]),
+        heartbeatDeadlineAt: before.heartbeatExpiry,
+        idleDeadlineAt: before.idleStop,
+        connectionState: this.connectionState(),
+        lastAcceptedHeartbeatAt:
+          this.lastAcceptedHeartbeat?.connectionId === this.activeConnection?.connectionId
+            ? this.lastAcceptedHeartbeat?.at
+            : undefined,
+        ...diagnosticConnection(this.activeConnection),
+        ...this.forwarding,
+      });
       await this.appendLog(deadlineTransition(now, id, 'fired'));
       await this.handleDeadline(id);
       await this.ctx.storage.transaction(async () => {
@@ -937,9 +969,17 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.put(CREDENTIAL_HASH_KEY, credentialHash);
       await this.appendLog(credentialTransition(Date.now(), 'issued'));
       const provider = this.provider;
+      let phase: 'create' | 'launch' = 'create';
+      let startedAt = Date.now();
+      let timedOut = false;
       try {
         this.assertWorktreeAdmission(worktreeId);
         if (acquisition) assertAcquisitionDeadline(acquisition);
+        this.logDiagnostic('allocation_launch', {
+          allocationId: intent.intentId,
+          phase,
+          result: 'started',
+        });
         const created = await withTimeout(
           provider.create({
             ...intent,
@@ -947,9 +987,19 @@ export class SandboxControl extends DurableObject<Env> {
             ...(networkPolicy ? { networkPolicy } : {}),
           }),
           DEADLINE_MS.startup,
-          'Sandbox allocation timed out'
+          'Sandbox allocation timed out',
+          () => {
+            timedOut = true;
+          }
         );
+        this.logDiagnostic('allocation_launch', {
+          allocationId: intent.intentId,
+          phase,
+          result: 'providerRef' in created ? 'completed' : 'unresolved',
+          durationMs: Date.now() - startedAt,
+        });
         if ('providerRef' in created) {
+          const launchEnv = await this.wrapperLaunchEnv(credential, intent.intentId);
           const current = await loadPhysicalRecord(this.ctx.storage);
           if (!sameAllocation(current, physical)) return currentStatus();
           if (current.stopTombstone) {
@@ -966,16 +1016,39 @@ export class SandboxControl extends DurableObject<Env> {
           }
           this.assertWorktreeAdmission(worktreeId);
           if (acquisition) assertAcquisitionDeadline(acquisition);
+          phase = 'launch';
+          startedAt = Date.now();
+          this.logDiagnostic('allocation_launch', {
+            allocationId: intent.intentId,
+            phase,
+            result: 'started',
+          });
           await withTimeout(
-            provider.launch(created.providerRef, this.wrapperLaunchEnv(credential)),
+            provider.launch(created.providerRef, launchEnv),
             DEADLINE_MS.startup,
-            'Sandbox wrapper launch timed out'
+            'Sandbox wrapper launch timed out',
+            () => {
+              timedOut = true;
+            }
           );
+          this.logDiagnostic('allocation_launch', {
+            allocationId: intent.intentId,
+            phase,
+            result: 'completed',
+            durationMs: Date.now() - startedAt,
+          });
         }
       } catch {
-        logger
-          .withFields({ sandboxId: this.sandboxId })
-          .warn('Sandbox allocation or launch failed');
+        this.logDiagnostic(
+          'allocation_launch',
+          {
+            result: timedOut ? 'timed_out' : 'failed',
+            phase,
+            durationMs: Date.now() - startedAt,
+            allocationId: physical.createIntent?.intentId,
+          },
+          'warn'
+        );
         const current = await loadPhysicalRecord(this.ctx.storage);
         if (
           sameAllocation(current, physical) &&
@@ -1742,6 +1815,10 @@ export class SandboxControl extends DurableObject<Env> {
   async recordStopAttempt(): Promise<PhysicalRecord> {
     const current = await loadPhysicalRecord(this.ctx.storage);
     if (this.stopAttemptInFlight && sameAllocation(this.stopAttemptInFlight.physical, current)) {
+      this.logDiagnostic('stop_coalesced', {
+        allocationId: current.createIntent?.intentId,
+        stopAttempts: current.stopTombstone?.attempts,
+      });
       return this.stopAttemptInFlight.promise;
     }
     const pending = { physical: current, promise: this.performStopAttempt(current) };
@@ -1787,12 +1864,48 @@ export class SandboxControl extends DurableObject<Env> {
   private async stopCurrentProvider(physical: PhysicalRecord): Promise<boolean> {
     let pending = this.providerStopInFlight;
     if (!pending || !sameAllocation(pending.physical, physical)) {
+      const startedAt = Date.now();
+      const diagnostic = {
+        allocationId: physical.createIntent?.intentId,
+        wrapperInstanceId: physical.stopTombstone?.wrapperInstanceId,
+        stopAttempts: physical.stopTombstone?.attempts,
+        physicalState: physical.state,
+        cleanupAgeMs: physical.stopTombstone
+          ? startedAt - physical.stopTombstone.createdAt
+          : undefined,
+      };
+      let timedOut = false;
+      this.logDiagnostic('provider_stop', { ...diagnostic, result: 'started' });
       pending = {
         physical,
         promise: withTimeout(
           this.provider.stop(physical.providerRef, physical.createIntent),
           DEADLINE_MS.stopAttempt,
-          'Sandbox stop attempt timed out'
+          'Sandbox stop attempt timed out',
+          () => {
+            timedOut = true;
+          }
+        ).then(
+          result => {
+            this.logDiagnostic('provider_stop', {
+              ...diagnostic,
+              result,
+              durationMs: Date.now() - startedAt,
+            });
+            return result;
+          },
+          error => {
+            this.logDiagnostic(
+              'provider_stop',
+              {
+                ...diagnostic,
+                result: timedOut ? 'timed_out' : 'failed',
+                durationMs: Date.now() - startedAt,
+              },
+              'warn'
+            );
+            throw error;
+          }
         ),
       };
       this.providerStopInFlight = pending;
@@ -1805,7 +1918,6 @@ export class SandboxControl extends DurableObject<Env> {
     try {
       return (await pending.promise) === 'terminal';
     } catch {
-      logger.withFields({ sandboxId: this.sandboxId }).warn('Sandbox stop attempt failed');
       return false;
     }
   }
@@ -1848,6 +1960,11 @@ export class SandboxControl extends DurableObject<Env> {
       return current;
     });
     if (!target) return;
+    this.logDiagnostic('slow_reap', {
+      allocationId: target.createIntent?.intentId,
+      stopAttempts: target.stopTombstone?.attempts,
+      cleanupAgeMs: target.stopTombstone ? Date.now() - target.stopTombstone.createdAt : undefined,
+    });
     const observed = await this.observeCurrentProvider(target);
     if (!sameAllocation(observed, physical) || !this.shouldSlowReap(observed)) return;
     const terminal = await this.stopCurrentProvider(observed);
@@ -2108,12 +2225,27 @@ export class SandboxControl extends DurableObject<Env> {
     return billing;
   }
 
-  private wrapperLaunchEnv(credential: string): Record<string, string> {
-    return buildControlWrapperLaunchEnv({
+  private async wrapperLaunchEnv(
+    credential: string,
+    allocationId: string
+  ): Promise<Record<string, string>> {
+    const signingSecret = await withTimeout(
+      resolveSecret(this.env.NEXTAUTH_SECRET),
+      1_000,
+      'Diagnostic signing secret lookup timed out'
+    ).catch(() => null);
+    const launchEnv = buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,
       credential,
+      diagnostics: { allocationId, signingSecret },
     });
+    this.logDiagnostic('wrapper_log_upload', {
+      allocationId,
+      configured: Boolean(launchEnv.CONTROL_LOG_UPLOAD_GRANT),
+      wrapperInstanceId: launchEnv.CONTROL_WRAPPER_INSTANCE_ID,
+    });
+    return launchEnv;
   }
 
   private matchesProviderReference(physical: PhysicalRecord, providerRef: string): boolean {
@@ -2283,6 +2415,7 @@ export class SandboxControl extends DurableObject<Env> {
     this.activeConnection = identity;
     this.readyConnectionId = null;
     this.kiloReady = false;
+    this.logDiagnostic('handshake_committed', diagnosticConnection(identity));
     this.socketHandler.closeProvisionalSockets();
   }
 
@@ -2318,68 +2451,134 @@ export class SandboxControl extends DurableObject<Env> {
     if (!this.isCurrentConnection(identity)) return;
     this.readyConnectionId = identity.connectionId;
     this.kiloReady = true;
+    this.logDiagnostic('wrapper_ready', {
+      ...diagnosticConnection(identity),
+      heartbeatDeadlineAt: now + DEADLINE_MS.heartbeatExpiry,
+    });
   }
 
   private async onHeartbeat(
     payload: SandboxHeartbeatPayload,
     identity: SandboxControlConnectionIdentity
   ): Promise<void> {
-    if (!this.isCurrentConnection(identity)) return;
+    const diagnostic = {
+      ...diagnosticConnection(identity),
+      reportedState: payload.state,
+      kiloReady: payload.kilo.ready,
+      reportedSessions: payload.sessions.length,
+      pendingMessages: payload.pendingMessages,
+      activeKiloSessions: payload.activeKiloSessions,
+      ...this.forwarding,
+    };
+    if (!this.isCurrentConnection(identity)) {
+      this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'stale_connection' });
+      return;
+    }
     if (!payload.kilo.ready) {
-      logger
-        .withFields({
-          sandboxId: this.sandboxId,
-          wrapperInstanceId: identity.wrapperInstanceId,
-          connectionId: identity.connectionId,
+      this.logDiagnostic(
+        'heartbeat',
+        {
+          ...diagnostic,
+          decision: 'kilo_unhealthy',
           reason: payload.kilo.reason ?? 'unknown',
-        })
-        .warn('Sandbox control received unhealthy heartbeat');
+        },
+        'warn'
+      );
       await this.quarantineConnection(identity, 'kilo_unhealthy');
       return;
     }
-    if (!this.readyWrapperRuntime()) return;
+    if (!this.readyWrapperRuntime()) {
+      this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'runtime_not_ready' });
+      return;
+    }
 
     const now = Date.now();
-    await this.ctx.storage.transaction(async () => {
-      const table = await loadRouteTable(this.ctx.storage);
-      if (!this.isCurrentConnection(identity)) return;
-      const reported = new Map(payload.sessions.map(session => [session.kiloSessionId, session]));
-      for (const route of table.values()) {
-        const report = reported.get(route.kiloSessionId) ?? {
-          state: 'idle' as const,
-          idleForMs: 0,
-        };
-        const previousState = route.lastState;
-        const applied = applyReportedSessionState(table, route.kiloSessionId, report, now);
-        if (applied.changed) {
-          await this.appendLog(
-            sessionStateTransition(now, route.kiloSessionId, previousState, report.state)
+    const applied = await this.ctx.storage
+      .transaction(async () => {
+        const table = await loadRouteTable(this.ctx.storage);
+        if (!this.isCurrentConnection(identity)) return;
+        const reported = new Map(payload.sessions.map(session => [session.kiloSessionId, session]));
+        let missingRoutes = 0;
+        let activeRoutes = 0;
+        let finalizingRoutes = 0;
+        let inputWaitingRoutes = 0;
+        for (const route of table.values()) {
+          const report = reported.get(route.kiloSessionId) ?? {
+            state: 'idle' as const,
+            idleForMs: 0,
+          };
+          if (!reported.has(route.kiloSessionId)) missingRoutes++;
+          if (report.state === 'active') activeRoutes++;
+          if (report.state === 'finalizing') finalizingRoutes++;
+          if ('waitingOn' in report && report.waitingOn === 'input') inputWaitingRoutes++;
+          const previousState = route.lastState;
+          const applied = applyReportedSessionState(table, route.kiloSessionId, report, now);
+          if (applied.changed) {
+            await this.appendLog(
+              sessionStateTransition(now, route.kiloSessionId, previousState, report.state)
+            );
+          }
+        }
+        await saveRouteTable(this.ctx.storage, table);
+        const previousDeadlines = await loadDeadlines(this.ctx.storage);
+        let deadlines = armDeadline(
+          previousDeadlines,
+          'heartbeatExpiry',
+          now + DEADLINE_MS.heartbeatExpiry
+        );
+        if (
+          payload.state !== 'idle' ||
+          (payload.pendingMessages ?? 0) > 0 ||
+          hasActiveWork(table)
+        ) {
+          deadlines = cancelDeadline(deadlines, 'idleStop');
+        } else {
+          deadlines = armDeadline(
+            deadlines,
+            'idleStop',
+            deadlines.idleStop ?? now + DEADLINE_MS.idleStop
           );
         }
-      }
-      await saveRouteTable(this.ctx.storage, table);
-      let deadlines = armDeadline(
-        await loadDeadlines(this.ctx.storage),
-        'heartbeatExpiry',
-        now + DEADLINE_MS.heartbeatExpiry
-      );
-      if (payload.state !== 'idle' || (payload.pendingMessages ?? 0) > 0 || hasActiveWork(table)) {
-        deadlines = cancelDeadline(deadlines, 'idleStop');
-      } else {
-        deadlines = armDeadline(
-          deadlines,
-          'idleStop',
-          deadlines.idleStop ?? now + DEADLINE_MS.idleStop
-        );
-      }
-      await saveDeadlines(this.ctx.storage, deadlines);
-      await this.scheduleAlarm(deadlines);
+        await saveDeadlines(this.ctx.storage, deadlines);
+        await this.scheduleAlarm(deadlines);
+        return {
+          routeCount: table.size,
+          missingRoutes,
+          activeRoutes,
+          finalizingRoutes,
+          inputWaitingRoutes,
+          heartbeatDeadlineAt: deadlines.heartbeatExpiry,
+          idleDeadlineAt: deadlines.idleStop ?? null,
+          idleDeadlineAction:
+            deadlines.idleStop === undefined
+              ? 'cancelled'
+              : previousDeadlines.idleStop === undefined
+                ? 'armed'
+                : 'retained',
+        };
+      })
+      .catch(error => {
+        this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'apply_failed' }, 'warn');
+        throw error;
+      });
+    if (applied) this.lastAcceptedHeartbeat = { connectionId: identity.connectionId, at: now };
+    this.logDiagnostic('heartbeat', {
+      ...diagnostic,
+      ...applied,
+      decision: applied ? 'accepted' : 'stale_during_apply',
     });
     await this.renewProviderLease(identity);
   }
 
   private async renewProviderLease(identity: SandboxControlConnectionIdentity): Promise<void> {
     const physical = await loadPhysicalRecord(this.ctx.storage);
+    const diagnostic = {
+      ...diagnosticConnection(identity),
+      allocationId: physical.createIntent?.intentId,
+      physicalState: physical.state,
+      hasTombstone: physical.stopTombstone !== null,
+      requestedLeaseMs: leaseAtLeastMs(),
+    };
     if (
       !this.isCurrentConnection(identity) ||
       !this.readyWrapperRuntime() ||
@@ -2387,16 +2586,36 @@ export class SandboxControl extends DurableObject<Env> {
       physical.stopTombstone !== null ||
       physical.providerRef === null
     ) {
+      this.logDiagnostic('lease', { ...diagnostic, result: 'skipped_authority' });
       return;
     }
+    const startedAt = Date.now();
+    let timedOut = false;
+    this.logDiagnostic('lease', { ...diagnostic, result: 'started' });
     try {
       await withTimeout(
         this.provider.ensureLeaseAtLeast(physical.providerRef, leaseAtLeastMs()),
         DEADLINE_MS.stopAttempt,
-        'Sandbox lease renewal timed out'
+        'Sandbox lease renewal timed out',
+        () => {
+          timedOut = true;
+        }
       );
+      this.logDiagnostic('lease', {
+        ...diagnostic,
+        result: 'completed',
+        durationMs: Date.now() - startedAt,
+      });
     } catch {
-      logger.withFields({ sandboxId: this.sandboxId }).warn('Provider lease renewal failed');
+      this.logDiagnostic(
+        'lease',
+        {
+          ...diagnostic,
+          result: timedOut ? 'timed_out' : 'failed',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
     }
   }
 
@@ -2405,15 +2624,26 @@ export class SandboxControl extends DurableObject<Env> {
     payload: SessionEventPayload,
     connection: SandboxControlConnectionIdentity
   ): Promise<void> {
-    if (!this.isCurrentConnection(connection)) return;
-    if (!identity) {
-      logger
-        .withFields({ sandboxId: this.sandboxId, eventType: payload.type })
-        .warn('session.event missing identity');
+    const diagnostic = {
+      ...diagnosticConnection(connection),
+      eventType: diagnosticEventType(payload.type),
+    };
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_enqueue', diagnostic);
       return;
     }
-    await this.forwardRoutedSessionFrame(identity, payload.type, connection, route =>
-      this.forwardSessionEvent(route, identity, payload, connection)
+    if (!identity) {
+      this.recordForwardDrop('missing_identity', diagnostic);
+      return;
+    }
+    await this.forwardRoutedSessionFrame(identity, payload.type, connection, (route, fields) =>
+      this.forwardSessionFrame(route, connection, fields, 'receiveSandboxControlEvent', stub =>
+        stub.receiveSandboxControlEvent({
+          identity,
+          payload,
+          wrapperInstanceId: connection.wrapperInstanceId,
+        })
+      )
     );
   }
 
@@ -2422,15 +2652,35 @@ export class SandboxControl extends DurableObject<Env> {
     payload: SessionPreparingPayload,
     connection: SandboxControlConnectionIdentity
   ): Promise<void> {
-    if (!this.isCurrentConnection(connection)) return;
-    if (!identity) {
-      logger
-        .withFields({ sandboxId: this.sandboxId, eventType: 'session.preparing' })
-        .warn('session.event missing identity');
+    const diagnostic = {
+      ...diagnosticConnection(connection),
+      eventType: 'session.preparing',
+    };
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_enqueue', diagnostic);
       return;
     }
-    await this.forwardRoutedSessionFrame(identity, 'session.preparing', connection, route =>
-      this.forwardSessionPreparing(route, identity, payload, connection)
+    if (!identity) {
+      this.recordForwardDrop('missing_identity', diagnostic);
+      return;
+    }
+    await this.forwardRoutedSessionFrame(
+      identity,
+      'session.preparing',
+      connection,
+      (route, fields) =>
+        this.forwardSessionFrame(
+          route,
+          connection,
+          fields,
+          'receiveSandboxControlPreparing',
+          stub =>
+            stub.receiveSandboxControlPreparing({
+              identity,
+              payload,
+              wrapperInstanceId: connection.wrapperInstanceId,
+            })
+        )
     );
   }
 
@@ -2438,86 +2688,136 @@ export class SandboxControl extends DurableObject<Env> {
     identity: SessionEventIdentity,
     eventType: string,
     connection: SandboxControlConnectionIdentity,
-    forward: (route: SessionRoute) => Promise<void>
+    forward: (route: SessionRoute, diagnostic: ControlDiagnosticFields) => Promise<void>
   ): Promise<void> {
+    const diagnostic = {
+      ...diagnosticConnection(connection),
+      eventType: diagnosticEventType(eventType),
+    };
     const table = await loadRouteTable(this.ctx.storage);
-    if (!this.isCurrentConnection(connection)) return;
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_enqueue', diagnostic);
+      return;
+    }
     const route = resolveSessionEventRoute(table, identity);
     if (!route) {
-      logger
-        .withFields({
-          sandboxId: this.sandboxId,
-          eventType,
-          directory: identity.directory,
-          kiloSessionId: identity.kiloSessionId,
-          rootKiloSessionId: identity.rootKiloSessionId,
-        })
-        .warn('session.event unroutable');
+      this.recordForwardDrop('unroutable', { ...diagnostic, routeCount: table.size });
       return;
     }
 
+    const queuedAt = Date.now();
+    this.forwarding.enqueued++;
+    this.forwarding.waiting++;
+    this.forwarding.highWater = Math.max(
+      this.forwarding.highWater,
+      this.forwarding.waiting + this.forwarding.inFlight
+    );
+    const fields = {
+      ...diagnostic,
+      sessionId: route.sessionId,
+      forwardSequence: this.forwarding.enqueued,
+      queuedAt,
+    };
+    this.logDiagnostic('forward_enqueued', { ...fields, ...this.forwarding });
     const previous = this.sessionForwardChains.get(route.sessionId) ?? Promise.resolve();
     const next = previous
       .catch(() => undefined)
-      .then(() => (this.isCurrentConnection(connection) ? forward(route) : undefined));
+      .then(async () => {
+        this.forwarding.waiting--;
+        this.forwarding.inFlight++;
+        this.logDiagnostic('forward_started', {
+          ...fields,
+          queueWaitMs: Date.now() - queuedAt,
+          ...this.forwarding,
+        });
+        try {
+          if (this.isCurrentConnection(connection)) await forward(route, fields);
+          else this.recordForwardDrop('stale_before_send', fields);
+        } finally {
+          this.forwarding.inFlight--;
+          this.forwarding.settled++;
+          this.logDiagnostic('forward_settled', {
+            ...fields,
+            totalForwardMs: Date.now() - queuedAt,
+            ...this.forwarding,
+          });
+        }
+      });
     this.sessionForwardChains.set(route.sessionId, next);
     this.ctx.waitUntil(next);
   }
 
-  private async forwardSessionEvent(
-    route: SessionRoute,
-    identity: SessionEventIdentity,
-    payload: SessionEventPayload,
-    connection: SandboxControlConnectionIdentity
-  ): Promise<void> {
-    if (!this.isCurrentConnection(connection)) return;
-    const delivered = await withTimeout(
-      withDORetry(
-        () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-        stub =>
-          this.isCurrentConnection(connection)
-            ? stub.receiveSandboxControlEvent({
-                identity,
-                payload,
-                wrapperInstanceId: connection.wrapperInstanceId,
-              })
-            : Promise.resolve({ applied: true }),
-        'receiveSandboxControlEvent'
-      ),
-      DEADLINE_MS.stopAttempt,
-      'Sandbox event forwarding timed out'
-    ).then(
-      () => true,
-      () => false
-    );
-    if (!delivered) await this.quarantineForwardingFailure(route, connection);
+  private recordForwardDrop(reason: string, fields: ControlDiagnosticFields): void {
+    this.forwarding.dropped++;
+    this.logDiagnostic('forward_dropped', { ...fields, reason, ...this.forwarding });
   }
 
-  private async forwardSessionPreparing(
+  private async forwardSessionFrame(
     route: SessionRoute,
-    identity: SessionEventIdentity,
-    payload: SessionPreparingPayload,
-    connection: SandboxControlConnectionIdentity
+    connection: SandboxControlConnectionIdentity,
+    diagnostic: ControlDiagnosticFields,
+    operation: 'receiveSandboxControlEvent' | 'receiveSandboxControlPreparing',
+    send: (stub: ReturnType<typeof getSandboxSessionStub>) => Promise<{ applied: boolean }>
   ): Promise<void> {
-    if (!this.isCurrentConnection(connection)) return;
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_send', diagnostic);
+      return;
+    }
+    const startedAt = Date.now();
+    let timedOut = false;
+    let skipped = false;
+    let attempts = 0;
     const delivered = await withTimeout(
       withDORetry(
         () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-        stub =>
-          this.isCurrentConnection(connection)
-            ? stub.receiveSandboxControlPreparing({
-                identity,
-                payload,
-                wrapperInstanceId: connection.wrapperInstanceId,
-              })
-            : Promise.resolve({ applied: true }),
-        'receiveSandboxControlPreparing'
+        stub => {
+          skipped = !this.isCurrentConnection(connection);
+          if (skipped) {
+            this.recordForwardDrop('stale_retry', diagnostic);
+            return Promise.resolve({ applied: true });
+          }
+          attempts++;
+          return send(stub);
+        },
+        operation
       ),
       DEADLINE_MS.stopAttempt,
-      'Sandbox preparation forwarding timed out'
+      operation === 'receiveSandboxControlEvent'
+        ? 'Sandbox event forwarding timed out'
+        : 'Sandbox preparation forwarding timed out',
+      () => {
+        timedOut = true;
+      }
     ).then(
-      () => true,
-      () => false
+      result => {
+        if (!skipped && result?.applied === false) this.forwarding.notApplied++;
+        this.logDiagnostic('forward_result', {
+          ...diagnostic,
+          operation,
+          attempts,
+          result: skipped ? 'skipped' : 'delivered',
+          applied: skipped ? undefined : result?.applied,
+          rpcWaitMs: Date.now() - startedAt,
+          ...this.forwarding,
+        });
+        return true;
+      },
+      () => {
+        this.forwarding.failed++;
+        this.logDiagnostic(
+          'forward_result',
+          {
+            ...diagnostic,
+            operation,
+            attempts,
+            result: timedOut ? 'timed_out' : 'failed',
+            rpcWaitMs: Date.now() - startedAt,
+            ...this.forwarding,
+          },
+          'warn'
+        );
+        return false;
+      }
     );
     if (!delivered) await this.quarantineForwardingFailure(route, connection);
   }
@@ -2534,8 +2834,13 @@ export class SandboxControl extends DurableObject<Env> {
       current.ownerId !== route.ownerId ||
       current.directory !== route.directory ||
       current.kiloSessionId !== route.kiloSessionId
-    )
+    ) {
+      this.logDiagnostic('forward_quarantine_skipped', {
+        sessionId: route.sessionId,
+        ...diagnosticConnection(connection),
+      });
       return;
+    }
     await this.quarantineConnection(connection, 'session_delivery_failed');
   }
 
@@ -2559,6 +2864,12 @@ export class SandboxControl extends DurableObject<Env> {
       physical.state === 'stopped' ||
       physical.stopTombstone
     ) {
+      this.logDiagnostic('quarantine_skipped', {
+        ...diagnosticConnection(identity),
+        cause: diagnosticCause(reason),
+        physicalState: physical.state,
+        hasTombstone: physical.stopTombstone !== null,
+      });
       return;
     }
     const next = beginStop(physical, reason, Date.now(), identity.wrapperInstanceId);
@@ -2575,18 +2886,34 @@ export class SandboxControl extends DurableObject<Env> {
     if (shouldRearmReconciliation(physical.state)) {
       await this.rearmReconciliation(physical);
     }
+    const startedAt = Date.now();
+    let timedOut = false;
+    let failed = false;
     let result: ProviderObservation;
     try {
       result = await withTimeout(
         this.provider.observe(physical.providerRef, physical.createIntent),
         DEADLINE_MS.stopAttempt,
-        'Sandbox observation timed out'
+        'Sandbox observation timed out',
+        () => {
+          timedOut = true;
+        }
       );
     } catch {
+      failed = true;
       result = { status: 'unknown' };
     }
     const current = await loadPhysicalRecord(this.ctx.storage);
-    if (!sameAllocation(current, physical) || current.state === 'stopped') return current;
+    const stale = !sameAllocation(current, physical) || current.state === 'stopped';
+    this.logDiagnostic('provider_observation', {
+      allocationId: physical.createIntent?.intentId,
+      physicalState: physical.state,
+      observation: result.status,
+      result: timedOut ? 'timed_out' : failed ? 'failed' : 'completed',
+      stale,
+      durationMs: Date.now() - startedAt,
+    });
+    if (stale) return current;
     if (result.providerRef && current.providerRef === null) {
       await savePhysicalRecord(this.ctx.storage, { ...current, providerRef: result.providerRef });
     }
@@ -2804,6 +3131,18 @@ export class SandboxControl extends DurableObject<Env> {
     const unavailable =
       to.stopTombstone !== null || (to.state !== 'creating' && to.state !== 'running');
     await this.ctx.storage.transaction(() => this.persistPhysicalState(from, to, cause));
+    this.logDiagnostic('physical_committed', {
+      allocationId: to.createIntent?.intentId ?? from.createIntent?.intentId,
+      wrapperInstanceId,
+      fromState: from.state,
+      toState: to.state,
+      cause: diagnosticCause(cause),
+      stopCause: to.stopTombstone ? diagnosticCause(to.stopTombstone.reason) : undefined,
+      stopAttempts: to.stopTombstone?.attempts ?? from.stopTombstone?.attempts,
+      cleanupAgeMs: from.stopTombstone ? Date.now() - from.stopTombstone.createdAt : undefined,
+      hasTombstone: to.stopTombstone !== null,
+      ...this.forwarding,
+    });
     if (!unavailable) return;
     this.activeConnection = null;
     this.readyConnectionId = null;
@@ -2989,6 +3328,18 @@ export class SandboxControl extends DurableObject<Env> {
   private async appendLog(row: TransitionRow): Promise<void> {
     const log = await loadTransitionLog(this.ctx.storage);
     await saveTransitionLog(this.ctx.storage, appendTransition(log, row));
+  }
+
+  private logDiagnostic(
+    event: string,
+    fields: ControlDiagnosticFields,
+    level: 'info' | 'warn' = 'info'
+  ): void {
+    logControlDiagnostic(
+      event,
+      { sandboxId: this.sandboxId, provider: this.providerKind, ...fields },
+      level
+    );
   }
 
   private async requireOwner(): Promise<string> {

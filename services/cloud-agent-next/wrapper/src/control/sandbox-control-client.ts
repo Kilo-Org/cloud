@@ -1,13 +1,19 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import {
+  emitControlDiagnostic,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import { z } from 'zod';
 import { prepareIngestFrame } from '../../../src/shared/ingest-frame.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import {
+  CONTROL_OPERATIONS,
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlFrameSchema,
+  controlErrorCodes,
   sandboxHelloResultSchema,
   sessionEventPayloadSchema,
   type ControlError,
@@ -39,6 +45,7 @@ export type SandboxControlClientOptions = {
   onRequest?: SandboxControlRequestHandler;
   onDisconnected?: () => void;
   log?: (message: string) => void;
+  onDiagnostic?: ControlDiagnosticReporter;
   reconnectDelayMs?: (attempt: number) => number;
 };
 
@@ -137,10 +144,18 @@ export function createSandboxControlClient(
 ): SandboxControlClient {
   const wrapperInstanceId = options.wrapperInstanceId;
   let state: ClientState = { kind: 'idle' };
+  let eventSequence = 0;
+  const diagnostic = (phase: string, ws?: WebSocket): void =>
+    emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
+      phase,
+      readyState: ws?.readyState,
+      bufferedBytes: ws?.bufferedAmount,
+    });
 
   function retireConnection(ws: WebSocket): void {
     if (state.kind !== 'ready' || state.socket !== ws) return;
     const current = state;
+    diagnostic('retired', ws);
     state = { kind: 'closed' };
     current.dispose();
     options.onDisconnected?.();
@@ -148,6 +163,22 @@ export function createSandboxControlClient(
 
   async function dispatchRequest(ws: WebSocket, request: RequestFrame): Promise<void> {
     if (state.kind !== 'ready' || state.socket !== ws || !options.onRequest) return;
+    const startedAt = Date.now();
+    let errorCode: string | undefined;
+    let retryable: boolean | undefined;
+    const requestDiagnostic = (phase: string, ok?: boolean): void =>
+      emitControlDiagnostic(options.onDiagnostic, 'control.request', {
+        phase,
+        operation: CONTROL_OPERATIONS.find(operation => operation === request.operation) ?? 'other',
+        requestId: request.requestId,
+        sessionId: request.session?.sessionId,
+        kiloSessionId: request.session?.kiloSessionId,
+        elapsedMs: Date.now() - startedAt,
+        ok,
+        errorCode,
+        retryable,
+      });
+    requestDiagnostic('received');
     let outcome: Awaited<ReturnType<SandboxControlRequestHandler>>;
     try {
       outcome = await options.onRequest(request.operation, request.session, request.payload);
@@ -158,8 +189,17 @@ export function createSandboxControlClient(
       };
     }
 
-    if (state.kind !== 'ready' || state.socket !== ws) return;
+    if (!outcome.ok) {
+      errorCode = controlErrorCodes.find(code => code === outcome.error?.code) ?? 'other';
+      retryable = outcome.error?.retryable;
+    }
+    requestDiagnostic('completed', outcome.ok);
+    if (state.kind !== 'ready' || state.socket !== ws) {
+      requestDiagnostic('response_skipped', outcome.ok);
+      return;
+    }
     if (ws.readyState !== 1) {
+      requestDiagnostic('response_failed', outcome.ok);
       retireConnection(ws);
       return;
     }
@@ -180,7 +220,9 @@ export function createSandboxControlClient(
               }),
         })
       );
+      requestDiagnostic('response_sent', outcome.ok);
     } catch {
+      requestDiagnostic('response_failed', outcome.ok);
       retireConnection(ws);
     }
   }
@@ -190,6 +232,7 @@ export function createSandboxControlClient(
     deadlineAt: number
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      diagnostic('opening');
       const ws = (options.openWebSocket ?? defaultOpenWebSocket)(options.url, options.credential);
       const signal = starting.abort.signal;
       const requestId = crypto.randomUUID();
@@ -203,19 +246,32 @@ export function createSandboxControlClient(
         ws.removeEventListener('open', onOpen);
         ws.removeEventListener('message', onMessage);
         ws.removeEventListener('error', onFailure);
-        ws.removeEventListener('close', onFailure);
+        ws.removeEventListener('close', onClose);
         if (ws.readyState === 0 || ws.readyState === 1) ws.close();
       }
 
       function fail(): void {
         if (phase === 'finished') return;
+        diagnostic('failed', ws);
         dispose();
         reject(new Error('sandbox control connect failed'));
       }
 
       function onFailure(): void {
+        diagnostic('failed', ws);
         if (state.kind === 'ready' && state.socket === ws) retireConnection(ws);
         else fail();
+      }
+
+      function onClose(event: CloseEvent): void {
+        emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
+          phase: 'closed',
+          closeCode: event.code,
+          wasClean: event.wasClean,
+          readyState: ws.readyState,
+          bufferedBytes: ws.bufferedAmount,
+        });
+        onFailure();
       }
 
       function onOpen(): void {
@@ -224,6 +280,7 @@ export function createSandboxControlClient(
           fail();
           return;
         }
+        diagnostic('opened', ws);
         phase = 'hello';
         clearTimeout(timeout);
         timeout = setTimeout(fail, Math.min(HELLO_TIMEOUT_MS, deadlineAt - Date.now()));
@@ -240,6 +297,7 @@ export function createSandboxControlClient(
         };
         try {
           ws.send(JSON.stringify(hello));
+          diagnostic('hello_sent', ws);
         } catch {
           onFailure();
         }
@@ -273,6 +331,7 @@ export function createSandboxControlClient(
             return;
           }
           phase = 'status';
+          diagnostic('hello_accepted', ws);
           return;
         }
         if (
@@ -296,12 +355,15 @@ export function createSandboxControlClient(
         const keepalive = setInterval(() => {
           if (state.kind !== 'ready' || state.socket !== ws) return;
           if (ws.readyState !== 1) {
+            diagnostic('keepalive_failed', ws);
             retireConnection(ws);
             return;
           }
           try {
             ws.send(SANDBOX_CONTROL_AUTO_PING);
+            diagnostic('keepalive_sent', ws);
           } catch {
+            diagnostic('keepalive_failed', ws);
             retireConnection(ws);
           }
         }, KEEPALIVE_INTERVAL_MS);
@@ -314,6 +376,7 @@ export function createSandboxControlClient(
             dispose();
           },
         };
+        diagnostic('ready', ws);
         resolve();
       }
 
@@ -321,7 +384,7 @@ export function createSandboxControlClient(
       ws.addEventListener('open', onOpen);
       ws.addEventListener('message', onMessage);
       ws.addEventListener('error', onFailure);
-      ws.addEventListener('close', onFailure);
+      ws.addEventListener('close', onClose);
       if (signal.aborted || ws.readyState > 1) fail();
       else if (ws.readyState === 1) onOpen();
     });
@@ -341,6 +404,10 @@ export function createSandboxControlClient(
         signal.throwIfAborted();
         if (Date.now() >= deadlineAt) throw new Error('sandbox control startup timeout');
         try {
+          emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
+            phase: 'connect_attempt',
+            attempt,
+          });
           await connectAttempt(starting, deadlineAt);
           return;
         } catch {
@@ -353,6 +420,11 @@ export function createSandboxControlClient(
             (options.reconnectDelayMs ?? defaultReconnectDelayMs)(attempt)
           );
           options.log?.(`sandbox control reconnect scheduled in ${delayMs}ms (connect failed)`);
+          emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
+            phase: 'retry_scheduled',
+            attempt,
+            delayMs,
+          });
           await delay(delayMs, undefined, { signal });
         }
       }
@@ -383,6 +455,7 @@ export function createSandboxControlClient(
 
     close(): void {
       const current = state;
+      diagnostic('closed', current.kind === 'ready' ? current.socket : undefined);
       state = { kind: 'closed' };
       if (current.kind === 'starting')
         current.abort.abort(new Error('sandbox control client closed'));
@@ -390,16 +463,48 @@ export function createSandboxControlClient(
     },
 
     sendEvent(event: string, payload: unknown, session?: SessionEventIdentity): boolean {
-      if (state.kind !== 'ready') return false;
+      eventSequence += 1;
+      const category =
+        event === 'session.event'
+          ? payload !== null &&
+            typeof payload === 'object' &&
+            'type' in payload &&
+            payload.type === 'session.message.outcome'
+            ? 'outcome'
+            : 'session_event'
+          : event === 'session.preparing'
+            ? 'preparing'
+            : event === 'sandbox.heartbeat'
+              ? 'heartbeat'
+              : event === 'sandbox.ready'
+                ? 'ready'
+                : 'other';
+      const eventDiagnostic = (phase: string, bytes?: number): void =>
+        emitControlDiagnostic(options.onDiagnostic, 'control.event', {
+          phase,
+          category,
+          sequence: eventSequence,
+          kiloSessionId: session?.kiloSessionId,
+          bytes,
+          bufferedBytes: state.kind === 'ready' ? state.socket.bufferedAmount : undefined,
+        });
+      if (state.kind !== 'ready') {
+        eventDiagnostic('skipped');
+        return false;
+      }
       const { socket } = state;
       if (socket.readyState !== 1) {
+        eventDiagnostic('send_failed');
         retireConnection(socket);
         return false;
       }
       try {
-        socket.send(serializeEvent(event, payload, session));
+        const serialized = serializeEvent(event, payload, session);
+        socket.send(serialized);
+        eventDiagnostic('sent', Buffer.byteLength(serialized));
         return true;
       } catch {
+        eventDiagnostic('send_failed');
         retireConnection(socket);
         return false;
       }

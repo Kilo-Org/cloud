@@ -1,5 +1,9 @@
 import path from 'node:path';
 import {
+  emitControlDiagnostic,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
+import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   SESSION_OPERATIONS,
@@ -211,6 +215,7 @@ export type HandlerDeps = {
   emitSessionEvent: (session: SessionRequestIdentity, payload: SessionEventPayload) => void;
   retireRuntime: (reason: string) => void;
   onShutdown?: () => void;
+  onDiagnostic?: ControlDiagnosticReporter;
   emitPreparing?: AttachPreparingEmitter;
   terminalRuntime?: ControlTerminalRuntime;
   applyAttach?: typeof applySessionAttach;
@@ -336,6 +341,17 @@ function startSessionTask(
   deps: HandlerDeps,
   run: (task: OwnedSessionTask) => Promise<ControlHandlerResult>
 ): OwnedSessionTask {
+  const startedAt = Date.now();
+  const diagnostic = (phase: string): void =>
+    emitControlDiagnostic(deps.onDiagnostic, 'session.task', {
+      sessionId: session.sessionId,
+      kiloSessionId: session.kiloSessionId,
+      messageId: identity.messageId,
+      kind: identity.kind,
+      phase,
+      elapsedMs: Date.now() - startedAt,
+    });
+  diagnostic('started');
   const completion = Promise.withResolvers<ControlHandlerResult>();
   const controller = new AbortController();
   const task: OwnedSessionTask = {
@@ -359,6 +375,7 @@ function startSessionTask(
         identity.kind !== 'preparation'
           ? 'Execution exceeded the 60 minute limit'
           : 'Session preparation timed out';
+      diagnostic('deadline_expired');
       controller.abort(new ControlTaskCancellation('failed', reason));
       deps.retireRuntime(reason);
     },
@@ -381,6 +398,7 @@ function startSessionTask(
           delete snapshot.pendingInputs;
         }
       }
+      diagnostic(result.ok ? 'finished' : 'failed');
       completion.resolve(result);
     });
   return task;
@@ -854,6 +872,17 @@ async function executePrompt(
   const { session, signal } = task;
   const { kiloClient, env } = runtime;
   const { messageId, turn, agent } = request;
+  const startedAt = Date.now();
+  const diagnostic = (phase: string, status?: SessionMessageOutcome['status']): void =>
+    emitControlDiagnostic(deps.onDiagnostic, 'session.execution', {
+      sessionId: session.sessionId,
+      kiloSessionId: session.kiloSessionId,
+      messageId,
+      phase,
+      status,
+      elapsedMs: Date.now() - startedAt,
+      aborted: signal.aborted,
+    });
   let outcome: SessionMessageOutcome;
   let result = ok({});
   let failureReason = 'Kilo execution failed';
@@ -891,6 +920,7 @@ async function executePrompt(
         { signal }
       );
       signal.throwIfAborted();
+      diagnostic('prompt_started');
       completion = await withTimeoutAndAbort(
         kiloClient.sendPrompt({
           ...options,
@@ -900,14 +930,18 @@ async function executePrompt(
         }),
         deadline
       );
+      diagnostic('prompt_completed');
     } else if (turn.command === 'compact') {
       if (!agent.model) throw new Error('Model is required for compact');
       failureReason = 'Context condensation failed';
       emitStatus('Condensing context...');
+      diagnostic('compact_started');
       await summarizeOwnedSession(task, kiloClient, { providerID: 'kilo', modelID: agent.model });
+      diagnostic('compact_completed');
       signal.throwIfAborted();
       emitStatus('Context condensed successfully');
     } else {
+      diagnostic('command_started');
       completion = await withTimeoutAndAbort(
         kiloClient.sendCommand({
           ...options,
@@ -919,13 +953,16 @@ async function executePrompt(
         }),
         deadline
       );
+      diagnostic('command_completed');
     }
     signal.throwIfAborted();
     const error = completion?.info.error;
     if (!error && (request.finalization?.autoCommit || request.finalization?.condenseOnComplete)) {
       task.kind = 'finalizing';
+      diagnostic('finalization_started');
       if (request.finalization.autoCommit) {
         failureReason = 'Auto-commit failed';
+        diagnostic('autocommit_started');
         const committed = await (deps.runAutoCommit ?? runAutoCommit)({
           workspacePath: session.directory,
           kiloClient,
@@ -936,6 +973,7 @@ async function executePrompt(
         });
         signal.throwIfAborted();
         if (!committed.success) throw new Error('Auto-commit failed');
+        diagnostic('autocommit_completed');
       }
       if (request.finalization.condenseOnComplete) {
         failureReason = 'Context condensation failed';
@@ -946,7 +984,9 @@ async function executePrompt(
             : undefined;
         if (!model) throw new Error('Model is required for condensation');
         emitStatus('Condensing context...');
+        diagnostic('condense_started');
         await summarizeOwnedSession(task, kiloClient, model, true);
+        diagnostic('condense_completed');
         signal.throwIfAborted();
         emitStatus('Context condensed successfully');
       }
@@ -959,6 +999,7 @@ async function executePrompt(
         }
       : { messageId, status: 'completed' };
   } catch {
+    diagnostic('execution_failed');
     const cancellation: unknown = signal.reason;
     outcome = {
       messageId,
@@ -967,18 +1008,24 @@ async function executePrompt(
         cancellation instanceof ControlTaskCancellation ? cancellation.message : failureReason,
     };
     try {
+      diagnostic('abort_started');
       await abortKiloSession(session, kiloClient);
+      diagnostic('abort_completed');
     } catch (error) {
+      diagnostic('abort_failed');
       deps.retireRuntime('Kilo cancellation failed');
       result = kiloFailure(error);
     }
   }
   try {
+    diagnostic('outcome_sending', outcome.status);
     deps.emitSessionEvent(session, {
       type: 'session.message.outcome',
       properties: sessionMessageOutcomeSchema.parse(outcome),
     });
+    diagnostic('outcome_sent', outcome.status);
   } catch {
+    diagnostic('outcome_failed', outcome.status);
     deps.retireRuntime('Session outcome delivery failed');
     return fail('not_ready', 'Session outcome delivery failed', false);
   }

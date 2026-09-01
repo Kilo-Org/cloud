@@ -47,6 +47,7 @@ import {
   parseBearerCredential,
 } from './sandbox-control/credential.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
+import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 
 const app = new Hono<HonoContext>();
 
@@ -223,6 +224,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
   }
   return null;
 }
+
+registerControlLogRoutes(app, requireInternalApi);
 
 app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);
@@ -659,6 +662,9 @@ app.put(
     const executionId = c.req.param('executionId');
     if (!rawUserId || !filename || !sessionId || !executionId) {
       return c.text('Missing route params', 400);
+    }
+    if (sessionPlaneFromId(sessionId) === 'control') {
+      return c.text('Not found', 404);
     }
 
     let userId: string;

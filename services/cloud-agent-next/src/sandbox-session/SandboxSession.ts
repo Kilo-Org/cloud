@@ -16,7 +16,13 @@ import {
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
-import { withDORetry } from '../utils/do-retry.js';
+import {
+  diagnosticCause,
+  diagnosticEventType,
+  logControlDiagnostic,
+  withControlDORetry as withDORetry,
+  type ControlDiagnosticFields,
+} from '../sandbox-control/diagnostics.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -273,19 +279,30 @@ export class SandboxSession extends DurableObject<Env> {
   private async applySandboxControlEvent(
     input: SandboxControlEventInput & { wrapperInstanceId?: string }
   ): Promise<{ applied: boolean }> {
+    const startedAt = Date.now();
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (!metadata || epoch === null) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          eventType: input.payload.type,
-        })
-        .warn('receiveSandboxControlEvent rejected; session metadata missing');
-      return { applied: false };
-    }
+    const result = (
+      applied: boolean,
+      disposition: string,
+      fields: ControlDiagnosticFields = {}
+    ) => {
+      logControlDiagnostic('session_event_result', {
+        sessionId: this.sessionId,
+        sandboxId: metadata?.workspace?.sandboxId,
+        wrapperInstanceId: input.wrapperInstanceId,
+        eventType: diagnosticEventType(input.payload.type),
+        applied,
+        disposition,
+        durationMs: Date.now() - startedAt,
+        ...fields,
+      });
+      return { applied };
+    };
+    if (!metadata || epoch === null) return result(false, 'session_unavailable');
     const root = metadata.auth.kiloSessionId;
-    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
+    if (input.identity.directory !== this.directory(metadata))
+      return result(false, 'directory_mismatch');
     const payloadKiloSessionId = ingestKiloSessionId(input.payload.type, input.payload.properties);
     const identityKiloSessionId = input.identity.kiloSessionId;
     const eventKiloSessionId = identityKiloSessionId ?? payloadKiloSessionId;
@@ -302,15 +319,7 @@ export class SandboxSession extends DurableObject<Env> {
         identityKiloSessionId !== root &&
         payloadKiloSessionId !== root)
     ) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          eventType: input.payload.type,
-          rootKiloSessionId: input.identity.rootKiloSessionId,
-          expectedRootKiloSessionId: root,
-        })
-        .warn('receiveSandboxControlEvent rejected; kilo session mismatch');
-      return { applied: false };
+      return result(false, 'root_mismatch');
     }
     if (input.payload.type === 'session.created' || input.payload.type === 'session.updated') {
       const info = input.payload.properties.info;
@@ -331,48 +340,66 @@ export class SandboxSession extends DurableObject<Env> {
     const sessionId = this.requireSessionId();
     if (input.payload.type === 'session.message.outcome') {
       const outcome = sessionMessageOutcomeSchema.safeParse(input.payload.properties);
-      if (
-        !outcome.success ||
-        !input.wrapperInstanceId ||
-        (eventKiloSessionId !== undefined && root !== undefined && eventKiloSessionId !== root)
-      ) {
-        return { applied: false };
+      if (!outcome.success) return result(false, 'invalid_outcome');
+      if (!input.wrapperInstanceId) return result(false, 'missing_wrapper_identity');
+      if (eventKiloSessionId !== undefined && root !== undefined && eventKiloSessionId !== root) {
+        return result(false, 'root_mismatch');
       }
       const messages = this.loadMessages();
       const existing = messages.find(message => message.messageId === outcome.data.messageId);
+      const diagnostic = {
+        messageId: existing?.messageId,
+        fromState: existing?.state,
+        outcome: outcome.data.status,
+      };
       if (
         existing?.wrapperInstanceId === input.wrapperInstanceId &&
         existing.state === outcome.data.status
       )
-        return { applied: true };
+        return result(true, 'duplicate', diagnostic);
       const settled = applyMessageOutcome(
         messages,
         outcome.data,
         input.wrapperInstanceId,
         Date.now()
       );
-      if (!settled || !this.saveMessages(settled, epoch)) return { applied: false };
+      if (!settled) {
+        return result(
+          false,
+          !existing
+            ? 'message_missing'
+            : existing.state !== 'queued' && existing.state !== 'accepted'
+              ? 'already_terminal'
+              : existing.wrapperInstanceId !== input.wrapperInstanceId
+                ? 'runtime_mismatch'
+                : 'not_queue_head',
+          diagnostic
+        );
+      }
+      if (!this.saveMessages(settled, epoch, 'wrapper_outcome'))
+        return result(false, 'epoch_changed', diagnostic);
       await this.armQueueRetry();
       const nextId = nextQueuedMessageId(this.loadMessages());
       if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
         this.ctx.waitUntil(this.dispatchQueued(nextId));
       }
-      return { applied: true };
+      return result(true, 'outcome_applied', diagnostic);
     }
-    if (!this.isCurrentEventRuntime(input.wrapperInstanceId)) return { applied: false };
+    if (!this.isCurrentEventRuntime(input.wrapperInstanceId))
+      return result(false, 'runtime_mismatch');
     if (
       eventKiloSessionId !== undefined &&
       eventKiloSessionId !== root &&
       (root === undefined || input.identity.rootKiloSessionId !== root)
     )
-      return { applied: false };
+      return result(false, 'root_mismatch');
     if (
       (input.payload.type === 'question.asked' || input.payload.type === 'permission.asked') &&
       !this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'
       )
     )
-      return { applied: false };
+      return result(false, 'no_pending_work');
     this.recordPendingInteraction(input.payload);
     persistSandboxControlSessionEvent({
       sessionId,
@@ -394,7 +421,7 @@ export class SandboxSession extends DurableObject<Env> {
         } catch {
           internalSecret = undefined;
         }
-        if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
+        if (!this.terminalLifecycle.isCurrent(epoch)) return result(false, 'epoch_changed');
         if (!internalSecret) {
           logger
             .withFields({
@@ -428,7 +455,8 @@ export class SandboxSession extends DurableObject<Env> {
         this.ctx.waitUntil(publication);
       }
     }
-    return { applied: this.terminalLifecycle.isCurrent(epoch) };
+    const applied = this.terminalLifecycle.isCurrent(epoch);
+    return result(applied, applied ? 'applied' : 'epoch_changed');
   }
 
   async receiveSandboxControlPreparing(input: {
@@ -438,15 +466,26 @@ export class SandboxSession extends DurableObject<Env> {
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (!metadata || epoch === null) return { applied: false };
+    const result = (applied: boolean, disposition: string) => {
+      logControlDiagnostic('session_preparing_result', {
+        sessionId: this.sessionId,
+        sandboxId: metadata?.workspace?.sandboxId,
+        wrapperInstanceId: input.wrapperInstanceId,
+        applied,
+        disposition,
+      });
+      return { applied };
+    };
+    if (!metadata || epoch === null) return result(false, 'session_unavailable');
     const root = metadata.auth.kiloSessionId;
-    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
+    if (input.identity.directory !== this.directory(metadata))
+      return result(false, 'directory_mismatch');
     if (
       input.identity.rootKiloSessionId !== undefined &&
       root !== undefined &&
       input.identity.rootKiloSessionId !== root
     ) {
-      return { applied: false };
+      return result(false, 'root_mismatch');
     }
     const message = this.loadMessages().find(
       item => item.messageId === input.payload.triggerMessageId
@@ -458,9 +497,18 @@ export class SandboxSession extends DurableObject<Env> {
       (input.wrapperInstanceId !== undefined &&
         message.wrapperInstanceId !== input.wrapperInstanceId)
     ) {
-      return { applied: false };
+      return result(
+        false,
+        !this.terminalLifecycle.isCurrent(epoch)
+          ? 'epoch_changed'
+          : !message
+            ? 'message_missing'
+            : message.preparationAttemptId !== input.payload.attemptId
+              ? 'attempt_mismatch'
+              : 'runtime_mismatch'
+      );
     }
-    if (message.state !== 'queued') return { applied: true };
+    if (message.state !== 'queued') return result(true, 'already_settled');
     const sessionId = this.requireSessionId();
     applyControlPlanePreparingEvent({
       sessionId,
@@ -468,7 +516,7 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       broadcast: event => this.broadcastStoredEvent(event),
     });
-    return { applied: true };
+    return result(true, 'processed');
   }
 
   async closeOrgStreams(organizationId: string): Promise<number> {
@@ -2046,7 +2094,11 @@ export class SandboxSession extends DurableObject<Env> {
     return this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
   }
 
-  private saveMessages(messages: MessageRecord[], epoch?: number): boolean {
+  private saveMessages(
+    messages: MessageRecord[],
+    epoch?: number,
+    source: 'coordinator' | 'wrapper_outcome' = 'coordinator'
+  ): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
     if (
       this.deletedWorktreeId ||
@@ -2055,6 +2107,7 @@ export class SandboxSession extends DurableObject<Env> {
     )
       return false;
     const events: StoredEvent[] = [];
+    const committed: ControlDiagnosticFields[] = [];
     this.ctx.storage.transactionSync(() => {
       const before = this.loadMessages();
       const previousById = new Map(before.map(message => [message.messageId, message]));
@@ -2069,6 +2122,13 @@ export class SandboxSession extends DurableObject<Env> {
           if (previous?.state !== 'accepted') {
             const event = this.persistMessageLifecycleEvent(message);
             if (event) events.push(event);
+            committed.push({
+              messageId: message.messageId,
+              wrapperInstanceId: message.wrapperInstanceId,
+              fromState: previous?.state,
+              toState: message.state,
+              lifecycleEventInserted: event !== undefined,
+            });
           }
           return message;
         }
@@ -2083,6 +2143,15 @@ export class SandboxSession extends DurableObject<Env> {
         }
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
+        committed.push({
+          messageId: terminal.messageId,
+          wrapperInstanceId: terminal.wrapperInstanceId,
+          fromState: previous?.state,
+          toState: terminal.state,
+          terminalAt: terminal.terminalAt,
+          lifecycleEventInserted: event !== undefined,
+          cause: terminal.failedReason ? diagnosticCause(terminal.failedReason) : undefined,
+        });
         if (terminal.preparationAttemptId) {
           events.push(
             ...finalizePreparationAttempt(
@@ -2105,6 +2174,13 @@ export class SandboxSession extends DurableObject<Env> {
       });
       this.ctx.storage.kv.put(MESSAGES_KEY, next);
     });
+    for (const fields of committed) {
+      logControlDiagnostic('session_message_committed', {
+        sessionId: this.sessionId,
+        source,
+        ...fields,
+      });
+    }
     for (const event of events) this.broadcastStoredEvent(event);
     return true;
   }

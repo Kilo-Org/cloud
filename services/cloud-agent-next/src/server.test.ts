@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
+import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 
 const {
   getRunningTerminalClientMock,
@@ -1046,6 +1047,20 @@ describe('server wrapper ingest route', () => {
 });
 
 describe('server wrapper log upload route', () => {
+  it('does not accept legacy raw archives for control-plane sessions', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/workspace_test/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+        body: 'raw archive',
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
   function createLogEnv() {
     const env = createEnv();
     return Object.assign(env, {
@@ -1486,6 +1501,57 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+});
+
+describe('server control log routes', () => {
+  it('accepts a log-only grant without touching sandbox liveness', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn().mockResolvedValue(null) } });
+    const identity = {
+      sandboxId: 'sandbox_test',
+      allocationId: 'allocation_test',
+      wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+    };
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/sandbox-logs/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/5886f962-cc33-43f7-bd94-a31c0ed6c13b`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            version: 1,
+            sequence: 0,
+            droppedRecords: 0,
+            records: [
+              { timestamp: 100, event: 'wrapper.lifecycle', fields: { phase: 'starting' } },
+            ],
+          }),
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('protects durable retrieval with the internal API secret', async () => {
+    const env = Object.assign(createEnv(), {
+      R2_BUCKET: { list: vi.fn().mockResolvedValue({ objects: [], truncated: false }) },
+    });
+    const url = 'http://worker.test/internal/sandbox-logs/sandbox_test';
+    expect((await fetchWorker(new Request(url), env)).status).toBe(401);
+    expect(env.R2_BUCKET.list).not.toHaveBeenCalled();
+    const response = await fetchWorker(
+      new Request(url, { headers: { 'x-internal-api-key': 'test-internal-secret' } }),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
   });
 });
 

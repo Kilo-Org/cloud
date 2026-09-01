@@ -165,6 +165,31 @@ Wrangler will show the `PUT` requests. The uploaded archive contains:
 
 The internal `getWrapperLogs` path also discovers these sandbox-side files directly by scanning `/tmp/kilocode-wrapper-*.log` and the Kilo CLI log directory.
 
+## Control-plane Diagnostics
+
+Control-plane (`workspace_*`) sessions use verbose structured wrapper diagnostics, not the legacy raw wrapper/Kilo tarball. Records include heartbeat attempts, feed freshness, control socket and request outcomes, event-send metadata, task phases, and retirement causes. They exclude prompts, assistant/tool content, raw errors, credentials, and URLs.
+
+The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. Shutdown attempts a final flush within the existing shutdown deadline. R2 keys are:
+
+```text
+logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
+```
+
+`sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
+
+Internal API authentication is required to list or download these archives:
+
+```text
+GET /internal/sandbox-logs/<sandboxId>?cursor=<optional-cursor>
+GET /internal/sandbox-logs/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>
+```
+
+Listing returns at most 100 objects and a continuation cursor. Download paths omit the `.json` suffix. These reads use R2 only and work after the container disappears. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these JSON archives.
+
+Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
+
+Uploads are best effort: an abrupt kill or network failure can lose unuploaded records. The buffer holds 512 records and each batch holds up to 128 records or 256 KiB. A recorded WebSocket send is a local handoff, not proof that a session DO applied the event; correlate it with the Worker forwarding and durable message-transition logs.
+
 ## Interpreting Common States
 
 - Worker queueing succeeds, but no wrapper logs appear:

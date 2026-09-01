@@ -1,8 +1,13 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signKiloToken } from '@kilocode/worker-utils';
-import { authMiddleware } from '../auth';
-import type { AuthContext } from '../auth';
+import {
+  EVENT_SERVICE_AUDIENCE,
+  KILO_CHAT_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  NOTIFICATIONS_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import { authMiddleware, type AuthContext } from '../auth';
 
 type MockEnv = {
   NEXTAUTH_SECRET: { get: () => Promise<string> };
@@ -11,31 +16,27 @@ type MockEnv = {
 };
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
-const currentPepperByUserId = vi.hoisted(() => new Map<string, string | null>());
+const dbState = vi.hoisted(() => ({ lookupCount: 0, fails: false }));
+const userRow = vi.hoisted(() => ({
+  pepper: 'pepper-current' as string | null,
+  blockedReason: null as string | null,
+}));
 
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [
-            {
-              api_token_pepper: currentPepperByUserId.get('user-xyz-789'),
-              blocked_reason: null,
-            },
-          ],
+          limit: async () => {
+            dbState.lookupCount++;
+            if (dbState.fails) throw new Error('connection refused');
+            return [{ api_token_pepper: userRow.pepper, blocked_reason: userRow.blockedReason }];
+          },
         }),
       }),
     }),
   }),
 }));
-
-function makeApp(_env: MockEnv) {
-  const app = new Hono<{ Bindings: MockEnv; Variables: AuthContext }>();
-  app.use('*', authMiddleware);
-  app.get('/test', c => c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') }));
-  return app;
-}
 
 const defaultEnv: MockEnv = {
   NEXTAUTH_SECRET: { get: async () => TEST_JWT_SECRET },
@@ -43,132 +44,175 @@ const defaultEnv: MockEnv = {
   WORKER_ENV: 'production',
 };
 
+function makeApp() {
+  let downstreamCalls = 0;
+  const app = new Hono<{ Bindings: MockEnv; Variables: AuthContext }>();
+  app.use('*', authMiddleware);
+  app.get('/test', c => {
+    downstreamCalls++;
+    return c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') });
+  });
+  return { app, downstreamCalls: () => downstreamCalls };
+}
+
+async function signToken(
+  params: {
+    audience?: string;
+    pepper?: string | null;
+    env?: string;
+    extra?: { tokenSource?: string; botId?: string; deviceSessionId?: string };
+  } = {}
+) {
+  return (
+    await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper' in params ? params.pepper : 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'env' in params ? params.env : 'production',
+      audience: params.audience,
+      extra: params.extra ?? { tokenSource: 'kilo-chat' },
+    })
+  ).token;
+}
+
+async function signWithAudience(aud: unknown): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const encode = (bytes: Uint8Array) =>
+    btoa(String.fromCharCode(...bytes))
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+  const json = (value: unknown) => encode(new TextEncoder().encode(JSON.stringify(value)));
+  const input = `${json({ alg: 'HS256', typ: 'JWT' })}.${json({
+    version: 3,
+    kiloUserId: 'user-xyz-789',
+    apiTokenPepper: 'pepper-current',
+    env: 'production',
+    aud,
+    iat: now,
+    exp: now + 3600,
+  })}`;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(TEST_JWT_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(input));
+  return `${input}.${encode(new Uint8Array(signature))}`;
+}
+
+async function request(token: string, env = defaultEnv) {
+  const testApp = makeApp();
+  const response = await testApp.app.request(
+    '/test',
+    { headers: { authorization: `Bearer ${token}` } },
+    env
+  );
+  return { response, ...testApp };
+}
+
 describe('authMiddleware', () => {
   beforeEach(() => {
-    currentPepperByUserId.set('user-xyz-789', 'pepper-current');
+    dbState.lookupCount = 0;
+    dbState.fails = false;
+    userRow.pepper = 'pepper-current';
+    userRow.blockedReason = null;
   });
 
   it('returns 401 with no authorization header', async () => {
-    const res = await makeApp(defaultEnv).request('/test', {}, defaultEnv);
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    const testApp = makeApp();
+    const response = await testApp.app.request('/test', {}, defaultEnv);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
   });
 
-  it('authenticates with a valid JWT and sets user identity', async () => {
+  it.each([
+    ['a matching string audience', () => signToken({ audience: NOTIFICATIONS_AUDIENCE })],
+    [
+      'a matching array audience',
+      () => signWithAudience([NOTIFICATIONS_AUDIENCE, 'other-service']),
+    ],
+    [
+      'a one-hour legacy kilo-chat token with bot and device-session claims',
+      () =>
+        signToken({
+          extra: {
+            tokenSource: 'kilo-chat',
+            botId: 'bot-123',
+            deviceSessionId: 'device-123',
+          },
+        }),
+    ],
+  ])('authenticates %s', async (_name, createToken) => {
+    const { response } = await request(await createToken());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ callerId: 'user-xyz-789', callerKind: 'user' });
+  });
+
+  it.each([
+    ['another batch', KILO_CHAT_AUDIENCE],
+    ['the gateway', KILO_GATEWAY_AUDIENCE],
+    ['another service', EVENT_SERVICE_AUDIENCE],
+  ])('rejects an audience for %s before database access', async (_name, audience) => {
+    const { response, downstreamCalls } = await request(await signToken({ audience }));
+    expect(response.status).toBe(401);
+    expect(dbState.lookupCount).toBe(0);
+    expect(downstreamCalls()).toBe(0);
+  });
+
+  it.each([null, '', ['notifications', 'notifications'], ['notifications', 1], []])(
+    'rejects malformed audience claims before database access',
+    async audience => {
+      const { response, downstreamCalls } = await request(await signWithAudience(audience));
+      expect(response.status).toBe(401);
+      expect(dbState.lookupCount).toBe(0);
+      expect(downstreamCalls()).toBe(0);
+    }
+  );
+
+  it.each([
+    ['a stale string pepper', 'pepper-stale', 'pepper-current', 401],
+    ['a null claim against a non-null pepper', null, 'pepper-current', 401],
+    ['a null claim against a null pepper', null, null, 200],
+  ])('preserves pepper semantics for %s', async (_name, pepper, currentPepper, status) => {
+    userRow.pepper = currentPepper;
+    const { response } = await request(
+      await signToken({ audience: NOTIFICATIONS_AUDIENCE, pepper })
+    );
+    expect(response.status).toBe(status);
+  });
+
+  it('preserves absent pepper claim semantics', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
-      pepper: 'pepper-current',
       secret: TEST_JWT_SECRET,
       expiresInSeconds: 3600,
       env: 'production',
-      extra: { tokenSource: 'kilo-chat' },
+      audience: NOTIFICATIONS_AUDIENCE,
     });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
-    );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      callerId: 'user-xyz-789',
-      callerKind: 'user',
-    });
+    const { response } = await request(token);
+    expect(response.status).toBe(200);
   });
 
-  it('authenticates a valid JWT from another token source', async () => {
-    const { token } = await signKiloToken({
-      userId: 'user-xyz-789',
-      pepper: 'pepper-current',
-      secret: TEST_JWT_SECRET,
-      expiresInSeconds: 3600,
-      env: 'production',
-      extra: { tokenSource: 'cloud-agent' },
-    });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
+  it.each([
+    ['a blocked account', () => (userRow.blockedReason = 'manual block'), defaultEnv, 'production'],
+    ['a missing env claim', () => undefined, defaultEnv, undefined],
+    ['a mismatched environment', () => undefined, defaultEnv, 'development'],
+  ])('returns 401 for %s', async (_name, arrange, env, tokenEnv) => {
+    arrange();
+    const { response } = await request(
+      await signToken({ audience: NOTIFICATIONS_AUDIENCE, env: tokenEnv }),
+      env
     );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      callerId: 'user-xyz-789',
-      callerKind: 'user',
-    });
+    expect(response.status).toBe(401);
   });
 
-  it('returns 401 when the chat JWT has a stale pepper', async () => {
-    const { token } = await signKiloToken({
-      userId: 'user-xyz-789',
-      pepper: 'pepper-stale',
-      secret: TEST_JWT_SECRET,
-      expiresInSeconds: 3600,
-      env: 'production',
-      extra: { tokenSource: 'kilo-chat' },
-    });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 401 when the chat JWT was minted for a different environment', async () => {
-    const { token } = await signKiloToken({
-      userId: 'user-xyz-789',
-      pepper: 'pepper-current',
-      secret: TEST_JWT_SECRET,
-      expiresInSeconds: 3600,
-      env: 'development',
-      extra: { tokenSource: 'kilo-chat' },
-    });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 401 with an expired JWT', async () => {
-    const { token } = await signKiloToken({
-      userId: 'user-xyz-789',
-      pepper: null,
-      secret: TEST_JWT_SECRET,
-      expiresInSeconds: -1,
-      env: 'production',
-      extra: { tokenSource: 'kilo-chat' },
-    });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 for an arbitrary non-JWT bearer', async () => {
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: 'Bearer not-a-jwt' } },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 401 when the JWT is signed with a different secret', async () => {
-    const { token } = await signKiloToken({
-      userId: 'user-xyz-789',
-      pepper: null,
-      secret: 'a-completely-different-secret-of-correct-length',
-      expiresInSeconds: 3600,
-    });
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      { headers: { authorization: `Bearer ${token}` } },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
+  it('maps dependency failures to 401', async () => {
+    dbState.fails = true;
+    const { response } = await request(await signToken({ audience: NOTIFICATIONS_AUDIENCE }));
+    expect(response.status).toBe(401);
   });
 });

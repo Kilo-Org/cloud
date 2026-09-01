@@ -1,5 +1,6 @@
 import { SignJWT } from 'jose';
-import { verifyKiloToken } from '@kilocode/worker-utils';
+import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
 
 export type ValidateResult =
@@ -17,9 +18,12 @@ export async function validateKiloToken(
   secret: string,
   expectedEnv: string | undefined
 ): Promise<ValidateResult> {
-  let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
+  let payload: Awaited<ReturnType<typeof verifyKiloTokenForResource>>;
   try {
-    payload = await verifyKiloToken(token, secret);
+    payload = await verifyKiloTokenForResource(token, secret, {
+      audience: KILOCLAW_AUDIENCE,
+      mode: 'allow-legacy',
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'JWT verification failed';
     return { success: false, error: message };

@@ -5,16 +5,22 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+
+import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import {
+  getActiveSessionsQueryMetadata,
+  subscribeActiveSessionsQueryMetadata,
+} from '@/lib/query-client';
 
 import { createOperationCoordinator } from '@/components/agents/use-history-backfill';
 import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
 import {
-  buildActiveSessionsTrayInput,
   filterActiveSessionsByOrganization,
   selectActiveExclusionIds,
 } from '@/lib/active-sessions-live';
-import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
@@ -33,7 +39,6 @@ import {
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
-import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -43,7 +48,7 @@ export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'
 
 export type ActiveSession = RouterOutputs['activeSessions']['list']['sessions'][number];
 
-type UseAgentSessionsOptions = {
+export type UseAgentSessionsOptions = {
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
   organizationId?: string | null;
@@ -130,27 +135,6 @@ function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
   return useInfiniteQuery(buildStoredSessionsQueryOptions(trpc, options));
-}
-
-function useActiveSessions(options?: UseAgentSessionsOptions) {
-  const trpc = useTRPC();
-  // Cloud rows have no WS channel — discovery from other devices and departure
-  // on session stop need a floor poll even while connected. WS writes remain
-  // the instant path for CLI rows; the poll uses the same wholesale-replace
-  // semantics as the existing enrichment refresh. When the socket is down,
-  // poll every 10s so a transient outage still updates the tray.
-  const wsConnected = useUserWebConnectionState();
-  const input = useMemo(
-    () => buildActiveSessionsTrayInput(options?.organizationId),
-    [options?.organizationId]
-  );
-  return useQuery(
-    trpc.activeSessions.list.queryOptions(input, {
-      refetchInterval: wsConnected ? 30_000 : 10_000,
-      staleTime: 5000,
-      enabled: options?.enabled,
-    })
-  );
 }
 
 export function useRecentAgentRepositories(options?: UseRecentAgentRepositoriesOptions) {
@@ -282,11 +266,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     () =>
       sortActiveSessionsByCreatedAt(
         filterActiveSessionsByOrganization(
-          active.data?.sessions ?? [],
+          active.canRead ? (active.data?.sessions ?? []) : [],
           options?.organizationId ?? null
         )
       ),
-    [active.data, options?.organizationId]
+    [active.canRead, active.data, options?.organizationId]
   );
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
@@ -301,8 +285,8 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // Compatibility: the old Agents combined list used it for exclusion; remove
   // when no caller remains.
   const activeExclusionIds = useMemo(
-    () => selectActiveExclusionIds(active.data?.sessions ?? []),
-    [active.data]
+    () => selectActiveExclusionIds(active.canRead ? (active.data?.sessions ?? []) : []),
+    [active.canRead, active.data]
   );
 
   const dateGroups = useMemo(
@@ -323,15 +307,16 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // transition (first poll) is ignored, and the initial mount with a non-empty
   // set is ignored (no "before" to compare against). The render hold above
   // keeps the last rows visible while this reset refetches page one.
-  const previousActiveIdsRef = useRef<Set<string> | null>(null);
+  const previousActiveIdsRef = useRef<{ ids: Set<string>; epoch: number } | null>(null);
   useEffect(() => {
+    const epoch = currentAuthEpoch();
     const previous = previousActiveIdsRef.current;
-    previousActiveIdsRef.current = activeSessionIds;
-    if (!previous) {
+    previousActiveIdsRef.current = { ids: activeSessionIds, epoch };
+    if (!active.canRead || !previous || previous.epoch !== epoch) {
       return;
     }
     let departedId: string | undefined = undefined;
-    for (const id of previous) {
+    for (const id of previous.ids) {
       if (!activeSessionIds.has(id)) {
         departedId = id;
         break;
@@ -339,10 +324,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     }
     if (departedId) {
       scheduleCacheMaintenance(() => {
-        reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+        if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+          reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+        }
       });
     }
-  }, [activeSessionIds, queryClient, trpc]);
+  }, [active.canRead, activeSessionIds, queryClient, trpc]);
 
   return {
     storedSessions: renderedStoredSessions,
@@ -375,19 +362,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage,
     refetch: async () => {
-      await Promise.all([
-        storedRefetch(),
-        (async () => {
-          // The live-sync owner writes and cancels this same query key, so a
-          // plain refetch alone can be swallowed by it. Drive the owner when
-          // one is attached — it is keyed to the same organization context
-          // this hook is given — and fall back to the plain refetch otherwise.
-          if (await refreshActiveSessionsNow()) {
-            return;
-          }
-          await active.refetch();
-        })(),
-      ]);
+      await Promise.all([storedRefetch(), active.refetch()]);
     },
   };
 }
@@ -395,52 +370,41 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
 /**
  * Live-only Agents tab variant. Reads the same `activeSessions.list` query as
  * `useAgentSessions` but never mounts the stored/history infinite query, so the
- * tab does not wait on stored pages. Reuses the private `useActiveSessions`.
+ * tab does not wait on stored pages. Reuses the shared active query.
  */
 export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
-  const trpc = useTRPC();
   const active = useActiveSessions(options);
   const queryClient = useQueryClient();
-
-  const input = useMemo(
-    () => buildActiveSessionsTrayInput(options?.organizationId),
-    [options?.organizationId]
+  const query = active.canRead
+    ? queryClient.getQueryCache().find({ queryKey: active.queryKey, exact: true })
+    : undefined;
+  const subscribe = useCallback(
+    (listener: () => void) => subscribeActiveSessionsQueryMetadata(query, listener),
+    [query]
   );
-  const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
-
+  const getSnapshot = useCallback(() => getActiveSessionsQueryMetadata(query), [query]);
+  const metadata = useSyncExternalStore(subscribe, getSnapshot);
   const activeSessions = useMemo(
     () =>
       sortActiveSessionsByCreatedAt(
         filterActiveSessionsByOrganization(
-          active.data?.sessions ?? [],
+          active.canRead ? (active.data?.sessions ?? []) : [],
           options?.organizationId ?? null
         )
       ),
-    [active.data, options?.organizationId]
+    [active.canRead, active.data, options?.organizationId]
   );
 
   return {
     activeSessions,
-    // Compatibility: the old combined `stored.isLoading || active.isLoading`
-    // remains on `useAgentSessions` for Home and Share; the live tab must not
-    // use it — it reads only the active poll. Remove the split only when no
-    // caller needs stored and active loading apart.
+    // Preserve the old flags; presentation must use provenance, not isLoading,
+    // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,
     isError: active.isError,
-    refetch: async (): Promise<boolean> => {
-      // The live-sync owner writes and cancels this same query key, so a plain
-      // refetch alone can be swallowed by it. Drive the owner when one is
-      // attached — it is keyed to the same organization context this hook is
-      // given — and fall back to the plain refetch otherwise.
-      if (await refreshActiveSessionsNow()) {
-        // The owner drove the refresh and swallows its own failures; read the
-        // settled query state to report success to the caller. Match by the
-        // exact owner query key (`getQueryState` is exact by default), not by
-        // a loose prefix.
-        return queryClient.getQueryState(queryKey)?.status !== 'error';
-      }
-      const result = await active.refetch();
-      return !result.isError;
-    },
+    hasAcceptedSuccess: metadata.acceptedRevision > 0,
+    terminalError: metadata.terminalError,
+    isFetching: active.canRead && active.isFetching,
+    isPaused: active.canRead && active.isPaused,
+    refetch: active.refetch,
   };
 }

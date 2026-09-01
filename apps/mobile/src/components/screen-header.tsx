@@ -67,6 +67,7 @@ export function ScreenHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
+  const hasRightContext = contextPosition === 'right' && Boolean(context);
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
@@ -84,7 +85,7 @@ export function ScreenHeader({
   if (title != null) {
     const titleText = (
       <Text
-        className={cn(titleClass, centerTitle && 'text-center')}
+        className={cn(titleClass, centerTitle && 'text-center', hasRightContext && 'shrink-0')}
         numberOfLines={titleNumberOfLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
@@ -114,7 +115,7 @@ export function ScreenHeader({
   }
 
   const heading = (
-    <View className="min-w-0 flex-1">
+    <View className={cn('min-w-0', hasRightContext && !centerTitle ? 'flex-none' : 'flex-1')}>
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
           className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
@@ -135,7 +136,12 @@ export function ScreenHeader({
     <View className={cn('bg-background px-4 pb-3', className)} style={{ paddingTop }}>
       {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
       <View className="flex-row items-center">
-        <View className="min-w-0 flex-1 flex-row items-center gap-1">
+        <View
+          className={cn(
+            'min-w-0 flex-row items-center gap-1',
+            hasRightContext ? 'flex-none' : 'flex-1'
+          )}
+        >
           {canGoBack && (
             <Pressable
               onPress={() => {
@@ -162,9 +168,7 @@ export function ScreenHeader({
           )}
           {!separateHeading && heading}
         </View>
-        {contextPosition === 'right' && context ? (
-          <View className="ms-3 min-w-0 w-2/5 items-end">{context}</View>
-        ) : null}
+        {hasRightContext ? <View className="ms-6 min-w-0 flex-1 items-end">{context}</View> : null}
         {headerRight ? (
           <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
             {headerRight}

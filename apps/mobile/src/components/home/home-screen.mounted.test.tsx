@@ -250,11 +250,20 @@ describe('HomeScreen composition', () => {
     state.boundary.org = state.boundary.orgs[0];
     await renderHome();
     const control = action('Home organization');
-    expect(control.parent?.parent?.parent?.props.className).toContain('w-2/5');
-    expect(control.parent?.parent?.parent?.props.className).toContain('items-end');
-    expect(nodes('Text').filter(node => node.children.includes('Home organization'))).toHaveLength(
-      1
-    );
+    const contextSlot = control.parent?.parent?.parent;
+    expect(contextSlot?.props.className).toContain('flex-1');
+    expect(contextSlot?.props.className).toContain('min-w-0');
+    expect(contextSlot?.props.className).toContain('ms-6');
+    expect(contextSlot?.props.className).toContain('items-end');
+    expect(contextSlot?.props.className).not.toContain('w-2/5');
+    const title = nodes('Text').find(node => node.props.accessibilityRole === 'header');
+    expect(title?.props.className).toContain('shrink-0');
+    expect(title?.parent?.props.className).toContain('flex-none');
+    expect(title?.parent?.parent?.props.className).toContain('flex-none');
+    const labels = nodes('Text').filter(node => node.children.includes('Home organization'));
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props.className).toContain('leading-[normal]');
+    expect(control.props.className).toContain('items-center');
     const loading = nodes('Text').find(node => node.children.includes('Loading…'));
     expect(loading?.props.className).toContain('absolute');
   });

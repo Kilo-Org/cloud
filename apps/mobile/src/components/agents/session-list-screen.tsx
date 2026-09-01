@@ -253,7 +253,7 @@ export function AgentSessionListScreen() {
         reserveEyebrow
         size="large"
         showBackButton={false}
-        className="px-[22px] pb-0"
+        className="px-[22px] pb-0.5"
         headerRight={headerRight}
       />
       <View className="px-[22px]">

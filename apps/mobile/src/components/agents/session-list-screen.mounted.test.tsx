@@ -432,7 +432,7 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(scroll.parent?.parent).toBe(header().parent);
     expect(header().parent?.children[0]).toBe(header());
-    expect(header().props.className).toBe('px-[22px] pb-0');
+    expect(header().props.className).toBe('px-[22px] pb-0.5');
     expect(scroll.findAll(node => node === contextControl())).toHaveLength(0);
     expect(scroll.props.className).toBe('flex-1');
     expect(scroll.props.contentContainerClassName).toBe('grow justify-center py-4');
@@ -791,7 +791,7 @@ describe('AgentSessionListScreen context control', () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
     expect(header().props.context).toBeUndefined();
-    expect(header().props.className).toContain('pb-0');
+    expect(header().props.className).toContain('pb-0.5');
     expect(contextControl().parent?.parent?.parent?.props.className).toContain('items-end');
     expect(nodes('Text').filter(node => node.children.includes('Personal'))).toHaveLength(1);
     expect(nodes('SessionListSearchHeader')).toHaveLength(1);

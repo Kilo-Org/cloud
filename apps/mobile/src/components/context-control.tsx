@@ -114,7 +114,7 @@ export function ContextControl({
     <Skeleton className="h-5 w-36 max-w-full shrink rounded" />
   ) : (
     <Text
-      className="min-w-0 shrink text-sm text-muted-foreground"
+      className="min-w-0 shrink text-sm leading-[normal] text-muted-foreground"
       numberOfLines={1}
       ellipsizeMode="tail"
     >

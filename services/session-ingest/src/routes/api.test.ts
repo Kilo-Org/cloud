@@ -2262,6 +2262,16 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       }));
       vi.mocked(getUserConnectionDO).mockReturnValue({
@@ -2280,8 +2290,32 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       });
+    });
+
+    it('keeps a failed instance lookup distinct from an empty list', async () => {
+      vi.mocked(getUserConnectionDO).mockReturnValue({
+        getConnectedInstances: vi.fn(async () => {
+          throw new Error('instance lookup failed');
+        }),
+      } as never);
+      const res = await makeApiApp().fetch(
+        new Request('http://local/instances/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(500);
+      expect(await res.text()).toBe('Internal Server Error');
     });
 
     it('returns 200 with an empty `instances` array when no CLIs are connected', async () => {

@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -82,6 +83,7 @@ import {
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  controlErrorCodes,
   sessionAttachResultSchema,
   sessionMessageOutcomeSchema,
   sessionPromptResultSchema,
@@ -652,6 +654,21 @@ export class SandboxSession extends DurableObject<Env> {
       return { success: true };
     } catch {
       if (!this.isCurrentAcceptedMessage(accepted, epoch)) return { success: true };
+      logControlDiagnostic(
+        'session_interrupt_failed',
+        {
+          sessionId: this.sessionId,
+          messageId: accepted.messageId,
+          expectedWrapperInstanceId: accepted.wrapperInstanceId,
+          sandboxId,
+          kiloSessionId,
+          worktreeId: metadata?.workspace?.worktreeId,
+          epoch,
+          operation: 'session.abort',
+          cause: 'runtime_unhealthy',
+        },
+        'warn'
+      );
       await this.failDelivery(accepted.messageId, 'runtime_unhealthy', accepted.wrapperInstanceId);
       return { success: false, message: 'The session runtime could not be interrupted' };
     }
@@ -1107,24 +1124,61 @@ export class SandboxSession extends DurableObject<Env> {
         decision.action === 'rearm' ? decision.at : now + DEADLINE_MS.acceptedAlarmCap
       );
       if (decision.action === 'check') {
+        const startedAt = Date.now();
+        const diagnostic: ControlDiagnosticFields = {
+          sessionId: this.sessionId,
+          messageId: accepted.messageId,
+          expectedWrapperInstanceId: accepted.wrapperInstanceId,
+          epoch,
+          acceptedAt: accepted.acceptedAt,
+          lastActivityAt: accepted.lastActivityAt,
+          stage: 'sync',
+        };
+        const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy') =>
+          logControlDiagnostic(
+            'accepted_reconciliation',
+            { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
+            result === 'runtime_unhealthy' ? 'warn' : 'info'
+          );
+        logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
         try {
-          const snapshot = await this.syncAcceptedMessage(accepted, epoch);
-          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) return;
+          const snapshot = await this.syncAcceptedMessage(accepted, epoch, 'accepted_alarm');
+          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) {
+            diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
+            report('superseded');
+            return;
+          }
+          diagnostic.stage = 'activity_check';
+          diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
+          diagnostic.questionCount = snapshot.questions.length;
+          diagnostic.permissionCount = snapshot.permissions.length;
           const healthy =
             snapshot.status.type === 'busy' ||
             snapshot.status.type === 'retry' ||
             snapshot.questions.length > 0 ||
             snapshot.permissions.length > 0;
-          if (!healthy) throw new Error('Accepted execution is no longer active');
+          diagnostic.healthy = healthy;
+          if (!healthy) {
+            diagnostic.reason = 'inactive_snapshot';
+            throw new Error('Accepted execution is no longer active');
+          }
+          diagnostic.stage = 'record_activity';
           const active = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
-          if (active) this.saveMessages(active, epoch);
+          diagnostic.activityRecorded = active ? this.saveMessages(active, epoch) : false;
+          report('healthy');
         } catch {
           if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+            diagnostic.reason ??=
+              diagnostic.stage === 'record_activity' ? 'activity_record_failed' : 'sync_failed';
+            report('runtime_unhealthy');
             await this.failDelivery(
               accepted.messageId,
               'runtime_unhealthy',
               accepted.wrapperInstanceId
             );
+          } else {
+            diagnostic.reason = 'accepted_message_changed';
+            report('superseded');
           }
         }
       }
@@ -1849,92 +1903,220 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async syncAcceptedMessage(
     message: MessageRecord,
-    epoch: number
+    epoch: number,
+    trigger: 'accepted_alarm' | 'pending_interactions'
   ): Promise<SessionSyncResult | undefined> {
-    const metadata = this.terminalLifecycle.getStoredMetadata();
-    const sandboxId = metadata?.workspace?.sandboxId;
-    const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (
-      !metadata ||
-      !sandboxId ||
-      !kiloSessionId ||
-      !message.wrapperInstanceId ||
-      this.pendingRuntimeCleanup()
-    ) {
-      throw new Error('Accepted runtime is unavailable');
-    }
-    const control = sandboxControlRpc(this.env, sandboxId);
-    const status = await withTimeout(
-      control.getStatus(),
-      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-      'Runtime status timed out'
-    );
-    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
-    if (
-      status.connection !== 'ready' ||
-      status.physical !== 'running' ||
-      status.wrapperInstanceId !== message.wrapperInstanceId
-    ) {
-      throw new Error('Accepted runtime is not ready');
-    }
-    const revision = this.readPendingInteractions()?.revision;
-    const response = await withTimeout(
-      control.request({
-        operation: 'session.sync',
-        expectedWrapperInstanceId: message.wrapperInstanceId,
-        session: {
-          sessionId: metadata.identity.sessionId,
-          kiloSessionId,
-          directory: this.directory(metadata),
-        },
-        payload: {},
-      }),
-      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-      'Session sync timed out'
-    );
-    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
-    if (!response.ok) throw new Error('Session sync failed');
-    const parsed = sessionSyncResultSchema.parse(response.result);
-    const belongsToRoot = (request: unknown): boolean => {
-      if (
-        typeof request !== 'object' ||
-        request === null ||
-        Array.isArray(request) ||
-        !('id' in request) ||
-        typeof request.id !== 'string' ||
-        request.id.length === 0 ||
-        !('sessionID' in request) ||
-        typeof request.sessionID !== 'string' ||
-        request.sessionID.length === 0
-      )
-        return false;
-      const root = 'rootKiloSessionId' in request ? request.rootKiloSessionId : undefined;
-      return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
+    const startedAt = Date.now();
+    const diagnostic: ControlDiagnosticFields = {
+      sessionId: this.sessionId,
+      messageId: message.messageId,
+      expectedWrapperInstanceId: message.wrapperInstanceId,
+      epoch,
+      trigger,
+      stage: 'runtime_context',
+      timeoutMs: SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      timedOut: false,
     };
-    const result = metadata.workspace?.worktreeId
-      ? {
-          ...parsed,
-          questions: parsed.questions.filter(belongsToRoot),
-          permissions: parsed.permissions.filter(belongsToRoot),
+    let outcome: 'synced' | 'superseded' | 'failed' = 'failed';
+    logControlDiagnostic('session_sync', { ...diagnostic, phase: 'started' });
+    try {
+      const metadata = this.terminalLifecycle.getStoredMetadata();
+      const sandboxId = metadata?.workspace?.sandboxId;
+      const kiloSessionId = metadata?.auth.kiloSessionId;
+      diagnostic.sandboxId = sandboxId;
+      diagnostic.kiloSessionId = kiloSessionId;
+      diagnostic.worktreeId = metadata?.workspace?.worktreeId;
+      if (
+        !metadata ||
+        !sandboxId ||
+        !kiloSessionId ||
+        !message.wrapperInstanceId ||
+        this.pendingRuntimeCleanup()
+      ) {
+        diagnostic.reason = !metadata
+          ? 'missing_metadata'
+          : !sandboxId
+            ? 'missing_sandbox'
+            : !kiloSessionId
+              ? 'missing_kilo_session'
+              : !message.wrapperInstanceId
+                ? 'missing_wrapper_identity'
+                : 'cleanup_pending';
+        throw new Error('Accepted runtime is unavailable');
+      }
+      const control = sandboxControlRpc(this.env, sandboxId);
+      diagnostic.stage = 'runtime_status';
+      const status = await withTimeout(
+        control.getStatus(),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Runtime status timed out',
+        () => {
+          diagnostic.timedOut = true;
         }
-      : parsed;
-    if (this.readPendingInteractions()?.revision === revision) {
-      this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
-        revision: (revision ?? 0) + 1,
-        questions: result.questions,
-        permissions: result.permissions,
+      );
+      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+        outcome = 'superseded';
+        diagnostic.reason = 'accepted_message_changed';
+        return undefined;
+      }
+      diagnostic.stage = 'runtime_identity';
+      const connection = status?.connection;
+      const physical = status?.physical;
+      const observedWrapperId = status?.wrapperInstanceId;
+      const observedWrapper = wrapperInstanceIdSchema.safeParse(observedWrapperId);
+      diagnostic.connection =
+        connection === undefined
+          ? 'missing'
+          : ['disconnected', 'connected', 'ready'].includes(connection)
+            ? connection
+            : 'other';
+      diagnostic.physical =
+        physical === undefined
+          ? 'missing'
+          : ['stopped', 'creating', 'running', 'stopping', 'failed', 'unknown'].includes(physical)
+            ? physical
+            : 'other';
+      diagnostic.observedWrapperInstanceId =
+        observedWrapperId === undefined
+          ? undefined
+          : observedWrapper.success
+            ? observedWrapper.data
+            : 'invalid';
+      diagnostic.wrapperMatches = observedWrapperId === message.wrapperInstanceId;
+      if (
+        status.connection !== 'ready' ||
+        status.physical !== 'running' ||
+        status.wrapperInstanceId !== message.wrapperInstanceId
+      ) {
+        diagnostic.reason =
+          status.connection !== 'ready'
+            ? 'connection_not_ready'
+            : status.physical !== 'running'
+              ? 'physical_not_running'
+              : 'wrapper_mismatch';
+        throw new Error('Accepted runtime is not ready');
+      }
+      diagnostic.stage = 'read_interactions';
+      const revision = this.readPendingInteractions()?.revision;
+      diagnostic.interactionRevision = revision;
+      diagnostic.stage = 'sync_request';
+      const response = await withTimeout(
+        control.request({
+          operation: 'session.sync',
+          expectedWrapperInstanceId: message.wrapperInstanceId,
+          session: {
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory: this.directory(metadata),
+          },
+          payload: {},
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session sync timed out',
+        () => {
+          diagnostic.timedOut = true;
+        }
+      );
+      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+        outcome = 'superseded';
+        diagnostic.reason = 'accepted_message_changed';
+        return undefined;
+      }
+      diagnostic.requestId = response?.requestId;
+      diagnostic.responseOk = typeof response?.ok === 'boolean' ? response.ok : undefined;
+      if (!response.ok) {
+        diagnostic.reason = 'sync_rejected';
+        const errorCode = response.error?.code;
+        diagnostic.errorCode = controlErrorCodes.some(code => code === errorCode)
+          ? errorCode
+          : 'other';
+        diagnostic.retryable =
+          typeof response.error?.retryable === 'boolean' ? response.error.retryable : undefined;
+        throw new Error('Session sync failed');
+      }
+      diagnostic.stage = 'validate_sync_result';
+      const parsed = sessionSyncResultSchema.parse(response.result);
+      diagnostic.syncStatus = diagnosticSyncStatus(parsed.status.type);
+      diagnostic.receivedQuestionCount = parsed.questions.length;
+      diagnostic.receivedPermissionCount = parsed.permissions.length;
+      const belongsToRoot = (request: unknown): boolean => {
+        if (
+          typeof request !== 'object' ||
+          request === null ||
+          Array.isArray(request) ||
+          !('id' in request) ||
+          typeof request.id !== 'string' ||
+          request.id.length === 0 ||
+          !('sessionID' in request) ||
+          typeof request.sessionID !== 'string' ||
+          request.sessionID.length === 0
+        )
+          return false;
+        const root = 'rootKiloSessionId' in request ? request.rootKiloSessionId : undefined;
+        return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
+      };
+      diagnostic.stage = 'scope_interactions';
+      const result = metadata.workspace?.worktreeId
+        ? {
+            ...parsed,
+            questions: parsed.questions.filter(belongsToRoot),
+            permissions: parsed.permissions.filter(belongsToRoot),
+          }
+        : parsed;
+      diagnostic.questionCount = result.questions.length;
+      diagnostic.permissionCount = result.permissions.length;
+      diagnostic.stage = 'interaction_revision';
+      const applyInteractions = this.readPendingInteractions()?.revision === revision;
+      diagnostic.interactionSnapshotApplied = false;
+      if (applyInteractions) {
+        diagnostic.stage = 'persist_interactions';
+        this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+          revision: (revision ?? 0) + 1,
+          questions: result.questions,
+          permissions: result.permissions,
+        });
+        diagnostic.interactionSnapshotApplied = true;
+      }
+      diagnostic.stage = 'persist_status';
+      persistSandboxControlSessionEvent({
+        sessionId: metadata.identity.sessionId,
+        payload: {
+          type: 'session.status',
+          properties: { sessionID: kiloSessionId, status: result.status },
+        },
+        eventQueries: this.eventQueries,
+        broadcast: event => this.broadcastStoredEvent(event),
       });
+      outcome = 'synced';
+      return result;
+    } catch (error) {
+      diagnostic.reason ??= diagnostic.timedOut
+        ? 'timeout'
+        : error instanceof z.ZodError
+          ? 'invalid_response'
+          : 'operation_failed';
+      diagnostic.errorClass =
+        error instanceof z.ZodError
+          ? 'validation_error'
+          : error instanceof TypeError
+            ? 'type_error'
+            : error instanceof Error
+              ? 'error'
+              : 'non_error';
+      if (error instanceof z.ZodError) {
+        diagnostic.validationIssueCount = error.issues.length;
+        diagnostic.invalidStatus = error.issues.some(issue => issue.path[0] === 'status');
+        diagnostic.invalidQuestions = error.issues.some(issue => issue.path[0] === 'questions');
+        diagnostic.invalidPermissions = error.issues.some(issue => issue.path[0] === 'permissions');
+      }
+      throw error;
+    } finally {
+      logControlDiagnostic(
+        'session_sync',
+        { ...diagnostic, phase: 'finished', result: outcome, durationMs: Date.now() - startedAt },
+        outcome === 'failed' ? 'warn' : 'info'
+      );
     }
-    persistSandboxControlSessionEvent({
-      sessionId: metadata.identity.sessionId,
-      payload: {
-        type: 'session.status',
-        properties: { sessionID: kiloSessionId, status: result.status },
-      },
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcastStoredEvent(event),
-    });
-    return result;
   }
 
   private async derivePendingInteractions(): Promise<
@@ -1945,7 +2127,7 @@ export class SandboxSession extends DurableObject<Env> {
     const accepted = this.loadMessages().find(message => message.state === 'accepted');
     if (accepted) {
       try {
-        await this.syncAcceptedMessage(accepted, epoch);
+        await this.syncAcceptedMessage(accepted, epoch, 'pending_interactions');
       } catch {
         logger
           .withFields({ sessionId: this.sessionId })

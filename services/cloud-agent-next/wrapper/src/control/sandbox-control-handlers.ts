@@ -1,5 +1,6 @@
 import path from 'node:path';
 import {
+  diagnosticSyncStatus,
   emitControlDiagnostic,
   type ControlDiagnosticRecord,
   type ControlDiagnosticReporter,
@@ -527,6 +528,24 @@ export async function handleControlRequest(
     operation !== 'session.abort' &&
     operation !== 'session.detach'
   ) {
+    if (operation === 'session.sync') {
+      emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+        operation,
+        phase: 'failed',
+        stage: 'runtime_lookup',
+        sessionId: session.sessionId,
+        kiloSessionId: session.kiloSessionId,
+        elapsedMs: 0,
+        ok: false,
+        errorCode: 'not_ready',
+        retryable: true,
+        aborted: deps.signal?.aborted ?? false,
+        ownedTask: deps.tasks.has(session.kiloSessionId),
+        statusQueryPending: false,
+        questionQueryPending: false,
+        permissionQueryPending: false,
+      });
+    }
     return missingKilo();
   }
 
@@ -1176,36 +1195,122 @@ async function handleSync(
   payload: unknown,
   deps: HandlerDeps
 ): Promise<ControlHandlerResult> {
+  const startedAt = Date.now();
+  const pending = { sync_status: false, sync_questions: false, sync_permissions: false };
+  let pendingAtAbort: typeof pending | undefined;
+  let nativeStatus: ControlDiagnosticRecord['fields']['nativeStatus'];
+  let questionCount: number | undefined;
+  let permissionCount: number | undefined;
+  const diagnostic = (
+    phase: 'completed' | 'failed',
+    stage: NonNullable<ControlDiagnosticRecord['fields']['stage']>,
+    fields: Partial<ControlDiagnosticRecord['fields']> = {}
+  ): void => {
+    const queries = pendingAtAbort ?? pending;
+    emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+      operation: 'session.sync',
+      phase,
+      stage,
+      sessionId: session.sessionId,
+      kiloSessionId: session.kiloSessionId,
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      ok: phase === 'completed',
+      aborted: deps.signal?.aborted ?? false,
+      ownedTask: deps.tasks.has(session.kiloSessionId),
+      statusQueryPending: queries.sync_status,
+      questionQueryPending: queries.sync_questions,
+      permissionQueryPending: queries.sync_permissions,
+      nativeStatus,
+      questionCount,
+      permissionCount,
+      ...fields,
+    });
+  };
   const kiloClient = sessionKiloRuntime(session, deps)?.kiloClient;
-  if (!kiloClient) return missingKilo();
+  if (!kiloClient) {
+    diagnostic('failed', 'runtime_lookup', { errorCode: 'not_ready', retryable: true });
+    return missingKilo();
+  }
   if (!sessionSyncPayloadSchema.safeParse(payload).success) {
+    diagnostic('failed', 'sync_validation', { errorCode: 'protocol_error', retryable: false });
     return fail('protocol_error', 'Invalid payload', false);
   }
   try {
-    const [statuses, questions, permissions] = await withKiloRequestDeadline(
-      signal =>
-        Promise.all([
-          kiloClient.getSessionStatuses(
-            directoryForSession(session.kiloSessionId) ?? session.directory,
-            signal
-          ),
-          readRootRequests(
-            session,
-            (directory, signal) => kiloClient.getQuestions(directory, signal),
-            signal
-          ),
-          readRootRequests(
-            session,
-            (directory, signal) => kiloClient.getPermissions(directory, signal),
-            signal
-          ),
-        ]),
-      deps.signal
-    );
-    return ok({
-      status: deps.tasks.has(session.kiloSessionId)
-        ? { type: 'busy' }
-        : (statuses[session.kiloSessionId] ?? { type: 'idle' }),
+    const [statuses, questions, permissions] = await withKiloRequestDeadline(signal => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          pendingAtAbort = { ...pending };
+        },
+        { once: true }
+      );
+      const query = <Value>(
+        stage: keyof typeof pending,
+        read: () => Promise<Value>,
+        completed: (value: Value) => void
+      ): Promise<Value> => {
+        pending[stage] = true;
+        const failed = (error: unknown): never => {
+          pending[stage] = false;
+          diagnostic('failed', stage, { aborted: signal.aborted });
+          throw error;
+        };
+        try {
+          return read().then(value => {
+            pending[stage] = false;
+            completed(value);
+            diagnostic('completed', stage, { aborted: signal.aborted });
+            return value;
+          }, failed);
+        } catch (error) {
+          return failed(error);
+        }
+      };
+      return Promise.all([
+        query(
+          'sync_status',
+          () =>
+            kiloClient.getSessionStatuses(
+              directoryForSession(session.kiloSessionId) ?? session.directory,
+              signal
+            ),
+          statuses => {
+            const status = statuses?.[session.kiloSessionId];
+            nativeStatus = status == null ? 'missing' : diagnosticSyncStatus(status.type);
+          }
+        ),
+        query(
+          'sync_questions',
+          () =>
+            readRootRequests(
+              session,
+              (directory, signal) => kiloClient.getQuestions(directory, signal),
+              signal
+            ),
+          questions => {
+            questionCount = questions.length;
+          }
+        ),
+        query(
+          'sync_permissions',
+          () =>
+            readRootRequests(
+              session,
+              (directory, signal) => kiloClient.getPermissions(directory, signal),
+              signal
+            ),
+          permissions => {
+            permissionCount = permissions.length;
+          }
+        ),
+      ]);
+    }, deps.signal);
+    const ownedTask = deps.tasks.has(session.kiloSessionId);
+    const status = ownedTask
+      ? { type: 'busy' }
+      : (statuses[session.kiloSessionId] ?? { type: 'idle' });
+    const result = ok({
+      status,
       questions: questions.map(({ request }) =>
         request.sessionID === session.kiloSessionId
           ? request
@@ -1217,7 +1322,18 @@ async function handleSync(
           : { ...request, rootKiloSessionId: session.kiloSessionId }
       ),
     });
+    diagnostic('completed', 'sync_result', {
+      ownedTask,
+      syncStatus: diagnosticSyncStatus(status.type),
+    });
+    return result;
   } catch (error) {
-    return kiloFailure(error);
+    const result = kiloFailure(error);
+    diagnostic('failed', 'sync_result', {
+      errorCode: 'not_ready',
+      retryable: !result.ok && result.error.retryable,
+      timedOut: error instanceof Error && error.message === 'Kilo request timed out',
+    });
+    return result;
   }
 }

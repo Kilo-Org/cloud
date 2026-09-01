@@ -28,6 +28,7 @@ export const controlLogWrapperIdSchema = z.string().uuid();
 const identifier = z.string().regex(/^[A-Za-z0-9_:-]{1,128}$/);
 const count = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const milliseconds = z.number().min(0).max(Number.MAX_SAFE_INTEGER);
+const syncStatusSchema = z.enum(['idle', 'busy', 'retry', 'finalizing', 'other']);
 
 export const controlDiagnosticFieldsSchema = z
   .object({
@@ -101,6 +102,11 @@ export const controlDiagnosticFieldsSchema = z
         'deletion_fence',
         'task_cancellation',
         'runtime_lookup',
+        'sync_validation',
+        'sync_status',
+        'sync_questions',
+        'sync_permissions',
+        'sync_result',
         'directory_validation',
         'manifest_discovery',
         'session_abort',
@@ -120,6 +126,8 @@ export const controlDiagnosticFieldsSchema = z
     sessionResolution: z.enum(['existing', 'restored', 'created']).optional(),
     kind: z.enum(['preparation', 'execution', 'finalizing']).optional(),
     status: z.enum(['completed', 'failed', 'cancelled']).optional(),
+    nativeStatus: z.enum(['missing', ...syncStatusSchema.options]).optional(),
+    syncStatus: syncStatusSchema.optional(),
     category: z
       .enum([
         'outcome',
@@ -170,6 +178,8 @@ export const controlDiagnosticFieldsSchema = z
     sequence: count.optional(),
     eventsReceived: count.optional(),
     sessionCount: count.optional(),
+    questionCount: count.optional(),
+    permissionCount: count.optional(),
     bufferedBytes: count.optional(),
     bytes: count.optional(),
     attempt: count.optional(),
@@ -181,6 +191,11 @@ export const controlDiagnosticFieldsSchema = z
     wasClean: z.boolean().optional(),
     ok: z.boolean().optional(),
     aborted: z.boolean().optional(),
+    timedOut: z.boolean().optional(),
+    ownedTask: z.boolean().optional(),
+    statusQueryPending: z.boolean().optional(),
+    questionQueryPending: z.boolean().optional(),
+    permissionQueryPending: z.boolean().optional(),
   })
   .strict();
 
@@ -225,6 +240,11 @@ export const controlLogBatchSchema = z
   .strict();
 
 export type ControlLogBatch = z.infer<typeof controlLogBatchSchema>;
+
+export function diagnosticSyncStatus(value: unknown): z.infer<typeof syncStatusSchema> {
+  const parsed = syncStatusSchema.safeParse(value);
+  return parsed.success ? parsed.data : 'other';
+}
 
 export function emitControlDiagnostic(
   callback: ControlDiagnosticReporter | undefined,

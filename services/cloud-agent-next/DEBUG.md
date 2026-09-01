@@ -198,6 +198,14 @@ Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unre
 
 Wrapper `control.request` attachment summaries separate `workspaceAction` (reuse or bootstrap) from `sessionResolution` (existing, restored, or created chat). Worktree deletion records include the first fence/drain, preparation/deletion outcome, stage, and session count. These records contain IDs and fixed outcomes, not repository paths, credentials, or session content.
 
+### Accepted-message Reconciliation
+
+For `runtime_unhealthy`, correlate Worker `accepted_reconciliation` and `session_sync` records by `messageId`, expected wrapper identity, and lifecycle epoch. Reconciliation records distinguish healthy, superseded, and unhealthy decisions. The unhealthy decision is logged before failure/cleanup starts; `session_message_committed` remains the durable message-state confirmation. `session_interrupt_failed` identifies the separate explicit-abort path that can produce the same public failure reason.
+
+`session_sync` identifies its trigger (`accepted_alarm` or `pending_interactions`), failed stage, timeout, observed physical/connection state, and expected versus observed wrapper identity. It records safe response codes and validation counts, never raw errors or response payloads. Compare `receivedQuestionCount`/`receivedPermissionCount` with `questionCount`/`permissionCount` to see root scoping, and check `interactionSnapshotApplied` for revision-fenced snapshots. A successful sync means the snapshot was fetched and processed, not necessarily that accepted work is still active; the reconciliation decision applies the activity rule afterward.
+
+Wrapper `control.request` records for `session.sync` separate status, question, and permission reads from the overall `sync_result`. `nativeStatus`, `syncStatus`, and `ownedTask` show the task-owned busy override. Pending-query flags are frozen when the shared request signal aborts, so a query that ignores cancellation is still visible. Missing counts mean no successful result was available; they are not zero counts. The three reads retain their original shared deadline and parallel execution.
+
 ## Interpreting Common States
 
 - Worker queueing succeeds, but no wrapper logs appear:

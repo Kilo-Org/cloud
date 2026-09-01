@@ -25,7 +25,7 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentToken } from '@/lib/tokens';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
@@ -1045,7 +1045,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       let watermarkEventId: number | null = null;
       if (!input.cursor && session.cloud_agent_session_id) {
         try {
-          const authToken = generateApiToken(ctx.user);
+          const authToken = generateCloudAgentToken(ctx.user);
           const client = createCloudAgentNextClient(authToken);
           const sessionState = await client.getSession(session.cloud_agent_session_id);
           watermarkEventId = sessionState.latestEventId ?? null;
@@ -1199,7 +1199,7 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       if (session.cloud_agent_session_id) {
         try {
-          const authToken = generateApiToken(ctx.user);
+          const authToken = generateCloudAgentToken(ctx.user);
           const client = createCloudAgentNextClient(authToken);
           runtimeState = await client.getSession(session.cloud_agent_session_id);
         } catch (error) {
@@ -1582,7 +1582,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
     if (session.cloud_agent_session_id) {
-      const authToken = generateApiToken(ctx.user);
+      const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       try {
         await client.deleteSession(session.cloud_agent_session_id);

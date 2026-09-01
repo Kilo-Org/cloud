@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../logger.js';
 import type { GitTokenService } from '../types.js';
 import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
+  resolveGitHubTokenForRepo,
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './git-token-service-client.js';
@@ -192,7 +193,7 @@ describe('resolveManagedGitLabToken', () => {
 });
 
 describe('issueCloudAgentGitHubSessionCapability', () => {
-  it('falls back to installation authentication when the capability RPC is not deployed yet', async () => {
+  it('fails closed without raw authentication when the capability RPC is not deployed yet', async () => {
     const getTokenForRepo = vi.fn().mockResolvedValue({
       success: true,
       token: 'installation-token',
@@ -200,23 +201,25 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       accountLogin: 'acme',
       appType: 'standard',
     });
+    const getCloudAgentAuthForRepo = vi.fn();
 
-    const result = await issueCloudAgentGitHubSessionCapability(createEnv({ getTokenForRepo }), {
-      githubRepo: 'acme/repo',
-      userId: 'user_1',
-      outboundContainerId: 'container-test',
-      allowUserAuthorization: true,
-    });
+    const result = await issueCloudAgentGitHubSessionCapability(
+      createEnv({ getTokenForRepo, getCloudAgentAuthForRepo }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      }
+    );
 
-    expect(getTokenForRepo).toHaveBeenCalledWith({ githubRepo: 'acme/repo', userId: 'user_1' });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
     expect(result).toEqual({
-      success: true,
-      value: {
-        githubToken: 'installation-token',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'installation',
+      success: false,
+      error: {
+        reason: 'service_not_configured',
+        message: 'git-token-service capability issuance is not configured',
       },
     });
   });
@@ -321,7 +324,7 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     expect(getTokenForRepo).not.toHaveBeenCalled();
   });
 
-  it('falls back to direct authentication when the capability RPC rejects during rollout', async () => {
+  it('fails closed without direct authentication when the capability RPC rejects', async () => {
     const issueGitHubSessionCapability = vi
       .fn()
       .mockRejectedValue(new Error('service unavailable'));
@@ -347,22 +350,81 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     );
 
     expect(result).toEqual({
-      success: true,
-      value: {
-        githubToken: 'user-token',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
-        source: 'user',
-        gitAuthor: { name: 'octocat', email: '101+octocat@users.noreply.github.com' },
-      },
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
     });
-    expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
-      githubRepo: 'acme/repo',
-      userId: 'user_1',
-      allowUserAuthorization: true,
-    });
+    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
     expect(getTokenForRepo).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  { method: 'getTokenForRepo', resolve: resolveGitHubTokenForRepo },
+  { method: 'getCloudAgentAuthForRepo', resolve: resolveCloudAgentGitHubAuthForRepo },
+  { method: 'issueGitHubSessionCapability', resolve: issueCloudAgentGitHubSessionCapability },
+] as const)('GitHub credential client $method failures', ({ method, resolve }) => {
+  const params = {
+    githubRepo: 'acme/repo',
+    userId: 'user_1',
+    outboundContainerId: 'container-test',
+    allowUserAuthorization: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['no_installation_found', 'repository_not_installed', 'integration_mismatch'] as const)(
+    'preserves %s without trying another authorization path',
+    async reason => {
+      const service = { ...createGitTokenService(), getCloudAgentAuthForRepo: vi.fn() };
+      service[method].mockResolvedValue({ success: false, reason });
+
+      const result = await resolve({ GIT_TOKEN_SERVICE: service }, params);
+
+      expect(result).toMatchObject({ success: false, error: { reason } });
+      for (const rpc of [
+        'getTokenForRepo',
+        'getCloudAgentAuthForRepo',
+        'issueGitHubSessionCapability',
+      ] as const) {
+        expect(service[rpc]).toHaveBeenCalledTimes(rpc === method ? 1 : 0);
+      }
+    }
+  );
+
+  it('keeps RPC exceptions distinct and excludes private errors from returned or logged data', async () => {
+    const secret = 'sensitive-credential-or-query-parameter';
+    const logFields = vi.spyOn(logger, 'withFields');
+    const service = { ...createGitTokenService(), getCloudAgentAuthForRepo: vi.fn() };
+    service[method].mockRejectedValue(
+      Object.assign(new Error(`query or transport failed: ${secret}`), {
+        request: { headers: { authorization: `Bearer ${secret}` } },
+        response: { data: { token: secret } },
+      })
+    );
+
+    const result = await resolve({ GIT_TOKEN_SERVICE: service }, params);
+
+    expect(result).toEqual({
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
+    });
+    for (const rpc of [
+      'getTokenForRepo',
+      'getCloudAgentAuthForRepo',
+      'issueGitHubSessionCapability',
+    ] as const) {
+      expect(service[rpc]).toHaveBeenCalledTimes(rpc === method ? 1 : 0);
+    }
+    expect(
+      JSON.stringify({
+        result,
+        fields: logFields.mock.calls,
+        errors: vi.mocked(logger.error).mock.calls,
+        warnings: vi.mocked(logger.warn).mock.calls,
+      })
+    ).not.toContain(secret);
   });
 });
 
@@ -527,7 +589,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     });
   });
 
-  it('falls back to installation authentication when an older service rejects the managed RPC', async () => {
+  it('does not fall back to a different authorization path when the managed RPC rejects', async () => {
     const getCloudAgentAuthForRepo = vi
       .fn()
       .mockRejectedValue(new Error('RPC method getCloudAgentAuthForRepo is not available'));
@@ -553,19 +615,14 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       userId: 'user_1',
       allowUserAuthorization: true,
     });
-    expect(getTokenForRepo).toHaveBeenCalledWith({ githubRepo: 'acme/repo', userId: 'user_1' });
-    expect(result).toMatchObject({
-      success: true,
-      value: {
-        githubToken: 'installation-token',
-        installationId: '123',
-        appType: 'standard',
-        source: 'installation',
-      },
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: false,
+      error: { reason: 'rpc_error', message: 'GitHub credential service is unavailable' },
     });
   });
 
-  it('preserves the expected integration id through direct and legacy fallbacks', async () => {
+  it('preserves the expected integration id through direct and legacy authentication', async () => {
     const getCloudAgentAuthForRepo = vi
       .fn()
       .mockRejectedValue(new Error('RPC method getCloudAgentAuthForRepo is not available'));
@@ -594,6 +651,16 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
       expectedIntegrationId,
       allowUserAuthorization: false,
     });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
+
+    await expect(
+      resolveCloudAgentGitHubAuthForRepo(createEnv({ getTokenForRepo }), {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        expectedIntegrationId,
+        allowUserAuthorization: false,
+      })
+    ).resolves.toMatchObject({ success: true, value: { source: 'installation' } });
     expect(getTokenForRepo).toHaveBeenCalledWith({
       githubRepo: 'acme/repo',
       userId: 'user_1',

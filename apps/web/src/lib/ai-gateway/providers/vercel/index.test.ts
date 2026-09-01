@@ -471,6 +471,60 @@ describe('applyVercelSettings BYOK pinning', () => {
     });
   });
 
+  it.each<GatewayRequest>([
+    {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    },
+    {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        max_tokens: 100,
+      },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'anthropic/claude-sonnet-4.5', input: 'hello' },
+    },
+  ])('forwards Bedrock API key credentials for $kind', async request => {
+    const credentials = { apiKey: 'bedrock-api-key', region: 'eu-west-1' };
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  it('retains a Bedrock API key when the caller ignores its only BYOK provider', async () => {
+    const request = byokRequest(['amazon-bedrock']);
+    const credentials = { apiKey: 'bedrock-api-key', region: 'us-east-1' };
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  it.each([
+    'bedrock-secret',
+    '{"apiKey":"bedrock-secret"',
+    '{"apiKey":"bedrock-secret"}',
+    '{"apiKey":"bedrock-secret","region":"us-east-1","accessKeyId":"AKIAEXAMPLE","secretAccessKey":"secret"}',
+  ])('rejects malformed Bedrock credentials without exposing secrets: %s', async credentials => {
+    await expect(
+      applyVercelSettings('anthropic/claude-sonnet-4.5', byokRequest([]), [
+        { decryptedAPIKey: credentials, providerId: 'bedrock' },
+      ])
+    ).rejects.toEqual(new Error('Failed to parse AWS credentials'));
+  });
+
   it('uses one Vertex credential key for Anthropic models served by Vertex', async () => {
     const request = byokRequest([]);
 

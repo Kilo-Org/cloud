@@ -46,6 +46,62 @@ function pressablesByLabel(
   );
 }
 
+describe('SheetHeader title layout', () => {
+  it.each([undefined, false])(
+    'keeps the single-line layout when wrapTitle is %s',
+    async wrapTitle => {
+      const renderer = await mount({
+        title: 'Inspect performance child 01',
+        onDone: () => undefined,
+        wrapTitle,
+      });
+      const heading = renderer.root.findByProps({ accessibilityRole: 'header' });
+
+      expect(heading.props.children).toBe('Inspect performance child 01');
+      expect(heading.props.numberOfLines).toBe(1);
+      expect(heading.parent?.parent?.props.className).toMatch(/(?:^|\s)h-11(?:\s|$)/u);
+
+      await act(async () => {
+        renderer.unmount();
+        await Promise.resolve();
+      });
+    }
+  );
+
+  it('wraps the full title in a growing row with space reserved for Done', async () => {
+    const onDone = vi.fn<() => void>();
+    const renderer = await mount({
+      title: 'Inspect performance child 01',
+      onDone,
+      wrapTitle: true,
+    });
+    const heading = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const titleRegion = heading.parent;
+    const row = titleRegion?.parent;
+    const dones = pressablesByLabel(renderer.root, 'Done');
+
+    expect(heading.props.children).toBe('Inspect performance child 01');
+    expect.soft(heading.props.numberOfLines).toBeUndefined();
+    expect.soft(row?.props.className).toContain('min-h-11');
+    expect.soft(row?.props.className).not.toMatch(/(?:^|\s)(?:h-|max-h-|overflow-hidden)/u);
+    expect(titleRegion?.props.className).toContain('flex-1');
+    expect(titleRegion?.props.className).toContain('px-24');
+    expect(heading.props.className).toContain('text-lg');
+    expect(heading.props.adjustsFontSizeToFit).not.toBe(true);
+    expect(row?.parent?.props.collapsable).toBe(false);
+    expect(dones).toHaveLength(1);
+    expect(dones[0]?.parent).toBe(row);
+    expect(dones[0]?.props.className).toContain('end-0');
+    expect(dones[0]?.props.onPress).toBe(onDone);
+    expect(dones[0]?.props.disabled).toBe(false);
+
+    await act(async () => {
+      renderer.unmount();
+      await Promise.resolve();
+    });
+  });
+});
+
 describe('SheetHeader share action', () => {
   it('renders a Share pressable in the left slot when onShare is provided', async () => {
     const renderer = await mount({

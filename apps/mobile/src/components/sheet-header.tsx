@@ -4,9 +4,11 @@ import { Pressable, View } from 'react-native';
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 export function SheetHeader({
   title,
+  wrapTitle = false,
   onDone,
   onCancel,
   doneLabel,
@@ -16,6 +18,8 @@ export function SheetHeader({
   disabled = false,
 }: {
   title: string;
+  /** Let the title wrap and the row grow while preserving the action slots. */
+  wrapTitle?: boolean;
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
@@ -44,11 +48,11 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
-      <View className="h-11 flex-row items-center justify-center">
+      <View className={cn('flex-row items-center justify-center', wrapTitle ? 'min-h-11' : 'h-11')}>
         <View className="flex-1 px-24">
           <Text
             className="text-center text-lg font-semibold text-foreground"
-            numberOfLines={1}
+            numberOfLines={wrapTitle ? undefined : 1}
             accessibilityRole="header"
           >
             {title}

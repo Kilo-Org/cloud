@@ -13,13 +13,14 @@
  * - POST /job/abort - Abort the current session
  */
 
+import { isDeepStrictEqual } from 'node:util';
 import type { WrapperState, SessionContext } from './state.js';
 import {
   isKiloServerUnreachableError,
   type WrapperKiloClient,
   type WrapperPtySize,
 } from './kilo-api.js';
-import { createLogUploader } from './log-uploader.js';
+import { createLogArchiveId, createLogUploader } from './log-uploader.js';
 import { configureCommitCoAuthorHook } from './commit-co-author-hook.js';
 import { logToFile } from './utils.js';
 import { materializePromptAttachments as defaultMaterializePromptAttachments } from './session-bootstrap.js';
@@ -70,7 +71,10 @@ export type ServerDependencies = {
   /** Notify lifecycle after an acknowledgement guard clears. */
   onDeliveryAcknowledged?: (kind: 'async-prompt' | 'sync-command' | 'failed') => void;
   /** Workspace/Kilo readiness path */
-  readySession?: (request: WrapperSessionReadyRequest) => Promise<WrapperSessionReadyResponse>;
+  readySession?: (
+    request: WrapperSessionReadyRequest,
+    logArchiveId: string
+  ) => Promise<WrapperSessionReadyResponse>;
   /** Apply refreshed runtime variables to the active Kilo runtime. */
   updateRuntimeEnvironment?: (env: Record<string, string>) => Promise<void>;
   /** Materialize signed prompt attachments into local file parts. */
@@ -277,7 +281,8 @@ export async function bindSessionContext(
    * Falls back to `config.sessionId` for callers that rebind an
    * already-bootstrapped wrapper, where `config.sessionId` is already current.
    */
-  kiloSessionIdOverride?: string
+  kiloSessionIdOverride?: string,
+  logArchiveId?: string
 ): Promise<Response | null> {
   const { state } = deps;
   const kiloSessionId = kiloSessionIdOverride ?? config.sessionId;
@@ -325,6 +330,29 @@ export async function bindSessionContext(
   }
 
   const existingSession = state.currentSession;
+  const uploadContext = {
+    workerBaseUrl,
+    kiloSessionId,
+    workerAuthToken: binding.workerAuthToken,
+  };
+  if (
+    !state.logUploader ||
+    existingSession?.wrapperRunId !== binding.wrapperRunId ||
+    (logArchiveId !== undefined && state.logUploader.archiveId !== logArchiveId)
+  ) {
+    const logUploader = createLogUploader({
+      archiveId: logArchiveId ?? createLogArchiveId(binding.wrapperRunId),
+      context: uploadContext,
+      sessionId: config.agentSessionId,
+      userId: config.userId,
+      cliLogDir: `/home/${config.agentSessionId}/.local/share/kilo/log`,
+      wrapperLogPath: process.env.WRAPPER_LOG_PATH ?? '/tmp/kilocode-wrapper.log',
+    });
+    state.setLogUploader(logUploader);
+    logUploader.start();
+  } else {
+    state.logUploader.updateContext(uploadContext);
+  }
 
   if (!existingSession) {
     if (state.isConnected) {
@@ -345,20 +373,6 @@ export async function bindSessionContext(
     };
     state.bindSession(sessionContext);
 
-    const cliLogDir = `/home/${config.agentSessionId}/.local/share/kilo/log`;
-    const wrapperLogPath = process.env.WRAPPER_LOG_PATH ?? '/tmp/kilocode-wrapper.log';
-    const logUploader = createLogUploader({
-      workerBaseUrl,
-      sessionId: config.agentSessionId,
-      getKiloSessionId: () => state.currentSession?.kiloSessionId ?? kiloSessionId,
-      executionId: 'session',
-      userId: config.userId,
-      getWorkerAuthToken: () => state.currentSession?.workerAuthToken ?? binding.workerAuthToken,
-      cliLogDir,
-      wrapperLogPath,
-    });
-    state.setLogUploader(logUploader);
-    logUploader.start();
     logToFile(`session bound: sessionId=${kiloSessionId}`);
     await notifySessionBound(deps, feedPolicy);
     return null;
@@ -1026,8 +1040,16 @@ function createWebSocketHandlers(config: ServerConfig, deps: ServerDependencies)
 }
 
 export function createSessionReadyHandler(deps: ServerDependencies) {
+  let inFlight:
+    | {
+        request: WrapperSessionReadyRequest;
+        promise: Promise<WrapperSessionReadyResponse>;
+      }
+    | undefined;
+
   return async (req: Request): Promise<Response> => {
-    if (!deps.readySession) {
+    const readySession = deps.readySession;
+    if (!readySession) {
       return errorResponse('NOT_READY', 'Wrapper readiness executor is not configured', 503);
     }
 
@@ -1042,7 +1064,33 @@ export function createSessionReadyHandler(deps: ServerDependencies) {
       return errorResponse('INVALID_REQUEST', 'Invalid session ready request', 400);
     }
 
-    const result = await deps.readySession(body);
+    let pending = inFlight;
+    if (!pending || !isDeepStrictEqual(pending.request, body)) {
+      const archiveId = createLogArchiveId(body.session.wrapperRunId);
+      const promise = (async () => {
+        let ready = false;
+        try {
+          const result = await readySession(body, archiveId);
+          ready = result.status === 'ready';
+          return result;
+        } finally {
+          const uploader = deps.state.logUploader;
+          if (!ready && uploader?.archiveId === archiveId) {
+            await uploader.finalize();
+            if (deps.state.logUploader === uploader) deps.state.setLogUploader(null);
+          }
+        }
+      })();
+      pending = { request: body, promise };
+      inFlight = pending;
+    }
+
+    let result: WrapperSessionReadyResponse;
+    try {
+      result = await pending.promise;
+    } finally {
+      if (inFlight === pending) inFlight = undefined;
+    }
     if (result.status === 'error') {
       const status = result.error.code === 'INVALID_REQUEST' ? 400 : 503;
       return jsonResponse(

@@ -13,6 +13,7 @@ import {
   runAndroidBuild,
 } from './mobile-android-build';
 import { withNativeBuildSemaphore } from './mobile-native-build';
+import { fetchAndroidApk } from './mobile-remote-native';
 import { withProcessLock, withProcessLockAsync } from './process-lock';
 
 type AndroidEnvironment = {
@@ -670,6 +671,7 @@ async function main(): Promise<void> {
           run: runBuild,
         }),
       build: staging => buildAndroidApk(env, mobileRoot, staging),
+      fetchRemote: async ({ nativeHash, destDir }) => fetchAndroidApk({ nativeHash, destDir }),
       readPackageId: apkPath => readAndroidPackageId(env, apkPath),
       install: (deviceSerial, apkPath) => {
         const command = buildAndroidInstallCommand(env.adb, deviceSerial, apkPath);

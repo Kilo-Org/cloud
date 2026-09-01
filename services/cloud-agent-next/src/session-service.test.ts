@@ -1,9 +1,15 @@
 import { dirname, relative } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
 import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { ExecutionError } from './execution/errors.js';
+import {
+  createPendingSessionMessage,
+  recordPendingFlushFailure,
+  type SessionQueueStorage,
+} from './session/pending-messages.js';
 
 vi.mock('./logger.js', () => ({
   logger: {
@@ -589,6 +595,297 @@ describe('SessionService.resolveWorkspaceTokens', () => {
       success: true,
       token: 'opaque-workspace-token',
     });
+  });
+
+  describe.each([false, true])('GitHub credential containment=%s', contained => {
+    const metadata = createMetadata({
+      githubRepo: 'acme/repo',
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      credentialContainment: { github: contained, gitlab: false, kilocode: false },
+    });
+
+    beforeEach(async () => {
+      const client = await vi.importActual<typeof GitTokenServiceClientModule>(
+        './services/git-token-service-client.js'
+      );
+      tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockImplementation(
+        client.resolveCloudAgentGitHubAuthForRepo
+      );
+      tokenMocks.issueCloudAgentGitHubSessionCapability.mockImplementation(
+        client.issueCloudAgentGitHubSessionCapability
+      );
+    });
+
+    function createGitHubEnv(rpc: Mock): PersistenceEnv {
+      const env = createEnv();
+      if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected git-token-service fixture');
+      if (contained) env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability = rpc;
+      else env.GIT_TOKEN_SERVICE.getCloudAgentAuthForRepo = rpc;
+      return env;
+    }
+
+    function createQueueStorage(): SessionQueueStorage {
+      const entries = new Map<string, unknown>();
+      return {
+        async get<T>(key: string) {
+          return entries.get(key) as T | undefined;
+        },
+        async put(key, value) {
+          entries.set(key, value);
+        },
+        async delete(keys) {
+          for (const key of typeof keys === 'string' ? [keys] : keys) entries.delete(key);
+        },
+        async list<T>({ prefix }: { prefix: string }) {
+          return new Map([...entries].filter(([key]) => key.startsWith(prefix)) as [string, T][]);
+        },
+      };
+    }
+
+    it.each(['no_installation_found', 'repository_not_installed'] as const)(
+      'terminalizes %s on the first preparation attempt',
+      async reason => {
+        const rpc = vi.fn().mockResolvedValue({ success: false, reason });
+        const error = await new SessionService()
+          .resolveWorkspaceTokens(createGitHubEnv(rpc), metadata, 'ses-abcdef' as SandboxId)
+          .catch((error: unknown) => error);
+
+        expect(error).toMatchObject({
+          code: 'WORKSPACE_SETUP_FAILED',
+          workspaceFailureSubtype: 'git_authentication_failed',
+          retryable: false,
+          message:
+            'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.',
+        });
+        if (!(error instanceof ExecutionError) || error.code !== 'WORKSPACE_SETUP_FAILED') {
+          throw new Error('Expected a workspace setup error');
+        }
+        expect(error.safeFailureMessage).toBe(error.message);
+        const result = await recordPendingFlushFailure(
+          createQueueStorage(),
+          createPendingSessionMessage({
+            messageId: 'msg_018f1e2d3c4bGitHubFailureA',
+            role: 'user',
+            content: 'prepare',
+            createdAt: 1,
+          }),
+          error.message,
+          100_000,
+          {
+            policy: 'cold-init',
+            code: error.code,
+            subtype: error.workspaceFailureSubtype,
+            safeFailureMessage: error.safeFailureMessage,
+            retryable: error.retryable,
+          }
+        );
+        expect(result).toMatchObject({
+          attempts: 1,
+          exhausted: true,
+          nextFlushAttemptAt: undefined,
+          message: {
+            lastFlushFailureSubtype: 'git_authentication_failed',
+            deliveryDisposition: 'terminalization-pending',
+          },
+        });
+        expect(rpc).toHaveBeenCalledOnce();
+      }
+    );
+
+    it.each([
+      new Error('database query failed with secret-query-parameter'),
+      new TypeError('transport failed with secret-credential'),
+    ])('uses the existing bounded preparation retry for an RPC exception', async rpcError => {
+      const rpc = vi.fn().mockRejectedValue(rpcError);
+      const env = createGitHubEnv(rpc);
+      const error = await new SessionService()
+        .resolveWorkspaceTokens(env, metadata, 'ses-abcdef' as SandboxId)
+        .catch((error: unknown) => error);
+
+      expect(error).toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        retryable: true,
+        workspaceFailureSubtype: undefined,
+        message: 'GitHub credential service is unavailable. Please try again.',
+      });
+      if (!(error instanceof ExecutionError) || error.code !== 'WORKSPACE_SETUP_FAILED') {
+        throw new Error('Expected a workspace setup error');
+      }
+      expect(error.safeFailureMessage).toBe(error.message);
+      expect(JSON.stringify({ error, message: error.message, cause: error.cause })).not.toContain(
+        'secret-'
+      );
+      const storage = createQueueStorage();
+      const options = {
+        policy: 'cold-init',
+        code: error.code,
+        subtype: error.workspaceFailureSubtype,
+        safeFailureMessage: error.safeFailureMessage,
+        retryable: error.retryable,
+      } as const;
+      const first = await recordPendingFlushFailure(
+        storage,
+        createPendingSessionMessage({
+          messageId: 'msg_018f1e2d3c4bGitHubFailureA',
+          role: 'user',
+          content: 'prepare',
+          createdAt: 1,
+        }),
+        error.message,
+        100_000,
+        options
+      );
+      expect(first).toMatchObject({
+        attempts: 1,
+        exhausted: false,
+        nextFlushAttemptAt: 102_000,
+      });
+      const second = await recordPendingFlushFailure(
+        storage,
+        first.message,
+        error.message,
+        102_000,
+        options
+      );
+      expect(second).toMatchObject({
+        attempts: 2,
+        exhausted: true,
+        nextFlushAttemptAt: undefined,
+      });
+      expect(rpc).toHaveBeenCalledOnce();
+      expect(
+        contained
+          ? tokenMocks.resolveCloudAgentGitHubAuthForRepo
+          : tokenMocks.issueCloudAgentGitHubSessionCapability
+      ).not.toHaveBeenCalled();
+    });
+
+    it.each(['invalid_repo_format', 'invalid_org_id', 'integration_mismatch'] as const)(
+      'keeps %s as a permanent validation or authorization rejection',
+      async reason => {
+        const rpc = vi.fn().mockResolvedValue({ success: false, reason });
+
+        await expect(
+          new SessionService().resolveWorkspaceTokens(
+            createGitHubEnv(rpc),
+            metadata,
+            'ses-abcdef' as SandboxId
+          )
+        ).rejects.toMatchObject({
+          code: 'INVALID_REQUEST',
+          retryable: false,
+          workspaceFailureSubtype: undefined,
+          message: `GitHub repository authorization failed (${reason})`,
+        });
+        expect(rpc).toHaveBeenCalledOnce();
+      }
+    );
+
+    it('keeps an unconfigured database retryable without installation guidance', async () => {
+      const rpc = vi.fn().mockResolvedValue({ success: false, reason: 'database_not_configured' });
+
+      await expect(
+        new SessionService().resolveWorkspaceTokens(
+          createGitHubEnv(rpc),
+          metadata,
+          'ses-abcdef' as SandboxId
+        )
+      ).rejects.toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        retryable: true,
+        message: 'GitHub credential service is unavailable. Please try again.',
+      });
+    });
+
+    it('keeps an unavailable binding retryable without falling back to raw credentials', async () => {
+      const env = createEnv();
+      delete env.GIT_TOKEN_SERVICE;
+
+      await expect(
+        new SessionService().resolveWorkspaceTokens(env, metadata, 'ses-abcdef' as SandboxId)
+      ).rejects.toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        retryable: true,
+        message: 'GitHub credential service is unavailable. Please try again.',
+      });
+      expect(
+        contained
+          ? tokenMocks.resolveCloudAgentGitHubAuthForRepo
+          : tokenMocks.issueCloudAgentGitHubSessionCapability
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not infer an access failure or expose details from an unknown reason', async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        success: false,
+        reason: 'unknown-secret-credential',
+      });
+
+      await expect(
+        new SessionService().resolveWorkspaceTokens(
+          createGitHubEnv(rpc),
+          metadata,
+          'ses-abcdef' as SandboxId
+        )
+      ).rejects.toMatchObject({
+        code: 'WORKSPACE_SETUP_FAILED',
+        retryable: true,
+        workspaceFailureSubtype: undefined,
+        message: 'GitHub credential resolution failed. Please try again.',
+        safeFailureMessage: 'GitHub credential resolution failed. Please try again.',
+        cause: undefined,
+      });
+    });
+  });
+
+  it('preserves a permanent capability configuration rejection without a raw token fallback', async () => {
+    tokenMocks.issueCloudAgentGitHubSessionCapability.mockResolvedValueOnce({
+      success: false,
+      error: { reason: 'capability_configuration_error', message: 'private-key-details' },
+    });
+
+    await expect(
+      new SessionService().resolveWorkspaceTokens(
+        createEnv(),
+        createMetadata({
+          githubRepo: 'acme/repo',
+          gitUrl: undefined,
+          gitToken: undefined,
+          platform: 'github',
+        }),
+        'ses-abcdef' as SandboxId
+      )
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+      retryable: false,
+      message: 'GitHub repository authorization failed (capability_configuration_error)',
+      cause: undefined,
+    });
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+  });
+
+  it('rejects a DIND sandbox before attempting contained GitHub credential issuance', async () => {
+    await expect(
+      new SessionService().resolveWorkspaceTokens(
+        createEnv(),
+        createMetadata({
+          githubRepo: 'acme/repo',
+          gitUrl: undefined,
+          gitToken: undefined,
+          platform: 'github',
+          credentialContainment: { github: true, gitlab: false, kilocode: false },
+        }),
+        'dind-test' as SandboxId
+      )
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+      retryable: false,
+      message: 'Managed SCM containment is not supported for DIND sandboxes',
+    });
+    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
   });
 
   it('fails closed for replayed Bitbucket metadata without an organization', async () => {
@@ -1964,7 +2261,7 @@ describe('SessionService.prepareWorkspace', () => {
           platform: 'github',
         }),
       })
-    ).rejects.toThrow('GitHub token or active app installation required');
+    ).rejects.toThrow('GitHub credential service is unavailable. Please try again.');
 
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
   });
@@ -2394,7 +2691,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           platform: 'github',
         })
       )
-    ).rejects.toThrow('GitHub token or active app installation required');
+    ).rejects.toThrow('GitHub credential service is unavailable. Please try again.');
 
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
   });
@@ -2975,7 +3272,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
 
     await expect(buildPromptWrapperRequests(metadata)).rejects.toThrow(
-      'GitHub token or active app installation required'
+      'GitHub credential service is unavailable. Please try again.'
     );
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalled();

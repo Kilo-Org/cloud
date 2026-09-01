@@ -152,7 +152,9 @@
     "appearanceDark": "어두움",
     "account": "계정",
     "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
-    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다."
+    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다.",
+    "returnSendsMessage": "리턴 키로 메시지 보내기",
+    "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다."
   },
   "notifications": {
     "title": "알림",
@@ -296,7 +298,8 @@
       "networkError": "네트워크 오류",
       "uploadFailed": "업로드 실패",
       "failedToUploadFile": "파일을 업로드하지 못했습니다: {{reason}}",
-      "nothingToPaste": "붙여넣을 내용이 없습니다"
+      "nothingToPaste": "붙여넣을 내용이 없습니다",
+      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1687,7 +1690,11 @@
       "previousTaskFinishing": "이전 작업이 아직 끝나지 않았습니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "지금 서비스를 사용할 수 없습니다. 다시 시도하세요.",
       "connectionTrouble": "연결 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
-      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요."
+      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요.",
+      "cancelQueuedFailed": "메시지를 취소하지 못했습니다.",
+      "cancelQueuedRestoreAvailable": "메시지가 취소되었습니다. 복원을 탭하여 메시지 입력란으로 되돌리세요.",
+      "cancelQueuedRestored": "메시지가 취소되었습니다. 프롬프트가 메시지 입력란으로 돌아왔습니다.",
+      "cancelQueuedUpgradeRequired": "대기 중인 메시지를 취소하려면 최신 Kilo CLI가 필요합니다. Kilo CLI를 업데이트하고 다시 연결하세요."
     },
     "remoteSession": {
       "failedToCreate": "원격 세션을 만들지 못했습니다",
@@ -1759,7 +1766,8 @@
       "continueFrom": "{{title}} 계속하는 중",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI는 세션을 계속할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
-      "importFailed": "이 세션을 가져올 수 없습니다."
+      "importFailed": "이 세션을 가져올 수 없습니다.",
+      "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -2007,7 +2015,11 @@
       "queuedAccessibility": "메시지 대기 중",
       "userMessage": "사용자 메시지",
       "assistantMessage": "어시스턴트 메시지",
-      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요"
+      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요",
+      "cancelQueued": "메시지 취소",
+      "cancelQueuedAccessibility": "대기 중인 메시지 취소",
+      "restoreQueued": "복원",
+      "restoreQueuedAccessibility": "취소된 메시지를 메시지 입력란으로 복원"
     },
     "olderMessages": {
       "arrived": "이전 메시지 로드됨",
@@ -2035,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "세션 필터링",
-      "sortBy": "정렬 기준",
-      "sortLastUpdated": "마지막 업데이트",
-      "sortCreated": "생성됨",
       "platform": "플랫폼",
       "platformCloud": "클라우드",
       "platformExtension": "확장 프로그램",
@@ -2091,7 +2100,9 @@
       "uploading": "업로드 중…",
       "uploaded": "업로드됨",
       "uploadFailedRetry": "업로드에 실패했습니다. 탭하여 다시 시도하세요.",
-      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다."
+      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다.",
+      "moveLeft": "{{filename}} 왼쪽으로 이동",
+      "moveRight": "{{filename}} 오른쪽으로 이동"
     },
     "attachmentPasteHint": {
       "accessibility": "클립보드에서 이미지 붙여넣기",
@@ -2121,7 +2132,11 @@
       "finalizingPlaceholder": "마무리 중...",
       "messagePlaceholder": "메시지...",
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
-      "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 다시 시도하려면 보내기를 탭하세요."
+      "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 다시 시도하려면 보내기를 탭하세요.",
+      "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
+      "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
+      "charactersRemaining": "{{count}}자 남음",
+      "insertNewline": "줄바꿈 삽입"
     },
     "chatLink": {
       "linkCopied": "링크 복사됨",
@@ -2340,7 +2355,8 @@
     "busy": "음성 입력이 사용 중입니다. 다시 시도하세요.",
     "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
     "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
-    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다."
+    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다.",
+    "listeningStopped": "듣기가 중지되었습니다."
   },
   "share": {
     "title": "Kilo로 공유",

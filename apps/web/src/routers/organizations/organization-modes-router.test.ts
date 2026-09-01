@@ -3,6 +3,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { addUserToOrganization, getOrganizationById } from '@/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
+import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import type { User, Organization } from '@kilocode/db/schema';
 import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -13,10 +14,38 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
+jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+  getEnhancedOpenRouterModels: jest.fn(
+    async () =>
+      ({
+        data: [
+          {
+            id: 'openai/gpt-4o',
+            name: 'GPT-4o',
+            created: 0,
+            description: '',
+            architecture: {
+              input_modalities: ['text'],
+              output_modalities: ['text'],
+              tokenizer: 'test',
+            },
+            top_provider: { is_moderated: false },
+            pricing: { prompt: '0', completion: '0' },
+            context_length: 8192,
+          },
+        ],
+      }) satisfies OpenRouterModelsResponse
+  ),
+}));
+
 jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
   getProviderSlugsForModel: jest.fn(async (modelId: string) =>
     modelId === 'openai/gpt-4o' ? new Set(['openai']) : new Set()
   ),
+}));
+
+jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
+  isPublicIdExperimented: jest.fn(async () => false),
 }));
 
 const mockedIsReleaseToggleEnabled = jest.mocked(

@@ -152,7 +152,9 @@
     "appearanceDark": "Tumma",
     "account": "Tili",
     "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
-    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun."
+    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun.",
+    "returnSendsMessage": "Enter-näppäin lähettää viestin",
+    "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -750,7 +752,8 @@
       "networkError": "Verkkovirhe",
       "uploadFailed": "Lataus epäonnistui",
       "failedToUploadFile": "Tiedoston lataaminen epäonnistui: {{reason}}",
-      "nothingToPaste": "Ei mitään liitettävää"
+      "nothingToPaste": "Ei mitään liitettävää",
+      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua.",
-      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen."
+      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen.",
+      "cancelQueuedFailed": "Viestiä ei voitu peruuttaa.",
+      "cancelQueuedRestoreAvailable": "Viesti peruutettu. Napauta Palauta palauttaaksesi sen viestikenttään.",
+      "cancelQueuedRestored": "Viesti peruutettu. Kehote on taas viestikentässä.",
+      "cancelQueuedUpgradeRequired": "Jonossa olevien viestien peruuttaminen edellyttää uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "continueFrom": "Jatketaan {{title}}",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
-      "importingSession": "Tuodaan istuntoa"
+      "importingSession": "Tuodaan istuntoa",
+      "discardWithUploadsMessage": "Kehotteesi ja ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan."
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Viesti jonossa",
       "userMessage": "Käyttäjän viesti",
       "assistantMessage": "Avustajan viesti",
-      "longPressHint": "Pitkä painallus viestin tietoja varten"
+      "longPressHint": "Pitkä painallus viestin tietoja varten",
+      "cancelQueued": "Peruuta viesti",
+      "cancelQueuedAccessibility": "Peruuta jonossa oleva viesti",
+      "restoreQueued": "Palauta",
+      "restoreQueuedAccessibility": "Palauta peruutettu viesti viestikenttään"
     },
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Suodata istuntoja",
-      "sortBy": "Lajittele",
-      "sortLastUpdated": "Päivitetty viimeksi",
-      "sortCreated": "Luotu",
       "platform": "Alusta",
       "platformCloud": "Pilvi",
       "platformExtension": "Laajennus",
@@ -2545,7 +2554,9 @@
       "uploading": "Ladataan…",
       "uploaded": "Ladattu",
       "uploadFailedRetry": "Lataus epäonnistui. Napauta yrittääksesi uudelleen.",
-      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata."
+      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata.",
+      "moveLeft": "Siirrä {{filename}} vasemmalle",
+      "moveRight": "Siirrä {{filename}} oikealle"
     },
     "attachmentPasteHint": {
       "accessibility": "Liitä kuva leikepöydältä",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Viimeistellään...",
       "messagePlaceholder": "Viesti...",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet lähettääksesi viestisi.",
-      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen."
+      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen.",
+      "discardAttachmentsMessage": "Ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
+      "discardAttachmentsTitle": "Hylätäänkö liitteet?",
+      "charactersRemaining": "{{count}} merkkiä jäljellä",
+      "insertNewline": "Lisää rivinvaihto"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",
@@ -2794,7 +2809,8 @@
     "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
     "stopped": "Puheentunnistus pysähtyi. Napauta mikrofonia yrittääksesi uudelleen.",
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
-    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle."
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle.",
+    "listeningStopped": "Kuuntelu pysähtyi."
   },
   "share": {
     "title": "Jaa Kiloon",

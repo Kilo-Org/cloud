@@ -151,7 +151,6 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     isSearching: false,
     searchQuery: '',
     onClearQuery: () => undefined,
-    sortBy: 'updated_at',
     ...overrides,
   };
 }
@@ -254,11 +253,10 @@ describe('AgentSessionListContent liveness', () => {
       press(hosts(renderer, 'StoredSessionRow')[1]);
       expect(destination).toEqual(['later', 'org-1', 'later title']);
 
-      act(() => {
-        renderer.update(createElement(AgentSessionListContent, { ...props, sortBy: 'created_at' }));
-      });
-      expect(hosts(renderer, 'SectionList')[0]).not.toBe(list);
-      expect(rows(renderer).map(item => item.id)).toEqual(['first', 'later']);
+      expect(hosts(renderer, 'StoredSessionRow').map(node => node.props.sortBy)).toEqual([
+        'created_at',
+        'created_at',
+      ]);
     }
   );
 

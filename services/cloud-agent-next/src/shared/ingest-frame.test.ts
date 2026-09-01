@@ -9,6 +9,11 @@ import {
 } from './ingest-frame.js';
 import { MAX_INLINE_FILE_URL_LENGTH } from './trim-payload.js';
 import type { IngestEvent } from './protocol.js';
+import {
+  classifyAssistantFailure,
+  isAssistantInterrupt,
+  projectSafeAssistantError,
+} from './assistant-failure.js';
 
 describe('prepareIngestFrame', () => {
   it('passes small events through unchanged', () => {
@@ -160,6 +165,183 @@ describe('prepareIngestFrame', () => {
     expect(info.role).toBe('assistant');
     expect(info.parts).toBeUndefined();
   });
+
+  it.each([
+    [undefined, false],
+    [null, false],
+    ['', true],
+    [false, true],
+    [0, true],
+    [true, true],
+    [1, true],
+    [[], true],
+    [{}, true],
+    [{ message: '' }, true],
+    [{ data: {} }, true],
+    [{ data: { message: '' } }, true],
+    [
+      {
+        responseBody: 'poison-body',
+        headers: { authorization: 'poison-header' },
+        metadata: 'poison-metadata',
+      },
+      true,
+    ],
+    ...[
+      'ProviderAuthError',
+      'UnknownError',
+      'MessageOutputLengthError',
+      'MessageAbortedError',
+      'StructuredOutputError',
+      'ContextOverflowError',
+      'ContentFilterError',
+      'APIError',
+    ].map(name => [{ name, data: {} }, true] as const),
+  ] as const)(
+    'preserves non-null error presence through projection and compaction: %j',
+    (error, hasError) => {
+      const projected = projectSafeAssistantError(error);
+      expect(projected !== undefined).toBe(hasError);
+      const frame = prepareIngestFrame({
+        streamEventType: 'kilocode',
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_presence',
+              role: 'assistant',
+              parentID: 'msg_parent',
+              error,
+              metadata: 'poison-metadata'.repeat(MAX_INGEST_EVENT_BYTES),
+            },
+          },
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.compacted).toBe(true);
+      expect(frame.serialized).not.toContain('poison');
+      const compactInfo = JSON.parse(frame.serialized).data.properties.info;
+      expect(compactInfo.error !== undefined && compactInfo.error !== null).toBe(hasError);
+      expect(compactInfo.error).toEqual(projected);
+      expect(isAssistantInterrupt(compactInfo.error)).toBe(isAssistantInterrupt(error));
+      if (!isAssistantInterrupt(error)) {
+        expect(classifyAssistantFailure(compactInfo.error)).toEqual(
+          classifyAssistantFailure(error)
+        );
+      }
+    }
+  );
+
+  it.each([
+    ['APIError', 'Payment required: insufficient credits'],
+    ['APIError', 'Unknown model'],
+    ['APIError', '[BYOK] Rate limit exceeded'],
+    ['APIError', 'Provider timeout'],
+    ['ProviderAuthError', '[BYOK] Provider authentication failed'],
+    ['APIError', 'Invalid request'],
+    ['APIError', 'Service unavailable'],
+    ['APIError', 'Unrecognized failure'],
+    ['ContextOverflowError', 'Unrecognized failure'],
+    ['MessageOutputLengthError', '[BYOK] Unrecognized failure'],
+    ['ContentFilterError', 'Unrecognized failure'],
+    ['StructuredOutputError', 'Unrecognized failure'],
+    ['UnknownError', 'Unrecognized failure'],
+    ['MessageAbortedError', 'aborted'],
+    ['MessageAbortedError', '[BYOK] aborted'],
+    ['FutureError', 'Unrecognized failure'],
+  ])(
+    'round-trips canonical error and interruption meaning through compaction for %s: %s',
+    (name, message) => {
+      const error = {
+        name,
+        data: {
+          message,
+          statusCode: 503,
+          isRetryable: false,
+          responseBody: 'poison-body'.repeat(MAX_INGEST_EVENT_BYTES),
+          responseHeaders: { authorization: 'poison-header' },
+          metadata: { url: 'https://poison.example' },
+        },
+      };
+      const safeError = projectSafeAssistantError(error);
+      for (const source of [error, safeError]) {
+        const info = {
+          id: 'asst_compacted',
+          parentID: 'msg_parent',
+          sessionID: 'session_root',
+          role: 'assistant',
+          modelID: 'vendor/model',
+          providerID: 'kilo',
+          error: source,
+          time: { created: 1, completed: 2 },
+          metadata: {
+            prompt: 'poison-prompt'.repeat(MAX_INGEST_EVENT_BYTES),
+            toolArguments: 'poison-arguments',
+          },
+        };
+        const frame = prepareIngestFrame({
+          streamEventType: 'kilocode',
+          timestamp: '2026-04-14T08:00:00.000Z',
+          data: { event: 'message.updated', properties: { info } },
+        });
+
+        expect(frame.kind).toBe('send');
+        if (frame.kind !== 'send') return;
+        expect(frame.compacted).toBe(true);
+        expect(frame.bytes).toBeLessThanOrEqual(MAX_INGEST_EVENT_BYTES);
+        expect(frame.serialized).not.toContain('poison');
+        const compactInfo = JSON.parse(frame.serialized).data.properties.info;
+        expect(compactInfo).toEqual({
+          id: info.id,
+          parentID: info.parentID,
+          sessionID: info.sessionID,
+          role: 'assistant',
+          time: info.time,
+          error: safeError,
+        });
+        expect(compactInfo.error).toBeTypeOf('string');
+        expect(isAssistantInterrupt(compactInfo.error)).toBe(isAssistantInterrupt(error));
+        expect(projectSafeAssistantError(compactInfo.error)).toBe(safeError);
+        if (!isAssistantInterrupt(error)) {
+          expect(classifyAssistantFailure(compactInfo.error)).toEqual(
+            classifyAssistantFailure(error)
+          );
+        }
+      }
+    }
+  );
+
+  it.each(['legacy error with poison-message', { metadata: 'poison-metadata' }])(
+    'preserves terminal error presence without SDK metadata for %j',
+    error => {
+      const frame = prepareIngestFrame({
+        streamEventType: 'kilocode',
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'asst_legacy',
+              role: 'assistant',
+              modelID: 'https://poison.example/model',
+              providerID: 'kilo',
+              error,
+              parts: ['poison-prompt'.repeat(MAX_INGEST_EVENT_BYTES)],
+            },
+          },
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.serialized).not.toContain('poison');
+      const info = JSON.parse(frame.serialized).data.properties.info;
+      expect(info.error).toBe('Assistant request failed');
+      expect(info).not.toHaveProperty('modelID');
+      expect(info).not.toHaveProperty('providerID');
+    }
+  );
 
   it('still sends a compact fatal event for a terminal error with huge diagnostics', () => {
     const event: IngestEvent = {

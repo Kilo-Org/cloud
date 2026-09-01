@@ -280,7 +280,8 @@
       "networkError": "Erro de rede",
       "uploadFailed": "Falha no envio",
       "failedToUploadFile": "Falha ao enviar o arquivo: {{reason}}",
-      "nothingToPaste": "Nada para colar"
+      "nothingToPaste": "Nada para colar",
+      "metadataStripFailed": "Não foi possível remover os metadados da foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1679,7 +1680,11 @@
       "previousTaskFinishing": "A tarefa anterior ainda está terminando. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível no momento. Tente novamente.",
       "connectionTrouble": "Problema de conexão. Tente novamente em um momento.",
-      "modelUnavailable": "Este modelo não está disponível para o Cloud Agent. Escolha outro modelo e tente novamente."
+      "modelUnavailable": "Este modelo não está disponível para o Cloud Agent. Escolha outro modelo e tente novamente.",
+      "cancelQueuedFailed": "Não foi possível cancelar a mensagem.",
+      "cancelQueuedRestoreAvailable": "Mensagem cancelada. Toque em Restaurar para devolvê-la ao campo de mensagem.",
+      "cancelQueuedRestored": "Mensagem cancelada. O prompt está de volta no campo de mensagem.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensagens na fila exige uma Kilo CLI mais recente. Atualize a Kilo CLI e reconecte."
     },
     "remoteSession": {
       "failedToCreate": "Falha ao criar a sessão remota",
@@ -1751,7 +1756,8 @@
       "continueFrom": "Continuando {{title}}",
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não pode continuar uma sessão. Escolha Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão."
+      "importFailed": "Não foi possível importar esta sessão.",
+      "discardWithUploadsMessage": "Seu prompt e todos os arquivos enviados que não estiverem anexados a mensagens enviadas serão excluídos."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo atualizado",
@@ -2002,7 +2008,11 @@
       "queuedAccessibility": "Mensagem na fila",
       "userMessage": "Mensagem do usuário",
       "assistantMessage": "Mensagem do assistente",
-      "longPressHint": "Pressione e segure para ver os detalhes da mensagem"
+      "longPressHint": "Pressione e segure para ver os detalhes da mensagem",
+      "cancelQueued": "Cancelar mensagem",
+      "cancelQueuedAccessibility": "Cancelar mensagem na fila",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar mensagem cancelada no campo de mensagem"
     },
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",
@@ -2033,9 +2043,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sessões",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Última atualização",
-      "sortCreated": "Criado",
       "platform": "Plataforma",
       "platformCloud": "Nuvem",
       "platformExtension": "Extensão",
@@ -2089,7 +2096,9 @@
       "uploading": "Enviando…",
       "uploaded": "Enviado",
       "uploadFailedRetry": "Falha no envio. Toque para tentar novamente.",
-      "uploadFailedTerminal": "Este arquivo não pode ser enviado."
+      "uploadFailedTerminal": "Este arquivo não pode ser enviado.",
+      "moveLeft": "Mover {{filename}} para a esquerda",
+      "moveRight": "Mover {{filename}} para a direita"
     },
     "attachmentPasteHint": {
       "accessibility": "Colar imagem da área de transferência",
@@ -2119,7 +2128,11 @@
       "finalizingPlaceholder": "Finalizando...",
       "messagePlaceholder": "Mensagem...",
       "cannotReceiveFiles": "Esta sessão não pode receber arquivos. Remova os anexos para enviar sua mensagem.",
-      "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em enviar para tentar novamente."
+      "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em enviar para tentar novamente.",
+      "discardAttachmentsMessage": "Os arquivos enviados que não estiverem anexados a mensagens enviadas serão excluídos.",
+      "discardAttachmentsTitle": "Descartar anexos?",
+      "charactersRemaining": "{{count}} caracteres restantes",
+      "insertNewline": "Inserir quebra de linha"
     },
     "chatLink": {
       "linkCopied": "Link copiado",
@@ -2249,7 +2262,9 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Adicionar atribuição do app às avaliações de PR",
-    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação."
+    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação.",
+    "returnSendsMessage": "A tecla Enter envia a mensagem",
+    "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes."
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2355,7 +2370,8 @@
     "busy": "A entrada de voz está ocupada. Tente novamente.",
     "stopped": "A entrada de voz foi interrompida. Toque no microfone para tentar novamente.",
     "unavailableDevice": "A entrada de voz não está disponível neste dispositivo.",
-    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo."
+    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo.",
+    "listeningStopped": "Escuta interrompida."
   },
   "share": {
     "title": "Compartilhar no Kilo",

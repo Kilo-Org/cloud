@@ -152,7 +152,9 @@
     "appearanceDark": "ਗੂੜ੍ਹਾ",
     "account": "ਖਾਤਾ",
     "prReviewAttribution": "PR ਸਮੀਖਿਆਵਾਂ ਵਿੱਚ ਐਪ ਐਟ੍ਰੀਬਿਊਸ਼ਨ ਸ਼ਾਮਲ ਕਰੋ",
-    "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰਨ ਵੇਲੇ Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਫੁੱਟਰ ਜੋੜੋ।"
+    "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰਨ ਵੇਲੇ Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਫੁੱਟਰ ਜੋੜੋ।",
+    "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
+    "returnSendsMessageSubtitle": "ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਏਜੰਟ ਕੰਪੋਜ਼ਰਾਂ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
@@ -750,7 +752,8 @@
       "networkError": "ਨੈੱਟਵਰਕ ਗਲਤੀ",
       "uploadFailed": "ਅੱਪਲੋਡ ਅਸਫਲ",
       "failedToUploadFile": "ਫਾਈਲ ਅੱਪਲੋਡ ਕਰਨ ਵਿੱਚ ਅਸਫਲ: {{reason}}",
-      "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ"
+      "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ",
+      "metadataStripFailed": "ਫੋਟੋ ਮੈਟਾਡੇਟਾ ਨਹੀਂ ਹਟਾਇਆ ਜਾ ਸਕਿਆ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਉਡੀਕੋ।",
       "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "connectionTrouble": "ਕਨੈਕਸ਼ਨ ਸਮੱਸਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "modelUnavailable": "ਇਹ ਮਾਡਲ Cloud Agent ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਮਾਡਲ ਚੁਣੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "modelUnavailable": "ਇਹ ਮਾਡਲ Cloud Agent ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਮਾਡਲ ਚੁਣੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "cancelQueuedFailed": "ਸੁਨੇਹਾ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "cancelQueuedRestoreAvailable": "ਸੁਨੇਹਾ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਇਸਨੂੰ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਵਾਪਸ ਲਿਆਉਣ ਲਈ ਬਹਾਲ ਕਰੋ 'ਤੇ ਟੈਪ ਕਰੋ।",
+      "cancelQueuedRestored": "ਸੁਨੇਹਾ ਰੱਦ ਕੀਤਾ ਗਿਆ। ਪ੍ਰੰਪਟ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਵਾਪਸ ਆ ਗਿਆ ਹੈ।",
+      "cancelQueuedUpgradeRequired": "ਕਤਾਰ ਵਿੱਚ ਪਏ ਸੁਨੇਹੇ ਰੱਦ ਕਰਨ ਲਈ Kilo CLI ਦੇ ਨਵੇਂ ਸੰਸਕਰਣ ਦੀ ਲੋੜ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਮੁੜ ਕਨੈਕਟ ਕਰੋ।"
     },
     "remoteSession": {
       "failedToCreate": "ਰਿਮੋਟ ਸੈਸ਼ਨ ਬਣਾਉਣ ਵਿੱਚ ਅਸਫਲ",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। ਕਲਾਉਡ ਏਜੰਟ ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
       "continueFrom": "{{title}} ਜਾਰੀ ਰੱਖ ਰਿਹਾ ਹੈ",
       "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
+      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੰਪਟ ਅਤੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹਿਆਂ ਨਾਲ ਅਟੈਚ ਨਾ ਕੀਤੀਆਂ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2463,7 +2471,11 @@
       "queuedAccessibility": "ਸੁਨੇਹਾ ਕਤਾਰ ਵਿੱਚ",
       "userMessage": "ਵਰਤੋਂਕਾਰ ਸੁਨੇਹਾ",
       "assistantMessage": "ਸਹਾਇਕ ਸੁਨੇਹਾ",
-      "longPressHint": "ਸੁਨੇਹੇ ਦੇ ਵੇਰਵਿਆਂ ਲਈ ਲੰਬਾ ਦਬਾਓ"
+      "longPressHint": "ਸੁਨੇਹੇ ਦੇ ਵੇਰਵਿਆਂ ਲਈ ਲੰਬਾ ਦਬਾਓ",
+      "cancelQueued": "ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
+      "cancelQueuedAccessibility": "ਕਤਾਰ ਵਿੱਚ ਪਿਆ ਸੁਨੇਹਾ ਰੱਦ ਕਰੋ",
+      "restoreQueued": "ਬਹਾਲ ਕਰੋ",
+      "restoreQueuedAccessibility": "ਰੱਦ ਕੀਤਾ ਸੁਨੇਹਾ ਕੰਪੋਜ਼ਰ ਵਿੱਚ ਬਹਾਲ ਕਰੋ"
     },
     "olderMessages": {
       "arrived": "ਪਹਿਲੇ ਸੁਨੇਹੇ ਲੋਡ ਹੋ ਗਏ",
@@ -2491,9 +2503,6 @@
     },
     "sessionFilter": {
       "title": "ਸੈਸ਼ਨ ਫਿਲਟਰ ਕਰੋ",
-      "sortBy": "ਕ੍ਰਮਬੱਧ ਕਰੋ",
-      "sortLastUpdated": "ਆਖਰੀ ਅੱਪਡੇਟ",
-      "sortCreated": "ਬਣਾਇਆ ਗਿਆ",
       "platform": "ਪਲੇਟਫਾਰਮ",
       "platformCloud": "ਕਲਾਉਡ",
       "platformExtension": "ਐਕਸਟੈਂਸ਼ਨ",
@@ -2547,7 +2556,9 @@
       "uploading": "ਅੱਪਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…",
       "uploaded": "ਅੱਪਲੋਡ ਹੋ ਗਿਆ",
       "uploadFailedRetry": "ਅੱਪਲੋਡ ਅਸਫਲ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।",
-      "uploadFailedTerminal": "ਇਹ ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।"
+      "uploadFailedTerminal": "ਇਹ ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
+      "moveLeft": "{{filename}} ਖੱਬੇ ਲਿਜਾਓ",
+      "moveRight": "{{filename}} ਸੱਜੇ ਲਿਜਾਓ"
     },
     "attachmentPasteHint": {
       "accessibility": "ਕਲਿੱਪਬੋਰਡ ਤੋਂ ਚਿੱਤਰ ਪੇਸਟ ਕਰੋ",
@@ -2577,7 +2588,11 @@
       "finalizingPlaceholder": "ਮੁਕੰਮਲ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
       "messagePlaceholder": "ਸੁਨੇਹਾ...",
       "cannotReceiveFiles": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਆਪਣਾ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਅਟੈਚਮੈਂਟ ਹਟਾਓ।",
-      "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਭੇਜੋ ਟੈਪ ਕਰੋ।"
+      "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਭੇਜੋ ਟੈਪ ਕਰੋ।",
+      "discardAttachmentsMessage": "ਭੇਜੇ ਗਏ ਸੁਨੇਹਿਆਂ ਨਾਲ ਅਟੈਚ ਨਾ ਕੀਤੀਆਂ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ।",
+      "discardAttachmentsTitle": "ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਈਏ?",
+      "charactersRemaining": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ",
+      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",
@@ -2796,7 +2811,8 @@
     "busy": "ਵੌਇਸ ਇਨਪੁਟ ਰੁੱਝਿਆ ਹੋਇਆ ਹੈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "stopped": "ਵੌਇਸ ਇਨਪੁਟ ਰੁਕ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ।",
     "unavailableDevice": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-    "unavailableLanguage": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਭਾਸ਼ਾ ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+    "unavailableLanguage": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਭਾਸ਼ਾ ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+    "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।"
   },
   "share": {
     "title": "Kilo ਨੂੰ ਸਾਂਝਾ ਕਰੋ",

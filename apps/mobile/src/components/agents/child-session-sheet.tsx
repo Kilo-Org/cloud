@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -75,6 +75,21 @@ export function ChildSessionSheet({
   const state = getChildSessionSheetState(hydrationState, messages.length, sessionError);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
   const { t } = useTranslation();
+  // Hydration drops its error while retrying. Retain this child's copy so
+  // the recovery controls stay mounted until the request settles.
+  const [lastHydrationError, setLastHydrationError] = useState<{
+    sessionId: string;
+    message: string | null;
+  }>({ sessionId, message: null });
+  let hydrationError: string | null = null;
+  if (hydrationState.status === 'error') {
+    hydrationError = hydrationState.message;
+  } else if (hydrationState.status === 'loading' && lastHydrationError.sessionId === sessionId) {
+    hydrationError = lastHydrationError.message;
+  }
+  if (lastHydrationError.sessionId !== sessionId || lastHydrationError.message !== hydrationError) {
+    setLastHydrationError({ sessionId, message: hydrationError });
+  }
   // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
   // always propagate the home-indicator inset), so we floor the value with
   // a comfortable constant to keep the last row / working indicator clear
@@ -85,32 +100,48 @@ export function ChildSessionSheet({
 
   if (state === 'content') {
     content = (
-      <SessionMessageList
-        sessionId={sessionId}
-        items={messages}
-        keyExtractor={message => message.info.id}
-        hasOlderMessages={hasOlderMessages}
-        isLoadingOlderMessages={isLoadingOlderMessages}
-        olderMessagesError={olderMessagesError}
-        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-        onLoadOlderMessages={onLoadOlderMessages}
-        renderItem={({ item }) => (
-          <MessageErrorBoundary>
-            <View className="px-4 py-1">
-              <ChildSessionMessage
-                message={item}
-                depth={0}
-                getChildMessages={getChildMessages}
-                renderPart={renderPart}
-                onOpenChildSession={onOpenChildSession}
-                modelOptions={modelOptions}
-              />
-            </View>
-          </MessageErrorBoundary>
-        )}
-        ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
-        contentBottomInset={sheetBottomInset}
-      />
+      <View className="flex-1">
+        {sessionError ? (
+          <SessionStatusIndicator
+            indicator={{ type: 'error', message: sessionError, timestamp: 0 }}
+          />
+        ) : null}
+        {hydrationError !== null ? (
+          <QueryError
+            title={t('agentChat.childSessionSheet.couldNotLoad')}
+            message={hydrationError}
+            onRetry={onRetry}
+            isRetrying={hydrationState.status === 'loading'}
+            className="flex-none gap-3 border-b border-border py-3"
+          />
+        ) : null}
+        <SessionMessageList
+          sessionId={sessionId}
+          items={messages}
+          keyExtractor={message => message.info.id}
+          hasOlderMessages={hasOlderMessages}
+          isLoadingOlderMessages={isLoadingOlderMessages}
+          olderMessagesError={olderMessagesError}
+          olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+          onLoadOlderMessages={onLoadOlderMessages}
+          renderItem={({ item }) => (
+            <MessageErrorBoundary>
+              <View className="px-4 py-1">
+                <ChildSessionMessage
+                  message={item}
+                  depth={0}
+                  getChildMessages={getChildMessages}
+                  renderPart={renderPart}
+                  onOpenChildSession={onOpenChildSession}
+                  modelOptions={modelOptions}
+                />
+              </View>
+            </MessageErrorBoundary>
+          )}
+          ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
+          contentBottomInset={sheetBottomInset}
+        />
+      </View>
     );
   } else if (state === 'error') {
     content =
@@ -146,20 +177,9 @@ export function ChildSessionSheet({
     );
   }
 
-  if (state === 'content' && sessionError) {
-    content = (
-      <View className="flex-1">
-        <SessionStatusIndicator
-          indicator={{ type: 'error', message: sessionError, timestamp: 0 }}
-        />
-        {content}
-      </View>
-    );
-  }
-
   return (
     <SessionPageSheet visible={visible} onClose={onClose} onDismiss={onDismiss}>
-      <SheetHeader title={title} onDone={onClose} />
+      <SheetHeader title={title} wrapTitle onDone={onClose} />
       {modelLabel ? (
         <View className="border-b border-border px-4 py-2">
           <ChildSessionModelLabel modelLabel={modelLabel} />

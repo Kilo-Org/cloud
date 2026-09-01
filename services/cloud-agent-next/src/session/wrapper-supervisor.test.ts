@@ -963,6 +963,89 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it.each(['wrapper_ping_timeout', 'wrapper_no_output', 'wrapper_disconnected'] as const)(
+    'preserves %s with per-message activity stages and positive terminal reconciliation',
+    async failureCode => {
+      const deadlineAt = 100_000;
+      const harness = createHarness(
+        [
+          liveRuntimeState(
+            failureCode === 'wrapper_no_output'
+              ? { noOutputDeadlineAt: deadlineAt, nextPingAt: deadlineAt + 1 }
+              : { pingDeadlineAt: deadlineAt, noOutputDeadlineAt: deadlineAt + 1 }
+          ),
+          OWNED_WRAPPER_LEASE,
+          ...(failureCode === 'wrapper_disconnected'
+            ? [disconnectGraceForCurrentConnection(deadlineAt - 10_000)]
+            : []),
+        ],
+        {
+          getAssistantMessageForUserMessage: (_sessionId, _kiloSessionId, parentMessageId) =>
+            parentMessageId === MESSAGE_ID
+              ? null
+              : {
+                  eventId: 1,
+                  timestamp: 2_500,
+                  info: {
+                    id: `assistant_${parentMessageId}`,
+                    role: 'assistant',
+                    time: {
+                      created: 2_500,
+                      ...(parentMessageId === NEWEST_MESSAGE_ID ? { completed: 90_000 } : {}),
+                    },
+                  },
+                  parts: [],
+                },
+        }
+      );
+      await putSessionMessageState(harness.storage, acceptedMessage());
+      for (const messageId of [NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID]) {
+        await putSessionMessageState(harness.storage, {
+          ...acceptedMessage(messageId),
+          agentActivityObservedAt: 2_500,
+        });
+      }
+
+      await harness.supervisor.runMaintenance(deadlineAt - 1);
+      expect(harness.events).toHaveLength(0);
+      await harness.supervisor.runMaintenance(deadlineAt);
+
+      for (const [messageId, failureStage] of [
+        [MESSAGE_ID, 'post_dispatch_no_activity'],
+        [NEWER_MESSAGE_ID, 'agent_activity'],
+      ] as const) {
+        await expect(getSessionMessageState(harness.storage, messageId)).resolves.toMatchObject({
+          status: 'failed',
+          completionSource: 'wrapper_failure',
+          failureStage,
+          failureCode,
+        });
+        expect(harness.events.map(event => JSON.parse(event.payload))).toContainEqual(
+          expect.objectContaining({
+            messageId,
+            status: 'failed',
+            failure: expect.objectContaining({ stage: failureStage, code: failureCode }),
+          })
+        );
+      }
+      await expect(
+        getSessionMessageState(harness.storage, NEWEST_MESSAGE_ID)
+      ).resolves.toMatchObject({
+        status: 'completed',
+        completionSource: 'idle_reconciliation',
+        assistantMessageId: `assistant_${NEWEST_MESSAGE_ID}`,
+      });
+      expect(
+        harness.events.filter(event => event.streamEventType === 'cloud.message.completed')
+      ).toHaveLength(1);
+      expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+      await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+        state: 'stop_needed',
+        reason: 'unhealthy-wrapper',
+      });
+    }
+  );
+
   it('fails genuinely silent accepted work at the no-output deadline', async () => {
     const acceptedAt = 2_000;
     const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
@@ -984,7 +1067,7 @@ describe('WrapperSupervisor', () => {
     expect(state).toMatchObject({
       status: 'failed',
       failureReason: 'wrapper_failure',
-      error: 'Wrapper accepted the message but produced no output',
+      error: 'Wrapper made no execution progress during the watchdog window',
       completionSource: 'wrapper_failure',
       failureStage: 'post_dispatch_no_activity',
       failureCode: 'wrapper_no_output',
@@ -1100,7 +1183,16 @@ describe('WrapperSupervisor', () => {
             info: {
               id: 'ase_terminal_error',
               role: 'assistant',
-              error: { data: { message: 'Payment required: insufficient credits' } },
+              modelID: 'vendor/model',
+              providerID: 'kilo',
+              error: {
+                name: 'APIError',
+                data: {
+                  message: 'Payment required: insufficient credits',
+                  statusCode: 402,
+                  isRetryable: false,
+                },
+              },
             },
             parts: [],
           }) as unknown as LatestAssistantMessage,
@@ -1108,6 +1200,10 @@ describe('WrapperSupervisor', () => {
     );
     await putSessionMessageState(harness.storage, acceptedMessage());
 
+    await harness.supervisor.runMaintenance(pingDeadlineAt - 1);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
     await harness.supervisor.runMaintenance(pingDeadlineAt);
 
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
@@ -1115,6 +1211,9 @@ describe('WrapperSupervisor', () => {
       failureReason: 'assistant_error',
       completionSource: 'idle_reconciliation',
       failureCode: 'payment_required',
+      assistantMessageId: 'ase_terminal_error',
+      assistantFailureReason: 'insufficient_credits',
+      safeFailureMessage: 'Assistant request failed: insufficient credits',
     });
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
   });
@@ -1876,40 +1975,75 @@ describe('WrapperSupervisor', () => {
     }
   );
 
-  it('fails a still-accepted errored reply when the wrapper completes', async () => {
-    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
-      getAssistantMessageForUserMessage: () =>
-        ({
+  it.each([
+    ['APIError', 'provider_unavailable', 'Assistant service is unavailable'],
+    ['ContextOverflowError', 'context_limit', 'The model context limit was exceeded'],
+    ['MessageOutputLengthError', 'output_limit', 'The model output limit was reached'],
+    [
+      'ContentFilterError',
+      'content_filter',
+      'The model provider blocked the response under its content policy',
+    ],
+    [
+      'StructuredOutputError',
+      'structured_output',
+      'The model response did not match the required format',
+    ],
+  ] as const)(
+    'fails a still-accepted %s reply when the wrapper completes',
+    async (name, assistantFailureReason, safeFailureMessage) => {
+      const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+        getAssistantMessageForUserMessage: () => ({
+          eventId: 1,
+          timestamp: 2_500,
           info: {
             id: 'ase_complete_error',
             role: 'assistant',
-            error: { data: { message: 'provider failed during completion' } },
+            modelID: 'vendor/model',
+            providerID: 'kilo',
+            error: {
+              name,
+              data: {
+                message: 'provider failed during completion',
+                statusCode: 503,
+                isRetryable: false,
+                responseBody: 'poison-body',
+                responseHeaders: { authorization: 'poison-header' },
+              },
+            },
           },
           parts: [],
-        }) as unknown as LatestAssistantMessage,
-    });
-    await putSessionMessageState(harness.storage, acceptedMessage());
+        }),
+      });
+      await putSessionMessageState(harness.storage, acceptedMessage());
 
-    await harness.supervisor.onTerminalEvent({
-      wrapperRunId: WRAPPER_RUN_ID,
-      status: 'completed',
-      messageIds: [MESSAGE_ID],
-    });
+      await harness.supervisor.onTerminalEvent({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'completed',
+        messageIds: [MESSAGE_ID],
+      });
 
-    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
-      status: 'failed',
-      failureReason: 'assistant_error',
-      error: 'provider failed during completion',
-      completionSource: 'idle_reconciliation',
-    });
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      reason: 'terminal-failed',
-    });
-    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
-      wrapperGeneration: 4,
-    });
-  });
+      const failed = await getSessionMessageState(harness.storage, MESSAGE_ID);
+      expect(failed).toMatchObject({
+        status: 'failed',
+        failureReason: 'assistant_error',
+        error: 'provider failed during completion',
+        completionSource: 'idle_reconciliation',
+        assistantMessageId: 'ase_complete_error',
+        assistantFailureReason,
+        safeFailureMessage,
+      });
+      expect(failed).not.toHaveProperty('failureFacts');
+      expect(JSON.stringify(failed)).not.toMatch(/poison|vendor\/model|statusCode|isRetryable/);
+      await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+        state: 'stop_needed',
+        reason: 'terminal-failed',
+      });
+      await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+        wrapperGeneration: 4,
+      });
+    }
+  );
 
   it('includes the gate result when wrapper completion releases a reconciled callback', async () => {
     const assistantMessageId = 'ase_complete_gate';

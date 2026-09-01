@@ -166,6 +166,7 @@ export type WrapperBootstrapDeps = {
   git?: GitRunner;
   runProcess?: ProcessRunner;
   restoreSession?: typeof restoreSession;
+  beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
 
@@ -427,7 +428,15 @@ async function removePath(filePath: string, signal?: AbortSignal): Promise<void>
   }
 }
 
-async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<void> {
+async function cleanupWorkspace(
+  request: WrapperSessionReadyRequest,
+  beforeFailureCleanup: WrapperBootstrapDeps['beforeFailureCleanup']
+): Promise<void> {
+  try {
+    await beforeFailureCleanup?.();
+  } catch {
+    logToFile('Failed to finalize logs before workspace cleanup');
+  }
   await Promise.allSettled([
     removePath(request.workspace.workspacePath),
     removePath(request.workspace.sessionHome),
@@ -1189,7 +1198,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   request: WrapperSessionReadyRequest,
   progress: BootstrapProgress | undefined,
   deps: WrapperBootstrapDeps,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutError: WrapperBootstrapError
 ): Promise<WrapperBootstrapResult> {
   const runGit = deps.git ?? git;
   const run = deps.runProcess ?? runProcess;
@@ -1308,24 +1318,25 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
   } catch (error) {
-    if (error instanceof RestoredWorkspaceReconciliationError) {
-      if (workspaceNeedsBootstrap) {
-        await cleanupWorkspace(request);
-      }
-      throw error;
-    }
+    const failure = signal.reason === timeoutError ? timeoutError : error;
     const bootstrapError =
-      error instanceof WrapperBootstrapError
-        ? error
-        : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
+      failure instanceof WrapperBootstrapError
+        ? failure
+        : failure instanceof RestoredWorkspaceReconciliationError
+          ? new WrapperBootstrapError({
+              code: 'WORKSPACE_RECONCILIATION_FAILED',
+              message: redactSecrets(cleanTerminalOutput(failure.message)),
+              retryable: true,
+            })
+          : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
-      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
+      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
     );
     if (workspaceNeedsBootstrap) {
-      await cleanupWorkspace(request);
+      await cleanupWorkspace(request, deps.beforeFailureCleanup);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
-    throw bootstrapError;
+    throw failure instanceof RestoredWorkspaceReconciliationError ? failure : bootstrapError;
   }
 }
 
@@ -1377,11 +1388,9 @@ export async function prepareWrapperBootstrapWorkspace(
               : workspaceSignal,
           }),
       },
-      workspaceSignal
+      workspaceSignal,
+      timeoutError
     );
-  } catch (error) {
-    if (workspaceSignal.reason === timeoutError) throw timeoutError;
-    throw error;
   } finally {
     clearTimeout(timeout);
   }

@@ -12,7 +12,7 @@
  * Auth: X-Internal-Secret header.
  */
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -20,19 +20,10 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
 
 // Constant-time comparison so a public attacker can't probe the
-// internal-api secret via response-timing differences. HMAC both
-// inputs with a fixed key so timingSafeEqual always sees fixed-length
-// (sha256 = 32 bytes) buffers — this avoids any branch on length and
-// any padding-prefix corner case. The HMAC key doesn't need to be
-// secret; it just normalizes both sides to a uniform-distribution
-// 32-byte digest so the byte-by-byte compare is meaningful.
-const SECRET_COMPARE_HMAC_KEY = Buffer.from('kiloclaw-internal-secret-compare');
-
+// internal-api secret via response-timing differences.
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
-  const a = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
-  const b = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
-  return timingSafeEqual(a, b);
+  return timingSafeEqual(provided, expected);
 }
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we

@@ -152,7 +152,9 @@
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
     "prReviewAttribution": "Додати атрибуцію застосунку до перевірок PR",
-    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку."
+    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку.",
+    "returnSendsMessage": "Клавіша повернення надсилає повідомлення",
+    "returnSendsMessageSubtitle": "Коли вимкнено, клавіша повернення вставляє новий рядок у полях введення повідомлень агентам."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -296,7 +298,8 @@
       "networkError": "Помилка мережі",
       "uploadFailed": "Не вдалося завантажити",
       "failedToUploadFile": "Не вдалося завантажити файл: {{reason}}",
-      "nothingToPaste": "Нема чого вставити"
+      "nothingToPaste": "Нема чого вставити",
+      "metadataStripFailed": "Не вдалося видалити метадані фото."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1703,7 +1706,11 @@
       "previousTaskFinishing": "Попереднє завдання ще завершується. Зачекайте, будь ласка.",
       "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз, будь ласка.",
       "connectionTrouble": "Проблеми зі з'єднанням. Спробуйте ще раз за мить.",
-      "modelUnavailable": "Ця модель недоступна для Cloud Agent. Виберіть іншу модель і спробуйте ще раз."
+      "modelUnavailable": "Ця модель недоступна для Cloud Agent. Виберіть іншу модель і спробуйте ще раз.",
+      "cancelQueuedFailed": "Не вдалося скасувати повідомлення.",
+      "cancelQueuedRestoreAvailable": "Повідомлення скасовано. Торкніться «Відновити», щоб повернути його в поле введення повідомлення.",
+      "cancelQueuedRestored": "Повідомлення скасовано. Запит знову в полі введення повідомлення.",
+      "cancelQueuedUpgradeRequired": "Скасування повідомлень у черзі потребує новішої версії Kilo CLI. Оновіть Kilo CLI та підключіться знову."
     },
     "remoteSession": {
       "failedToCreate": "Не вдалося створити віддалений сеанс",
@@ -1775,7 +1782,8 @@
       "cliCannotContinue": "Цей CLI не може продовжити сеанс. Виберіть Хмарний агент або інший CLI.",
       "continueFrom": "Продовження {{title}}",
       "importFailed": "Не вдалося імпортувати цей сеанс.",
-      "importingSession": "Імпортування сеансу"
+      "importingSession": "Імпортування сеансу",
+      "discardWithUploadsMessage": "Ваш запит і всі завантажені файли, не прикріплені до надісланих повідомлень, буде видалено."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -2027,7 +2035,11 @@
       "queuedAccessibility": "Повідомлення в черзі",
       "userMessage": "Повідомлення користувача",
       "assistantMessage": "Повідомлення асистента",
-      "longPressHint": "Довге натискання для відомостей про повідомлення"
+      "longPressHint": "Довге натискання для відомостей про повідомлення",
+      "cancelQueued": "Скасувати повідомлення",
+      "cancelQueuedAccessibility": "Скасувати повідомлення в черзі",
+      "restoreQueued": "Відновити",
+      "restoreQueuedAccessibility": "Відновити скасоване повідомлення в полі введення повідомлення"
     },
     "olderMessages": {
       "arrived": "Раніші повідомлення завантажено",
@@ -2061,9 +2073,6 @@
     },
     "sessionFilter": {
       "title": "Фільтрувати сеанси",
-      "sortBy": "Сортувати за",
-      "sortLastUpdated": "Останнє оновлення",
-      "sortCreated": "Створено",
       "platform": "Платформа",
       "platformCloud": "Хмара",
       "platformExtension": "Розширення",
@@ -2117,7 +2126,9 @@
       "uploading": "Завантаження…",
       "uploaded": "Завантажено",
       "uploadFailedRetry": "Завантаження не вдалося. Торкніться, щоб повторити.",
-      "uploadFailedTerminal": "Цей файл не можна завантажити."
+      "uploadFailedTerminal": "Цей файл не можна завантажити.",
+      "moveLeft": "Перемістити {{filename}} ліворуч",
+      "moveRight": "Перемістити {{filename}} праворуч"
     },
     "attachmentPasteHint": {
       "accessibility": "Вставити зображення з буфера обміну",
@@ -2147,7 +2158,11 @@
       "finalizingPlaceholder": "Завершення...",
       "messagePlaceholder": "Повідомлення...",
       "cannotReceiveFiles": "Ця сесія не може отримувати файли. Видаліть вкладення, щоб надіслати повідомлення.",
-      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз."
+      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз.",
+      "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
+      "discardAttachmentsTitle": "Відкинути вкладення?",
+      "charactersRemaining": "Залишилося символів: {{count}}",
+      "insertNewline": "Вставити новий рядок"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",
@@ -2368,7 +2383,8 @@
     "busy": "Голосове введення зайняте. Спробуйте ще раз.",
     "stopped": "Голосове введення зупинено. Торкніться мікрофона, щоб спробувати ще раз.",
     "unavailableDevice": "Голосове введення недоступне на цьому пристрої.",
-    "unavailableLanguage": "Голосове введення недоступне для мови цього пристрою."
+    "unavailableLanguage": "Голосове введення недоступне для мови цього пристрою.",
+    "listeningStopped": "Прослуховування зупинено."
   },
   "share": {
     "title": "Поділитися в Kilo",

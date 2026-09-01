@@ -27,16 +27,20 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
   return result;
 }
 
-function upsertPartDroppingStaleSyntheticTextParts(arr: Part[], part: Part): Part[] {
+function upsertPartDroppingStaleSyntheticParts(arr: Part[], part: Part): Part[] {
   const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
-  const shouldDropSyntheticText = !incomingIsSynthetic && part.type === 'text';
-  const filtered = shouldDropSyntheticText
+  // A non-synthetic text or file part drops the synthetic placeholder parts of
+  // the same type on its message: the optimistic text row and the optimistic
+  // file placeholders both reconcile to one authoritative part set.
+  const shouldDropSynthetic =
+    !incomingIsSynthetic && (part.type === 'text' || part.type === 'file');
+  const filtered = shouldDropSynthetic
     ? arr.filter(
         existing =>
           existing.id === part.id ||
           existing.messageID !== part.messageID ||
-          existing.type !== 'text' ||
+          existing.type !== part.type ||
           Reflect.get(existing, 'synthetic') !== true
       )
     : arr;
@@ -112,5 +116,5 @@ export {
   insertSorted,
   isSupportedDeltaField,
   notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  upsertPartDroppingStaleSyntheticParts,
 };

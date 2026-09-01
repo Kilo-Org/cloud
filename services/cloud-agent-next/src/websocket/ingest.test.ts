@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createIngestHandler, type IngestDOContext, type IngestAttachment } from './ingest.js';
 import type { EventQueries } from '../session/queries/index.js';
 import type { SessionId } from '../types/ids.js';
+import {
+  getSessionMessageState,
+  putSessionMessageState,
+  terminalizeMessageOnce,
+  type SessionMessageStorage,
+} from '../session/session-message-state.js';
+import { prepareIngestFrame } from '../shared/ingest-frame.js';
 
 const SESSION_ID = 'sess_test' as SessionId;
 const WRAPPER_RUN_ID = 'wr_test_basic';
@@ -952,6 +959,150 @@ describe('createIngestHandler', () => {
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
     });
 
+    it.each([
+      [undefined, undefined],
+      [null, undefined],
+      ['', 'failed'],
+      [false, 'failed'],
+      [0, 'failed'],
+      [[], 'failed'],
+      [{}, 'failed'],
+      [{ message: '' }, 'failed'],
+      [{ data: {} }, 'failed'],
+      [{ data: { message: '' } }, 'failed'],
+      [{ name: 'MessageOutputLengthError', data: {} }, 'failed'],
+      [{ name: 'APIError', data: {} }, 'failed'],
+      [{ name: 'MessageAbortedError', data: {} }, 'interrupted'],
+    ] as const)(
+      'keeps the existing assistant-error terminalization semantics before and after compaction: %j',
+      async (error, kind) => {
+        for (const oversized of [false, true]) {
+          const doContext = createNewPathDOContext();
+          const handler = createIngestHandler(
+            createFakeState(),
+            createFakeEventQueries(),
+            SESSION_ID,
+            vi.fn(),
+            doContext
+          );
+          const ws = createFakeWebSocket(makeNewPathAttachment());
+          const frame = prepareIngestFrame({
+            streamEventType: 'kilocode',
+            timestamp: new Date().toISOString(),
+            data: {
+              event: 'message.updated',
+              properties: {
+                info: {
+                  id: 'asst_presence',
+                  role: 'assistant',
+                  parentID: 'msg_user_presence',
+                  error,
+                  ...(oversized ? { metadata: 'poison-metadata'.repeat(100_000) } : {}),
+                },
+              },
+            },
+          });
+          expect(frame.kind).toBe('send');
+          if (frame.kind !== 'send') return;
+          expect(frame.compacted).toBe(oversized);
+          await handler.handleIngestMessage(ws, frame.serialized);
+          if (kind === undefined) {
+            expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
+          } else {
+            expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+              'msg_user_presence',
+              expect.objectContaining({ kind }),
+              WRAPPER_RUN_ID
+            );
+          }
+        }
+      }
+    );
+
+    it.each([
+      ['ContextOverflowError', undefined, 'context_limit', 'The model context limit was exceeded'],
+      ['MessageOutputLengthError', undefined, 'output_limit', 'The model output limit was reached'],
+      [
+        'ContentFilterError',
+        undefined,
+        'content_filter',
+        'The model provider blocked the response under its content policy',
+      ],
+      [
+        'StructuredOutputError',
+        undefined,
+        'structured_output',
+        'The model response did not match the required format',
+      ],
+      ['APIError', 504, 'timeout', 'Assistant request timed out'],
+      ['APIError', 400, 'invalid_request', 'Assistant request was invalid'],
+    ] as const)(
+      'classifies %s/%s transiently before and after compaction',
+      async (name, statusCode, assistantFailureReason, safeFailureMessage) => {
+        for (const oversized of [false, true]) {
+          const doContext = createNewPathDOContext();
+          const eventQueries = createFakeEventQueries();
+          const handler = createIngestHandler(
+            createFakeState(),
+            eventQueries,
+            SESSION_ID,
+            vi.fn(),
+            doContext
+          );
+          const frame = prepareIngestFrame({
+            streamEventType: 'kilocode',
+            timestamp: new Date().toISOString(),
+            data: {
+              event: 'message.updated',
+              properties: {
+                info: {
+                  id: 'asst_classified',
+                  role: 'assistant',
+                  parentID: 'msg_user_classified',
+                  error: {
+                    name,
+                    data: {
+                      message: '[BYOK] opaque failure',
+                      statusCode,
+                      isRetryable: false,
+                      responseBody: 'poison-body'.repeat(oversized ? 200_000 : 1),
+                      responseHeaders: { authorization: 'poison-header' },
+                    },
+                  },
+                },
+              },
+            },
+          });
+          expect(frame.kind).toBe('send');
+          if (frame.kind !== 'send') return;
+          expect(frame.compacted).toBe(oversized);
+          await handler.handleIngestMessage(
+            createFakeWebSocket(makeNewPathAttachment()),
+            frame.serialized
+          );
+
+          const payload = vi.mocked(eventQueries.upsert).mock.calls[0][0].payload;
+          expect(JSON.parse(payload).properties.info.error).toBe(`[BYOK] ${safeFailureMessage}`);
+          expect(payload).not.toMatch(/poison|statusCode|isRetryable|responseBody|responseHeaders/);
+          expect(doContext.terminalizeSessionMessageOnce).toHaveBeenCalledWith(
+            'msg_user_classified',
+            expect.objectContaining({
+              kind: 'failed',
+              assistantMessageId: 'asst_classified',
+              failureCode: 'assistant_error',
+              assistantFailureReason,
+              providerOwnership: 'byok',
+              safeFailureMessage,
+            }),
+            WRAPPER_RUN_ID
+          );
+          expect(doContext.terminalizeSessionMessageOnce.mock.calls[0][1]).not.toHaveProperty(
+            'failureFacts'
+          );
+        }
+      }
+    );
+
     it('terminalizes on wrapper cloud.message.completed control event', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
@@ -1031,7 +1182,19 @@ describe('createIngestHandler', () => {
               sessionID: 'kilo_session_333',
               role: 'assistant',
               parentID: 'msg_user_333',
-              error: { data: { message: secretError, responseBody: 'secret-response' } },
+              modelID: 'vendor/model',
+              providerID: 'kilo',
+              error: {
+                name: 'APIError',
+                data: {
+                  message: secretError,
+                  statusCode: 429,
+                  isRetryable: false,
+                  responseBody: 'secret-response',
+                  responseHeaders: { authorization: 'secret-header' },
+                  metadata: { url: 'https://secret.example', toolArguments: 'secret-arguments' },
+                },
+              },
             },
           },
         },
@@ -1048,6 +1211,8 @@ describe('createIngestHandler', () => {
             sessionID: 'kilo_session_333',
             role: 'assistant',
             parentID: 'msg_user_333',
+            modelID: 'vendor/model',
+            providerID: 'kilo',
             error: 'Assistant request was rate limited',
           },
         },
@@ -1075,6 +1240,115 @@ describe('createIngestHandler', () => {
         }),
         WRAPPER_RUN_ID
       );
+      expect(doContext.terminalizeSessionMessageOnce.mock.calls[0][1]).not.toHaveProperty(
+        'failureFacts'
+      );
+      expect(JSON.stringify(vi.mocked(eventQueries.upsert).mock.calls)).not.toMatch(
+        /statusCode|isRetryable|responseBody|responseHeaders|secret-header|secret-arguments/
+      );
+    });
+
+    it('does not attribute compacted child, replayed, late, or stale failures to another message', async () => {
+      const records = new Map<string, unknown>();
+      const storage: SessionMessageStorage = {
+        async get<T>(key: string) {
+          return records.get(key) as T | undefined;
+        },
+        async put(key, value) {
+          records.set(key, value);
+        },
+        async list<T>({ prefix }: { prefix: string }) {
+          return new Map(
+            [...records].filter(([key]) => key.startsWith(prefix)) as Array<[string, T]>
+          );
+        },
+      };
+      const parentId = 'msg_0123456789abABCDEFGHIJKLMN';
+      const nextId = 'msg_0123456789abABCDEFGHIJKLMO';
+      for (const messageId of [parentId, nextId]) {
+        await putSessionMessageState(storage, {
+          messageId,
+          status: 'accepted',
+          prompt: 'do not report this',
+          createdAt: 1,
+          acceptedAt: 2,
+          wrapperRunId: WRAPPER_RUN_ID,
+        });
+      }
+      const doContext = createNewPathDOContext();
+      doContext.terminalizeSessionMessageOnce.mockImplementation(async (messageId, params) => {
+        await terminalizeMessageOnce(storage, messageId, params);
+      });
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      async function sendFailure(
+        parentID: string,
+        id: string,
+        message = 'Rate limit exceeded',
+        sessionID = 'root_session'
+      ) {
+        const frame = prepareIngestFrame({
+          streamEventType: 'kilocode',
+          timestamp: new Date().toISOString(),
+          data: {
+            event: 'message.updated',
+            properties: {
+              info: {
+                id,
+                parentID,
+                sessionID,
+                role: 'assistant',
+                error: {
+                  name: 'APIError',
+                  data: {
+                    message,
+                    statusCode: 429,
+                    isRetryable: false,
+                    responseBody: 'poison-body'.repeat(200_000),
+                  },
+                },
+              },
+            },
+          },
+        });
+        expect(frame.kind).toBe('send');
+        if (frame.kind !== 'send') return;
+        expect(frame.compacted).toBe(true);
+        expect(frame.serialized).not.toContain('poison');
+        await handler.handleIngestMessage(ws, frame.serialized);
+      }
+
+      await sendFailure('msg_child_only', 'asst_child', 'Rate limit exceeded', 'child_session');
+      expect((await getSessionMessageState(storage, parentId))?.status).toBe('accepted');
+      expect((await getSessionMessageState(storage, nextId))?.status).toBe('accepted');
+
+      await sendFailure(parentId, 'asst_original');
+      const failed = await getSessionMessageState(storage, parentId);
+      expect(failed).toMatchObject({
+        status: 'failed',
+        assistantMessageId: 'asst_original',
+        assistantFailureReason: 'rate_limited',
+        safeFailureMessage: 'Assistant request was rate limited',
+      });
+      expect(failed).not.toHaveProperty('failureFacts');
+      await sendFailure(parentId, 'asst_original');
+      await sendFailure(parentId, 'asst_late', 'Provider timeout');
+      expect(await getSessionMessageState(storage, parentId)).toEqual(failed);
+      expect(
+        (await getSessionMessageState(storage, nextId))?.assistantFailureReason
+      ).toBeUndefined();
+      expect((await getSessionMessageState(storage, nextId))?.assistantMessageId).toBeUndefined();
+
+      vi.mocked(doContext.wrapperSupervisor.isCurrentConnection).mockResolvedValue(false);
+      await sendFailure(nextId, 'asst_stale');
+      expect((await getSessionMessageState(storage, nextId))?.status).toBe('accepted');
+      expect(ws.close).toHaveBeenCalledWith(4401, 'Stale wrapper connection');
     });
 
     it('publishes and persists a safe session error with session correlation intact', async () => {

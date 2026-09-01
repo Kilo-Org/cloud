@@ -152,7 +152,9 @@
     "appearanceDark": "داكن",
     "account": "الحساب",
     "prReviewAttribution": "أضِف إسناد التطبيق إلى مراجعات PR",
-    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة."
+    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة.",
+    "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
+    "returnSendsMessageSubtitle": "عند إيقاف هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول إدخال رسائل الوكلاء."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -296,7 +298,8 @@
       "networkError": "خطأ في الشبكة",
       "uploadFailed": "فشل الرفع",
       "failedToUploadFile": "فشل رفع الملف: {{reason}}",
-      "nothingToPaste": "لا يوجد شيء للصق"
+      "nothingToPaste": "لا يوجد شيء للصق",
+      "metadataStripFailed": "تعذّر إزالة البيانات الوصفية للصورة."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1719,7 +1722,11 @@
       "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
       "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة.",
-      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى."
+      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى.",
+      "cancelQueuedFailed": "تعذّر إلغاء الرسالة.",
+      "cancelQueuedRestoreAvailable": "تم إلغاء الرسالة. اضغط على «استعادة» لإعادتها إلى حقل إدخال الرسالة.",
+      "cancelQueuedRestored": "تم إلغاء الرسالة. عادت المطالبة إلى حقل إدخال الرسالة.",
+      "cancelQueuedUpgradeRequired": "يتطلب إلغاء الرسائل في قائمة الانتظار إصدارًا أحدث من Kilo CLI. حدّث Kilo CLI وأعد الاتصال."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
@@ -1791,7 +1798,8 @@
       "continueFrom": "متابعة {{title}}",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "لا يمكن لهذه CLI متابعة جلسة. اختر وكيل سحابي أو CLI آخر.",
-      "importFailed": "تعذر استيراد هذه الجلسة."
+      "importFailed": "تعذر استيراد هذه الجلسة.",
+      "discardWithUploadsMessage": "سيتم حذف مطالبتك وأي ملفات مرفوعة غير مرفقة برسائل مرسلة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -2045,7 +2053,11 @@
       "queuedAccessibility": "الرسالة في قائمة الانتظار",
       "userMessage": "رسالة المستخدم",
       "assistantMessage": "رسالة المساعد",
-      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة"
+      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة",
+      "cancelQueued": "إلغاء الرسالة",
+      "cancelQueuedAccessibility": "إلغاء الرسالة في قائمة الانتظار",
+      "restoreQueued": "استعادة",
+      "restoreQueuedAccessibility": "استعادة الرسالة الملغاة إلى حقل إدخال الرسالة"
     },
     "olderMessages": {
       "arrived": "تم تحميل الرسائل السابقة",
@@ -2085,9 +2097,6 @@
     },
     "sessionFilter": {
       "title": "تصفية الجلسات",
-      "sortBy": "ترتيب حسب",
-      "sortLastUpdated": "آخر تحديث",
-      "sortCreated": "تم الإنشاء",
       "platform": "المنصة",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",
@@ -2141,7 +2150,9 @@
       "uploading": "جارٍ الرفع…",
       "uploaded": "تم الرفع",
       "uploadFailedRetry": "تعذّر الرفع. اضغط لإعادة المحاولة.",
-      "uploadFailedTerminal": "لا يمكن رفع هذا الملف."
+      "uploadFailedTerminal": "لا يمكن رفع هذا الملف.",
+      "moveLeft": "نقل {{filename}} إلى اليسار",
+      "moveRight": "نقل {{filename}} إلى اليمين"
     },
     "attachmentPasteHint": {
       "accessibility": "لصق صورة من الحافظة",
@@ -2171,7 +2182,11 @@
       "finalizingPlaceholder": "جارٍ الإنهاء...",
       "messagePlaceholder": "رسالة...",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
-      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى."
+      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
+      "discardAttachmentsMessage": "سيتم حذف الملفات المرفوعة غير المرفقة برسائل مرسلة.",
+      "discardAttachmentsTitle": "تجاهل المرفقات؟",
+      "charactersRemaining": "الأحرف المتبقية: {{count}}",
+      "insertNewline": "إدراج سطر جديد"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",
@@ -2394,7 +2409,8 @@
     "busy": "الإدخال الصوتي مشغول. حاول مرة أخرى.",
     "stopped": "توقف الإدخال الصوتي. اضغط على الميكروفون للمحاولة مرة أخرى.",
     "unavailableDevice": "الإدخال الصوتي غير متاح على هذا الجهاز.",
-    "unavailableLanguage": "الإدخال الصوتي غير متاح للغة الجهاز هذه."
+    "unavailableLanguage": "الإدخال الصوتي غير متاح للغة الجهاز هذه.",
+    "listeningStopped": "توقف الاستماع."
   },
   "share": {
     "title": "مشاركة إلى Kilo",

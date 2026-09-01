@@ -94,11 +94,12 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
 
 type FilePartRendererProps = {
   part: FilePart;
+  onLongPress?: () => void;
 };
 
 type PreviewMode = 'markdown' | 'text';
 
-export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
+export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -243,6 +244,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       if (imageFailed && !viewerVisible) {
         return (
           <Pressable
+            onLongPress={onLongPress}
             onPress={() => {
               if (!resolved.attachmentRef) {
                 setImageFailed(false);
@@ -269,6 +271,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return (
         <>
           <Pressable
+            onLongPress={onLongPress}
             onPress={openViewer}
             className="my-1 overflow-hidden rounded-lg active:opacity-80"
             accessibilityRole="button"
@@ -330,6 +333,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
     if (resolved.status === 'error') {
       return (
         <Pressable
+          onLongPress={onLongPress}
           onPress={() => {
             resolved.retry?.();
           }}
@@ -353,6 +357,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   return (
     <>
       <Pressable
+        onLongPress={onLongPress}
         onPress={handleChipTap}
         disabled={sharing}
         accessibilityState={{ busy: sharing || resolved.status === 'resolving' }}

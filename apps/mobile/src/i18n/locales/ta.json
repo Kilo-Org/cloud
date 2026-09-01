@@ -152,7 +152,9 @@
     "appearanceDark": "இருள்",
     "account": "கணக்கு",
     "prReviewAttribution": "PR மதிப்பாய்வுகளில் பயன்பாட்டு பங்களிப்பைச் சேர்க்கவும்",
-    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்"
+    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்",
+    "returnSendsMessage": "திரும்பு விசை செய்தியை அனுப்பும்",
+    "returnSendsMessageSubtitle": "முடக்கப்பட்டால், திரும்பு விசை முகவர்களின் செய்தி உள்ளீடுகளில் புதிய வரியைச் செருகும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -750,7 +752,8 @@
       "networkError": "நெட்வொர்க் பிழை",
       "uploadFailed": "பதிவேற்றம் தோல்வியடைந்தது",
       "failedToUploadFile": "கோப்பை பதிவேற்ற முடியவில்லை: {{reason}}",
-      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை"
+      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை",
+      "metadataStripFailed": "புகைப்பட மெட்டாடேட்டாவை அகற்ற முடியவில்லை."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடைந்து கொண்டிருக்கிறது. சிறிது காத்திருக்கவும்.",
       "serviceUnavailable": "சேவை இப்போது கிடைக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "connectionTrouble": "இணைப்பில் சிக்கல். சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.",
-      "modelUnavailable": "இந்த மாதிரி Cloud Agent-க்குக் கிடைக்கவில்லை. வேறு மாதிரியைத் தேர்ந்தெடுத்து மீண்டும் முயற்சிக்கவும்."
+      "modelUnavailable": "இந்த மாதிரி Cloud Agent-க்குக் கிடைக்கவில்லை. வேறு மாதிரியைத் தேர்ந்தெடுத்து மீண்டும் முயற்சிக்கவும்.",
+      "cancelQueuedFailed": "செய்தியை ரத்து செய்ய முடியவில்லை.",
+      "cancelQueuedRestoreAvailable": "செய்தி ரத்து செய்யப்பட்டது. அதைச் செய்தி உள்ளீட்டிற்குத் திருப்ப, “மீட்டமைக்கவும்” என்பதைத் தட்டவும்.",
+      "cancelQueuedRestored": "செய்தி ரத்து செய்யப்பட்டது. வினவல் மீண்டும் செய்தி உள்ளீட்டில் உள்ளது.",
+      "cancelQueuedUpgradeRequired": "வரிசையில் உள்ள செய்திகளை ரத்து செய்ய Kilo CLI இன் புதிய பதிப்பு தேவை. Kilo CLI ஐ புதுப்பித்து மீண்டும் இணைக்கவும்."
     },
     "remoteSession": {
       "failedToCreate": "தொலை அமர்வை உருவாக்க முடியவில்லை",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "இந்த CLI ஒரு அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது மற்றொரு CLIஐ தேர்ந்தெடுக்கவும்.",
       "continueFrom": "{{title}} தொடர்கிறது",
       "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
-      "importingSession": "அமர்வை இறக்குமதி செய்கிறது"
+      "importingSession": "அமர்வை இறக்குமதி செய்கிறது",
+      "discardWithUploadsMessage": "உங்கள் வினவலும் அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்களும் நீக்கப்படும்."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2463,7 +2471,11 @@
       "queuedAccessibility": "செய்தி வரிசையில் உள்ளது",
       "userMessage": "பயனர் செய்தி",
       "assistantMessage": "உதவியாளர் செய்தி",
-      "longPressHint": "செய்தி விவரங்களுக்கு நீண்ட அழுத்தவும்"
+      "longPressHint": "செய்தி விவரங்களுக்கு நீண்ட அழுத்தவும்",
+      "cancelQueued": "செய்தியை ரத்து செய்யவும்",
+      "cancelQueuedAccessibility": "வரிசையில் உள்ள செய்தியை ரத்து செய்யவும்",
+      "restoreQueued": "மீட்டமைக்கவும்",
+      "restoreQueuedAccessibility": "ரத்து செய்த செய்தியைச் செய்தி உள்ளீட்டில் மீட்டமைக்கவும்"
     },
     "olderMessages": {
       "arrived": "முந்தைய செய்திகள் ஏற்றப்பட்டன",
@@ -2491,9 +2503,6 @@
     },
     "sessionFilter": {
       "title": "அமர்வுகளை வடிகட்டு",
-      "sortBy": "வரிசைப்படுத்து",
-      "sortLastUpdated": "கடைசியாக புதுப்பிக்கப்பட்டது",
-      "sortCreated": "உருவாக்கப்பட்டது",
       "platform": "தளம்",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2547,7 +2556,9 @@
       "uploading": "பதிவேற்றுகிறது…",
       "uploaded": "பதிவேற்றப்பட்டது",
       "uploadFailedRetry": "பதிவேற்றம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்க தட்டவும்.",
-      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது."
+      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது.",
+      "moveLeft": "{{filename}} ஐ இடப்புறம் நகர்த்தவும்",
+      "moveRight": "{{filename}} ஐ வலப்புறம் நகர்த்தவும்"
     },
     "attachmentPasteHint": {
       "accessibility": "கிளிப்போர்டிலிருந்து படத்தை ஒட்டவும்",
@@ -2577,7 +2588,11 @@
       "finalizingPlaceholder": "முடிக்கிறது...",
       "messagePlaceholder": "செய்தி...",
       "cannotReceiveFiles": "இந்த அமர்வு கோப்புகளைப் பெற முடியாது. உங்கள் செய்தியை அனுப்ப இணைப்புகளை அகற்றவும்.",
-      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்."
+      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்.",
+      "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
+      "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?",
+      "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
+      "insertNewline": "புதிய வரியைச் செருகவும்"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",
@@ -2796,7 +2811,8 @@
     "busy": "குரல் உள்ளீடு பரபரப்பாக உள்ளது. மீண்டும் முயற்சிக்கவும்.",
     "stopped": "குரல் உள்ளீடு நிறுத்தப்பட்டது. மீண்டும் முயற்சிக்க மைக்ரோஃபோனைத் தட்டவும்.",
     "unavailableDevice": "இந்த சாதனத்தில் குரல் உள்ளீடு கிடைக்கவில்லை.",
-    "unavailableLanguage": "இந்த சாதன மொழிக்கு குரல் உள்ளீடு கிடைக்கவில்லை."
+    "unavailableLanguage": "இந்த சாதன மொழிக்கு குரல் உள்ளீடு கிடைக்கவில்லை.",
+    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது."
   },
   "share": {
     "title": "Kiloவுக்கு பகிர்",

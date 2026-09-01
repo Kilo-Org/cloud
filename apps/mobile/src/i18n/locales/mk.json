@@ -152,7 +152,9 @@
     "appearanceDark": "Темно",
     "account": "Сметка",
     "prReviewAttribution": "Додајте припишување на апликацијата во прегледите на PR",
-    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед."
+    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед.",
+    "returnSendsMessage": "Копчето за нов ред испраќа порака",
+    "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -750,7 +752,8 @@
       "networkError": "Грешка во мрежата",
       "uploadFailed": "Испраќањето не успеа",
       "failedToUploadFile": "Не успеа испраќањето на датотеката: {{reason}}",
-      "nothingToPaste": "Нема што да се залепи"
+      "nothingToPaste": "Нема што да се залепи",
+      "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај момент.",
       "serviceUnavailable": "Услугата во моментов не е достапна. Обиди се повторно.",
       "connectionTrouble": "Проблем со врската. Обиди се повторно по момент.",
-      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно."
+      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно.",
+      "cancelQueuedFailed": "Не можеше да се откаже пораката.",
+      "cancelQueuedRestoreAvailable": "Пораката е откажана. Допрете „Вратете“ за да ја вратите во полето за внес на пораки.",
+      "cancelQueuedRestored": "Пораката е откажана. Предлогот е повторно во полето за внес на пораки.",
+      "cancelQueuedUpgradeRequired": "Откажувањето пораки во чекање бара понов Kilo CLI. Ажурирајте го Kilo CLI и поврзете се повторно."
     },
     "remoteSession": {
       "failedToCreate": "Не успеа да се создаде далечинска сесија",
@@ -2213,7 +2220,8 @@
       "continueFrom": "Продолжување со {{title}}",
       "importingSession": "Внесување на сесија",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Изберете Cloud Agent или друг CLI.",
-      "importFailed": "Не можеше да се внесе оваа сесија."
+      "importFailed": "Не можеше да се внесе оваа сесија.",
+      "discardWithUploadsMessage": "Вашиот предлог и сите прикачени датотеки што не се приложени кон испратени пораки ќе бидат избришани."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2463,7 +2471,11 @@
       "queuedAccessibility": "Пораката е во ред",
       "userMessage": "Корисничка порака",
       "assistantMessage": "Порака од асистентот",
-      "longPressHint": "Долго притиснете за детали за пораката"
+      "longPressHint": "Долго притиснете за детали за пораката",
+      "cancelQueued": "Откажете ја пораката",
+      "cancelQueuedAccessibility": "Откажете ја пораката во чекање",
+      "restoreQueued": "Вратете",
+      "restoreQueuedAccessibility": "Вратете ја откажаната порака во полето за внес на пораки"
     },
     "olderMessages": {
       "arrived": "Пораните пораки се вчитани",
@@ -2491,9 +2503,6 @@
     },
     "sessionFilter": {
       "title": "Филтрирај сесии",
-      "sortBy": "Сортирај по",
-      "sortLastUpdated": "Последно ажурирано",
-      "sortCreated": "Создадено",
       "platform": "Платформа",
       "platformCloud": "Облак",
       "platformExtension": "Екстензија",
@@ -2547,7 +2556,9 @@
       "uploading": "Испраќање…",
       "uploaded": "Испратено",
       "uploadFailedRetry": "Испраќањето не успеа. Допрете за да се обидете повторно.",
-      "uploadFailedTerminal": "Оваа датотека не може да се испрати."
+      "uploadFailedTerminal": "Оваа датотека не може да се испрати.",
+      "moveLeft": "Поместете ја {{filename}} налево",
+      "moveRight": "Поместете ја {{filename}} надесно"
     },
     "attachmentPasteHint": {
       "accessibility": "Залепи слика од таблата со исечоци",
@@ -2577,7 +2588,11 @@
       "finalizingPlaceholder": "Завршување...",
       "messagePlaceholder": "Порака...",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстранете ги прилозите за да ја испратите пораката.",
-      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно."
+      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно.",
+      "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
+      "discardAttachmentsTitle": "Да се отфрлат прилозите?",
+      "charactersRemaining": "Преостануваат {{count}} знаци",
+      "insertNewline": "Вметнете нов ред"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",
@@ -2796,7 +2811,8 @@
     "busy": "Гласовниот внес е зафатен. Обидете се повторно.",
     "stopped": "Гласовниот внес е запрен. Допрете го микрофонот за да се обидете повторно.",
     "unavailableDevice": "Гласовниот внес не е достапен на овој уред.",
-    "unavailableLanguage": "Гласовниот внес не е достапен за јазикот на овој уред."
+    "unavailableLanguage": "Гласовниот внес не е достапен за јазикот на овој уред.",
+    "listeningStopped": "Слушањето е запрено."
   },
   "share": {
     "title": "Сподели во Kilo",

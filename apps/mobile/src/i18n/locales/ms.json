@@ -152,7 +152,9 @@
     "appearanceDark": "Gelap",
     "account": "Akaun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
-    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan."
+    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan.",
+    "returnSendsMessage": "Kekunci Kembali menghantar mesej",
+    "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -750,7 +752,8 @@
       "networkError": "Ralat rangkaian",
       "uploadFailed": "Muat naik gagal",
       "failedToUploadFile": "Gagal memuat naik fail: {{reason}}",
-      "nothingToPaste": "Tiada apa untuk ditampal"
+      "nothingToPaste": "Tiada apa untuk ditampal",
+      "metadataStripFailed": "Metadata foto tidak dapat dibuang."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan mesej.",
+      "cancelQueuedRestoreAvailable": "Mesej dibatalkan. Ketik Pulihkan untuk mengembalikannya ke komposer.",
+      "cancelQueuedRestored": "Mesej dibatalkan. Gesaan kembali dalam komposer.",
+      "cancelQueuedUpgradeRequired": "Pembatalan mesej dalam baris gilir memerlukan Kilo CLI yang lebih baharu. Kemas kini Kilo CLI dan sambung semula."
     },
     "remoteSession": {
       "failedToCreate": "Gagal mencipta sesi jauh",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Ejen Awan atau CLI lain.",
       "continueFrom": "Meneruskan {{title}}",
       "importFailed": "Tidak dapat mengimport sesi ini.",
-      "importingSession": "Mengimport sesi"
+      "importingSession": "Mengimport sesi",
+      "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2463,7 +2471,11 @@
       "queuedAccessibility": "Mesej dalam baris gilir",
       "userMessage": "Mesej pengguna",
       "assistantMessage": "Mesej pembantu",
-      "longPressHint": "Tekan lama untuk butiran mesej"
+      "longPressHint": "Tekan lama untuk butiran mesej",
+      "cancelQueued": "Batalkan mesej",
+      "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke komposer"
     },
     "olderMessages": {
       "arrived": "Mesej awal dimuatkan",
@@ -2491,9 +2503,6 @@
     },
     "sessionFilter": {
       "title": "Tapis sesi",
-      "sortBy": "Susun mengikut",
-      "sortLastUpdated": "Kemas kini terakhir",
-      "sortCreated": "Dicipta",
       "platform": "Platform",
       "platformCloud": "Awan",
       "platformExtension": "Penyambung",
@@ -2547,7 +2556,9 @@
       "uploading": "Memuat naik…",
       "uploaded": "Dimuat naik",
       "uploadFailedRetry": "Muat naik gagal. Ketik untuk mencuba semula.",
-      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik."
+      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik.",
+      "moveLeft": "Alihkan {{filename}} ke kiri",
+      "moveRight": "Alihkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tampal imej daripada papan keratan",
@@ -2577,7 +2588,11 @@
       "finalizingPlaceholder": "Menyiapkan...",
       "messagePlaceholder": "Mesej...",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula."
+      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
+      "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} aksara berbaki",
+      "insertNewline": "Sisipkan baris baharu"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",
@@ -2796,7 +2811,8 @@
     "busy": "Input suara sibuk. Cuba lagi.",
     "stopped": "Input suara dihentikan. Ketik mikrofon untuk mencuba lagi.",
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
-    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini."
+    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
+    "listeningStopped": "Pendengaran dihentikan."
   },
   "share": {
     "title": "Kongsi ke Kilo",

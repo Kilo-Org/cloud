@@ -90,6 +90,7 @@ export async function createReviewSpectatorStream(input: {
   organizationId?: string;
   onEvent: (event: CloudAgentEvent) => void;
   onConnected: () => void;
+  onReconnected: () => void;
   onDisconnected: () => void;
   onError: (error: StreamError) => void;
 }): Promise<Connection> {
@@ -105,6 +106,7 @@ export async function createReviewSpectatorStream(input: {
     ticket: ticketResult,
     onEvent: input.onEvent,
     onConnected: input.onConnected,
+    onReconnected: input.onReconnected,
     onDisconnected: input.onDisconnected,
     onError: input.onError,
     websocketHeaders: { Origin: WEB_BASE_URL },

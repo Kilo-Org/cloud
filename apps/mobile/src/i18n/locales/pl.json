@@ -152,7 +152,9 @@
     "appearanceDark": "Ciemny",
     "account": "Konto",
     "prReviewAttribution": "Dodaj atrybucję aplikacji do recenzji PR",
-    "prReviewAttributionSubtitle": "Dodaj stopkę „Reviewed via Kilo”, gdy wysyłasz recenzję."
+    "prReviewAttributionSubtitle": "Dodaj stopkę „Reviewed via Kilo”, gdy wysyłasz recenzję.",
+    "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
+    "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów."
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -296,7 +298,8 @@
       "networkError": "Błąd sieci",
       "uploadFailed": "Przesyłanie nie powiodło się",
       "failedToUploadFile": "Nie udało się przesłać pliku: {{reason}}",
-      "nothingToPaste": "Nie ma nic do wklejenia"
+      "nothingToPaste": "Nie ma nic do wklejenia",
+      "metadataStripFailed": "Nie udało się usunąć metadanych zdjęcia."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1703,7 +1706,11 @@
       "previousTaskFinishing": "Poprzednie zadanie wciąż się kończy. Proszę chwilę poczekać.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
       "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
-      "modelUnavailable": "Ten model nie jest dostępny dla Cloud Agent. Wybierz inny model i spróbuj ponownie."
+      "modelUnavailable": "Ten model nie jest dostępny dla Cloud Agent. Wybierz inny model i spróbuj ponownie.",
+      "cancelQueuedFailed": "Nie udało się anulować wiadomości.",
+      "cancelQueuedRestoreAvailable": "Wiadomość anulowana. Dotknij „Przywróć”, aby przywrócić ją do pola wiadomości.",
+      "cancelQueuedRestored": "Wiadomość anulowana. Polecenie jest ponownie w polu wiadomości.",
+      "cancelQueuedUpgradeRequired": "Anulowanie wiadomości w kolejce wymaga nowszej wersji Kilo CLI. Zaktualizuj Kilo CLI i połącz się ponownie."
     },
     "remoteSession": {
       "failedToCreate": "Nie udało się utworzyć sesji zdalnej",
@@ -1775,7 +1782,8 @@
       "continueFrom": "Kontynuowanie {{title}}",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "To CLI nie może kontynuować sesji. Wybierz Cloud Agent lub inne CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji."
+      "importFailed": "Nie udało się zaimportować tej sesji.",
+      "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",
@@ -2027,7 +2035,11 @@
       "queuedAccessibility": "Wiadomość w kolejce",
       "userMessage": "Wiadomość użytkownika",
       "assistantMessage": "Wiadomość asystenta",
-      "longPressHint": "Przytrzymaj, aby zobaczyć szczegóły wiadomości"
+      "longPressHint": "Przytrzymaj, aby zobaczyć szczegóły wiadomości",
+      "cancelQueued": "Anuluj wiadomość",
+      "cancelQueuedAccessibility": "Anuluj wiadomość w kolejce",
+      "restoreQueued": "Przywróć",
+      "restoreQueuedAccessibility": "Przywróć anulowaną wiadomość do pola wiadomości"
     },
     "olderMessages": {
       "arrived": "Załadowano wcześniejsze wiadomości",
@@ -2061,9 +2073,6 @@
     },
     "sessionFilter": {
       "title": "Filtruj sesje",
-      "sortBy": "Sortuj według",
-      "sortLastUpdated": "Ostatnio zaktualizowane",
-      "sortCreated": "Utworzono",
       "platform": "Platforma",
       "platformCloud": "Chmura",
       "platformExtension": "Rozszerzenie",
@@ -2117,7 +2126,9 @@
       "uploading": "Przesyłanie…",
       "uploaded": "Przesłano",
       "uploadFailedRetry": "Przesyłanie nie powiodło się. Dotknij, aby ponowić.",
-      "uploadFailedTerminal": "Tego pliku nie można przesłać."
+      "uploadFailedTerminal": "Tego pliku nie można przesłać.",
+      "moveLeft": "Przesuń {{filename}} w lewo",
+      "moveRight": "Przesuń {{filename}} w prawo"
     },
     "attachmentPasteHint": {
       "accessibility": "Wklej obraz ze schowka",
@@ -2147,7 +2158,11 @@
       "finalizingPlaceholder": "Kończenie...",
       "messagePlaceholder": "Wiadomość...",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
-      "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij Wyślij, aby spróbować ponownie."
+      "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij Wyślij, aby spróbować ponownie.",
+      "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
+      "discardAttachmentsTitle": "Odrzucić załączniki?",
+      "charactersRemaining": "Pozostała liczba znaków: {{count}}",
+      "insertNewline": "Wstaw nowy wiersz"
     },
     "chatLink": {
       "linkCopied": "Link skopiowany",
@@ -2368,7 +2383,8 @@
     "busy": "Wprowadzanie głosowe jest zajęte. Spróbuj ponownie.",
     "stopped": "Wprowadzanie głosowe zostało zatrzymane. Dotknij mikrofonu, aby spróbować ponownie.",
     "unavailableDevice": "Wprowadzanie głosowe nie jest dostępne na tym urządzeniu.",
-    "unavailableLanguage": "Wprowadzanie głosowe nie jest dostępne dla języka tego urządzenia."
+    "unavailableLanguage": "Wprowadzanie głosowe nie jest dostępne dla języka tego urządzenia.",
+    "listeningStopped": "Słuchanie zatrzymane."
   },
   "share": {
     "title": "Udostępnij do Kilo",

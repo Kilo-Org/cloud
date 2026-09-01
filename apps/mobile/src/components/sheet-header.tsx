@@ -7,6 +7,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function SheetHeader({
   title,
+  wrapTitle = false,
   onDone,
   onCancel,
   doneLabel,
@@ -16,6 +17,8 @@ export function SheetHeader({
   disabled = false,
 }: {
   title: string;
+  /** Let the title wrap and the row grow while preserving the action slots. */
+  wrapTitle?: boolean;
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
@@ -70,7 +73,7 @@ export function SheetHeader({
         <View className="max-w-full grow">
           <Text
             className="text-center text-lg font-semibold text-foreground"
-            numberOfLines={2}
+            numberOfLines={wrapTitle ? undefined : 2}
             ellipsizeMode="tail"
             accessibilityRole="header"
             accessibilityLabel={title}

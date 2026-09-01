@@ -161,6 +161,8 @@ function defaultProps() {
     onAddAttachment: vi.fn(),
     onRemoveAttachment: vi.fn(),
     onRetryAttachment: vi.fn(),
+    onMoveAttachment: vi.fn(),
+    onReorderAttachments: vi.fn(),
     onRefetchModels: vi.fn(),
     onPrefillAttachments: vi.fn(),
     shareId: undefined as string | undefined,
@@ -614,5 +616,26 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+  });
+
+  // ── Case 13: reorder wiring lock ──
+  it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const onMoveAttachment = vi.fn<(id: string, direction: 'left' | 'right') => void>();
+    const onReorderAttachments = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      onMoveAttachment,
+      onReorderAttachments,
+    }) as Node;
+
+    const prompt = findElementByType(element, 'NewSessionPrompt');
+    expect(prompt).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
   });
 });

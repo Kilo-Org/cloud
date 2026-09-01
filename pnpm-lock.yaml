@@ -759,9 +759,6 @@ importers:
       '@ai-sdk/gateway':
         specifier: 4.0.21
         version: 4.0.21(zod@4.4.3)
-      '@ai-sdk/mistral':
-        specifier: 4.0.12
-        version: 4.0.12(zod@4.4.3)
       '@ai-sdk/openai-compatible':
         specifier: 3.0.11
         version: 3.0.11(zod@4.4.3)
@@ -3334,12 +3331,6 @@ packages:
 
   '@ai-sdk/gateway@4.0.21':
     resolution: {integrity: sha512-GafyeyHFDKJjdtbyhCQ0aC2FORdyE56IxK45EZ1JLO1iVdg8XqEU3bwnRzI0+5S1XHV7W2qQsxkZnGYPbsFiXA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/mistral@4.0.12':
-    resolution: {integrity: sha512-5g74RyDnhakURB9SjaEoRG6KDVzvTnxY/eDW3vjXmZm2OzOK24uFwM3Lw1eZb0AyY2LKO+e+HNiT8D89PHLfLA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -18787,12 +18778,6 @@ snapshots:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
       '@vercel/oidc': 3.2.0
-      zod: 4.4.3
-
-  '@ai-sdk/mistral@4.0.12(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
       zod: 4.4.3
 
   '@ai-sdk/openai-compatible@3.0.11(zod@4.4.3)':

@@ -1175,6 +1175,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       expect(archives.get(archivePath)).toBe(retainedArchive);
       if (uploadResult === 'success') {
         expect(retainedArchive).toContain('final CLI failure evidence');
+        expect(retainedArchive).toContain(`code=${workspaceBootstrapErrorCode(bootstrapError)}`);
+        expect(retainedArchive).toContain(
+          stage === 'restored'
+            ? 'error=Failed to fetch authoritative remote state'
+            : 'error=Repository checkout failed'
+        );
       } else {
         expect(retainedArchive).not.toContain('final CLI failure evidence');
       }
@@ -1188,6 +1194,77 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       expect(retainedArchive).not.toContain(request.materialized.env.KILOCODE_TOKEN);
     }
   );
+
+  it('redacts reconciliation diagnostics before cleanup while preserving the error type', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.upstreamBranch = 'main';
+    request.workspace.restoredFromBackup = true;
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    const fetchError = new Error(
+      '\u001b[31mFetch failed\u001b[0m Authorization: Bearer fetch-secret'
+    );
+    let logsBeforeCleanup = '';
+    let bootstrapError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args[0] === 'fetch') throw fetchError;
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        beforeFailureCleanup: async () => {
+          logsBeforeCleanup = await fsp.readFile(wrapperLogPath, 'utf8');
+        },
+      });
+    } catch (error) {
+      bootstrapError = error;
+    }
+
+    expect(bootstrapError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
+    expect(bootstrapError).toMatchObject({ cause: fetchError });
+    expect(logsBeforeCleanup).toContain('code=WORKSPACE_RECONCILIATION_FAILED');
+    expect(logsBeforeCleanup).toContain('error=Fetch failed Authorization: Bearer [REDACTED]');
+    expect(logsBeforeCleanup).not.toContain('fetch-secret');
+    expect(logsBeforeCleanup).not.toContain('\u001b');
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
+
+  it('preserves the recorded failure when finalization crosses the workspace deadline', async () => {
+    const request = makeRequest(tmpDir);
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    let commandSignal: AbortSignal | undefined;
+    let logsBeforeCleanup = '';
+    let bootstrapError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        workspacePreparationTimeoutMs: 100,
+        git: async (_args, options) => {
+          commandSignal = options?.signal;
+          return { stdout: '', stderr: '', exitCode: 1 };
+        },
+        beforeFailureCleanup: async () => {
+          logsBeforeCleanup = await fsp.readFile(wrapperLogPath, 'utf8');
+          if (commandSignal && !commandSignal.aborted) {
+            await new Promise<void>(resolve =>
+              commandSignal?.addEventListener('abort', () => resolve(), { once: true })
+            );
+          }
+        },
+      });
+    } catch (error) {
+      bootstrapError = error;
+    }
+
+    expect(commandSignal?.aborted).toBe(true);
+    expect(bootstrapError).toMatchObject({ message: 'Repository clone failed' });
+    expect(logsBeforeCleanup).toContain('error=Repository clone failed');
+    expect(logsBeforeCleanup).not.toContain('Workspace preparation timed out');
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
+  });
 
   it('still cleans up and preserves the bootstrap error if the pre-cleanup callback throws', async () => {
     const request = makeRequest(tmpDir);
@@ -1219,15 +1296,45 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     );
   });
 
-  it('aborts active work and cleans up when the shared workspace deadline expires', async () => {
+  it('archives the shared workspace deadline failure before cleaning up aborted work', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];
+    const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
+    const cliLogPath = path.join(cliLogDir, 'kilo.log');
+    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    await fsp.mkdir(cliLogDir, { recursive: true });
+    await fsp.writeFile(cliLogPath, 'earlier CLI evidence\n');
+
+    let archivedLogs = '';
+    let uploadCalls = 0;
+    let cliPresentDuringUpload = false;
+    globalThis.fetch = asFetch(async (_input, init) => {
+      uploadCalls++;
+      cliPresentDuringUpload = fs.existsSync(cliLogPath);
+      archivedLogs = gunzipSync(await new Response(init?.body).arrayBuffer()).toString();
+      return new Response(null, { status: 204 });
+    });
+    const uploader = createLogUploader({
+      archiveId: 'wr_test--workspace-timeout',
+      context: {
+        workerBaseUrl: 'https://worker.example.com',
+        kiloSessionId: request.kiloSessionId,
+        workerAuthToken: request.session.workerAuthToken,
+      },
+      sessionId: request.agentSessionId,
+      userId: request.userId,
+      cliLogDir,
+      wrapperLogPath,
+    });
+    uploaders.push(uploader);
     let commandSignal: AbortSignal | undefined;
     let caughtError: unknown;
 
     try {
       await prepareWrapperBootstrapWorkspace(request, undefined, {
         workspacePreparationTimeoutMs: 100,
+        beforeFailureCleanup: () => uploader.finalize(),
         git: async (args, opts) => {
           if (args[0] !== 'clone') {
             return { stdout: '', stderr: '', exitCode: 0 };
@@ -1262,6 +1369,15 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       retryable: true,
       message: expect.stringContaining('Workspace preparation timed out'),
     });
+    await uploader.finalize();
+    await uploader.uploadNow();
+    expect(uploadCalls).toBe(1);
+    expect(cliPresentDuringUpload).toBe(true);
+    expect(archivedLogs).toContain('earlier CLI evidence');
+    expect(archivedLogs).toContain('code=WORKSPACE_SETUP_FAILED subtype=workspace_setup_unknown');
+    expect(archivedLogs).toContain('error=Workspace preparation timed out after 0.1s');
+    expect(archivedLogs).not.toContain('error=Repository clone failed');
+    expect(archivedLogs).not.toContain(request.session.workerAuthToken);
     expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });

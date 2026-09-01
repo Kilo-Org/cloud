@@ -513,9 +513,7 @@ describe('CloudAgentWorkspaceTabs', () => {
       const tab = findButtonMarkup(html, 'First worktree chat');
 
       expect(tab.includes('aria-keyshortcuts="F2"')).toBe(canRename);
-      expect(
-        tab.includes('aria-description="Double-click to rename. Press F2 when focused."')
-      ).toBe(canRename);
+      expect(tab.includes('aria-description="Double-click to rename."')).toBe(canRename);
       expect(html).not.toContain('>Rename<');
       expect(html).not.toContain('Delete session');
       expect(html).not.toContain('Session actions for');

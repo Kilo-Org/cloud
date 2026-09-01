@@ -152,7 +152,9 @@
     "appearanceDark": "تیره",
     "account": "حساب",
     "prReviewAttribution": "افزودن انتساب برنامه به مرورهای PR",
-    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید."
+    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید.",
+    "returnSendsMessage": "کلید بازگشت پیام را ارسال می‌کند",
+    "returnSendsMessageSubtitle": "وقتی خاموش است، کلید بازگشت در کادرهای ورودی پیام عامل یک خط جدید درج می‌کند."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -750,7 +752,8 @@
       "networkError": "خطای شبکه",
       "uploadFailed": "بارگذاری ناموفق بود",
       "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}",
-      "nothingToPaste": "چیزی برای جای‌گذاری نیست"
+      "nothingToPaste": "چیزی برای جای‌گذاری نیست",
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
       "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید.",
-      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید."
+      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید.",
+      "cancelQueuedFailed": "لغو پیام ممکن نشد.",
+      "cancelQueuedRestoreAvailable": "پیام لغو شد. برای بازگرداندن آن به کادر ورودی پیام، روی بازیابی ضربه بزنید.",
+      "cancelQueuedRestored": "پیام لغو شد. پرسش به کادر ورودی پیام بازگشت.",
+      "cancelQueuedUpgradeRequired": "لغو پیام‌های در صف به نسخه جدیدتری از Kilo CLI نیاز دارد. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "continueFrom": "در حال ادامهٔ {{title}}",
       "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "importingSession": "در حال وارد کردن نشست"
+      "importingSession": "در حال وارد کردن نشست",
+      "discardWithUploadsMessage": "پرسش شما و فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "پیام در صف قرار گرفت",
       "userMessage": "پیام کاربر",
       "assistantMessage": "پیام دستیار",
-      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید"
+      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید",
+      "cancelQueued": "لغو پیام",
+      "cancelQueuedAccessibility": "لغو پیام در صف",
+      "restoreQueued": "بازیابی",
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر ورودی پیام"
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "فیلتر جلسات",
-      "sortBy": "مرتب‌سازی بر اساس",
-      "sortLastUpdated": "آخرین به‌روزرسانی",
-      "sortCreated": "ایجاد شده",
       "platform": "پلتفرم",
       "platformCloud": "ابر",
       "platformExtension": "افزونه",
@@ -2545,7 +2554,9 @@
       "uploading": "در حال بارگذاری…",
       "uploaded": "بارگذاری شد",
       "uploadFailedRetry": "بارگذاری ناموفق بود. برای تلاش مجدد لمس کنید.",
-      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست."
+      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست.",
+      "moveLeft": "انتقال {{filename}} به چپ",
+      "moveRight": "انتقال {{filename}} به راست"
     },
     "attachmentPasteHint": {
       "accessibility": "چسباندن تصویر از کلیپ‌بورد",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "در حال تکمیل...",
       "messagePlaceholder": "پیام...",
       "cannotReceiveFiles": "این جلسه نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
-      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید."
+      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید.",
+      "discardAttachmentsMessage": "فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد.",
+      "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟",
+      "charactersRemaining": "{{count}} نویسه باقی مانده",
+      "insertNewline": "درج خط جدید"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",
@@ -2794,7 +2809,8 @@
     "busy": "ورودی صوتی مشغول است. دوباره تلاش کنید.",
     "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
     "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
-    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست."
+    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست.",
+    "listeningStopped": "گوش دادن متوقف شد."
   },
   "share": {
     "title": "اشتراک در Kilo",

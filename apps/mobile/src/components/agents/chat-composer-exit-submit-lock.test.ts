@@ -45,7 +45,6 @@ function createExitSubmissionHarness() {
   const dismiss = vi.fn(() => {
     order.push('dismiss');
   });
-  const resetAttachments = vi.fn((): void => undefined);
 
   return {
     lock,
@@ -53,7 +52,6 @@ function createExitSubmissionHarness() {
     onExitSession,
     clearDraft,
     dismiss,
-    resetAttachments,
     submit: async () => {
       const submitted = await settleVoiceInputBeforeSubmit({
         lock: lockAdapter,
@@ -72,7 +70,7 @@ function createExitSubmissionHarness() {
               onRestartSession: vi.fn(),
               onSendPrompt: vi.fn(),
             },
-            { clearDraft, dismiss, resetAttachments }
+            { clearDraft, dismiss }
           );
         },
       });
@@ -150,7 +148,6 @@ describe('remote session exit submit lock integration', () => {
 
     expect(harness.onExitSession).toHaveBeenCalledTimes(1);
     expect(harness.order).toEqual(['exit', 'accepted', 'clear', 'dismiss']);
-    expect(harness.resetAttachments).not.toHaveBeenCalled();
     expect(harness.lock.isLocked()).toBe(false);
   });
 });

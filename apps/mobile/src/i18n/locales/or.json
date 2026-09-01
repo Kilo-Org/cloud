@@ -152,7 +152,9 @@
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍ ଆଟ୍ରିବ୍ୟୁଶନ୍ ଯୋଡନ୍ତୁ",
-    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।"
+    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।",
+    "returnSendsMessage": "ରିଟର୍ନ କୀ ବାର୍ତ୍ତା ପଠାଏ",
+    "returnSendsMessageSubtitle": "ବନ୍ଦ ଥିଲେ, ରିଟର୍ନ କୀ ଏଜେଣ୍ଟର ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ନୂଆ ଧାଡ଼ି ଯୋଡ଼େ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -750,7 +752,8 @@
       "networkError": "ନେଟୱର୍କ ତ୍ରୁଟି",
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ",
       "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ବିଫଳ ହେଲା: {{reason}}",
-      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ"
+      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ",
+      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ଅପସାରଣ ହୋଇପାରିଲା ନାହିଁ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "ପୂର୍ବ କାର୍ଯ୍ୟ ଏବେବି ସରୁଛି। ଦୟାକରି ଏକ ମୁହୂର୍ତ୍ତ ଅପେକ୍ଷା କରନ୍ତୁ।",
       "serviceUnavailable": "ସେବା ଏବେ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "connectionTrouble": "ସଂଯୋଗ ସମସ୍ୟା। ଦୟାକରି କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "modelUnavailable": "ଏହି ମଡେଲ୍ Cloud Agent ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ମଡେଲ୍ ବାଛି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "modelUnavailable": "ଏହି ମଡେଲ୍ Cloud Agent ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ମଡେଲ୍ ବାଛି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "cancelQueuedFailed": "ବାର୍ତ୍ତା ବାତିଲ ହୋଇପାରିଲା ନାହିଁ।",
+      "cancelQueuedRestoreAvailable": "ବାର୍ତ୍ତା ବାତିଲ ହେଲା। ଏହାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାଇବାକୁ “ପୁନଃସ୍ଥାପନ କରନ୍ତୁ” ଟାପ୍ କରନ୍ତୁ।",
+      "cancelQueuedRestored": "ବାର୍ତ୍ତା ବାତିଲ ହେଲା। ପ୍ରମ୍ପ୍ଟ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରିଛି।",
+      "cancelQueuedUpgradeRequired": "ଧାଡ଼ିରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରିବାକୁ Kilo CLI ର ଏକ ନୂତନ ସଂସ୍କରଣ ଆବଶ୍ୟକ। Kilo CLI ଅଦ୍ୟତନ କରନ୍ତୁ ଏବଂ ପୁନଃସଂଯୋଗ କରନ୍ତୁ।"
     },
     "remoteSession": {
       "failedToCreate": "ଦୂରସ୍ଥ ସେସନ୍ ସୃଷ୍ଟି କରିବାରେ ବିଫଳ ହେଲା",
@@ -2213,7 +2220,8 @@
       "cliCannotContinue": "ଏହି CLI ଏକ ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ CLI ଚୟନ କରନ୍ତୁ।",
       "continueFrom": "{{title}} ଜାରି ରହୁଛି",
       "importFailed": "ଏହି ସେସନ୍ ଆମଦାନୀ କରିପାରିଲା ନାହିଁ।",
-      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି"
+      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି",
+      "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "ବାର୍ତ୍ତା ଧାଡିରେ ଅଛି",
       "userMessage": "ବ୍ୟବହାରକାରୀ ବାର୍ତ୍ତା",
       "assistantMessage": "ସହାୟକ ବାର୍ତ୍ତା",
-      "longPressHint": "ବାର୍ତ୍ତା ବିବରଣୀ ପାଇଁ ଦୀର୍ଘ ଦବାନ୍ତୁ"
+      "longPressHint": "ବାର୍ତ୍ତା ବିବରଣୀ ପାଇଁ ଦୀର୍ଘ ଦବାନ୍ତୁ",
+      "cancelQueued": "ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
+      "cancelQueuedAccessibility": "ଧାଡ଼ିରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
+      "restoreQueued": "ପୁନଃସ୍ଥାପନ କରନ୍ତୁ",
+      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ପୁନଃସ୍ଥାପନ କରନ୍ତୁ"
     },
     "olderMessages": {
       "arrived": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହେଲା",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "ସେସନ୍ ଫିଲ୍ଟର କରନ୍ତୁ",
-      "sortBy": "କ୍ରମବଦ୍ଧ କରନ୍ତୁ",
-      "sortLastUpdated": "ସର୍ବଶେଷ ଅପଡେଟ୍",
-      "sortCreated": "ସୃଷ୍ଟି",
       "platform": "ପ୍ଲାଟଫର୍ମ",
       "platformCloud": "କ୍ଲାଉଡ୍",
       "platformExtension": "ଏକ୍ସଟେନ୍ସନ୍",
@@ -2545,7 +2554,9 @@
       "uploading": "ଅପଲୋଡ୍ ହେଉଛି…",
       "uploaded": "ଅପଲୋଡ୍ ହେଲା",
       "uploadFailedRetry": "ଅପଲୋଡ୍ ବିଫଳ। ପୁନଃଚେଷ୍ଟା ପାଇଁ ଟାପ୍ କରନ୍ତୁ।",
-      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।"
+      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।",
+      "moveLeft": "{{filename}} କୁ ବାମକୁ ଘୁଞ୍ଚାନ୍ତୁ",
+      "moveRight": "{{filename}} କୁ ଡାହାଣକୁ ଘୁଞ୍ଚାନ୍ତୁ"
     },
     "attachmentPasteHint": {
       "accessibility": "କ୍ଲିପବୋର୍ଡରୁ ଛବି ପେଷ୍ଟ କରନ୍ତୁ",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "ସମାପ୍ତ ହେଉଛି...",
       "messagePlaceholder": "ସନ୍ଦେଶ",
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ଆପଣଙ୍କ ବାର୍ତ୍ତା ପଠାଇବାକୁ ଆଟାଚମେଣ୍ଟ ଅପସାରଣ କରନ୍ତୁ।",
-      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।"
+      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।",
+      "discardAttachmentsMessage": "ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।",
+      "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?",
+      "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
@@ -2794,7 +2809,8 @@
     "busy": "ଭଏସ୍ ଇନ୍ପୁଟ୍ ବ୍ୟସ୍ତ ଅଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "stopped": "ଭଏସ୍ ଇନ୍ପୁଟ୍ ବନ୍ଦ ହେଲା। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ମାଇକ୍ରୋଫୋନ୍ ଟାପ୍ କରନ୍ତୁ।",
     "unavailableDevice": "ଏହି ଡିଭାଇସ୍ ରେ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।",
-    "unavailableLanguage": "ଏହି ଡିଭାଇସ୍ ଭାଷା ପାଇଁ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।"
+    "unavailableLanguage": "ଏହି ଡିଭାଇସ୍ ଭାଷା ପାଇଁ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।",
+    "listeningStopped": "ଶୁଣିବା ବନ୍ଦ ହେଲା।"
   },
   "share": {
     "title": "Kilo କୁ ଅଂଶୀଦାର କରନ୍ତୁ",

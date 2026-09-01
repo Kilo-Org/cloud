@@ -15,6 +15,7 @@ import {
   isTerminalMessageState,
   type SessionMessageState,
   type SessionMessageStorage,
+  type MarkMessageFailedParams,
 } from './session-message-state.js';
 import type { SessionMessageIntent } from '../execution/types.js';
 
@@ -255,6 +256,93 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     expect(loaded?.agentActivityObservedAt).toBeUndefined();
   });
 
+  it.each([
+    ['legacy', undefined],
+    ['current', createIntent(VALID_MESSAGE_ID, 'stored prompt')],
+  ] as const)(
+    'strips retired failureFacts on %s state reads and writes',
+    async (_name, admissionSnapshot) => {
+      const storage = createFakeStorage();
+      const storedState = {
+        messageId: VALID_MESSAGE_ID,
+        status: 'failed' as const,
+        prompt: 'stored prompt',
+        createdAt: 1000,
+        terminalAt: 2000,
+        assistantMessageId: 'asst_original',
+        assistantFailureReason: 'provider_unavailable' as const,
+        safeFailureMessage: 'Assistant service is unavailable',
+        failureFacts: {
+          version: 1,
+          sdkModel: 'vendor/model',
+          sdkProvider: 'kilo',
+          errorName: 'APIError',
+          sdkStatusCode: 503,
+          isRetryable: false,
+        },
+        admissionSnapshot,
+        agent: { model: 'legacy-model' },
+        callbackRequired: true,
+      };
+      await storage.put(`session_message:${VALID_MESSAGE_ID}`, storedState);
+
+      const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+      expect(loaded).toMatchObject({
+        status: 'failed',
+        terminalAt: 2000,
+        assistantMessageId: 'asst_original',
+        assistantFailureReason: 'provider_unavailable',
+        safeFailureMessage: 'Assistant service is unavailable',
+        callbackRequired: true,
+      });
+      expect(loaded).not.toHaveProperty('failureFacts');
+      expect(loaded?.admissionSnapshot).toEqual(admissionSnapshot);
+      expect(loaded?.legacyAdmissionConstraints).toEqual(
+        admissionSnapshot === undefined ? { agent: { model: 'legacy-model' } } : undefined
+      );
+      expect(await listMessagesWithPendingCallbacks(storage)).toEqual([loaded]);
+
+      await putSessionMessageState(storage, storedState);
+      expect(storage.store.get(`session_message:${VALID_MESSAGE_ID}`)).not.toHaveProperty(
+        'failureFacts'
+      );
+      expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toEqual(loaded);
+      expect(storedState).toHaveProperty('failureFacts');
+    }
+  );
+
+  it.each(['future_assistant_reason', null, 42, {}])(
+    'ignores an unknown optional assistant reason without losing lifecycle or callback state: %j',
+    async assistantFailureReason => {
+      const storage = createFakeStorage();
+      await storage.put(`session_message:${VALID_MESSAGE_ID}`, {
+        messageId: VALID_MESSAGE_ID,
+        status: 'failed',
+        prompt: 'stored prompt',
+        createdAt: 1000,
+        terminalAt: 2000,
+        assistantMessageId: 'asst_original',
+        assistantFailureReason,
+        safeFailureMessage: 'Assistant request failed',
+        callbackRequired: true,
+      });
+
+      const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+      expect(loaded).toMatchObject({
+        status: 'failed',
+        terminalAt: 2000,
+        assistantMessageId: 'asst_original',
+        safeFailureMessage: 'Assistant request failed',
+        callbackRequired: true,
+      });
+      expect(loaded?.assistantFailureReason).toBeUndefined();
+      expect(await listMessagesWithPendingCallbacks(storage)).toEqual([loaded]);
+      if (!loaded) throw new Error('Expected stored lifecycle state');
+      await putSessionMessageState(storage, loaded);
+      expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toEqual(loaded);
+    }
+  );
+
   it('returns undefined for unknown messageId', async () => {
     const storage = createFakeStorage();
     const loaded = await getSessionMessageState(storage, 'msg_unknown00000000ABCDEFGHIJKLMN');
@@ -447,6 +535,85 @@ describe('markMessageFailed', () => {
     expect(secondFail).toBeNull();
   });
 });
+
+describe.each(['markMessageFailed', 'terminalizeMessageOnce'] as const)(
+  '%s failure correlation',
+  path => {
+    async function fail(
+      storage: SessionMessageStorage,
+      params: MarkMessageFailedParams,
+      now: number
+    ) {
+      return path === 'markMessageFailed'
+        ? markMessageFailed(storage, VALID_MESSAGE_ID, params, now)
+        : (
+            await terminalizeMessageOnce(
+              storage,
+              VALID_MESSAGE_ID,
+              { kind: 'failed', ...params },
+              now
+            )
+          ).state;
+    }
+
+    it('round-trips the failure reason and assistant identity without accepting a conflicting late failure', async () => {
+      const storage = createFakeStorage();
+      await putSessionMessageState(
+        storage,
+        createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'))
+      );
+      await markMessageAccepted(storage, VALID_MESSAGE_ID, 'wr_failure', 1000);
+      const params: MarkMessageFailedParams = {
+        reason: 'assistant_error',
+        completionSource: 'assistant_message_event',
+        assistantMessageId: 'asst_original',
+        assistantFailureReason: 'provider_unavailable',
+        providerOwnership: 'managed',
+        safeFailureMessage: 'Assistant service is unavailable',
+      };
+
+      const failed = await fail(storage, params, 2000);
+      expect(failed).toMatchObject({
+        status: 'failed',
+        terminalAt: 2000,
+        assistantMessageId: params.assistantMessageId,
+        assistantFailureReason: params.assistantFailureReason,
+        safeFailureMessage: params.safeFailureMessage,
+      });
+      expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toEqual(failed);
+
+      await fail(storage, params, 3000);
+      await fail(
+        storage,
+        {
+          ...params,
+          assistantMessageId: 'asst_late_conflict',
+          assistantFailureReason: 'rate_limited',
+          safeFailureMessage: 'Assistant request was rate limited',
+        },
+        4000
+      );
+      expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toEqual(failed);
+    });
+
+    it('keeps the stored assistant identity when the failure omits it', async () => {
+      const storage = createFakeStorage();
+      await putSessionMessageState(storage, {
+        ...createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello')),
+        assistantMessageId: 'asst_original',
+      });
+      await fail(
+        storage,
+        { reason: 'assistant_error', completionSource: 'idle_reconciliation' },
+        2000
+      );
+      expect(await getSessionMessageState(storage, VALID_MESSAGE_ID)).toMatchObject({
+        status: 'failed',
+        assistantMessageId: 'asst_original',
+      });
+    });
+  }
+);
 
 describe('markMessageInterrupted', () => {
   it('transitions queued to interrupted', async () => {

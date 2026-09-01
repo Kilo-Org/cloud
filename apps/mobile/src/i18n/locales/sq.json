@@ -152,7 +152,9 @@
     "appearanceDark": "E errët",
     "account": "Llogaria",
     "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
-    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim."
+    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim.",
+    "returnSendsMessage": "Tasti i kthimit dërgon mesazhin",
+    "returnSendsMessageSubtitle": "Kur çaktivizohet, tasti i kthimit shton një rresht të ri në fushat e mesazheve të agjentëve."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -750,7 +752,8 @@
       "networkError": "Gabim rrjeti",
       "uploadFailed": "Ngarkimi dështoi",
       "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}",
-      "nothingToPaste": "Asgjë për të ngjitur"
+      "nothingToPaste": "Asgjë për të ngjitur",
+      "metadataStripFailed": "Metadatat e fotos nuk mund të hiqeshin."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
       "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti.",
-      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri."
+      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri.",
+      "cancelQueuedFailed": "Mesazhi nuk mund të anulohej.",
+      "cancelQueuedRestoreAvailable": "Mesazhi u anulua. Prekni Rivendosni për ta kthyer në fushën e mesazhit.",
+      "cancelQueuedRestored": "Mesazhi u anulua. Kërkesa është sërish në fushën e mesazhit.",
+      "cancelQueuedUpgradeRequired": "Anulimi i mesazheve në pritje kërkon një Kilo CLI më të ri. Përditësoni Kilo CLI dhe rilidhuni."
     },
     "remoteSession": {
       "failedToCreate": "Dështoi krijimi i seancës në distancë",
@@ -2213,7 +2220,8 @@
       "continueFrom": "Duke vazhduar {{title}}",
       "importingSession": "Duke importuar seancë",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidhni Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë."
+      "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "discardWithUploadsMessage": "Kërkesa juaj dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Mesazhi në radhë",
       "userMessage": "Mesazh përdoruesi",
       "assistantMessage": "Mesazh asistenti",
-      "longPressHint": "Shtypni gjatë për detaje të mesazhit"
+      "longPressHint": "Shtypni gjatë për detaje të mesazhit",
+      "cancelQueued": "Anuloni mesazhin",
+      "cancelQueuedAccessibility": "Anuloni mesazhin në pritje",
+      "restoreQueued": "Rivendosni",
+      "restoreQueuedAccessibility": "Rivendosni mesazhin e anuluar në fushën e mesazhit"
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtro seancat",
-      "sortBy": "Rendit sipas",
-      "sortLastUpdated": "Përditësuar së fundi",
-      "sortCreated": "Krijuar",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Zgjerimi",
@@ -2545,7 +2554,9 @@
       "uploading": "Duke u ngarkuar…",
       "uploaded": "U ngarkua",
       "uploadFailedRetry": "Ngarkimi dështoi. Prekni për të riprovuar.",
-      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet."
+      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet.",
+      "moveLeft": "Zhvendosni {{filename}} majtas",
+      "moveRight": "Zhvendosni {{filename}} djathtas"
     },
     "attachmentPasteHint": {
       "accessibility": "Ngjit imazhin nga clipboard",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Duke përfunduar...",
       "messagePlaceholder": "Mesazh",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiqni bashkëngjitjet për të dërguar mesazhin tuaj.",
-      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar."
+      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar.",
+      "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
+      "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?",
+      "charactersRemaining": "Mbeten {{count}} karaktere",
+      "insertNewline": "Shtoni një rresht të ri"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",
@@ -2794,7 +2809,8 @@
     "busy": "Futja me zë është e zënë. Provo përsëri.",
     "stopped": "Futja me zë u ndal. Prekni mikrofonin për të provuar përsëri.",
     "unavailableDevice": "Futja me zë nuk është e disponueshme në këtë pajisje.",
-    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje."
+    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje.",
+    "listeningStopped": "Dëgjimi u ndal."
   },
   "share": {
     "title": "Ndaj te Kilo",

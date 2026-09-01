@@ -152,7 +152,9 @@
     "appearanceDark": "Fènwa",
     "account": "Kont",
     "prReviewAttribution": "Ajoute atribisyon aplikasyon nan revizyon PR",
-    "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon."
+    "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon.",
+    "returnSendsMessage": "Kle Retou a voye mesaj",
+    "returnSendsMessageSubtitle": "Lè li dezaktive, kle Retou a antre yon nouvo liy nan chan mesaj ajan yo."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -750,7 +752,8 @@
       "networkError": "Erè rezo",
       "uploadFailed": "Chajman echwe",
       "failedToUploadFile": "Echwe pou chaje fichye a: {{reason}}",
-      "nothingToPaste": "Pa gen anyen pou kole"
+      "nothingToPaste": "Pa gen anyen pou kole",
+      "metadataStripFailed": "Pa t ka retire metadone foto a."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
       "serviceUnavailable": "Sèvis la pa disponib kounye a. Tanpri eseye ankò.",
       "connectionTrouble": "Pwoblèm koneksyon. Tanpri eseye ankò nan yon moman.",
-      "modelUnavailable": "Modèl sa a pa disponib pou Cloud Agent. Chwazi yon lòt modèl epi eseye ankò."
+      "modelUnavailable": "Modèl sa a pa disponib pou Cloud Agent. Chwazi yon lòt modèl epi eseye ankò.",
+      "cancelQueuedFailed": "Pa t ka anile mesaj la.",
+      "cancelQueuedRestoreAvailable": "Mesaj la anile. Tape Retabli pou remete li nan chan mesaj la.",
+      "cancelQueuedRestored": "Mesaj la anile. Pwompt la tounen nan chan mesaj la.",
+      "cancelQueuedUpgradeRequired": "Anile mesaj annatant yo mande yon vèsyon Kilo CLI ki pi resan. Mete ajou Kilo CLI a epi rekonekte."
     },
     "remoteSession": {
       "failedToCreate": "Echwe pou kreye sesyon aleka",
@@ -2213,7 +2220,8 @@
       "continueFrom": "Ap kontinye {{title}}",
       "importingSession": "Ap enpòte sesyon",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Pa t ka enpòte sesyon sa a."
+      "importFailed": "Pa t ka enpòte sesyon sa a.",
+      "discardWithUploadsMessage": "Pwompt ou a ak nenpòt fichye telechaje ki pa atache ak mesaj voye yo pral efase."
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Mesaj nan fil",
       "userMessage": "Mesaj itilizatè",
       "assistantMessage": "Mesaj asistan",
-      "longPressHint": "Peze lontan pou detay mesaj"
+      "longPressHint": "Peze lontan pou detay mesaj",
+      "cancelQueued": "Anile mesaj la",
+      "cancelQueuedAccessibility": "Anile mesaj annatant lan",
+      "restoreQueued": "Retabli",
+      "restoreQueuedAccessibility": "Retabli mesaj anile a nan chan mesaj la"
     },
     "olderMessages": {
       "arrived": "Mesaj pi bonè chaje",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Filtre sesyon",
-      "sortBy": "Triye pa",
-      "sortLastUpdated": "Dènye aktyalizasyon",
-      "sortCreated": "Kreye",
       "platform": "Platfòm",
       "platformCloud": "Nwaj",
       "platformExtension": "Ekstansyon",
@@ -2545,7 +2554,9 @@
       "uploading": "Ap chaje…",
       "uploaded": "Chaje",
       "uploadFailedRetry": "Chajman echwe. Tape pou eseye ankò.",
-      "uploadFailedTerminal": "Fichye sa a pa ka chaje."
+      "uploadFailedTerminal": "Fichye sa a pa ka chaje.",
+      "moveLeft": "Deplase {{filename}} agoch",
+      "moveRight": "Deplase {{filename}} adwat"
     },
     "attachmentPasteHint": {
       "accessibility": "Kole imaj soti nan clipboard",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Ap fini...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire pyès jwenn yo pou voye mesaj ou.",
-      "couldNotAttachFiles": "Pa t ka kole fichye. Tape voye pou eseye ankò."
+      "couldNotAttachFiles": "Pa t ka kole fichye. Tape voye pou eseye ankò.",
+      "discardAttachmentsMessage": "Fichye telechaje ki pa atache ak mesaj voye yo pral efase.",
+      "discardAttachmentsTitle": "Jete atachman yo?",
+      "charactersRemaining": "{{count}} karaktè rete",
+      "insertNewline": "Antre yon nouvo liy"
     },
     "chatLink": {
       "linkCopied": "Lyen kopye",
@@ -2794,7 +2809,8 @@
     "busy": "Antre vwa okipe. Eseye ankò.",
     "stopped": "Antre vwa sispann. Tape mikwofòn nan pou eseye ankò.",
     "unavailableDevice": "Antre vwa pa disponib sou aparèy sa a.",
-    "unavailableLanguage": "Antre vwa pa disponib pou lang aparèy sa a."
+    "unavailableLanguage": "Antre vwa pa disponib pou lang aparèy sa a.",
+    "listeningStopped": "Koute a sispann."
   },
   "share": {
     "title": "Pataje nan Kilo",

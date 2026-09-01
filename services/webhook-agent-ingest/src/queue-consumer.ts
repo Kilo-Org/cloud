@@ -412,6 +412,7 @@ async function processWebhookMessage(
         mode: string;
         model: string;
         variant?: string;
+        sandboxAllocation?: 'isolated-standard';
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
@@ -442,6 +443,9 @@ async function processWebhookMessage(
       }
       if (triggerConfig.variant !== undefined) {
         prepareSessionBody.variant = triggerConfig.variant;
+      }
+      if (triggerConfig.sandboxAllocation !== undefined) {
+        prepareSessionBody.sandboxAllocation = triggerConfig.sandboxAllocation;
       }
 
       logger.debug('Calling prepareSession', {

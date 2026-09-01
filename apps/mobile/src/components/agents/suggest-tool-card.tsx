@@ -7,7 +7,6 @@ import { useSessionManager } from '@/components/agents/session-provider';
 
 import { FixedPartRow } from './fixed-part-row';
 import { resolveSuggestionPresentation } from './suggestion-card-state';
-import { SuggestionCard } from './suggestion-card';
 import { getToolDisplay } from './tool-card-display';
 
 export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
@@ -20,20 +19,8 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
     activeSuggestion
   );
 
-  if (presentation === 'interactive' && activeSuggestion) {
-    return (
-      <SuggestionCard
-        key={activeSuggestion.requestId}
-        text={activeSuggestion.text}
-        actions={activeSuggestion.actions}
-        onAccept={async index => {
-          await manager.acceptSuggestion(activeSuggestion.requestId, index);
-        }}
-        onDismiss={async () => {
-          await manager.dismissSuggestion(activeSuggestion.requestId);
-        }}
-      />
-    );
+  if (presentation === 'interactive') {
+    return null;
   }
 
   const display = getToolDisplay(part);

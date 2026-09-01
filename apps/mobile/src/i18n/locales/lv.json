@@ -152,7 +152,9 @@
     "appearanceDark": "Tumšs",
     "account": "Konts",
     "prReviewAttribution": "Pievienot lietotnes attiecinājumu PR pārskatiem",
-    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu."
+    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu.",
+    "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
+    "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -757,7 +759,8 @@
       "networkError": "Tīkla kļūda",
       "uploadFailed": "Augšupielāde neizdevās",
       "failedToUploadFile": "Neizdevās augšupielādēt failu: {{reason}}",
-      "nothingToPaste": "Nav ko ielīmēt"
+      "nothingToPaste": "Nav ko ielīmēt",
+      "metadataStripFailed": "Neizdevās noņemt foto metadatus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2156,7 +2159,11 @@
       "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
       "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa.",
-      "modelUnavailable": "Šis modelis nav pieejams Cloud Agent. Izvēlieties citu modeli un mēģiniet vēlreiz."
+      "modelUnavailable": "Šis modelis nav pieejams Cloud Agent. Izvēlieties citu modeli un mēģiniet vēlreiz.",
+      "cancelQueuedFailed": "Neizdevās atcelt ziņojumu.",
+      "cancelQueuedRestoreAvailable": "Ziņojums atcelts. Pieskarieties “Atjaunot”, lai to atgrieztu ziņojuma ievades laukā.",
+      "cancelQueuedRestored": "Ziņojums atcelts. Jautājums atkal ir ziņojuma ievades laukā.",
+      "cancelQueuedUpgradeRequired": "Lai atceltu rindā esošus ziņojumus, nepieciešama jaunāka Kilo CLI versija. Atjauniniet Kilo CLI un savienojieties vēlreiz."
     },
     "remoteSession": {
       "failedToCreate": "Neizdevās izveidot attālo sesiju",
@@ -2228,7 +2235,8 @@
       "continueFrom": "Turpina {{title}}",
       "importingSession": "Importē sesiju",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlieties Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju."
+      "importFailed": "Neizdevās importēt šo sesiju.",
+      "discardWithUploadsMessage": "Jūsu jautājums un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2477,7 +2485,11 @@
       "queuedAccessibility": "Ziņojums rindā",
       "userMessage": "Lietotāja ziņojums",
       "assistantMessage": "Asistenta ziņojums",
-      "longPressHint": "Turiet piespiestu ziņojuma detaļām"
+      "longPressHint": "Turiet piespiestu ziņojuma detaļām",
+      "cancelQueued": "Atcelt ziņojumu",
+      "cancelQueuedAccessibility": "Atcelt rindā esošu ziņojumu",
+      "restoreQueued": "Atjaunot",
+      "restoreQueuedAccessibility": "Atjaunot atcelto ziņojumu ziņojuma ievades laukā"
     },
     "olderMessages": {
       "arrived": "Ielādēti agrāki ziņojumi",
@@ -2508,9 +2520,6 @@
     },
     "sessionFilter": {
       "title": "Filtrēt sesijas",
-      "sortBy": "Kārtot pēc",
-      "sortLastUpdated": "Pēdējo reizi atjaunināts",
-      "sortCreated": "Izveidots",
       "platform": "Platforma",
       "platformCloud": "Mākonis",
       "platformExtension": "Paplašinājums",
@@ -2564,7 +2573,9 @@
       "uploading": "Augšupielādē…",
       "uploaded": "Augšupielādēts",
       "uploadFailedRetry": "Augšupielāde neizdevās. Pieskarieties, lai mēģinātu vēlreiz.",
-      "uploadFailedTerminal": "Šo failu nevar augšupielādēt."
+      "uploadFailedTerminal": "Šo failu nevar augšupielādēt.",
+      "moveLeft": "Pārvietot {{filename}} pa kreisi",
+      "moveRight": "Pārvietot {{filename}} pa labi"
     },
     "attachmentPasteHint": {
       "accessibility": "Ielīmēt attēlu no starpliktuves",
@@ -2594,7 +2605,11 @@
       "finalizingPlaceholder": "Pabeidz...",
       "messagePlaceholder": "Ziņojums...",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
-      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz."
+      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz.",
+      "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
+      "discardAttachmentsTitle": "Atmest pielikumus?",
+      "charactersRemaining": "Atlikušās rakstzīmes: {{count}}",
+      "insertNewline": "Ievietot jaunu rindu"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",
@@ -2814,7 +2829,8 @@
     "busy": "Balss ievade ir aizņemta. Mēģiniet vēlreiz.",
     "stopped": "Balss ievade tika apturēta. Pieskarieties mikrofonam, lai mēģinātu vēlreiz.",
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
-    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai."
+    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai.",
+    "listeningStopped": "Klausīšanās apturēta."
   },
   "share": {
     "title": "Kopīgot Kilo",

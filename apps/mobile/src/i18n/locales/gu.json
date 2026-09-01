@@ -152,7 +152,9 @@
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપ એટ્રિબ્યુશન ઉમેરો",
-    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો."
+    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો.",
+    "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
+    "returnSendsMessageSubtitle": "બંધ હોય ત્યારે, રિટર્ન એજન્ટના સંદેશ ઇનપુટમાં નવી લાઇન દાખલ કરે છે."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -750,7 +752,8 @@
       "networkError": "નેટવર્ક ભૂલ",
       "uploadFailed": "અપલોડ નિષ્ફળ",
       "failedToUploadFile": "ફાઇલ અપલોડ કરવામાં નિષ્ફળ: {{reason}}",
-      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી"
+      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી",
+      "metadataStripFailed": "ફોટો મેટાડેટા દૂર કરી શકાયું નહીં."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
       "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
       "connectionTrouble": "કનેક્શન સમસ્યા. થોડી વાર પછી ફરી પ્રયાસ કરો.",
-      "modelUnavailable": "આ મૉડલ Cloud Agent માટે ઉપલબ્ધ નથી. બીજું મૉડલ પસંદ કરીને ફરી પ્રયાસ કરો."
+      "modelUnavailable": "આ મૉડલ Cloud Agent માટે ઉપલબ્ધ નથી. બીજું મૉડલ પસંદ કરીને ફરી પ્રયાસ કરો.",
+      "cancelQueuedFailed": "સંદેશ રદ કરી શકાયો નહીં.",
+      "cancelQueuedRestoreAvailable": "સંદેશ રદ થયો. તેને સંદેશ ઇનપુટમાં પાછો લાવવા માટે પુનઃસ્થાપિત કરો પર ટેપ કરો.",
+      "cancelQueuedRestored": "સંદેશ રદ થયો. પ્રોમ્પ્ટ સંદેશ ઇનપુટમાં પાછો આવી ગયો છે.",
+      "cancelQueuedUpgradeRequired": "કતારમાં રહેલા સંદેશો રદ કરવા માટે Kilo CLI નું નવું સંસ્કરણ જરૂરી છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "remoteSession": {
       "failedToCreate": "રિમોટ સત્ર બનાવવામાં નિષ્ફળ",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}} ચાલુ કરી રહ્યાં છીએ",
       "importingSession": "સત્ર આયાત કરી રહ્યાં છીએ",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી."
+      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી.",
+      "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "સંદેશ કતારબદ્ધ",
       "userMessage": "વપરાશકર્તા સંદેશ",
       "assistantMessage": "સહાયક સંદેશ",
-      "longPressHint": "સંદેશ વિગતો માટે લાંબું દબાવો"
+      "longPressHint": "સંદેશ વિગતો માટે લાંબું દબાવો",
+      "cancelQueued": "સંદેશ રદ કરો",
+      "cancelQueuedAccessibility": "કતારમાં રહેલો સંદેશ રદ કરો",
+      "restoreQueued": "પુનઃસ્થાપિત કરો",
+      "restoreQueuedAccessibility": "રદ કરેલો સંદેશ સંદેશ ઇનપુટમાં પુનઃસ્થાપિત કરો"
     },
     "olderMessages": {
       "arrived": "અગાઉના સંદેશાઓ લોડ થયા",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "સત્રો ફિલ્ટર કરો",
-      "sortBy": "ક્રમ આપો",
-      "sortLastUpdated": "છેલ્લે અપડેટ",
-      "sortCreated": "બનાવેલ",
       "platform": "પ્લેટફોર્મ",
       "platformCloud": "ક્લાઉડ",
       "platformExtension": "એક્સટેન્શન",
@@ -2545,7 +2554,9 @@
       "uploading": "અપલોડ થઈ રહ્યું છે…",
       "uploaded": "અપલોડ થયું",
       "uploadFailedRetry": "અપલોડ નિષ્ફળ. ફરી પ્રયાસ કરવા ટેપ કરો.",
-      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી."
+      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી.",
+      "moveLeft": "{{filename}} ડાબે ખસેડો",
+      "moveRight": "{{filename}} જમણે ખસેડો"
     },
     "attachmentPasteHint": {
       "accessibility": "ક્લિપબોર્ડમાંથી ઇમેજ પેસ્ટ કરો",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
       "messagePlaceholder": "સંદેશ...",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો મેળવી શકતું નથી. તમારો સંદેશ મોકલવા માટે એટેચમેન્ટ્સ દૂર કરો.",
-      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો."
+      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો.",
+      "discardAttachmentsMessage": "મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે.",
+      "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?",
+      "charactersRemaining": "{{count}} અક્ષરો બાકી",
+      "insertNewline": "નવી લાઇન દાખલ કરો"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",
@@ -2794,7 +2809,8 @@
     "busy": "વૉઇસ ઇનપુટ વ્યસ્ત છે. ફરી પ્રયત્ન કરો.",
     "stopped": "વૉઇસ ઇનપુટ બંધ થયું. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
     "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
-    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી."
+    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
+    "listeningStopped": "સાંભળવાનું બંધ થયું."
   },
   "share": {
     "title": "Kilo પર શેર કરો",

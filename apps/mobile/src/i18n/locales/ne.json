@@ -152,7 +152,9 @@
     "appearanceDark": "गाढा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाहरूमा एप विशेषता थप्नुहोस्",
-    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।"
+    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।",
+    "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
+    "returnSendsMessageSubtitle": "बन्द हुँदा, रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति घुसाउँछ।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -750,7 +752,8 @@
       "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड असफल भयो",
       "failedToUploadFile": "फाइल अपलोड गर्न असफल: {{reason}}",
-      "nothingToPaste": "टाँस्न केही छैन"
+      "nothingToPaste": "टाँस्न केही छैन",
+      "metadataStripFailed": "फोटोको मेटाडेटा हटाउन सकिएन।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
       "connectionTrouble": "जडान समस्या। कृपया केही क्षणमा फेरि प्रयास गर्नुहोस्।",
-      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।"
+      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।",
+      "cancelQueuedFailed": "सन्देश रद्द गर्न सकिएन।",
+      "cancelQueuedRestoreAvailable": "सन्देश रद्द गरियो। यसलाई सन्देश लेख्ने ठाउँमा फर्काउन “पुनः स्थापित गर्नुहोस्” मा ट्याप गर्नुहोस्।",
+      "cancelQueuedRestored": "सन्देश रद्द गरियो। प्रम्प्ट सन्देश लेख्ने ठाउँमा फर्किएको छ।",
+      "cancelQueuedUpgradeRequired": "लाममा रहेका सन्देशहरू रद्द गर्न नयाँ Kilo CLI चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र सिर्जना गर्न असफल भयो",
@@ -2213,7 +2220,8 @@
       "continueFrom": "{{title}} जारी राख्दै",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
-      "importFailed": "यो सत्र आयात गर्न सकिएन।"
+      "importFailed": "यो सत्र आयात गर्न सकिएन।",
+      "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "सन्देश लाइनमा राखियो",
       "userMessage": "प्रयोगकर्ता सन्देश",
       "assistantMessage": "सहायक सन्देश",
-      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्"
+      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्",
+      "cancelQueued": "सन्देश रद्द गर्नुहोस्",
+      "cancelQueuedAccessibility": "लाममा रहेको सन्देश रद्द गर्नुहोस्",
+      "restoreQueued": "पुनः स्थापित गर्नुहोस्",
+      "restoreQueuedAccessibility": "रद्द गरिएको सन्देशलाई सन्देश लेख्ने ठाउँमा पुनः स्थापित गर्नुहोस्"
     },
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भयो",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "सत्र फिल्टर गर्नुहोस्",
-      "sortBy": "क्रमबद्ध गर्ने आधार",
-      "sortLastUpdated": "पछिल्लो अद्यावधिक",
-      "sortCreated": "सिर्जना गरिएको",
       "platform": "प्लेटफर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेन्सन",
@@ -2545,7 +2554,9 @@
       "uploading": "अपलोड हुँदै…",
       "uploaded": "अपलोड गरियो",
       "uploadFailedRetry": "अपलोड असफल भयो। पुनःप्रयास गर्न ट्याप गर्नुहोस्।",
-      "uploadFailedTerminal": "यो फाइल अपलोड गर्न सकिँदैन।"
+      "uploadFailedTerminal": "यो फाइल अपलोड गर्न सकिँदैन।",
+      "moveLeft": "{{filename}} बायाँ सार्नुहोस्",
+      "moveRight": "{{filename}} दायाँ सार्नुहोस्"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्डबाट छवि टाँस्नुहोस्",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "समाप्त गर्दै...",
       "messagePlaceholder": "सन्देश...",
       "cannotReceiveFiles": "यो सत्रले फाइल प्राप्त गर्न सक्दैन। आफ्नो सन्देश पठाउन संलग्नहरू हटाउनुहोस्।",
-      "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न पठाउनुहोस् ट्याप गर्नुहोस्।"
+      "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न पठाउनुहोस् ट्याप गर्नुहोस्।",
+      "discardAttachmentsMessage": "पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।",
+      "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?",
+      "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
+      "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्"
     },
     "chatLink": {
       "linkCopied": "लिंक प्रतिलिपि गरियो",
@@ -2794,7 +2809,8 @@
     "busy": "भ्वाइस इनपुट व्यस्त छ। फेरि प्रयास गर्नुहोस्।",
     "stopped": "भ्वाइस इनपुट रोकियो। फेरि प्रयास गर्न माइक्रोफोनमा ट्याप गर्नुहोस्।",
     "unavailableDevice": "यो यन्त्रमा भ्वाइस इनपुट उपलब्ध छैन।",
-    "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।"
+    "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।",
+    "listeningStopped": "सुन्न रोकियो।"
   },
   "share": {
     "title": "Kilo मा साझेदारी गर्नुहोस्",

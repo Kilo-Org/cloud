@@ -152,7 +152,9 @@
     "appearanceDark": "Fosc",
     "account": "Compte",
     "prReviewAttribution": "Afegiu l'atribució de l'aplicació a les revisions de PR",
-    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió."
+    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió.",
+    "returnSendsMessage": "La tecla de retorn envia el missatge",
+    "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -757,7 +759,8 @@
       "networkError": "Error de xarxa",
       "uploadFailed": "La pujada ha fallat",
       "failedToUploadFile": "No s'ha pogut pujar el fitxer: {{reason}}",
-      "nothingToPaste": "Res per enganxar"
+      "nothingToPaste": "Res per enganxar",
+      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2156,7 +2159,11 @@
       "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Problema de connexió. Torna-ho a provar d'aquí a un moment.",
-      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar."
+      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar.",
+      "cancelQueuedFailed": "No s'ha pogut cancel·lar el missatge.",
+      "cancelQueuedRestoreAvailable": "Missatge cancel·lat. Toca Restaura per tornar-lo al camp de missatge.",
+      "cancelQueuedRestored": "Missatge cancel·lat. El missatge torna a ser al camp de missatge.",
+      "cancelQueuedUpgradeRequired": "Per cancel·lar missatges en cua cal una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "remoteSession": {
       "failedToCreate": "No s'ha pogut crear la sessió remota",
@@ -2228,7 +2235,8 @@
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Trieu Cloud Agent o un altre CLI.",
       "continueFrom": "Continuant {{title}}",
       "importFailed": "No s'ha pogut importar aquesta sessió.",
-      "importingSession": "Important la sessió"
+      "importingSession": "Important la sessió",
+      "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2477,7 +2485,11 @@
       "queuedAccessibility": "Missatge en cua",
       "userMessage": "Missatge de l'usuari",
       "assistantMessage": "Missatge de l'assistent",
-      "longPressHint": "Manteniu premut per veure els detalls del missatge"
+      "longPressHint": "Manteniu premut per veure els detalls del missatge",
+      "cancelQueued": "Cancel·la el missatge",
+      "cancelQueuedAccessibility": "Cancel·la el missatge en cua",
+      "restoreQueued": "Restaura",
+      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge"
     },
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",
@@ -2508,9 +2520,6 @@
     },
     "sessionFilter": {
       "title": "Filtra les sessions",
-      "sortBy": "Ordena per",
-      "sortLastUpdated": "Última actualització",
-      "sortCreated": "Creat",
       "platform": "Plataforma",
       "platformCloud": "Cloud",
       "platformExtension": "Extensió",
@@ -2564,7 +2573,9 @@
       "uploading": "Penjant…",
       "uploaded": "Penjat",
       "uploadFailedRetry": "La pujada ha fallat. Toqueu per tornar-ho a provar.",
-      "uploadFailedTerminal": "Aquest fitxer no es pot penjar."
+      "uploadFailedTerminal": "Aquest fitxer no es pot penjar.",
+      "moveLeft": "Mou {{filename}} a l'esquerra",
+      "moveRight": "Mou {{filename}} a la dreta"
     },
     "attachmentPasteHint": {
       "accessibility": "Enganxa la imatge del portapapers",
@@ -2594,7 +2605,11 @@
       "finalizingPlaceholder": "Tancant...",
       "messagePlaceholder": "Missatge...",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
-      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar."
+      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar.",
+      "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
+      "discardAttachmentsTitle": "Descartar els adjunts?",
+      "charactersRemaining": "Queden {{count}} caràcters",
+      "insertNewline": "Insereix un salt de línia"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",
@@ -2814,7 +2829,8 @@
     "busy": "L'entrada de veu està ocupada. Torna-ho a provar.",
     "stopped": "L'entrada de veu s'ha aturat. Toca el micròfon per tornar-ho a provar.",
     "unavailableDevice": "L'entrada de veu no està disponible en aquest dispositiu.",
-    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu."
+    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu.",
+    "listeningStopped": "S'ha aturat l'escolta."
   },
   "share": {
     "title": "Comparteix a Kilo",

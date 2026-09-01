@@ -332,6 +332,12 @@ export function efficientPoolBlockedResponse() {
   const message =
     `${error} Configure a custom Efficient model pool with allowed models, ` +
     `or adjust your organization model restrictions.`;
+  const logMessage = `[efficientPoolBlockedResponse] ${message}`;
+  warnExceptInTest(logMessage);
+  captureMessage(logMessage, {
+    level: 'warning',
+    tags: { source: 'openrouter-proxy', error_type: ProxyErrorType.model_not_allowed },
+  });
   return NextResponse.json(
     {
       error,

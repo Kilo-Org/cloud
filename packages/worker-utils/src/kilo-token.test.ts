@@ -200,6 +200,24 @@ describe('verifyKiloToken', () => {
     await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
   });
 
+  it('retains jose audience-array handling for the strict reader', async () => {
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-123',
+      aud: ['git-token-service:bitbucket-repositories', 'another-service'],
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(encode(SECRET));
+
+    await expect(
+      verifyKiloToken(token, SECRET, { audience: 'git-token-service:bitbucket-repositories' })
+    ).resolves.toMatchObject({ kiloUserId: 'user-123' });
+    await expect(verifyKiloToken(token, SECRET, { audience: 'other-service' })).rejects.toThrow();
+    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow('Unexpected token audience');
+  });
+
   it('rejects wrong secret', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' });
     await expect(

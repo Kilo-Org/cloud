@@ -2,6 +2,7 @@ import { jwtVerify } from 'jose';
 import { z } from 'zod';
 import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
+import type { KiloTokenPayload } from './kilo-token';
 
 const audienceName = z
   .string()
@@ -74,6 +75,20 @@ export function isKiloResourceAudienceAllowed(
   return typeof parsed.data === 'string'
     ? parsed.data === policy.audience
     : parsed.data.includes(policy.audience);
+}
+
+export async function verifyKiloTokenForResource(
+  token: string,
+  secret: string,
+  audiencePolicy: KiloResourceAudiencePolicy
+): Promise<KiloTokenPayload> {
+  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+    algorithms: ['HS256'],
+  });
+  if (!isKiloResourceAudienceAllowed(payload.aud, audiencePolicy)) {
+    throw new Error('Unexpected token audience');
+  }
+  return kiloTokenPayload.parse(payload);
 }
 
 const verifiedAuth = Symbol('verified-kilo-policy-auth');

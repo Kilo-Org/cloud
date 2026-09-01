@@ -8,6 +8,7 @@ import {
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
@@ -34,6 +35,8 @@ import {
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
   baseSendMessageNextSchema,
+  baseGetMessageResultNextSchema,
+  baseGetMessageResultNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
@@ -121,6 +124,7 @@ async function assertOrganizationOwnsSession(params: {
   organizationId: string;
   userId: string;
   cloudAgentSessionId: string;
+  expectedWorktreeId?: string;
 }): Promise<void> {
   const sessionOwnership = await verifyOrgOwnsSessionV2ByCloudAgentId(
     db,
@@ -133,6 +137,13 @@ async function assertOrganizationOwnsSession(params: {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Organization does not own this session',
+    });
+  }
+  if (params.expectedWorktreeId !== undefined) {
+    await assertSessionWorktree(db, {
+      kiloSessionId: sessionOwnership.kiloSessionId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      expectedWorktreeId: params.expectedWorktreeId,
     });
   }
 }
@@ -152,7 +163,7 @@ const InitiateFromPreparedSessionInput = baseInitiateFromPreparedSessionNextSche
   organizationId: z.uuid(),
 });
 
-const SendMessageInput = baseSendMessageNextSchema.extend({
+const SendMessageInput = baseSendMessageNextSchema.safeExtend({
   organizationId: z.uuid(),
 });
 
@@ -407,6 +418,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
+        expectedWorktreeId: input.expectedWorktreeId,
       });
       const authToken = generateCloudAgentToken(ctx.user);
       // Prompt turns carry their own model; command turns run the session's
@@ -471,6 +483,23 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  getMessageResult: organizationMemberProcedure
+    .input(baseGetMessageResultNextSchema.extend({ organizationId: z.uuid() }))
+    .output(baseGetMessageResultNextOutputSchema.nullable())
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        expectedWorktreeId: input.expectedWorktreeId,
+      });
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      return await client.getMessageResult({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+      });
     }),
 
   getWorktreeChanges: organizationMemberProcedure

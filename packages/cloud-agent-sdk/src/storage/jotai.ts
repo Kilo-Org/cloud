@@ -14,7 +14,7 @@ import {
   insertSorted,
   isSupportedDeltaField,
   notify,
-  upsertPartDroppingStaleSyntheticTextParts,
+  upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
 type JotaiStore = ReturnType<typeof createStore>;
@@ -116,7 +116,7 @@ function createJotaiStorage(
     upsertPart(messageId, part) {
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
-      const nextArr = upsertPartDroppingStaleSyntheticTextParts(arr, part);
+      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part);
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
       partsSnapshot.set(messageId, null);

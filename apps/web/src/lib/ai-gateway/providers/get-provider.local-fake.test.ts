@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
 
@@ -19,17 +20,15 @@ jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
 }));
 
-const request = {
-  kind: 'chat_completions',
-  body: { model: 'fake-deterministic', messages: [] },
-} as GatewayRequest;
-
 const user = { id: 'user-id' } as User;
 
 function providerInput(requestedModel: string) {
   return {
     requestedModel,
-    request,
+    request: {
+      kind: 'chat_completions',
+      body: { model: requestedModel, messages: [] },
+    } satisfies GatewayRequest,
     user,
     organizationId: undefined,
     taskId: undefined,
@@ -54,6 +53,10 @@ function replaceEnv(overrides: {
 }
 
 describe('getProvider local fake deterministic routing', () => {
+  beforeEach(() => {
+    jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(false);
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -111,15 +114,29 @@ describe('getProvider local fake deterministic routing', () => {
     missingUrl.restore();
   });
 
-  test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
-    'routes %s through Vercel AI Gateway',
-    async model => {
-      expect(await getProvider(providerInput(model))).toEqual({
-        kind: 'provider',
-        provider: VERCEL_AI_GATEWAY,
-        userByok: null,
-        bypassAccessCheck: false,
-      });
-    }
-  );
+  describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])('%s', modelId => {
+    test.each([
+      { routeToVercel: false, provider: OPENROUTER },
+      { routeToVercel: true, provider: VERCEL_AI_GATEWAY },
+    ])(
+      'uses normal routing when Vercel selection is $routeToVercel',
+      async ({ routeToVercel, provider }) => {
+        jest.mocked(shouldRouteToVercel).mockResolvedValue(routeToVercel);
+        const input = providerInput(modelId);
+
+        expect(await getProvider(input)).toEqual({
+          kind: 'provider',
+          provider,
+          userByok: null,
+          bypassAccessCheck: false,
+        });
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(
+          modelId,
+          input.request,
+          user.id,
+          expect.any(Function)
+        );
+      }
+    );
+  });
 });

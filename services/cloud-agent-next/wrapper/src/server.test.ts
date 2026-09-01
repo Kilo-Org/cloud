@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import fsp from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { WrapperState } from './state';
 import {
   bindSessionContext,
@@ -9,10 +13,12 @@ import {
   createServer,
   createSessionReadyHandler,
   resolvePtyClientClose,
+  type ServerDependencies,
   type WrapperServer,
 } from './server';
 import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from './kilo-api';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
+import type { WrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
 
 type PtyCall = {
   cwd: string;
@@ -21,6 +27,16 @@ type PtyCall = {
 };
 
 const servers: WrapperServer[] = [];
+const states: WrapperState[] = [];
+const originalFetch = globalThis.fetch;
+const originalLogPath = process.env.WRAPPER_LOG_PATH;
+const temporaryDirectories: string[] = [];
+
+function createTestState(): WrapperState {
+  const state = new WrapperState();
+  states.push(state);
+  return state;
+}
 
 function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -89,7 +105,7 @@ function createTestFetch(overrides?: {
       wrapperInstanceGeneration: 8,
     },
     {
-      state: new WrapperState(),
+      state: createTestState(),
       kiloClient,
       openConnection: async () => {},
       closeConnection: async () => {},
@@ -105,7 +121,16 @@ function createTestFetch(overrides?: {
 }
 
 afterEach(async () => {
+  for (const state of states.splice(0)) state.clearSession();
   await Promise.all(servers.splice(0).map(server => server.stop()));
+  globalThis.fetch = originalFetch;
+  if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+  else process.env.WRAPPER_LOG_PATH = originalLogPath;
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map(directory => fsp.rm(directory, { recursive: true, force: true }))
+  );
 });
 
 describe('kilo server unreachable recovery', () => {
@@ -120,7 +145,7 @@ describe('kilo server unreachable recovery', () => {
   };
 
   function boundState(): WrapperState {
-    const state = new WrapperState();
+    const state = createTestState();
     state.bindSession(sessionBinding);
     return state;
   }
@@ -271,7 +296,7 @@ describe('session readiness errors', () => {
   it('forwards validated workspace subtype and safe diagnostic fields', async () => {
     const { fetchHandler } = createTestFetch();
     const handler = createSessionReadyHandler({
-      state: new WrapperState(),
+      state: createTestState(),
       kiloClient: {} as WrapperKiloClient,
       openConnection: async () => {},
       closeConnection: async () => {},
@@ -430,7 +455,7 @@ describe('wrapper PTY routes', () => {
         userId: 'user_test',
       },
       {
-        state: new WrapperState(),
+        state: createTestState(),
         kiloClient,
         openConnection: async () => {},
         closeConnection: async () => {},
@@ -524,7 +549,7 @@ describe('wrapper Kilo proxy route', () => {
         userId: 'user_test',
       },
       {
-        state: new WrapperState(),
+        state: createTestState(),
         kiloClient,
         openConnection: async () => {},
         closeConnection: async () => {},
@@ -548,6 +573,328 @@ describe('wrapper Kilo proxy route', () => {
   });
 });
 
+describe('wrapper log archive retention', () => {
+  const binding = {
+    ingestUrl: 'wss://worker.test/ingest',
+    workerAuthToken: 'kka1.first-ticket',
+    wrapperRunId: 'run_1',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_1',
+  };
+  const config = {
+    port: 5000,
+    workspacePath: '/workspace/repo',
+    version: 'test',
+    sessionId: 'kilo_sess_test',
+    agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    userId: 'user_test',
+  };
+  const readyRequest: WrapperSessionReadyRequest = {
+    agentSessionId: config.agentSessionId,
+    userId: config.userId,
+    sandboxId: 'sandbox_test',
+    kiloSessionId: config.sessionId,
+    workspace: {
+      workspacePath: config.workspacePath,
+      sessionHome: '/home/session',
+      branchName: 'main',
+    },
+    materialized: { env: {} },
+    preparation: { attemptId: 'preparation_1', triggerMessageId: 'message_1' },
+    session: binding,
+  };
+
+  function requestReady(): Request {
+    return new Request('http://wrapper.test/session/ready', {
+      method: 'POST',
+      body: JSON.stringify(readyRequest),
+    });
+  }
+
+  async function createArchiveFixture() {
+    const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'wrapper-archive-test-'));
+    temporaryDirectories.push(directory);
+    const wrapperLogPath = path.join(directory, 'wrapper.log');
+    await fsp.writeFile(wrapperLogPath, 'wrapper started\n');
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+    const archives = new Map<string, string>();
+    const uploads: Array<{ url: URL; authorization: string | null }> = [];
+    const state = createTestState();
+    const deps: ServerDependencies = {
+      state,
+      kiloClient: {} as WrapperKiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+    };
+    globalThis.fetch = Object.assign(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input.toString());
+        const bytes = await new Response(init?.body).arrayBuffer();
+        uploads.push({ url, authorization: new Headers(init?.headers).get('Authorization') });
+        archives.set(url.pathname, gunzipSync(bytes).toString());
+        return new Response(null, { status: 204 });
+      },
+      { preconnect: originalFetch.preconnect }
+    );
+    return { state, deps, wrapperLogPath, archives, uploads };
+  }
+
+  it('retains the old archive and captured credentials when a warm wrapper changes runs', async () => {
+    const { state, deps, wrapperLogPath, archives, uploads } = await createArchiveFixture();
+    await bindSessionContext(binding, config, deps);
+    const first = state.logUploader;
+    if (!first) throw new Error('Expected first archive');
+    const recordUpload = globalThis.fetch;
+    const periodicStarted = Promise.withResolvers<void>();
+    const releasePeriodic = Promise.withResolvers<void>();
+    let firstUpload = true;
+    globalThis.fetch = Object.assign(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const response = await recordUpload(input, init);
+        if (firstUpload) {
+          firstUpload = false;
+          periodicStarted.resolve();
+          await releasePeriodic.promise;
+        }
+        return response;
+      },
+      { preconnect: originalFetch.preconnect }
+    );
+    first.start(5);
+    await periodicStarted.promise;
+    await fsp.appendFile(wrapperLogPath, 'original run failed\n');
+
+    const rebind = bindSessionContext(
+      {
+        ...binding,
+        ingestUrl: 'wss://next-worker.test/ingest',
+        workerAuthToken: 'kka1.next-run-ticket',
+        wrapperRunId: 'run_2',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_2',
+      },
+      config,
+      deps,
+      'restart',
+      'kilo_sess_next'
+    );
+    expect(await Promise.race([rebind.then(() => true), Bun.sleep(100).then(() => false)])).toBe(
+      true
+    );
+    const second = state.logUploader;
+    if (!second) throw new Error('Expected second archive');
+    expect(second.archiveId).toMatch(/^run_2--[a-f0-9-]+$/);
+    expect(second.archiveId).not.toBe(first.archiveId);
+    expect(state.currentSession?.wrapperRunId).toBe('run_2');
+
+    await second.uploadNow();
+    releasePeriodic.resolve();
+    await first.finalize();
+    const firstPath = `/sessions/user_test/${config.agentSessionId}/logs/${first.archiveId}/logs.tar.gz`;
+    const firstArchive = archives.get(firstPath);
+    await fsp.appendFile(wrapperLogPath, 'later run completed\n');
+    await second.uploadNow();
+
+    expect(archives.size).toBe(2);
+    expect(firstArchive).toContain('original run failed');
+    expect(firstArchive).not.toContain('later run completed');
+    expect(archives.get(firstPath)).toBe(firstArchive);
+    for (const upload of uploads) {
+      if (upload.url.pathname === firstPath) {
+        expect(upload.url.origin).toBe('https://worker.test');
+        expect(upload.url.searchParams.get('kiloSessionId')).toBe(config.sessionId);
+        expect(upload.authorization).toBe('Bearer kka1.first-ticket');
+      } else {
+        expect(upload.url.origin).toBe('https://next-worker.test');
+        expect(upload.url.searchParams.get('kiloSessionId')).toBe('kilo_sess_next');
+        expect(upload.authorization).toBe('Bearer kka1.next-run-ticket');
+      }
+    }
+  });
+
+  it('keeps the archive for same-run credential refreshes and refreshes the Kilo session', async () => {
+    const { state, deps, uploads } = await createArchiveFixture();
+    await bindSessionContext(binding, config, deps);
+    const uploader = state.logUploader;
+    if (!uploader) throw new Error('Expected archive');
+    await uploader.uploadNow();
+    const refreshedBinding = {
+      ...binding,
+      ingestUrl: 'wss://refreshed-worker.test/ingest',
+      workerAuthToken: 'kka1.refreshed-ticket',
+      ingestToken: 'refreshed-ingest-ticket',
+      wrapperConnectionId: 'conn_refreshed',
+    };
+    await bindSessionContext(refreshedBinding, config, deps, 'restart', 'kilo_sess_refreshed');
+    await state.logUploader?.uploadNow();
+    await bindSessionContext(refreshedBinding, config, deps, 'restart', 'kilo_sess_latest');
+    await state.logUploader?.uploadNow();
+
+    expect(state.logUploader).toBe(uploader);
+    expect(state.currentSession?.workerAuthToken).toBe(refreshedBinding.workerAuthToken);
+    expect(state.currentSession?.kiloSessionId).toBe('kilo_sess_latest');
+    expect(new Set(uploads.map(upload => upload.url.pathname)).size).toBe(1);
+    expect(uploads.map(upload => upload.url.searchParams.get('kiloSessionId'))).toEqual([
+      config.sessionId,
+      'kilo_sess_refreshed',
+      'kilo_sess_latest',
+    ]);
+    expect(uploads.map(upload => upload.authorization)).toEqual([
+      'Bearer kka1.first-ticket',
+      'Bearer kka1.refreshed-ticket',
+      'Bearer kka1.refreshed-ticket',
+    ]);
+    expect(uploads[1]?.url.origin).toBe('https://refreshed-worker.test');
+  });
+
+  it('retains a failed bootstrap archive when retrying the same run and preparation attempt', async () => {
+    const { state, deps, wrapperLogPath, archives, uploads } = await createArchiveFixture();
+    let attempts = 0;
+    deps.readySession = async (request, archiveId) => {
+      attempts++;
+      await bindSessionContext(
+        request.session,
+        config,
+        deps,
+        'close-until-runtime-ready',
+        request.kiloSessionId,
+        archiveId
+      );
+      if (attempts === 1) {
+        await fsp.appendFile(wrapperLogPath, 'failed bootstrap evidence\n');
+        return {
+          status: 'error',
+          error: {
+            code: 'WORKSPACE_SETUP_FAILED',
+            message: 'Workspace setup failed',
+            retryable: true,
+          },
+        };
+      }
+      await fsp.appendFile(wrapperLogPath, 'bootstrap retry ready\n');
+      return {
+        status: 'ready',
+        kiloSessionId: request.kiloSessionId,
+        workspaceReady: {
+          ...request.workspace,
+          sandboxId: request.sandboxId,
+          kiloSessionId: request.kiloSessionId,
+        },
+      };
+    };
+    const handler = createSessionReadyHandler(deps);
+    const firstResponse = await handler(requestReady());
+    const firstPath = uploads[0]?.url.pathname;
+    if (!firstPath) throw new Error('Expected failed bootstrap upload');
+    const failedArchive = archives.get(firstPath);
+    expect(state.logUploader).toBeNull();
+
+    const retryResponse = await handler(requestReady());
+    await state.logUploader?.uploadNow();
+    await state.logUploader?.uploadNow();
+
+    expect(firstResponse.status).toBe(503);
+    expect(retryResponse.status).toBe(200);
+    expect(attempts).toBe(2);
+    expect(archives.size).toBe(2);
+    expect(failedArchive).toContain('failed bootstrap evidence');
+    expect(failedArchive).not.toContain('bootstrap retry ready');
+    expect(archives.get(firstPath)).toBe(failedArchive);
+    expect(uploads[1]?.url.pathname).not.toBe(firstPath);
+    expect(uploads[2]?.url.pathname).toBe(uploads[1]?.url.pathname);
+    expect(state.logUploader?.archiveId).toMatch(/^run_1--[a-f0-9-]+$/);
+  });
+
+  it('shares an archive for duplicate in-flight ready requests but rotates for the next bootstrap', async () => {
+    const { state, deps, archives } = await createArchiveFixture();
+    const bootstrapStarted = Promise.withResolvers<void>();
+    const releaseBootstrap = Promise.withResolvers<void>();
+    let attempts = 0;
+    deps.readySession = async (request, archiveId) => {
+      attempts++;
+      await bindSessionContext(
+        request.session,
+        config,
+        deps,
+        'close-until-runtime-ready',
+        request.kiloSessionId,
+        archiveId
+      );
+      bootstrapStarted.resolve();
+      await releaseBootstrap.promise;
+      return {
+        status: 'ready',
+        kiloSessionId: request.kiloSessionId,
+        workspaceReady: {
+          ...request.workspace,
+          sandboxId: request.sandboxId,
+          kiloSessionId: request.kiloSessionId,
+        },
+      };
+    };
+    const handler = createSessionReadyHandler(deps);
+    const firstRequest = handler(requestReady());
+    await bootstrapStarted.promise;
+    const first = state.logUploader;
+    if (!first) throw new Error('Expected bootstrap archive');
+    const duplicate = handler(requestReady());
+    await Bun.sleep(10);
+    await first.uploadNow();
+
+    expect(attempts).toBe(1);
+    expect(state.logUploader).toBe(first);
+    expect(archives.size).toBe(1);
+    releaseBootstrap.resolve();
+    const responses = await Promise.all([firstRequest, duplicate]);
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+
+    const nextResponse = await handler(requestReady());
+    await first.finalize();
+    await state.logUploader?.uploadNow();
+    expect(nextResponse.status).toBe(200);
+    expect(attempts).toBe(2);
+    expect(state.logUploader?.archiveId).not.toBe(first.archiveId);
+    expect(archives.size).toBe(2);
+  });
+
+  it('does not replace a bootstrap failure with a log upload failure or log its credential', async () => {
+    const { deps, state, wrapperLogPath } = await createArchiveFixture();
+    globalThis.fetch = Object.assign(
+      async () => {
+        throw new Error(`Authorization: Bearer ${binding.workerAuthToken}`);
+      },
+      { preconnect: originalFetch.preconnect }
+    );
+    deps.readySession = async (request, archiveId) => {
+      await bindSessionContext(
+        request.session,
+        config,
+        deps,
+        'close-until-runtime-ready',
+        request.kiloSessionId,
+        archiveId
+      );
+      return {
+        status: 'error',
+        error: { code: 'KILO_SERVER_FAILED', message: 'Kilo server failed', retryable: true },
+      };
+    };
+
+    const response = await createSessionReadyHandler(deps)(requestReady());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'KILO_SERVER_FAILED',
+      message: 'Kilo server failed',
+      retryable: true,
+    });
+    expect(state.logUploader).toBeNull();
+    expect(await fsp.readFile(wrapperLogPath, 'utf8')).not.toContain(binding.workerAuthToken);
+  });
+});
+
 describe('wrapper session binding', () => {
   it('binds the kiloSessionId supplied by the caller even when config has not been updated yet', async () => {
     // A freshly bootstrapped wrapper's ServerConfig.sessionId starts out empty
@@ -555,7 +902,7 @@ describe('wrapper session binding', () => {
     // processed. bindSessionContext must use the id the caller already knows
     // (from the ready request), not a stale config value, since that id also
     // seeds the log uploader's kiloSessionId for the wrapper's entire life.
-    const state = new WrapperState();
+    const state = createTestState();
 
     const response = await bindSessionContext(
       {
@@ -590,7 +937,7 @@ describe('wrapper session binding', () => {
   });
 
   it('rejects even the current binding while the wrapper is finalizing', async () => {
-    const state = new WrapperState();
+    const state = createTestState();
     const sessionBinding = {
       kiloSessionId: 'kilo_sess_test',
       ingestUrl: 'ws://worker.test/ingest',
@@ -633,7 +980,7 @@ describe('wrapper session binding', () => {
   });
 
   it('keeps bootstrap rebindings close-only until runtime readiness is verified', async () => {
-    const state = new WrapperState();
+    const state = createTestState();
     state.bindSession({
       kiloSessionId: 'kilo_sess_test',
       ingestUrl: 'ws://worker.test/ingest',
@@ -683,7 +1030,7 @@ describe('wrapper session binding', () => {
   });
 
   it('closes the bootstrap feed for an unchanged binding until runtime readiness is verified', async () => {
-    const state = new WrapperState();
+    const state = createTestState();
     const sessionBinding = {
       kiloSessionId: 'kilo_sess_test',
       ingestUrl: 'ws://worker.test/ingest',
@@ -733,7 +1080,7 @@ describe('wrapper session binding', () => {
   });
 
   it('keeps restart behavior for legacy direct rebindings', async () => {
-    const state = new WrapperState();
+    const state = createTestState();
     state.bindSession({
       kiloSessionId: 'kilo_sess_test',
       ingestUrl: 'ws://worker.test/ingest',
@@ -779,7 +1126,7 @@ describe('wrapper session binding', () => {
   });
 
   it('resets lifecycle state when warm rebinding an existing connected session', async () => {
-    const state = new WrapperState();
+    const state = createTestState();
     state.bindSession({
       kiloSessionId: 'kilo_sess_test',
       ingestUrl: 'ws://worker.test/ingest',

@@ -16,6 +16,7 @@
  * URL: POST /api/internal/integrations/dolthub/token
  */
 
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -34,7 +35,7 @@ const RequestSchema = z
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

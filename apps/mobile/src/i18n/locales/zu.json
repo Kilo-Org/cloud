@@ -152,7 +152,9 @@
     "appearanceDark": "Ubumnyama",
     "account": "Akhawunti",
     "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
-    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo."
+    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo.",
+    "returnSendsMessage": "Ukhiye wokubuyela uthumela umlayezo",
+    "returnSendsMessageSubtitle": "Uma kuvaliwe, ukhiye wokubuyela ufaka umugqa omusha kuma-composer ama-ejenti."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -750,7 +752,8 @@
       "networkError": "Iphutha lenethiwekhi",
       "uploadFailed": "Ukulayisha kwehlulekile",
       "failedToUploadFile": "Kwehlulekile ukulayisha ifayela: {{reason}}",
-      "nothingToPaste": "Akukho okunamathiselwa"
+      "nothingToPaste": "Akukho okunamathiselwa",
+      "metadataStripFailed": "I-metadata yesithombe ayikwazanga ukususwa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
       "connectionTrouble": "Inkinga yokuxhumana. Uyacelwa ukuthi uzame futhi emuva kwesikhashana.",
-      "modelUnavailable": "Le modeli ayitholakali ku-Cloud Agent. Khetha enye bese uzama futhi."
+      "modelUnavailable": "Le modeli ayitholakali ku-Cloud Agent. Khetha enye bese uzama futhi.",
+      "cancelQueuedFailed": "Akukwazanga ukukhansela umlayezo.",
+      "cancelQueuedRestoreAvailable": "Umlayezo ukhanseliwe. Thepha u-Buyisela ukuze uwubuyisele ku-composer.",
+      "cancelQueuedRestored": "Umlayezo ukhanseliwe. Isicelo osibhalile sesibuyile ku-composer.",
+      "cancelQueuedUpgradeRequired": "Ukukhansela imilayezo efakiwe kuqoqo kudinga i-Kilo CLI entsha. Buyekeza i-Kilo CLI bese uxhumana futhi."
     },
     "remoteSession": {
       "failedToCreate": "Kwehlulekile ukudala iseshini ekude",
@@ -2213,7 +2220,8 @@
       "continueFrom": "Ukuqhubeka {{title}}",
       "importingSession": "Ukungenisa iseshini",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka iseshini. Khetha I-Cloud Agent noma enye i-CLI.",
-      "importFailed": "Ayikwazanga ukungenisa lesi seshini."
+      "importFailed": "Ayikwazanga ukungenisa lesi seshini.",
+      "discardWithUploadsMessage": "Isicelo osibhalile nanoma yimaphi amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "Umlayezo ufakiwe kuqoqo",
       "userMessage": "Umlayezo womsebenzisi",
       "assistantMessage": "Umlayezo womsizi",
-      "longPressHint": "Cindezela isikhathi eside ukuze ubone imininingwane yomlayezo"
+      "longPressHint": "Cindezela isikhathi eside ukuze ubone imininingwane yomlayezo",
+      "cancelQueued": "Khansela umlayezo",
+      "cancelQueuedAccessibility": "Khansela umlayezo ofakiwe kuqoqo",
+      "restoreQueued": "Buyisela",
+      "restoreQueuedAccessibility": "Buyisela umlayezo okhanseliwe ku-composer"
     },
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "Hlunga amaseshini",
-      "sortBy": "Hlunga ngokwe-",
-      "sortLastUpdated": "Kugcine ukubuyekezwa",
-      "sortCreated": "Daliwe",
       "platform": "Inkundla",
       "platformCloud": "I-Cloud",
       "platformExtension": "Isandiso",
@@ -2545,7 +2554,9 @@
       "uploading": "Kuyalayishwa…",
       "uploaded": "Kulayishiwe",
       "uploadFailedRetry": "Ukulayisha kwehlulekile. Thepha ukuzama futhi.",
-      "uploadFailedTerminal": "Leli fayela alikwazi ukulayishwa."
+      "uploadFailedTerminal": "Leli fayela alikwazi ukulayishwa.",
+      "moveLeft": "Hambisa {{filename}} kwesokunxele",
+      "moveRight": "Hambisa {{filename}} kwesokudla"
     },
     "attachmentPasteHint": {
       "accessibility": "Namathisela isithombe esivela ku-clipboard",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "Kuyaphethwa...",
       "messagePlaceholder": "Umlayezo...",
       "cannotReceiveFiles": "Lesi seshini asikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
-      "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha thumela ukuzama futhi."
+      "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha thumela ukuzama futhi.",
+      "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
+      "discardAttachmentsTitle": "Lahla okunamathiselwe?",
+      "charactersRemaining": "Kusele izinhlamvu ezingu-{{count}}",
+      "insertNewline": "Faka umugqa omusha"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",
@@ -2794,7 +2809,8 @@
     "busy": "Ukufaka ngezwi kumatasatasa. Zama futhi.",
     "stopped": "Ukufaka ngezwi kumisiwe. Thepha imakrofoni ukuze uzame futhi.",
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
-    "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi."
+    "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
+    "listeningStopped": "Ukulalela kumisiwe."
   },
   "share": {
     "title": "Yabelana nge-Kilo",

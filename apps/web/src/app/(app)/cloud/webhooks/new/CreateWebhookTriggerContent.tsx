@@ -34,7 +34,9 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     ? `/organizations/${organizationId}/integrations`
     : '/integrations';
 
-  // Fetch eligibility to check if user can create webhook triggers (requires credits)
+  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
+  );
 
   // Fetch GitHub repositories
   const {
@@ -118,6 +120,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         mode: formData.mode,
         model: formData.model,
         variant: formData.variant ?? undefined,
+        sandboxAllocation: formData.sandboxAllocation ?? undefined,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
         autoCommit: formData.autoCommit,
@@ -203,6 +206,8 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         repositoriesError={repoError?.message}
         models={modelOptions}
         isLoadingModels={isLoadingModels}
+        canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+        isLoadingCapabilities={isLoadingCapabilities}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isLoading={isCreatePending}

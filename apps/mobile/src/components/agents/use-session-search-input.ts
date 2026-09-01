@@ -183,7 +183,7 @@ export function useSessionSearchInput({
 
   // Broad clear primitive: reset the uncontrolled TextInput's visible text
   // and `hasText` flag without blurring. The caller still orchestrates the
-  // query/filters reset via `searchController.clearBroadly`.
+  // query reset and any filter reset itself.
   const clearSearchInput = useCallback(() => {
     searchInputRef.current?.clear();
     setHasText(false);

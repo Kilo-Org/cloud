@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
-import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
@@ -13,6 +13,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
+import { collectCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { selectMessageFailure } from './message-failure-state';
@@ -20,6 +21,9 @@ import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
+
+/** Restore keeps the platform minimum target despite the compact button size. */
+const QUEUED_CONTROL_MIN_HEIGHT = Platform.OS === 'android' ? 'min-h-12' : 'min-h-11';
 
 type MessageBubbleProps = {
   message: StoredMessage;
@@ -43,6 +47,8 @@ type MessageBubbleProps = {
   onRetryMessage?: (message: StoredMessage) => void;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /** Restores a canceled queued message's prompt back into the composer. */
+  onRestoreQueued?: (message: StoredMessage) => void;
 };
 
 function MessageBubbleImpl({
@@ -58,27 +64,30 @@ function MessageBubbleImpl({
   holdQueuedSlot,
   onRetryMessage,
   onCopyToComposer,
+  onRestoreQueued,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const canCopy = collectCopyableText(message).length > 0;
+  const a11y = buildAgentMessageBubbleAccessibilityProps({
+    isUser,
+    canCopy,
+    canOpenDetails: onLongPressDetails !== undefined,
+  });
 
   const handleLongPress = () => {
     onLongPressDetails?.(message);
   };
 
-  // Long-press opens the details sheet; the VoiceOver/TalkBack rotor "copy"
-  // action stays available so a11y tooling still reaches the existing
-  // ActionSheet copy path. The wrapping `Pressable` is explicitly
-  // `accessible={false}` so iOS does not collapse the message subtree
-  // (permission/question `Button`s, child-session "open" `Pressable`, tool
-  // cards, file parts, markdown link handlers) into a single, unnavigable
-  // node; the role/label/hint/copy action live on a dedicated,
-  // non-interactive focusable overlay so the rotor still has a target.
+  // Keep actions on the separate host so interactive descendants remain reachable.
+  // Accessible Copy retains the existing ActionSheet path; details matches long-press.
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
-    if (event.nativeEvent.actionName === 'copy') {
+    if (event.nativeEvent.actionName === 'copy' && canCopy) {
       void copyMessage(message);
+    } else if (event.nativeEvent.actionName === 'details') {
+      handleLongPress();
     }
   };
 
@@ -162,7 +171,6 @@ function MessageBubbleImpl({
     const fileParts = message.parts.filter(isFilePart);
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
-    const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });
 
     return (
       <>
@@ -174,32 +182,52 @@ function MessageBubbleImpl({
                   <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
                 ) : null}
                 {fileParts.map(part => (
-                  <FilePartRenderer key={part.id} part={part} />
+                  <FilePartRenderer
+                    key={part.id}
+                    part={part}
+                    onLongPress={onLongPressDetails ? handleLongPress : undefined}
+                  />
                 ))}
               </InMessageBubbleContext.Provider>
             </Bubble>
-            {hasBadgeSlot ? (
+            {hasBadgeSlot || onRestoreQueued ? (
               <View className="flex-row items-center gap-2 self-end pr-1">
-                <View
-                  accessibilityRole={isQueued ? 'text' : undefined}
-                  accessibilityLabel={
-                    isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
-                  }
-                  accessible={isQueued}
-                  {...(!isQueued
-                    ? {
-                        accessibilityElementsHidden: true as const,
-                        importantForAccessibility: 'no-hide-descendants' as const,
-                      }
-                    : {})}
-                  pointerEvents={isQueued ? 'auto' : 'none'}
-                  className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  <Clock size={12} color={colors.mutedForeground} />
-                  <Text className="text-xs text-muted-foreground">
-                    {t('agentChat.messageBubble.queued')}
-                  </Text>
-                </View>
+                {hasBadgeSlot ? (
+                  <View
+                    accessibilityRole={isQueued ? 'text' : undefined}
+                    accessibilityLabel={
+                      isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                    }
+                    accessible={isQueued}
+                    {...(!isQueued
+                      ? {
+                          accessibilityElementsHidden: true as const,
+                          importantForAccessibility: 'no-hide-descendants' as const,
+                        }
+                      : {})}
+                    pointerEvents={isQueued ? 'auto' : 'none'}
+                    className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                  >
+                    <Clock size={12} color={colors.mutedForeground} />
+                    <Text className="text-xs text-muted-foreground">
+                      {t('agentChat.messageBubble.queued')}
+                    </Text>
+                  </View>
+                ) : null}
+                {!isQueued && onRestoreQueued ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={QUEUED_CONTROL_MIN_HEIGHT}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
+                    onPress={() => {
+                      onRestoreQueued(message);
+                    }}
+                  >
+                    <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
+                  </Button>
+                ) : null}
               </View>
             ) : null}
           </View>
@@ -226,7 +254,6 @@ function MessageBubbleImpl({
   // same value as the gap-2 between parts of one message and the user
   // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
-  const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
 
   return (
     <>

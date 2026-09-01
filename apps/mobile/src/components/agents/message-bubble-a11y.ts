@@ -21,8 +21,8 @@ import { i18n } from '@/i18n';
  *   is an inset-matched, non-interactive, focusable `View` with no children,
  *   so it does not swallow the message subtree while still giving the rotor a
  *   target aligned with the bubble's actual bounds. The caller must only render
- *   this host when `accessibilityActions` is non-empty; when the copy action is
- *   not exposed the overlay is omitted so VoiceOver/TalkBack do not stop on an
+ *   this host when `accessibilityActions` is non-empty; when no action is
+ *   exposed the overlay is omitted so VoiceOver/TalkBack do not stop on an
  *   empty focusable node.
  */
 type AgentMessageBubbleAccessibility = {
@@ -43,6 +43,8 @@ type AgentMessageBubbleA11yInput = {
   isUser: boolean;
   /** Whether the copy custom action should be exposed. */
   canCopy: boolean;
+  /** Whether the message-details sheet can open. */
+  canOpenDetails?: boolean;
 };
 
 export function buildAgentMessageBubbleAccessibilityProps(
@@ -51,12 +53,19 @@ export function buildAgentMessageBubbleAccessibilityProps(
   const accessibilityLabel = input.isUser
     ? i18n.t('agentChat.messageBubble.userMessage')
     : i18n.t('agentChat.messageBubble.assistantMessage');
-  // Long-press opens the message-details sheet; copy remains available only
-  // through the rotor custom action below.
-  const accessibilityHint = i18n.t('agentChat.messageBubble.longPressHint');
-  const accessibilityActions: AccessibilityActionInfo[] = input.canCopy
-    ? [{ name: 'copy', label: i18n.t('agentChat.messageDetails.copyMessage') }]
-    : [];
+  const accessibilityHint = input.canOpenDetails
+    ? i18n.t('agentChat.messageBubble.longPressHint')
+    : '';
+  const accessibilityActions: AccessibilityActionInfo[] = [];
+  if (input.canOpenDetails) {
+    accessibilityActions.push({ name: 'details', label: i18n.t('agentChat.messageDetails.title') });
+  }
+  if (input.canCopy) {
+    accessibilityActions.push({
+      name: 'copy',
+      label: i18n.t('agentChat.messageDetails.copyMessage'),
+    });
+  }
 
   return {
     accessible: false,

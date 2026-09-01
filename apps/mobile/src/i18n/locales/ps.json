@@ -152,7 +152,9 @@
     "appearanceDark": "تیاره",
     "account": "حساب",
     "prReviewAttribution": "د PR بیاکتنو ته د ایپ انتساب اضافه کړئ",
-    "prReviewAttributionSubtitle": "کله چې تاسو یوه بیاکتنه وړاندې کوئ، د Reviewed via Kilo فوټر اضافه کړئ."
+    "prReviewAttributionSubtitle": "کله چې تاسو یوه بیاکتنه وړاندې کوئ، د Reviewed via Kilo فوټر اضافه کړئ.",
+    "returnSendsMessage": "د بېرته ستنېدو کیلي پیغام لېږي",
+    "returnSendsMessageSubtitle": "کله چې بند وي، د بېرته ستنېدو کیلي د ایجنټ د پیغام لیکلو په ځایونو کې نوې کرښه دننه کوي."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
@@ -750,7 +752,8 @@
       "networkError": "د شبکې تېروتنه",
       "uploadFailed": "پورته کول ناکام شول",
       "failedToUploadFile": "د فایل پورته کول ناکام شول: {{reason}}",
-      "nothingToPaste": "د پیسټ کولو لپاره څه نشته"
+      "nothingToPaste": "د پیسټ کولو لپاره څه نشته",
+      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2141,7 +2144,11 @@
       "previousTaskFinishing": "مخکینی کار لا هم روان دی. مهرباني وکړئ یوه شېبه انتظار وکړئ.",
       "serviceUnavailable": "خدمت اوس مهال شتون نلري. مهرباني وکړئ بیا هڅه وکړئ.",
       "connectionTrouble": "د اړیکې ستونزه. مهرباني وکړئ یوه شېبه وروسته بیا هڅه وکړئ.",
-      "modelUnavailable": "دا ماډل د Cloud Agent لپاره شتون نلري. بل ماډل غوره کړئ او بیا هڅه وکړئ."
+      "modelUnavailable": "دا ماډل د Cloud Agent لپاره شتون نلري. بل ماډل غوره کړئ او بیا هڅه وکړئ.",
+      "cancelQueuedFailed": "پیغام لغوه نه شو.",
+      "cancelQueuedRestoreAvailable": "پیغام لغوه شو. د پیغام لیکلو ځای ته د بیرته راوړلو لپاره «بیرته راوړئ» ټک کړئ.",
+      "cancelQueuedRestored": "پیغام لغوه شو. پرامپټ بیرته د پیغام لیکلو په ځای کې دی.",
+      "cancelQueuedUpgradeRequired": "په کتار کې د پیغامونو لغوه کولو لپاره نوې Kilo CLI اړینه ده. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "remoteSession": {
       "failedToCreate": "لیرې ناسته جوړه نه شوه",
@@ -2213,7 +2220,8 @@
       "continueFrom": "د {{title}} ادامه",
       "importingSession": "ناسته استورول",
       "cliCannotContinue": "دا CLI نشي کولای یوه ناسته ادامه کړي. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته استوره نه شوه."
+      "importFailed": "دا ناسته استوره نه شوه.",
+      "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",
@@ -2461,7 +2469,11 @@
       "queuedAccessibility": "پیغام په قطار کې ایښودل شوی",
       "userMessage": "د کاروونکي پیغام",
       "assistantMessage": "د مرستیال پیغام",
-      "longPressHint": "د پیغام د تفصیل لپاره اوږد فشار ورکړئ"
+      "longPressHint": "د پیغام د تفصیل لپاره اوږد فشار ورکړئ",
+      "cancelQueued": "پیغام لغوه کړئ",
+      "cancelQueuedAccessibility": "په کتار کې پیغام لغوه کړئ",
+      "restoreQueued": "بیرته راوړئ",
+      "restoreQueuedAccessibility": "لغوه شوی پیغام د پیغام لیکلو ځای ته بیرته راوړئ"
     },
     "olderMessages": {
       "arrived": "پخواني پیغامونه پورته شول",
@@ -2489,9 +2501,6 @@
     },
     "sessionFilter": {
       "title": "غونډې فلټر کړئ",
-      "sortBy": "ترتیب کول",
-      "sortLastUpdated": "وروستی تازه شوی",
-      "sortCreated": "جوړ شوی",
       "platform": "پلیټ فارم",
       "platformCloud": "کلاوډ",
       "platformExtension": "اکسټنشن",
@@ -2545,7 +2554,9 @@
       "uploading": "پورته کېږي…",
       "uploaded": "پورته شو",
       "uploadFailedRetry": "پورته کول ناکام شول. د بیا هڅې لپاره ټایپ کړئ.",
-      "uploadFailedTerminal": "دا فایل نه شي پورته کېدلای."
+      "uploadFailedTerminal": "دا فایل نه شي پورته کېدلای.",
+      "moveLeft": "{{filename}} کیڼ لوري ته ولېږدوئ",
+      "moveRight": "{{filename}} ښي لوري ته ولېږدوئ"
     },
     "attachmentPasteHint": {
       "accessibility": "له کلیپ بورډ څخه انځور ولګوئ",
@@ -2575,7 +2586,11 @@
       "finalizingPlaceholder": "بشپړېږي...",
       "messagePlaceholder": "پیغام...",
       "cannotReceiveFiles": "دا غونډه فایلونه نه شي ترلاسه کولای. د پیغام لیږلو لپاره ضمیمې لرې کړئ.",
-      "couldNotAttachFiles": "فایلونه ونه لګېدل. د بیا هڅې لپاره لیږل ټایپ کړئ."
+      "couldNotAttachFiles": "فایلونه ونه لګېدل. د بیا هڅې لپاره لیږل ټایپ کړئ.",
+      "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
+      "discardAttachmentsTitle": "ضمیمې لغوه کړئ؟",
+      "charactersRemaining": "{{count}} توري پاتې دي",
+      "insertNewline": "نوې کرښه دننه کړئ"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",
@@ -2794,7 +2809,8 @@
     "busy": "د غږ معلومات بوخت دی. بیا هڅه وکړئ.",
     "stopped": "د غږ معلومات ودرول شو. د بیا هڅې لپاره مایکروفون ټک کړئ.",
     "unavailableDevice": "د غږ معلومات په دې وسیله شتون نلري.",
-    "unavailableLanguage": "د غږ معلومات د دې وسیلې ژبې لپاره شتون نلري."
+    "unavailableLanguage": "د غږ معلومات د دې وسیلې ژبې لپاره شتون نلري.",
+    "listeningStopped": "اورېدل ودرېدل."
   },
   "share": {
     "title": "Kilo ته شریک کړئ",

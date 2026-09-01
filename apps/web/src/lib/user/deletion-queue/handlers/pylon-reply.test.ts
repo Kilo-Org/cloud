@@ -75,7 +75,7 @@ describe('handlePylonReply', () => {
     expect(outcome).toEqual({ kind: 'not_applicable' });
   });
 
-  it('posts the unwrapped confirmation HTML to the latest public customer message and always sends to_emails', async () => {
+  it('posts the unwrapped confirmation HTML using the latest public customer message ID, not its thread ID, and always sends to_emails', async () => {
     const { request, step, context } = await setupReplyRequest();
     const fetchSpy = mockPylon({
       requesterEmail: TARGET_EMAIL,
@@ -117,7 +117,7 @@ describe('handlePylonReply', () => {
     expect(posted).toHaveLength(1);
     expect(JSON.parse(String(posted[0]?.[1]?.body))).toEqual({
       body_html: USER_DELETION_PYLON_REPLY_HTML,
-      message_id: 'thread-latest',
+      message_id: 'msg-latest',
       email_info: { to_emails: [TARGET_EMAIL] },
     });
     expect(closedIssue(fetchSpy)).toBe(false);

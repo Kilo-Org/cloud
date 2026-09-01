@@ -4,7 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
+import {
+  hashRootNativeInputs,
+  mobileLockfileSlice,
+  withNativeBuildSemaphore,
+} from './mobile-native-build';
 
 test('serializes native producers across different platform builds', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
@@ -205,6 +209,49 @@ test('root native inputs hash changes with patch, workspace, and lockfile edits'
     assert.equal(seen.includes(next), false);
     seen.push(next);
   }
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+function lockfileWith(mobileVersion: string, webVersion: string): string {
+  return [
+    "lockfileVersion: '9.0'",
+    'importers:',
+    '  apps/mobile:',
+    '    dependencies:',
+    '      expo:',
+    '        specifier: ^57.0.0',
+    `        version: ${mobileVersion}`,
+    '',
+    '  apps/web:',
+    '    dependencies:',
+    '      next:',
+    '        specifier: ^15.0.0',
+    `        version: ${webVersion}`,
+    '',
+  ].join('\n');
+}
+
+test('lockfile hash input ignores changes outside the apps/mobile importer block', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-lock-slice-'));
+  writeRootNativeInputs(root);
+  const lockPath = path.join(root, 'pnpm-lock.yaml');
+  fs.writeFileSync(lockPath, lockfileWith('57.0.10', '15.0.1'));
+  const before = hashRootNativeInputs(root);
+  // A web-only resolution change must not re-key the mobile native build.
+  fs.writeFileSync(lockPath, lockfileWith('57.0.10', '15.0.2'));
+  assert.equal(hashRootNativeInputs(root), before);
+  // A mobile resolution change must re-key it.
+  fs.writeFileSync(lockPath, lockfileWith('57.0.11', '15.0.2'));
+  assert.notEqual(hashRootNativeInputs(root), before);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('lockfile slice falls back to the whole file when no apps/mobile importer block exists', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-lock-slice-'));
+  const lockPath = path.join(root, 'pnpm-lock.yaml');
+  fs.writeFileSync(lockPath, 'lockfileVersion: 9\n');
+  assert.equal(mobileLockfileSlice(lockPath).toString(), 'lockfileVersion: 9\n');
+  assert.equal(mobileLockfileSlice(path.join(root, 'missing.yaml')).toString(), '<missing>');
   fs.rmSync(root, { recursive: true, force: true });
 });
 

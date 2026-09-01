@@ -1818,6 +1818,129 @@ describe('SandboxSession orchestration', () => {
         expect(writer.record('writer')?.state).toBe('completed');
       });
 
+      it.each(['ensureReady', 'attachSession'] as const)(
+        'preserves the accepted sibling when a busy retry is cancelled during %s',
+        async stage => {
+          const { writer, sibling } = sharedSessions();
+          await writer.admit('writer');
+          await writer.flush();
+          const ready = {
+            physical: 'running',
+            connection: 'ready',
+            wrapperInstanceId: RUNTIME_ID,
+            attachment: {
+              ...ATTACHMENT,
+              kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+            },
+          } satisfies ControlStatus;
+          writer.control.ensureReady.mockResolvedValue(ready);
+          delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+          await sibling.admit('waiting');
+          await sibling.flush();
+          expect(sibling.record('waiting')).toMatchObject({
+            state: 'queued',
+            deliveryRetryScope: 'message',
+            wrapperInstanceId: RUNTIME_ID,
+          });
+          expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+          sibling.reload();
+          writer.control.ensureReady.mockClear();
+          writer.control.attachSession.mockClear();
+          writer.control.request.mockClear();
+          const pending = deferred<void>();
+          if (stage === 'ensureReady') {
+            writer.control.ensureReady.mockImplementationOnce(async () => {
+              await pending.promise;
+              return ready;
+            });
+          } else {
+            writer.control.attachSession.mockImplementationOnce(async () => {
+              await pending.promise;
+              return {};
+            });
+          }
+          const retry = sibling.fireAlarm();
+          await sibling.flush();
+          try {
+            expect(writer.control.ensureReady).toHaveBeenCalledOnce();
+            expect(writer.control.attachSession).toHaveBeenCalledTimes(
+              stage === 'attachSession' ? 1 : 0
+            );
+            expect(writer.control.request).not.toHaveBeenCalled();
+            expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+            await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
+            expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+            expect(writer.record('writer')?.state).toBe('accepted');
+            expect(writer.terminalEvents()).toHaveLength(0);
+            expect(sibling.record('waiting')?.state).toBe('cancelled');
+            expect(sibling.terminalEvents()).toHaveLength(1);
+            expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
+          } finally {
+            pending.resolve(undefined);
+            await retry;
+            await sibling.flush();
+          }
+          await sibling.fireAlarm();
+          expect(writer.control.request).not.toHaveBeenCalled();
+          expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+          expect(sibling.record('waiting')?.state).toBe('cancelled');
+          expect(sibling.terminalEvents()).toHaveLength(1);
+          expect(writer.record('writer')?.state).toBe('accepted');
+          await writer.outcome('writer', 'completed');
+          expect(writer.record('writer')?.state).toBe('completed');
+        }
+      );
+
+      it('quarantines a busy retry interrupted during wrapper dispatch', async () => {
+        const { writer, sibling } = sharedSessions();
+        await writer.admit('writer');
+        await writer.flush();
+        delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+        await sibling.admit('waiting');
+        await sibling.flush();
+        expect(sibling.record('waiting')?.deliveryRetryScope).toBe('message');
+        const pending = deferred<ResponseFrame>();
+        delegateRequest(writer, operation, () => pending.promise);
+        writer.control.request.mockClear();
+        sibling.reload();
+        const retry = sibling.fireAlarm();
+        await sibling.flush();
+        try {
+          expect(writer.control.request).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ operation, expectedWrapperInstanceId: RUNTIME_ID })
+          );
+          expect(sibling.record('waiting')).toMatchObject({
+            state: 'queued',
+            unresolvedDispatch: true,
+            wrapperInstanceId: RUNTIME_ID,
+          });
+          expect(sibling.record('waiting')?.deliveryRetryScope).toBeUndefined();
+          await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
+          expect(writer.control.quarantineRuntime).toHaveBeenCalledExactlyOnceWith({
+            ownerId: writer.metadata.identity.userId,
+            sessionId: sibling.metadata.identity.sessionId,
+            wrapperInstanceId: RUNTIME_ID,
+            reason: 'preparation_interrupted',
+          });
+          expect(sibling.record('waiting')?.state).toBe('cancelled');
+          expect(writer.record('writer')?.state).toBe('failed');
+        } finally {
+          pending.resolve(
+            controlResponse(
+              operation === 'session.attach'
+                ? { attached: true }
+                : { messageId: 'waiting', status: 'accepted' }
+            )
+          );
+          await retry;
+          await sibling.flush();
+        }
+        await sibling.fireAlarm();
+        expect(writer.control.request).toHaveBeenCalledOnce();
+        expect(sibling.record('waiting')?.state).toBe('cancelled');
+        expect(sibling.terminalEvents()).toHaveLength(1);
+      });
+
       it.each(['stop', 'expiry'] as const)(
         'retains unresolved dispatch ownership through a lost acknowledgement, busy replay, and %s',
         async action => {

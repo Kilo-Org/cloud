@@ -1320,7 +1320,9 @@ export class SandboxSession extends DurableObject<Env> {
         if (!isCurrent()) return;
         this.saveMessages(
           this.loadMessages().map(message =>
-            message.messageId === messageId ? { ...message, unresolvedDispatch } : message
+            message.messageId === messageId
+              ? { ...message, unresolvedDispatch, deliveryRetryScope: undefined }
+              : message
           ),
           epoch
         );
@@ -1347,14 +1349,6 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     if (this.pendingRuntimeCleanup()) return;
-    if (queued.deliveryRetryScope !== undefined) {
-      this.saveMessages(
-        this.loadMessages().map(message =>
-          message.messageId === messageId ? { ...message, deliveryRetryScope: undefined } : message
-        ),
-        epoch
-      );
-    }
     const intent = queued.intent;
     const model = dispatchedKilocodeModelId(intent?.agent.model);
     const control = sandboxControlRpc(this.env, sandboxId);

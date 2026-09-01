@@ -503,6 +503,7 @@ function FilePreviewModal({
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader
         title={part.filename ?? t('agentChat.filePart.defaultName')}
+        titleEllipsis="middle"
         onDone={onClose}
         doneLabel={t('common.done')}
         onShare={onShare}

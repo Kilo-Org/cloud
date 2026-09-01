@@ -7,6 +7,7 @@ import {
 } from '../../../wrapper/src/kilo-api.js';
 import { createKiloClient, type KiloClient as SDKClient } from '@kilocode/sdk';
 import type { SessionCommandResponse, SessionPromptResponse } from '@kilocode/sdk/v2';
+import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
 
 function createSdkClient(): SDKClient {
   return createKiloClient({ baseUrl: 'http://127.0.0.1:0' });
@@ -548,8 +549,10 @@ describe('createWrapperKiloClient session initialization', () => {
     vi.unstubAllGlobals();
   });
 
-  it('looks up an existing session in its attached directory without importing', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 'kilo_sess' }));
+  it('preserves an existing custom-titled session in its attached directory without importing', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ id: 'kilo_sess', title: 'My chosen title' }));
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
 
@@ -562,7 +565,7 @@ describe('createWrapperKiloClient session initialization', () => {
     expect(new URL(request.url).searchParams.get('directory')).toBe(workspacePath);
   });
 
-  it('imports only a missing session with directory in both query and body', async () => {
+  it('imports a missing session with an auto-title-eligible placeholder and scoped directory', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ message: 'missing' }, { status: 404 }))
@@ -584,15 +587,17 @@ describe('createWrapperKiloClient session initialization', () => {
     const imported = requests[2];
     expect(imported.method).toBe('POST');
     expect(new URL(imported.url).pathname).toBe('/kilocode/session-import/session');
-    await expect(imported.json()).resolves.toEqual({
+    const body = await imported.json();
+    expect(isDefaultSessionTitle(body.title)).toBe(true);
+    expect(body).toEqual({
       id: 'kilo_sess',
       projectID: nativeProjectId,
       slug: 'kilo_sess',
       directory: workspacePath,
-      title: 'Cloud Agent',
+      title: 'New session - ' + new Date(body.timeCreated).toISOString(),
       version: '7.4.20',
       timeCreated: expect.any(Number),
-      timeUpdated: expect.any(Number),
+      timeUpdated: body.timeCreated,
     });
   });
 

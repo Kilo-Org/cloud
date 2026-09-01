@@ -13,8 +13,16 @@ import {
   printMobileOpenUsage,
   resolveMobileOpenRoute,
 } from './mobile-open-routes';
-import { getSeedDb } from '../seed/lib/db';
-import { resolveSeedUserId } from '../seed/lib/users';
+
+// dev/local is ESM (dev/local/package.json sets type: module); dev/seed is CommonJS.
+// A static named import across that boundary fails, because tsx's CJS output
+// hides the named exports from Node's module lexer. Import at call time instead:
+// a dynamic import resolves the names at runtime and keeps this the only file
+// that has to know the two directories disagree.
+async function seedLib() {
+  const [db, users] = await Promise.all([import('../seed/lib/db'), import('../seed/lib/users')]);
+  return { getSeedDb: db.getSeedDb, resolveSeedUserId: users.resolveSeedUserId };
+}
 
 const ACCESS_TOKEN_SECONDS = 60 * 60;
 const REFRESH_TOKEN_SECONDS = 30 * 24 * 60 * 60;
@@ -36,6 +44,7 @@ async function issueDevMobileSession(userId: string): Promise<{
     );
   }
 
+  const { getSeedDb } = await seedLib();
   const db = getSeedDb();
   const [user] = await db
     .select({
@@ -140,6 +149,7 @@ export async function runMobileOpen(args: string[]): Promise<void> {
   }
 
   const webPath = resolveMobileOpenRoute(options.route, options.sessionId);
+  const { resolveSeedUserId } = await seedLib();
   const userId = await resolveSeedUserId(options.email);
   const credentials = await issueDevMobileSession(userId);
   const url = buildDevSessionUrl(webPath, credentials);

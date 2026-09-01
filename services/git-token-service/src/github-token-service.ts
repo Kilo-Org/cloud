@@ -33,6 +33,25 @@ const GitHubInstallationAccountSchema = z.object({
   }),
 });
 
+const GitHubTokenErrorSchema = z.object({
+  status: z.number().int().min(400).max(599),
+  response: z
+    .object({
+      data: z.object({ message: z.string() }),
+    })
+    .optional(),
+});
+
+export class GitHubTokenGenerationError extends Error {
+  constructor(
+    readonly status: number | undefined,
+    readonly reason?: 'no_installation_found' | 'repository_not_installed'
+  ) {
+    super('Failed to generate GitHub installation token');
+    this.name = 'GitHubTokenGenerationError';
+  }
+}
+
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
 
@@ -215,14 +234,26 @@ export class GitHubTokenService {
         expiresAt: new Date(result.expiresAt).getTime(),
       };
     } catch (error) {
+      const parsed = GitHubTokenErrorSchema.safeParse(error);
+      const status = parsed.success ? parsed.data.status : undefined;
+      const message = parsed.success ? parsed.data.response?.data.message : undefined;
+      const reason =
+        status === 404
+          ? 'no_installation_found'
+          : (status === 403 && message === 'Resource not accessible by integration') ||
+              (status === 422 &&
+                message ===
+                  'There is at least one repository that does not exist or is not accessible to the parent installation.')
+            ? 'repository_not_installed'
+            : undefined;
       console.error(
         JSON.stringify({
           message: 'Failed to generate GitHub installation token',
-          errorType: error instanceof Error ? error.name : 'UnknownError',
+          status,
+          reason,
         })
       );
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to generate GitHub installation token: ${message}`);
+      throw new GitHubTokenGenerationError(status, reason);
     }
   }
 

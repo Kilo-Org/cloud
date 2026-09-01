@@ -1,359 +1,135 @@
-/* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/app/(app)/agent-chat/[session-id].mounted.test.tsx. */
-/* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
-import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- Keep the detail trigger and real SDK request regressions with their shared screen fixture. */
+/* eslint-disable typescript-eslint/no-deprecated -- The repository uses react-test-renderer for DOM-free native component tests. */
+import { type ComponentProps, createElement, Fragment } from 'react';
+import { createStore, Provider } from 'jotai';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { type Pressable } from 'react-native';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import {
+  createSessionManager,
+  createUserWebConnection,
+  type KiloSessionId,
+  type SessionManager,
+  type SessionSnapshotPageOutcome,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
+import { kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
-import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import type * as ReactI18next from 'react-i18next';
-
-import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import { ChildSessionSection } from '@/components/agents/child-session-section';
+import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
+import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
+import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { type SessionMessageList } from '@/components/agents/session-message-list';
 import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
+import { ContextControl } from '@/components/context-control';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { i18n } from '@/i18n';
+import { renderWithProviders } from '@/test/render-with-providers';
 
-// The composer and session-list mocks are the only two sub-components the
-// suite drives; everything else is a string host element so the tree renders
-// without pulling in the real native/navigation surface.
-const hoisted = vi.hoisted(() => ({
-  managerRef: { current: null as unknown },
-  chatComposer: {
-    control: {
-      hasContent: vi.fn(() => false),
-      setText: vi.fn(),
-      restoreAttachments: vi.fn(),
-    },
-    lastProps: null as null | {
-      onSend?: (text: string, options?: Record<string, unknown>) => Promise<void> | void;
-    },
+const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+vi.mock('@/components/agents/session-provider', () => ({
+  useSessionManager: () => {
+    if (!managerSlot.current) {
+      throw new Error('Missing test session manager');
+    }
+    return managerSlot.current;
   },
 }));
 
-// Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
-// and `session-detail-content.tsx` pull in transitively before loading either
-// module.
-vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(),
-}));
-vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
-}));
-vi.mock('@kilocode/cloud-agent-sdk', () => ({
-  createSessionManager: vi.fn(),
-}));
-vi.mock('@kilocode/cloud-agent-sdk/preparation-attempts', () => ({
-  isNoOpCompletedPreparationAttempt: () => false,
-}));
-vi.mock('@/lib/auth/token-owner', () => ({
-  getAuthTokenForRequest: vi.fn(() => 'test-token'),
-}));
-vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
-  normalizeTransportPayload: vi.fn((x: unknown) => x),
-}));
-vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
-  withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
-}));
-vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
-  fetchMobileSessionSnapshotPage: vi.fn(),
-}));
-vi.mock('@/lib/config', () => ({
-  API_BASE_URL: 'https://api.test',
-  CLOUD_AGENT_WS_URL: 'wss://ws.test',
-  WEB_BASE_URL: 'https://web.test',
-}));
-vi.mock('@/lib/user-web-connection-lifecycle', () => ({
-  createNativeUserWebConnectionLifecycleHooks: vi.fn(() => ({})),
-}));
-vi.mock('@/components/agents/tool-card-image-cache', () => ({
-  cacheToolAttachment: vi.fn(),
-  cacheToolCardImage: vi.fn(),
-}));
-vi.mock('@/components/agents/file-part-cache', () => ({
-  cacheFilePart: vi.fn(),
-}));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
-  trpcClient: {
-    cloudAgentNext: {
-      getAttachmentDownloadUrl: { mutate: vi.fn() },
-      prepareSession: { mutate: vi.fn() },
-      sendMessage: { mutate: vi.fn() },
-      cancelQueuedMessage: { mutate: vi.fn() },
-    },
-    organizations: {
-      cloudAgentNext: {
-        prepareSession: { mutate: vi.fn() },
-        sendMessage: { mutate: vi.fn() },
-        cancelQueuedMessage: { mutate: vi.fn() },
-      },
-    },
-    cliSessionsV2: {
-      getWithRuntimeState: { query: vi.fn() },
-    },
-  },
-}));
-
-// ── react-native / native bridges ──────────────────────────────────────────
+// Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
+// rendering and unrelated composer, account, model-picker, and router dependencies.
+const navigationRoutes = vi.hoisted(() => ['session-detail']);
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  View: 'View',
   Pressable: 'Pressable',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
-  View: 'View',
-}));
-vi.mock('expo-router', () => ({
-  useFocusEffect: vi.fn(),
-  useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn(), canGoBack: () => true, back: vi.fn() }),
-}));
-vi.mock('expo-keep-awake', () => ({
-  useKeepAwake: vi.fn(),
-}));
-vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(async () => undefined),
-  notificationAsync: vi.fn(async () => undefined),
-  NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
 vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
+  default: { View: 'AnimatedView' },
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
 }));
-vi.mock('react-i18next', async importOriginal => {
-  const actual = await importOriginal<typeof ReactI18next>();
-  return {
-    ...actual,
-    useTranslation: () => ({ t: (key: string) => key }),
-  };
-});
-
-// ── jotai + session provider ───────────────────────────────────────────────
-// Each atom carries its current value on `.value` so `useAtomValue` can read it
-// without a real Jotai store. `useSetAtom` and `useStore` are inert.
-vi.mock('jotai', () => ({
-  useAtomValue: (atom: { value: unknown }) => atom.value,
-  useSetAtom: () => vi.fn(),
-  useStore: () => ({ get: vi.fn(), sub: vi.fn(() => vi.fn()) }),
-}));
-vi.mock('@/components/agents/session-provider', () => ({
-  useSessionManager: () => hoisted.managerRef.current,
-}));
-
-// ── hooks and libs ─────────────────────────────────────────────────────────
-vi.mock('@/lib/utils', () => ({
-  cn: (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' '),
-}));
-vi.mock('@/lib/intl-cache', () => ({
-  dateTimeFormat: vi.fn(() => ({ format: () => '' })),
-  relativeTimeFormat: vi.fn(() => ({ format: () => '' })),
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  captureEvent: vi.fn(),
-  MESSAGE_SENT_EVENT: 'message_sent',
-  SESSION_VIEWED_EVENT: 'session_viewed',
-}));
-vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
-}));
-vi.mock('@/lib/persist/drafts', () => ({
-  agentComposerDraftKey: (id: string) => `agent-composer:${id}`,
-}));
-vi.mock('@/lib/persist/use-draft-load', () => ({
-  useFencedDraftLoad: () => ({ settled: true, value: null }),
-}));
-vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ isLoading: false, userId: undefined }),
-}));
-vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ isLoading: false, models: [] }),
-}));
-vi.mock('@/lib/hooks/use-model-preferences', () => ({
-  useModelPreferences: () => ({ setLastSelected: vi.fn() }),
-}));
-vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
-  usePersistedAgentModel: () => ({ saveModel: vi.fn() }),
-}));
-vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
-  useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
-}));
-vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
-  useReasoningPreference: () => ({ defaultExpanded: false }),
-}));
-vi.mock('@/lib/hooks/use-session-model-options', () => ({
-  createRemoteModelOverride: vi.fn(),
-  revalidateLegacyGatewayOverride: vi.fn(),
-  useSessionModelOptions: () => ({ options: [], selectedValue: null, selectedVariant: null }),
-}));
-vi.mock('@/lib/use-github-repos-refresh', () => ({
-  useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
-}));
-vi.mock('@/lib/session-context-info', () => ({
-  resolveSessionContextInfo: () => null,
-}));
-vi.mock('@/lib/picker-bridge', () => ({
-  areModelPickerSelectionScopesEqual: () => true,
-}));
-
-// ── agent hooks ────────────────────────────────────────────────────────────
-vi.mock('@/components/agents/use-continue-session', () => ({
-  useContinueSession: () => ({
-    clearGuidance: vi.fn(),
-    continueSession: vi.fn(),
-    guidance: null,
-    isContinuing: false,
-  }),
-}));
-vi.mock('@/components/agents/use-interaction-handlers', () => ({
-  useInteractionHandlers: () => ({
-    handleAnswerQuestion: vi.fn(),
-    handleRejectQuestion: vi.fn(),
-    handleRespondToPermission: vi.fn(),
-    isAnswering: false,
-    isRespondingToPermission: false,
-    permissionSubmissionError: null,
-    questionSubmissionError: null,
-  }),
-}));
-vi.mock('@/components/agents/use-session-config-sync', () => ({
-  useSessionConfigSync: () => ({
-    currentMode: 'code',
-    currentModel: undefined,
-    currentVariant: '',
-    setCurrentMode: vi.fn(),
-    setCurrentModel: vi.fn(),
-    setCurrentVariant: vi.fn(),
-  }),
-}));
-vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: () => ({
-    closeModal: vi.fn(),
-    isModalOpen: false,
-    isTitleInteractive: true,
-    modalInitialValue: '',
-    openModal: vi.fn(),
-    submit: vi.fn(),
-    title: 'Test session',
-  }),
-}));
-vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
-  resolveLoadedCliSessionPresenceId: () => null,
-  useCliSessionPresence: vi.fn(),
-}));
-
-// ── pure helpers the component still calls ────────────────────────────────
-vi.mock('@/components/agents/agent-interaction-policy', () => ({
-  getBlockingInteraction: () => 'none',
-}));
-vi.mock('@/components/agents/mode-normalize', () => ({
-  customModeOptionsFromRuntimeAgents: () => [],
-  dedupeCustomModeOptions: (options: unknown) => options,
-  ensureSelectedCustomOption: (options: unknown) => options,
-  lockedModelOption: () => ({}),
-  resolvePinnedAgentModel: () => ({}),
-}));
-vi.mock('@/components/agents/queued-badge-hold', () => ({
-  nextHeldQueuedIds: (held: unknown) => held,
-}));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'app-aware-padding',
-}));
-vi.mock('@/components/agents/context-usage-display', () => ({
-  getContextSheetMountState: () => ({ mounted: false, visible: false }),
-}));
-vi.mock('@/components/agents/session-composer-disabled', () => ({
-  resolveSessionComposerDisabled: () => false,
-}));
-vi.mock('@/components/agents/session-list-helpers', () => ({
-  selectSessionCostInputs: () => ({ breakdownCostUsd: null, totalMicrodollars: null }),
-}));
-vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
-  buildRemoteAttachmentParts: vi.fn(),
-}));
-vi.mock('@/components/agents/session-working-state', () => ({
-  shouldShowAgentWorkingIndicator: () => false,
-  shouldShowFooterWorkingIndicator: () => false,
-  shouldShowSessionFooterRow: () => false,
-}));
-vi.mock('@/components/agents/session-keep-awake', () => ({
-  shouldKeepSessionAwake: () => false,
-}));
-vi.mock('@/components/agents/session-focus-refetch', () => ({
-  shouldRefetchOnFocus: () => false,
-}));
-vi.mock('@/components/agents/session-terminal-error', () => ({
-  buildTerminalErrorCopyText: () => '',
-  resolveSessionTerminalError: () => null,
-}));
-vi.mock('@/components/agents/child-session-card-state', () => ({
-  getChildSessionStreaming: () => false,
-}));
-vi.mock('@/components/agents/child-session-sheet-state', () => ({
-  closeChildSessionSheet: vi.fn(),
-  openChildSessionSheet: vi.fn(),
-  releaseChildSessionSheet: vi.fn(),
-}));
-vi.mock('@/components/agents/use-message-copy', () => ({
-  performCopy: vi.fn(),
-}));
-vi.mock('@/components/agents/session-detail-content-helpers', () => ({
-  collectEmptyChildSessionIds: () => [],
-  countInFlightMessages: () => 0,
-  hydrateEmptyChildSessions: vi.fn(),
-  resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
-  runConnectRepository: vi.fn(),
-}));
-vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
-  createAndNavigateAgentSession: vi.fn(),
-}));
-vi.mock('@/components/agents/exit-remote-session-with-feedback', () => ({
-  exitRemoteSessionWithFeedback: vi.fn(),
-}));
-vi.mock('@/components/agents/restart-agent-session', () => ({
-  restartAgentSession: vi.fn(),
-}));
-
-// ── sub-components ─────────────────────────────────────────────────────────
-// ChatComposer is the only non-string mock: it binds the composer control
-// handle and captures its props so the suite can drive `onSend`.
-vi.mock('@/components/agents/chat-composer', async () => {
-  const React = await import('react');
-  return {
-    ChatComposer: (props: {
-      controlRef?: React.Ref<unknown>;
-      onSend?: (text: string, options?: Record<string, unknown>) => Promise<void> | void;
-    }) => {
-      hoisted.chatComposer.lastProps = props;
-      React.useImperativeHandle(props.controlRef, () => hoisted.chatComposer.control);
-      return React.createElement('ChatComposer', null);
+vi.mock('expo-router', () => ({
+  useFocusEffect: vi.fn(),
+  useIsFocused: () => true,
+  useRouter: () => ({
+    canGoBack: () => navigationRoutes.length > 1,
+    back: () => {
+      navigationRoutes.pop();
     },
-  };
-});
-vi.mock('@/components/agents/message-bubble', () => ({
-  MessageBubble: 'MessageBubble',
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
+    },
+    push: (href: string) => {
+      navigationRoutes.push(href);
+    },
+  }),
 }));
-vi.mock('@/components/agents/session-message-list', () => ({
-  SessionMessageList: 'SessionMessageList',
+vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Error: 'error', Success: 'success' },
+}));
+vi.mock('@/components/agents/mobile-session-manager', () => ({
+  isCancelQueuedUpgradeRequired: vi.fn(),
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  ChevronDown: 'ChevronDown',
+  Clock: 'Clock',
+  Loader2: 'Loader2',
+  MessageSquare: 'MessageSquare',
+}));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronLeft: 'ChevronLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
+vi.mock('@/components/agents/part-detail-sheet-host', () => ({
+  PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/message-error-boundary', () => ({
+  MessageErrorBoundary: 'MessageErrorBoundary',
 }));
 vi.mock('@/components/agents/message-details-sheet', () => ({
   MessageDetailsSheet: 'MessageDetailsSheet',
 }));
+vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerSelectionScopeProvider: 'ModelPickerSelectionScopeProvider',
 }));
-vi.mock('@/components/agents/permission-card', () => ({
-  PermissionCard: 'PermissionCard',
-}));
-vi.mock('@/components/agents/question-card', () => ({
-  QuestionCard: 'QuestionCard',
-}));
+vi.mock('@/components/agents/permission-card', () => ({ PermissionCard: 'PermissionCard' }));
+vi.mock('@/components/agents/question-card', () => ({ QuestionCard: 'QuestionCard' }));
+vi.mock('@/components/agents/preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
 vi.mock('@/components/agents/session-connection-indicator', () => ({
   SessionConnectionIndicator: 'SessionConnectionIndicator',
 }));
@@ -363,14 +139,9 @@ vi.mock('@/components/agents/session-context-metrics', () => ({
 vi.mock('@/components/agents/session-context-sheet', () => ({
   SessionContextSheet: 'SessionContextSheet',
 }));
-vi.mock('@/components/agents/session-pr-badge', () => ({
-  SessionPrBadge: 'SessionPrBadge',
-}));
+vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
-}));
-vi.mock('@/components/agents/preparation-group', () => ({
-  PreparationGroup: 'PreparationGroup',
 }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
@@ -378,29 +149,123 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
 vi.mock('@/components/agents/transcript-time-marker', () => ({
   TranscriptTimeMarker: 'TranscriptTimeMarker',
 }));
-vi.mock('@/components/agents/working-indicator', () => ({
-  WorkingIndicator: 'WorkingIndicator',
+vi.mock('@/components/agents/working-indicator', () => ({ WorkingIndicator: 'WorkingIndicator' }));
+vi.mock('@/components/agents/compaction-separator', () => ({
+  CompactionSeparator: 'CompactionSeparator',
 }));
-vi.mock('@/components/agents/child-session-sheet', () => ({
-  ChildSessionSheet: 'ChildSessionSheet',
+vi.mock('@/components/agents/file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
+vi.mock('@/components/agents/reasoning-part-renderer', () => ({
+  ReasoningPartRenderer: 'ReasoningPartRenderer',
 }));
-vi.mock('@/components/agents/part-detail-sheet-host', () => ({
-  PartDetailSheetHost: 'PartDetailSheetHost',
+vi.mock('@/components/agents/text-part-renderer', () => ({
+  TextPartRenderer: ({ text }: { text: string }) => createElement('Text', null, text),
 }));
-vi.mock('@/components/agents/part-renderer', () => ({
-  PartRenderer: 'PartRenderer',
+vi.mock('@/components/agents/chat-markdown-text', () => ({
+  ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
 }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: 'EmptyState',
+vi.mock('@/components/agents/tool-cards', () => ({ TaskToolCard: 'TaskToolCard' }));
+vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
+vi.mock('@/components/agents/session-message-list', () => ({
+  SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
+    return createElement(
+      'MessageList',
+      null,
+      props.items.map((item, index) =>
+        createElement(
+          Fragment,
+          { key: props.keyExtractor(item) },
+          props.renderItem({ item, index, target: 'Cell' })
+        )
+      )
+    );
+  },
 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
-vi.mock('@/components/query-error', () => ({
-  QueryError: 'QueryError',
+vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
+  resolveLoadedCliSessionPresenceId: vi.fn(),
+  useCliSessionPresence: vi.fn(),
 }));
-vi.mock('@/components/rename-modal', () => ({
-  RenameModal: 'RenameModal',
+vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
+  createAndNavigateAgentSession: vi.fn(),
+}));
+vi.mock('@/components/agents/exit-remote-session-with-feedback', () => ({
+  exitRemoteSessionWithFeedback: vi.fn(),
+}));
+vi.mock('@/components/agents/restart-agent-session', () => ({ restartAgentSession: vi.fn() }));
+vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
+  buildRemoteAttachmentParts: vi.fn(),
+}));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
+vi.mock('@/components/agents/use-interaction-handlers', () => ({
+  useInteractionHandlers: () => ({}),
+}));
+vi.mock('@/components/agents/use-session-config-sync', () => ({
+  useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
+}));
+const openRenameModal = vi.hoisted(() => vi.fn());
+vi.mock('@/components/agents/use-session-detail-rename', () => ({
+  useSessionDetailRename: ({ serverTitle }: { serverTitle?: string }) => ({
+    title: serverTitle,
+    isTitleInteractive: serverTitle !== undefined,
+    openModal: openRenameModal,
+  }),
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+  MESSAGE_SENT_EVENT: 'sent',
+  SESSION_VIEWED_EVENT: 'viewed',
+}));
+vi.mock('@/lib/a11y/announce', () => ({
+  moveA11yFocus: () => false,
+  announceForA11y: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'test-user', isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-available-models', () => ({
+  useAvailableModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-model-preferences', () => ({
+  useModelPreferences: () => ({ setLastSelected: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
+  usePersistedAgentModel: () => ({ saveModel: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
+  useReasoningPreference: () => ({ defaultExpanded: false }),
+}));
+vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
+  useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-session-model-options', () => ({
+  useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ settled: true, value: null }),
+}));
+const organizations = vi.hoisted(() => [
+  { organizationId: 'org-a', organizationName: 'Session organization' },
+]);
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations'],
+          queryFn: () => organizations,
+          initialData: organizations,
+        }),
+      },
+    },
+  }),
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
@@ -414,180 +279,344 @@ const globalContext = vi.hoisted(() => ({
   setOrganizationId: vi.fn(),
 }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({
-    data: [{ organizationId: 'org-a', organizationName: 'Session organization' }],
-  }),
-}));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
-vi.mock('@/components/ui/accessible-status', () => ({
-  AccessibleStatus: 'AccessibleStatus',
-}));
-vi.mock('@/components/ui/blur-bar', () => ({
-  BlurBar: 'BlurBar',
-}));
-vi.mock('@/components/ui/button', () => ({
-  Button: 'Button',
-}));
-vi.mock('@/components/ui/text', () => ({
-  Text: 'Text',
-}));
-vi.mock('@/components/ui/icons', () => ({
-  ChevronLeft: 'ChevronLeft',
-  ChevronDown: 'ChevronDown',
-  MessageSquare: 'MessageSquare',
-}));
 
-const { SessionDetailContent } = await import('@/components/agents/session-detail-content');
+const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
+const ROOT_ID = kiloId('ses-root');
+const NEXT_ROOT_ID = kiloId('ses-next-root');
+const SELECTED_ID = kiloId('ses-selected');
+const NESTED_ID = kiloId('ses-nested');
+const CHILD_IDS = [
+  SELECTED_ID,
+  ...Array.from({ length: 23 }, (_, index) => kiloId(`ses-sibling-${index}`)),
+];
 
-const SESSION_ID = 'sess-1' as KiloSessionId;
-
-function makeManager() {
+function taskMessage(parentId: KiloSessionId, childIds: KiloSessionId[]): StoredMessage {
+  const message = assistantMessage(`msg-${parentId}`);
   return {
-    atoms: {
-      messagesList: { value: [] as StoredMessage[] },
-      isLoading: { value: false },
-      error: { value: null },
-      fetchedSessionData: {
-        value: {
-          associatedPr: null,
-          cloudAgentSessionId: undefined,
-          gitUrl: undefined,
-          kiloSessionId: SESSION_ID,
-          mode: undefined,
-          organizationId: undefined,
-          title: 'Test session',
-          totalCostMicrodollars: null,
-        },
-      },
-      sessionConfig: { value: null },
-      isStreaming: { value: false },
-      statusIndicator: { value: null },
-      agentStatus: { value: { type: 'connected' } },
-      cloudStatus: { value: null },
-      preparationAttempts: { value: [] },
-      canSend: { value: true },
-      isReadOnly: { value: false },
-      supportsAttachments: { value: true },
-      activeQuestion: { value: null },
-      activePermission: { value: null },
-      pendingQuestions: { value: [] },
-      pendingPermissions: { value: [] },
-      totalCost: { value: null },
-      childMessages: { value: () => new Map() },
-      childSessionHydrationState: { value: () => ({ status: 'idle' }) },
-      childSessionError: { value: () => null },
-      pendingMessages: { value: new Map<string, { status: string }>() },
-      activeSessionType: { value: null },
-      remoteModelState: { value: { catalog: null, ownerConnectionId: null, protocol: 'v1' } },
-      observedModel: { value: null },
-      remoteModelOverride: { value: null },
-      cloudAgentModelOverride: { value: null },
-      availableCommands: { value: [] },
-      remoteCommandState: { value: null },
-      contextUsage: { value: null },
-      hasOlderMessages: { value: false },
-      isLoadingOlderMessages: { value: false },
-      olderMessagesError: { value: null },
-      olderMessagesOmittedItemCount: { value: 0 },
-    },
-    switchSession: vi.fn(),
-    send: vi.fn(),
-    cancelQueuedMessage: vi.fn(),
-    interrupt: vi.fn(),
-    setCloudAgentModelOverride: vi.fn(),
-    setRemoteModelOverride: vi.fn(),
-    updateFetchedAssociatedPr: vi.fn(),
-    hydrateChildSession: vi.fn(),
-    loadOlderMessages: vi.fn(),
-    trimRetainedHistory: vi.fn(),
-    loadOlderChildMessages: vi.fn(),
-    clearFailedMessage: vi.fn(),
-    createRemoteSession: vi.fn(),
-    exitRemoteSession: vi.fn(),
-    destroy: vi.fn(),
+    info: { ...message.info, sessionID: parentId },
+    parts: childIds.map((childId, index): ToolPart => {
+      const input = { description: `Task ${childId}`, subagent_type: 'Researcher' };
+      const metadata = { sessionId: childId };
+      let state: ToolPart['state'] = {
+        status: 'completed',
+        input,
+        metadata,
+        output: 'Done',
+        title: 'Task',
+        time: { start: 1, end: 2 },
+      };
+      if (index % 3 === 1) {
+        state = { status: 'running', input, metadata, time: { start: 1 } };
+      } else if (index % 3 === 2) {
+        state = {
+          status: 'error',
+          input,
+          metadata,
+          error: 'Task failed',
+          time: { start: 1, end: 2 },
+        };
+      }
+      return {
+        id: `part-${childId}`,
+        sessionID: parentId,
+        messageID: message.info.id,
+        type: 'tool',
+        tool: 'task',
+        callID: `call-${childId}`,
+        state,
+      };
+    }),
   };
 }
 
-type TestManager = ReturnType<typeof makeManager>;
-
-let currentManager: TestManager = makeManager();
-
-const TEXT_PART = { type: 'text', text: 'Queued prompt' } as const;
-const FILE_PART = {
-  type: 'file',
-  filename: 'a.pdf',
-  mime: 'application/pdf',
-  url: 'file:///tmp/attachments/sess-1/user-1/msg-1/a.pdf',
-} as const;
-
-function queuedMessage(parts: readonly unknown[] = [TEXT_PART]): StoredMessage {
+function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
+  const message = assistantMessage(`msg-${sessionId}`);
   return {
-    info: { id: 'msg-queued-1', role: 'user', time: { created: undefined } },
-    parts,
-  } as unknown as StoredMessage;
+    info: { ...message.info, sessionID: sessionId },
+    parts: [
+      stubTextPart({
+        id: `text-${sessionId}`,
+        sessionID: sessionId,
+        messageID: message.info.id,
+        text,
+      }),
+    ],
+  };
 }
 
-const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
-
-function mount(
-  displayScope: Parameters<typeof SessionDetailContent>[0]['displayScope'] = PERSONAL_DISPLAY_SCOPE
-): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  act(() => {
-    ref.current = TestRenderer.create(
-      createElement(SessionDetailContent, { sessionId: SESSION_ID, displayScope })
-    );
-  });
-  if (!ref.current) {
-    throw new Error('SessionDetailContent did not render');
-  }
-  return ref.current;
-}
-
-function findByType(
-  renderer: TestRenderer.ReactTestRenderer,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return renderer.root.findAll(node => node.type === type);
-}
-
-/** Reads the MessageBubble element the current transcript renders for `messageId`. */
-function readBubble(
-  renderer: TestRenderer.ReactTestRenderer,
-  messageId: string
-): ReactElement | undefined {
-  const lists = findByType(renderer, 'SessionMessageList');
-  const listProps = lists[0]?.props as
-    | {
-        items?: SessionTranscriptItem[];
-        renderItem?: (args: { item: SessionTranscriptItem }) => ReactElement;
-      }
-    | undefined;
-  const item = listProps?.items?.find(
-    candidate => candidate.type === 'message' && candidate.message.info.id === messageId
-  );
-  if (!item || !listProps?.renderItem) {
-    return undefined;
-  }
-  return listProps.renderItem({ item });
-}
-
-function bubbleProps(
-  renderer: TestRenderer.ReactTestRenderer,
-  messageId: string
-): Record<string, unknown> {
-  return (readBubble(renderer, messageId)?.props ?? {}) as Record<string, unknown>;
+function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnapshotPageOutcome {
+  return {
+    kind: 'success',
+    info: { id: sessionId },
+    messages,
+    nextCursor: null,
+    omittedItemCount: 0,
+  };
 }
 
 beforeEach(() => {
-  currentManager = makeManager();
-  hoisted.managerRef.current = currentManager;
-  hoisted.chatComposer.lastProps = null;
-  hoisted.chatComposer.control.hasContent.mockReset().mockReturnValue(false);
-  hoisted.chatComposer.control.setText.mockReset();
-  hoisted.chatComposer.control.restoreAttachments.mockReset();
+  navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  openRenameModal.mockClear();
+  globalContext.organizationId = 'global-org';
+  globalContext.setOrganizationId.mockClear();
+});
+
+async function mountDetails(
+  rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)],
+  metadataReady?: Promise<undefined>,
+  displayScope: ComponentProps<typeof SessionDetailContent>['displayScope'] = PERSONAL_DISPLAY_SCOPE
+) {
+  const store = createStore();
+  const rootPages = new Map([[ROOT_ID, rootMessages]]);
+  const requests: {
+    id: KiloSessionId;
+    response: ReturnType<typeof Promise.withResolvers<SessionSnapshotPageOutcome | null>>;
+  }[] = [];
+  const connection = createUserWebConnection({
+    websocketUrl: 'wss://example.test',
+    getAuthToken: vi.fn(),
+  });
+  const manager = createSessionManager({
+    store,
+    userWebConnection: connection,
+    resolveSession: async id => {
+      await Promise.resolve();
+      return { type: 'read-only', kiloSessionId: id };
+    },
+    getTicket: vi.fn(),
+    fetchSnapshot: vi.fn(),
+    fetchSnapshotPage: async id => {
+      const response = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
+      requests.push({ id, response });
+      const messages = rootPages.get(id);
+      if (messages) {
+        response.resolve(page(id, messages));
+      }
+      const outcome = await response.promise;
+      return outcome;
+    },
+    api: {
+      send: vi.fn(),
+      interrupt: vi.fn(),
+      answer: vi.fn(),
+      reject: vi.fn(),
+      respondToPermission: vi.fn(),
+    },
+    prepare: vi.fn(),
+    initiate: vi.fn(),
+    fetchSession: async id => {
+      await metadataReady;
+      return {
+        kiloSessionId: id,
+        cloudAgentSessionId: null,
+        title: `Root ${id}`,
+        organizationId: null,
+        gitUrl: null,
+        gitBranch: null,
+        mode: null,
+        model: null,
+        variant: null,
+        repository: null,
+        isInitiated: true,
+        needsLegacyPrepare: false,
+        isPreparingAsync: false,
+        prompt: null,
+        initialMessageId: null,
+        associatedPr: null,
+      };
+    },
+  });
+  managerSlot.current = manager;
+  onTestFinished(() => {
+    manager.destroy();
+    connection.destroy();
+  });
+  const element = (id: KiloSessionId) =>
+    createElement(
+      Provider,
+      { store },
+      createElement(SessionDetailContent, { key: id, sessionId: id, displayScope })
+    );
+  const view = await renderWithProviders(element(ROOT_ID));
+  onTestFinished(view.unmount);
+  const requestFor = (id: KiloSessionId) => {
+    const request = requests.findLast(candidate => candidate.id === id);
+    if (!request) {
+      throw new Error(`No page request for ${id}`);
+    }
+    return request.response;
+  };
+  return {
+    ...view,
+    manager,
+    store,
+    rootPages,
+    requestedIds: () => requests.map(request => request.id),
+    respond: async (id: KiloSessionId, messages: StoredMessage[]) => {
+      await act(async () => {
+        requestFor(id).resolve(page(id, messages));
+        await Promise.resolve();
+      });
+    },
+    fail: async (id: KiloSessionId, error: unknown) => {
+      await act(async () => {
+        requestFor(id).reject(error);
+        await Promise.resolve();
+      });
+    },
+    switchRoot: async (id: KiloSessionId) => {
+      await act(async () => {
+        view.renderer.update(
+          createElement(QueryClientProvider, { client: view.queryClient }, element(id))
+        );
+        await Promise.resolve();
+      });
+    },
+  };
+}
+
+function cardFor(renderer: ReactTestRenderer, sessionId: KiloSessionId): ReactTestInstance {
+  const card = renderer.root.findAllByType(ChildSessionSection).find(node => {
+    const props = node.props as ComponentProps<typeof ChildSessionSection>;
+    return getTaskToolSessionId(props.part) === sessionId;
+  });
+  if (!card) {
+    throw new Error(`No card for ${sessionId}`);
+  }
+  return card;
+}
+
+function pressCard(renderer: ReactTestRenderer, sessionId: KiloSessionId) {
+  const { onPress } = cardFor(renderer, sessionId).findByProps({ accessibilityRole: 'button' })
+    .props as { onPress: () => void };
+  act(() => {
+    onPress();
+  });
+}
+
+function sheetProps(renderer: ReactTestRenderer) {
+  return renderer.root.findByType(ChildSessionSheet).props as ComponentProps<
+    typeof ChildSessionSheet
+  >;
+}
+
+function renderedText(node: ReactTestInstance) {
+  return node
+    .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
+    .flatMap(child => child.children.filter(value => typeof value === 'string'))
+    .join('\n');
+}
+
+function pressHeaderBack(renderer: ReactTestRenderer) {
+  const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
+    onPress: () => void;
+  };
+  act(onPress);
+}
+
+describe('SessionDetailContent display scope', () => {
+  it.each([
+    { organizationId: null, isResolved: true, label: i18n.t('profile.personal') },
+    { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
+    { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
+  ])('renders a read-only $label and preserves header actions', async state => {
+    const { renderer } = await mountDetails([], undefined, {
+      organizationId: state.organizationId,
+      isResolved: state.isResolved,
+    });
+    const header = renderer.root.findByType(ScreenHeader);
+    const context = header.findByType(ContextControl);
+    const label = context.findByProps({ accessibilityRole: 'text' });
+    expect(label.props).toMatchObject({
+      accessibilityLabel: state.label,
+      accessibilityState: { busy: !state.isResolved },
+    });
+    expect(
+      header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
+    ).toHaveLength(0);
+    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    const { onPress } = header.findByProps({
+      accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
+        title: `Root ${ROOT_ID}`,
+      }),
+    }).props as { onPress: () => void };
+    act(onPress);
+    expect(openRenameModal).toHaveBeenCalledOnce();
+    if (state.organizationId === 'missing-org') {
+      expect(context.findByType(AccessibleStatus).props.message).toBe(
+        i18n.t('organization.boundary.organizationUnavailable')
+      );
+    }
+    pressHeaderBack(renderer);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(globalContext.organizationId).toBe('global-org');
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([true, false])('session detail return with history=%s', hasHistory => {
+  beforeEach(() => {
+    if (hasHistory) {
+      navigationRoutes.unshift('previous-screen');
+    }
+  });
+
+  it.each(['loaded after child dismissal', 'empty'] as const)('leaves %s content', async state => {
+    const view = await mountDetails(state === 'empty' ? [] : undefined);
+    if (state === 'empty') {
+      expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+        title: i18n.t('agentChat.session.emptyTitle'),
+      });
+    } else {
+      pressCard(view.renderer, SELECTED_ID);
+      await view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Selected child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      act(() => {
+        sheetProps(view.renderer).onClose();
+      });
+      act(() => {
+        sheetProps(view.renderer).onDismiss?.();
+      });
+      expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+      expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    }
+
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+    );
+  });
+
+  it.each([
+    { state: 'pending metadata', code: undefined },
+    { state: 'retryable metadata failure', code: 'INTERNAL_SERVER_ERROR' },
+    { state: 'terminal access denial', code: 'UNAUTHORIZED' },
+  ] as const)('leaves $state without changing its feedback', async ({ code }) => {
+    const metadata = Promise.withResolvers<undefined>();
+    const view = await mountDetails([], metadata.promise);
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    if (code) {
+      await act(async () => {
+        metadata.reject({ data: { code } });
+        await Promise.resolve();
+      });
+      const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+        typeof QueryError
+      >;
+      expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
+      expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
+      expect(renderedText(view.renderer.root)).toContain('Back to sessions');
+      expect(renderedText(view.renderer.root)).toContain('Copy');
+    }
+
+    pressHeaderBack(view.renderer);
+    expect(navigationRoutes).toEqual(
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
+    );
+  });
 });
 
 describe('resolveSendAttachmentKind', () => {
@@ -625,171 +654,247 @@ describe('shouldRefuseSilentAttachmentDrop', () => {
   );
 });
 
-describe('SessionDetailContent display scope', () => {
+// These tests run in the existing detail suite with the DOM-free renderer.
+// Request order and rendered state are deterministic; native paint timing is not.
+describe('child transcript requests', () => {
   it.each([
-    { organizationId: null, isResolved: true, label: 'profile.personal' },
-    { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
-    { organizationId: 'missing-org', isResolved: true, label: 'profile.organization' },
-    { organizationId: null, isResolved: false, label: 'profile.selectAccount' },
-  ])('renders a read-only $label and preserves header actions', state => {
-    const renderer = mount({ organizationId: state.organizationId, isResolved: state.isResolved });
-    const label = renderer.root.find(
-      node => (node.type as string) === 'View' && node.props.accessibilityRole === 'text'
-    );
-    expect(label.props.accessibilityLabel).toBe(state.label);
-    expect(label.props.accessibilityState).toEqual({ busy: !state.isResolved });
-    const controls = findByType(renderer, 'Pressable');
-    expect(
-      controls.filter(node => node.props.accessibilityHint === 'profile.selectAccount')
-    ).toHaveLength(0);
-    expect(controls.map(node => node.props.accessibilityLabel)).toContain('screenHeader.goBack');
-    expect(controls.map(node => node.props.accessibilityLabel)).toContain(
-      'agentChat.session.renameAccessibility'
-    );
-    if (state.organizationId === 'missing-org') {
-      expect(findByType(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
-        'organization.boundary.organizationUnavailable'
-      );
+    {
+      sessionId: SELECTED_ID,
+      status: 'completed',
+      text: 'Researcher\nTask ses-selected\ncompleted',
+      textRows: 3,
+      waiting: false,
+    },
+    {
+      sessionId: kiloId('ses-sibling-0'),
+      status: 'running',
+      text: 'Researcher\nTask ses-sibling-0\nWaiting for activity\nrunning',
+      textRows: 4,
+      waiting: true,
+    },
+    {
+      sessionId: kiloId('ses-sibling-1'),
+      status: 'error',
+      text: 'Researcher\nTask ses-sibling-1\nerror',
+      textRows: 3,
+      waiting: false,
+    },
+  ] as const)(
+    'renders the $status card without fetching a child transcript for labels',
+    async ({ sessionId, status, text, textRows, waiting }) => {
+      const view = await mountDetails();
+      const card = cardFor(view.renderer, sessionId);
+      const button = card.findByProps({ accessibilityRole: 'button' }).props as ComponentProps<
+        typeof Pressable
+      >;
+
+      expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
+      expect(renderedText(card)).toBe(text);
+      expect(card.findAll(node => (node.type as string) === 'Text')).toHaveLength(textRows);
+      expect(button).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(button.accessibilityLabel).toContain('Researcher');
+      expect(button.accessibilityLabel).toContain(`Task ${sessionId}`);
+      expect(button.accessibilityLabel).toContain(status);
+      expect(button.accessibilityLabel?.includes('Waiting for activity')).toBe(waiting);
+      expect(view.renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
+      expect(view.requestedIds()).toEqual([ROOT_ID]);
     }
-    expect(globalContext.organizationId).toBe('global-org');
-    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  );
+
+  it.each([
+    [SELECTED_ID, NESTED_ID, 'completed'],
+    [kiloId('ses-sibling-0'), kiloId('ses-nested-sibling'), 'running'],
+    [kiloId('ses-sibling-1'), kiloId('ses-nested-failed'), 'error'],
+  ] as const)(
+    'opens %s and its nested sheet immediately without requesting siblings',
+    async (selectedId, nestedId, status) => {
+      const isRunning = status === 'running';
+      const view = await mountDetails();
+      pressCard(view.renderer, selectedId);
+      pressCard(view.renderer, selectedId);
+
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: selectedId,
+        title: `Task ${selectedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      const selected = taskMessage(selectedId, [
+        NESTED_ID,
+        kiloId('ses-nested-sibling'),
+        kiloId('ses-nested-failed'),
+      ]);
+      selected.parts.push(...childMessage(selectedId, 'Selected child row').parts);
+      await view.respond(selectedId, [selected]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      const selectedCard = cardFor(view.renderer, selectedId);
+      expect(renderedText(selectedCard)).toContain(`Task ${selectedId}`);
+      expect(renderedText(selectedCard).includes('Writing response')).toBe(isRunning);
+      const selectedButton = selectedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(selectedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
+      expect(selectedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const nestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(nestedCard)).toBe(
+        `Researcher\nTask ${nestedId}${isRunning ? '\nWaiting for activity' : ''}\n${status}`
+      );
+      expect(nestedCard.findAll(node => (node.type as string) === 'Text')).toHaveLength(
+        isRunning ? 4 : 3
+      );
+      const nestedButton = nestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(nestedButton).toMatchObject({
+        disabled: false,
+        accessibilityState: { disabled: false },
+        accessibilityHint: i18n.t('agentChat.childSession.openHint'),
+      });
+      expect(nestedButton.accessibilityLabel).toContain(`Task ${nestedId}`);
+      expect(nestedButton.accessibilityLabel).toContain(status);
+      expect(nestedButton.accessibilityLabel?.includes('Waiting for activity')).toBe(isRunning);
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId]);
+
+      pressCard(view.renderer, nestedId);
+      expect(sheetProps(view.renderer)).toMatchObject({
+        visible: true,
+        sessionId: nestedId,
+        title: `Task ${nestedId}`,
+        hydrationState: { status: 'loading' },
+      });
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+      await view.respond(nestedId, [childMessage(nestedId, 'Nested child row')]);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Nested child row'
+      );
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).not.toContain(
+        'Selected child row'
+      );
+
+      pressCard(view.renderer, selectedId);
+      expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+        'Selected child row'
+      );
+      const hydratedNestedCard = cardFor(view.renderer, nestedId);
+      expect(renderedText(hydratedNestedCard)).toContain(`Task ${nestedId}`);
+      expect(renderedText(hydratedNestedCard).includes('Writing response')).toBe(isRunning);
+      expect(hydratedNestedCard.findAllByType(ChildSessionModelLabel)).toHaveLength(1);
+      const hydratedNestedButton = hydratedNestedCard.findByProps({ accessibilityRole: 'button' })
+        .props as ComponentProps<typeof Pressable>;
+      expect(hydratedNestedButton.accessibilityLabel?.includes('Writing response')).toBe(isRunning);
+      expect(view.requestedIds()).toEqual([ROOT_ID, selectedId, nestedId]);
+    }
+  );
+
+  it('keeps metadata after a retryable failure and retries only on explicit Retry', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    await view.fail(SELECTED_ID, new Error('fetch failed'));
+
+    const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(errorProps.message).toBe('Connection lost. Please retry in a moment.');
+    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+
     act(() => {
-      renderer.unmount();
+      errorProps.onRetry?.();
+      errorProps.onRetry?.();
     });
-  });
-});
-
-describe('SessionDetailContent cancel/restore', () => {
-  function seedQueuedMessage(message: StoredMessage = queuedMessage()): void {
-    currentManager.atoms.messagesList.value = [message];
-    currentManager.atoms.pendingMessages.value = new Map([[message.info.id, { status: 'queued' }]]);
-  }
-
-  it('keeps the Restore action after canceling a queued message while the composer is occupied', async () => {
-    seedQueuedMessage();
-    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
-    hoisted.chatComposer.control.hasContent.mockReturnValue(true);
-
-    const renderer = mount();
-    const onCancelQueued = bubbleProps(renderer, 'msg-queued-1').onCancelQueued as
-      | ((message: StoredMessage) => Promise<void>)
-      | undefined;
-    expect(onCancelQueued).toBeInstanceOf(Function);
-
-    await act(async () => {
-      await onCancelQueued?.(queuedMessage());
-    });
-
-    // Occupied composer → the row must stay with a Restore action, not be
-    // dropped out of the transcript.
-    expect(bubbleProps(renderer, 'msg-queued-1').onRestoreQueued).toBeInstanceOf(Function);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('keeps the queued row and shows a failure status when cancel reports dropped=false', async () => {
-    seedQueuedMessage();
-    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: false });
-    hoisted.chatComposer.control.hasContent.mockReturnValue(false);
-
-    const renderer = mount();
-    const onCancelQueued = bubbleProps(renderer, 'msg-queued-1').onCancelQueued as
-      | ((message: StoredMessage) => Promise<void>)
-      | undefined;
-    expect(onCancelQueued).toBeInstanceOf(Function);
-
-    await act(async () => {
-      await onCancelQueued?.(queuedMessage());
-    });
-
-    // The queue did not drop the message: the row stays queued (still wired
-    // for Cancel, no Restore) and the prompt is not restored into the composer.
-    expect(bubbleProps(renderer, 'msg-queued-1').onCancelQueued).toBeInstanceOf(Function);
-    expect(bubbleProps(renderer, 'msg-queued-1').onRestoreQueued).toBeUndefined();
-    expect(hoisted.chatComposer.control.setText).not.toHaveBeenCalled();
-    expect(hoisted.chatComposer.control.restoreAttachments).not.toHaveBeenCalled();
-
-    const statuses = findByType(renderer, 'AccessibleStatus');
-    const messages = statuses.map(instance => instance.props.message as string | null);
-    expect(messages).toContain('agentChat.session.cancelQueuedFailed');
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('restores the prompt and file parts into an empty composer after cancel', async () => {
-    const message = queuedMessage([TEXT_PART, FILE_PART]);
-    seedQueuedMessage(message);
-    currentManager.cancelQueuedMessage.mockResolvedValue({ dropped: true });
-    hoisted.chatComposer.control.hasContent.mockReturnValue(false);
-
-    const renderer = mount();
-    const onCancelQueued = bubbleProps(renderer, 'msg-queued-1').onCancelQueued as
-      | ((message: StoredMessage) => Promise<void>)
-      | undefined;
-    expect(onCancelQueued).toBeInstanceOf(Function);
-
-    await act(async () => {
-      await onCancelQueued?.(message);
-    });
-
-    expect(hoisted.chatComposer.control.setText).toHaveBeenCalledWith('Queued prompt');
-    expect(hoisted.chatComposer.control.restoreAttachments).toHaveBeenCalledWith([FILE_PART]);
-    // Empty composer → the row is dropped, so the transcript no longer renders it.
-    expect(readBubble(renderer, 'msg-queued-1')).toBeUndefined();
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('shows the upgrade-required copy when cancel fails with CLI_UPGRADE_REQUIRED', async () => {
-    seedQueuedMessage();
-    currentManager.cancelQueuedMessage.mockRejectedValue(
-      Object.assign(new Error('old cli'), { code: 'CLI_UPGRADE_REQUIRED' })
+    expect(sheetProps(view.renderer).hydrationState.status).toBe('loading');
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, SELECTED_ID]);
+    await view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Recovered child row')]);
+    expect(renderedText(view.renderer.root.findByType(ChildSessionSheet))).toContain(
+      'Recovered child row'
     );
-
-    const renderer = mount();
-    const onCancelQueued = bubbleProps(renderer, 'msg-queued-1').onCancelQueued as
-      | ((message: StoredMessage) => Promise<void>)
-      | undefined;
-    expect(onCancelQueued).toBeInstanceOf(Function);
-
-    await act(async () => {
-      await onCancelQueued?.(queuedMessage());
-    });
-
-    const statuses = findByType(renderer, 'AccessibleStatus');
-    const messages = statuses.map(instance => instance.props.message as string | null);
-    expect(messages).toContain('agentChat.session.cancelQueuedUpgradeRequired');
-
-    act(() => {
-      renderer.unmount();
-    });
+    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(0);
   });
-});
 
-describe('SessionDetailContent send failure', () => {
-  it('throws without putting the prompt back itself (the composer owns the restore)', async () => {
-    currentManager.send.mockResolvedValue(false);
+  it('preserves access-error copy and dismissal without automatic retry', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    await view.fail(SELECTED_ID, { data: { code: 'FORBIDDEN' } });
 
-    const renderer = mount();
-    const onSend = hoisted.chatComposer.lastProps?.onSend;
-    expect(onSend).toBeInstanceOf(Function);
-
-    await act(async () => {
-      await expect(onSend?.('prompt text', {})).rejects.toThrow('Failed to send message');
+    const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(errorProps.message).toBe('You are not authorized to use the Cloud Agent.');
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+    act(() => {
+      sheetProps(view.renderer).onClose();
     });
+    expect(sheetProps(view.renderer).visible).toBe(false);
+    act(() => {
+      sheetProps(view.renderer).onDismiss?.();
+    });
+    expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+    expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
+    expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(24);
+  });
 
-    // The session layer must not restore the prompt itself — that would
-    // duplicate the composer's own empty-composer restore.
-    expect(hoisted.chatComposer.control.setText).not.toHaveBeenCalled();
+  it.each(['failure', 'success'] as const)(
+    'does not publish or retry old child work after a root change and late %s',
+    async outcome => {
+      const view = await mountDetails();
+      pressCard(view.renderer, SELECTED_ID);
+      view.rootPages.set(NEXT_ROOT_ID, [taskMessage(NEXT_ROOT_ID, [kiloId('ses-next-child')])]);
+      await view.switchRoot(NEXT_ROOT_ID);
+      await (outcome === 'failure'
+        ? view.fail(SELECTED_ID, new Error('fetch failed'))
+        : view.respond(SELECTED_ID, [childMessage(SELECTED_ID, 'Old scope row')]));
+
+      expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, NEXT_ROOT_ID]);
+      expect(view.store.get(view.manager.atoms.childMessages)(SELECTED_ID)).toEqual([]);
+      expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+      expect(renderedText(view.renderer.root)).toContain('Task ses-next-child');
+      expect(renderedText(view.renderer.root)).not.toContain('Old scope row');
+      expect(renderedText(view.renderer.root)).not.toContain('Task ses-selected');
+    }
+  );
+
+  it('shows confirmed empty history without fetching it again for labels or reopening', async () => {
+    const view = await mountDetails();
+    pressCard(view.renderer, SELECTED_ID);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.loading'),
+    });
+    await view.respond(SELECTED_ID, []);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.noMessages'),
+    });
 
     act(() => {
-      renderer.unmount();
+      sheetProps(view.renderer).onClose();
     });
+    act(() => {
+      sheetProps(view.renderer).onDismiss?.();
+    });
+    pressCard(view.renderer, SELECTED_ID);
+    expect(sheetProps(view.renderer)).toMatchObject({
+      visible: true,
+      hydrationState: { status: 'ready' },
+    });
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.childSessionSheet.noMessages'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
+    expect(cardFor(view.renderer, SELECTED_ID).findAllByType(ChildSessionModelLabel)).toHaveLength(
+      0
+    );
+  });
+
+  it('renders no child card or sheet when the root has no children', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'Root-only row')]);
+    expect(renderedText(view.renderer.root)).toContain('Root-only row');
+    expect(view.renderer.root.findAllByType(ChildSessionSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType(ChildSessionSheet)).toHaveLength(0);
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
   });
 });

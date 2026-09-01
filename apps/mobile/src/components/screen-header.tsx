@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { I18nManager, Platform, Pressable, View } from 'react-native';
@@ -24,6 +24,8 @@ type ScreenHeaderProps = {
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
+  /** Keep Back available without history, replacing the current route with this destination. */
+  backFallback?: Href;
   onTitlePress?: () => void;
   /**
    * Accessibility label for the pressable title. Defaults to a generic
@@ -46,6 +48,7 @@ export function ScreenHeader({
   modal,
   showBackButton,
   onBack,
+  backFallback,
   onTitlePress,
   onTitlePressAccessibilityLabel,
   backIcon,
@@ -55,7 +58,7 @@ export function ScreenHeader({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const canGoBack = showBackButton ?? router.canGoBack();
+  const canGoBack = showBackButton ?? (router.canGoBack() || backFallback !== undefined);
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
@@ -106,6 +109,8 @@ export function ScreenHeader({
               onPress={() => {
                 if (onBack) {
                   onBack();
+                } else if (backFallback !== undefined && !router.canGoBack()) {
+                  router.replace(backFallback);
                 } else {
                   router.back();
                 }

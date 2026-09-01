@@ -69,7 +69,10 @@ describe('abortKiloSessionForShutdown', () => {
     });
     let uploaderStopped = false;
     state.setLogUploader({
+      archiveId: 'run_1--test',
       start: () => {},
+      updateContext: () => {},
+      finalize: async () => {},
       uploadNow: async () => {
         signalUploadStarted?.();
         await new Promise<void>(resolve => {

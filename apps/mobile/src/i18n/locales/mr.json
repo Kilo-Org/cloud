@@ -2590,13 +2590,7 @@
       "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
       "discardAttachmentsTitle": "संलग्नता टाकून द्यायच्या?",
       "charactersRemaining": "{{count}} अक्षरे शिल्लक",
-      "insertNewline": "नवीन ओळ घाला",
-      "starterChipBuild": "वैशिष्ट्य तयार कर",
-      "starterChipEmpty": "कल्पनेपासून सुरुवात कर",
-      "starterChipFix": "त्रुटी दुरुस्त कर",
-      "starterChipPrepare": "माझे वातावरण तयार कर",
-      "starterChipWrapUp": "माझे सत्र पूर्ण कर",
-      "starterChipWriteTests": "चाचण्या लिही"
+      "insertNewline": "नवीन ओळ घाला"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी केली",

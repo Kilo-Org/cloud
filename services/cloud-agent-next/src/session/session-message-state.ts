@@ -222,7 +222,7 @@ export const SessionMessageStateSchema = z
     failureStage: SessionMessageFailureStageSchema.optional(),
     failureCode: SessionMessageFailureCodeSchema.optional(),
     failureSubtype: WorkspaceFailureSubtypeSchema.optional(),
-    assistantFailureReason: CloudAgentAssistantFailureReasonSchema.optional(),
+    assistantFailureReason: CloudAgentAssistantFailureReasonSchema.optional().catch(undefined),
     providerOwnership: CloudAgentProviderOwnershipSchema.optional(),
     safeFailureMessage: z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH).optional(),
     modelNotFoundRuntimeDiagnostics: ModelNotFoundRuntimeDiagnosticsSchema.optional(),
@@ -321,6 +321,7 @@ function normalizeParsedSessionMessageState(
 ): SessionMessageState {
   const currentState = { ...state };
 
+  delete currentState.failureFacts;
   delete currentState.turn;
   delete currentState.images;
   delete currentState.agent;
@@ -434,6 +435,7 @@ export async function putSessionMessageState(
   state: SessionMessageState
 ): Promise<void> {
   const parsedState = SessionMessageStateSchema.parse(state);
+  delete parsedState.failureFacts;
   if (parsedState.wrapperRunId) {
     await storage.put(
       wrapperRunMessageIndexKey(parsedState.wrapperRunId, parsedState.messageId),
@@ -523,6 +525,7 @@ export async function markMessageCompleted(
 }
 
 export type MarkMessageFailedParams = {
+  assistantMessageId?: string;
   reason: string;
   error?: string;
   completionSource: SessionMessageCompletionSource;
@@ -558,6 +561,7 @@ export async function markMessageFailed(
     assistantFailureReason: params.assistantFailureReason,
     providerOwnership: params.providerOwnership,
     safeFailureMessage: params.safeFailureMessage,
+    assistantMessageId: params.assistantMessageId ?? state.assistantMessageId,
     modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
     attempts: params.attempts,
   };
@@ -770,6 +774,7 @@ export type TerminalizeParams =
     }
   | {
       kind: 'failed';
+      assistantMessageId?: string;
       reason: string;
       error?: string;
       completionSource: SessionMessageCompletionSource;
@@ -844,6 +849,7 @@ export async function terminalizeMessageOnce(
       assistantFailureReason: params.assistantFailureReason,
       providerOwnership: resolveTerminalProviderOwnership(params, state),
       safeFailureMessage: params.safeFailureMessage,
+      assistantMessageId: params.assistantMessageId ?? state.assistantMessageId,
       modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
       attempts: params.attempts,
       terminalEffects,

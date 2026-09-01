@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CLOUD_AGENT_FAILURE_CODES,
   CLOUD_AGENT_FAILURE_STAGES,
+  CLOUD_AGENT_PROVIDER_OWNERSHIPS,
   CloudAgentCallbackFailureSchema,
+  CloudAgentFailureReasonSchema,
   CloudAgentSafeFailureSchema,
   classifyCloudAgentFailure,
   isWorkspaceFailureSubtype,
@@ -26,6 +28,9 @@ describe('CloudAgentCallbackFailureSchema', () => {
     { code: 'future_failure_code', message: 'Future failure' },
     { code: 'workspace_setup_failed', subtype: 'future_workspace_failure' },
     { code: 'assistant_error', futureField: true },
+    { code: 'assistant_error', assistantReason: 'ContextOverflowError' },
+    { code: 'assistant_error', assistantReason: null },
+    { code: 'assistant_error', providerOwnership: 'future_ownership' },
     { attempts: -1 },
     { message: 'x'.repeat(4_097) },
   ])('discards unsupported or malformed structured failures: %o', failure => {
@@ -72,26 +77,109 @@ describe('classifyCloudAgentFailure', () => {
     ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
   });
 
-  it('uses provider ownership for authentication and availability failures', () => {
-    expect(
-      classifyCloudAgentFailure({
-        source: 'run',
-        stage: 'agent_activity',
-        code: 'assistant_error',
-        assistantReason: 'provider_authentication',
-        providerOwnership: 'byok',
-      })
-    ).toEqual({ responsibility: 'user', reason: 'provider_authentication' });
-    expect(
-      classifyCloudAgentFailure({
-        source: 'run',
-        stage: 'agent_activity',
-        code: 'assistant_error',
-        assistantReason: 'provider_unavailable',
-        providerOwnership: 'managed',
-      })
-    ).toEqual({ responsibility: 'platform', reason: 'managed_provider_unavailable' });
+  it.each([
+    ['provider_authentication', 'byok', 'user', 'provider_authentication'],
+    ['provider_authentication', 'managed', 'platform', 'managed_provider_authentication'],
+    ['provider_authentication', 'unknown', 'unknown', 'provider_authentication'],
+    ['provider_authentication', undefined, 'unknown', 'provider_authentication'],
+    ['provider_unavailable', 'byok', 'unknown', 'provider_unavailable'],
+    ['provider_unavailable', 'managed', 'platform', 'managed_provider_unavailable'],
+    ['provider_unavailable', 'unknown', 'unknown', 'provider_unavailable'],
+    ['provider_unavailable', undefined, 'unknown', 'provider_unavailable'],
+  ] as const)(
+    'classifies %s with %s ownership without losing the known cause',
+    (assistantReason, providerOwnership, responsibility, reason) => {
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason,
+          providerOwnership,
+        })
+      ).toEqual({ responsibility, reason });
+    }
+  );
+
+  it.each([
+    ['managed', 'platform'],
+    ['byok', 'unknown'],
+    ['unknown', 'unknown'],
+    [undefined, 'unknown'],
+  ] as const)('retains request_timeout with %s ownership', (providerOwnership, responsibility) => {
+    const failure = classifyCloudAgentFailure({
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      assistantReason: 'timeout',
+      providerOwnership,
+    });
+
+    expect(failure).toEqual({ responsibility, reason: 'request_timeout' });
+    expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe('request_timeout');
   });
+
+  it.each([
+    'context_limit',
+    'output_limit',
+    'content_filter',
+    'structured_output',
+    'invalid_request',
+  ] as const)('retains %s without inferring responsibility from ownership', assistantReason => {
+    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+      const failure = classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason,
+        providerOwnership,
+      });
+
+      expect(failure).toEqual({ responsibility: 'unknown', reason: assistantReason });
+      expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe(assistantReason);
+    }
+  });
+
+  it.each(['insufficient_credits', 'rate_limited'] as const)(
+    'keeps %s as user responsibility regardless of provider ownership',
+    assistantReason => {
+      for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            assistantReason,
+            providerOwnership,
+          })
+        ).toEqual({ responsibility: 'user', reason: assistantReason });
+      }
+    }
+  );
+
+  it.each([true, false, undefined])(
+    'uses managed model selection %s rather than provider ownership for model failures',
+    managedModelSelection => {
+      for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+        for (const code of ['assistant_error', 'model_missing'] as const) {
+          expect(
+            classifyCloudAgentFailure({
+              source: 'run',
+              stage: 'agent_activity',
+              code,
+              assistantReason: 'model_unavailable',
+              providerOwnership,
+              managedModelSelection,
+            })
+          ).toEqual(
+            managedModelSelection
+              ? { responsibility: 'platform', reason: 'managed_model_configuration' }
+              : { responsibility: 'user', reason: 'model_unavailable' }
+          );
+        }
+      }
+    }
+  );
 
   it('classifies setup failures from structured stage and code only', () => {
     expect(

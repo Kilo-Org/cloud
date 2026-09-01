@@ -2,6 +2,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
+import type * as GitHubTokenServiceModule from './github-token-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findInstallationId: vi.fn(),
@@ -32,7 +33,8 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('./github-token-service.js', () => ({
+vi.mock('./github-token-service.js', async importOriginal => ({
+  ...(await importOriginal<typeof GitHubTokenServiceModule>()),
   GitHubTokenService: class GitHubTokenService {
     getToken = serviceMocks.getToken;
     getTokenForRepo = serviceMocks.getTokenForRepo;
@@ -98,6 +100,7 @@ vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
+import { GitHubTokenGenerationError } from './github-token-service.js';
 
 beforeEach(() => {
   serviceMocks.hasGitLabProjectCredentialCandidates.mockReset().mockResolvedValue(false);
@@ -748,6 +751,90 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       'acme'
     );
   });
+});
+
+describe.each([
+  'getTokenForRepo',
+  'getCloudAgentAuthForRepo',
+  'issueGitHubSessionCapability',
+] as const)('GitHub credential failures through %s', method => {
+  const params = { githubRepo: 'acme/repo', userId: 'user_1' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const installation = {
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'write', pull_requests: 'write' },
+    };
+    serviceMocks.findInstallationId.mockReset().mockResolvedValue(installation);
+    serviceMocks.findManagedInstallationForRepo.mockReset().mockResolvedValue(installation);
+    serviceMocks.findRefreshCandidates
+      .mockReset()
+      .mockResolvedValue({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockReset().mockResolvedValue('installation-token');
+  });
+
+  it.each([
+    [404, 'no_installation_found'],
+    [403, 'repository_not_installed'],
+    [422, 'repository_not_installed'],
+  ] as const)(
+    'returns the structured %s token failure without a token or capability',
+    async (status, reason) => {
+      serviceMocks.getTokenForRepo.mockRejectedValueOnce(
+        new GitHubTokenGenerationError(status, reason)
+      );
+
+      await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    'no_installation_found',
+    'invalid_repo_format',
+    'invalid_org_id',
+    'integration_mismatch',
+  ] as const)('preserves the %s lookup gate before token issuance', async reason => {
+    serviceMocks.findInstallationId.mockResolvedValue({ success: false, reason });
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({ success: false, reason });
+
+    await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('does not turn a database lookup exception into a missing installation', async () => {
+    const databaseError = new Error('query failed with private SQL parameters', {
+      cause: new Error('database connection closed'),
+    });
+    serviceMocks.findInstallationId.mockRejectedValueOnce(databaseError);
+    serviceMocks.findManagedInstallationForRepo.mockRejectedValueOnce(databaseError);
+
+    await expect(createService()[method](params)).rejects.toBe(databaseError);
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it.each([403, 429, 500, undefined])(
+    'leaves unclassified %s token failures as exceptions',
+    async status => {
+      const error = new GitHubTokenGenerationError(status);
+      serviceMocks.getTokenForRepo.mockRejectedValueOnce(error);
+
+      await expect(createService()[method](params)).rejects.toBe(error);
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    }
+  );
 });
 
 const outboundContainerId = 'outbound-container-1';

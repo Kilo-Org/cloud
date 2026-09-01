@@ -46,6 +46,8 @@ export type UsageByOrganization = Map<
   { costMicrodollars: number; requests: number; tokens: number }
 >;
 
+export type UsageDataStatus = 'loading' | 'available' | 'unavailable';
+
 function OrganizationLink({ id, name }: { id: string; name: string }) {
   return (
     <Link
@@ -97,10 +99,12 @@ export function OverviewSection({
   organizationId,
   data,
   spendByOrganization,
+  usageDataStatus,
 }: {
   organizationId: string;
   data: Overview;
   spendByOrganization: Map<string, number>;
+  usageDataStatus: UsageDataStatus;
 }) {
   return (
     <Card>
@@ -116,50 +120,67 @@ export function OverviewSection({
           <CreateSubOrganizationButton organizationId={organizationId} />
         )}
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent className="space-y-4">
+        {usageDataStatus === 'unavailable' && (
+          <Alert variant="warning">
+            <AlertTriangle className="size-4" />
+            <AlertDescription>
+              30-day usage data is temporarily unavailable. Organization details remain current, but
+              spend cannot be shown right now.
+            </AlertDescription>
+          </Alert>
+        )}
         {data.children.length === 0 ? (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No sub-organizations yet. Create one to start managing it separately.
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sub-organization</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead className="text-right">Members</TableHead>
-                <TableHead className="text-right">Seats</TableHead>
-                <TableHead className="text-right">Credit balance</TableHead>
-                <TableHead className="text-right">Spend (30 days)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.children.map(child => (
-                <TableRow key={child.id}>
-                  <TableCell className="font-medium">
-                    <OrganizationLink id={child.id} name={child.name} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {child.plan}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {child.requireSeats
-                      ? `${child.seatCount.used} / ${child.seatCount.total}`
-                      : 'Not required'}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMicrodollars(child.balanceMicrodollars)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatMicrodollars(spendByOrganization.get(child.id) ?? 0)}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sub-organization</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead className="text-right">Members</TableHead>
+                  <TableHead className="text-right">Seats</TableHead>
+                  <TableHead className="text-right">Credit balance</TableHead>
+                  <TableHead className="text-right">Spend (30 days)</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {data.children.map(child => (
+                  <TableRow key={child.id}>
+                    <TableCell className="font-medium">
+                      <OrganizationLink id={child.id} name={child.name} />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {child.plan}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{child.memberCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {child.requireSeats
+                        ? `${child.seatCount.used} / ${child.seatCount.total}`
+                        : 'Not required'}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMicrodollars(child.balanceMicrodollars)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {usageDataStatus === 'loading' ? (
+                        <Skeleton className="ml-auto h-4 w-16" />
+                      ) : usageDataStatus === 'unavailable' ? (
+                        <span className="text-muted-foreground">Unavailable</span>
+                      ) : (
+                        formatMicrodollars(spendByOrganization.get(child.id) ?? 0)
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -559,10 +580,12 @@ export function CreditsSection({
   organizationId,
   data,
   thirtyDaySpend,
+  usageDataStatus,
 }: {
   organizationId: string;
   data: Credits;
   thirtyDaySpend: Map<string, number>;
+  usageDataStatus: UsageDataStatus;
 }) {
   return (
     <div className="space-y-4">
@@ -572,6 +595,15 @@ export function CreditsSection({
           <AlertDescription>
             Kilo Pass allocation data is temporarily unavailable. Credit balances and usage remain
             current.
+          </AlertDescription>
+        </Alert>
+      )}
+      {usageDataStatus === 'unavailable' && (
+        <Alert variant="warning">
+          <AlertTriangle className="size-4" />
+          <AlertDescription>
+            30-day usage data is temporarily unavailable. Credit balances remain current, but burn
+            and runway cannot be calculated right now.
           </AlertDescription>
         </Alert>
       )}
@@ -650,10 +682,24 @@ export function CreditsSection({
                           : 'None'}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMicrodollars(spend)}
+                      {usageDataStatus === 'loading' ? (
+                        <Skeleton className="ml-auto h-4 w-16" />
+                      ) : usageDataStatus === 'unavailable' ? (
+                        <span className="text-muted-foreground">Unavailable</span>
+                      ) : (
+                        formatMicrodollars(spend)
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {runway === null ? 'No observed burn' : `${Math.floor(runway)} days`}
+                      {usageDataStatus === 'loading' ? (
+                        <Skeleton className="ml-auto h-4 w-20" />
+                      ) : usageDataStatus === 'unavailable' ? (
+                        <span className="text-muted-foreground">Unavailable</span>
+                      ) : runway === null ? (
+                        'No observed burn'
+                      ) : (
+                        `${Math.floor(runway)} days`
+                      )}
                     </TableCell>
                   </TableRow>
                 );

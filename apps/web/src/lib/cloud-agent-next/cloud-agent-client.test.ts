@@ -102,6 +102,72 @@ const realCloudAgentClientModule =
 const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
   realCloudAgentClientModule;
 
+describe('CloudAgentNextClient review message results', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
+  };
+  const query = jest.fn<(request: typeof input) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ getMessageResult: { query } });
+  });
+
+  it('returns only admission metadata without assistant text or diagnostics', async () => {
+    query.mockResolvedValue({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+      terminalAt: 2,
+      failure: { message: 'private diagnostic' },
+      assistant: { text: 'source code' },
+    });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('distinguishes the exact message-not-found response from missing sessions', async () => {
+    query.mockRejectedValueOnce(
+      new TRPCClientError('Message not found', {
+        result: {
+          error: {
+            message: 'Message not found',
+            code: -32004,
+            data: { code: 'NOT_FOUND', httpStatus: 404 },
+          },
+        },
+      })
+    );
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toBeNull();
+  });
+
+  it.each(['Session not found', 'Access denied'])(
+    'does not interpret %s as permission to retry',
+    async message => {
+      query.mockRejectedValueOnce(
+        new TRPCClientError(message, {
+          result: {
+            error: { message, code: -32004, data: { code: 'NOT_FOUND', httpStatus: 404 } },
+          },
+        })
+      );
+      await expect(new CloudAgentNextClient('token').getMessageResult(input)).rejects.toThrow(
+        'Message result unavailable'
+      );
+    }
+  );
+
+  it('rejects unrecognized lifecycle state instead of confirming admission', async () => {
+    query.mockResolvedValue({ ...input, status: 'not-admitted' });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).rejects.toThrow();
+  });
+});
+
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {

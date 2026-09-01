@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  type AgentSessionFilters,
-  clearAgentSessionNarrowingFilters,
+  countActiveSessionFilters,
   createDefaultAgentSessionFilters,
   parseStoredAgentSessionFilters,
 } from './agent-session-filters';
 
 describe('createDefaultAgentSessionFilters', () => {
-  it('returns empty narrowing filters and the default sort', () => {
+  it('returns empty narrowing filters', () => {
     expect(createDefaultAgentSessionFilters()).toEqual({
       platformFilter: [],
       projectFilter: [],
-      sortBy: 'updated_at',
     });
   });
 });
@@ -37,7 +35,6 @@ describe('parseStoredAgentSessionFilters', () => {
     expect(parseStoredAgentSessionFilters(raw)).toEqual({
       platformFilter: ['cli', 'cloud-agent'],
       projectFilter: ['https://github.com/foo/bar'],
-      sortBy: 'updated_at',
     });
   });
 
@@ -49,58 +46,26 @@ describe('parseStoredAgentSessionFilters', () => {
     expect(parseStoredAgentSessionFilters(raw)).toEqual({
       platformFilter: ['cli', 'extension'],
       projectFilter: ['https://x', 'y'],
-      sortBy: 'updated_at',
     });
-  });
-
-  it('accepts a stored sortBy value', () => {
-    const raw = JSON.stringify({
-      platformFilter: [],
-      projectFilter: [],
-      sortBy: 'created_at',
-    });
-    expect(parseStoredAgentSessionFilters(raw)?.sortBy).toBe('created_at');
-  });
-
-  it('defaults sortBy to updated_at for missing, malformed, or unknown values', () => {
-    expect(
-      parseStoredAgentSessionFilters(JSON.stringify({ platformFilter: [], projectFilter: [] }))
-        ?.sortBy
-    ).toBe('updated_at');
-    expect(
-      parseStoredAgentSessionFilters(
-        JSON.stringify({ platformFilter: [], projectFilter: [], sortBy: 'title' })
-      )?.sortBy
-    ).toBe('updated_at');
-    expect(
-      parseStoredAgentSessionFilters(
-        JSON.stringify({ platformFilter: [], projectFilter: [], sortBy: 42 })
-      )?.sortBy
-    ).toBe('updated_at');
   });
 });
 
-describe('clearAgentSessionNarrowingFilters', () => {
-  const current: AgentSessionFilters = {
-    platformFilter: ['cli'],
-    projectFilter: ['https://github.com/foo/bar'],
-    sortBy: 'created_at',
-  };
-
-  it('resets platform and project filters but preserves sortBy', () => {
-    expect(clearAgentSessionNarrowingFilters(current)).toEqual({
-      platformFilter: [],
-      projectFilter: [],
-      sortBy: 'created_at',
-    });
+describe('countActiveSessionFilters', () => {
+  it('counts both narrowing dimensions', () => {
+    expect(countActiveSessionFilters(createDefaultAgentSessionFilters())).toBe(0);
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['cli', 'slack'],
+        projectFilter: ['https://github.com/foo/bar'],
+      })
+    ).toBe(3);
   });
+});
 
-  it('does not mutate the input', () => {
-    const snapshot: AgentSessionFilters = {
-      ...current,
-      platformFilter: [...current.platformFilter],
-    };
-    clearAgentSessionNarrowingFilters(current);
-    expect(current).toEqual(snapshot);
-  });
+it('ignores a legacy stored sortBy field', () => {
+  expect(
+    parseStoredAgentSessionFilters(
+      JSON.stringify({ platformFilter: ['cli'], projectFilter: [], sortBy: 'created_at' })
+    )
+  ).toEqual({ platformFilter: ['cli'], projectFilter: [] });
 });

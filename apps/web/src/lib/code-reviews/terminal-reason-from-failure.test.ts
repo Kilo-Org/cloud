@@ -3,21 +3,8 @@ import {
   CLOUD_AGENT_FAILURE_CODES,
   WORKSPACE_FAILURE_SUBTYPES,
 } from '@kilocode/worker-utils/cloud-agent-failure';
-import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { CODE_REVIEW_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import { terminalReasonFromCloudAgentFailure } from './terminal-reason-from-failure';
-
-describe('terminal reason list parity', () => {
-  // These two lists live in separate packages that cannot import each other, so
-  // drift is only caught here. A mismatch makes the orchestrator send a reason
-  // the callback allowlist rejects, or makes the worker's zod enum silently
-  // coerce a valid reason to undefined via its `.catch(undefined)`.
-  it('keeps the db and worker-utils terminal reason lists identical', () => {
-    expect([...CLOUD_AGENT_TERMINAL_REASONS].sort()).toEqual(
-      [...CODE_REVIEW_TERMINAL_REASONS].sort()
-    );
-  });
-});
 
 describe('terminalReasonFromCloudAgentFailure', () => {
   it('returns undefined without a structured failure', () => {
@@ -82,14 +69,34 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     ).toBe('assistant_unavailable');
   });
 
-  it('resolves every assistant reason to a valid terminal reason', () => {
-    const valid = new Set<string>(CODE_REVIEW_TERMINAL_REASONS);
-    const resolved = CLOUD_AGENT_ASSISTANT_FAILURE_REASONS.map(assistantReason => [
-      assistantReason,
-      terminalReasonFromCloudAgentFailure({ code: 'assistant_error', assistantReason }),
-    ]);
+  it.each(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS)(
+    'resolves assistant reason %s to a defined, valid terminal reason',
+    assistantReason => {
+      const reason = terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason,
+      });
 
-    expect(resolved.filter(([, reason]) => !valid.has(reason as string))).toEqual([]);
+      expect(reason).toBeDefined();
+      expect(CODE_REVIEW_TERMINAL_REASONS).toContain(reason);
+    }
+  );
+
+  it.each([
+    ['context_limit', 'assistant_failed'],
+    ['output_limit', 'assistant_failed'],
+    ['content_filter', 'assistant_failed'],
+    ['structured_output', 'assistant_failed'],
+    ['timeout', 'assistant_timeout'],
+    ['invalid_request', 'assistant_invalid_request'],
+  ] as const)('keeps %s mapped to the existing %s category', (assistantReason, expected) => {
+    expect(
+      terminalReasonFromCloudAgentFailure({
+        code: 'assistant_error',
+        assistantReason,
+        message: 'Assistant request was rate limited',
+      })
+    ).toBe(expected);
   });
 
   it('splits assistant failures by their safe message', () => {

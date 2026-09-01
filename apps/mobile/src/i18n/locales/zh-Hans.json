@@ -152,7 +152,9 @@
     "appearanceDark": "深色",
     "account": "账户",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
-    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。"
+    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。",
+    "returnSendsMessage": "回车键发送消息",
+    "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。"
   },
   "notifications": {
     "title": "通知",
@@ -296,7 +298,8 @@
       "networkError": "网络错误",
       "uploadFailed": "上传失败",
       "failedToUploadFile": "上传文件失败：{{reason}}",
-      "nothingToPaste": "没有可粘贴的内容"
+      "nothingToPaste": "没有可粘贴的内容",
+      "metadataStripFailed": "无法移除照片元数据。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1689,7 +1692,11 @@
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
       "connectionTrouble": "连接出现问题。请稍后重试。",
-      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。"
+      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。",
+      "cancelQueuedFailed": "无法取消消息。",
+      "cancelQueuedRestoreAvailable": "消息已取消。点击“恢复”将其放回编辑器。",
+      "cancelQueuedRestored": "消息已取消。提示词已放回编辑器。",
+      "cancelQueuedUpgradeRequired": "取消已排队的消息需要更新的 Kilo CLI。请更新 Kilo CLI 并重新连接。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",
@@ -1761,7 +1768,8 @@
       "continueFrom": "正在继续 {{title}}",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
-      "importFailed": "无法导入此会话。"
+      "importFailed": "无法导入此会话。",
+      "discardWithUploadsMessage": "您的提示词和未附加到已发送消息的上传文件将被删除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -2011,7 +2019,11 @@
       "queuedAccessibility": "消息已排队",
       "userMessage": "用户消息",
       "assistantMessage": "助手消息",
-      "longPressHint": "长按查看消息详情"
+      "longPressHint": "长按查看消息详情",
+      "cancelQueued": "取消消息",
+      "cancelQueuedAccessibility": "取消已排队的消息",
+      "restoreQueued": "恢复",
+      "restoreQueuedAccessibility": "将已取消的消息恢复到编辑器"
     },
     "olderMessages": {
       "arrived": "已加载较早的消息",
@@ -2039,9 +2051,6 @@
     },
     "sessionFilter": {
       "title": "筛选会话",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最近更新",
-      "sortCreated": "创建时间",
       "platform": "平台",
       "platformCloud": "云端",
       "platformExtension": "扩展",
@@ -2095,7 +2104,9 @@
       "uploading": "正在上传…",
       "uploaded": "已上传",
       "uploadFailedRetry": "上传失败。点击重试。",
-      "uploadFailedTerminal": "无法上传此文件。"
+      "uploadFailedTerminal": "无法上传此文件。",
+      "moveLeft": "将 {{filename}} 向左移动",
+      "moveRight": "将 {{filename}} 向右移动"
     },
     "attachmentPasteHint": {
       "accessibility": "从剪贴板粘贴图片",
@@ -2125,7 +2136,11 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "消息...",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
-      "couldNotAttachFiles": "无法附加文件。点击发送以重试。"
+      "couldNotAttachFiles": "无法附加文件。点击发送以重试。",
+      "discardAttachmentsMessage": "未附加到已发送消息的上传文件将被删除。",
+      "discardAttachmentsTitle": "丢弃附件？",
+      "charactersRemaining": "还可输入 {{count}} 个字符",
+      "insertNewline": "插入换行"
     },
     "chatLink": {
       "linkCopied": "链接已复制",
@@ -2344,7 +2359,8 @@
     "busy": "语音输入正忙。请重试。",
     "stopped": "语音输入已停止。点击麦克风重试。",
     "unavailableDevice": "此设备不支持语音输入。",
-    "unavailableLanguage": "语音输入不支持此设备的语言。"
+    "unavailableLanguage": "语音输入不支持此设备的语言。",
+    "listeningStopped": "已停止聆听。"
   },
   "share": {
     "title": "分享到 Kilo",

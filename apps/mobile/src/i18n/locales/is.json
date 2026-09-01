@@ -152,7 +152,9 @@
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
     "prReviewAttribution": "Bæta við app-eignarmerki í PR-úttektir",
-    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt."
+    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt.",
+    "returnSendsMessage": "Færslulykill sendir skilaboð",
+    "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -750,7 +752,8 @@
       "networkError": "Netvilla",
       "uploadFailed": "Upphleðsla mistókst",
       "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}",
-      "nothingToPaste": "Ekkert til að líma"
+      "nothingToPaste": "Ekkert til að líma",
+      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2143,7 +2146,11 @@
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
       "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik.",
-      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur."
+      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur.",
+      "cancelQueuedFailed": "Ekki tókst að hætta við skilaboðin.",
+      "cancelQueuedRestoreAvailable": "Hætt var við skilaboðin. Bankaðu á Endurheimta til að færa þau aftur í ritilinn.",
+      "cancelQueuedRestored": "Hætt var við skilaboðin. Skilaboðin eru aftur í ritlinum.",
+      "cancelQueuedUpgradeRequired": "Til að hætta við skilaboð í biðröð þarf nýrri Kilo CLI. Uppfærðu Kilo CLI og tengdu aftur."
     },
     "remoteSession": {
       "failedToCreate": "Ekki tókst að búa til fjarlota lotu",
@@ -2215,7 +2222,8 @@
       "continueFrom": "Halda áfram með {{title}}",
       "importingSession": "Flytur inn lotu",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2465,7 +2473,11 @@
       "queuedAccessibility": "Skilaboð sett í biðröð",
       "userMessage": "Skilaboð frá notanda",
       "assistantMessage": "Skilaboð frá aðstoðarmanni",
-      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar"
+      "longPressHint": "Haltu lengi inni fyrir skilaboðaupplýsingar",
+      "cancelQueued": "Hætta við skilaboð",
+      "cancelQueuedAccessibility": "Hætta við skilaboð í biðröð",
+      "restoreQueued": "Endurheimta",
+      "restoreQueuedAccessibility": "Endurheimta afturkölluð skilaboð í ritilinn"
     },
     "olderMessages": {
       "arrived": "Eldri skilaboð hlaðin",
@@ -2493,9 +2505,6 @@
     },
     "sessionFilter": {
       "title": "Sía lotur",
-      "sortBy": "Raða eftir",
-      "sortLastUpdated": "Síðast uppfært",
-      "sortCreated": "Búið til",
       "platform": "Vettvangur",
       "platformCloud": "Ský",
       "platformExtension": "Viðbót",
@@ -2549,7 +2558,9 @@
       "uploading": "Hleð upp…",
       "uploaded": "Hlaðið upp",
       "uploadFailedRetry": "Upphleðsla mistókst. Bankaðu til að reyna aftur.",
-      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp."
+      "uploadFailedTerminal": "Ekki er hægt að hlaða þessari skrá upp.",
+      "moveLeft": "Færa {{filename}} til vinstri",
+      "moveRight": "Færa {{filename}} til hægri"
     },
     "attachmentPasteHint": {
       "accessibility": "Líma mynd af klippispjaldi",
@@ -2579,7 +2590,11 @@
       "finalizingPlaceholder": "Ljýkur máli...",
       "messagePlaceholder": "Skilaboð...",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
-      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur."
+      "couldNotAttachFiles": "Ekki tókst að hengja skrár við. Bankaðu á senda til að reyna aftur.",
+      "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
+      "discardAttachmentsTitle": "Farga viðhengjum?",
+      "charactersRemaining": "{{count}} stafir eftir",
+      "insertNewline": "Setja inn línuskil"
     },
     "chatLink": {
       "linkCopied": "Krækja afrituð",
@@ -2798,7 +2813,8 @@
     "busy": "Raddinnsláttur er upptekinn. Reyndu aftur.",
     "stopped": "Raddinnsláttur stöðvaðist. Bankaðu á hljóðnemann til að reyna aftur.",
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
-    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið."
+    "unavailableLanguage": "Raddinnsláttur er ekki í boði fyrir tækjatungumálið.",
+    "listeningStopped": "Hlustun stöðvaðist."
   },
   "share": {
     "title": "Deila í Kilo",

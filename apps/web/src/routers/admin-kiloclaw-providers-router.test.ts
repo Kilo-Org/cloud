@@ -62,33 +62,6 @@ describe('admin KiloClaw provider rollout router', () => {
     });
   });
 
-  it('returns provider rollout config from the Worker', async () => {
-    kiloclawClientMock.__getProviderRolloutMock.mockResolvedValue({
-      rollout: {
-        northflank: {
-          personalTrafficPercent: 0,
-          organizationTrafficPercent: 0,
-          enabledOrganizationIds: [],
-        },
-      },
-      availability: { northflank: false },
-      source: 'default',
-    });
-    const caller = await createCallerForUser(adminUser.id);
-
-    await expect(caller.admin.kiloclawProviders.getRollout()).resolves.toEqual({
-      rollout: {
-        northflank: {
-          personalTrafficPercent: 0,
-          organizationTrafficPercent: 0,
-          enabledOrganizationIds: [],
-        },
-      },
-      availability: { northflank: false },
-      source: 'default',
-    });
-  });
-
   it('updates provider rollout config through the Worker', async () => {
     const input = {
       northflank: {

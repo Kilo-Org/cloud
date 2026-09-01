@@ -1,10 +1,15 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type KiloSessionId,
+  type MessageDeliveryState,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Haptics from 'expo-haptics';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +17,11 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
+import {
+  ChatComposer,
+  type ChatComposerControl,
+  type ChatComposerSendOptions,
+} from '@/components/agents/chat-composer';
 import {
   type AgentMode,
   customModeOptionsFromRuntimeAgents,
@@ -42,6 +51,8 @@ import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
+import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
+import { firstHumanText, isFilePart } from './part-types';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
@@ -56,9 +67,7 @@ import {
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import {
-  collectEmptyChildSessionIds,
   countInFlightMessages,
-  hydrateEmptyChildSessions,
   resolveRetryPrompt,
   retryMessageAndClear,
 } from '@/components/agents/session-detail-content-helpers';
@@ -77,6 +86,7 @@ import { SessionSkeletonMessages } from '@/components/agents/session-detail-skel
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
@@ -100,11 +110,10 @@ import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
-import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
   type AnalyticsSurface,
   captureEvent,
@@ -151,6 +160,13 @@ type SessionDetailContentProps = {
   cachedTitle?: string;
 };
 
+type CancelQueuedStatus = {
+  messageId: string;
+  tone: 'status' | 'error';
+  message: string;
+  attempt: number;
+};
+
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
@@ -170,7 +186,6 @@ export function SessionDetailContent({
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerControlRef = useRef<ChatComposerControl | null>(null);
-  const childHydrateAttemptedRef = useRef<Set<string>>(new Set());
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -194,6 +209,7 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
@@ -219,7 +235,8 @@ export function SessionDetailContent({
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
-  const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
+  const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
+  const detailsMessageIdRef = useRef<string | null>(null);
 
   const { bottom } = useSafeAreaInsets();
 
@@ -456,42 +473,6 @@ export function SessionDetailContent({
 
   const store = useStore();
 
-  useEffect(() => {
-    childHydrateAttemptedRef.current = new Set();
-  }, [sessionId]);
-
-  // Hydrate child transcripts for task cards that have no messages yet, so a
-  // reopened parent shows each completed child's model on the card without
-  // opening the child sheet. An attempted id is never hydrated again for the
-  // same parent session; a hydrate error retries once.
-  useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-    if (fetchedData?.kiloSessionId !== sessionId) {
-      return;
-    }
-    const liveGetChildMessages = store.get(manager.atoms.childMessages);
-    const readHydrationStatus = (id: KiloSessionId) =>
-      store.get(manager.atoms.childSessionHydrationState)(id).status;
-    const emptyIds = collectEmptyChildSessionIds(messages, liveGetChildMessages).filter(
-      id => !childHydrateAttemptedRef.current.has(id)
-    );
-    if (emptyIds.length === 0) {
-      return;
-    }
-    for (const id of emptyIds) {
-      childHydrateAttemptedRef.current.add(id);
-    }
-    void hydrateEmptyChildSessions(
-      emptyIds,
-      async id => {
-        await manager.hydrateChildSession(id);
-      },
-      readHydrationStatus
-    );
-  }, [isLoading, fetchedData?.kiloSessionId, sessionId, messages, manager, store]);
-
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
@@ -655,9 +636,125 @@ export function SessionDetailContent({
     }
   }, [clearChildSheetReleaseTimeout]);
 
+  // Canceled queued rows: `droppedQueuedIds` filters a canceled (empty-composer)
+  // row out of the transcript before merge; `canceledQueuedMessages` keeps the
+  // full row with a Restore action when the composer was occupied (the SDK
+  // deletes the row on cloud.message.canceled, so the local copy re-inserts it).
+  // Sheet and screen outcomes have separate slots so one cannot erase the other.
+  // The rows and feedback reset on session switch.
+  const EMPTY_CANCELED: ReadonlyMap<string, StoredMessage> = new Map();
+  const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [canceledQueuedMessages, setCanceledQueuedMessages] =
+    useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
+  const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
+    null
+  );
+  const cancelQueuedAttemptRef = useRef(0);
+  const cancelingQueuedIdsRef = useRef(new Set<string>());
+  const [cancelingQueuedIds, setCancelingQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  // Successful drops stay guarded before React commits and after Restore removes a retained row.
+  const canceledQueuedIdsRef = useRef(new Set<string>());
+  // The SDK owner ID changes when a replacement CLI connection takes over.
+  // Catalog refreshes and temporary owner loss do not prove recovery.
+  const cancelQueuedUpgradeRequiredRef = useRef<{
+    ownerConnectionId: string | null;
+    attempt: number;
+  } | null>(null);
+  const isQueuedCancellationUnsupported = useCallback(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+    return (
+      unsupported !== null &&
+      (ownerConnectionId === null || ownerConnectionId === unsupported.ownerConnectionId)
+    );
+  }, [manager, store]);
+
+  useEffect(() => {
+    const unsupported = cancelQueuedUpgradeRequiredRef.current;
+    if (
+      unsupported !== null &&
+      remoteModelState.ownerConnectionId !== null &&
+      remoteModelState.ownerConnectionId !== unsupported.ownerConnectionId
+    ) {
+      cancelQueuedUpgradeRequiredRef.current = null;
+      setCancelQueuedStatus(current => (current?.attempt === unsupported.attempt ? null : current));
+      setCancelQueuedSheetStatus(current =>
+        current?.attempt === unsupported.attempt ? null : current
+      );
+    }
+  }, [remoteModelState.ownerConnectionId]);
+
+  const isQueuedCancellationEligible = useCallback(
+    (
+      message: StoredMessage | undefined,
+      delivery: MessageDeliveryState | undefined,
+      busy: boolean
+    ) =>
+      !isQueuedCancellationUnsupported() &&
+      message?.info.role === 'user' &&
+      delivery?.status === 'queued' &&
+      !canceledQueuedIdsRef.current.has(message.info.id) &&
+      !busy,
+    [isQueuedCancellationUnsupported]
+  );
+
+  const handleOpenDetails = useCallback((message: StoredMessage) => {
+    detailsMessageIdRef.current = message.info.id;
+    setDetailsMessageId(message.info.id);
+    setCancelQueuedSheetStatus(null);
+  }, []);
+
+  const handleCloseDetails = useCallback(() => {
+    const messageId = detailsMessageIdRef.current;
+    detailsMessageIdRef.current = null;
+    setDetailsMessageId(null);
+    // A presented sheet failure must not become a second, outer announcement on dismissal.
+    setCancelQueuedSheetStatus(current => (current?.messageId === messageId ? null : current));
+  }, []);
+
+  const visibleMessages = useMemo(() => {
+    const base =
+      droppedQueuedIds.size === 0
+        ? messages
+        : messages.filter(m => !droppedQueuedIds.has(m.info.id));
+    if (canceledQueuedMessages.size === 0) {
+      return base;
+    }
+    // Re-insert the canceled-but-kept rows the SDK already removed, in their
+    // original id-sorted position (the SDK orders messages by id).
+    const kept = [...canceledQueuedMessages.values()].filter(
+      m => !base.some(b => b.info.id === m.info.id)
+    );
+    if (kept.length === 0) {
+      return base;
+    }
+    return [...base, ...kept].toSorted((a, b) => {
+      if (a.info.id < b.info.id) {
+        return -1;
+      }
+      if (a.info.id > b.info.id) {
+        return 1;
+      }
+      return 0;
+    });
+  }, [messages, droppedQueuedIds, canceledQueuedMessages]);
+
+  const detailsMessage = visibleMessages.find(message => message.info.id === detailsMessageId);
+  const detailsDelivery =
+    detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
+  const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
+  const canCancelSelected = isQueuedCancellationEligible(
+    detailsMessage,
+    detailsDelivery,
+    detailsBusy
+  );
+  const isCancelingSelected =
+    detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
+
   const transcript = useMemo(
-    () => mergeSessionTranscript(messages, preparationAttempts),
-    [messages, preparationAttempts]
+    () => mergeSessionTranscript(visibleMessages, preparationAttempts),
+    [visibleMessages, preparationAttempts]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -668,6 +765,16 @@ export function SessionDetailContent({
   if (prevSessionId !== sessionId) {
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
+    setDroppedQueuedIds(EMPTY_IDS);
+    setCanceledQueuedMessages(EMPTY_CANCELED);
+    setCancelQueuedStatus(null);
+    setCancelQueuedSheetStatus(null);
+    detailsMessageIdRef.current = null;
+    setDetailsMessageId(null);
+    cancelingQueuedIdsRef.current = new Set();
+    setCancelingQueuedIds(EMPTY_IDS);
+    canceledQueuedIdsRef.current = new Set();
+    cancelQueuedUpgradeRequiredRef.current = null;
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -678,11 +785,8 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
 
   const handleSend = useCallback(
-    async (
-      text: string,
-      attachments?: AgentAttachmentWire,
-      submission?: AgentAttachmentSubmissionPayload
-    ) => {
+    async (text: string, options?: ChatComposerSendOptions) => {
+      const { attachments, submission, onOptimisticSend } = options ?? {};
       if (requiresModel && !(pinned.model ?? currentModel)) {
         toast.error(t('agentChat.composer.selectModelBeforeSending'));
         return;
@@ -750,6 +854,7 @@ export function SessionDetailContent({
         },
         ...(kind === 'cloud' && attachments ? { attachments } : {}),
         ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
+        ...(onOptimisticSend ? { onOptimisticSend } : {}),
       });
       if (!sent) {
         throw new Error('Failed to send message');
@@ -799,6 +904,137 @@ export function SessionDetailContent({
     [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
   );
 
+  const handleCancelQueued = useCallback(
+    async (selectedMessage: StoredMessage) => {
+      const messageId = selectedMessage.info.id;
+      const message = store
+        .get(manager.atoms.messagesList)
+        .find(item => item.info.id === messageId);
+      const inFlight = cancelingQueuedIdsRef.current;
+      if (
+        !message ||
+        !isQueuedCancellationEligible(
+          message,
+          store.get(manager.atoms.pendingMessages).get(messageId),
+          inFlight.has(messageId)
+        )
+      ) {
+        return;
+      }
+      inFlight.add(messageId);
+      setCancelingQueuedIds(new Set(inFlight));
+      setCancelQueuedStatus(current => (current?.messageId === messageId ? null : current));
+      setCancelQueuedSheetStatus(current => (current?.messageId === messageId ? null : current));
+      // The attempt also resets announcement identity if React batches an immediate retry failure.
+      cancelQueuedAttemptRef.current += 1;
+      const attempt = cancelQueuedAttemptRef.current;
+      const ownerConnectionId = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+      const reportFailure = (feedback: string, upgradeRequired = false) => {
+        if (inFlight !== cancelingQueuedIdsRef.current) {
+          return;
+        }
+        if (upgradeRequired) {
+          cancelQueuedUpgradeRequiredRef.current = { ownerConnectionId, attempt };
+        }
+        const setStatus =
+          detailsMessageIdRef.current === messageId
+            ? setCancelQueuedSheetStatus
+            : setCancelQueuedStatus;
+        setStatus({
+          messageId,
+          tone: 'error',
+          message: feedback,
+          attempt,
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      };
+      try {
+        let dropped = false;
+        try {
+          ({ dropped } = await manager.cancelQueuedMessage(messageId));
+        } catch (cancelError) {
+          // Old CLI versions without queue drop require an upgrade. Remove only when all
+          // supported CLI versions implement queue drop; never fall back to interrupt.
+          const currentOwner = store.get(manager.atoms.remoteModelState).ownerConnectionId;
+          const upgrade =
+            isCancelQueuedUpgradeRequired(cancelError) &&
+            (currentOwner === null || currentOwner === ownerConnectionId);
+          reportFailure(
+            upgrade
+              ? t('agentChat.session.cancelQueuedUpgradeRequired')
+              : t('agentChat.session.cancelQueuedFailed'),
+            upgrade
+          );
+          return;
+        }
+        if (inFlight !== cancelingQueuedIdsRef.current) {
+          return;
+        }
+        if (!dropped) {
+          // An accepted or missing queue entry must not be hidden or restored as an unsent draft.
+          reportFailure(t('agentChat.session.cancelQueuedFailed'));
+          return;
+        }
+        canceledQueuedIdsRef.current.add(messageId);
+        const composerHasContent = composerControlRef.current?.hasContent() ?? false;
+        const prompt = firstHumanText(message.parts);
+        if (!composerHasContent) {
+          if (prompt !== '') {
+            composerControlRef.current?.setText(prompt);
+          }
+          composerControlRef.current?.restoreAttachments(message.parts.filter(isFilePart));
+          setDroppedQueuedIds(prev => new Set(prev).add(messageId));
+        } else {
+          setCanceledQueuedMessages(prev => new Map(prev).set(messageId, message));
+        }
+        if (detailsMessageIdRef.current === messageId) {
+          handleCloseDetails();
+        }
+        setCancelQueuedStatus({
+          messageId,
+          tone: 'status',
+          message: composerHasContent
+            ? t('agentChat.session.cancelQueuedRestoreAvailable')
+            : t('agentChat.session.cancelQueuedRestored'),
+          attempt,
+        });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } finally {
+        inFlight.delete(messageId);
+        if (inFlight === cancelingQueuedIdsRef.current) {
+          setCancelingQueuedIds(new Set(inFlight));
+        }
+      }
+    },
+    [manager, store, isQueuedCancellationEligible, handleCloseDetails, t]
+  );
+
+  const handleRestoreQueued = useCallback(
+    (message: StoredMessage) => {
+      const stored = canceledQueuedMessages.get(message.info.id) ?? message;
+      const prompt = firstHumanText(stored.parts);
+      if (prompt !== '') {
+        composerControlRef.current?.setText(prompt);
+      }
+      composerControlRef.current?.restoreAttachments(stored.parts.filter(isFilePart));
+      setDroppedQueuedIds(prev => new Set(prev).add(message.info.id));
+      setCanceledQueuedMessages(prev => {
+        const next = new Map(prev);
+        next.delete(message.info.id);
+        return next;
+      });
+      cancelQueuedAttemptRef.current += 1;
+      setCancelQueuedStatus({
+        messageId: message.info.id,
+        tone: 'status',
+        message: t('agentChat.session.cancelQueuedRestored'),
+        attempt: cancelQueuedAttemptRef.current,
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    [canceledQueuedMessages, t]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: SessionTranscriptItem }) => {
       if (item.type === 'preparation') {
@@ -807,12 +1043,11 @@ export function SessionDetailContent({
       if (item.type === 'time') {
         return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
       }
-      // Look up delivery state by message id. The map is keyed by user-message
-      // id and may briefly contain an entry before the bubble has rendered
-      // (ServiceEvents can be applied while chat events are still buffered),
-      // so a plain lookup is enough — no render-order guard.
+      // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
       const deliveryState =
-        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+        item.message.info.role === 'user' && !canceledQueuedMessages.has(item.message.info.id)
+          ? pendingMessages.get(item.message.info.id)
+          : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
       const retryPrompt = resolveRetryPrompt(item.message, messages);
       return (
@@ -825,10 +1060,13 @@ export function SessionDetailContent({
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
-          onLongPressDetails={setDetailsMessage}
+          onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
           onCopyToComposer={handleCopyToComposer}
+          onRestoreQueued={
+            canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
+          }
         />
       );
     },
@@ -844,6 +1082,9 @@ export function SessionDetailContent({
       messages,
       handleRetryMessage,
       handleCopyToComposer,
+      handleOpenDetails,
+      handleRestoreQueued,
+      canceledQueuedMessages,
     ]
   );
 
@@ -1152,6 +1393,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
+          backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive
             ? {
@@ -1203,12 +1445,23 @@ export function SessionDetailContent({
         ) : null}
 
         <MessageDetailsSheet
-          visible={detailsMessage !== null}
-          message={detailsMessage}
+          visible={detailsMessageId !== null}
+          message={detailsMessage ?? null}
           modelOptions={modelOptions}
-          onClose={() => {
-            setDetailsMessage(null);
-          }}
+          onClose={handleCloseDetails}
+          canCancelQueued={canCancelSelected}
+          isCancelingQueued={isCancelingSelected}
+          onCancelQueued={handleCancelQueued}
+          cancelQueuedFeedback={
+            cancelQueuedSheetStatus?.messageId === detailsMessageId ? cancelQueuedSheetStatus : null
+          }
+          cancelQueuedGuidance={
+            isQueuedCancellationUnsupported() &&
+            detailsMessage?.info.role === 'user' &&
+            detailsDelivery?.status === 'queued'
+              ? t('agentChat.session.cancelQueuedUpgradeRequired')
+              : null
+          }
         />
 
         {childSessionSheet.sheet ? (
@@ -1270,6 +1523,13 @@ export function SessionDetailContent({
           />
           {renderContent()}
         </View>
+
+        <AccessibleStatus
+          key={cancelQueuedStatus?.attempt}
+          message={cancelQueuedStatus?.message ?? null}
+          tone={cancelQueuedStatus?.tone ?? 'status'}
+          className="px-4 text-center text-sm"
+        />
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
@@ -1377,6 +1637,13 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 sessionId={sessionId}
+                suggestion={activeSuggestion}
+                onAcceptSuggestion={async (requestId, index) => {
+                  await manager.acceptSuggestion(requestId, index);
+                }}
+                onDismissSuggestion={async requestId => {
+                  await manager.dismissSuggestion(requestId);
+                }}
                 controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>
@@ -1436,7 +1703,7 @@ export function SessionDetailContent({
     if (shouldBlockMessages) {
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
-    if (messages.length === 0) {
+    if (visibleMessages.length === 0) {
       return (
         <View className="flex-1 items-center justify-center px-6">
           {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
@@ -1458,6 +1725,7 @@ export function SessionDetailContent({
           sessionId={sessionId}
           items={transcript}
           keyExtractor={getSessionTranscriptItemKey}
+          getItemType={getSessionTranscriptItemType}
           hasOlderMessages={hasOlderMessages}
           isLoadingOlderMessages={isLoadingOlderMessages}
           olderMessagesError={olderMessagesError}

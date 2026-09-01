@@ -15,6 +15,10 @@ import { Bot, Plus } from '@/components/ui/icons';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { SessionFilterButton } from '@/components/agents/session-filter-button';
+import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -54,9 +58,14 @@ export function AgentSessionListScreen() {
     enabled: orgLoaded,
   });
 
+  const query = useLiveSessionQuery(activeSessions);
+  const { visibleSessions, isSearching } = query;
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   // Treat !orgLoaded as loading so the empty state cannot flash before skeletons.
   const loading = isLoading || !orgLoaded;
   const hasLiveRows = activeSessions.length > 0;
+  const hasVisibleRows = visibleSessions.length > 0;
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -106,21 +115,32 @@ export function AgentSessionListScreen() {
 
   const seeAllLabel = t('home.seeAll');
   const headerRight = (
-    <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
-      // left slop capped against the large title, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
-      accessibilityRole="button"
-      accessibilityLabel={seeAllLabel}
-      testID="agents-view-history"
-      className="active:opacity-70"
-    >
-      <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-        {seeAllLabel}
-      </Text>
-    </Pressable>
+    <View className="flex-row items-center gap-4">
+      <Pressable
+        onPress={() => {
+          router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+        }}
+        // left slop capped against the large title, right slop reaches 44pt wide
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+        accessibilityRole="button"
+        accessibilityLabel={seeAllLabel}
+        testID="agents-view-history"
+        className="active:opacity-70"
+      >
+        <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+          {seeAllLabel}
+        </Text>
+      </Pressable>
+      {query.canFilter ? (
+        <SessionFilterButton
+          activeCount={query.activeFilterCount}
+          onPress={() => {
+            setShowFilterModal(true);
+          }}
+          testID="agents-open-filters"
+        />
+      ) : null}
+    </View>
   );
 
   const [refreshing, setRefreshing] = useState(false);
@@ -175,7 +195,9 @@ export function AgentSessionListScreen() {
   );
 
   let body: ReactNode = null;
-  if (loading && !hasLiveRows) {
+  // An unread filter record holds the skeletons even over cached rows: painting
+  // the unfiltered list first would drop rows once the stored filter arrives.
+  if (!query.hasLoaded || (loading && !hasLiveRows)) {
     body = (
       <View className="pt-[18px]">
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
@@ -192,6 +214,28 @@ export function AgentSessionListScreen() {
         onRetry={() => {
           void refetch();
         }}
+      />
+    );
+  } else if (hasLiveRows && !hasVisibleRows) {
+    body = (
+      <EmptyState
+        icon={Bot}
+        title={t('agents.sessionList.noMatches')}
+        description={
+          isSearching
+            ? t('agents.sessionList.tryDifferentSearch')
+            : t('agents.sessionList.tryAdjustFilters')
+        }
+        action={
+          <Button
+            variant="outline"
+            onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+          >
+            <Text>
+              {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
+            </Text>
+          </Button>
+        }
       />
     );
   } else if (!hasLiveRows) {
@@ -217,7 +261,7 @@ export function AgentSessionListScreen() {
     body = (
       <FlatList
         ref={listRef}
-        data={activeSessions}
+        data={visibleSessions}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
@@ -242,6 +286,23 @@ export function AgentSessionListScreen() {
         className="px-[22px]"
         headerRight={headerRight}
       />
+      {hasLiveRows || isSearching ? (
+        <SessionListSearchHeader
+          inputRef={query.searchInputRef}
+          hasText={query.searchQuery.length > 0}
+          showSearchBusy={false}
+          showInlineError={false}
+          onChangeText={query.handleSearchChange}
+          onClearSearch={query.handleClearSearch}
+        />
+      ) : null}
+      <SessionFilterChips
+        platformFilter={query.platformFilter}
+        projectFilter={query.projectFilter}
+        projectOptions={query.options.projectOptions}
+        onRemovePlatform={query.handleRemovePlatform}
+        onRemoveProject={query.handleRemoveProject}
+      />
       {body}
       {/* FAB visible when there are live rows — empty state already owns the creation CTA. */}
       {hasLiveRows && (
@@ -257,6 +318,18 @@ export function AgentSessionListScreen() {
         >
           <Plus size={24} color={colors.primaryForeground} />
         </Pressable>
+      )}
+      {showFilterModal && (
+        <SessionFilterModal
+          selectedPlatforms={query.platformFilter}
+          selectedProjects={query.projectFilter}
+          projectOptions={query.options.projectOptions}
+          platformOptions={query.options.platformOptions}
+          onClose={() => {
+            setShowFilterModal(false);
+          }}
+          onApply={query.handleApplyFilters}
+        />
       )}
     </View>
   );

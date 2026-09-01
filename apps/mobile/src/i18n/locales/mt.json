@@ -152,7 +152,9 @@
     "appearanceDark": "Skur",
     "account": "Kont",
     "prReviewAttribution": "Żid attribuzzjoni tal-app mar-reviżjonijiet tal-PR",
-    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni."
+    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni.",
+    "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
+    "returnSendsMessageSubtitle": "Meta jkun mitfi, it-tast tar-ritorn idaħħal linja ġdida fl-oqsma tad-dħul tal-messaġġi tal-aġenti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -771,7 +773,8 @@
       "networkError": "Żball tan-netwerk",
       "uploadFailed": "L-upload fallejt",
       "failedToUploadFile": "Ma rnexxiliex ttella' l-fajl: {{reason}}",
-      "nothingToPaste": "Xejn x'tippejstja"
+      "nothingToPaste": "Xejn x'tippejstja",
+      "metadataStripFailed": "Il-metadata tar-ritratt ma setgħetx titneħħa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2191,7 +2194,11 @@
       "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
       "connectionTrouble": "Problema ta' konnessjoni. Jekk jogħġbok erġa' pprova fi ftit.",
-      "modelUnavailable": "Dan il-mudell mhux disponibbli għal Cloud Agent. Agħżel mudell ieħor u erġa' pprova."
+      "modelUnavailable": "Dan il-mudell mhux disponibbli għal Cloud Agent. Agħżel mudell ieħor u erġa' pprova.",
+      "cancelQueuedFailed": "Ma setax jiġi kkanċellat il-messaġġ.",
+      "cancelQueuedRestoreAvailable": "Il-messaġġ ġie kkanċellat. Tektek Irrestawra biex terġa' tqiegħdu fil-qasam tad-dħul tal-messaġġ.",
+      "cancelQueuedRestored": "Il-messaġġ ġie kkanċellat. Il-prompt reġa' jinsab fil-qasam tad-dħul tal-messaġġ.",
+      "cancelQueuedUpgradeRequired": "Il-kanċellazzjoni tal-messaġġi fil-kju teħtieġ Kilo CLI aktar ġdid. Aġġorna l-Kilo CLI u erġa' kkonnetta."
     },
     "remoteSession": {
       "failedToCreate": "Ma rnexxiliex tinħoloq sessjoni remota",
@@ -2263,7 +2270,8 @@
       "continueFrom": "Qed tkompli {{title}}",
       "importingSession": "Qed timporta s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx timporta din is-sessjoni."
+      "importFailed": "Ma setgħetx timporta din is-sessjoni.",
+      "discardWithUploadsMessage": "Il-prompt tiegħek u kwalunkwe fajl imtella' li mhuwiex mehmuż ma' messaġġ mibgħut se jitħassru."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2516,7 +2524,11 @@
       "queuedAccessibility": "Il-messaġġ qiegħed f'kju",
       "userMessage": "Messaġġ tal-utent",
       "assistantMessage": "Messaġġ tal-assistent",
-      "longPressHint": "Agħfas fit-tul għad-dettalji tal-messaġġ"
+      "longPressHint": "Agħfas fit-tul għad-dettalji tal-messaġġ",
+      "cancelQueued": "Ikkanċella l-messaġġ",
+      "cancelQueuedAccessibility": "Ikkanċella l-messaġġ fil-kju",
+      "restoreQueued": "Irrestawra",
+      "restoreQueuedAccessibility": "Irrestawra l-messaġġ ikkanċellat fil-qasam tad-dħul tal-messaġġ"
     },
     "olderMessages": {
       "arrived": "Messaġġi aktar bikrin mibgħuta",
@@ -2553,9 +2565,6 @@
     },
     "sessionFilter": {
       "title": "Iffiltra s-sessjonijiet",
-      "sortBy": "Irranġa skont",
-      "sortLastUpdated": "Aġġornat l-aħħar",
-      "sortCreated": "Maħluq",
       "platform": "Pjattaforma",
       "platformCloud": "Cloud",
       "platformExtension": "Estensjoni",
@@ -2609,7 +2618,9 @@
       "uploading": "Qed jittella'…",
       "uploaded": "Imtella'",
       "uploadFailedRetry": "L-upload fallejt. Tektek biex terġa' tipprova.",
-      "uploadFailedTerminal": "Dan il-fajl ma jistax jittella'."
+      "uploadFailedTerminal": "Dan il-fajl ma jistax jittella'.",
+      "moveLeft": "Mexxi {{filename}} lejn ix-xellug",
+      "moveRight": "Mexxi {{filename}} lejn il-lemin"
     },
     "attachmentPasteHint": {
       "accessibility": "Inkolla l-immaġni mill-clipboard",
@@ -2639,7 +2650,11 @@
       "finalizingPlaceholder": "Qed jitlesta...",
       "messagePlaceholder": "Messaġġ...",
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
-      "couldNotAttachFiles": "Ma setgħux jintrabtu l-fajls. Tektek biex tibgħat u erġa' ipprova."
+      "couldNotAttachFiles": "Ma setgħux jintrabtu l-fajls. Tektek biex tibgħat u erġa' ipprova.",
+      "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
+      "discardAttachmentsTitle": "Twarrab l-annessi?",
+      "charactersRemaining": "Fadal {{count}} karattru",
+      "insertNewline": "Daħħal linja ġdida"
     },
     "chatLink": {
       "linkCopied": "Ir-rabta ġiet ikkupjata",
@@ -2861,7 +2876,8 @@
     "busy": "Id-dħul bil-vuċi huwa okkupat. Erġa' pprova.",
     "stopped": "Id-dħul bil-vuċi waqaf. Tektek il-mikrofonu biex terġa' tipprova.",
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan it-tagħmir.",
-    "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal din il-lingwa tal-apparat."
+    "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal din il-lingwa tal-apparat.",
+    "listeningStopped": "Is-smigħ waqaf."
   },
   "share": {
     "title": "Aqsam ma' Kilo",

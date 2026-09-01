@@ -152,7 +152,9 @@
     "appearanceDark": "Koyu",
     "account": "Hesap",
     "prReviewAttribution": "PR incelemelerine uygulama atfı ekle",
-    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle"
+    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle",
+    "returnSendsMessage": "Enter tuşu mesaj gönderir",
+    "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -296,7 +298,8 @@
       "networkError": "Ağ hatası",
       "uploadFailed": "Yükleme başarısız oldu",
       "failedToUploadFile": "Dosya yüklenemedi: {{reason}}",
-      "nothingToPaste": "Yapıştırılacak bir şey yok"
+      "nothingToPaste": "Yapıştırılacak bir şey yok",
+      "metadataStripFailed": "Fotoğraf meta verileri kaldırılamadı."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1689,7 +1692,11 @@
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
       "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin.",
-      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin."
+      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin.",
+      "cancelQueuedFailed": "Mesaj iptal edilemedi.",
+      "cancelQueuedRestoreAvailable": "Mesaj iptal edildi. Mesaj giriş alanına geri getirmek için “Geri yükleyin” düğmesine dokunun.",
+      "cancelQueuedRestored": "Mesaj iptal edildi. İstem, mesaj giriş alanına geri getirildi.",
+      "cancelQueuedUpgradeRequired": "Kuyruktaki mesajları iptal etmek daha yeni bir Kilo CLI gerektirir. Kilo CLI'yı güncelleyin ve yeniden bağlanın."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",
@@ -1761,7 +1768,8 @@
       "continueFrom": "{{title}} devam ediliyor",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam edemez. Bulut Ajanı veya başka bir CLI seçin.",
-      "importFailed": "Bu oturum içe aktarılamadı."
+      "importFailed": "Bu oturum içe aktarılamadı.",
+      "discardWithUploadsMessage": "İsteminiz ve gönderilen mesajlara eklenmemiş tüm yüklemeler silinecek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -2011,7 +2019,11 @@
       "queuedAccessibility": "Mesaj kuyruğa alındı",
       "userMessage": "Kullanıcı mesajı",
       "assistantMessage": "Asistan mesajı",
-      "longPressHint": "Mesaj ayrıntıları için uzun basın"
+      "longPressHint": "Mesaj ayrıntıları için uzun basın",
+      "cancelQueued": "Mesajı iptal edin",
+      "cancelQueuedAccessibility": "Kuyruktaki mesajı iptal edin",
+      "restoreQueued": "Geri yükleyin",
+      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj giriş alanına geri yükleyin"
     },
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",
@@ -2039,9 +2051,6 @@
     },
     "sessionFilter": {
       "title": "Oturumları filtrele",
-      "sortBy": "Sıralama ölçütü",
-      "sortLastUpdated": "Son güncellenen",
-      "sortCreated": "Oluşturulma",
       "platform": "Platform",
       "platformCloud": "Bulut",
       "platformExtension": "Eklenti",
@@ -2095,7 +2104,9 @@
       "uploading": "Yükleniyor…",
       "uploaded": "Yüklendi",
       "uploadFailedRetry": "Yükleme başarısız oldu. Tekrar denemek için dokunun.",
-      "uploadFailedTerminal": "Bu dosya yüklenemiyor."
+      "uploadFailedTerminal": "Bu dosya yüklenemiyor.",
+      "moveLeft": "{{filename}} dosyasını sola taşıyın",
+      "moveRight": "{{filename}} dosyasını sağa taşıyın"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan görüntü yapıştır",
@@ -2125,7 +2136,11 @@
       "finalizingPlaceholder": "Tamamlanıyor...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu oturum dosya alamaz. Mesajınızı göndermek için ekleri kaldırın.",
-      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun."
+      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun.",
+      "discardAttachmentsMessage": "Gönderilen mesajlara eklenmemiş yüklemeler silinecek.",
+      "discardAttachmentsTitle": "Ekler silinsin mi?",
+      "charactersRemaining": "{{count}} karakter kaldı",
+      "insertNewline": "Yeni satır ekleyin"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",
@@ -2344,7 +2359,8 @@
     "busy": "Sesli giriş meşgul. Tekrar deneyin.",
     "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokunun.",
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
-    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor."
+    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor.",
+    "listeningStopped": "Dinleme durdu."
   },
   "share": {
     "title": "Kilo'ya paylaş",

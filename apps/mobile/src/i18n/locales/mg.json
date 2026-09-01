@@ -152,7 +152,9 @@
     "appearanceDark": "Maizina",
     "account": "Kaonty",
     "prReviewAttribution": "Ampio ny attribution ny app amin'ny fandinihana PR",
-    "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao."
+    "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao.",
+    "returnSendsMessage": "Mandefa hafatra ny bokotra Fiverenana",
+    "returnSendsMessageSubtitle": "Rehefa tsy alefa, ny bokotra Fiverenana dia mampiditra andalana vaovao ao amin'ny fampidirana hafatry ny mpanampy."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -750,7 +752,8 @@
       "networkError": "Hadisoan'ny tambajotra",
       "uploadFailed": "Tsy nahomby ny fampiakarana",
       "failedToUploadFile": "Tsy nahomby ny fampiakarana ny rakitra: {{reason}}",
-      "nothingToPaste": "Tsy misy hamenoina"
+      "nothingToPaste": "Tsy misy hamenoina",
+      "metadataStripFailed": "Tsy afaka nesorina ny angona mamaritra ny sary."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2143,7 +2146,11 @@
       "previousTaskFinishing": "Ny asa teo aloha mbola vita. Andraso kely azafady.",
       "serviceUnavailable": "Tsy misy ny serivisy amin'izao fotoana izao. Andramo indray azafady.",
       "connectionTrouble": "Olana amin'ny fifandraisana. Andramo indray rehefa afaka kely.",
-      "modelUnavailable": "Tsy misy io modely io ho an'ny Cloud Agent. Misafidìa modely hafa ary andramo indray."
+      "modelUnavailable": "Tsy misy io modely io ho an'ny Cloud Agent. Misafidìa modely hafa ary andramo indray.",
+      "cancelQueuedFailed": "Tsy afaka nanafoana ny hafatra.",
+      "cancelQueuedRestoreAvailable": "Nofoanana ny hafatra. Tsindrio ny Avereno mba hamerenana azy ao amin'ny fampidirana hafatra.",
+      "cancelQueuedRestored": "Nofoanana ny hafatra. Niverina ao amin'ny fampidirana hafatra ny hafatrao.",
+      "cancelQueuedUpgradeRequired": "Mitaky Kilo CLI vaovao kokoa ny fanafoanana hafatra miandry. Havaozy ny Kilo CLI ary ampifandraiso indray."
     },
     "remoteSession": {
       "failedToCreate": "Tsy nahomby namorona session lavitra",
@@ -2215,7 +2222,8 @@
       "continueFrom": "Manohy ny {{title}}",
       "importingSession": "Mampiditra session",
       "cliCannotContinue": "Ity CLI ity tsy afaka manohy session. Fidio ny Cloud Agent na CLI hafa.",
-      "importFailed": "Tsy afaka nampidirina ity session ity."
+      "importFailed": "Tsy afaka nampidirina ity session ity.",
+      "discardWithUploadsMessage": "Hofafana ny hafatrao sy ny rakitra nampidirina nefa tsy nampiarahina tamin'ny hafatra nalefa."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}",
@@ -2465,7 +2473,11 @@
       "queuedAccessibility": "Eo amin'ny filaharana ny hafatra",
       "userMessage": "Hafatra mpampiasa",
       "assistantMessage": "Hafatra mpanampy",
-      "longPressHint": "Tsindrio maharitra raha hita ny antsipirian'ny hafatra"
+      "longPressHint": "Tsindrio maharitra raha hita ny antsipirian'ny hafatra",
+      "cancelQueued": "Foano ny hafatra",
+      "cancelQueuedAccessibility": "Foano ny hafatra miandry",
+      "restoreQueued": "Avereno",
+      "restoreQueuedAccessibility": "Avereno ao amin'ny fampidirana hafatra ny hafatra nofoanana"
     },
     "olderMessages": {
       "arrived": "Voaray ny hafatra taloha",
@@ -2493,9 +2505,6 @@
     },
     "sessionFilter": {
       "title": "Filtrera session",
-      "sortBy": "Alaharo araka ny",
-      "sortLastUpdated": "Nohavaozina farany",
-      "sortCreated": "Noforonina",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2549,7 +2558,9 @@
       "uploading": "Mandefa…",
       "uploaded": "Voaray",
       "uploadFailedRetry": "Tsy nahomby ny fandefasana. Tsindrio raha handramana indray.",
-      "uploadFailedTerminal": "Tsy azo alefa ity rakitra ity."
+      "uploadFailedTerminal": "Tsy azo alefa ity rakitra ity.",
+      "moveLeft": "Afindrao miankavia ny {{filename}}",
+      "moveRight": "Afindrao miankavanana ny {{filename}}"
     },
     "attachmentPasteHint": {
       "accessibility": "Ampio sary avy amin'ny clipboard",
@@ -2579,7 +2590,11 @@
       "finalizingPlaceholder": "Mamita...",
       "messagePlaceholder": "Hafatra...",
       "cannotReceiveFiles": "Tsy afaka mandray rakitra ity session ity. Esory ny rakitra vao alefaso ny hafatrao.",
-      "couldNotAttachFiles": "Tsy afaka nampidirina ny rakitra. Tsindrio ny send raha handramana indray."
+      "couldNotAttachFiles": "Tsy afaka nampidirina ny rakitra. Tsindrio ny send raha handramana indray.",
+      "discardAttachmentsMessage": "Hofafana ny rakitra nampidirina nefa tsy nampiarahina tamin'ny hafatra nalefa.",
+      "discardAttachmentsTitle": "Ario ve ny firaiketana?",
+      "charactersRemaining": "Soratra {{count}} sisa",
+      "insertNewline": "Ampidiro andalana vaovao"
     },
     "chatLink": {
       "linkCopied": "Adika ny rohy",
@@ -2798,7 +2813,8 @@
     "busy": "Saika miasa ny fidirana amin'ny feo. Andramana indray.",
     "stopped": "Nijanona ny fidirana amin'ny feo. Tsindrio ny mikrô mba andramana indray.",
     "unavailableDevice": "Tsy misy ny fidirana amin'ny feo amin'ity fitaovana ity.",
-    "unavailableLanguage": "Tsy misy ny fidirana amin'ny feo ho an'ny fitenin'ity fitaovana ity."
+    "unavailableLanguage": "Tsy misy ny fidirana amin'ny feo ho an'ny fitenin'ity fitaovana ity.",
+    "listeningStopped": "Nijanona ny fihainoana."
   },
   "share": {
     "title": "Zarao amin'ny Kilo",

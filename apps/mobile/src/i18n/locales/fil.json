@@ -152,7 +152,9 @@
     "appearanceDark": "Dark",
     "account": "Account",
     "prReviewAttribution": "Magdagdag ng app attribution sa mga PR review",
-    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review."
+    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review.",
+    "returnSendsMessage": "Nagpapadala ng mensahe ang Return key",
+    "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",
@@ -750,7 +752,8 @@
       "networkError": "Error sa network",
       "uploadFailed": "Nabigo ang pag-upload",
       "failedToUploadFile": "Nabigong i-upload ang file: {{reason}}",
-      "nothingToPaste": "Walang maipa-paste"
+      "nothingToPaste": "Walang maipa-paste",
+      "metadataStripFailed": "Hindi maalis ang photo metadata."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2143,7 +2146,11 @@
       "previousTaskFinishing": "Tinatapos pa lang ang nakaraang gawain. Pakihintay sandali.",
       "serviceUnavailable": "Hindi available ang serbisyo ngayon. Pakisubukan muli.",
       "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali.",
-      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli."
+      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli.",
+      "cancelQueuedFailed": "Hindi makansela ang mensahe.",
+      "cancelQueuedRestoreAvailable": "Kinansela ang mensahe. I-tap ang I-restore para ibalik ito sa input ng mensahe.",
+      "cancelQueuedRestored": "Kinansela ang mensahe. Nasa input ng mensahe na muli ang prompt.",
+      "cancelQueuedUpgradeRequired": "Ang pagkansela ng mga nakapilang mensahe ay nangangailangan ng mas bagong Kilo CLI. I-update ang Kilo CLI at muling kumonekta."
     },
     "remoteSession": {
       "failedToCreate": "Nabigong gumawa ng remote session",
@@ -2215,7 +2222,8 @@
       "continueFrom": "Ipinagpapatuloy ang {{title}}",
       "importingSession": "I-import ang session",
       "cliCannotContinue": "Hindi maipagpapatuloy ng CLI na ito ang session. Pumili ng Cloud Agent o ibang CLI.",
-      "importFailed": "Hindi ma-import ang session na ito."
+      "importFailed": "Hindi ma-import ang session na ito.",
+      "discardWithUploadsMessage": "Ide-delete ang iyong prompt at anumang na-upload na file na hindi nakalakip sa mga naipadalang mensahe."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} file",
@@ -2465,7 +2473,11 @@
       "queuedAccessibility": "Naka-queue ang mensahe",
       "userMessage": "Mensahe ng user",
       "assistantMessage": "Mensahe ng assistant",
-      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe"
+      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe",
+      "cancelQueued": "Kanselahin ang mensahe",
+      "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
+      "restoreQueued": "I-restore",
+      "restoreQueuedAccessibility": "I-restore ang kinanselang mensahe sa input ng mensahe"
     },
     "olderMessages": {
       "arrived": "Ni-load ang mga naunang mensahe",
@@ -2493,9 +2505,6 @@
     },
     "sessionFilter": {
       "title": "I-filter ang mga session",
-      "sortBy": "Ayusin ayon sa",
-      "sortLastUpdated": "Huling na-update",
-      "sortCreated": "Nalikha",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2549,7 +2558,9 @@
       "uploading": "Ina-upload…",
       "uploaded": "Na-upload",
       "uploadFailedRetry": "Nabigo ang upload. I-tap para subukang muli.",
-      "uploadFailedTerminal": "Hindi ma-upload ang file na ito."
+      "uploadFailedTerminal": "Hindi ma-upload ang file na ito.",
+      "moveLeft": "Ilipat ang {{filename}} pakaliwa",
+      "moveRight": "Ilipat ang {{filename}} pakanan"
     },
     "attachmentPasteHint": {
       "accessibility": "I-paste ang imahe mula sa clipboard",
@@ -2579,7 +2590,11 @@
       "finalizingPlaceholder": "Inaayos na…",
       "messagePlaceholder": "Mensahe...",
       "cannotReceiveFiles": "Hindi makakatanggap ng file ang session na ito. Alisin ang mga attachment para maipadala ang iyong mensahe.",
-      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli."
+      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli.",
+      "discardAttachmentsMessage": "Ide-delete ang mga na-upload na file na hindi nakalakip sa mga naipadalang mensahe.",
+      "discardAttachmentsTitle": "I-discard ang mga attachment?",
+      "charactersRemaining": "{{count}} na character ang natitira",
+      "insertNewline": "Magpasok ng bagong linya"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",
@@ -2798,7 +2813,8 @@
     "busy": "Abala ang voice input. Subukan muli.",
     "stopped": "Huminto ang voice input. Tap ang mikropono para subukan muli.",
     "unavailableDevice": "Hindi available ang voice input sa device na ito.",
-    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device."
+    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device.",
+    "listeningStopped": "Huminto ang pakikinig."
   },
   "share": {
     "title": "I-share sa Kilo",

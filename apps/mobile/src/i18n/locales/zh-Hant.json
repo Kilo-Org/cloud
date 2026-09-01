@@ -152,7 +152,9 @@
     "appearanceDark": "深色",
     "account": "帳戶",
     "prReviewAttribution": "在 PR 審查中加入應用程式歸因",
-    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。"
+    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。",
+    "returnSendsMessage": "換行鍵傳送訊息",
+    "returnSendsMessageSubtitle": "關閉時，換行鍵會在代理撰寫器中插入換行。"
   },
   "notifications": {
     "title": "通知",
@@ -296,7 +298,8 @@
       "networkError": "網路錯誤",
       "uploadFailed": "上傳失敗",
       "failedToUploadFile": "上傳檔案失敗：{{reason}}",
-      "nothingToPaste": "沒有可貼上的內容"
+      "nothingToPaste": "沒有可貼上的內容",
+      "metadataStripFailed": "無法移除相片中繼資料。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1689,7 +1692,11 @@
       "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
       "serviceUnavailable": "服務目前無法使用。請重試。",
       "connectionTrouble": "連線發生問題。請稍後重試。",
-      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。"
+      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。",
+      "cancelQueuedFailed": "無法取消訊息。",
+      "cancelQueuedRestoreAvailable": "訊息已取消。請點按「還原」將其放回撰寫器。",
+      "cancelQueuedRestored": "訊息已取消。提示已放回撰寫器。",
+      "cancelQueuedUpgradeRequired": "取消已排入佇列的訊息需要更新的 Kilo CLI。請更新 Kilo CLI 並重新連接。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",
@@ -1761,7 +1768,8 @@
       "continueFrom": "正在繼續 {{title}}",
       "importingSession": "正在匯入工作階段",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
-      "importFailed": "無法匯入此工作階段。"
+      "importFailed": "無法匯入此工作階段。",
+      "discardWithUploadsMessage": "您的提示和任何未附加至已傳送訊息的上傳檔案將遭刪除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案",
@@ -2011,7 +2019,11 @@
       "queuedAccessibility": "訊息已排入佇列",
       "userMessage": "使用者訊息",
       "assistantMessage": "助理訊息",
-      "longPressHint": "長按以檢視訊息詳細資料"
+      "longPressHint": "長按以檢視訊息詳細資料",
+      "cancelQueued": "取消訊息",
+      "cancelQueuedAccessibility": "取消已排入佇列的訊息",
+      "restoreQueued": "還原",
+      "restoreQueuedAccessibility": "將已取消的訊息還原至撰寫器"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",
@@ -2039,9 +2051,6 @@
     },
     "sessionFilter": {
       "title": "篩選工作階段",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最後更新",
-      "sortCreated": "建立時間",
       "platform": "平台",
       "platformCloud": "雲端",
       "platformExtension": "擴充功能",
@@ -2095,7 +2104,9 @@
       "uploading": "正在上傳…",
       "uploaded": "已上傳",
       "uploadFailedRetry": "上傳失敗。點按重試。",
-      "uploadFailedTerminal": "此檔案無法上傳。"
+      "uploadFailedTerminal": "此檔案無法上傳。",
+      "moveLeft": "將 {{filename}} 向左移動",
+      "moveRight": "將 {{filename}} 向右移動"
     },
     "attachmentPasteHint": {
       "accessibility": "從剪貼簿貼上圖片",
@@ -2125,7 +2136,11 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "訊息...",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
-      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。"
+      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。",
+      "discardAttachmentsMessage": "未附加至已傳送訊息的上傳檔案將遭刪除。",
+      "discardAttachmentsTitle": "捨棄附件？",
+      "charactersRemaining": "剩餘 {{count}} 個字元",
+      "insertNewline": "插入換行"
     },
     "chatLink": {
       "linkCopied": "連結已複製",
@@ -2344,7 +2359,8 @@
     "busy": "語音輸入忙碌中。請再試一次。",
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
-    "unavailableLanguage": "此裝置語言無法使用語音輸入。"
+    "unavailableLanguage": "此裝置語言無法使用語音輸入。",
+    "listeningStopped": "已停止聆聽。"
   },
   "share": {
     "title": "分享到 Kilo",

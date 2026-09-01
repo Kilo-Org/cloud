@@ -15,13 +15,20 @@ vi.mock('../../../wrapper/src/utils.js', () => ({
   logToFile: vi.fn(),
 }));
 
-vi.mock('../../../wrapper/src/log-uploader.js', () => ({
-  createLogUploader: vi.fn(() => ({
-    start: vi.fn(),
-    uploadNow: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn(),
-  })),
-}));
+vi.mock(import('../../../wrapper/src/log-uploader.js'), async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createLogUploader: vi.fn<typeof actual.createLogUploader>(options => ({
+      archiveId: options.archiveId,
+      start: vi.fn(),
+      updateContext: vi.fn(),
+      uploadNow: vi.fn().mockResolvedValue(undefined),
+      finalize: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+    })),
+  };
+});
 
 const config: ServerConfig = {
   port: 5000,

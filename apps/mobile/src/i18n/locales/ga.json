@@ -152,7 +152,9 @@
     "appearanceDark": "Dorcha",
     "account": "Cuntas",
     "prReviewAttribution": "Cuir sonrú an aip le hathbhreithnithe PR",
-    "prReviewAttributionSubtitle": "Cuir an chúlscríbhinn 'Athbhreithnithe trí Kilo' leis nuair a chuireann tú isteach athbhreithniú."
+    "prReviewAttributionSubtitle": "Cuir an chúlscríbhinn 'Athbhreithnithe trí Kilo' leis nuair a chuireann tú isteach athbhreithniú.",
+    "returnSendsMessage": "Seolann an eochair Aisfhillte teachtaireacht",
+    "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair Aisfhillte líne nua isteach i réimsí ionchuir teachtaireachta na ngníomhairí."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe ar fáil",
@@ -771,7 +773,8 @@
       "networkError": "Earráid líonra",
       "uploadFailed": "Theip ar an uaslódáil",
       "failedToUploadFile": "Theip ar an gcomhad a uaslódáil: {{reason}}",
-      "nothingToPaste": "Níl aon rud le greamú"
+      "nothingToPaste": "Níl aon rud le greamú",
+      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2191,7 +2194,11 @@
       "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
       "connectionTrouble": "Fadhb cheangail. Bain triail as arís i gceann nóiméid.",
-      "modelUnavailable": "Níl an tsamhail seo ar fáil do Cloud Agent. Roghnaigh samhail eile agus bain triail as arís."
+      "modelUnavailable": "Níl an tsamhail seo ar fáil do Cloud Agent. Roghnaigh samhail eile agus bain triail as arís.",
+      "cancelQueuedFailed": "Níorbh fhéidir an teachtaireacht a chealú.",
+      "cancelQueuedRestoreAvailable": "Cealaíodh an teachtaireacht. Tapáil Athchóirigh chun í a chur ar ais sa réimse ionchuir teachtaireachta.",
+      "cancelQueuedRestored": "Cealaíodh an teachtaireacht. Tá an leid ar ais sa réimse ionchuir teachtaireachta.",
+      "cancelQueuedUpgradeRequired": "Éilíonn cealú teachtaireachtaí sa scuaine Kilo CLI níos nua. Nuashonraigh Kilo CLI agus athcheangail."
     },
     "remoteSession": {
       "failedToCreate": "Theip ar sheisiún cianda a chruthú",
@@ -2263,7 +2270,8 @@
       "cliCannotContinue": "Ní féidir leis an CLI seo seisiún a leanúint ar aghaidh. Roghnaigh Cloud Agent nó CLI eile.",
       "continueFrom": "Ag leanúint ar aghaidh le {{title}}",
       "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
-      "importingSession": "Ag iompórtáil seisiúin"
+      "importingSession": "Ag iompórtáil seisiúin",
+      "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2516,7 +2524,11 @@
       "queuedAccessibility": "Teachtaireacht curtha sa scuaine",
       "userMessage": "Teachtaireacht úsáideora",
       "assistantMessage": "Teachtaireacht chúntóra",
-      "longPressHint": "Brúigh fada le sonraí na teachtaireachta"
+      "longPressHint": "Brúigh fada le sonraí na teachtaireachta",
+      "cancelQueued": "Cealaigh teachtaireacht",
+      "cancelQueuedAccessibility": "Cealaigh teachtaireacht sa scuaine",
+      "restoreQueued": "Athchóirigh",
+      "restoreQueuedAccessibility": "Athchóirigh an teachtaireacht chealaithe sa réimse ionchuir teachtaireachta"
     },
     "olderMessages": {
       "arrived": "Lódáladh teachtaireachtaí níos luaithe",
@@ -2553,9 +2565,6 @@
     },
     "sessionFilter": {
       "title": "Scag seisiúin",
-      "sortBy": "Sórtáil de réir",
-      "sortLastUpdated": "Nuashonraithe deireanach",
-      "sortCreated": "Cruthaithe",
       "platform": "Ardán",
       "platformCloud": "Scamall",
       "platformExtension": "Eisínteacht",
@@ -2609,7 +2618,9 @@
       "uploading": "Ag uaslódáil…",
       "uploaded": "Uaslódáilte",
       "uploadFailedRetry": "Theip ar an uaslódáil. Tapáil le hathiarracht a dhéanamh.",
-      "uploadFailedTerminal": "Ní féidir an comhad seo a uaslódáil."
+      "uploadFailedTerminal": "Ní féidir an comhad seo a uaslódáil.",
+      "moveLeft": "Bog {{filename}} ar chlé",
+      "moveRight": "Bog {{filename}} ar dheis"
     },
     "attachmentPasteHint": {
       "accessibility": "Greamaigh íomhá ón ngearrthaisce",
@@ -2639,7 +2650,11 @@
       "finalizingPlaceholder": "Ag críochnú...",
       "messagePlaceholder": "Teachtaireacht...",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
-      "couldNotAttachFiles": "Níorbh fhéidir comhaid a cheangal. Tapáil seol le triail arís."
+      "couldNotAttachFiles": "Níorbh fhéidir comhaid a cheangal. Tapáil seol le triail arís.",
+      "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
+      "discardAttachmentsTitle": "An gcaithfear na ceangaltáin ar lár?",
+      "charactersRemaining": "{{count}} carachtar fágtha",
+      "insertNewline": "Cuir líne nua isteach"
     },
     "chatLink": {
       "linkCopied": "Nasc cóipeáilte",
@@ -2861,7 +2876,8 @@
     "busy": "Tá an t-ionchur gutha gnóthach. Bain triail as arís.",
     "stopped": "Stop an t-ionchur gutha. Tapáil an micreafón chun triail arís a bhaint.",
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
-    "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga gléis seo."
+    "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga gléis seo.",
+    "listeningStopped": "Stop an éisteacht."
   },
   "share": {
     "title": "Roinn le Kilo",

@@ -152,7 +152,9 @@
     "appearanceDark": "Sötét",
     "account": "Fiók",
     "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
-    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el.",
+    "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
+    "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -750,7 +752,8 @@
       "networkError": "Hálózati hiba",
       "uploadFailed": "A feltöltés nem sikerült",
       "failedToUploadFile": "Nem sikerült feltölteni a fájlt: {{reason}}",
-      "nothingToPaste": "Nincs mit beilleszteni"
+      "nothingToPaste": "Nincs mit beilleszteni",
+      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2143,7 +2146,11 @@
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
       "connectionTrouble": "Kapcsolódási probléma. Kérjük, próbálja újra egy pillanat múlva.",
-      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra."
+      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra.",
+      "cancelQueuedFailed": "Nem sikerült visszavonni az üzenetet.",
+      "cancelQueuedRestoreAvailable": "Üzenet visszavonva. Koppintson a Visszaállítás gombra, hogy visszakerüljön az üzenetbeviteli mezőbe.",
+      "cancelQueuedRestored": "Üzenet visszavonva. A prompt visszakerült az üzenetbeviteli mezőbe.",
+      "cancelQueuedUpgradeRequired": "A várakozó üzenetek visszavonásához újabb Kilo CLI szükséges. Frissítse a Kilo CLI-t, és csatlakozzon újra."
     },
     "remoteSession": {
       "failedToCreate": "A távoli munkamenet létrehozása nem sikerült",
@@ -2215,7 +2222,8 @@
       "continueFrom": "Folytatás {{title}}",
       "importingSession": "Munkamenet importálása",
       "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "discardWithUploadsMessage": "A promptja és az elküldött üzenetekhez nem csatolt feltöltések törlődnek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2465,7 +2473,11 @@
       "queuedAccessibility": "Üzenet sorban",
       "userMessage": "Felhasználói üzenet",
       "assistantMessage": "Asszisztens üzenet",
-      "longPressHint": "Az üzenet részleteihez tartsd nyomva"
+      "longPressHint": "Az üzenet részleteihez tartsd nyomva",
+      "cancelQueued": "Üzenet visszavonása",
+      "cancelQueuedAccessibility": "Várakozó üzenet visszavonása",
+      "restoreQueued": "Visszaállítás",
+      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe"
     },
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",
@@ -2493,9 +2505,6 @@
     },
     "sessionFilter": {
       "title": "Munkamenetek szűrése",
-      "sortBy": "Rendezés",
-      "sortLastUpdated": "Utolsó módosítás",
-      "sortCreated": "Létrehozva",
       "platform": "Platform",
       "platformCloud": "Felhő",
       "platformExtension": "Bővítmény",
@@ -2549,7 +2558,9 @@
       "uploading": "Feltöltés…",
       "uploaded": "Feltöltve",
       "uploadFailedRetry": "A feltöltés nem sikerült. Az újrapróbáláshoz koppints.",
-      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni."
+      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni.",
+      "moveLeft": "{{filename}} mozgatása balra",
+      "moveRight": "{{filename}} mozgatása jobbra"
     },
     "attachmentPasteHint": {
       "accessibility": "Kép beillesztése a vágólapról",
@@ -2579,7 +2590,11 @@
       "finalizingPlaceholder": "Befejezés...",
       "messagePlaceholder": "Üzenet...",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
-      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre."
+      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre.",
+      "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
+      "discardAttachmentsTitle": "Elveti a csatolmányokat?",
+      "charactersRemaining": "{{count}} karakter maradt",
+      "insertNewline": "Új sor beszúrása"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",
@@ -2798,7 +2813,8 @@
     "busy": "A hangbevitel foglalt. Próbálja újra.",
     "stopped": "A hangbevitel leállt. A mikrofon megérintésével próbálja újra.",
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
-    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez."
+    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez.",
+    "listeningStopped": "A figyelés leállt."
   },
   "share": {
     "title": "Megosztás a Kilo-val",

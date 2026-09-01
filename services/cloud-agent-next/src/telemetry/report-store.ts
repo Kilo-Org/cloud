@@ -80,6 +80,8 @@ type StoredRunRow = {
   failureCode: string | null;
   failureResponsibility: string | null;
   failureReason: string | null;
+  errorMessageRedacted: string | null;
+  errorExpiresAt: string | null;
 };
 
 function retentionCutoff(now: string): string {
@@ -117,14 +119,22 @@ function isTerminalStatus(status: StoredRunRow['status']): boolean {
   return status === 'completed' || status === 'failed' || status === 'interrupted';
 }
 
-function validDiagnostic(
-  diagnostic: { errorMessageRedacted: string; errorExpiresAt: string } | undefined,
-  now: string
-): { error_message_redacted: string; error_expires_at: string } | undefined {
-  if (!diagnostic || Date.parse(diagnostic.errorExpiresAt) <= Date.parse(now)) return undefined;
+function validDiagnostic(run: CloudAgentRunStateReport['run'], now: string) {
+  if (run.status !== 'failed' || run.terminalAt === undefined) return undefined;
+  const diagnostic = diagnosticSchema.safeParse(run.diagnostic);
+  if (!diagnostic.success) return undefined;
+  const expiresAt = Date.parse(diagnostic.data.errorExpiresAt);
+  const terminalAt = Date.parse(run.terminalAt);
+  if (
+    expiresAt <= Date.parse(now) ||
+    expiresAt <= terminalAt ||
+    expiresAt - terminalAt > CLOUD_AGENT_ERROR_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ) {
+    return undefined;
+  }
   return {
-    error_message_redacted: diagnostic.errorMessageRedacted,
-    error_expires_at: diagnostic.errorExpiresAt,
+    error_message_redacted: diagnostic.data.errorMessageRedacted,
+    error_expires_at: diagnostic.data.errorExpiresAt,
   };
 }
 
@@ -158,6 +168,8 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         failureCode: cloud_agent_session_runs.failure_code,
         failureResponsibility: cloud_agent_session_runs.failure_responsibility,
         failureReason: cloud_agent_session_runs.failure_reason,
+        errorMessageRedacted: cloud_agent_session_runs.error_message_redacted,
+        errorExpiresAt: cloud_agent_session_runs.error_expires_at,
       })
       .from(cloud_agent_session_runs)
       .where(
@@ -169,7 +181,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .limit(1);
     const existing = rows[0];
     const incoming = report.run;
-    const diagnostic = validDiagnostic(incoming.diagnostic, now);
+    const diagnostic = validDiagnostic(incoming, now);
 
     if (!existing) {
       await tx.insert(cloud_agent_session_runs).values({
@@ -233,6 +245,40 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     const mayFillFailureResponsibility =
       mayFillTerminalFacts &&
       (existing.failureCode === null || existing.failureCode === incoming.failureCode);
+    const mayFillDiagnostic =
+      mayFillTerminalFacts &&
+      incoming.status === 'failed' &&
+      (existing.failureStage === null || existing.failureStage === incoming.failureStage) &&
+      (existing.failureCode === null || existing.failureCode === incoming.failureCode) &&
+      (existing.failureResponsibility === null ||
+        incoming.failureResponsibility === undefined ||
+        existing.failureResponsibility === incoming.failureResponsibility) &&
+      (existing.failureReason === null ||
+        incoming.failureReason === undefined ||
+        existing.failureReason === incoming.failureReason) &&
+      (existing.wrapperRunId === null ||
+        incoming.wrapperRunId === undefined ||
+        existing.wrapperRunId === incoming.wrapperRunId) &&
+      (existing.terminalAt === null ||
+        (incoming.terminalAt !== undefined &&
+          Date.parse(existing.terminalAt) === Date.parse(incoming.terminalAt)));
+    const retainedDiagnostic = {
+      error_message_redacted: existing.errorMessageRedacted,
+      error_expires_at: existing.errorExpiresAt,
+    };
+    if (
+      existing.errorExpiresAt !== null &&
+      Date.parse(existing.errorExpiresAt) <= Date.parse(now)
+    ) {
+      retainedDiagnostic.error_message_redacted = null;
+      retainedDiagnostic.error_expires_at = null;
+    } else if (mayFillDiagnostic && diagnostic) {
+      retainedDiagnostic.error_message_redacted ??= diagnostic.error_message_redacted;
+      retainedDiagnostic.error_expires_at = earliestTimestamp(
+        existing.errorExpiresAt,
+        diagnostic.error_expires_at
+      );
+    }
     const status = establishedTerminal
       ? existing.status
       : incomingTerminal || incoming.status === 'accepted'
@@ -255,7 +301,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         terminal_at: mayApplyTerminalFacts
           ? (incoming.terminalAt ?? null)
           : incomingSameTerminal
-            ? earliestTimestamp(existing.terminalAt, incoming.terminalAt)
+            ? (existing.terminalAt ?? incoming.terminalAt ?? null)
             : existing.terminalAt,
         failure_stage:
           existing.failureStage ?? (mayFillTerminalFacts ? (incoming.failureStage ?? null) : null),
@@ -267,7 +313,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
         failure_reason:
           existing.failureReason ??
           (mayFillFailureResponsibility ? (incoming.failureReason ?? null) : null),
-        ...(mayFillTerminalFacts ? (diagnostic ?? {}) : {}),
+        ...retainedDiagnostic,
       })
       .where(
         and(

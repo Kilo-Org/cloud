@@ -85,6 +85,18 @@ describe('failure responsibility summary', () => {
   it('has a human-readable label for every shared reason', () => {
     expect(hasExhaustiveFailureReasonLabels()).toBe(true);
     expect(CLOUD_AGENT_FAILURE_REASONS.map(failureReasonLabel)).not.toContain('');
+    expect(CLOUD_AGENT_FAILURE_REASONS.map(failureReasonLabel)).not.toContain(undefined);
     expect(failureReasonLabel('unclassified')).toBe('Unclassified');
+  });
+
+  it.each([
+    ['context_limit', 'Context limit'],
+    ['output_limit', 'Output limit'],
+    ['content_filter', 'Content filter'],
+    ['structured_output', 'Invalid structured output'],
+    ['invalid_request', 'Model request rejected'],
+    ['request_timeout', 'Request timed out'],
+  ] as const)('labels %s as %s', (reason, label) => {
+    expect(failureReasonLabel(reason)).toBe(label);
   });
 });

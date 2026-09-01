@@ -4,38 +4,21 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import {
+  PLATFORM_FILTERS,
+  type ProjectFilterOption,
+} from '@/components/agents/session-list-helpers';
 import { Button } from '@/components/ui/button';
-import { ChoiceRow } from '@/components/ui/choice-row';
-import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
+import { type AgentSessionFilters } from '@/lib/agent-session-filters';
+import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { cn } from '@/lib/utils';
 
-const PLATFORM_FILTERS = [
-  'cloud-agent',
-  'extension',
-  'cli',
-  'slack',
-  'github',
-  'linear',
-  'other',
-] as const;
-const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
+export { type ProjectFilterOption };
 
-export type ProjectFilterOption = {
-  gitUrl: string;
-  displayName: string;
-};
-
-type SessionFilters = {
-  platformFilter: string[];
-  projectFilter: string[];
-  sortBy: AgentSessionSortBy;
-};
-
-type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
+type SessionFilterChipsProps = AgentSessionFilters & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
   onRemoveProject: (gitUrl: string) => void;
@@ -44,10 +27,11 @@ type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
   selectedProjects: string[];
-  selectedSortBy: AgentSessionSortBy;
   projectOptions: ProjectFilterOption[];
+  /** Platform rows to offer. Defaults to every known platform. */
+  platformOptions?: readonly string[];
   onClose: () => void;
-  onApply: (filters: SessionFilters) => void;
+  onApply: (filters: AgentSessionFilters) => void;
 };
 
 type FilterCheckboxRowProps = {
@@ -80,7 +64,7 @@ function platformFilterLabel(p: string): string {
       return i18n.t('agentChat.sessionFilter.platformOther');
     }
     default: {
-      return p;
+      return platformLabel(p);
     }
   }
 }
@@ -131,15 +115,16 @@ export function SessionFilterChips({
   return (
     <ScrollView
       horizontal
+      className="grow-0 shrink-0"
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={chipScrollContentStyle}
+      contentContainerClassName="items-center gap-2 px-[22px] py-2"
     >
       {projectFilter.map(gitUrl => {
         const label = projectFilterLabel(gitUrl, projectOptions);
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+            className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
@@ -147,7 +132,7 @@ export function SessionFilterChips({
             accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
           >
             <Text
-              className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
               numberOfLines={1}
             >
               {label}
@@ -159,7 +144,7 @@ export function SessionFilterChips({
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+          className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
@@ -168,7 +153,10 @@ export function SessionFilterChips({
             label: platformFilterLabel(platform),
           })}
         >
-          <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
+          <Text
+            className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+            numberOfLines={1}
+          >
             {platformFilterLabel(platform)}
           </Text>
           <X size={12} color={colors.accentSoftForeground} />
@@ -181,19 +169,14 @@ export function SessionFilterChips({
 export function SessionFilterModal({
   selectedPlatforms,
   selectedProjects,
-  selectedSortBy,
   projectOptions,
+  platformOptions = PLATFORM_FILTERS,
   onClose,
   onApply,
 }: Readonly<SessionFilterModalProps>) {
   const { t } = useTranslation();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(selectedSortBy);
-  const sortOptions: readonly { value: AgentSessionSortBy; label: string }[] = [
-    { value: 'updated_at', label: t('agentChat.sessionFilter.sortLastUpdated') },
-    { value: 'created_at', label: t('agentChat.sessionFilter.sortCreated') },
-  ];
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -236,27 +219,9 @@ export function SessionFilterModal({
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  {t('agentChat.sessionFilter.sortBy')}
-                </Text>
-                <RadioGroup label={t('agentChat.sessionFilter.sortBy')}>
-                  {sortOptions.map(option => (
-                    <ChoiceRow
-                      key={option.value}
-                      label={option.label}
-                      selected={draftSortBy === option.value}
-                      onPress={() => {
-                        setDraftSortBy(option.value);
-                      }}
-                      className="rounded-lg px-3"
-                    />
-                  ))}
-                </RadioGroup>
-              </View>
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
                   {t('agentChat.sessionFilter.platform')}
                 </Text>
-                {PLATFORM_FILTERS.map(platform => (
+                {platformOptions.map(platform => (
                   <FilterCheckboxRow
                     key={platform}
                     label={platformFilterLabel(platform)}
@@ -295,7 +260,6 @@ export function SessionFilterModal({
                 onApply({
                   platformFilter: draftPlatforms,
                   projectFilter: draftProjects,
-                  sortBy: draftSortBy,
                 });
                 onClose();
               }}

@@ -46,6 +46,11 @@ vi.mock('expo-router', () => ({
   useScrollToTop: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));
+vi.mock('@/lib/auth/account-metadata-write', () => ({
+  setAccountMetadata: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
@@ -54,6 +59,7 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  TextInput: 'TextInput',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
@@ -64,6 +70,8 @@ vi.mock('@/components/ui/icons', () => ({
   MessageCircle: 'MessageCircle',
   MessageSquare: 'MessageSquare',
   UserRound: 'UserRound',
+  Search: 'Search',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

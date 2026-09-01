@@ -1065,6 +1065,38 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=installation_already_claimed`);
   });
 
+  test('redirects when multiple installations are disabled for the organization', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    mockedConsumeInstallState.mockResolvedValue({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: organizationId,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({
+      ok: false,
+      reason: 'multiple_installations_disabled',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/organizations/${organizationId}/integrations/github?error=multiple_installations_disabled`
+    );
+  });
+
   test('logs distinct messages for code-absent vs non-admin', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 

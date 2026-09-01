@@ -152,7 +152,9 @@
     "appearanceDark": "כהה",
     "account": "חשבון",
     "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
-    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה.",
+    "returnSendsMessage": "מקש החזרה שולח הודעה",
+    "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש החזרה מוסיף שורה חדשה בשדות ההודעה של הסוכנים."
   },
   "notifications": {
     "title": "התראות",
@@ -296,7 +298,8 @@
       "networkError": "שגיאת רשת",
       "uploadFailed": "ההעלאה נכשלה",
       "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}",
-      "nothingToPaste": "אין מה להדביק"
+      "nothingToPaste": "אין מה להדביק",
+      "metadataStripFailed": "לא ניתן היה להסיר את מטא-נתוני התמונה."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1698,7 +1701,11 @@
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
       "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע.",
-      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב."
+      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב.",
+      "cancelQueuedFailed": "לא ניתן היה לבטל את ההודעה.",
+      "cancelQueuedRestoreAvailable": "ההודעה בוטלה. הקש על שחזר כדי להחזיר אותה לשדה ההודעה.",
+      "cancelQueuedRestored": "ההודעה בוטלה. ההנחיה חזרה לשדה ההודעה.",
+      "cancelQueuedUpgradeRequired": "ביטול הודעות בתור דורש Kilo CLI חדש יותר. עדכן את Kilo CLI והתחבר מחדש."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
@@ -1770,7 +1777,8 @@
       "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
       "continueFrom": "ממשיך {{title}}",
       "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
-      "importingSession": "מייבא הפעלה"
+      "importingSession": "מייבא הפעלה",
+      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו."
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -2021,7 +2029,11 @@
       "queuedAccessibility": "ההודעה בתור",
       "userMessage": "הודעת משתמש",
       "assistantMessage": "הודעת עוזר",
-      "longPressHint": "לחיצה ארוכה לפרטי ההודעה"
+      "longPressHint": "לחיצה ארוכה לפרטי ההודעה",
+      "cancelQueued": "בטל הודעה",
+      "cancelQueuedAccessibility": "בטל הודעה בתור",
+      "restoreQueued": "שחזר",
+      "restoreQueuedAccessibility": "שחזר הודעה שבוטלה לשדה ההודעה"
     },
     "olderMessages": {
       "arrived": "הודעות קודמות נטענו",
@@ -2052,9 +2064,6 @@
     },
     "sessionFilter": {
       "title": "סנן הפעלות",
-      "sortBy": "מיין לפי",
-      "sortLastUpdated": "עודכן לאחרונה",
-      "sortCreated": "נוצר",
       "platform": "פלטפורמה",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",
@@ -2108,7 +2117,9 @@
       "uploading": "מעלה…",
       "uploaded": "הועלה",
       "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
-      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה."
+      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה.",
+      "moveLeft": "הזז את {{filename}} שמאלה",
+      "moveRight": "הזז את {{filename}} ימינה"
     },
     "attachmentPasteHint": {
       "accessibility": "הדבק תמונה מהלוח",
@@ -2138,7 +2149,11 @@
       "finalizingPlaceholder": "מסיים...",
       "messagePlaceholder": "הודעה...",
       "cannotReceiveFiles": "סשן זה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה.",
-      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב."
+      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
+      "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
+      "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
+      "charactersRemaining": "נותרו {{count}} תווים",
+      "insertNewline": "הוסף שורה חדשה"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",
@@ -2358,7 +2373,8 @@
     "busy": "קלט קולי עסוק. נסה שוב.",
     "stopped": "קלט קולי הופסק. הקש על המיקרופון כדי לנסות שוב.",
     "unavailableDevice": "קלט קולי אינו זמין במכשיר זה.",
-    "unavailableLanguage": "קלט קולי אינו זמין עבור שפת המכשיר הזו."
+    "unavailableLanguage": "קלט קולי אינו זמין עבור שפת המכשיר הזו.",
+    "listeningStopped": "ההאזנה הופסקה."
   },
   "share": {
     "title": "שתף ל-Kilo",

@@ -152,7 +152,9 @@
     "appearanceDark": "Duhu",
     "account": "Asusu",
     "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
-    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita.",
+    "returnSendsMessage": "Maɓallin Komawa yana aika saƙo",
+    "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -750,7 +752,8 @@
       "networkError": "Kuskuren hanyar sadarwa",
       "uploadFailed": "Ɗorawa ya gaza",
       "failedToUploadFile": "An kasa ɗora fayil: {{reason}}",
-      "nothingToPaste": "Babu abin da za a manna"
+      "nothingToPaste": "Babu abin da za a manna",
+      "metadataStripFailed": "Ba a iya cire bayanan hoto ba."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2143,7 +2146,11 @@
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
       "connectionTrouble": "Matsalar haɗi. Da fatan za ka sake gwadawa bayan ɗan lokaci.",
-      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa."
+      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa.",
+      "cancelQueuedFailed": "An kasa soke saƙon.",
+      "cancelQueuedRestoreAvailable": "An soke saƙon. Danna Maido don mayar da shi zuwa wurin shigar da saƙo.",
+      "cancelQueuedRestored": "An soke saƙon. Bayanin ya koma wurin shigar da saƙo.",
+      "cancelQueuedUpgradeRequired": "Soke saƙonnin da ke jira yana buƙatar sabuwar Kilo CLI. Sabunta Kilo CLI kuma sake haɗawa."
     },
     "remoteSession": {
       "failedToCreate": "An kasa ƙirƙirar zaman na nesa",
@@ -2215,7 +2222,8 @@
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zama ba. Zaɓi Cloud Agent ko wani CLI.",
       "continueFrom": "Ci gaba da {{title}}",
       "importFailed": "An kasa shigo da wannan zaman.",
-      "importingSession": "Ana shigo da zama"
+      "importingSession": "Ana shigo da zama",
+      "discardWithUploadsMessage": "Za a share bayaninka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2465,7 +2473,11 @@
       "queuedAccessibility": "An jera saƙon",
       "userMessage": "Saƙon mai amfani",
       "assistantMessage": "Saƙon mataimaki",
-      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo"
+      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo",
+      "cancelQueued": "Soke saƙo",
+      "cancelQueuedAccessibility": "Soke saƙon da ke jira",
+      "restoreQueued": "Maido",
+      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin shigar da saƙo"
     },
     "olderMessages": {
       "arrived": "An ɗora saƙonnin farko",
@@ -2493,9 +2505,6 @@
     },
     "sessionFilter": {
       "title": "Tace zaman",
-      "sortBy": "Tsara ta",
-      "sortLastUpdated": "An sabunta kwanan nan",
-      "sortCreated": "An ƙirƙira",
       "platform": "Dandali",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2549,7 +2558,9 @@
       "uploading": "Ana ɗorawa…",
       "uploaded": "An ɗora",
       "uploadFailedRetry": "Ɗorawa ya gaza. Danna don sake gwadawa.",
-      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba."
+      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba.",
+      "moveLeft": "Matsar da {{filename}} zuwa hagu",
+      "moveRight": "Matsar da {{filename}} zuwa dama"
     },
     "attachmentPasteHint": {
       "accessibility": "Manna hoto daga clipboard",
@@ -2579,7 +2590,11 @@
       "finalizingPlaceholder": "Ana gamawa...",
       "messagePlaceholder": "Saƙo",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire abubuwan da aka haɗa don aika sakonka.",
-      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa."
+      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa.",
+      "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
+      "discardAttachmentsTitle": "Watsi da haɗe-haɗe?",
+      "charactersRemaining": "Haruffa {{count}} suka rage",
+      "insertNewline": "Saka sabon layi"
     },
     "chatLink": {
       "linkCopied": "An kwafa hanyar",
@@ -2798,7 +2813,8 @@
     "busy": "Shigar da murya tana aiki. Sake gwadawa.",
     "stopped": "Shigar da murya ta tsaya. Danna makirufo don sake gwadawa.",
     "unavailableDevice": "Shigar da murya ba ta samuwa akan wannan na'ura.",
-    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura."
+    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura.",
+    "listeningStopped": "An dakatar da sauraro."
   },
   "share": {
     "title": "Raba zuwa Kilo",

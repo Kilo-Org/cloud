@@ -1467,16 +1467,17 @@ export class SandboxSession extends DurableObject<Env> {
         return;
       }
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
-      if (
-        this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId ||
-        status.attachment?.kilo?.containmentEnabled === false
-      ) {
-        recorder.onProgress('workspace_setup', 'Setting up workspace…');
+      const needsPreparation =
+        this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId;
+      if (needsPreparation || status.attachment?.kilo?.containmentEnabled === false) {
+        if (needsPreparation) recorder.onProgress('workspace_setup', 'Setting up workspace…');
         if (!status.attachment?.kilo)
           throw new Error('Contained session attachment is unavailable');
         const attachPayload = {
           ...status.attachment,
-          preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId },
+          ...(needsPreparation
+            ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
+            : {}),
         };
         phase = 'attach';
         await wait(() =>

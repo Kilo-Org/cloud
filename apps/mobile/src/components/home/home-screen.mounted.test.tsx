@@ -13,8 +13,27 @@ const orgLoaded = vi.hoisted(() => ({ value: true }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQuery: () => ({ data: [{ organizationId: 'org-1', organizationName: 'Home organization' }] }),
 }));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ canGoBack: () => false }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -41,9 +60,6 @@ vi.mock('@/components/home/product-choices', () => ({
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
 }));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: () => null,
-}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
 }));
@@ -62,7 +78,13 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   }),
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: 'org-1', isLoaded: orgLoaded.value }),
+  useOrganization: () => ({
+    organizationId: 'org-1',
+    isLoaded: orgLoaded.value,
+    error: null,
+    retry: vi.fn(),
+    setOrganizationId: vi.fn(),
+  }),
 }));
 
 function nodeCount(root: TestRenderer.ReactTestInstance, type: string): number {
@@ -93,6 +115,27 @@ async function mountHome(): Promise<TestRenderer.ReactTestRenderer> {
 }
 
 describe('HomeScreen composition', () => {
+  it.each([false, true])('keeps an accessible context control with readiness=%s', async loaded => {
+    orgLoaded.value = loaded;
+    sessionsLoading.value = false;
+    storedIsError.value = false;
+    activeIsError.value = false;
+    const renderer = await mountHome();
+    const control = renderer.root.find(
+      node =>
+        (node.type as string) === 'Pressable' && node.props.accessibilityHint === 'Select account'
+    );
+    expect(control.props.accessibilityRole).toBe('button');
+    expect(control.props.accessibilityState).toEqual({ busy: !loaded, disabled: !loaded });
+    expect(control.props.accessibilityLabel).toBe(loaded ? 'Home organization' : 'Select account');
+    expect(
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
+    ).not.toContain('Personal');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('renders the sessions section and new-task button on an empty load', async () => {
     storedIsError.value = false;
     activeIsError.value = false;
@@ -134,6 +177,9 @@ describe('HomeScreen composition', () => {
     sessionsLoading.value = false;
     orgLoaded.value = true;
     const renderer = await mountHome();
+    expect(
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
+    ).toContain('Home organization');
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError).toBeDefined();
     expect(queryError?.props.title).toBe("Couldn't load active sessions");
@@ -154,6 +200,9 @@ describe('HomeScreen composition', () => {
     sessionsLoading.value = false;
     orgLoaded.value = true;
     const renderer = await mountHome();
+    expect(
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
+    ).toContain('Home organization');
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError).toBeDefined();
     expect(queryError?.props.title).toBe("Couldn't load sessions");

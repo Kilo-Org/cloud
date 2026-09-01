@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import { ScreenHeader } from '@/components/screen-header';
 
 type MountedRenderer = TestRenderer.ReactTestRenderer;
 
@@ -56,6 +57,8 @@ const sessionListState = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: appState.addEventListener },
   FlatList: 'FlatList',
@@ -72,18 +75,21 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: 'LinearTransition',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
   useFocusEffect: (effect: () => void) => {
     focusCallbacks.current.add(effect);
   },
-  useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy }),
+  useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy, canGoBack: () => false }),
   useScrollToTop: () => undefined,
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
+  useQuery: () => ({
+    data: [{ organizationId: 'org-1', organizationName: 'Agents organization' }],
+  }),
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -115,6 +121,7 @@ vi.mock('sonner-native', () => ({
 // Combined-list machinery is mocked as inert string nodes so a regression that
 // re-renders any of it shows up as a tree node the assertions below reject.
 vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
   Check: 'Check',
@@ -160,8 +167,12 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
-vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: toastErrorSpy },
@@ -170,6 +181,9 @@ vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({
     organizationId: orgState.organizationId,
     isLoaded: orgState.isLoaded,
+    error: null,
+    retry: vi.fn(),
+    setOrganizationId: vi.fn(),
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -212,9 +226,7 @@ async function renderScreen(): Promise<MountedRenderer> {
 type HeaderElement = { type: string; props: Record<string, unknown> };
 
 function headerOf(renderer: MountedRenderer) {
-  return renderer.root.find(
-    node => typeof node.type === 'string' && (node.type as string) === 'ScreenHeader'
-  );
+  return renderer.root.findByType(ScreenHeader);
 }
 
 function headerRightOf(renderer: MountedRenderer) {
@@ -232,7 +244,8 @@ function headerActionOf(renderer: MountedRenderer, testID: string): HeaderElemen
 
 function requireHeaderAction(renderer: MountedRenderer, testID: string): HeaderElement {
   const action = headerActionOf(renderer, testID);
-  if (!action) {
+  const isMounted = renderer.root.findAll(node => node.props.testID === testID).length > 0;
+  if (!action || !isMounted) {
     throw new Error(`header action ${testID} was not rendered`);
   }
   return action;
@@ -316,6 +329,14 @@ describe('AgentSessionListScreen live tab', () => {
     const seeAll = requireHeaderAction(renderer, 'agents-view-history');
 
     expect(seeAll.props.accessibilityRole).toBe('button');
+    const control = renderer.root.find(
+      node =>
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityHint === 'profile.selectAccount'
+    );
+    expect(control.props.accessibilityRole).toBe('button');
+    expect(control.props.accessibilityLabel).toBe('profile.personal');
+    expect(control.props.accessibilityState).toEqual({ busy: false, disabled: false });
   });
 
   it('pushes the history route when See-all is pressed', async () => {
@@ -499,12 +520,14 @@ describe('AgentSessionListScreen live tab', () => {
     expect((strip.props.className as string | undefined)?.split(' ')).toEqual(
       expect.arrayContaining(['grow-0', 'shrink-0'])
     );
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.parent?.children[0]).toBe(header);
     const selectedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
     expect(
       selectedTree.children
         ?.slice(0, 3)
         .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'ScrollView']);
+    ).toEqual(['View', 'SessionListSearchHeader', 'ScrollView']);
 
     for (const step of [
       {
@@ -539,7 +562,7 @@ describe('AgentSessionListScreen live tab', () => {
       clearedTree.children
         ?.slice(0, 3)
         .map(child => (typeof child === 'string' ? child : child.type))
-    ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'FlatList']);
+    ).toEqual(['View', 'SessionListSearchHeader', 'FlatList']);
   });
 
   it('keeps saved repository and platform selections after a successful list retry', async () => {
@@ -700,15 +723,33 @@ describe('AgentSessionListScreen live tab', () => {
     expect(findTypeCount(renderer, 'FlatList')).toBe(1);
   });
 
-  it('treats a not-loaded org as loading so the empty state cannot flash', async () => {
+  it('keeps the context and list unresolved until the organization restores', async () => {
     orgState.isLoaded = false;
     sessionListState.isLoading = false;
     sessionListState.isError = false;
-
     const renderer = await renderScreen();
-
     expect(findTypeCount(renderer, 'EmptyState')).toBe(0);
-    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
+    expect(findTypeCount(renderer, 'Skeleton')).toBe(9);
+    const control = () =>
+      renderer.root.find(
+        node =>
+          (node.type as string) === 'Pressable' &&
+          node.props.accessibilityHint === 'profile.selectAccount'
+      );
+    expect(control().props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(
+      renderer.root.findAll(node => (node.type as string) === 'Text').flatMap(node => node.children)
+    ).not.toContain('profile.personal');
+    orgState.organizationId = 'org-1';
+    orgState.isLoaded = true;
+    await act(() => {
+      renderer.update(createElement(AgentSessionListScreen));
+    });
+    expect(control().props.accessibilityLabel).toBe('Agents organization');
+    expect(control().props.accessibilityState).toEqual({ busy: false, disabled: false });
+    expect(requireHeaderAction(renderer, 'agents-view-history').props.accessibilityRole).toBe(
+      'button'
+    );
   });
 
   it('renders skeletons while the live query is loading with no cached rows', async () => {

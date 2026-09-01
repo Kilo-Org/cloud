@@ -29,8 +29,11 @@ import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
+import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -105,6 +108,7 @@ vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -203,10 +207,12 @@ vi.mock('@/components/agents/use-interaction-handlers', () => ({
 vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
 }));
+const openRenameModal = vi.hoisted(() => vi.fn());
 vi.mock('@/components/agents/use-session-detail-rename', () => ({
   useSessionDetailRename: ({ serverTitle }: { serverTitle?: string }) => ({
     title: serverTitle,
-    isTitleInteractive: false,
+    isTitleInteractive: serverTitle !== undefined,
+    openModal: openRenameModal,
   }),
 }));
 vi.mock('@/lib/analytics/posthog', () => ({
@@ -214,7 +220,10 @@ vi.mock('@/lib/analytics/posthog', () => ({
   MESSAGE_SENT_EVENT: 'sent',
   SESSION_VIEWED_EVENT: 'viewed',
 }));
-vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: () => false }));
+vi.mock('@/lib/a11y/announce', () => ({
+  moveA11yFocus: () => false,
+  announceForA11y: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'test-user', isLoading: false }),
 }));
@@ -241,8 +250,37 @@ vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => 
 vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({ settled: true, value: null }),
 }));
-vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+const organizations = vi.hoisted(() => [
+  { organizationId: 'org-a', organizationName: 'Session organization' },
+]);
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations'],
+          queryFn: () => organizations,
+          initialData: organizations,
+        }),
+      },
+    },
+  }),
+}));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+const globalContext = vi.hoisted(() => ({
+  organizationId: 'global-org',
+  isLoaded: true,
+  error: null,
+  retry: vi.fn(),
+  setOrganizationId: vi.fn(),
+}));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
 
+const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
 const ROOT_ID = kiloId('ses-root');
 const NEXT_ROOT_ID = kiloId('ses-next-root');
 const SELECTED_ID = kiloId('ses-selected');
@@ -318,11 +356,15 @@ function page(sessionId: KiloSessionId, messages: StoredMessage[]): SessionSnaps
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  openRenameModal.mockClear();
+  globalContext.organizationId = 'global-org';
+  globalContext.setOrganizationId.mockClear();
 });
 
 async function mountDetails(
   rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)],
-  metadataReady?: Promise<undefined>
+  metadataReady?: Promise<undefined>,
+  displayScope: ComponentProps<typeof SessionDetailContent>['displayScope'] = PERSONAL_DISPLAY_SCOPE
 ) {
   const store = createStore();
   const rootPages = new Map([[ROOT_ID, rootMessages]]);
@@ -393,7 +435,7 @@ async function mountDetails(
     createElement(
       Provider,
       { store },
-      createElement(SessionDetailContent, { key: id, sessionId: id })
+      createElement(SessionDetailContent, { key: id, sessionId: id, displayScope })
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -471,6 +513,47 @@ function pressHeaderBack(renderer: ReactTestRenderer) {
   };
   act(onPress);
 }
+
+describe('SessionDetailContent display scope', () => {
+  it.each([
+    { organizationId: null, isResolved: true, label: i18n.t('profile.personal') },
+    { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
+    { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
+  ])('renders a read-only $label and preserves header actions', async state => {
+    const { renderer } = await mountDetails([], undefined, {
+      organizationId: state.organizationId,
+      isResolved: state.isResolved,
+    });
+    const header = renderer.root.findByType(ScreenHeader);
+    const context = header.findByType(ContextControl);
+    const label = context.findByProps({ accessibilityRole: 'text' });
+    expect(label.props).toMatchObject({
+      accessibilityLabel: state.label,
+      accessibilityState: { busy: !state.isResolved },
+    });
+    expect(
+      header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
+    ).toHaveLength(0);
+    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    const { onPress } = header.findByProps({
+      accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
+        title: `Root ${ROOT_ID}`,
+      }),
+    }).props as { onPress: () => void };
+    act(onPress);
+    expect(openRenameModal).toHaveBeenCalledOnce();
+    if (state.organizationId === 'missing-org') {
+      expect(context.findByType(AccessibleStatus).props.message).toBe(
+        i18n.t('organization.boundary.organizationUnavailable')
+      );
+    }
+    pressHeaderBack(renderer);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
+    expect(globalContext.organizationId).toBe('global-org');
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
 
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
   beforeEach(() => {

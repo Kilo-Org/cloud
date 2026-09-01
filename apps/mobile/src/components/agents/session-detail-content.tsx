@@ -109,6 +109,7 @@ import {
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
+import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -149,6 +150,7 @@ import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
+  displayScope: ContextDisplayScope;
   openedVia?: 'push' | 'app';
   /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
   shareId?: string;
@@ -171,6 +173,7 @@ const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
   sessionId,
+  displayScope,
   openedVia = 'app',
   shareId,
   autoSend,
@@ -1393,6 +1396,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
+          context={<ContextControl scope={displayScope} />}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive

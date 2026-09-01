@@ -419,6 +419,7 @@ vi.mock('@/components/query-error', () => ({
 vi.mock('@/components/rename-modal', () => ({
   RenameModal: 'RenameModal',
 }));
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: 'ScreenHeader',
 }));
@@ -438,6 +439,7 @@ vi.mock('@/components/ui/icons', () => ({
 const { SessionDetailContent } = await import('@/components/agents/session-detail-content');
 
 const SESSION_ID = 'sess-1' as KiloSessionId;
+const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
 
 function makeManager() {
   return {
@@ -534,7 +536,10 @@ function mount(): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(SessionDetailContent, { sessionId: SESSION_ID })
+      createElement(SessionDetailContent, {
+        sessionId: SESSION_ID,
+        displayScope: PERSONAL_DISPLAY_SCOPE,
+      })
     );
   });
   if (!ref.current) {
@@ -616,7 +621,12 @@ function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
 
 function updateScreen(renderer: TestRenderer.ReactTestRenderer): void {
   act(() => {
-    renderer.update(createElement(SessionDetailContent, { sessionId: SESSION_ID }));
+    renderer.update(
+      createElement(SessionDetailContent, {
+        sessionId: SESSION_ID,
+        displayScope: PERSONAL_DISPLAY_SCOPE,
+      })
+    );
   });
 }
 
@@ -1089,7 +1099,12 @@ describe('SessionDetailContent cancel/restore', () => {
       seedQueuedMessage(nextMessage);
       currentManager.atoms.fetchedSessionData.value.kiloSessionId = nextSessionId;
       act(() => {
-        renderer.update(createElement(SessionDetailContent, { sessionId: nextSessionId }));
+        renderer.update(
+          createElement(SessionDetailContent, {
+            sessionId: nextSessionId,
+            displayScope: PERSONAL_DISPLAY_SCOPE,
+          })
+        );
       });
       await act(async () => {
         if (outcome === 'upgrade') {
@@ -1130,7 +1145,12 @@ describe('SessionDetailContent cancel/restore', () => {
     seedQueuedMessage(nextMessage);
     currentManager.atoms.fetchedSessionData.value.kiloSessionId = nextSessionId;
     act(() => {
-      renderer.update(createElement(SessionDetailContent, { sessionId: nextSessionId }));
+      renderer.update(
+        createElement(SessionDetailContent, {
+          sessionId: nextSessionId,
+          displayScope: PERSONAL_DISPLAY_SCOPE,
+        })
+      );
     });
     openDetails(renderer, nextMessage);
     expect(statusMessages(renderer)).toEqual([]);

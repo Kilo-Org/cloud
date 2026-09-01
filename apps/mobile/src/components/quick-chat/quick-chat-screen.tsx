@@ -12,6 +12,7 @@ import { getSessionKeyboardContainerKind } from '@/components/agents/session-key
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -257,7 +258,11 @@ function ScopedQuickChatScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('quickChat.title')} showBackButton={false} />
+      <ScreenHeader
+        title={t('quickChat.title')}
+        showBackButton={false}
+        context={<ContextControl />}
+      />
       {keyboardContainerKind === 'app-aware-padding' ? (
         <AppAwareKeyboardPaddingView className="flex-1">
           {renderKeyboardBody()}

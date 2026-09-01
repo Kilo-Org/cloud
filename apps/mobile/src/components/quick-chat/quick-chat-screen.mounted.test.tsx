@@ -73,6 +73,8 @@ const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 const authEpoch = vi.hoisted(() => ({ value: 0 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
+  Pressable: 'Pressable',
   View: 'View',
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
@@ -113,7 +115,13 @@ vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: () => 'token-1',
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: organizationId.value, isLoaded: orgLoaded.value }),
+  useOrganization: () => ({
+    organizationId: organizationId.value,
+    isLoaded: orgLoaded.value,
+    error: null,
+    retry: vi.fn(),
+    setOrganizationId: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: () => ({ activeSessions: [], isLoading: false, isError: false }),
@@ -145,6 +153,14 @@ vi.mock('@/lib/finding-detail-back', () => ({
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations-list'],
+          queryFn: () => [{ organizationId: 'org-1', organizationName: 'Chat organization' }],
+        }),
+      },
+    },
     quickChat: {
       listMessages: {
         queryKey: (input: unknown) => [['quickChat', 'listMessages'], { input, type: 'query' }],
@@ -188,7 +204,10 @@ vi.mock('@/components/agents/session-keyboard-container-state', () => ({
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: () => {
     skeletonRenders.count += 1;
@@ -198,6 +217,7 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
   Bot: 'Bot',
   House: 'House',
   MessageCircle: 'MessageCircle',
@@ -325,6 +345,40 @@ beforeEach(() => {
 });
 
 describe('QuickChatScreen composer', () => {
+  it.each(['pending', 'restored', 'history-error', 'catalog-error'])(
+    'keeps the accessible context control in the %s state',
+    async state => {
+      orgLoaded.value = state !== 'pending';
+      organizationId.value = 'org-1';
+      modelsState.isError = state === 'catalog-error';
+      if (state === 'history-error') {
+        listMessagesQueryFn.mockRejectedValue(new Error('offline'));
+      }
+      const { renderer, unmount } = await mountScreen();
+      const control = () =>
+        renderer.root.find(
+          node =>
+            (node.type as string) === 'Pressable' &&
+            node.props.accessibilityHint === 'Select account'
+        );
+      if (orgLoaded.value) {
+        await waitFor(() => control().props.accessibilityLabel === 'Chat organization');
+      }
+      expect(control().props.accessibilityRole).toBe('button');
+      expect(control().props.accessibilityState).toEqual({
+        busy: !orgLoaded.value,
+        disabled: !orgLoaded.value,
+      });
+      expect(
+        renderer.root
+          .findAll(node => (node.type as string) === 'Text')
+          .flatMap(node => node.children)
+      ).not.toContain('Personal');
+      expect(latestComposer()?.placeholder).toBe('Message');
+      unmount();
+    }
+  );
+
   it('renders the composer with the quick-chat placeholder even when empty', async () => {
     await mountScreen();
     await waitFor(() => composerRenders.list.length > 0);

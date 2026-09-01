@@ -17,7 +17,7 @@ import {
 import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import '@/i18n';
-import { useSessionManager } from '@/components/agents/session-provider';
+import { AgentSessionProvider, useSessionManager } from '@/components/agents/session-provider';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { QueryError } from '@/components/query-error';
@@ -37,6 +37,9 @@ const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
 const useRouterMock = vi.hoisted(() => vi.fn());
 const useQueryMock = vi.hoisted(() => vi.fn());
 const queryOptionsMock = vi.hoisted(() => vi.fn());
+const organizations = vi.hoisted(() => [
+  { organizationId: 'org-a', organizationName: 'Session organization' },
+]);
 const createMobileManagerMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
   token: 'account-a-token' as string | undefined,
@@ -60,7 +63,7 @@ const queryState = vi.hoisted(() => ({
   isError: false,
   isFetching: false,
   error: null as { data?: { code?: string } } | null,
-  data: null as { organization_id?: string } | null,
+  data: null as { organization_id?: string | null } | null,
   refetch: vi.fn(),
 }));
 
@@ -119,6 +122,15 @@ vi.mock('@/lib/auth/auth-context', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations', 'list'],
+          queryFn: () => organizations,
+          initialData: organizations,
+        }),
+      },
+    },
     cliSessionsV2: {
       get: {
         queryOptions: queryOptionsMock,
@@ -204,6 +216,19 @@ vi.mock('@/components/agents/session-terminal-error', () => ({
 vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
 }));
+
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+const globalContext = vi.hoisted(() => ({
+  organizationId: 'global-org' as string | null,
+  isLoaded: true,
+  error: null,
+  retry: vi.fn(),
+  setOrganizationId: vi.fn(),
+}));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: () => globalContext }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
@@ -390,24 +415,31 @@ beforeEach(() => {
     },
   });
   useQueryMock.mockReset();
-  useQueryMock.mockImplementation((options: { enabled?: boolean } | undefined) => {
-    // A disabled TanStack query stays pending forever (`isPending: true` when
-    // `enabled` is false). Model that so the invalid-param tests exercise the
-    // real branch order instead of a skeleton that never resolves.
-    const disabled = options?.enabled === false;
-    return {
-      ...queryState,
-      isPending: disabled ? true : queryState.isPending,
-    };
-  });
+  useQueryMock.mockImplementation(
+    (options: { enabled?: boolean; queryKey?: string[] } | undefined) => {
+      if (options?.queryKey?.[0] === 'organizations') {
+        return { data: organizations };
+      }
+      // A disabled TanStack query stays pending forever (`isPending: true` when
+      // `enabled` is false). Model that so the invalid-param tests exercise the
+      // real branch order instead of a skeleton that never resolves.
+      const disabled = options?.enabled === false;
+      return {
+        ...queryState,
+        isPending: disabled ? true : queryState.isPending,
+      };
+    }
+  );
   queryOptionsMock.mockReset();
   queryOptionsMock.mockReturnValue({});
   queryState.isPending = false;
   queryState.isError = false;
   queryState.isFetching = false;
   queryState.error = null;
-  queryState.data = null;
-  queryState.refetch.mockClear();
+  queryState.data = {};
+  queryState.refetch.mockReset();
+  globalContext.organizationId = 'global-org';
+  globalContext.setOrganizationId.mockClear();
 });
 
 describe('SessionDetailScreen invalid session-id', () => {
@@ -431,6 +463,108 @@ describe('SessionDetailScreen invalid session-id', () => {
     expect(propOf(invalid[0], 'backTo')).toBe('/(app)');
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
     expect(queryEnabled()).toBe(false);
+  });
+});
+
+describe('SessionDetailScreen display scope', () => {
+  it.each([
+    { label: 'route organization', route: 'org-a', data: null, expected: 'org-a' },
+    {
+      label: 'fetched organization',
+      route: undefined,
+      data: { organization_id: 'org-a' },
+      expected: 'org-a',
+    },
+    {
+      label: 'explicit Personal',
+      route: undefined,
+      data: { organization_id: null },
+      expected: null,
+    },
+    { label: 'legacy Personal', route: undefined, data: {}, expected: null },
+  ])('passes resolved $label without changing global scope', async state => {
+    useLocalSearchParamsMock.mockReturnValue({
+      'session-id': 'sess-1',
+      organizationId: state.route,
+    });
+    queryState.data = state.data;
+    globalContext.organizationId = state.expected === null ? 'global-org' : null;
+    const globalId = globalContext.organizationId;
+    const renderer = await mountRoute();
+    const content = findByType(renderer.root, 'SessionDetailContent')[0];
+    expect(propOf(content, 'displayScope')).toEqual({
+      organizationId: state.expected,
+      isResolved: true,
+    });
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe(
+      state.expected ?? undefined
+    );
+    expect(globalContext.organizationId).toBe(globalId);
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+
+  it.each(['pending', 'INTERNAL_SERVER_ERROR', 'NOT_FOUND', 'UNAUTHORIZED'])(
+    'keeps the %s header unresolved and read-only',
+    async state => {
+      useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+      queryState.data = null;
+      queryState.isPending = state === 'pending';
+      queryState.isError = state !== 'pending';
+      queryState.error = { data: { code: state } };
+      const renderer = await mountRoute();
+      const label = renderer.root.find(
+        node => (node.type as string) === 'View' && propOf(node, 'accessibilityRole') === 'text'
+      );
+      expect(propOf(label, 'accessibilityState')).toEqual({ busy: true });
+      expect(findByType(renderer.root, 'Text').flatMap(node => node.children)).not.toContain(
+        'Personal'
+      );
+      expect(
+        findByType(renderer.root, 'Pressable').filter(
+          node => propOf(node, 'accessibilityHint') === 'Select account'
+        )
+      ).toHaveLength(0);
+      if (state !== 'pending') {
+        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(
+          state === 'INTERNAL_SERVER_ERROR'
+        );
+        const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
+          findByType(button, 'Text').flatMap(node => node.children)
+        );
+        expect(buttonLabels).toEqual(
+          state === 'INTERNAL_SERVER_ERROR'
+            ? ['Retry', 'Copy', 'Back to sessions']
+            : ['Copy', 'Back to sessions']
+        );
+      }
+      expect(globalContext.organizationId).toBe('global-org');
+      expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+    }
+  );
+
+  it('resolves scope through the existing session Retry', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    const renderer = await mountRoute();
+    queryState.refetch.mockImplementation(() => {
+      queryState.isError = false;
+      queryState.error = null;
+      queryState.data = { organization_id: 'org-a' };
+    });
+    act(() => {
+      pressControl(retryControl(renderer));
+    });
+    await updateRoute(renderer);
+    expect(queryState.refetch).toHaveBeenCalledOnce();
+    expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
+      organizationId: 'org-a',
+      isResolved: true,
+    });
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+    expect(globalContext.organizationId).toBe('global-org');
+    expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
 });
 

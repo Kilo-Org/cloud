@@ -2146,7 +2146,11 @@
     "sessionExited": "Relace ukončena",
     "remoteSpawnRetryable": "Instanci se nepodařilo dosáhnout — mohla se odpojit.",
     "remoteSpawnNonRetryable": "Instanci se nepodařilo spustit relaci — zkontrolujte stroj nebo aktualizujte CLI.",
-    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusťte relaci na Cloud Agent nebo vyberte jinou instanci."
+    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusťte relaci na Cloud Agent nebo vyberte jinou instanci.",
+    "liveCount_one": "{{count}} ŽIVĚ",
+    "liveCount_other": "{{count}} ŽIVĚ",
+    "liveCount_few": "{{count}} ŽIVĚ",
+    "liveCount_many": "{{count}} ŽIVĚ"
   },
   "agentChat": {
     "session": {
@@ -2313,7 +2317,9 @@
       "noCliInstancesDescription": "Spusťte `kilo remote` v projektu na počítači, nebo aktualizujte Kilo CLI, pokud jeden již běží.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Spustit na Cloud Agent"
+      "runOnCloudAgent": "Spustit na Cloud Agent",
+      "terminals": "Terminály",
+      "remotes": "Vzdálené instance"
     },
     "modePicker": {
       "title": "Vybrat režim",

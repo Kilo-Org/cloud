@@ -2131,7 +2131,10 @@
     "sessionExited": "Sesija je završena",
     "remoteSpawnRetryable": "Nije moguće doći do instance — možda se prekinula veza.",
     "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjerite stroj ili ažurirajte CLI.",
-    "remoteSpawnInstanceDisconnected": "Odabrana instanca se prekinula. Pokrenite sesiju na Cloud Agent ili odaberite drugu instancu."
+    "remoteSpawnInstanceDisconnected": "Odabrana instanca se prekinula. Pokrenite sesiju na Cloud Agent ili odaberite drugu instancu.",
+    "liveCount_one": "{{count}} UŽIVO",
+    "liveCount_other": "{{count}} UŽIVO",
+    "liveCount_few": "{{count}} UŽIVO"
   },
   "agentChat": {
     "session": {
@@ -2297,7 +2300,9 @@
       "noCliInstancesDescription": "Pokrenite `kilo remote` u projektu na računalu ili ažurirajte Kilo CLI ako već radi.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Pokreni na Cloud Agent"
+      "runOnCloudAgent": "Pokreni na Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Udaljene instance"
     },
     "modePicker": {
       "title": "Odaberi način rada",

@@ -2116,7 +2116,9 @@
     "sessionExited": "Nifarana ny session",
     "remoteSpawnRetryable": "Tsy tratra ilay fitaovana — mety ho tapaka ny fifandraisana.",
     "remoteSpawnNonRetryable": "Tsy nahomby ny fanombohan'ny sessio tamin'ilay fitaovana — jereo ny milina na havaozy ny CLI.",
-    "remoteSpawnInstanceDisconnected": "Tapaka ny fitaovana voafidy. Atombohy sessio amin'ny Cloud Agent na fidio fitaovana hafa."
+    "remoteSpawnInstanceDisconnected": "Tapaka ny fitaovana voafidy. Atombohy sessio amin'ny Cloud Agent na fidio fitaovana hafa.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2281,7 +2283,9 @@
       "noCliInstancesDescription": "Ampandeho `kilo remote` amin'ny tetikasa iray ao amin'ny solosainao, na havaozy ny Kilo CLI raha efa mandeha iray.",
       "instanceOnProject": "{{name}} amin'ny {{project}}",
       "instanceOnProjectSuffix": "{{name}} amin'ny {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ampandeho amin'ny Cloud Agent"
+      "runOnCloudAgent": "Ampandeho amin'ny Cloud Agent",
+      "terminals": "Terminaly",
+      "remotes": "Instances lavitra"
     },
     "modePicker": {
       "title": "Safidio ny mode",

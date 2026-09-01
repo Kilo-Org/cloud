@@ -2146,7 +2146,11 @@
     "sessionExited": "Seja je končana",
     "remoteSpawnRetryable": "Instance ni bilo mogoče doseči — morda se je odklopila.",
     "remoteSpawnNonRetryable": "Instance ni uspela zagnati seje — preverite stroj ali posodobite CLI.",
-    "remoteSpawnInstanceDisconnected": "Izbrana instanca se je odklopila. Začnite sejo na Cloud Agent ali izberite drugo instanco."
+    "remoteSpawnInstanceDisconnected": "Izbrana instanca se je odklopila. Začnite sejo na Cloud Agent ali izberite drugo instanco.",
+    "liveCount_one": "{{count}} V ŽIVO",
+    "liveCount_other": "{{count}} V ŽIVO",
+    "liveCount_two": "{{count}} V ŽIVO",
+    "liveCount_few": "{{count}} V ŽIVO"
   },
   "agentChat": {
     "session": {
@@ -2313,7 +2317,9 @@
       "noCliInstancesDescription": "Zaženi `kilo remote` v projektu na svojem računalniku ali pa posodobi Kilo CLI, če že teče.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Zaženi na Cloud Agent"
+      "runOnCloudAgent": "Zaženi na Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Oddaljene instance"
     },
     "modePicker": {
       "title": "Izberi način",

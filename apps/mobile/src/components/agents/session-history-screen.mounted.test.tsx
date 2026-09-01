@@ -1,10 +1,13 @@
 /* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, type default as TestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { type StoredSession, type useAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { SessionHistoryScreen } from './session-history-screen';
 
@@ -101,50 +104,57 @@ vi.mock('@/components/agents/use-session-search-input', () => ({
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
 }));
-// Keep query construction and persisted filters real. Only the server response
-// is modeled here, so dropped query dimensions change the resulting rows.
-vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: ({
-    gitUrl,
-    createdOnPlatform,
-  }: Parameters<typeof useAgentSessions>[0] = {}) => {
-    const storedSessions = listState.storedSessions.filter(
-      session =>
-        (!gitUrl || gitUrl.includes(session.git_url ?? '')) &&
-        (!createdOnPlatform || createdOnPlatform.includes(session.created_on_platform ?? ''))
-    );
-    return {
-      storedSessions,
-      dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
-      activeIsError: false,
-      storedIsError: listState.isError,
-      storedIsFetching: false,
-      storedLoadedPageCount: 1,
+vi.mock('@/lib/hooks/use-agent-sessions', async () => {
+  const { useQuery } = await import('@tanstack/react-query');
+  return {
+    useAgentSessions: ({
+      gitUrl,
+      createdOnPlatform,
+    }: Parameters<typeof useAgentSessions>[0] = {}) => {
+      const active = useQuery({
+        queryKey: ['existing-active-sessions'],
+        queryFn: () => new Set<string>(),
+        initialData: () => new Set<string>(),
+      });
+      const storedSessions = listState.storedSessions.filter(
+        session =>
+          (!gitUrl || gitUrl.includes(session.git_url ?? '')) &&
+          (!createdOnPlatform || createdOnPlatform.includes(session.created_on_platform ?? ''))
+      );
+      return {
+        storedSessions,
+        activeSessionIds: active.data,
+        dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
+        activeIsError: false,
+        storedIsError: listState.isError,
+        storedIsFetching: false,
+        storedLoadedPageCount: 1,
+        hasNextPage: false,
+        isFetchingNextPage: false,
+        fetchNextPage: vi.fn(),
+        refetch: handleRefetchSpy,
+      };
+    },
+    useAgentSessionSearch: () => ({
+      dateGroups: [],
+      isError: listState.isError,
+      isFetching: false,
+      isPending: false,
       hasNextPage: false,
       isFetchingNextPage: false,
+      isPlaceholderData: false,
       fetchNextPage: vi.fn(),
       refetch: handleRefetchSpy,
-    };
-  },
-  useAgentSessionSearch: () => ({
-    dateGroups: [],
-    isError: listState.isError,
-    isFetching: false,
-    isPending: false,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    isPlaceholderData: false,
-    fetchNextPage: vi.fn(),
-    refetch: handleRefetchSpy,
-  }),
-  useRecentAgentRepositories: () => ({
-    data: {
-      repositories: listState.storedSessions.flatMap(session =>
-        session.git_url ? [{ gitUrl: session.git_url }] : []
-      ),
-    },
-  }),
-}));
+    }),
+    useRecentAgentRepositories: () => ({
+      data: {
+        repositories: listState.storedSessions.flatMap(session =>
+          session.git_url ? [{ gitUrl: session.git_url }] : []
+        ),
+      },
+    }),
+  };
+});
 vi.mock('expo-secure-store', () => ({ getItemAsync: readFilterRecord }));
 vi.mock('@/lib/auth/account-metadata-write', () => ({
   setAccountMetadata: vi.fn().mockResolvedValue(undefined),
@@ -217,18 +227,12 @@ function fireFocus(): void {
   }
 }
 
-async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
-  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
-    current: undefined,
-  };
-  await act(async () => {
-    await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(SessionHistoryScreen));
+async function renderScreen(
+  queryClient: QueryClient = createTestQueryClient()
+): Promise<TestRenderer.ReactTestRenderer> {
+  const { renderer } = await renderWithProviders(createElement(SessionHistoryScreen), {
+    queryClient,
   });
-  const renderer = rendererRef.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
   mountedRenderers.push(renderer);
   return renderer;
 }
@@ -347,7 +351,8 @@ describe('SessionHistoryScreen', () => {
         : null;
     });
     listState.isError = true;
-    const renderer = await renderScreen();
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isError).toBe(true);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
@@ -359,7 +364,13 @@ describe('SessionHistoryScreen', () => {
     await act(async () => {
       (content.props.onRetry as () => void)();
       await Promise.resolve();
-      renderer.update(createElement(SessionHistoryScreen));
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
     });
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.isError).toBe(false);
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
@@ -409,13 +420,20 @@ describe('SessionHistoryScreen', () => {
     );
     listState.storedSessions = sessions;
     listState.isSearching = true;
-    const renderer = await renderScreen();
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isSearching).toBe(true);
     expect(storedSessionIds(renderer)).toEqual([]);
     act(() => {
       (content.props.onClearQuery as () => void)();
-      renderer.update(createElement(SessionHistoryScreen));
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
     });
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
@@ -472,6 +490,34 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.hasActiveQuery).toBe(true);
     expect(content.props.hasAnySessions).toBe(true);
+  });
+
+  it('hands the existing live query set through data and screen without another subscription', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    const queryKey = ['existing-active-sessions'];
+    const activeQuery = queryClient.getQueryCache().find({ queryKey });
+
+    expect(content.props.activeSessionIds).toEqual(new Set());
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    const liveIds = new Set(['stored-1']);
+    act(() => {
+      queryClient.setQueryData(queryKey, liveIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === liveIds);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBe(content);
+    expect(content.props.activeSessionIds).toBe(liveIds);
+
+    const nextIds = new Set(['stored-2']);
+    act(() => {
+      queryClient.setQueryData(queryKey, nextIds);
+    });
+    await waitFor(() => content.props.activeSessionIds === nextIds);
+    expect(content.props.activeSessionIds).toBe(nextIds);
+    expect(activeQuery?.getObserversCount()).toBe(1);
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
   });
 
   it('refetches stored sessions through the wrapped refetch on route focus', async () => {

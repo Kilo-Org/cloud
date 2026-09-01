@@ -1662,7 +1662,9 @@
     "sessionExited": "Phiên đã thoát",
     "remoteSpawnRetryable": "Không thể kết nối tới phiên bản — có thể nó đã ngắt kết nối.",
     "remoteSpawnNonRetryable": "Phiên bản không khởi động được phiên — hãy kiểm tra máy hoặc cập nhật CLI.",
-    "remoteSpawnInstanceDisconnected": "Phiên bản đã chọn bị ngắt kết nối. Hãy bắt đầu phiên trên Cloud Agent hoặc chọn phiên bản khác."
+    "remoteSpawnInstanceDisconnected": "Phiên bản đã chọn bị ngắt kết nối. Hãy bắt đầu phiên trên Cloud Agent hoặc chọn phiên bản khác.",
+    "liveCount_one": "{{count}} TRỰC TIẾP",
+    "liveCount_other": "{{count}} TRỰC TIẾP"
   },
   "agentChat": {
     "session": {
@@ -1827,7 +1829,9 @@
       "noCliInstancesDescription": "Chạy `kilo remote` trong một dự án trên máy tính của bạn, hoặc cập nhật Kilo CLI nếu một phiên bản đang chạy.",
       "instanceOnProject": "{{name}} trên {{project}}",
       "instanceOnProjectSuffix": "{{name}} trên {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Chạy trên tác nhân đám mây"
+      "runOnCloudAgent": "Chạy trên tác nhân đám mây",
+      "terminals": "Thiết bị đầu cuối",
+      "remotes": "Phiên bản từ xa"
     },
     "modePicker": {
       "title": "Chọn chế độ",

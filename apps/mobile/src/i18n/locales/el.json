@@ -2116,7 +2116,9 @@
     "sessionExited": "Η συνεδρία τερματίστηκε",
     "remoteSpawnRetryable": "Δεν ήταν δυνατή η πρόσβαση στην παρουσία — μπορεί να αποσυνδέθηκε.",
     "remoteSpawnNonRetryable": "Η παρουσία απέτυχε να ξεκινήσει τη συνεδρία — ελέγξτε τη μηχανή ή ενημερώστε το CLI.",
-    "remoteSpawnInstanceDisconnected": "Η επιλεγμένη παρουσία αποσυνδέθηκε. Ξεκινήστε μια συνεδρία στο Cloud Agent ή επιλέξτε άλλη παρουσία."
+    "remoteSpawnInstanceDisconnected": "Η επιλεγμένη παρουσία αποσυνδέθηκε. Ξεκινήστε μια συνεδρία στο Cloud Agent ή επιλέξτε άλλη παρουσία.",
+    "liveCount_one": "{{count}} ΖΩΝΤΑΝΑ",
+    "liveCount_other": "{{count}} ΖΩΝΤΑΝΑ"
   },
   "agentChat": {
     "session": {
@@ -2281,7 +2283,9 @@
       "noCliInstancesDescription": "Εκτελέστε το `kilo remote` σε ένα έργο στον υπολογιστή σας ή ενημερώστε το Kilo CLI εάν εκτελείται ήδη.",
       "instanceOnProject": "{{name}} στο {{project}}",
       "instanceOnProjectSuffix": "{{name}} στο {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent"
+      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent",
+      "terminals": "Τερματικά",
+      "remotes": "Απομακρυσμένες περιπτώσεις"
     },
     "modePicker": {
       "title": "Επιλογή λειτουργίας",

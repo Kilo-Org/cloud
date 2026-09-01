@@ -1750,7 +1750,9 @@
       "instanceOnProject": "{{name}} sur {{project}}",
       "instanceOnProjectSuffix": "{{name}} sur {{project}} ({{suffix}})",
       "runOnCloudAgent": "Exécuter sur Agent cloud",
-      "runOnAccessibility": "Exécuter sur : {{label}}"
+      "runOnAccessibility": "Exécuter sur : {{label}}",
+      "terminals": "Terminaux",
+      "remotes": "Instances distantes"
     },
     "modePicker": {
       "title": "Sélectionner le mode",
@@ -2534,7 +2536,10 @@
     "sessionExited": "Session terminée",
     "remoteSpawnRetryable": "Impossible d'atteindre l'instance — elle s'est peut-être déconnectée.",
     "remoteSpawnNonRetryable": "L'instance n'a pas pu démarrer la session — vérifiez la machine ou mettez à jour le CLI.",
-    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance."
+    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance.",
+    "liveCount_one": "{{count}} EN DIRECT",
+    "liveCount_other": "{{count}} EN DIRECT",
+    "liveCount_many": "{{count}} EN DIRECT"
   },
   "monoScrollBlock": {
     "contentTruncated": "Contenu tronqué",

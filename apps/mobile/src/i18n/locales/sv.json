@@ -2116,7 +2116,9 @@
     "sessionExited": "Session avslutad",
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen – kontrollera maskinen eller uppdatera CLI:n.",
-    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session på Cloud Agent eller välj en annan instans."
+    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session på Cloud Agent eller välj en annan instans.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2281,7 +2283,9 @@
       "noCliInstancesDescription": "Kör `kilo remote` i ett projekt på din dator, eller uppdatera Kilo CLI om en redan körs.",
       "instanceOnProject": "{{name}} på {{project}}",
       "instanceOnProjectSuffix": "{{name}} på {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Kör på Cloud Agent"
+      "runOnCloudAgent": "Kör på Cloud Agent",
+      "terminals": "Terminaler",
+      "remotes": "Fjärrinstanser"
     },
     "modePicker": {
       "title": "Välj läge",

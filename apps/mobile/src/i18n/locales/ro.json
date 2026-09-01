@@ -2131,7 +2131,10 @@
     "sessionExited": "Sesiunea a fost închisă",
     "remoteSpawnRetryable": "Nu s-a putut ajunge la instanță — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică mașina sau actualizează CLI-ul.",
-    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță."
+    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2297,7 +2300,9 @@
       "noCliInstancesDescription": "Rulează `kilo remote` într-un proiect de pe computerul tău sau actualizează Kilo CLI dacă unul rulează deja.",
       "instanceOnProject": "{{name}} pe {{project}}",
       "instanceOnProjectSuffix": "{{name}} pe {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rulează pe Cloud Agent"
+      "runOnCloudAgent": "Rulează pe Cloud Agent",
+      "terminals": "Terminale",
+      "remotes": "Instanțe la distanță"
     },
     "modePicker": {
       "title": "Selectează modul",

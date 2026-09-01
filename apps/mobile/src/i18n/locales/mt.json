@@ -2161,7 +2161,12 @@
     "sessionExited": "Is-sessjoni spiċċat",
     "remoteSpawnRetryable": "Ma stajniex nilħqu l-istanza — jista' jkun li skonnettjat.",
     "remoteSpawnNonRetryable": "L-istanza ma rnexxiliex tibda s-sessjoni — iċċekkja l-magna jew aġġorna l-CLI.",
-    "remoteSpawnInstanceDisconnected": "L-istanza magħżula skonnettjat. Ibda sessjoni fuq Cloud Agent jew agħżel istanza oħra."
+    "remoteSpawnInstanceDisconnected": "L-istanza magħżula skonnettjat. Ibda sessjoni fuq Cloud Agent jew agħżel istanza oħra.",
+    "liveCount_one": "{{count}} DIRETT",
+    "liveCount_other": "{{count}} DIRETT",
+    "liveCount_two": "{{count}} DIRETT",
+    "liveCount_few": "{{count}} DIRETT",
+    "liveCount_many": "{{count}} DIRETT"
   },
   "agentChat": {
     "session": {
@@ -2329,7 +2334,9 @@
       "noCliInstancesDescription": "Mexxi `kilo remote` fi proġett fuq il-kompjuter tiegħek, jew aġġorna l-Kilo CLI jekk waħda diġà qed taħdem.",
       "instanceOnProject": "{{name}} fuq {{project}}",
       "instanceOnProjectSuffix": "{{name}} fuq {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Mexxi fuq Cloud Agent"
+      "runOnCloudAgent": "Mexxi fuq Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Istanzi remoti"
     },
     "modePicker": {
       "title": "Agħżel il-mod",

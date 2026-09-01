@@ -1662,7 +1662,9 @@
     "sessionExited": "Sessie beëindigd",
     "remoteSpawnRetryable": "De instantie is niet bereikbaar — deze is mogelijk verbroken.",
     "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
-    "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie."
+    "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1827,7 +1829,9 @@
       "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Uitvoeren op Cloudagent"
+      "runOnCloudAgent": "Uitvoeren op Cloudagent",
+      "terminals": "Terminals",
+      "remotes": "Externe instanties"
     },
     "modePicker": {
       "title": "Selecteer modus",

@@ -1694,7 +1694,13 @@
     "sessionExited": "انتهت الجلسة",
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
     "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
-    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر.",
+    "liveCount_one": "{{count}} مباشر",
+    "liveCount_other": "{{count}} مباشر",
+    "liveCount_zero": "{{count}} مباشر",
+    "liveCount_two": "{{count}} مباشر",
+    "liveCount_few": "{{count}} مباشر",
+    "liveCount_many": "{{count}} مباشر"
   },
   "agentChat": {
     "session": {
@@ -1863,7 +1869,9 @@
       "noCliInstancesDescription": "شغّل `kilo remote` في مشروع على جهاز الكمبيوتر الخاص بك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
       "instanceOnProject": "{{name}} على {{project}}",
       "instanceOnProjectSuffix": "{{name}} على {{project}} ({{suffix}})",
-      "runOnCloudAgent": "التشغيل على وكيل سحابي"
+      "runOnCloudAgent": "التشغيل على وكيل سحابي",
+      "terminals": "الطرفيات",
+      "remotes": "المثيلات البعيدة"
     },
     "modePicker": {
       "title": "اختيار الوضع",

@@ -1,5 +1,5 @@
 /**
- * PostgreSQL text and JSONB columns reject escaped NUL characters and lone UTF-16 surrogates.
+ * PostgreSQL text rejects NUL characters; JSONB also rejects lone UTF-16 surrogates.
  * JavaScript strings can contain both, so repair them before sending values to
  * a PostgreSQL column.
  */

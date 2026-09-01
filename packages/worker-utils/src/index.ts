@@ -144,6 +144,7 @@ export {
   isKiloCredentialExchangeEligible,
   isKiloResourceAudienceAllowed,
   verifyKiloSessionForPolicy,
+  verifyKiloTokenForResource,
   verifyKiloTokenForPolicy,
 } from './kilo-token-policy.js';
 export type {

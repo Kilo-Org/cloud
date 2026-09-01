@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 
 import { getCachedSecret } from './cached-secret';
 import { verifyKiloToken } from './kilo-token';
+import { verifyKiloTokenForResource, type KiloResourceAudiencePolicy } from './kilo-token-policy';
 
 export type KiloBearerAuthResult = {
   userId: string;
@@ -20,6 +21,16 @@ export type GetKiloUserPepper = (
   connectionString: string,
   userId: string
 ) => Promise<KiloUserPepperResult | null | undefined>;
+
+type KiloBearerAudienceOptions =
+  | {
+      audience?: string;
+      resourceAudience?: never;
+    }
+  | {
+      audience?: never;
+      resourceAudience?: KiloResourceAudiencePolicy;
+    };
 
 export async function findKiloUserPepper(
   connectionString: string,
@@ -47,15 +58,19 @@ export async function findKiloUserPepper(
  * A dependency failure (secret store, database) throws, so a caller can map an
  * outage to a retryable 503 instead of reporting it as an invalid token.
  */
-export async function verifyKiloBearerAgainstCurrentPepper(params: {
-  token: string | null;
-  nextAuthSecret: KiloSecretBinding | string;
-  workerEnv?: string;
-  connectionString: string;
-  getUserPepper?: GetKiloUserPepper;
-  audience?: string;
-  allowBlocked?: boolean;
-}): Promise<KiloBearerAuthResult | null> {
+export async function verifyKiloBearerAgainstCurrentPepper(
+  params: {
+    token: string | null;
+    nextAuthSecret: KiloSecretBinding | string;
+    workerEnv?: string;
+    connectionString: string;
+    getUserPepper?: GetKiloUserPepper;
+    allowBlocked?: boolean;
+  } & KiloBearerAudienceOptions
+): Promise<KiloBearerAuthResult | null> {
+  if (params.audience !== undefined && params.resourceAudience !== undefined) {
+    throw new Error('Bearer audience and resource audience policies are mutually exclusive');
+  }
   if (!params.token) return null;
 
   const getUserPepper = params.getUserPepper ?? findKiloUserPepper;
@@ -67,11 +82,14 @@ export async function verifyKiloBearerAgainstCurrentPepper(params: {
 
   let payload: Awaited<ReturnType<typeof verifyKiloToken>>;
   try {
-    payload = await verifyKiloToken(
-      params.token,
-      secret,
-      params.audience ? { audience: params.audience } : undefined
-    );
+    payload =
+      params.resourceAudience === undefined
+        ? await verifyKiloToken(
+            params.token,
+            secret,
+            params.audience ? { audience: params.audience } : undefined
+          )
+        : await verifyKiloTokenForResource(params.token, secret, params.resourceAudience);
   } catch {
     return null;
   }

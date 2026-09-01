@@ -6,6 +6,7 @@ import {
   isKiloCredentialExchangeEligible,
   isKiloResourceAudienceAllowed,
   verifyKiloSessionForPolicy,
+  verifyKiloTokenForResource,
   verifyKiloTokenForPolicy,
   type ModernKiloTokenClaims,
   type VerifiedKiloAuthContext,
@@ -319,6 +320,154 @@ describe('verifyKiloTokenForPolicy', () => {
         SECRET,
         LEGACY_POLICY
       )
+    ).rejects.toThrow();
+  });
+});
+
+describe('verifyKiloTokenForResource', () => {
+  it.each([
+    ['matching audience', legacyClaims({ aud: 'kilo-api' }), API_POLICY, true],
+    [
+      'matching audience array',
+      legacyClaims({ aud: ['kilo-gateway', 'kilo-api'] }),
+      API_POLICY,
+      true,
+    ],
+    ['missing required audience', legacyClaims(), API_POLICY, false],
+    ['missing legacy audience', legacyClaims(), LEGACY_POLICY, true],
+    ['mismatched audience', legacyClaims({ aud: 'kilo-gateway' }), API_POLICY, false],
+    ['null audience', legacyClaims({ aud: null }), API_POLICY, false],
+    ['empty audience', legacyClaims({ aud: '' }), API_POLICY, false],
+    ['numeric audience', legacyClaims({ aud: 1 }), API_POLICY, false],
+    ['empty audience array', legacyClaims({ aud: [] }), API_POLICY, false],
+    [
+      'duplicate audience members',
+      legacyClaims({ aud: ['kilo-api', 'kilo-api'] }),
+      API_POLICY,
+      false,
+    ],
+    [
+      'trimmed audience member',
+      legacyClaims({ aud: ['kilo-api', ' kilo-gateway'] }),
+      API_POLICY,
+      false,
+    ],
+    ['numeric audience member', legacyClaims({ aud: ['kilo-api', 1] }), API_POLICY, false],
+  ])('handles %s', async (_name, claims, policy, allowed) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const verification = verifyKiloTokenForResource(await sign(claims), SECRET, policy);
+    if (allowed) {
+      await expect(verification).resolves.toMatchObject({ kiloUserId: 'synthetic-user' });
+    } else {
+      await expect(verification).rejects.toThrow();
+    }
+  });
+
+  it.each(['', ' kilo-api', 'kilo-api '])(
+    'fails closed for invalid configured audience %j',
+    async audience => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      await expect(
+        verifyKiloTokenForResource(await sign(legacyClaims({ aud: 'kilo-api' })), SECRET, {
+          audience,
+          mode: 'required',
+        })
+      ).rejects.toThrow();
+    }
+  );
+
+  it('preserves known legacy claims and strips ignored unknown claims', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const payload = await verifyKiloTokenForResource(
+      await sign(
+        legacyClaims({
+          aud: 'kilo-api',
+          apiTokenPepper: null,
+          env: 'production',
+          botId: 'synthetic-bot',
+          tokenPurpose: 'human-api',
+          credentialExchange: true,
+          ignoredFutureResourceClaim: true,
+        })
+      ),
+      SECRET,
+      API_POLICY
+    );
+
+    expect(payload).toMatchObject({
+      kiloUserId: 'synthetic-user',
+      apiTokenPepper: null,
+      env: 'production',
+      botId: 'synthetic-bot',
+    });
+    expect(payload).not.toHaveProperty('ignoredFutureResourceClaim');
+    expect(payload).not.toHaveProperty('tokenPurpose');
+    expect(payload).not.toHaveProperty('credentialExchange');
+  });
+
+  it('preserves optional dates and jose temporal behavior', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const undated = await verifyKiloTokenForResource(
+      await sign({ version: 3, kiloUserId: 'synthetic-user', aud: 'kilo-api' }, { dates: false }),
+      SECRET,
+      API_POLICY
+    );
+    expect(undated).not.toHaveProperty('iat');
+    expect(undated).not.toHaveProperty('exp');
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ aud: 'kilo-api', iat: NOW_SECONDS + 1, exp: NOW_SECONDS + 10 })),
+        SECRET,
+        API_POLICY
+      )
+    ).resolves.toMatchObject({ iat: NOW_SECONDS + 1 });
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ aud: 'kilo-api', exp: NOW_SECONDS + 1.5 })),
+        SECRET,
+        API_POLICY
+      )
+    ).resolves.toMatchObject({ exp: NOW_SECONDS + 1.5 });
+  });
+
+  it('rejects malformed, expired, not-before, signature, version, and user failures', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    await expect(verifyKiloTokenForResource('not.a.token', SECRET, API_POLICY)).rejects.toThrow();
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ aud: 'kilo-api', exp: NOW_SECONDS - 1 })),
+        SECRET,
+        API_POLICY
+      )
+    ).rejects.toThrow();
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ aud: 'kilo-api' }), { nbf: NOW_SECONDS + 1 }),
+        SECRET,
+        API_POLICY
+      )
+    ).rejects.toThrow();
+    await expect(
+      verifyKiloTokenForResource(
+        await sign(legacyClaims({ aud: 'kilo-api' }), { secret: 'another-secret' }),
+        SECRET,
+        API_POLICY
+      )
+    ).rejects.toThrow();
+    await expect(
+      verifyKiloTokenForResource(
+        await sign({ version: 2, kiloUserId: 'synthetic-user', aud: 'kilo-api' }),
+        SECRET,
+        API_POLICY
+      )
+    ).rejects.toThrow();
+    await expect(
+      verifyKiloTokenForResource(await sign({ version: 3, aud: 'kilo-api' }), SECRET, API_POLICY)
     ).rejects.toThrow();
   });
 });

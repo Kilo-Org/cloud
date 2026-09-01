@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
-import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { kiloAuthMiddleware } from './kilo-auth.middleware';
-import type { GastownEnv } from '../gastown.worker';
+import type { WastelandEnv } from '../wasteland.worker';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 function createApp() {
   let downstreamCalls = 0;
-  const app = new Hono<GastownEnv>();
+  const app = new Hono<WastelandEnv>();
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
-  const handler = (c: Context<GastownEnv>) => {
+  const handler = (c: Context<WastelandEnv>) => {
     downstreamCalls += 1;
     return c.json({
       kiloUserId: c.get('kiloUserId'),
       isAdmin: c.get('kiloIsAdmin'),
       pepper: c.get('kiloApiTokenPepper'),
-      gastownAccess: c.get('kiloGastownAccess'),
       memberships: c.get('kiloOrgMemberships'),
     });
   };
@@ -42,7 +41,7 @@ async function signToken(
 }
 
 async function request(
-  app: Hono<GastownEnv>,
+  app: Hono<WastelandEnv>,
   token: string | undefined,
   secret: string | { get(): Promise<string | null> } | null = TEST_SECRET
 ) {
@@ -87,14 +86,14 @@ describe('kiloAuthMiddleware', () => {
   });
 
   it('accepts its audience as a string or an array', async () => {
-    for (const aud of [GASTOWN_AUDIENCE, ['kilo-api', GASTOWN_AUDIENCE]]) {
+    for (const aud of [WASTELAND_AUDIENCE, ['kilo-api', WASTELAND_AUDIENCE]]) {
       const { app } = createApp();
       const responses = await request(app, await signToken({ aud }));
       expect(responses.map(response => response.status)).toEqual([200, 200]);
     }
   });
 
-  it.each(['wasteland', 'kilo-api', 'kilo-gateway', 'git-token-service:github-user-access-token'])(
+  it.each(['gastown', 'kilo-api', 'kilo-gateway', 'git-token-service:github-user-access-token'])(
     'rejects a token for %s before calling downstream',
     async aud => {
       const { app, downstreamCalls } = createApp();
@@ -109,9 +108,9 @@ describe('kiloAuthMiddleware', () => {
     false,
     null,
     '',
-    ` ${GASTOWN_AUDIENCE}`,
-    [GASTOWN_AUDIENCE, ''],
-    [GASTOWN_AUDIENCE, GASTOWN_AUDIENCE],
+    ` ${WASTELAND_AUDIENCE}`,
+    [WASTELAND_AUDIENCE, ''],
+    [WASTELAND_AUDIENCE, WASTELAND_AUDIENCE],
   ])('rejects malformed explicit audiences before calling downstream', async aud => {
     const { app, downstreamCalls } = createApp();
     const responses = await request(app, await signToken({ aud }));
@@ -141,12 +140,11 @@ describe('kiloAuthMiddleware', () => {
     const responses = await request(
       app,
       await signToken({
-        aud: GASTOWN_AUDIENCE,
+        aud: WASTELAND_AUDIENCE,
         isAdmin: true,
         apiTokenPepper: 'pepper',
-        gastownAccess: true,
         orgMemberships: [{ orgId: 'org-a', role: 'owner' }],
-        deviceSessionId: 'session-gastown-test',
+        deviceSessionId: 'session-wasteland-test',
       })
     );
 
@@ -155,7 +153,6 @@ describe('kiloAuthMiddleware', () => {
         kiloUserId: 'user-abc',
         isAdmin: true,
         pepper: 'pepper',
-        gastownAccess: true,
         memberships: [{ orgId: 'org-a', role: 'owner' }],
       });
     }
@@ -166,7 +163,6 @@ describe('kiloAuthMiddleware', () => {
         kiloUserId: 'user-abc',
         isAdmin: false,
         pepper: null,
-        gastownAccess: false,
         memberships: [],
       });
     }

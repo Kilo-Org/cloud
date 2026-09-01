@@ -2114,7 +2114,9 @@
     "sessionExited": "Сесията е прекратена",
     "remoteSpawnRetryable": "Не може да се достигне инстанцията — вероятно се е прекъснала връзката.",
     "remoteSpawnNonRetryable": "Инстанцията не успя да стартира сесията — проверете машината или актуализирайте CLI.",
-    "remoteSpawnInstanceDisconnected": "Избраната инстанция се прекъсна. Стартирайте сесия в Cloud Agent или изберете друга инстанция."
+    "remoteSpawnInstanceDisconnected": "Избраната инстанция се прекъсна. Стартирайте сесия в Cloud Agent или изберете друга инстанция.",
+    "liveCount_one": "{{count}} НА ЖИВО",
+    "liveCount_other": "{{count}} НА ЖИВО"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Изпълни `kilo remote` в проект на компютъра си или актуализирай Kilo CLI, ако вече работи.",
       "instanceOnProject": "{{name}} в {{project}}",
       "instanceOnProjectSuffix": "{{name}} в {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Изпълни в Cloud Agent"
+      "runOnCloudAgent": "Изпълни в Cloud Agent",
+      "terminals": "Терминали",
+      "remotes": "Отдалечени инстанции"
     },
     "modePicker": {
       "title": "Избери режим",

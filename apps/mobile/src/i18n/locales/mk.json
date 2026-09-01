@@ -2114,7 +2114,9 @@
     "sessionExited": "Сесијата е затворена",
     "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
     "remoteSpawnNonRetryable": "Инстанцата не успеа да ја започне сесијата — проверете ја машината или ажурирајте го CLI.",
-    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започнете сесија на Cloud Agent или изберете друга инстанца."
+    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започнете сесија на Cloud Agent или изберете друга инстанца.",
+    "liveCount_one": "{{count}} ВОЖИВО",
+    "liveCount_other": "{{count}} ВОЖИВО"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Изврши `kilo remote` во проект на твојот компјутер, или ажурирај го Kilo CLI ако еден веќе работи.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Изврши на Cloud Agent"
+      "runOnCloudAgent": "Изврши на Cloud Agent",
+      "terminals": "Терминали",
+      "remotes": "Оддалечени инстанци"
     },
     "modePicker": {
       "title": "Избери режим",

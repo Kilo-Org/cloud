@@ -2144,7 +2144,11 @@
     "sessionExited": "Сеанс завершаны",
     "remoteSpawnRetryable": "Не ўдалося злучыцца з інстансам — магчыма, ён адключыўся.",
     "remoteSpawnNonRetryable": "Інстанс не змог запусціць сеанс — праверце машыну або абнавіце CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбраны інстанс адключыўся. Запусціце сеанс у Cloud Agent або абярыце іншы інстанс."
+    "remoteSpawnInstanceDisconnected": "Выбраны інстанс адключыўся. Запусціце сеанс у Cloud Agent або абярыце іншы інстанс.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE",
+    "liveCount_many": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2311,7 +2315,9 @@
       "noCliInstancesDescription": "Выканайце `kilo remote` у праекце на вашым кампутары або абнавіце Kilo CLI, калі ён ужо працуе.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запуск на Cloud Agent"
+      "runOnCloudAgent": "Запуск на Cloud Agent",
+      "terminals": "Тэрміналы",
+      "remotes": "Аддаленыя экзэмпляры"
     },
     "modePicker": {
       "title": "Выбраць рэжым",

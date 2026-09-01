@@ -2114,7 +2114,9 @@
     "sessionExited": "Iseshini iphumile",
     "remoteSpawnRetryable": "Asikwazanga ukufinyelela isibonelo — kungenzeka sinqanyulwe.",
     "remoteSpawnNonRetryable": "Isibonelo sehlulekile ukuqala iseshini — hlola umshini noma ubuyekeze i-CLI.",
-    "remoteSpawnInstanceDisconnected": "Isibonelo esikhethiwe sinqanyulwe. Qala iseshini ku-Cloud Agent noma ukhethe esinye isibonelo."
+    "remoteSpawnInstanceDisconnected": "Isibonelo esikhethiwe sinqanyulwe. Qala iseshini ku-Cloud Agent noma ukhethe esinye isibonelo.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Qalisa `kilo remote` kuphrojetha ekhompuyutheni yakho, noma buyekeza i-Kilo CLI uma isivele isebenza.",
       "instanceOnProject": "{{name}} ku-{{project}}",
       "instanceOnProjectSuffix": "{{name}} ku-{{project}} ({{suffix}})",
-      "runOnCloudAgent": "Sebenza ku-Cloud Agent"
+      "runOnCloudAgent": "Sebenza ku-Cloud Agent",
+      "terminals": "Amatheminali",
+      "remotes": "Izimo ezikude"
     },
     "modePicker": {
       "title": "Khetha imodi",

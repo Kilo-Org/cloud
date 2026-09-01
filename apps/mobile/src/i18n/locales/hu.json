@@ -2114,7 +2114,9 @@
     "sessionExited": "A munkamenet kilépett",
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet — ellenőrizze a gépet vagy frissítse a CLI-t.",
-    "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt."
+    "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt.",
+    "liveCount_one": "{{count}} ÉLŐ",
+    "liveCount_other": "{{count}} ÉLŐ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Futtassa a `kilo remote` parancsot egy projekten a számítógépén, vagy frissítse a Kilo CLI-t, ha már fut egy.",
       "instanceOnProject": "{{name}} a {{project}} projekten",
       "instanceOnProjectSuffix": "{{name}} a {{project}} projekten ({{suffix}})",
-      "runOnCloudAgent": "Futtatás a Cloud Ageneten"
+      "runOnCloudAgent": "Futtatás a Cloud Ageneten",
+      "terminals": "Terminálok",
+      "remotes": "Távoli példányok"
     },
     "modePicker": {
       "title": "Mód kiválasztása",

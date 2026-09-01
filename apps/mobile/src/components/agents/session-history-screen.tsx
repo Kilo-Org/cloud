@@ -78,6 +78,7 @@ export function SessionHistoryScreen() {
 
   const {
     storedSessions,
+    activeSessionIds,
     storedIsFetching,
     storedLoadedPageCount,
     paging,
@@ -212,6 +213,7 @@ export function SessionHistoryScreen() {
         <AgentSessionListContent
           searchInputRef={searchInputRef}
           sections={sections}
+          activeSessionIds={activeSessionIds}
           hasAnySessions={hasAnySessions}
           isLoading={isLoading}
           isError={contentIsError}

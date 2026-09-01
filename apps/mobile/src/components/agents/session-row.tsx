@@ -77,8 +77,8 @@ type StoredSessionRowProps = {
    */
   interactive?: boolean;
   /**
-   * Forwarded to the base `SessionRow` live dot. Defaults to `false` so
-   * Home and the Agents list stay behavior-identical.
+   * Forwarded to the base `SessionRow` live dot. Defaults to `false` for
+   * callers that do not supply liveness.
    */
   live?: boolean;
   /**
@@ -204,6 +204,7 @@ export function StoredSessionRow({
         accessibilityLabel={sessionRowAccessibilityLabel({
           title,
           needsInput,
+          live: variant === 'list' && live,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.git_branch,

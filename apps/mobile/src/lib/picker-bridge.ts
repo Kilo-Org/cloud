@@ -1,3 +1,5 @@
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -73,19 +75,9 @@ export type RepoPickerBridge = {
   onSelect: (repo: string) => void;
 };
 
-/**
- * One row inside the "Run on" instance picker. Identical to the tRPC
- * `activeSessions.listInstances` output shape so the bridge can hand the
- * server payload straight to the picker without re-derivation.
- */
-export type InstancePickerInstance = {
-  connectionId: string;
-  name: string;
-  projectName: string;
-  version?: string;
-  /** Optional capability map carried through from the tRPC row. */
-  capabilities?: { attachments?: boolean; sessionClone?: boolean };
-};
+/** The complete normalized router row, including all advertised capabilities. */
+export type InstancePickerInstance =
+  inferRouterOutputs<MobileRouter>['activeSessions']['listInstances']['instances'][number];
 
 export type InstancePickerBridge = {
   instances: InstancePickerInstance[];

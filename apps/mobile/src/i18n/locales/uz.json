@@ -2114,7 +2114,9 @@
     "sessionExited": "Sessiya tugadi",
     "remoteSpawnRetryable": "Ishlab chiquvchi muhitga yetib bo‘lmadi — u uzilgan bo‘lishi mumkin.",
     "remoteSpawnNonRetryable": "Ishlab chiquvchi muhit sessiyani ishga tushira olmadi — mashinani tekshiring yoki CLI versiyasini yangilang.",
-    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang."
+    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang.",
+    "liveCount_one": "{{count}} JO'N",
+    "liveCount_other": "{{count}} JO'N"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Kompyuteringizdagi loyihada `kilo remote` ni ishga tushiring yoki allaqachon ishlayotgan bo'lsa Kilo CLI'ni yangilang.",
       "instanceOnProject": "{{project}} ustida {{name}}",
       "instanceOnProjectSuffix": "{{project}} ustida {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent'da yurgizish"
+      "runOnCloudAgent": "Cloud Agent'da yurgizish",
+      "terminals": "Terminallar",
+      "remotes": "Masofaviy missallar"
     },
     "modePicker": {
       "title": "Rejimni tanlash",

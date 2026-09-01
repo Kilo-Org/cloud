@@ -2114,7 +2114,9 @@
     "sessionExited": "Lotu lokið",
     "remoteSpawnRetryable": "Náði ekki til eintaksins — það gæti hafa tengst af.",
     "remoteSpawnNonRetryable": "Eintakið náði ekki að ræsa lotuna — athugaðu vélina eða uppfærðu CLI.",
-    "remoteSpawnInstanceDisconnected": "Valið eintak tengdist af. Byrjaðu lotu á Cloud Agent eða veldu annað eintak."
+    "remoteSpawnInstanceDisconnected": "Valið eintak tengdist af. Byrjaðu lotu á Cloud Agent eða veldu annað eintak.",
+    "liveCount_one": "{{count}} BEIN",
+    "liveCount_other": "{{count}} BEIN"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "Keyrðu `kilo remote` í verkefni á tölvunni þinni, eða uppfærðu Kilo CLI ef eitt er þegar í gangi.",
       "instanceOnProject": "{{name}} á {{project}}",
       "instanceOnProjectSuffix": "{{name}} á {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Keyra á Cloud Agent"
+      "runOnCloudAgent": "Keyra á Cloud Agent",
+      "terminals": "Útstöðvar",
+      "remotes": "Fjartilvik"
     },
     "modePicker": {
       "title": "Veldu ham",

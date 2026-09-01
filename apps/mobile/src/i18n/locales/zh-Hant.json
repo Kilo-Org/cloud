@@ -1660,7 +1660,9 @@
     "sessionExited": "工作階段已結束",
     "remoteSpawnRetryable": "無法連線到該執行個體 — 它可能已斷線。",
     "remoteSpawnNonRetryable": "該執行個體無法啟動工作階段 — 請檢查機器或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "選取的執行個體已斷線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。"
+    "remoteSpawnInstanceDisconnected": "選取的執行個體已斷線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。",
+    "liveCount_one": "{{count}} 即時",
+    "liveCount_other": "{{count}} 即時"
   },
   "agentChat": {
     "session": {
@@ -1825,7 +1827,9 @@
       "noCliInstancesDescription": "在您電腦上的專案中執行 `kilo remote`，或如果已有 Kilo CLI 在執行，請更新它。",
       "instanceOnProject": "{{project}} 上的 {{name}}",
       "instanceOnProjectSuffix": "{{project}} 上的 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "在雲端代理上執行"
+      "runOnCloudAgent": "在雲端代理上執行",
+      "terminals": "終端機",
+      "remotes": "遠端執行個體"
     },
     "modePicker": {
       "title": "選取模式",

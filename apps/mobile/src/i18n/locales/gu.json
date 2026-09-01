@@ -2114,7 +2114,9 @@
     "sessionExited": "સત્ર બહાર નીકળ્યું",
     "remoteSpawnRetryable": "ઇન્સ્ટન્સ સુધી પહોંચી શકાયું નહીં — તે ડિસ્કનેક્ટ થયું હોઈ શકે છે.",
     "remoteSpawnNonRetryable": "ઇન્સ્ટન્સ સત્ર શરૂ કરવામાં નિષ્ફળ ગયું — મશીન તપાસો અથવા CLI અપડેટ કરો.",
-    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો."
+    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો.",
+    "liveCount_one": "{{count}} લાઇવ",
+    "liveCount_other": "{{count}} લાઇવ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "તમારા કમ્પ્યુટરના પ્રોજેક્ટમાં `kilo remote` ચલાવો, અથવા જો પહેલેથી ચાલતું હોય તો Kilo CLI અપડેટ કરો.",
       "instanceOnProject": "{{name}} {{project}} પર",
       "instanceOnProjectSuffix": "{{name}} {{project}} પર ({{suffix}})",
-      "runOnCloudAgent": "ક્લાઉડ એજન્ટ પર ચલાવો"
+      "runOnCloudAgent": "ક્લાઉડ એજન્ટ પર ચલાવો",
+      "terminals": "ટર્મિનલો",
+      "remotes": "રિમોટ ઇન્સ્ટન્સ"
     },
     "modePicker": {
       "title": "મોડ પસંદ કરો",

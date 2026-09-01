@@ -123,6 +123,9 @@ vi.mock('@/lib/organization-context', () => ({
     setOrganizationId: vi.fn(),
   }),
 }));
+vi.mock('@/lib/hooks/use-agent-sessions', () => ({
+  useLiveAgentSessions: () => ({ activeSessions: [], isLoading: false, isError: false }),
+}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({
     userId: 'u-1',

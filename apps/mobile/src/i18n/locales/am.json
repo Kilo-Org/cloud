@@ -2114,7 +2114,9 @@
     "sessionExited": "ክፍለ ጊዜው ወጥቷል",
     "remoteSpawnRetryable": "እንደገና መድረስ አልተቻለም — ተቋርጦ ሊሆን ይችላል።",
     "remoteSpawnNonRetryable": "ክፍለ ጊዜውን መጀመር አልተሳካም — ማሽኑን ያረጋግጡ ወይም CLI ን ያዘምኑ።",
-    "remoteSpawnInstanceDisconnected": "የተመረጠው እንደጠየቀ አካል ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ይጀምሩ ወይም ሌላ እንደጠየቀ ይምረጡ።"
+    "remoteSpawnInstanceDisconnected": "የተመረጠው እንደጠየቀ አካል ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ይጀምሩ ወይም ሌላ እንደጠየቀ ይምረጡ።",
+    "liveCount_one": "{{count}} ቀጥታ",
+    "liveCount_other": "{{count}} ቀጥታ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "በኮምፒውተርዎ ላይ ባለ ፕሮጀክት ውስጥ `kilo remote` ያሂዱ፣ ወይም አንድ እየሰራ ካለ የKilo CLIን ያዘምኑ።",
       "instanceOnProject": "{{name}} በ{{project}} ላይ",
       "instanceOnProjectSuffix": "{{name}} በ{{project}} ላይ ({{suffix}})",
-      "runOnCloudAgent": "በክላውድ ወኪል ላይ ያሂዱ"
+      "runOnCloudAgent": "በክላውድ ወኪል ላይ ያሂዱ",
+      "terminals": "ተርሚናሎች",
+      "remotes": "የርቀት አጋጣሚዎች"
     },
     "modePicker": {
       "title": "ሁነታን ይምረጡ",

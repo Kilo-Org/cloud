@@ -2114,7 +2114,9 @@
     "sessionExited": "ਸੈਸ਼ਨ ਬੰਦ ਹੋਇਆ",
     "remoteSpawnRetryable": "ਇੰਸਟੈਂਸ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ — ਇਹ ਡਿਸਕਨੈਕਟ ਹੋ ਸਕਦਾ ਹੈ।",
     "remoteSpawnNonRetryable": "ਇੰਸਟੈਂਸ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰਨ ਵਿੱਚ ਅਸਫਲ ਰਿਹਾ — ਮਸ਼ੀਨ ਜਾਂਚੋ ਜਾਂ CLI ਅੱਪਡੇਟ ਕਰੋ।",
-    "remoteSpawnInstanceDisconnected": "ਚੁਣਿਆ ਗਿਆ ਇੰਸਟੈਂਸ ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ। Cloud Agent 'ਤੇ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਕੋਈ ਹੋਰ ਇੰਸਟੈਂਸ ਚੁਣੋ।"
+    "remoteSpawnInstanceDisconnected": "ਚੁਣਿਆ ਗਿਆ ਇੰਸਟੈਂਸ ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ। Cloud Agent 'ਤੇ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਕੋਈ ਹੋਰ ਇੰਸਟੈਂਸ ਚੁਣੋ।",
+    "liveCount_one": "{{count}} ਲਾਈਵ",
+    "liveCount_other": "{{count}} ਲਾਈਵ"
   },
   "agentChat": {
     "session": {
@@ -2279,7 +2281,9 @@
       "noCliInstancesDescription": "ਆਪਣੇ ਕੰਪਿਊਟਰ ਦੇ ਪ੍ਰੋਜੈਕਟ ਵਿੱਚ `kilo remote` ਚਲਾਓ, ਜਾਂ ਜੇਕਰ ਕੋਈ ਪਹਿਲਾਂ ਹੀ ਚੱਲ ਰਿਹਾ ਹੈ ਤਾਂ Kilo CLI ਅੱਪਡੇਟ ਕਰੋ।",
       "instanceOnProject": "{{name}} {{project}} 'ਤੇ",
       "instanceOnProjectSuffix": "{{name}} {{project}} 'ਤੇ ({{suffix}})",
-      "runOnCloudAgent": "ਕਲਾਉਡ ਏਜੰਟ 'ਤੇ ਚਲਾਓ"
+      "runOnCloudAgent": "ਕਲਾਉਡ ਏਜੰਟ 'ਤੇ ਚਲਾਓ",
+      "terminals": "ਟਰਮੀਨਲ",
+      "remotes": "ਰਿਮੋਟ ਇੰਸਟੈਂਸ"
     },
     "modePicker": {
       "title": "ਮੋਡ ਚੁਣੋ",

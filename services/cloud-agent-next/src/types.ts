@@ -597,23 +597,13 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
-  /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
-  GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */
-  GITLAB_TOKEN_CONTAINMENT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose Bitbucket token uses credential containment, or `*` for all orgs */
-  BITBUCKET_TOKEN_CONTAINMENT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose Kilo token uses credential containment, or `*` for all orgs */
-  KILOCODE_TOKEN_CONTAINMENT_ORG_IDS?: string;
+  CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
   REPO_SNAPSHOT_ORG_IDS?: string;
   /**
-   * Comma-separated org IDs that get the wrapper-side tool/server memory
-   * cgroup partition, or '*' for all. See MEMORY_CGROUPS_PLAN.md (W4).
+   * Wrapper-side tool/server memory cgroup partition configuration. See
+   * MEMORY_CGROUPS_PLAN.md (W4).
    */
-  TOOL_CGROUP_ORG_IDS?: string;
-  /** Passed through to the wrapper when the org is gated in by TOOL_CGROUP_ORG_IDS. See wrapper/src/tool-cgroup.ts. */
-  TOOL_CGROUP_MODE?: string;
   TOOL_CGROUP_RESERVE_MB?: string;
   TOOL_CGROUP_SERVER_LIMIT_MB?: string;
   TOOL_CGROUP_SWEEP_INTERVAL_MS?: string;

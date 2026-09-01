@@ -26,31 +26,20 @@ cloud-agent-next refactor.
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
 
-## Credential containment (opt-in)
+## Credential containment
 
-Credential containment is **disabled by default** in the local `dev`
-environment: all three `*_TOKEN_CONTAINMENT_ORG_IDS` values in
-`wrangler.jsonc` `env.dev.vars` are empty, so new sessions use non-containment
-sandbox classes and receive raw development credentials.
+`CREDENTIAL_CONTAINMENT_ENABLED` controls GitHub, GitLab, Bitbucket, and Kilo
+credential containment together for new non-devcontainer sessions. Containment
+is enabled unless this variable is set to `false`.
 
-To exercise containment locally, opt in by setting one or more lists to `*`
-in `.dev.vars`:
+Local `dev` defaults to `false` because of Cloudflare's local outbound proxy
+limitations. Set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` to opt in
+when using proxy-compatible upstreams. Devcontainer sessions remain excluded
+because DIND does not support managed SCM containment.
 
-```bash
-# GitHub containment only:
-GITHUB_TOKEN_CONTAINMENT_ORG_IDS=*
-
-# All providers:
-GITHUB_TOKEN_CONTAINMENT_ORG_IDS=*
-GITLAB_TOKEN_CONTAINMENT_ORG_IDS=*
-KILOCODE_TOKEN_CONTAINMENT_ORG_IDS=*
-```
-
-`.dev.vars` overrides take precedence over the empty `wrangler.jsonc` dev
-defaults. Containment flags are persisted on the workspace at session
-creation, so changing these values requires a **new session** (or a normal
-local state reset) to take effect — existing sessions keep their original
-containment flags.
+Containment flags are persisted on the workspace at session creation, so
+changing this variable requires a new session; existing sessions keep their
+original containment flags.
 
 ## Running
 

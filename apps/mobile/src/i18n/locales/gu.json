@@ -156,7 +156,7 @@
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
     "returnSendsMessageSubtitle": "બંધ હોય ત્યારે, રિટર્ન એજન્ટના સંદેશ ઇનપુટમાં નવી લાઇન દાખલ કરે છે.",
     "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
-    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે. ઉપકરણના સેટિંગ્સમાં બાયોમેટ્રિક્સ અથવા ઉપકરણનો પાસકોડ સેટ કરો. તમારા ઉપકરણનો પાસકોડ વૈકલ્પિક ઉપાય તરીકે ઉપલબ્ધ છે."
+    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "explore": "શોધો",
     "seeAll": "બધા જુઓ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "અત્યારે કંઈ ચાલી રહ્યું નથી"
   },
   "imageViewer": {
     "close": "{{filename}} બંધ કરો",

@@ -159,7 +159,7 @@ describe('SessionFilterChips', () => {
       expect.arrayContaining(['grow-0', 'shrink-0'])
     );
     expect(stripProps.contentContainerClassName?.split(' ')).toEqual(
-      expect.arrayContaining(['items-center', 'gap-2', 'px-[22px]', 'py-2'])
+      expect.arrayContaining(['items-center', 'gap-2', 'px-[22px]'])
     );
     expect(stripProps.contentContainerStyle).toBeUndefined();
     const pills = strip.findAllByType(Pressable);
@@ -169,17 +169,21 @@ describe('SessionFilterChips', () => {
       expect(pillProps.accessibilityRole).toBe('button');
       expect(pillProps.className?.split(' ')).toEqual(
         expect.arrayContaining([
-          'min-h-[48px]',
-          'min-w-[48px]',
+          'min-h-[44px]',
+          'min-w-[44px]',
           'self-center',
           'shrink-0',
-          'items-center',
-          'rounded-full',
+          'justify-center',
           'active:opacity-70',
         ])
       );
       const label = pill.findByType(Text);
       const labelProps = label.props as ComponentProps<typeof Text>;
+      expect((label.parent?.props.className as string | undefined)?.split(' ')).toEqual(
+        expect.arrayContaining(['rounded-full', 'px-2', 'py-1'])
+      );
+      expect(pillProps.className).not.toContain('bg-accent-soft');
+      expect(labelProps.ellipsizeMode).toBe('tail');
       expect(labelProps.numberOfLines).toBe(1);
       expect(labelProps.className?.split(' ')).toContain('max-w-[220px]');
       expect(labelProps.allowFontScaling).not.toBe(false);

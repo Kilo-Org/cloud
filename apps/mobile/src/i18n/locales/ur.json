@@ -156,7 +156,7 @@
     "returnSendsMessage": "ریٹرن کلید پیغام بھیجتی ہے",
     "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔",
     "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
-    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔ ڈیوائس کی سیٹنگز میں بایومیٹرکس یا ڈیوائس کا پاس کوڈ ترتیب دیں۔ آپ کی ڈیوائس کا پاس کوڈ متبادل کے طور پر دستیاب ہے۔"
+    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "نیا کوڈنگ کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "اس وقت کچھ بھی نہیں چل رہا"
   },
   "imageViewer": {
     "close": "{{filename}} بند کریں",

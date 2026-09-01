@@ -732,7 +732,7 @@ describe('SessionDetailContent cancel/restore', () => {
     });
     expect(hoisted.chatComposer.draft).toEqual({ text: 'Current prompt', files: [FILE_PART] });
     expect(readBubble(renderer, selected.info.id)).toBeUndefined();
-    expect(statusMessages(renderer)).toEqual([restored]);
+    expect(statusMessages(renderer)).toEqual([]);
     unmountScreen(renderer);
   });
 
@@ -778,7 +778,7 @@ describe('SessionDetailContent cancel/restore', () => {
       });
       expect(currentManager.cancelQueuedMessage.mock.calls).toEqual([[message.info.id]]);
       expect(detailsProps(renderer).visible).toBe(false);
-      expect(statusMessages(renderer)).toEqual([occupied ? restoreAvailable : restored]);
+      expect(statusMessages(renderer)).toEqual([]);
       expect(hoisted.announce.mock.calls).toEqual([[occupied ? restoreAvailable : restored]]);
       if (occupied) {
         expect(hoisted.chatComposer.draft).toEqual(original);
@@ -800,7 +800,7 @@ describe('SessionDetailContent cancel/restore', () => {
         act(() => {
           restore(message);
         });
-        expect(statusMessages(renderer)).toEqual([restored]);
+        expect(statusMessages(renderer)).toEqual([]);
         expect(hoisted.announce.mock.calls).toEqual([[restoreAvailable], [restored]]);
       }
       expect(hoisted.chatComposer.draft).toEqual({ text: text || original.text, files });
@@ -981,7 +981,7 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(hoisted.chatComposer.draft).toEqual({ text: 'Queued prompt', files: [FILE_PART] });
       expect(readBubble(renderer, message.info.id)).toBeUndefined();
       expect(detailsProps(renderer).visible).toBe(false);
-      expect(statusMessages(renderer)).toEqual([restored]);
+      expect(statusMessages(renderer)).toEqual([]);
       expect(hoisted.announce.mock.calls).toEqual([[upgrade], [restored]]);
       unmountScreen(renderer);
     }
@@ -1044,7 +1044,7 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(hoisted.chatComposer.draft).toEqual({ text: 'Queued prompt', files: [] });
       expect(readBubble(renderer, message.info.id)).toBeUndefined();
       expect(detailsProps(renderer).visible).toBe(false);
-      expect(statusMessages(renderer)).toEqual([restored]);
+      expect(statusMessages(renderer)).toEqual([]);
       expect(hoisted.announce.mock.calls).toEqual([[failed], [restored]]);
       unmountScreen(renderer);
     }
@@ -1161,7 +1161,7 @@ describe('SessionDetailContent cancel/restore', () => {
     });
     expect(hoisted.chatComposer.draft).toEqual({ text: 'Next session prompt', files: [] });
     expect(readBubble(renderer, nextMessage.info.id)).toBeUndefined();
-    expect(statusMessages(renderer)).toEqual([restored]);
+    expect(statusMessages(renderer)).toEqual([]);
     unmountScreen(renderer);
   });
 
@@ -1288,7 +1288,7 @@ describe('SessionDetailContent cancel/restore', () => {
       });
       expect(detailsProps(renderer).visible).toBe(false);
       expect(detailsProps(renderer).cancelQueuedFeedback).toBeNull();
-      expect(statusMessages(renderer)).toEqual([outcome === 'success' ? restored : failed]);
+      expect(statusMessages(renderer)).toEqual(outcome === 'success' ? [] : [failed]);
       expect(hoisted.announce.mock.calls).toEqual([[outcome === 'success' ? restored : failed]]);
       expect(hoisted.chatComposer.draft.text).toBe(outcome === 'success' ? 'Queued prompt' : '');
       closeDetails(renderer);
@@ -1356,7 +1356,9 @@ describe('SessionDetailContent cancel/restore', () => {
           .findAll(node => node.type === Text && node.props.children === failed)
       ).toHaveLength(1);
       expect(detailsProps(renderer).canCancelQueued).toBe(outcome !== 'upgrade');
-      expect(statusMessages(renderer)).toEqual([firstFeedback, failed]);
+      expect(statusMessages(renderer)).toEqual(
+        outcome === 'success' ? [failed] : [firstFeedback, failed]
+      );
       expect(hoisted.announce.mock.calls).toEqual([[failed], [firstFeedback]]);
       expect(hoisted.chatComposer.draft).toEqual(
         outcome === 'success'
@@ -1370,7 +1372,7 @@ describe('SessionDetailContent cancel/restore', () => {
         [second.info.id],
       ]);
       closeDetails(renderer);
-      expect(statusMessages(renderer)).toEqual([firstFeedback]);
+      expect(statusMessages(renderer)).toEqual(outcome === 'success' ? [] : [firstFeedback]);
       expect(hoisted.announce.mock.calls).toEqual([[failed], [firstFeedback]]);
       unmountScreen(renderer);
     }
@@ -1466,7 +1468,7 @@ describe('SessionDetailContent cancel/restore', () => {
       expect(detailsProps(renderer).message?.info.id).toBe(second.info.id);
       expect(detailsProps(renderer).canCancelQueued).toBe(true);
       expect(detailsProps(renderer).cancelQueuedFeedback).toBeNull();
-      expect(statusMessages(renderer)).toEqual([dropped ? restored : failed]);
+      expect(statusMessages(renderer)).toEqual(dropped ? [] : [failed]);
       expect(hoisted.announce.mock.calls).toEqual([[dropped ? restored : failed]]);
       expect(hoisted.chatComposer.draft.text).toBe(dropped ? 'Queued prompt' : '');
       unmountScreen(renderer);

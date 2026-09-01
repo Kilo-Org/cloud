@@ -156,7 +156,7 @@
     "returnSendsMessage": "Færslulykill sendir skilaboð",
     "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða.",
     "biometricUnlock": "Aflæsa með lífkennum",
-    "biometricUnlockSubtitle": "Aflæsingar er krafist við ræsingu og eftir fimm mínútur í bakgrunni. Settu upp lífkenni eða aðgangskóða tækisins í stillingum tækisins. Þú getur notað aðgangskóða tækisins sem varaleið."
+    "biometricUnlockSubtitle": "Aflæsingar er krafist við ræsingu og eftir fimm mínútur í bakgrunni."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -839,7 +839,7 @@
       "managedByAdmin": "Stofnun þín sér um reikninga.",
       "couldNotLoad": "Tókst ekki að hlaða reikningsupplýsingum",
       "manageOnWeb": "Sýsla reikninga á vefnum",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Snemmbúinn",
       "finalCommitTermEndsOn": "Lokaskildi skuldbindingar þinnar endar {{date}}. Haltu áfram sem Standard á {{price}}, annars lýkur hýsingu.",
       "freeTrial": "Ókeypis reynslutímabil",
@@ -856,7 +856,7 @@
       "trialDaysRemaining": "Reynslutímabil: {{remaining}} eftir",
       "trialEndingSoon": "Reynslutímabili lýkur fljótlega: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1135,9 +1135,9 @@
       "destroying": "EYÐI",
       "provisioned": "UNDIRBÚIÐ",
       "restarting": "ENDURRÆSI",
-      "running": "Í gangi",
+      "running": "Í GANGI",
       "shuttingDown": "SLÖKKT AÐ KVÍKNA",
-      "starting": "Hefst",
+      "starting": "HEFST",
       "stopped": "STÖÐVUÐ",
       "stopping": "STÖÐVA",
       "unknown": "ÓÞEKKT",
@@ -1294,7 +1294,7 @@
       "started": "Hófst",
       "completed": "Lokið",
       "cost": "Kostnaður",
-      "tokens": "tákn",
+      "tokens": "Tákn",
       "tokensInOut": "{{input}} inn / {{output}} út",
       "openPullRequest": "Opna pull request",
       "council": "Ráð",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Bíða eftir úttektarafritinu.",
       "transcriptEmpty": "Ekkert afrit fyrir þessa úttekt.",
       "transcriptRetry": "Ekki tókst að hlaða úttektarafritið.",
-      "transcriptLive": "BEIN",
+      "transcriptLive": "Bein",
       "agentIdle": "Umboð í bið",
       "agentWorking": "Umboð að vinna...",
       "anErrorOccurred": "Villa kom upp",
@@ -1702,7 +1702,7 @@
       "statusOpen": "Opið",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "lagfæring er þegar hafin",
-      "reasonNoBandwidth": "Engin afkastageta er tiltæk",
+      "reasonNoBandwidth": "engin afkastageta er tiltæk",
       "reasonTolerableRisk": "áhættan er þolanleg",
       "reasonInaccurate": "atvikið er ónákvæmt",
       "reasonNotUsed": "viðkvæmur kóði er ekki notaður",
@@ -2673,7 +2673,7 @@
       "open": "opin pull-beiðni",
       "closed": "lokuð pull-beiðni",
       "merged": "sameinuð pull-beiðni",
-      "draft": "Pull request í drögum",
+      "draft": "pull request í drögum",
       "updating": "Uppfærir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull-beiðni"
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Nýtt forritunarverkefni",
     "explore": "Kanna",
     "seeAll": "Sjá allt",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ekkert er í gangi núna"
   },
   "imageViewer": {
     "close": "Loka {{filename}}",
@@ -2991,7 +2991,7 @@
   "feedback": {
     "noEmailApp": "Ekkert tölvupóstforrit tiltækt. Þú getur náð í okkur á {{email}}",
     "couldNotOpenStore": "Ekki tókst að opna verslunina.",
-    "emailSubject": "Ábending um farsímaapp",
+    "emailSubject": "ábending um farsímaapp",
     "neutralTitle": "Metdu Kilo-forritið",
     "rateTheApp": "Metdu forritið",
     "sendFeedback": "Senda endurgjöf"

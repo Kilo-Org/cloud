@@ -247,6 +247,7 @@ export function NewSessionScreenBody() {
   const {
     data: instancesData,
     isLoading: isLoadingInstances,
+    isFetching: isFetchingInstances,
     refetch: refetchInstances,
   } = useQuery({
     ...trpc.activeSessions.listInstances.queryOptions(undefined, {
@@ -660,6 +661,8 @@ export function NewSessionScreenBody() {
         runOnInstance={runOnInstance}
         instanceList={instanceList}
         isLoadingInstances={isLoadingInstances}
+        isFetchingInstances={isFetchingInstances}
+        onRefreshInstances={() => void refetchInstances()}
         onChangeRunOnInstance={handleRunOnChange}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         folderPath={folderPath}

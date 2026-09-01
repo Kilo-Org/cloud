@@ -25,6 +25,7 @@ import {
 import { getChildSessionModelLabel } from './child-session-model';
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
 
 export { getTaskToolSessionId } from './child-session-card-state';
@@ -158,9 +159,14 @@ export function ChildSessionMessage({
     );
   }
 
+  const visibleParts = message.parts.filter(partRendersContent);
+  if (visibleParts.length === 0) {
+    return null;
+  }
+
   return (
     <View className="gap-1 rounded-md bg-secondary p-2">
-      {message.parts.map(p => {
+      {visibleParts.map(p => {
         if (isToolPart(p) && p.tool === 'task') {
           const nestedSessionId = getTaskToolSessionId(p);
           const nestedMessages = nestedSessionId ? getChildMessages(nestedSessionId) : [];

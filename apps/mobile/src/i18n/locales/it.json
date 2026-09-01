@@ -890,7 +890,7 @@
       "transcriptWaiting": "In attesa della trascrizione della revisione.",
       "transcriptEmpty": "Nessuna trascrizione per questa revisione.",
       "transcriptRetry": "Impossibile caricare la trascrizione della revisione.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agente inattivo",
       "agentWorking": "Agente al lavoro...",
       "anErrorOccurred": "Si è verificato un errore",
@@ -2270,7 +2270,7 @@
     "returnSendsMessage": "Il tasto Invio invia il messaggio",
     "returnSendsMessageSubtitle": "Se disattivato, Invio inserisce un'interruzione di riga nei campi di inserimento dei messaggi degli agenti.",
     "biometricUnlock": "Sblocca con l'autenticazione biometrica",
-    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano. Configura l'autenticazione biometrica o un codice di accesso del dispositivo nelle impostazioni del dispositivo. Il codice di accesso del dispositivo resta disponibile come alternativa."
+    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2312,7 +2312,7 @@
     "newCodingTask": "Nuova attività di codifica",
     "explore": "Esplora",
     "seeAll": "Vedi tutto",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Niente in esecuzione al momento"
   },
   "imageViewer": {
     "close": "Chiudi {{filename}}",

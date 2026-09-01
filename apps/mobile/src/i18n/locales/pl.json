@@ -156,7 +156,7 @@
     "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
     "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów.",
     "biometricUnlock": "Odblokuj za pomocą biometrii",
-    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle. Skonfiguruj biometrię lub kod urządzenia w ustawieniach urządzenia. Kod urządzenia pozostaje dostępny jako metoda zapasowa."
+    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle."
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -730,9 +730,9 @@
       "destroying": "NISZCZENIE",
       "provisioned": "PRZYGOTOWANA",
       "restarting": "PONOWNE URUCHAMIANIE",
-      "running": "W toku",
+      "running": "W TOKU",
       "shuttingDown": "ZAMYKANIE",
-      "starting": "Rozpoczynanie",
+      "starting": "ROZPOCZYNANIE",
       "stopped": "ZATRZYMANA",
       "stopping": "ZATRZYMYWANIE",
       "unknown": "NIEZNANY",
@@ -912,7 +912,7 @@
       "transcriptWaiting": "Oczekiwanie na transkrypt przeglądu.",
       "transcriptEmpty": "Brak transkryptu tego przeglądu.",
       "transcriptRetry": "Nie udało się załadować transkryptu przeglądu.",
-      "transcriptLive": "NA ŻYWO",
+      "transcriptLive": "Na żywo",
       "agentIdle": "Agent bezczynny",
       "agentWorking": "Agent pracuje...",
       "anErrorOccurred": "Wystąpił błąd",
@@ -1298,11 +1298,11 @@
       "statusFixed": "Naprawione",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Poprawka już się rozpoczęła",
-      "reasonNoBandwidth": "Brak wolnych zasobów",
-      "reasonTolerableRisk": "Ryzyko jest akceptowalne",
-      "reasonInaccurate": "Ustalenie jest nieprawidłowe",
-      "reasonNotUsed": "Podatny kod nie jest używany",
+      "reasonFixStarted": "poprawka już się rozpoczęła",
+      "reasonNoBandwidth": "brak wolnych zasobów",
+      "reasonTolerableRisk": "ryzyko jest akceptowalne",
+      "reasonInaccurate": "ustalenie jest nieprawidłowe",
+      "reasonNotUsed": "podatny kod nie jest używany",
       "reasonAfterReview": "po przeglądzie"
     },
     "findingList": {
@@ -2247,7 +2247,7 @@
       "open": "otwarty pull request",
       "closed": "zamknięty pull request",
       "merged": "scalony pull request",
-      "draft": "Pull request w wersji roboczej",
+      "draft": "pull request w wersji roboczej",
       "updating": "Aktualizowanie, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2326,7 +2326,7 @@
     "newCodingTask": "Nowe zadanie kodowania",
     "explore": "Odkrywaj",
     "seeAll": "Zobacz wszystkie",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Obecnie nic nie jest uruchomione"
   },
   "imageViewer": {
     "close": "Zamknij {{filename}}",
@@ -2371,7 +2371,7 @@
     "optionsExpiredDescription": "Wróć i otwórz ponownie ten wybór z poprzedniego ekranu."
   },
   "sessionRow": {
-    "needsInput": "wymaga danych"
+    "needsInput": "WYMAGA DANYCH"
   },
   "voiceInput": {
     "listening": "Słuchanie...",

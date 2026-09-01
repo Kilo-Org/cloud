@@ -156,7 +156,7 @@
     "returnSendsMessage": "換行鍵傳送訊息",
     "returnSendsMessageSubtitle": "關閉時，換行鍵會在代理撰寫器中插入換行。",
     "biometricUnlock": "使用生物辨識解鎖",
-    "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。請在裝置設定中設定生物辨識或裝置密碼。您也可以使用裝置密碼作為備用解鎖方式。"
+    "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。"
   },
   "notifications": {
     "title": "通知",
@@ -2298,7 +2298,7 @@
     "newCodingTask": "新程式設計任務",
     "explore": "探索",
     "seeAll": "查看全部",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "目前沒有正在執行的內容"
   },
   "imageViewer": {
     "close": "關閉 {{filename}}",

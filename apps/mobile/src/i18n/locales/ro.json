@@ -156,7 +156,7 @@
     "returnSendsMessage": "Tasta Enter trimite mesajul",
     "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților.",
     "biometricUnlock": "Deblocare prin autentificare biometrică",
-    "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal. Configurează autentificarea biometrică sau un cod de acces al dispozitivului în setările dispozitivului. Codul de acces al dispozitivului tău este disponibil ca alternativă."
+    "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponibil",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff prea mare pentru a fi afișat",
       "openOnGitHub": "Deschide pe GitHub",
       "openDiffOnGitHub": "Deschide diff-ul acestui fișier pe GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Șterge selecția",
@@ -847,7 +847,7 @@
       "managedByAdmin": "Facturarea este gestionată de administratorul organizației tale.",
       "couldNotLoad": "Informațiile de facturare nu au putut fi încărcate",
       "manageOnWeb": "Gestionare facturare pe Web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Termenul tău final de angajare se încheie pe {{date}}. Continuă ca Standard la {{price}}, sau găzduirea se încheie.",
       "freeTrial": "Perioadă de probă gratuită",
@@ -864,7 +864,7 @@
       "trialDaysRemaining": "Perioadă de probă: {{remaining}} rămase",
       "trialEndingSoon": "Perioada de probă se încheie curând: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1143,9 +1143,9 @@
       "destroying": "SE DISTRUGE",
       "provisioned": "PUS ÎN FUNCȚIUNE",
       "restarting": "SE REPORNEȘTE",
-      "running": "Rulează",
+      "running": "RULEAZĂ",
       "shuttingDown": "SE ÎNCHIDE",
-      "starting": "Se pornește",
+      "starting": "SE PORNEȘTE",
       "stopped": "OPRIT",
       "stopping": "SE OPRESTE",
       "unknown": "NECUNOSCUT",
@@ -1318,7 +1318,7 @@
       "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
       "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
       "transcriptRetry": "Nu s-a putut încărca transcrierea revizuirii.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent inactiv",
       "agentWorking": "Agent lucrează...",
       "anErrorOccurred": "A apărut o eroare",
@@ -2682,7 +2682,7 @@
       "olderActivity": "Activitate anterioară",
       "olderActivityDescription": "Cost neatribuit istoricului încărcat",
       "ofWindowTokens": "din {{window}} tokeni",
-      "tokens": "Token-uri",
+      "tokens": "token-uri",
       "tokensWithPercentage": "tokeni ({{percentage}})",
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} pași",
@@ -2694,7 +2694,7 @@
       "open": "pull request deschisă",
       "closed": "pull request închisă",
       "merged": "pull request îmbinată",
-      "draft": "Pull request în ciornă",
+      "draft": "pull request în ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2773,7 +2773,7 @@
     "newCodingTask": "Sarcină de codare nouă",
     "explore": "Explorează",
     "seeAll": "Vezi tot",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Nimic nu rulează în acest moment"
   },
   "imageViewer": {
     "close": "Închide {{filename}}",
@@ -2818,7 +2818,7 @@
     "optionsExpiredDescription": "Întoarce-te și redeschide acest selector de pe ecranul anterior."
   },
   "sessionRow": {
-    "needsInput": "necesită introducere"
+    "needsInput": "NECESITĂ INTRODUCERE"
   },
   "voiceInput": {
     "listening": "Se ascultă...",

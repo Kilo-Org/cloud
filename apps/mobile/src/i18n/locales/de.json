@@ -156,7 +156,7 @@
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
     "returnSendsMessageSubtitle": "Wenn deaktiviert, fügt die Eingabetaste einen Zeilenumbruch in die Nachrichteneingabe für Agenten ein.",
     "biometricUnlock": "Mit Biometrie entsperren",
-    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich. Richte Biometrie oder einen Gerätecode in den Geräteeinstellungen ein. Dein Gerätecode bleibt als Alternative verfügbar."
+    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -908,7 +908,7 @@
       "transcriptWaiting": "Warten auf das Review-Sitzungsprotokoll.",
       "transcriptEmpty": "Kein Sitzungsprotokoll für dieses Review.",
       "transcriptRetry": "Das Review-Sitzungsprotokoll konnte nicht geladen werden.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent inaktiv",
       "agentWorking": "Agent arbeitet...",
       "anErrorOccurred": "Ein Fehler ist aufgetreten",
@@ -2298,7 +2298,7 @@
     "newCodingTask": "Neue Codieraufgabe",
     "explore": "Entdecken",
     "seeAll": "Alle ansehen",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Zurzeit läuft nichts"
   },
   "imageViewer": {
     "close": "{{filename}} schließen",

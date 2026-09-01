@@ -24,7 +24,6 @@ import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
-import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -140,7 +139,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
-          context={<ContextControl scope={displayScope} />}
+          titleNumberOfLines={1}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
             <SessionContextMetrics
@@ -192,7 +191,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
-          context={<ContextControl scope={displayScope} />}
+          titleNumberOfLines={1}
           backFallback="/(app)/(tabs)/(2_agents)"
         />
         <SessionConnectionIndicator />

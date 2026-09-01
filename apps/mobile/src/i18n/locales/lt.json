@@ -156,7 +156,7 @@
     "returnSendsMessage": "Grįžimo klavišas siunčia žinutę",
     "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose.",
     "biometricUnlock": "Atrakinti naudojant biometrinius duomenis",
-    "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti. Įrenginio nustatymuose nustatykite biometrinius duomenis arba įrenginio prieigos kodą. Įrenginio prieigos kodą galite naudoti kaip atsarginį atrakinimo būdą."
+    "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -1151,12 +1151,12 @@
       "destroying": "NAKINAMA",
       "provisioned": "PARUOŠTA",
       "restarting": "PALEIDŽIAMA IŠ NAUJO",
-      "running": "Vykdoma",
+      "running": "VYKDOMA",
       "shuttingDown": "IŠJUNGINAMA",
       "starting": "PRADEDAMA",
       "stopped": "SUSTABDYTA",
       "stopping": "STABDOMA",
-      "unknown": "Nežinomas",
+      "unknown": "NEŽINOMAS",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1721,11 +1721,11 @@
       "statusFixed": "Ištaisyta",
       "statusOpen": "Atidaryta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Taisymas jau pradėtas",
-      "reasonNoBandwidth": "Nėra laisvos talpos",
-      "reasonTolerableRisk": "Rizika yra priimtina",
-      "reasonInaccurate": "Radinys yra netikslus",
-      "reasonNotUsed": "Pažeidžiamas kodas nenaudojamas",
+      "reasonFixStarted": "taisymas jau pradėtas",
+      "reasonNoBandwidth": "nėra laisvos talpos",
+      "reasonTolerableRisk": "rizika yra priimtina",
+      "reasonInaccurate": "radinys yra netikslus",
+      "reasonNotUsed": "pažeidžiamas kodas nenaudojamas",
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {
@@ -2794,7 +2794,7 @@
     "newCodingTask": "Nauja kodavimo užduotis",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Šiuo metu niekas nevykdoma"
   },
   "imageViewer": {
     "close": "Uždaryti {{filename}}",

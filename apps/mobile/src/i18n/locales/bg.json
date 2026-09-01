@@ -156,7 +156,7 @@
     "returnSendsMessage": "Клавишът за нов ред изпраща съобщение",
     "returnSendsMessageSubtitle": "Когато настройката е изключена, клавишът за нов ред вмъква нов ред в полетата за въвеждане на съобщения до агенти.",
     "biometricUnlock": "Отключване с биометрични данни",
-    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим. Настрой биометрични данни или код за достъп до устройството в настройките на устройството. Кодът за достъп до устройството остава наличен като резервен вариант."
+    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ът е недостъпен",
@@ -1135,7 +1135,7 @@
       "destroying": "УНИЩОЖАВАНЕ",
       "provisioned": "ОСИГУРЕНА",
       "restarting": "РЕСТАРТИРАНЕ",
-      "running": "Изпълнява се",
+      "running": "ИЗПЪЛНЯВА СЕ",
       "shuttingDown": "ИЗКЛЮЧВАНЕ",
       "starting": "СТАРТИРАНЕ",
       "stopped": "СПРЯНА",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Изчакване на препис на прегледа.",
       "transcriptEmpty": "Няма препис за този преглед.",
       "transcriptRetry": "Не можа да се зареди преписът на прегледа.",
-      "transcriptLive": "НА ЖИВО",
+      "transcriptLive": "На живо",
       "agentIdle": "Агентът е неактивен",
       "agentWorking": "Агентът работи...",
       "anErrorOccurred": "Възникна грешка",
@@ -1701,12 +1701,12 @@
       "statusFixed": "Коригирано",
       "statusOpen": "Отворено",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Корекция вече е започната",
-      "reasonNoBandwidth": "Няма наличен капацитет",
-      "reasonTolerableRisk": "Рискът е приемлив",
-      "reasonInaccurate": "Откритието е неточно",
-      "reasonNotUsed": "Уязвимият код не се използва",
-      "reasonAfterReview": "След преглед"
+      "reasonFixStarted": "корекция вече е започната",
+      "reasonNoBandwidth": "няма наличен капацитет",
+      "reasonTolerableRisk": "рискът е приемлив",
+      "reasonInaccurate": "откритието е неточно",
+      "reasonNotUsed": "уязвимият код не се използва",
+      "reasonAfterReview": "след преглед"
     },
     "settingsOverview": {
       "title": "Настройки",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Нова задача за кодиране",
     "explore": "Разгледайте",
     "seeAll": "Вижте всички",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "В момента нищо не се изпълнява"
   },
   "imageViewer": {
     "close": "Затворете {{filename}}",

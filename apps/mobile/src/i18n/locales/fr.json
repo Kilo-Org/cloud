@@ -2200,7 +2200,7 @@
     "returnSendsMessage": "La touche Entrée envoie le message",
     "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
     "biometricUnlock": "Déverrouiller avec la biométrie",
-    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan. Configurez la biométrie ou un code d'accès dans les réglages de votre appareil. Le code d'accès de votre appareil reste disponible comme solution de secours."
+    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2242,7 +2242,7 @@
     "newCodingTask": "Nouvelle tâche de codage",
     "explore": "Explorer",
     "seeAll": "Tout voir",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Rien n'est en cours d'exécution pour le moment"
   },
   "imageViewer": {
     "close": "Fermer {{filename}}",

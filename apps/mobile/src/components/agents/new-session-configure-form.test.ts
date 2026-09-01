@@ -72,6 +72,7 @@ vi.mock('@/components/agents/new-session-start-button', () => ({
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
+vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
@@ -171,6 +172,8 @@ function defaultProps() {
     runOnInstance: null as InstancePickerInstance | null,
     instanceList: [] as InstancePickerInstance[],
     isLoadingInstances: false,
+    isFetchingInstances: false,
+    onRefreshInstances: vi.fn(),
     onChangeRunOnInstance: vi.fn(),
     showInstanceDisconnectedNote: false,
     folderPath: '',
@@ -203,6 +206,44 @@ function defaultProps() {
 }
 
 describe('NewSessionConfigureForm', () => {
+  it.each([false, true])(
+    'refreshes targets while fetching=%s without changing the selection',
+    async isFetchingInstances => {
+      const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+      const props = {
+        ...defaultProps(),
+        showRunOnSelector: true,
+        runOnInstance: INSTANCE,
+        isFetchingInstances,
+      };
+      const element = renderForm(props);
+      const button = findElementByType(element, 'Button');
+      expect(button).toMatchObject({
+        accessibilityLabel: 'Refresh',
+        size: 'icon',
+        disabled: isFetchingInstances,
+        loading: isFetchingInstances,
+        onPress: props.onRefreshInstances,
+      });
+      const selector = findElementByType(element, 'InstanceSelector');
+      expect(selector?.value).toBe(INSTANCE);
+      if (!button) {
+        throw new Error('Missing target refresh button');
+      }
+      if (!isFetchingInstances) {
+        (button.onPress as () => void)();
+        expect(props.onRefreshInstances).toHaveBeenCalledOnce();
+        expect(props.onChangeRunOnInstance).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('disables target refresh during session creation', async () => {
+    const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+    const element = renderForm({ ...defaultProps(), showRunOnSelector: true, isCreating: true });
+    expect(findElementByType(element, 'Button')?.disabled).toBe(true);
+  });
+
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and "Run on" label when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

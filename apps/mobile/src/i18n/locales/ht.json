@@ -156,7 +156,7 @@
     "returnSendsMessage": "Kle Retou a voye mesaj",
     "returnSendsMessageSubtitle": "Lè li dezaktive, kle Retou a antre yon nouvo liy nan chan mesaj ajan yo.",
     "biometricUnlock": "Debloke ak byometri",
-    "biometricUnlockSubtitle": "Ou dwe debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan. Konfigire byometri oswa yon kòd aksè pou aparèy la nan paramèt aparèy la. Kòd aksè aparèy ou a rete disponib kòm yon lòt mwayen pou debloke."
+    "biometricUnlockSubtitle": "Ou dwe debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -838,7 +838,7 @@
       "managedByAdmin": "Faktirasyon an jere pa administratè òganizasyon ou an.",
       "couldNotLoad": "Pa t ka chaje enfòmasyon faktirasyon",
       "manageOnWeb": "Jere Faktirasyon sou Web",
-      "commitPlan": "komit",
+      "commitPlan": "Komit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Dènye tèm Commit ou a fini sou {{date}}. Kontinye kòm Standard nan {{price}}, oswa òganizasyon an fini.",
       "freeTrial": "Eseye Gratis",
@@ -856,7 +856,7 @@
       "trialDaysRemaining": "Eseye: {{remaining}} rete",
       "trialEndingSoon": "Eseye ap fini pito: {{remaining}}",
       "planName": {
-        "commit": "komit",
+        "commit": "Komit",
         "standard": "Standard"
       }
     },
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Ap tann transkripsyon revizyon an.",
       "transcriptEmpty": "Pa gen transkripsyon pou revizyon sa a.",
       "transcriptRetry": "Pa t ka chaje transkripsyon revizyon an.",
-      "transcriptLive": "AN DIRÈK",
+      "transcriptLive": "An dirèk",
       "agentIdle": "Agent inaktif",
       "agentWorking": "Agent ap travay...",
       "anErrorOccurred": "Yon erè te rive",
@@ -1908,7 +1908,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Enstale GitHub App Kilo a pou senkronize otomatikman alèt Dependabot epi jere rezilta sekirite atravè repo ou yo.",
-      "connectTitle": "konekte GitHub pou kòmanse",
+      "connectTitle": "Konekte GitHub pou kòmanse",
       "couldNotLoad": "Pa t 'kapab chaje Security Agent",
       "installApp": "Enstale GitHub App",
       "reauthorizeButton": "Re-otorize GitHub App",
@@ -2096,7 +2096,7 @@
       "dollar": "dola",
       "dollar_other": "dola",
       "costSpoken": "kout {{cost}}",
-      "costSpokenWithTime": "Pri {{cost}}, {{time}}",
+      "costSpokenWithTime": "pri {{cost}}, {{time}}",
       "pullRequest": "demann pull request {{number}}"
     },
     "githubInstall": {
@@ -2246,7 +2246,7 @@
       "contentTruncated": "Kontni koupe",
       "truncated": "Koupe",
       "toolRead": "li",
-      "toolEdit": "Modifye",
+      "toolEdit": "modifye",
       "toolWrite": "ekri",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2662,7 +2662,7 @@
       "olderActivity": "Aktivite pi bonè",
       "olderActivityDescription": "Kout pa atribiye ak istwa chaje",
       "ofWindowTokens": "nan {{window}} token",
-      "tokens": "Jeton",
+      "tokens": "jeton",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} etap",
       "stepsCount": "{{steps}} etap",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Nouvo travay kodaj",
     "explore": "Eksplore",
     "seeAll": "Wè tout",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Pa gen anyen k ap mache kounye a"
   },
   "imageViewer": {
     "close": "Fèmen {{filename}}",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Ale tounen epi relouvri selektè sa a nan ekran anvan an."
   },
   "sessionRow": {
-    "needsInput": "bezwen input"
+    "needsInput": "BEZWEN INPUT"
   },
   "voiceInput": {
     "listening": "Ap koute...",

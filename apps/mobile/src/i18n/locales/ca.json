@@ -156,7 +156,7 @@
     "returnSendsMessage": "La tecla de retorn envia el missatge",
     "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
     "biometricUnlock": "Desbloqueja amb biometria",
-    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla. Configura la biometria o un codi d'accés del dispositiu a la configuració del dispositiu. El codi d'accés del dispositiu continua disponible com a alternativa."
+    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff massa gran per mostrar",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre el diff d'aquest fitxer a GitHub",
-      "githubDiff": "diff de GitHub"
+      "githubDiff": "Diff de GitHub"
     },
     "floatingActions": {
       "clearSelection": "Esborra la selecció",
@@ -250,7 +250,7 @@
       "oldNew": "Antic: {{old}} | Nou: {{new}}",
       "oldOnly": "Només antic: {{text}}",
       "newOnly": "Només nou: {{text}}",
-      "emptyDiffRow": "fila de diff buida"
+      "emptyDiffRow": "Fila de diff buida"
     },
     "connectionExpired": "La connexió de GitHub ha caducat.",
     "merge": {
@@ -1318,7 +1318,7 @@
       "transcriptWaiting": "S'espera la transcripció de la revisió.",
       "transcriptEmpty": "No hi ha transcripció per a aquesta revisió.",
       "transcriptRetry": "No s'ha pogut carregar la transcripció de la revisió.",
-      "transcriptLive": "EN DIRECTE",
+      "transcriptLive": "En directe",
       "agentIdle": "Agent inactiu",
       "agentWorking": "Agent treballant...",
       "anErrorOccurred": "S'ha produït un error",
@@ -2773,7 +2773,7 @@
     "newCodingTask": "Nova tasca de programació",
     "explore": "Explora",
     "seeAll": "Veure-ho tot",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ara mateix no hi ha res en execució"
   },
   "imageViewer": {
     "close": "Tanca {{filename}}",
@@ -2818,7 +2818,7 @@
     "optionsExpiredDescription": "Torna enrere i reobre aquest selector des de la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "requereix entrada"
+    "needsInput": "REQUEREIX ENTRADA"
   },
   "voiceInput": {
     "listening": "Escoltant...",

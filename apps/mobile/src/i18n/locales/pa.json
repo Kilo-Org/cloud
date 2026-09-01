@@ -156,7 +156,7 @@
     "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
     "returnSendsMessageSubtitle": "ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਏਜੰਟ ਕੰਪੋਜ਼ਰਾਂ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।",
     "biometricUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਨਾਲ ਅਨਲੌਕ ਕਰੋ",
-    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ। ਡਿਵਾਈਸ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਜਾਂ ਡਿਵਾਈਸ ਦਾ ਪਾਸਕੋਡ ਸੈੱਟ ਕਰੋ। ਤੁਹਾਡੀ ਡਿਵਾਈਸ ਦਾ ਪਾਸਕੋਡ ਵਿਕਲਪ ਵਜੋਂ ਉਪਲਬਧ ਰਹਿੰਦਾ ਹੈ।"
+    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "explore": "ਪੜਚੋਲ ਕਰੋ",
     "seeAll": "ਸਭ ਵੇਖੋ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ਇਸ ਵੇਲੇ ਕੁਝ ਵੀ ਨਹੀਂ ਚੱਲ ਰਿਹਾ"
   },
   "imageViewer": {
     "close": "{{filename}} ਬੰਦ ਕਰੋ",

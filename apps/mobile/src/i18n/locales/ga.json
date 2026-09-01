@@ -156,7 +156,7 @@
     "returnSendsMessage": "Seolann an eochair Aisfhillte teachtaireacht",
     "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair Aisfhillte líne nua isteach i réimsí ionchuir teachtaireachta na ngníomhairí.",
     "biometricUnlock": "Díghlasáil le bithmhéadracht",
-    "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra. Socraigh bithmhéadracht nó paschód an ghléis i socruithe an ghléis. Tá paschód do ghléis ar fáil mar rogha chúltaca."
+    "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe ar fáil",
@@ -1321,7 +1321,7 @@
       "started": "Tosaithe",
       "completed": "Críochnaithe",
       "cost": "Costas",
-      "tokens": "tocain",
+      "tokens": "Tocain",
       "tokensInOut": "{{input}} isteach / {{output}} amach",
       "openPullRequest": "Oscail iarratas tarraingthe",
       "council": "Comhairle",
@@ -1336,7 +1336,7 @@
       "transcriptWaiting": "Ag fanacht le hathscríbhinn an athbhreithnithe.",
       "transcriptEmpty": "Níl aon athscríbhinn don athbhreithniú seo.",
       "transcriptRetry": "Níorbh fhéidir athscríbhinn an athbhreithnithe a lódáil.",
-      "transcriptLive": "BEO",
+      "transcriptLive": "Beo",
       "agentIdle": "Gníomhaire díomhaoin",
       "agentWorking": "Gníomhaire ag obair...",
       "anErrorOccurred": "Tharla earráid",
@@ -1464,7 +1464,7 @@
     "status": {
       "pending": "Ar feitheamh",
       "queued": "Sa scuaine",
-      "running": "AG RITH",
+      "running": "Ag rith",
       "completed": "Críochnaithe",
       "failed": "Theip",
       "cancelled": "Cealaithe",
@@ -1731,7 +1731,7 @@
       "statusFixed": "Deisithe",
       "statusOpen": "Oscailte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Thosaigh deisiúchán cheana",
+      "reasonFixStarted": "thosaigh deisiúchán cheana",
       "reasonNoBandwidth": "níl aon bandaleithead ar fáil",
       "reasonTolerableRisk": "tá an priacal inghlactha",
       "reasonInaccurate": "tá an fhionnachtain míchruinn",
@@ -1915,7 +1915,7 @@
       "newFindingSeverityLabel": "Déine íosta na fionnachtain nua",
       "newFindingSubtitle": "Seolta aon uair a shioncronaítear fionnachtain nua, lena n-áirítear ar an gcéad shioncrónú.",
       "readOnly": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
-      "slaLeadTimeAccessibility": "am treorach rabhaidh SLA i laethanta",
+      "slaLeadTimeAccessibility": "Am treorach rabhaidh SLA i laethanta",
       "slaLeadTimeError": "Cuir isteach uimhir iomlán laethanta idir 1 agus 365.",
       "slaLeadTimeHint": "Cuir isteach uimhir iomlán idir 1 agus 365",
       "slaLeadTimeLabel": "Am treorach rabhaidh SLA (laethanta)",
@@ -2815,7 +2815,7 @@
     "newCodingTask": "Tasc códaithe nua",
     "explore": "Taiscéal",
     "seeAll": "Féach ar gach ceann",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Níl aon rud ar siúl faoi láthair"
   },
   "imageViewer": {
     "close": "Dún {{filename}}",

@@ -156,7 +156,7 @@
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
     "returnSendsMessageSubtitle": "Když je tato volba vypnutá, klávesa Enter vloží nový řádek do polí pro zprávu agentům.",
     "biometricUnlock": "Odemykat pomocí biometrie",
-    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí. V nastavení zařízení nastavte biometrii nebo přístupový kód zařízení. Přístupový kód zařízení můžete použít jako záložní možnost."
+    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -1327,7 +1327,7 @@
       "transcriptWaiting": "Čeká se na přepis kontroly.",
       "transcriptEmpty": "Pro tuto kontrolu neexistuje přepis.",
       "transcriptRetry": "Nepodařilo se načíst přepis kontroly.",
-      "transcriptLive": "ŽIVĚ",
+      "transcriptLive": "Živě",
       "agentIdle": "Agent nečinný",
       "agentWorking": "Agent pracuje…",
       "anErrorOccurred": "Došlo k chybě",
@@ -2287,7 +2287,7 @@
       "toolGrep": "grep",
       "toolList": "seznam",
       "toolPatch": "oprava",
-      "toolTask": "Úkol",
+      "toolTask": "úkol",
       "readTodos": "Přečíst úkoly",
       "updateTodos": "Aktualizovat úkoly",
       "linesBadge": "{{displayCount}} řádků",
@@ -2715,7 +2715,7 @@
       "open": "otevřený pull request",
       "closed": "uzavřený pull request",
       "merged": "sloučený pull request",
-      "draft": "Návrh pull requestu",
+      "draft": "návrh pull requestu",
       "updating": "Aktualizuje se, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2794,7 +2794,7 @@
     "newCodingTask": "Nový programovací úkol",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Právě nic neběží"
   },
   "imageViewer": {
     "close": "Zavřít {{filename}}",

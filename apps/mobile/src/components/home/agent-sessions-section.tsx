@@ -193,13 +193,19 @@ export function LiveSessionFeedback({
 
   return (
     <View className="gap-2">
-      {context.label && <Text className="text-xs text-muted-foreground">{context.label}</Text>}
       <View className="flex-row items-center gap-2">
         {/* The app-wide OfflineBanner owns the offline announcement. */}
         {internet === 'offline' ? (
           <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
         ) : (
-          <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
+          <AccessibleStatus
+            message={connectionLabel}
+            tone="status"
+            className={cn(
+              'flex-1 text-xs',
+              !reconnectExhausted && 'absolute size-px overflow-hidden'
+            )}
+          />
         )}
         {context.isReady && !isConnected && reconnectExhausted && (
           <Button
@@ -217,13 +223,13 @@ export function LiveSessionFeedback({
       <AccessibleStatus
         message={content === 'pending' ? t('agentChat.instancePicker.loading') : null}
         tone="status"
-        className="text-xs"
+        className="absolute size-px overflow-hidden"
       />
       {content === 'rows' && sessions.isFetching && !sessions.isPaused && (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}
           tone="status"
-          className="text-xs"
+          className="absolute size-px overflow-hidden"
         />
       )}
       {failure}

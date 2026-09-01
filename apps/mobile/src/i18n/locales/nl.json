@@ -156,7 +156,7 @@
     "returnSendsMessage": "Return-toets verzendt bericht",
     "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in.",
     "biometricUnlock": "Ontgrendelen met biometrie",
-    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan. Stel biometrie of een toegangscode in via de instellingen van je apparaat. De toegangscode van je apparaat blijft beschikbaar als alternatief."
+    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan."
   },
   "notifications": {
     "channel": {
@@ -726,7 +726,7 @@
       "destroying": "VERNIETIGEN",
       "provisioned": "INGERICHT",
       "restarting": "HERSTARTEN",
-      "running": "Bezig",
+      "running": "BEZIG",
       "shuttingDown": "AFSLUITEN",
       "starting": "STARTEN",
       "stopped": "GESTOPT",
@@ -2298,7 +2298,7 @@
     "newCodingTask": "Nieuwe codeertaak",
     "explore": "Verkennen",
     "seeAll": "Alles bekijken",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Er draait momenteel niets"
   },
   "imageViewer": {
     "close": "{{filename}} sluiten",
@@ -2343,7 +2343,7 @@
     "optionsExpiredDescription": "Ga terug en open deze kiezer opnieuw vanaf het vorige scherm."
   },
   "sessionRow": {
-    "needsInput": "heeft invoer nodig"
+    "needsInput": "HEEFT INVOER NODIG"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2552,7 +2552,7 @@
       "skipped": "{{displayCount}} overgeslagen",
       "title": "Checks",
       "viewOnGitHub": "PR op GitHub bekijken",
-      "checkDetails": "Checkdetails",
+      "checkDetails": "checkdetails",
       "pullRequest": "pull-aanvraag"
     },
     "composer": {

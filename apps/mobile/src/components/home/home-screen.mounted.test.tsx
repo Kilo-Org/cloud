@@ -4,7 +4,7 @@ import * as ReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { HomeScreen } from '@/components/home/home-screen';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
@@ -13,6 +13,7 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
   organization: { organizationId: null as string | null, isLoaded: true },
+  memberships: [] as Org[],
   boundary: {
     orgs: undefined as Org[] | undefined,
     org: undefined as Org | undefined,
@@ -42,7 +43,7 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,
-  useQuery: () => ({ data: [{ organizationId: 'org-1', organizationName: 'Home organization' }] }),
+  useQuery: () => ({ data: state.memberships }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
@@ -77,7 +78,6 @@ vi.mock('expo-router', () => ({
     },
   }),
 }));
-vi.mock('@/components/home/greeting', () => ({ buildTimedGreeting: () => 'Good morning' }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -203,6 +203,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
+  state.memberships = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
   Object.assign(state.boundary, {
     orgs: undefined,
     org: undefined,
@@ -227,13 +228,37 @@ beforeEach(() => {
   state.boundaryRefetch.mockReset();
   state.socketRetry.mockReset();
 });
-afterEach(() => {
+afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
   queryClient.clear();
+  await i18n.changeLanguage('en');
 });
 
 describe('HomeScreen composition', () => {
+  it.each(['en', 'sr'])('shows only the Kilo brand as the Home title in %s', async language => {
+    await i18n.changeLanguage(language);
+    await renderHome();
+    const title = nodes('Text').find(node => node.props.accessibilityRole === 'header');
+    expect(title?.children).toEqual(['Kilo']);
+    expect(text()).not.toContain(i18n.t('login.welcome'));
+  });
+
+  it('keeps one bounded context picker beside the title', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    await renderHome();
+    const control = action('Home organization');
+    expect(control.parent?.parent?.parent?.props.className).toContain('w-2/5');
+    expect(control.parent?.parent?.parent?.props.className).toContain('items-end');
+    expect(nodes('Text').filter(node => node.children.includes('Home organization'))).toHaveLength(
+      1
+    );
+    const loading = nodes('Text').find(node => node.children.includes('Loading…'));
+    expect(loading?.props.className).toContain('absolute');
+  });
+
   it.each([
     { name: 'account pending', patch: { isLoading: true } },
     { name: 'signed out', patch: { token: undefined } },
@@ -564,6 +589,25 @@ describe('Home live presentation', () => {
 });
 
 describe('Home admission', () => {
+  it('hides cached names during membership resolution and restores one label after admission', async () => {
+    state.organization.organizationId = 'org-1';
+    state.memberships = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    state.boundary.orgs = state.memberships;
+    state.boundary.org = state.memberships[0];
+    state.boundary.isResolving = true;
+    state.live.activeSessions = [row];
+    await renderHome();
+    expect(text()).not.toContain('Engineering');
+    expect(action('Organization').props.accessibilityHint).toBe('Select account');
+    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
+    state.boundary.isResolving = false;
+    await renderHome();
+    expect(nodes('Text').filter(node => node.children.includes('Engineering'))).toHaveLength(1);
+    expect(action('Engineering').props.accessibilityHint).toBe('Select account');
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+  });
+
   it.each(['unresolved', 'failed', 'missing'] as const)(
     'keeps PR Review behind its own flag and route while membership is %s',
     async mode => {
@@ -613,6 +657,7 @@ describe('Home admission', () => {
     state.live.hasAcceptedSuccess = true;
     state.organization.organizationId = 'org-1';
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    state.memberships = state.boundary.orgs;
     state.boundary.org = state.boundary.orgs[0];
     if (mode === 'account pending') {
       state.auth.isLoading = true;
@@ -679,6 +724,7 @@ describe('Home admission', () => {
     state.boundaryRefetch.mockImplementation(async () => {
       state.boundary.isError = false;
       state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+      state.memberships = state.boundary.orgs;
       state.boundary.org = state.boundary.orgs[0];
       await Promise.resolve();
     });

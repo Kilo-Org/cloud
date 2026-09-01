@@ -156,7 +156,7 @@
     "returnSendsMessage": "Terugkeersleutel stuur boodskap",
     "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die terugkeersleutel 'n nuwe reël in agente se boodskapinvoer in.",
     "biometricUnlock": "Ontsluit met biometrie",
-    "biometricUnlockSubtitle": "Ontsluit wanneer die app begin en nadat dit vyf minute in die agtergrond was. Stel biometrie of 'n toesteltoegangskode in die toestelinstellings op. Jou toesteltoegangskode bly as 'n alternatief beskikbaar."
+    "biometricUnlockSubtitle": "Ontsluit wanneer die app begin en nadat dit vyf minute in die agtergrond was."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Wag vir die hersieningtranskripsie.",
       "transcriptEmpty": "Geen transkripsie vir hierdie hersiening nie.",
       "transcriptRetry": "Kon nie die hersieningtranskripsie laai nie.",
-      "transcriptLive": "LEWEND",
+      "transcriptLive": "Lewend",
       "agentIdle": "Agent ledig",
       "agentWorking": "Agent werk...",
       "anErrorOccurred": "'n Fout het voorgekom",
@@ -2662,7 +2662,7 @@
       "olderActivity": "Ouer aktiwiteit",
       "olderActivityDescription": "Koste nie toegeskryf aan die gelaai geskiedenis nie",
       "ofWindowTokens": "van {{window}} tekens",
-      "tokens": "Tokens",
+      "tokens": "tokens",
       "tokensWithPercentage": "tekens ({{percentage}})",
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
@@ -2673,7 +2673,7 @@
       "open": "oop trekversoek",
       "closed": "geslote trekkingsversoek",
       "merged": "saamgevoegde trekkingsversoek",
-      "draft": "Konsep-trekversoek",
+      "draft": "konsep-trekversoek",
       "updating": "Werk op, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "trekversoek"
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Nuwe koderingstaak",
     "explore": "Verken",
     "seeAll": "Sien alles",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Niks loop tans nie"
   },
   "imageViewer": {
     "close": "Maak {{filename}} toe",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Gaan terug en maak hierdie keuseerder van die vorige skerm af weer oop."
   },
   "sessionRow": {
-    "needsInput": "benodig invoer"
+    "needsInput": "BENODIG INVOER"
   },
   "voiceInput": {
     "listening": "Luister...",

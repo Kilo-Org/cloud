@@ -22,7 +22,7 @@
     "copiedToClipboard": "Voasoratra tamin'ny clipboard",
     "couldNotCopyToClipboard": "Tsy afaka nanoratra tamin'ny clipboard",
     "required": "ilaina",
-    "error": "Hadisoana: {{error}}",
+    "error": "hadisoana: {{error}}",
     "back": "Miverina",
     "somethingWentWrong": "Nisy olana",
     "couldNotOpen": "Tsy afaka nanokatra {{label}}",
@@ -156,7 +156,7 @@
     "returnSendsMessage": "Mandefa hafatra ny bokotra Fiverenana",
     "returnSendsMessageSubtitle": "Rehefa tsy alefa, ny bokotra Fiverenana dia mampiditra andalana vaovao ao amin'ny fampidirana hafatry ny mpanampy.",
     "biometricUnlock": "Mamaha hidy amin'ny biometrika",
-    "biometricUnlockSubtitle": "Ilaina ny mamaha hidy rehefa manomboka ny rindranasa sy rehefa avy nijanona dimy minitra tany ambadika. Apetraho ao amin'ny fika an'ny fitaovana ny biometrika na ny kaody fanokafana ny fitaovana. Azo ampiasaina ho solony ny kaody fanokafana ny fitaovanao."
+    "biometricUnlockSubtitle": "Ilaina ny mamaha hidy rehefa manomboka ny rindranasa sy rehefa avy nijanona dimy minitra tany ambadika."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -886,7 +886,7 @@
       "dangerZone": "FARITRA MAHABAKA",
       "destroying": "Mandringana…",
       "serviceDegraded": "Nihena ny serivisy — tsindrio hijery ny sata",
-      "up": "Miasa"
+      "up": "MIASA"
     },
     "channels": {
       "title": "Fantsona",
@@ -1307,7 +1307,7 @@
       "threshold": "Vola fetra",
       "pullRequest": "pull request",
       "transcriptEmpty": "Tsy misy transcript ho an'ity review ity.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "transcriptRetry": "Tsy afaka namaky ny transcript an'ny review.",
       "transcriptWaiting": "Miandry ny transcript an'ny review.",
       "agentIdle": "Tsy miasa ny agent",
@@ -2097,7 +2097,7 @@
       "dollar_other": "dolara",
       "costSpoken": "vidy {{cost}}",
       "costSpokenWithTime": "vidy {{cost}}, {{time}}",
-      "pullRequest": "Pull request {{number}}"
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
@@ -2246,7 +2246,7 @@
       "contentTruncated": "Nohafohy ny votoaty",
       "truncated": "Nohafohy",
       "toolRead": "famakiana",
-      "toolEdit": "Ovay",
+      "toolEdit": "ovay",
       "toolWrite": "soratana",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2673,7 +2673,7 @@
       "open": "misokatra ny pull request",
       "closed": "mihidy ny pull request",
       "merged": "natambatra ny pull request",
-      "draft": "Pull request drafta",
+      "draft": "pull request drafta",
       "updating": "Manavao, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Asa coding vaovao",
     "explore": "Mijerena",
     "seeAll": "Jereo daholo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Tsy misy mandeha amin'izao fotoana izao"
   },
   "imageViewer": {
     "close": "Hanidy {{filename}}",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Miverena ary sokafy indray ity picker ity avy amin'ny efijery teo aloha."
   },
   "sessionRow": {
-    "needsInput": "mila fampidirana"
+    "needsInput": "MILA FAMPIDIRANA"
   },
   "voiceInput": {
     "listening": "Mihaino...",

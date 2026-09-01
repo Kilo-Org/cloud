@@ -3,17 +3,21 @@ import { createElement, Fragment, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { Text } from '@/components/ui/text';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
 type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
+  fontScale: 1,
+  topInset: 0,
+  tabBarHeight: 60,
   focusCallbacks: new Set<() => void>(),
   listeners: new Set<(state: string) => void>(),
   auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
@@ -57,7 +61,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
-  useWindowDimensions: () => ({ fontScale: 1 }),
+  useWindowDimensions: () => ({ fontScale: state.fontScale }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -87,7 +91,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: 'LinearTransition',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: state.topInset, bottom: 0 }),
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
@@ -196,7 +200,7 @@ vi.mock('@/lib/a11y/announce', () => ({
     state.announcements.push(message);
   },
 }));
-vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
+vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: () => ({ ...state.live, refetch: state.refetch }),
   useAgentSessions: () => {
@@ -229,7 +233,7 @@ function listSkeletons() {
   );
 }
 function contextControl() {
-  return header().find(
+  return root().find(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
@@ -305,6 +309,9 @@ function foreground() {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
+  state.fontScale = 1;
+  state.topInset = 0;
+  state.tabBarHeight = 60;
   state.focusCallbacks.clear();
   state.destination = '';
   state.sessionId = '';
@@ -329,10 +336,11 @@ beforeEach(() => {
   state.invalidate.mockReset();
   readFilterRecord.mockReset().mockResolvedValue(null);
 });
-afterEach(() => {
+afterEach(async () => {
   act(() => mountedRenderer?.unmount());
   mountedRenderer = undefined;
   state.listeners.clear();
+  await i18n.changeLanguage('en');
 });
 
 describe('AgentSessionListScreen live presentation', () => {
@@ -395,6 +403,7 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
+    expect(nodes('ScrollView')).toHaveLength(test.empty ? 1 : 0);
     expect(text()).toContain('Personal');
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -409,6 +418,60 @@ describe('AgentSessionListScreen live presentation', () => {
       press('New session');
     }
     expect(state.destination).toBe('/(app)/agent-chat/new');
+  });
+
+  it('compensates the empty state for measured controls and keeps large text scrollable', async () => {
+    state.topInset = 44;
+    await renderScreen();
+    const scroll = requireNode('ScrollView');
+    const emptyState = root().findByType(EmptyState);
+    const spacer = scroll.findByProps({ pointerEvents: 'none' });
+    const onLayout = scroll.props.onLayout as (event: {
+      nativeEvent: { layout: { y: number } };
+    }) => void;
+
+    expect(scroll.parent?.parent).toBe(header().parent);
+    expect(header().parent?.children[0]).toBe(header());
+    expect(header().props.className).toBe('px-[22px] pb-0');
+    expect(scroll.findAll(node => node === contextControl())).toHaveLength(0);
+    expect(scroll.props.className).toBe('flex-1');
+    expect(scroll.props.contentContainerClassName).toBe('grow justify-center py-4');
+    expect(scroll.props.contentContainerStyle).toBeUndefined();
+    expect(scroll.props.scrollEnabled).not.toBe(false);
+    expect(emptyState.props.placement).toBe('top');
+    expect(emptyState.props.className).toBe('shrink-0 pt-0');
+    expect(spacer.props.className).toBe('shrink-0');
+    expect(spacer.props.style).toEqual({ height: 60 });
+
+    for (const { y, height } of [
+      { y: 180, height: 196 },
+      { y: 260, height: 276 },
+      { y: 20, height: 60 },
+    ]) {
+      act(() => {
+        onLayout({ nativeEvent: { layout: { y } } });
+      });
+      expect(spacer.props.style).toEqual({ height });
+    }
+
+    state.fontScale = 2;
+    state.tabBarHeight = 84;
+    await renderScreen();
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 260 } } });
+    });
+    expect(spacer.props.style).toEqual({ height: 300 });
+    state.topInset = 64;
+    await renderScreen();
+    expect(spacer.props.style).toEqual({ height: 280 });
+    const createAction = action('New coding task');
+    const label = createAction.findByType(Text);
+    expect(createAction.props.className).toContain('max-w-full');
+    expect(createAction.props.className).toContain('min-h-[44px]');
+    expect(label.props.className).toBe('shrink text-center');
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.allowFontScaling).not.toBe(false);
+    expect(label.props.adjustsFontSizeToFit).not.toBe(true);
   });
 
   it('keeps cold-loading feedback stable until an accepted result', async () => {
@@ -665,6 +728,87 @@ describe('AgentSessionListScreen live presentation', () => {
 });
 
 describe('AgentSessionListScreen context control', () => {
+  it.each([
+    { fontScale: 1, filterable: false },
+    { fontScale: 1, filterable: true },
+    { fontScale: 2, filterable: false },
+    { fontScale: 2, filterable: true },
+  ])('bounds Hungarian history text at scale $fontScale with filters=$filterable', async test => {
+    await i18n.changeLanguage('hu');
+    state.fontScale = test.fontScale;
+    const organizationName = 'An organization with a long name that must remain truncated';
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName }];
+    state.live.activeSessions = [
+      { ...row, gitUrl: test.filterable ? 'https://github.com/kilo/cloud.git' : undefined },
+    ];
+    await renderScreen();
+    const history = action('Összes megtekintése');
+    const label = history.findByType(Text);
+    const actions = history.parent;
+    const actionSlot = actions?.parent;
+    const title = header().findByProps({ accessibilityRole: 'header' });
+    expect(actionSlot?.props.className).toContain('max-w-[50%]');
+    expect(actionSlot?.props.className).not.toContain('shrink-0');
+    expect(history.props.className).toContain('min-w-0');
+    expect(history.props.className).toContain('shrink');
+    expect(actions?.props.className).toContain('items-center');
+    expect(label.props.className).toContain('text-center');
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.allowFontScaling).not.toBe(false);
+    expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+    expect(title.parent?.parent?.parent).toBe(actionSlot?.parent);
+    expect(header().props.reserveEyebrow).toBe(true);
+    expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
+    const context = action(organizationName);
+    expect(context.findByType(Text).props.numberOfLines).toBe(1);
+    expect(nodes('Text').filter(node => node.children.includes(organizationName))).toHaveLength(1);
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
+    ).toHaveLength(test.filterable ? 1 : 0);
+    press('Összes megtekintése');
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+  });
+
+  it('hides cached names and rows until membership resolves', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    state.boundary.isResolving = true;
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(text()).not.toContain('Engineering');
+    expect(contextControl().props.accessibilityLabel).toBe('Organization');
+    expect(nodes('FlatList')).toHaveLength(0);
+    expect(header().props.eyebrow).toBeUndefined();
+    state.boundary.isResolving = false;
+    await renderScreen();
+    expect(nodes('Text').filter(node => node.children.includes('Engineering'))).toHaveLength(1);
+    expect(contextControl().props.accessibilityLabel).toBe('Engineering');
+    expect(nodes('FlatList')).toHaveLength(1);
+  });
+
+  it('right-aligns one context picker above search and centers the header controls', async () => {
+    state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
+    await renderScreen();
+    expect(header().props.context).toBeUndefined();
+    expect(header().props.className).toContain('pb-0');
+    expect(contextControl().parent?.parent?.parent?.props.className).toContain('items-end');
+    expect(nodes('Text').filter(node => node.children.includes('Personal'))).toHaveLength(1);
+    expect(nodes('SessionListSearchHeader')).toHaveLength(1);
+    const history = nodes('Pressable').find(node => node.props.testID === 'agents-view-history');
+    const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
+    expect(history?.parent?.props.className).toContain('items-center');
+    expect(history?.parent?.props.className).toContain('min-h-11');
+    expect(filters?.parent?.parent).toBe(history?.parent);
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeUndefined();
+    state.live.isFetching = true;
+    await renderScreen();
+    expect(
+      nodes('Text').find(node => node.children.includes('Updating'))?.props.className
+    ).toContain('absolute');
+  });
+
   it('keeps the context picker and history action mounted', async () => {
     await renderScreen();
     expect(header().parent?.children[0]).toBe(header());
@@ -694,6 +838,7 @@ describe('AgentSessionListScreen context control', () => {
 
 describe('AgentSessionListScreen live counts', () => {
   it.each([
+    { count: 0, label: '0 LIVE' },
     { count: 1, label: '1 LIVE' },
     { count: 3, label: '3 LIVE' },
     { count: 4, label: '4 LIVE' },
@@ -719,6 +864,10 @@ describe('AgentSessionListScreen live counts', () => {
     await renderScreen();
 
     expect(header().props.eyebrow).toBeUndefined();
+    expect(header().props.reserveEyebrow).toBe(true);
+    const reserved = nodes('Text').find(node => node.props.variant === 'eyebrow');
+    expect(reserved?.props.className).toContain('opacity-0');
+    expect(reserved?.props.accessibilityElementsHidden).toBe(true);
     expect(nodes('FlatList')).toHaveLength(orgLoaded ? 1 : 0);
   });
 });

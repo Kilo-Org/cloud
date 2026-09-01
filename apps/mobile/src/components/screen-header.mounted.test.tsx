@@ -48,12 +48,7 @@ function isBackPressable(node: TestInstance): boolean {
 }
 
 function findBackPressable(root: TestInstance): TestInstance {
-  const nodes = root.findAll(isBackPressable);
-  const node = nodes[0];
-  if (!node) {
-    throw new Error('back pressable not found');
-  }
-  return node;
+  return root.find(node => isBackPressable(node));
 }
 
 function backPressableCount(root: TestInstance): number {
@@ -61,18 +56,13 @@ function backPressableCount(root: TestInstance): number {
 }
 
 function findTitlePressable(root: TestInstance): TestInstance {
-  const nodes = root.findAll(
+  return root.find(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
   );
-  const node = nodes[0];
-  if (!node) {
-    throw new Error('title pressable not found');
-  }
-  return node;
 }
 
 function findIcon(back: TestInstance, type: string): TestInstance {
@@ -154,6 +144,9 @@ describe('ScreenHeader mounted', () => {
     }
     expect(headerRight.props.className).toContain('mr-3');
     expect(headerRight.props.className).not.toContain('ml-3');
+    expect(headerRight.props.className).toContain('max-w-[50%]');
+    expect(headerRight.props.className).toContain('shrink');
+    expect(headerRight.props.className).not.toContain('shrink-0');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -311,13 +304,18 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.hitSlop).toBeUndefined();
   });
 
-  it('renders every layout variant without error and keeps the back classes', () => {
+  it('preserves title line limits and back controls across layout variants', () => {
+    const longTitle = 'A long session name that must stay on one row. '.repeat(4);
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
-      { title: 'Sessions', size: 'large' },
+      { title: 'Agents', size: 'large' },
+      { title: 'Home', size: 'large', contextPosition: 'right', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
+      { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
       { title: 'Sessions', headerRight: 'RIGHT' },
+      { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
+      { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
     ];
 
     for (const props of variants) {
@@ -326,6 +324,15 @@ describe('ScreenHeader mounted', () => {
       expect(back.props.className).toContain('h-11 w-11');
       expect(back.props.className).toContain('items-center');
       expect(back.props.className).toContain('justify-center');
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
+      expect(title.props.ellipsizeMode).toBe('tail');
+      expect(title.children).toEqual([props.title]);
+      if (props.modal || props.centerTitle) {
+        expect(title.props.className).toContain('text-center');
+        expect(title.parent?.parent).not.toBe(back.parent);
+        expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
+      }
     }
   });
 });

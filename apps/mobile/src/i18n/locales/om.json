@@ -156,7 +156,7 @@
     "returnSendsMessage": "Furtuun deebi'uu ergaa ergiti",
     "returnSendsMessageSubtitle": "Yeroo cufamu, furtuun deebi'uu iddoo ergaa ejentii galchuu keessatti sarara haaraa galchiti.",
     "biometricUnlock": "Baayoometirikisiin qulfii bani",
-    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii banuun barbaachisa. Ejjannoo meeshaa keessatti baayoometirikisii yookaan koodii iccitii meeshaa qindeessi. Koodiin iccitii meeshaa keetii akka filannoo bakka bu'uutti fayyadamuuf ni jira."
+    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii banuun barbaachisa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -786,7 +786,7 @@
       "retrySend": "Ergachuu deebi'i",
       "moreReactions": "Falxiiwwan dabalataa",
       "reply": "Deebisii",
-      "edit": "gulaali",
+      "edit": "Gulaali",
       "sendFailed": "Ergicha erguun hin milkaa'ine",
       "retrySendFailed": "Deebi'ee erguun hin milkaa'ine",
       "editFailed": "Ergicha jijjiruu hin dandeenye",
@@ -1127,7 +1127,7 @@
       "memory": "Qabiyyee",
       "model": "Modeelii",
       "region": "Naannoo",
-      "resources": "Qabeenya",
+      "resources": "QABEENYA",
       "restarts": "Irra deebi'ii jalqaba",
       "state": "Haala",
       "uptime": "Yeroo hojii",
@@ -1135,12 +1135,12 @@
       "destroying": "BARBADEESSAA",
       "provisioned": "MADAALAMEE",
       "restarting": "IRRA DEEBI'AA",
-      "running": "Hojii irra jira",
+      "running": "HOJII IRRA JIRA",
       "shuttingDown": "DUUFAA",
-      "starting": "Jalqabaa jira",
+      "starting": "JALQABAA JIRA",
       "stopped": "DHAABAME",
       "stopping": "DHAABAA",
-      "unknown": "Hin beekamu",
+      "unknown": "HIN BEEKAMU",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Galmee xalayyii sakatta'aa eeggachaa jira.",
       "transcriptEmpty": "Sakatta'a kanaaf galmee xalayyii hin jiru.",
       "transcriptRetry": "Galmee xalayyii sakatta'aa fudhachuu hin danda'ine.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Eejentii hojii irraa boqachaa",
       "agentWorking": "Eejentii hojachaa jira...",
       "anErrorOccurred": "Dogoggorri uumame",
@@ -1701,7 +1701,7 @@
       "statusFixed": "Qulqullaa'e",
       "statusOpen": "Banaa",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Furmaanni duraan jalqabeera",
+      "reasonFixStarted": "furmaanni duraan jalqabeera",
       "reasonNoBandwidth": "dandeettiin hin jiru",
       "reasonTolerableRisk": "balaan obsa danda'ama",
       "reasonInaccurate": "raawwiin dogoggoraadha",
@@ -2662,7 +2662,7 @@
       "olderActivity": "Sochii duraanii",
       "olderActivityDescription": "Gatii seenaa fe'amee irratti kaa'amaa hin turre",
       "ofWindowTokens": "tokkanoota {{window}} keessaa",
-      "tokens": "Tokenwwan",
+      "tokens": "tokenwwan",
       "tokensWithPercentage": "tokkanoota ({{percentage}})",
       "stepsCount_one": "tarkaanfii {{steps}}",
       "stepsCount": "tarkaanfiiwwan {{steps}}",
@@ -2670,7 +2670,7 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Pull request bani",
+      "open": "pull request bani",
       "closed": "pull request cufame",
       "merged": "pull request makame",
       "draft": "pull request daaftaraa",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Hojii code haaraa",
     "explore": "Qoradhu",
     "seeAll": "Hunda ilaali",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Amma wanti hojjechaa jiru hin jiru"
   },
   "imageViewer": {
     "close": "{{filename}} cufi",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Deebi'ii filattoo kana fuulla duraanii irraa deebi'ii bani."
   },
   "sessionRow": {
-    "needsInput": "seensa barbaada"
+    "needsInput": "SEENSA BARBAADA"
   },
   "voiceInput": {
     "listening": "Dhaggeeffachaa jira...",

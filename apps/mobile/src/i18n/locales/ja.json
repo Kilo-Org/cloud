@@ -156,7 +156,7 @@
     "returnSendsMessage": "リターンキーでメッセージを送信",
     "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
     "biometricUnlock": "生体認証でロック解除",
-    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。デバイスの設定で、生体認証またはデバイスのパスコードを設定してください。生体認証の代わりにデバイスのパスコードも使用できます。"
+    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。"
   },
   "notifications": {
     "title": "通知",
@@ -2298,7 +2298,7 @@
     "newCodingTask": "新しいコーディングタスク",
     "explore": "探索",
     "seeAll": "すべて表示",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "現在実行中のものはありません"
   },
   "imageViewer": {
     "close": "{{filename}}を閉じる",

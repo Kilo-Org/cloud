@@ -156,7 +156,7 @@
     "returnSendsMessage": "Sartu teklak mezua bidaltzen du",
     "returnSendsMessageSubtitle": "Desaktibatuta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen konpositoreetan.",
     "biometricUnlock": "Desblokeatu biometriarekin",
-    "biometricUnlockSubtitle": "Aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren desblokeatu behar duzu. Konfiguratu biometria edo gailuaren sarbide-kodea gailuaren ezarpenetan. Zure gailuaren sarbide-kodea erabil dezakezu ordezko aukera gisa."
+    "biometricUnlockSubtitle": "Aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren desblokeatu behar duzu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
@@ -839,7 +839,7 @@
       "managedByAdmin": "Fakturazioa zure erakundeko administratzaileak kudeatzen du.",
       "couldNotLoad": "Fakturazio-informazioa ezin izan da kargatu",
       "manageOnWeb": "Kudeatu fakturazioa webgunean",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Zure azken Commit epea {{date}}n amaitzen da. Jarraitu Standard gisa {{price}}rekin, edo hostinga amaitzen da.",
       "freeTrial": "Doako proba",
@@ -1135,7 +1135,7 @@
       "destroying": "SUNTSITZEN",
       "provisioned": "HORNITUTA",
       "restarting": "BERRABIARAZTEN",
-      "running": "Exekutatzen",
+      "running": "EXEKUTATZEN",
       "shuttingDown": "ITZALTZEN",
       "starting": "HASTEN",
       "stopped": "GELDITUTA",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Berrikuspenaren transkripzioaren zain.",
       "transcriptEmpty": "Berrikuspen honetarako transkripziorik ez.",
       "transcriptRetry": "Ezin izan da berrikuspenaren transkripzioa kargatu.",
-      "transcriptLive": "ZUZENEAN",
+      "transcriptLive": "Zuzenean",
       "agentIdle": "Agentea geldirik",
       "agentWorking": "Agentea lanean...",
       "anErrorOccurred": "Errore bat gertatu da",
@@ -2457,7 +2457,7 @@
       "modelAccessibility": "Modeloa: {{modelLabel}}",
       "openHint": "Ireki subagentearen saioa",
       "subagent": "Subagentea",
-      "task": "zeregina",
+      "task": "Zeregina",
       "waitingForActivity": "Jardueraren zain"
     },
     "childSessionSheet": {
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Kodetze-lan berria",
     "explore": "Arakatu",
     "seeAll": "Ikusi guztiak",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ez dago ezer martxan une honetan"
   },
   "imageViewer": {
     "close": "Itxi {{filename}}",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Itzuli eta ireki hautatzaile hau aurreko pantailatik berriro."
   },
   "sessionRow": {
-    "needsInput": "sarreraren zain"
+    "needsInput": "SARRERAREN ZAIN"
   },
   "voiceInput": {
     "listening": "Entzuten...",

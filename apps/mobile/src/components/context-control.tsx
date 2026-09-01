@@ -58,7 +58,10 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
 }
 
 /** An explicit scope is always read-only; explicit null never inherits global scope. */
-export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope }) {
+export function ContextControl({
+  scope,
+  showOrganizationName = true,
+}: Readonly<{ scope?: ContextDisplayScope; showOrganizationName?: boolean }>) {
   const context = useOrganization();
   const { token } = useAuth();
   const trpc = useTRPC();
@@ -79,10 +82,11 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
   const pending =
     (!isResolved && providerError !== 'restore') ||
     (isResolved && organizationId !== null && orgs === undefined && !nameError);
+  const organizationName = showOrganizationName ? org?.organizationName : undefined;
   let label =
     organizationId === null
       ? t('profile.personal')
-      : (org?.organizationName ?? t('profile.organization'));
+      : (organizationName ?? t('profile.organization'));
   if (!isResolved) {
     label = t('profile.selectAccount');
   }
@@ -107,13 +111,19 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
   const disabled = !isResolved || orgs === undefined;
   const pickerBusy = pending || (orgs === undefined && token != null && organizations.isPending);
   const content = pending ? (
-    <Skeleton className="h-5 w-36 rounded" />
+    <Skeleton className="h-5 w-36 max-w-full shrink rounded" />
   ) : (
-    <Text className="shrink text-sm text-muted-foreground">{label}</Text>
+    <Text
+      className="min-w-0 shrink text-sm text-muted-foreground"
+      numberOfLines={1}
+      ellipsizeMode="tail"
+    >
+      {label}
+    </Text>
   );
 
   return (
-    <View>
+    <View className="min-w-0 max-w-full">
       {scope ? (
         <View
           accessible
@@ -135,7 +145,7 @@ export function ContextControl({ scope }: { readonly scope?: ContextDisplayScope
           className="min-h-11 flex-row items-center gap-1 active:opacity-70"
         >
           {content}
-          <View className="size-5 items-center justify-center">
+          <View className="size-5 shrink-0 items-center justify-center">
             {pickerBusy ? (
               <ActivityIndicator size="small" color={colors.mutedForeground} />
             ) : (

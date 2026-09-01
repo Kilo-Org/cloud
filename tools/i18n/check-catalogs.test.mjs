@@ -23,17 +23,20 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
-function runChecker(context, { english = ENGLISH, translated = TRANSLATED, source = SOURCE } = {}) {
+function runChecker(
+  context,
+  { english = ENGLISH, translated = TRANSLATED, source = SOURCE, language = 'ru' } = {}
+) {
   const root = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
   const files = {
-    'apps/mobile/src/i18n/languages.ts': "export const SUPPORTED_LANGUAGES = ['en', 'ru'];",
+    'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', '${language}'];`,
     'apps/mobile/src/example.ts': source,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
-    'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(translated),
+    [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
-    'packages/notifications/src/locales/ru.json': '{}',
+    [`packages/notifications/src/locales/${language}.json`]: '{}',
   };
   for (const [path, content] of Object.entries(files)) {
     const file = join(root, path);
@@ -129,6 +132,45 @@ test('rejects unused English plural siblings', context => {
     result.stderr,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
+});
+
+for (const [language, title, badge] of [
+  ['tr', 'Çalışıyor', 'ÇALIŞIYOR'],
+  ['az', 'İşləyir', 'İŞLƏYİR'],
+  ['el', 'Σε εξέλιξη', 'ΣΕ ΕΞΕΛΙΞΗ'],
+  ['de', 'Straße', 'STRASSE'],
+]) {
+  test(`accepts locale-aware case variants in ${language}`, context => {
+    const result = runChecker(context, {
+      language,
+      english: { title: 'Running', badge: 'RUNNING' },
+      translated: { title, badge },
+      source: "t('title'); t('badge');",
+    });
+    assert.equal(result.status, 0, result.stderr);
+  });
+}
+
+test('still rejects different wording after locale-aware case folding', context => {
+  const result = runChecker(context, {
+    language: 'tr',
+    english: { title: 'Running', badge: 'RUNNING' },
+    translated: { title: 'Çalışıyor', badge: 'DURDU' },
+    source: "t('title'); t('badge');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /English "running" is translated 2 ways/);
+});
+
+test('rejects the English live-session empty state in a translated catalog', context => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const result = runChecker(context, {
+    english,
+    translated: english,
+    source: "t('home.noLiveSessions');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /mobile\/ru: "home\.noLiveSessions" must be translated/);
 });
 
 test('rejects an empty translated value', context => {

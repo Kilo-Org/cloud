@@ -156,7 +156,7 @@
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
     "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau.",
     "biometricUnlock": "Datgloi gyda biometreg",
-    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir. Gosodwch fiometreg neu god pas y ddyfais yng ngosodiadau'r ddyfais. Mae cod pas eich dyfais ar gael fel dewis wrth gefn."
+    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff yn rhy fawr i'w ddangos",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor diff y ffeil hon ar GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Clirio dewis",
@@ -1345,7 +1345,7 @@
       "transcriptWaiting": "Yn aros am drawsgrifiad yr adolygiad.",
       "transcriptEmpty": "Dim trawsgrifiad ar gyfer yr adolygiad hwn.",
       "transcriptRetry": "Ni ellid llwytho trawsgrifiad yr adolygiad.",
-      "transcriptLive": "BYW",
+      "transcriptLive": "Byw",
       "agentIdle": "Asiant yn segur",
       "agentWorking": "Asiant yn gweithio...",
       "anErrorOccurred": "Digwyddodd gwall",
@@ -2742,7 +2742,7 @@
       "olderActivity": "Gweithgaredd cynharach",
       "olderActivityDescription": "Cost heb ei phriodoli i'r hanes a lwythwyd",
       "ofWindowTokens": "o {{window}} token",
-      "tokens": "Tocynnau",
+      "tokens": "tocynnau",
       "tokensWithPercentage": "tokenau ({{percentage}})",
       "stepsCount_one": "{{steps}} cam",
       "stepsCount": "{{steps}} cam",
@@ -2836,7 +2836,7 @@
     "newCodingTask": "Tasg codio newydd",
     "explore": "Archwilio",
     "seeAll": "Gweld y cyfan",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Does dim byd yn rhedeg ar hyn o bryd"
   },
   "imageViewer": {
     "close": "Cau {{filename}}",
@@ -3075,7 +3075,7 @@
   "feedback": {
     "noEmailApp": "Dim app e-bost ar gael. Gallwch gysylltu â ni yn {{email}}",
     "couldNotOpenStore": "Methwyd agor y siop.",
-    "emailSubject": "Adborth ap symudol",
+    "emailSubject": "adborth ap symudol",
     "neutralTitle": "Graduwch ap Kilo",
     "rateTheApp": "Graduwch yr ap",
     "sendFeedback": "Anfonwch adborth"

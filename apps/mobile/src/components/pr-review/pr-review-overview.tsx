@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
@@ -26,6 +26,7 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -72,7 +73,7 @@ export function PrReviewOverview({
   isActive: _isActive,
 }: PrReviewOverviewProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const connection = useCheckGitHubConnection();
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -86,18 +87,6 @@ export function PrReviewOverview({
     };
     router.push(href);
   }, [owner, repo, number, router]);
-
-  const handleReconnect = useCallback(() => {
-    // A PRECONDITION_FAILED here means the gate's authorization is no
-    // longer valid even though the gate already passed. Forcing a
-    // refetch of the gate's query will either (a) flip it to
-    // disconnected/revoked, in which case the gate renders its own
-    // empty state with the Connect CTA, or (b) return connected, in
-    // which case the user can tap Retry to reload the PR.
-    void queryClient.invalidateQueries({
-      queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-    });
-  }, [queryClient, trpc.githubApps.getUserAuthorization]);
 
   const handleInstallApp = useCallback(() => {
     void (async () => {
@@ -153,7 +142,13 @@ export function PrReviewOverview({
           title={t('prReview.connectionExpiredTitle')}
           description={t('prReview.connectionExpiredDescription')}
           action={
-            <Button className="mt-3 w-full" onPress={handleReconnect}>
+            <Button
+              className="mt-3 w-full"
+              onPress={() => {
+                connection.mutate();
+              }}
+              loading={connection.isPending}
+            >
               <Text>{t('prReview.checkConnection')}</Text>
             </Button>
           }

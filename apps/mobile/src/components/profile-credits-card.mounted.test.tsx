@@ -130,6 +130,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = ['user', 'getContextBalance'] as const;
+const organizationName = 'A very long organization name that must leave the credits label visible';
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
@@ -197,11 +198,11 @@ describe('CreditsCard balance state', () => {
   it.each([
     { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {
-      orgs: [{ organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' }],
-      options: ['Personal', 'Supplied organization', 'Cancel'],
+      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
+      options: ['Personal', organizationName, 'Cancel'],
       choice: 1,
       expected: 'org-a',
-      label: 'Supplied organization',
+      label: organizationName,
     },
   ])('uses supplied memberships for native selection: $expected', async state => {
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'missing-org');
@@ -220,7 +221,8 @@ describe('CreditsCard balance state', () => {
       call[1](state.choice);
     });
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
-    expect(texts()).toContain(state.label);
+    const label = renderer.root.findByProps({ children: state.label });
+    expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
     unmount();
   });
 

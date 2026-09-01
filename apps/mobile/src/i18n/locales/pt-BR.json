@@ -708,7 +708,7 @@
       "destroying": "DESTRUINDO",
       "provisioned": "PROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "Em execução",
+      "running": "EM EXECUÇÃO",
       "shuttingDown": "DESLIGANDO",
       "starting": "INICIANDO",
       "stopped": "PARADO",
@@ -890,7 +890,7 @@
       "transcriptWaiting": "Aguardando a transcrição da revisão.",
       "transcriptEmpty": "Nenhuma transcrição para esta revisão.",
       "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
-      "transcriptLive": "AO VIVO",
+      "transcriptLive": "Ao vivo",
       "agentIdle": "Agente ocioso",
       "agentWorking": "Agente trabalhando...",
       "anErrorOccurred": "Ocorreu um erro",
@@ -1275,11 +1275,11 @@
       "statusFixed": "Corrigido",
       "statusOpen": "Aberto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Uma correção já foi iniciada",
-      "reasonNoBandwidth": "Não há capacidade disponível",
-      "reasonTolerableRisk": "O risco é tolerável",
-      "reasonInaccurate": "A descoberta é imprecisa",
-      "reasonNotUsed": "O código vulnerável não é usado",
+      "reasonFixStarted": "uma correção já foi iniciada",
+      "reasonNoBandwidth": "não há capacidade disponível",
+      "reasonTolerableRisk": "o risco é tolerável",
+      "reasonInaccurate": "a descoberta é imprecisa",
+      "reasonNotUsed": "o código vulnerável não é usado",
       "reasonAfterReview": "após a revisão"
     },
     "findingList": {
@@ -2270,7 +2270,7 @@
     "returnSendsMessage": "A tecla Enter envia a mensagem",
     "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloquear com biometria",
-    "biometricUnlockSubtitle": "Desbloqueie ao iniciar o app e após cinco minutos em segundo plano. Configure a biometria ou um código de acesso do dispositivo nos Ajustes do dispositivo. O código de acesso do seu dispositivo fica disponível como alternativa."
+    "biometricUnlockSubtitle": "Desbloqueie ao iniciar o app e após cinco minutos em segundo plano."
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2312,7 +2312,7 @@
     "newCodingTask": "Nova tarefa de codificação",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Nada em execução no momento"
   },
   "imageViewer": {
     "close": "Fechar {{filename}}",

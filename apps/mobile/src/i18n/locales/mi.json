@@ -156,7 +156,7 @@
     "returnSendsMessage": "Ka tuku karere te pātuhi Whakahoki",
     "returnSendsMessageSubtitle": "Ina weto, ka whakauru te pātuhi Whakahoki i tētahi rārangi hōu ki ngā kaitito māngai.",
     "biometricUnlock": "Wewete mā te tautuhi koiora",
-    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri. Whakaritea te tautuhi koiora, he waehere uru rānei mō te pūrere, i ngā tautuhinga o te pūrere. Ka taea tonu te whakamahi i te waehere uru o tō pūrere hei ara kē."
+    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -1135,7 +1135,7 @@
       "destroying": "KEI TE WHANGARO",
       "provisioned": "KUA WHAKARATOHIA",
       "restarting": "KEI TE TĪMATA ANŌ",
-      "running": "Kei te oma",
+      "running": "KEI TE OMA",
       "shuttingDown": "KEI TE TUTAKI",
       "starting": "KEI TE TĪMATA",
       "stopped": "KUA MUTU",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Kei te tatari mō te tuhinga arotake.",
       "transcriptEmpty": "Kāore he tuhinga mō tēnei arotake.",
       "transcriptRetry": "Kāore i taea te uta te tuhinga arotake.",
-      "transcriptLive": "ORA",
+      "transcriptLive": "Ora",
       "agentIdle": "Kore mahi te kaiāwhina",
       "agentWorking": "Kei te mahi te kaiāwhina...",
       "anErrorOccurred": "I puta he hapa",
@@ -2662,7 +2662,7 @@
       "olderActivity": "Ngā mahi o mua",
       "olderActivityDescription": "Te utu kāore i pā ki te hītori kua utaina",
       "ofWindowTokens": "o ngā tōkena {{window}}",
-      "tokens": "Ngā tōkena",
+      "tokens": "ngā tōkena",
       "tokensWithPercentage": "ngā tōkena ({{percentage}})",
       "stepsCount_one": "{{steps}} mahi",
       "stepsCount": "{{steps}} ngā mahi",
@@ -2673,7 +2673,7 @@
       "open": "tono hiki tuwhera",
       "closed": "tono hiki kua katia",
       "merged": "tono hiki kua hanumi",
-      "draft": "Tono huna hukitanga",
+      "draft": "tono huna hukitanga",
       "updating": "E whakahou ana, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "tono huna"
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Mahi whakawaehere hōu",
     "explore": "Torotoro",
     "seeAll": "Tirohia katoa",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Kāore he mea e rere ana i tēnei wā"
   },
   "imageViewer": {
     "close": "Katia {{filename}}",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Hoki whakamuri, whakatuwhera anō i tēnei kōwhiri mai i te mata o mua."
   },
   "sessionRow": {
-    "needsInput": "e hiahia ana ki te whakaurunga"
+    "needsInput": "E HIAHIA ANA KI TE WHAKAURUNGA"
   },
   "voiceInput": {
     "listening": "E whakarongo ana...",

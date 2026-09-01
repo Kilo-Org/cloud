@@ -117,34 +117,37 @@ export function SessionFilterChips({
       horizontal
       className="grow-0 shrink-0"
       showsHorizontalScrollIndicator={false}
-      contentContainerClassName="items-center gap-2 px-[22px] py-2"
+      contentContainerClassName="items-center gap-2 px-[22px]"
     >
       {projectFilter.map(gitUrl => {
         const label = projectFilterLabel(gitUrl, projectOptions);
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+            className="min-h-[44px] min-w-[44px] shrink-0 justify-center self-center active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
             accessibilityRole="button"
             accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
           >
-            <Text
-              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-            <X size={12} color={colors.accentSoftForeground} />
+            <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2 py-1">
+              <Text
+                className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {label}
+              </Text>
+              <X size={12} color={colors.accentSoftForeground} />
+            </View>
           </Pressable>
         );
       })}
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+          className="min-h-[44px] min-w-[44px] shrink-0 justify-center self-center active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
@@ -153,13 +156,16 @@ export function SessionFilterChips({
             label: platformFilterLabel(platform),
           })}
         >
-          <Text
-            className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-            numberOfLines={1}
-          >
-            {platformFilterLabel(platform)}
-          </Text>
-          <X size={12} color={colors.accentSoftForeground} />
+          <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2 py-1">
+            <Text
+              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {platformFilterLabel(platform)}
+            </Text>
+            <X size={12} color={colors.accentSoftForeground} />
+          </View>
         </Pressable>
       ))}
     </ScrollView>
@@ -214,7 +220,9 @@ export function SessionFilterModal({
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">{t('agentChat.sessionFilter.title')}</Text>
+          <Text accessibilityRole="header" className="text-center text-base font-semibold">
+            {t('agentChat.sessionFilter.title')}
+          </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">

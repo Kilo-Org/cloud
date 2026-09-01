@@ -42,6 +42,17 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
+      <View className="min-h-11 items-center justify-center">
+        <Text
+          className="w-full text-center text-lg font-semibold text-foreground"
+          numberOfLines={wrapTitle ? undefined : 2}
+          ellipsizeMode="tail"
+          accessibilityRole="header"
+          accessibilityLabel={title}
+        >
+          {title}
+        </Text>
+      </View>
       <View className="min-h-11 flex-row flex-wrap items-center gap-x-2 gap-y-1">
         {onShare !== undefined ? (
           <Pressable
@@ -70,17 +81,6 @@ export function SheetHeader({
             </Text>
           </Pressable>
         ) : null}
-        <View className="max-w-full grow">
-          <Text
-            className="text-center text-lg font-semibold text-foreground"
-            numberOfLines={wrapTitle ? undefined : 2}
-            ellipsizeMode="tail"
-            accessibilityRole="header"
-            accessibilityLabel={title}
-          >
-            {title}
-          </Text>
-        </View>
         <Pressable
           onPress={onDone}
           disabled={disabled}

@@ -156,7 +156,7 @@
     "returnSendsMessage": "Клавіша повернення надсилає повідомлення",
     "returnSendsMessageSubtitle": "Коли вимкнено, клавіша повернення вставляє новий рядок у полях введення повідомлень агентам.",
     "biometricUnlock": "Розблокування за допомогою біометрії",
-    "biometricUnlockSubtitle": "Розблоковуйте застосунок під час запуску та після п’яти хвилин перебування у фоновому режимі. Налаштуйте біометрію або код допуску пристрою в налаштуваннях пристрою. Код допуску пристрою доступний як запасний спосіб розблокування."
+    "biometricUnlockSubtitle": "Розблоковуйте застосунок під час запуску та після п’яти хвилин перебування у фоновому режимі."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -730,7 +730,7 @@
       "destroying": "ЗНИЩЕННЯ",
       "provisioned": "ПІДГОТОВЛЕНО",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "Виконується",
+      "running": "ВИКОНУЄТЬСЯ",
       "shuttingDown": "ЗАВЕРШЕННЯ РОБОТИ",
       "starting": "ЗАПУСК",
       "stopped": "ЗУПИНЕНО",
@@ -912,7 +912,7 @@
       "transcriptWaiting": "Очікування транскрипту перевірки.",
       "transcriptEmpty": "Немає транскрипту для цієї перевірки.",
       "transcriptRetry": "Не вдалося завантажити транскрипт перевірки.",
-      "transcriptLive": "НАЖИВО",
+      "transcriptLive": "Наживо",
       "agentIdle": "Агент бездіє",
       "agentWorking": "Агент працює…",
       "anErrorOccurred": "Сталася помилка",
@@ -1545,12 +1545,12 @@
       "overdue_other": "прострочено на {{count}} днів",
       "dueToday": "Термін сьогодні",
       "dueTomorrow": "Термін завтра",
-      "dueInDays_one": "термін через {{count}} день",
-      "dueInDays_few": "термін через {{count}} дні",
-      "dueInDays_many": "термін через {{count}} днів",
-      "dueInDays_other": "термін через {{count}} днів",
+      "dueInDays_one": "Термін через {{count}} день",
+      "dueInDays_few": "Термін через {{count}} дні",
+      "dueInDays_many": "Термін через {{count}} днів",
+      "dueInDays_other": "Термін через {{count}} днів",
       "overdue": "прострочено на {{count}} днів",
-      "dueInDays": "термін через {{count}} днів"
+      "dueInDays": "Термін через {{count}} днів"
     },
     "remediationStatus": {
       "cancellationRequested": "Запит на скасування",
@@ -2326,7 +2326,7 @@
     "newCodingTask": "Нове завдання кодування",
     "explore": "Дослідити",
     "seeAll": "Показати всі",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Зараз нічого не запущено"
   },
   "imageViewer": {
     "close": "Закрити {{filename}}",
@@ -2371,7 +2371,7 @@
     "optionsExpiredDescription": "Поверніться та знову відкрийте цей вибір з попереднього екрана."
   },
   "sessionRow": {
-    "needsInput": "потребує вводу"
+    "needsInput": "ПОТРЕБУЄ ВВОДУ"
   },
   "voiceInput": {
     "listening": "Слухаю...",

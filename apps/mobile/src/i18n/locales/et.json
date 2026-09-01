@@ -156,7 +156,7 @@
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
     "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
     "biometricUnlock": "Lukust avamine biomeetria abil",
-    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist. Seadista seadme seadetes biomeetria või seadme pääsukood. Seadme pääsukoodi saab kasutada varuvariandina."
+    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -1307,7 +1307,7 @@
       "threshold": "Lävi",
       "pullRequest": "pull request",
       "transcriptEmpty": "Selle ülevaate jaoks transkriptsiooni pole.",
-      "transcriptLive": "OTSE",
+      "transcriptLive": "Otse",
       "transcriptRetry": "Ülevaate transkriptsiooni laadimine ebaõnnestus.",
       "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni.",
       "agentIdle": "Agent on jõude",
@@ -1437,7 +1437,7 @@
     "status": {
       "pending": "Ootel",
       "queued": "Järjekorras",
-      "running": "TÖÖTAB",
+      "running": "Töötab",
       "completed": "Lõpetatud",
       "failed": "Ebaõnnestus",
       "cancelled": "Tühistatud",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Uus kodeerimisülesanne",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Praegu ei tööta midagi"
   },
   "imageViewer": {
     "close": "Sulge {{filename}}",

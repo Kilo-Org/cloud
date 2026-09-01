@@ -40,11 +40,11 @@ describe('SheetHeader title layout', () => {
 
       expect(heading.props.children).toBe('Inspect performance child 01');
       expect(heading.props.numberOfLines).toBe(2);
-      expect(heading.parent?.parent?.props.className).toContain('min-h-11');
+      expect(heading.parent?.props.className).toContain('min-h-11');
     }
   );
 
-  it('wraps the full title in a growing row with space reserved for Done', async () => {
+  it('centers the full title above the controls without overlap', async () => {
     const onDone = vi.fn<() => void>();
     const renderer = await mount({
       title: 'Inspect performance child 01',
@@ -53,7 +53,7 @@ describe('SheetHeader title layout', () => {
     });
     const heading = renderer.root.findByProps({ accessibilityRole: 'header' });
     const titleRegion = heading.parent;
-    const row = titleRegion?.parent;
+    const header = titleRegion?.parent;
     const dones = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
@@ -63,15 +63,16 @@ describe('SheetHeader title layout', () => {
 
     expect(heading.props.children).toBe('Inspect performance child 01');
     expect.soft(heading.props.numberOfLines).toBeUndefined();
-    expect.soft(row?.props.className).toContain('min-h-11');
-    expect.soft(row?.props.className).not.toMatch(/(?:^|\s)(?:h-|max-h-|overflow-hidden)/u);
-    expect(titleRegion?.props.className).toContain('grow');
-    expect(titleRegion?.props.className).toContain('max-w-full');
+    expect.soft(titleRegion?.props.className).toContain('min-h-11');
+    expect.soft(titleRegion?.props.className).not.toMatch(/(?:^|\s)(?:h-|max-h-|overflow-hidden)/u);
+    expect(heading.props.className).toContain('w-full');
+    expect(heading.props.className).toContain('text-center');
     expect(heading.props.className).toContain('text-lg');
     expect(heading.props.adjustsFontSizeToFit).not.toBe(true);
-    expect(row?.parent?.props.collapsable).toBe(false);
+    expect(header?.props.collapsable).toBe(false);
     expect(dones).toHaveLength(1);
-    expect(dones[0]?.parent).toBe(row);
+    expect(dones[0]?.parent).not.toBe(titleRegion);
+    expect(dones[0]?.parent?.parent).toBe(header);
     expect(dones[0]?.props.className).toContain('ms-auto');
     expect(dones[0]?.props.className).not.toContain('absolute');
     expect(dones[0]?.props.onPress).toBe(onDone);

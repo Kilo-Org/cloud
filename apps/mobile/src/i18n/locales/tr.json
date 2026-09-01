@@ -156,7 +156,7 @@
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
     "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler.",
     "biometricUnlock": "Biyometrik doğrulama ile kilit açma",
-    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir. Cihaz ayarlarında biyometrik doğrulamayı veya cihaz parolasını ayarlayın. Cihaz parolanızı yedek yöntem olarak kullanabilirsiniz."
+    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -355,7 +355,7 @@
       "online": "Çevrimiçi",
       "idle": "Boşta",
       "offline": "Çevrimdışı",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "loadingUser": "Kullanıcı yükleniyor...",
       "waitingForStatus": "Bot durumu bekleniyor...",
       "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
@@ -726,9 +726,9 @@
       "destroying": "YOK EDİLİYOR",
       "provisioned": "SAĞLANDI",
       "restarting": "YENİDEN BAŞLATILIYOR",
-      "running": "Çalışıyor",
+      "running": "ÇALIŞIYOR",
       "shuttingDown": "KAPATILIYOR",
-      "starting": "Başlatılıyor",
+      "starting": "BAŞLATILIYOR",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
       "unknown": "BİLİNMİYOR",
@@ -908,7 +908,7 @@
       "transcriptWaiting": "İnceleme dökümü bekleniyor.",
       "transcriptEmpty": "Bu incelemeye ait döküm yok.",
       "transcriptRetry": "İnceleme dökümü yüklenemedi.",
-      "transcriptLive": "CANLI",
+      "transcriptLive": "Canlı",
       "agentIdle": "Ajan boşta",
       "agentWorking": "Ajan çalışıyor...",
       "anErrorOccurred": "Bir hata oluştu",
@@ -1102,7 +1102,7 @@
       "suggestedFix": "Önerilen düzeltme",
       "triageConfidence": "Triyaj güveni",
       "triageReasoning": "Triyaj gerekçesi",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "watchInCloudAgent": "Bulut Ajanı'nda izle",
       "whereFound": "Bunun bulunduğu yer ({{displayCount}})",
       "yes": "Evet"
@@ -1284,7 +1284,7 @@
       "sourceRecord": "Kaynak kaydı",
       "supersededBy": "Güncel bir bulgu tarafından geçersiz kılındı",
       "supersededByDescription": "Durum, analiz ve iyileştirme için güncel kaydı açmak üzere dokunun.",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "updated": "Güncellendi",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
       "vulnerableVersions": "Savunmasız sürümler",
@@ -1633,7 +1633,7 @@
       "couldNotCopyId": "Oturum kimliği kopyalanamadı",
       "untitled": "Başlıksız oturum",
       "sessionDeleted": "Oturum silindi",
-      "needsInput": "Girdi gerekli",
+      "needsInput": "girdi gerekli",
       "fromPlatform": "{{platform}} üzerinden",
       "cent_one": "sent",
       "cent": "sent",
@@ -2219,7 +2219,7 @@
       "open": "açık pull request",
       "closed": "kapalı pull request",
       "merged": "birleştirilmiş pull request",
-      "draft": "Taslak çekme isteği",
+      "draft": "taslak çekme isteği",
       "updating": "Güncelleniyor, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "çekme isteği"
@@ -2298,7 +2298,7 @@
     "newCodingTask": "Yeni kodlama görevi",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Şu anda çalışan bir şey yok"
   },
   "imageViewer": {
     "close": "{{filename}} kapat",
@@ -2343,7 +2343,7 @@
     "optionsExpiredDescription": "Geri dönün ve bu seçiciyi önceki ekrandan yeniden açın."
   },
   "sessionRow": {
-    "needsInput": "Girdi gerekli"
+    "needsInput": "GİRDİ GEREKLİ"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -3053,7 +3053,7 @@
         "void": "Geçersiz",
         "draft": "Taslak",
         "uncollectible": "Tahsil edilemez",
-        "unknown": "BİLİNMİYOR"
+        "unknown": "Bilinmiyor"
       },
       "loadMore": "Daha fazla yükle",
       "loadMoreFailed": "Daha fazlası yüklenemedi",

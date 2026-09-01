@@ -22,7 +22,7 @@
     "copiedToClipboard": "Waxaa la nuqulay",
     "couldNotCopyToClipboard": "Ma nuqulin karin",
     "required": "loo baahan yahay",
-    "error": "Qalad: {{error}}",
+    "error": "qalad: {{error}}",
     "back": "Dib",
     "somethingWentWrong": "Waxbaa khaldamay",
     "couldNotOpen": "{{label}} lama furi karin",
@@ -156,7 +156,7 @@
     "returnSendsMessage": "Furaha soo noqoshada wuxuu diraa fariinta",
     "returnSendsMessageSubtitle": "Marka uu dansan yahay, furaha soo noqoshada wuxuu geliyaa sadar cusub composer-ka wakiilka.",
     "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
-    "biometricUnlockSubtitle": "Furitaanka ayaa loo baahan yahay marka barnaamijku bilaabmo iyo marka uu shan daqiiqo ku jiray asalka. Ku deji aqoonsiga astaamaha jirka ama koodhka furitaanka aaladda gudaha dejinta aaladda. Koodhka furitaanka aaladdaada ayaa weli loo isticmaali karaa hab beddel ah."
+    "biometricUnlockSubtitle": "Furitaanka ayaa loo baahan yahay marka barnaamijku bilaabmo iyo marka uu shan daqiiqo ku jiray asalka."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",
@@ -1135,12 +1135,12 @@
       "destroying": "BURBURINAYA",
       "provisioned": "LA HELAY",
       "restarting": "DIB-U-BILAWAYA",
-      "running": "Socodaya",
+      "running": "SOCODAYA",
       "shuttingDown": "WAA LA DAMIYAY",
-      "starting": "Waa bilaabayaa",
+      "starting": "WAA BILAABAYAA",
       "stopped": "JOOGSATAY",
       "stopping": "JOOGSINAYA",
-      "unknown": "Lama garanayo",
+      "unknown": "LAMA GARANAYO",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Sugaya qoraalka dib-u-eegista.",
       "transcriptEmpty": "Qoraal kama jiro dib-u-eegistan.",
       "transcriptRetry": "Qoraalka dib-u-eegista lama soo dejin karin.",
-      "transcriptLive": "TOOS AH",
+      "transcriptLive": "Toos ah",
       "agentIdle": "Wakiilku waa fadhiisan",
       "agentWorking": "Wakiilku wuu shaqaynayaa...",
       "anErrorOccurred": "Khalad baa dhacay",
@@ -2246,14 +2246,14 @@
       "contentTruncated": "Nuxurka waa la gaabiyay",
       "truncated": "Waa la gaabiyay",
       "toolRead": "read",
-      "toolEdit": "Tafatir",
+      "toolEdit": "tafatir",
       "toolWrite": "write",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "Hawsha",
+      "toolTask": "hawsha",
       "readTodos": "Akhri todos",
       "updateTodos": "Cusboonaysii todos",
       "linesBadge": "{{displayCount}} sadar",
@@ -2541,7 +2541,7 @@
       "provider": "Provider {{id}}",
       "modelId": "Model {{id}}",
       "unavailable": "Maan heli karo",
-      "unavailableState": "Maan heli karo",
+      "unavailableState": "maan heli karo",
       "selectedState": "la doortay",
       "thinkingEffort": "Hesho fekerka",
       "thinkingEffortAccessibility": "{{label}} hesaha fekerka",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Hawshooda cusub ee codeynta",
     "explore": "Sahan",
     "seeAll": "Fiiri dhammaan",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Waxba ma socdaan hadda"
   },
   "imageViewer": {
     "close": "Xidh {{filename}}",
@@ -2797,7 +2797,7 @@
     "optionsExpiredDescription": "Noqo dib oo dib u fur soo-bixiyahan boggi hore."
   },
   "sessionRow": {
-    "needsInput": "u baahan wax-soo-gal"
+    "needsInput": "U BAAHAN WAX-SOO-GAL"
   },
   "voiceInput": {
     "listening": "Dhageysanaya...",

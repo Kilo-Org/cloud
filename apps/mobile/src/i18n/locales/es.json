@@ -156,7 +156,7 @@
     "returnSendsMessage": "La tecla Intro envía el mensaje",
     "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
     "biometricUnlock": "Desbloquear con biometría",
-    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano. Configura la biometría o un código de acceso del dispositivo en los ajustes del dispositivo. El código de acceso de tu dispositivo está disponible como alternativa."
+    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano."
   },
   "notifications": {
     "channel": {
@@ -910,7 +910,7 @@
       "transcriptWaiting": "Esperando la transcripción de la revisión.",
       "transcriptEmpty": "No hay transcripción para esta revisión.",
       "transcriptRetry": "No se pudo cargar la transcripción de la revisión.",
-      "transcriptLive": "EN VIVO",
+      "transcriptLive": "En vivo",
       "agentIdle": "Agente inactivo",
       "agentWorking": "Agente trabajando...",
       "anErrorOccurred": "Se produjo un error",
@@ -2233,7 +2233,7 @@
       "open": "solicitud de cambios abierta",
       "closed": "solicitud de cambios cerrada",
       "merged": "solicitud de cambios fusionada",
-      "draft": "Pull request en borrador",
+      "draft": "pull request en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2312,7 +2312,7 @@
     "newCodingTask": "Nueva tarea de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "No hay nada en ejecución ahora mismo"
   },
   "imageViewer": {
     "close": "Cerrar {{filename}}",
@@ -2566,7 +2566,7 @@
       "skipped": "{{displayCount}} omitidas",
       "title": "Verificaciones",
       "viewOnGitHub": "Ver PR en GitHub",
-      "checkDetails": "Detalles de la verificación",
+      "checkDetails": "detalles de la verificación",
       "pullRequest": "pull request"
     },
     "composer": {

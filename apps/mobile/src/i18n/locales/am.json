@@ -156,7 +156,7 @@
     "returnSendsMessage": "የመመለሻ ቁልፍ መልእክት ይልካል",
     "returnSendsMessageSubtitle": "ሲጠፋ፣ የመመለሻ ቁልፍ በወኪል መልእክት ማስገቢያዎች ውስጥ አዲስ መስመር ያስገባል።",
     "biometricUnlock": "በባዮሜትሪክስ መክፈት",
-    "biometricUnlockSubtitle": "መተግበሪያው ሲጀመር እና ከበስተጀርባ ለአምስት ደቂቃዎች ከቆየ በኋላ መክፈት ያስፈልጋል። በመሣሪያው ቅንብሮች ውስጥ ባዮሜትሪክስ ወይም የመሣሪያ የይለፍ ኮድ ያዘጋጁ። የመሣሪያዎን የይለፍ ኮድ እንደ አማራጭ መጠቀም ይችላሉ።"
+    "biometricUnlockSubtitle": "መተግበሪያው ሲጀመር እና ከበስተጀርባ ለአምስት ደቂቃዎች ከቆየ በኋላ መክፈት ያስፈልጋል።"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "አዲስ የኮዲንግ ተግባር",
     "explore": "ይቃኙ",
     "seeAll": "ሁሉንም ይመልከቱ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "አሁን እየሰራ ያለ ምንም የለም"
   },
   "imageViewer": {
     "close": "{{filename}}ን ይዝጉ",

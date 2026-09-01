@@ -26,7 +26,7 @@
     "back": "Артқа",
     "somethingWentWrong": "Бірдеңе қате кетті",
     "couldNotOpen": "{{label}} ашу мүмкін болмады",
-    "link": "Сілтеме",
+    "link": "сілтеме",
     "takingLonger": "Бұл күтілгеннен ұзағырақ уақыт алады. Мұны жауып, кейін қайта тексеруге болады."
   },
   "language": {
@@ -156,7 +156,7 @@
     "returnSendsMessage": "Қайтару пернесі хабарламаны жібереді",
     "returnSendsMessageSubtitle": "Өшірулі кезде Қайтару пернесі агенттердің хабарлама енгізу өрістеріне жаңа жол енгізеді.",
     "biometricUnlock": "Биометрия арқылы құлыпты ашу",
-    "biometricUnlockSubtitle": "Қосымша іске қосылғанда және фонда бес минут тұрғаннан кейін құлыпты ашу қажет. Құрылғы параметрлерінде биометрияны немесе құрылғының кіру кодын орнатыңыз. Құрылғыңыздың кіру кодын балама ретінде пайдалануға болады."
+    "biometricUnlockSubtitle": "Қосымша іске қосылғанда және фонда бес минут тұрғаннан кейін құлыпты ашу қажет."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -1135,9 +1135,9 @@
       "destroying": "ЖОЙЫЛУДА",
       "provisioned": "ДАЙЫНДАЛДЫ",
       "restarting": "ҚАЙТА ІСКЕ ҚОСЫЛУДА",
-      "running": "Орындалуда",
+      "running": "ОРЫНДАЛУДА",
       "shuttingDown": "ӨШІРІЛУДЕ",
-      "starting": "Басталуда",
+      "starting": "БАСТАЛУДА",
       "stopped": "ТОҚТАТЫЛДЫ",
       "stopping": "ТОҚТАТЫЛУДА",
       "unknown": "БЕЛГІСІЗ",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Шолу транскрипті күтілуде.",
       "transcriptEmpty": "Бұл шолу үшін транскрипт жоқ.",
       "transcriptRetry": "Шолу транскриптін жүктеу мүмкін болмады.",
-      "transcriptLive": "ТІКІ",
+      "transcriptLive": "Тікі",
       "agentIdle": "Агент бос тұр",
       "agentWorking": "Агент орындалуда...",
       "anErrorOccurred": "Қате орын алды",
@@ -2662,7 +2662,7 @@
       "olderActivity": "Ескі әрекет",
       "olderActivityDescription": "Жүктелген тарихқа жатқызылмаған құн",
       "ofWindowTokens": "{{window}} токеннің",
-      "tokens": "Токендер",
+      "tokens": "токендер",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} қадам",
       "stepsCount": "{{steps}} қадам",
@@ -2752,7 +2752,7 @@
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "explore": "Зерттеу",
     "seeAll": "Барлығын қарау",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Қазір ештеңе орындалып жатқан жоқ"
   },
   "imageViewer": {
     "close": "{{filename}} жабу",

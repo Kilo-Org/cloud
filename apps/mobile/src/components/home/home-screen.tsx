@@ -42,8 +42,10 @@ export function HomeScreen() {
         size="large"
         showBackButton={false}
         className="px-[22px]"
+        contextPosition="right"
         context={
           <ContextControl
+            showOrganizationName={context.isReady}
             scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
           />
         }

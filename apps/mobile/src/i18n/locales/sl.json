@@ -156,7 +156,7 @@
     "returnSendsMessage": "Tipka Enter pošlje sporočilo",
     "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom.",
     "biometricUnlock": "Odklepanje z biometrijo",
-    "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju. V nastavitvah naprave nastavite biometrijo ali kodo naprave. Koda naprave ostaja na voljo kot nadomestni način odklepanja."
+    "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",
@@ -1455,7 +1455,7 @@
     "status": {
       "pending": "Na čakanju",
       "queued": "V čakalni vrsti",
-      "running": "DELUJE",
+      "running": "Deluje",
       "completed": "Dokončano",
       "failed": "Ni uspelo",
       "cancelled": "Preklicano",
@@ -2024,7 +2024,7 @@
       "cancellationRequested": "Preklic je bil zahtevan",
       "notStarted": "Ni začeto",
       "queued": "V čakalni vrsti",
-      "starting": "SE ZAGANJA",
+      "starting": "Se zaganja",
       "inProgress": "V teku",
       "draftPrOpened": "Odprt osnutek PR",
       "prOpened": "PR odprt",
@@ -2715,7 +2715,7 @@
       "open": "odprt pull request",
       "closed": "zaprt pull request",
       "merged": "združen pull request",
-      "draft": "Pull request v osnutku",
+      "draft": "pull request v osnutku",
       "updating": "Posodabljanje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2794,7 +2794,7 @@
     "newCodingTask": "Nova naloga kodiranja",
     "explore": "Razišči",
     "seeAll": "Prikaži vse",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Trenutno nič ne teče"
   },
   "imageViewer": {
     "close": "Zapri {{filename}}",

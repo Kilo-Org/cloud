@@ -156,7 +156,7 @@
     "returnSendsMessage": "Tombol Enter mengirim pesan",
     "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen.",
     "biometricUnlock": "Buka kunci dengan biometrik",
-    "biometricUnlockSubtitle": "Buka kunci saat aplikasi diluncurkan dan setelah berada di latar belakang selama lima menit. Siapkan biometrik atau kode sandi perangkat di pengaturan perangkat. Kode sandi perangkat Anda tetap tersedia sebagai cadangan."
+    "biometricUnlockSubtitle": "Buka kunci saat aplikasi diluncurkan dan setelah berada di latar belakang selama lima menit."
   },
   "notifications": {
     "title": "Notifikasi",
@@ -2219,7 +2219,7 @@
       "open": "pull request terbuka",
       "closed": "pull request tertutup",
       "merged": "pull request tergabung",
-      "draft": "Draf pull request",
+      "draft": "draf pull request",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2298,7 +2298,7 @@
     "newCodingTask": "Tugas coding baru",
     "explore": "Jelajahi",
     "seeAll": "Lihat semua",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Tidak ada yang berjalan saat ini"
   },
   "imageViewer": {
     "close": "Tutup {{filename}}",
@@ -2343,7 +2343,7 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "memerlukan input"
+    "needsInput": "MEMERLUKAN INPUT"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",

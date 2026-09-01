@@ -57,6 +57,7 @@ import type {
   UserMessage,
   OlderMessagesError,
   PreparationAttempt,
+  SessionCommit,
 } from './types';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { splitByContiguousPrefix } from './array-utils';
@@ -82,6 +83,7 @@ type SessionStatusIndicator = {
   type: 'error' | 'warning' | 'info' | 'progress';
   message: string;
   timestamp: number;
+  commitHash?: string;
 };
 type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
@@ -363,6 +365,7 @@ type SessionManagerAtoms = {
   cloudStatus: W<CloudStatus | null>;
   setupLog: W<readonly string[]>;
   preparationAttempts: W<readonly PreparationAttempt[]>;
+  commits: W<readonly SessionCommit[]>;
   sessionConfig: W<SessionConfig | null>;
   sessionType: W<ActiveSessionType | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
@@ -659,7 +662,12 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (s.type === 'autocommit') {
     const kind = s.step === 'failed' ? 'error' : s.step === 'completed' ? 'info' : 'progress';
-    return { type: kind, message: s.message, timestamp: now } satisfies SessionStatusIndicator;
+    return {
+      type: kind,
+      message: s.message,
+      timestamp: now,
+      ...(s.step === 'completed' && s.commitHash ? { commitHash: s.commitHash } : {}),
+    } satisfies SessionStatusIndicator;
   }
   if (s.type === 'disconnected')
     return { type: 'error', message: 'Agent connection lost', timestamp: now };
@@ -738,6 +746,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const cloudStatusAtom = atom<CloudStatus | null>(null);
   const setupLogAtom = atom<readonly string[]>([]);
   const preparationAttemptsAtom = atom<readonly PreparationAttempt[]>([]);
+  const commitsAtom = atom<readonly SessionCommit[]>([]);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
   const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
@@ -963,6 +972,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(cloudStatusAtom, null);
     store.set(setupLogAtom, []);
     store.set(preparationAttemptsAtom, []);
+    store.set(commitsAtom, []);
     store.set(sessionConfigAtom, null);
     store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
@@ -1327,7 +1337,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
-    const sKey = (s: AgentStatus) => (s.type === 'autocommit' ? `${s.type}:${s.step}` : s.type);
+    const sKey = (s: AgentStatus) =>
+      s.type === 'autocommit' ? `${s.type}:${s.step}:${s.commitHash ?? ''}` : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''
@@ -1352,6 +1363,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         preparationAttemptsAtom,
         'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : []
       );
+      store.set(commitsAtom, session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -1423,7 +1435,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             ind !== null ||
             shouldClearCloudIndicator ||
             (st.type === 'idle' &&
-              (previousStatus.type === 'error' || previousStatus.type === 'interrupted'))
+              (previousStatus.type === 'error' ||
+                previousStatus.type === 'interrupted' ||
+                (previousStatus.type === 'autocommit' && previousStatus.step === 'started')))
           ) {
             setIndicator(ind);
           }
@@ -2221,6 +2235,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function clearTranscript(): void {
     if (!currentSession) return;
     currentSession.storage.clear();
+    currentSession.state.clearCommits();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
     // Reset the retained-history stack so a later `trimRetainedHistory`
@@ -2409,6 +2424,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       cloudStatus: cloudStatusAtom,
       setupLog: setupLogAtom,
       preparationAttempts: preparationAttemptsAtom,
+      commits: commitsAtom,
       sessionConfig: sessionConfigAtom,
       sessionType: sessionTypeAtom,
       chatUI: chatUIAtom,

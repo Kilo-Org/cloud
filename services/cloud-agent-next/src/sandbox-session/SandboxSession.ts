@@ -936,7 +936,6 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       const messages = this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
       const cancelled = messages.map(message =>
         message.state === 'queued' || message.state === 'accepted'
@@ -947,7 +946,11 @@ export class SandboxSession extends DurableObject<Env> {
     });
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    await this.ctx.storage.deleteAlarm();
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } finally {
+      await this.ctx.storage.deleteAlarm();
+    }
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -1038,15 +1041,23 @@ export class SandboxSession extends DurableObject<Env> {
     await this.interruptExecution();
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
-    const records = this.ctx.storage.transactionSync(() => {
-      const records = this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
-      return records;
-    });
+    const records = this.terminalLifecycle.beginDeletion(metadata);
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
-    await this.terminalLifecycle.cleanupSession(metadata, records);
+    const errors: unknown[] = [];
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await this.terminalLifecycle.cleanupSession(metadata, records);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Session cleanup failed');
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     await this.ctx.storage.deleteAlarm();

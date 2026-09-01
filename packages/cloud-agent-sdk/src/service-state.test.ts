@@ -1,6 +1,8 @@
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
+import { autocommitCompletedDataSchema } from './schemas';
+import type { SessionCommit } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
   return { rootSessionId: 'root-1', ...overrides };
@@ -1177,6 +1179,95 @@ describe('createServiceState', () => {
   });
 
   describe('autocommit_completed', () => {
+    const localCommit = {
+      commitHash: 'a'.repeat(40),
+      commitMessage: 'Actual commit\n\nPreserve the body.\n',
+      messageId: 'assistant-1',
+      userMessageId: 'user-1',
+      committedAt: '2026-09-01T10:00:00Z',
+      pushStatus: 'failed',
+    } satisfies SessionCommit;
+
+    it('retains the canonical local commit when the operation reports failure', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: false, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+      expect(state.getStatus()).toMatchObject({
+        type: 'autocommit',
+        step: 'completed',
+        commitHash: localCommit.commitHash,
+      });
+    });
+
+    it('deduplicates immutable facts and keeps multiple commits at one anchor', () => {
+      const state = createServiceState(makeConfig());
+      const second = {
+        ...localCommit,
+        commitHash: 'b'.repeat(40),
+        committedAt: '2026-09-01T10:00:01Z',
+      };
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      state.process({ type: 'autocommit_completed', success: true, ...second });
+      state.process({
+        type: 'autocommit_completed',
+        success: false,
+        ...localCommit,
+        commitMessage: 'Conflicting replay',
+      });
+      expect(state.getCommits()).toEqual([localCommit, second]);
+      state.clearCommits();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      state.reset();
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit });
+      expect(state.getCommits()).toEqual([localCommit]);
+    });
+
+    it.each([
+      { commitHash: 'abc123' },
+      { commitMessage: undefined },
+      { commitMessage: '漢'.repeat(6_000) },
+      { messageId: '' },
+      { messageId: 'a'.repeat(257) },
+      { userMessageId: undefined },
+      { userMessageId: 'u'.repeat(257) },
+      { committedAt: undefined },
+      { committedAt: 'not-a-date' },
+      { pushStatus: undefined },
+      { commitMessageTruncated: false },
+    ])('does not retain a commit from incomplete or invalid metadata: %j', invalid => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_completed', success: true, ...localCommit, ...invalid });
+      expect(state.getCommits()).toEqual([]);
+    });
+
+    it('preserves offset timestamps and explicit bounded-message truncation through wire parsing', () => {
+      const state = createServiceState(makeConfig());
+      const data = autocommitCompletedDataSchema.parse({
+        ...localCommit,
+        success: false,
+        committedAt: '2026-09-01T12:00:00+02:00',
+        commitMessage: 'x'.repeat(16 * 1024),
+        commitMessageTruncated: true,
+      });
+      state.process({ type: 'autocommit_completed', ...data });
+      expect(state.getCommits()).toEqual([
+        expect.objectContaining({
+          committedAt: '2026-09-01T12:00:00+02:00',
+          commitMessage: data.commitMessage,
+          commitMessageTruncated: true,
+        }),
+      ]);
+    });
+
+    it('never treats a skipped completion as a commit even with stale metadata', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'autocommit_started', messageId: localCommit.messageId });
+      state.process({ type: 'autocommit_completed', success: true, skipped: true, ...localCommit });
+      expect(state.getCommits()).toEqual([]);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
     it('success sets status to autocommit completed', () => {
       const state = createServiceState(makeConfig());
 
@@ -1214,12 +1305,10 @@ describe('createServiceState', () => {
       });
     });
 
-    it('skipped does not update status', () => {
+    it('skipped clears the running commit indicator', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'autocommit_started', messageId: 'msg-1', message: 'Committing...' });
-
-      const statusBefore = state.getStatus();
 
       state.process({
         type: 'autocommit_completed',
@@ -1228,7 +1317,8 @@ describe('createServiceState', () => {
         skipped: true,
       });
 
-      expect(state.getStatus()).toBe(statusBefore);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(state.getCommits()).toEqual([]);
     });
   });
 

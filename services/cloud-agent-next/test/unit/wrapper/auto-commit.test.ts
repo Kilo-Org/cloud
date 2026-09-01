@@ -7,6 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { createKiloClient } from '@kilocode/sdk';
+import {
+  MAX_AUTO_COMMIT_MESSAGE_BYTES,
+  autoCommitRecordSchema,
+} from '@kilocode/worker-utils/cloud-agent-commits';
 import { runAutoCommit, type AutoCommitOptions } from '../../../wrapper/src/auto-commit.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import type * as Utils from '../../../wrapper/src/utils.js';
@@ -55,9 +59,6 @@ const createMockKiloClient = (): WrapperKiloClient => ({
   answerPermission: vi.fn(),
   answerQuestion: vi.fn(),
   rejectQuestion: vi.fn(),
-  getSessionStatuses: vi.fn(),
-  getQuestions: vi.fn(),
-  getPermissions: vi.fn(),
   getNetworkWaits: vi.fn(),
   resumeNetworkWait: vi.fn(),
   generateCommitMessage: vi.fn().mockResolvedValue({ message: 'test commit' }),
@@ -110,19 +111,21 @@ function blockCommitMessageRequest() {
   };
 }
 
-/** Configure mocks for a full happy-path commit+push (from git status onward). */
+const commitHash = 'a'.repeat(40);
+const committedAt = '2026-09-01T00:00:00.000Z';
+const raw = (stdout: string): Utils.ExecResult => ({ ...ok(), stdoutBytes: Buffer.from(stdout) });
+const commitObject = (message: string) =>
+  raw(`tree ${'b'.repeat(40)}\ncommitter Test <test@example.com> 1788220800 +0000\n\n${message}`);
+
 function setupHappyPathGit(): void {
-  // git status --porcelain  →  has changes
-  // git add -A              →  ok
-  // git commit -m ...       →  ok
-  // git rev-parse --short HEAD  →  abc1234
-  // git push ...            →  ok
-  mockGit
-    .mockResolvedValueOnce(ok(' M file.ts')) // status
-    .mockResolvedValueOnce(ok()) // add
-    .mockResolvedValueOnce(ok('[main abc1234] test commit')) // commit
-    .mockResolvedValueOnce(ok('abc1234')) // rev-parse
-    .mockResolvedValueOnce(ok()); // push
+  let message = 'test commit';
+  mockGit.mockImplementation(async args => {
+    if (args[0] === 'status') return ok(' M file.ts');
+    if (args[0] === 'commit') message = args.at(-1) ?? '';
+    if (args.includes('reflog')) return raw(`${commitHash}\n`);
+    if (args.includes('cat-file')) return commitObject(message);
+    return ok();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +134,7 @@ function setupHappyPathGit(): void {
 
 describe('runAutoCommit', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockHasGitUpstream.mockResolvedValue(true);
   });
 
@@ -262,7 +265,10 @@ describe('runAutoCommit', () => {
     // Should have emitted autocommit_started and autocommit_completed (success)
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
     expect(completed?.data).toEqual(
-      expect.objectContaining({ success: true, message: 'Changes committed and pushed' })
+      expect.objectContaining({
+        success: true,
+        message: 'Changes committed; push command completed',
+      })
     );
   });
 
@@ -276,7 +282,10 @@ describe('runAutoCommit', () => {
     expect(result).toEqual({ success: true });
     const completed = events.find(e => e.streamEventType === 'autocommit_completed');
     expect(completed?.data).toEqual(
-      expect.objectContaining({ success: true, message: 'Changes committed and pushed' })
+      expect.objectContaining({
+        success: true,
+        message: 'Changes committed; push command completed',
+      })
     );
   });
 
@@ -315,11 +324,159 @@ describe('runAutoCommit', () => {
     expect(completed?.data).toEqual(
       expect.objectContaining({
         success: true,
-        message: 'Changes committed and pushed',
-        commitHash: 'abc1234',
+        message: 'Changes committed; push command completed',
+        commitHash,
         commitMessage: 'test commit',
       })
     );
+  });
+
+  it.each(['unknown', 'failed'] as const)(
+    'emits a bounded, anchored shared commit fact with push status %s',
+    async pushStatus => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const actualMessage = 'Hook message\n\n' + '漢'.repeat(MAX_AUTO_COMMIT_MESSAGE_BYTES);
+      mockGit.mockImplementation(async (args, options) => {
+        if (args.includes('cat-file')) return commitObject(actualMessage);
+        if (args[0] === 'push' && pushStatus === 'failed') return { ...ok(), exitCode: 1 };
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({ userMessageId: 'user', messageId: 'assistant' });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      const record = autoCommitRecordSchema.parse(events.at(-1)?.data);
+      expect(record).toMatchObject({
+        commitHash,
+        committedAt,
+        userMessageId: 'user',
+        messageId: 'assistant',
+        pushStatus,
+        commitMessageTruncated: true,
+      });
+      expect(Buffer.byteLength(record.commitMessage)).toBeLessThanOrEqual(
+        MAX_AUTO_COMMIT_MESSAGE_BYTES
+      );
+      expect(actualMessage.startsWith(record.commitMessage)).toBe(true);
+      expect(record.commitMessage).not.toContain('�');
+    }
+  );
+
+  it.each(['rejection', 'throw', 'timeout', 'abort'] as const)(
+    'retains immutable local evidence after push %s',
+    async failure => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const controller = new AbortController();
+      mockGit.mockImplementation(async (args, options) => {
+        if (args.includes('cat-file')) return commitObject('actual hook message\n');
+        if (args[0] === 'push') {
+          if (failure === 'throw') throw new Error('Push spawn failed');
+          if (failure === 'abort') controller.abort();
+          return {
+            ...ok(),
+            exitCode: failure === 'rejection' ? 1 : 124,
+            ...(failure === 'timeout' ? { terminationReason: 'timeout' as const } : {}),
+            ...(failure === 'abort' ? { terminationReason: 'abort' as const } : {}),
+          };
+        }
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({
+        messageId: 'assistant',
+        userMessageId: 'user',
+        signal: controller.signal,
+      });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(
+        events
+          .filter(event => event.streamEventType === 'autocommit_completed')
+          .map(event => event.data)
+      ).toEqual([
+        expect.objectContaining({
+          success: true,
+          commitHash,
+          commitMessage: 'actual hook message\n',
+          committedAt,
+          messageId: 'assistant',
+          userMessageId: 'user',
+          pushStatus: failure === 'rejection' ? 'failed' : 'unknown',
+        }),
+      ]);
+    }
+  );
+
+  it.each(['returned', 'throw', 'abort'] as const)(
+    'recovers a commit when its process %s after updating the ref',
+    async completion => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      setupHappyPathGit();
+      const implementation = mockGit.getMockImplementation();
+      if (!implementation) throw new Error('Missing Git fixture');
+      const controller = new AbortController();
+      mockGit.mockImplementation(async (args, options) => {
+        if (args[0] === 'commit') {
+          controller.abort();
+          if (completion === 'throw') throw new Error('Commit interrupted after ref update');
+          return completion === 'returned'
+            ? ok()
+            : { ...ok(), exitCode: 124, terminationReason: 'abort' };
+        }
+        if (args.includes('reflog') || args.includes('cat-file'))
+          expect(options?.signal).toBeUndefined();
+        return implementation(args, options);
+      });
+      const { opts, events } = createOpts({
+        signal: controller.signal,
+        userMessageId: 'user',
+        messageId: 'assistant',
+      });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(events.at(-1)?.data).toMatchObject({
+        success: true,
+        commitHash,
+        commitMessage: 'test commit',
+        committedAt,
+        pushStatus: 'not_attempted',
+      });
+      expect(mockGit.mock.calls.filter(([args]) => args[0] === 'commit')).toHaveLength(1);
+      expect(mockGit.mock.calls.some(([args]) => args[0] === 'push')).toBe(false);
+    }
+  );
+
+  it.each(['stage', 'commit'] as const)(
+    'does not invent commit evidence on %s failure',
+    async failure => {
+      mockGetCurrentBranch.mockResolvedValue('work');
+      mockGit.mockImplementation(async args => {
+        if (args[0] === 'status') return ok(' M file.ts');
+        if (args.includes('reflog')) return raw('');
+        if (args[0] === 'commit' || (failure === 'stage' && args[0] === 'add'))
+          return { ...ok(), exitCode: 1 };
+        return ok();
+      });
+      const { opts, events } = createOpts();
+      expect((await runAutoCommit(opts)).success).toBe(false);
+      expect(events.at(-1)?.data.commitHash).toBeUndefined();
+      expect(events.at(-1)?.data.success).toBe(false);
+    }
+  );
+
+  it('keeps successful local status without fabricating unreadable metadata', async () => {
+    mockGetCurrentBranch.mockResolvedValue('work');
+    setupHappyPathGit();
+    const implementation = mockGit.getMockImplementation();
+    if (!implementation) throw new Error('Missing Git fixture');
+    mockGit.mockImplementation(async (args, options) =>
+      args.includes('cat-file') ? { ...ok(), exitCode: 1 } : implementation(args, options)
+    );
+    const { opts, events } = createOpts();
+    expect(await runAutoCommit(opts)).toEqual({ success: true });
+    expect(events.at(-1)?.data).toMatchObject({ success: true, commitHash, pushStatus: 'unknown' });
+    expect(events.at(-1)?.data.commitMessage).toBeUndefined();
   });
 
   it('appends the supplied co-author trailer to generated commit messages', async () => {
@@ -394,8 +551,8 @@ describe('runAutoCommit', () => {
         expect(completed?.data).toEqual(
           expect.objectContaining({
             success: true,
-            message: 'Changes committed and pushed',
-            commitHash: 'abc1234',
+            message: 'Changes committed; push command completed',
+            commitHash,
             commitMessage,
           })
         );
@@ -472,7 +629,8 @@ describe('runAutoCommit', () => {
       .mockResolvedValueOnce(ok(' M file.ts'))
       .mockResolvedValueOnce(ok())
       .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
-      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
       .mockResolvedValueOnce({
         stdout: '',
         stderr: `remote: rejected credential ${secret}`,
@@ -495,7 +653,8 @@ describe('runAutoCommit', () => {
       .mockResolvedValueOnce(ok(' M file.ts'))
       .mockResolvedValueOnce(ok())
       .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] test commit'))
-      .mockResolvedValueOnce(ok('abc1234'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
       .mockResolvedValueOnce({
         stdout: '',
         stderr:
@@ -530,7 +689,8 @@ describe('runAutoCommit', () => {
       const directory = options?.cwd ?? '';
       if (args[0] === 'status') return ok(dirty.has(directory) ? ' M result.txt\n' : '');
       if (args[0] === 'commit') dirty.delete(directory);
-      if (args[0] === 'rev-parse') return ok('abc1234');
+      if (args.includes('reflog')) return raw(`${commitHash}\n`);
+      if (args.includes('cat-file')) return commitObject('test commit');
       if (args[0] === 'push' && directory === workspacePath) {
         pushing.resolve();
         return stopped.promise;
@@ -598,6 +758,228 @@ describe('runAutoCommit', () => {
       mockGit.mockReset();
       mockGetCurrentBranch.mockReset();
       mockHasGitUpstream.mockReset();
+    }
+  });
+
+  it.each(['sha1', 'sha256'] as const)(
+    'uses invocation reflog identity and hook-authored %s metadata despite a later HEAD',
+    async objectFormat => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'owned-commit-'));
+      const env = {
+        PATH: process.env.PATH,
+        HOME: root,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      };
+      const run = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: root, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout.trim();
+      };
+      let ownedHash = '';
+      try {
+        await run(['init', '-b', 'work', `--object-format=${objectFormat}`]);
+        await run(['config', 'user.name', 'Test']);
+        await run(['config', 'user.email', 'test@example.com']);
+        await run(['config', 'commit.gpgsign', 'false']);
+        await fs.writeFile(path.join(root, 'file.txt'), 'owned\n');
+        await fs.writeFile(
+          path.join(root, '.git/hooks/commit-msg'),
+          '#!/bin/sh\nprintf "Hook subject\\n\\nHook body\\n" > "$1"\n',
+          { mode: 0o755 }
+        );
+        mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+        mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+        mockGit.mockImplementation(async (args, options) => {
+          const result = await actual.git(args, options);
+          if (args[0] === 'commit') {
+            ownedHash = await run(['rev-parse', 'HEAD']);
+            await fs.writeFile(path.join(root, 'file.txt'), 'later\n');
+            await run(['add', '-A']);
+            await run(['-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'Unrelated later commit']);
+          }
+          return result;
+        });
+        const { opts, events } = createOpts({
+          workspacePath: root,
+          env,
+          userMessageId: 'user',
+          messageId: 'assistant',
+        });
+        expect(await runAutoCommit(opts)).toEqual({ success: true });
+        expect(ownedHash).toHaveLength(objectFormat === 'sha1' ? 40 : 64);
+        expect(await run(['rev-parse', 'HEAD'])).not.toBe(ownedHash);
+        expect(events.at(-1)?.data).toMatchObject({
+          success: true,
+          commitHash: ownedHash,
+          commitMessage: 'Hook subject\n\nHook body\n',
+          userMessageId: 'user',
+          messageId: 'assistant',
+          pushStatus: 'failed',
+        });
+        expect(events.at(-1)?.data.committedAt).toBe(
+          new Date(await run(['show', '-s', '--format=%cI', ownedHash])).toISOString()
+        );
+        expect(autoCommitRecordSchema.safeParse(events.at(-1)?.data).success).toBe(true);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.each([true, false])(
+    'does not claim the captured commit was pushed after a non-descendant ref move with tracking=%s',
+    async tracking => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'moved-autocommit-ref-'));
+      const workspacePath = path.join(root, 'workspace');
+      const remote = path.join(root, 'remote.git');
+      const env = {
+        PATH: process.env.PATH,
+        HOME: root,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      };
+      const run = async (args: string[], cwd = workspacePath) => {
+        const result = await actual.git(args, { cwd, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout.trim();
+      };
+      const pushCalls: string[][] = [];
+      let capturedHash = '';
+      try {
+        await fs.mkdir(workspacePath);
+        await run(['init', '--bare', remote]);
+        await run(['init', '-b', 'work']);
+        await run(['config', 'user.name', 'Test']);
+        await run(['config', 'user.email', 'test@example.com']);
+        await run(['config', 'commit.gpgsign', 'false']);
+        await run(['remote', 'add', 'origin', remote]);
+        await fs.writeFile(path.join(workspacePath, 'file.txt'), 'seed\n');
+        await run(['add', '-A']);
+        await run(['commit', '-m', 'seed']);
+        await run(['push', ...(tracking ? ['-u'] : []), 'origin', 'work']);
+        const replacementHash = await run([
+          'commit-tree',
+          'HEAD^{tree}',
+          '-p',
+          'HEAD',
+          '-m',
+          'Unrelated B',
+        ]);
+        await fs.writeFile(path.join(workspacePath, 'file.txt'), 'managed A\n');
+        mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+        mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+        mockGit.mockImplementation(async (args, options) => {
+          if (args[0] === 'push') {
+            expect(capturedHash).toMatch(/^[0-9a-f]{40}$/);
+            pushCalls.push(args);
+            await run(['update-ref', 'refs/heads/work', replacementHash, capturedHash]);
+          }
+          const result = await actual.git(args, options);
+          if (args.includes('cat-file') && args.includes('commit'))
+            capturedHash = args.at(-1) ?? '';
+          if (args[0] === 'push') expect(result.exitCode).toBe(0);
+          return result;
+        });
+        const { opts, events } = createOpts({
+          workspacePath,
+          env,
+          userMessageId: 'user',
+          messageId: 'assistant',
+        });
+        expect(await runAutoCommit(opts)).toEqual({ success: true });
+        expect(pushCalls).toEqual([tracking ? ['push'] : ['push', '-u', 'origin', 'work']]);
+        expect(await run(['rev-parse', 'refs/heads/work'], remote)).toBe(replacementHash);
+        expect(
+          (
+            await actual.git(['merge-base', '--is-ancestor', capturedHash, replacementHash], {
+              cwd: workspacePath,
+              env,
+              inheritEnv: false,
+            })
+          ).exitCode
+        ).toBe(1);
+        expect(
+          (
+            await actual.git(['cat-file', '-e', `${capturedHash}^{commit}`], {
+              cwd: remote,
+              env,
+              inheritEnv: false,
+            })
+          ).exitCode
+        ).not.toBe(0);
+        expect(events.at(-1)?.data).toMatchObject({
+          success: true,
+          commitHash: capturedHash,
+          commitMessage: 'test commit\n',
+          userMessageId: 'user',
+          messageId: 'assistant',
+          pushStatus: 'unknown',
+          message: 'Changes committed; push command completed',
+        });
+        expect(autoCommitRecordSchema.safeParse(events.at(-1)?.data).success).toBe(true);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('recovers real ref evidence when cancellation kills the post-commit hook', async () => {
+    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aborted-owned-commit-'));
+    const env = {
+      PATH: process.env.PATH,
+      HOME: root,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+    };
+    const run = async (args: string[]) => {
+      const result = await actual.git(args, { cwd: root, env, inheritEnv: false });
+      expect(result.exitCode).toBe(0);
+      return result.stdout.trim();
+    };
+    const controller = new AbortController();
+    try {
+      await run(['init', '-b', 'work']);
+      await run(['config', 'user.name', 'Test']);
+      await run(['config', 'user.email', 'test@example.com']);
+      await run(['config', 'commit.gpgsign', 'false']);
+      await fs.writeFile(path.join(root, 'file.txt'), 'owned\n');
+      await fs.writeFile(
+        path.join(root, '.git/hooks/post-commit'),
+        '#!/bin/sh\nprintf "ref-updated\\n"\nsleep 30\n',
+        { mode: 0o755 }
+      );
+      mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+      mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+      mockGit.mockImplementation((args, options) =>
+        actual.git(args, {
+          ...options,
+          ...(args[0] === 'commit'
+            ? {
+                terminationGraceMs: 100,
+                onOutput: (_stream, output) => {
+                  if (output.includes('ref-updated')) controller.abort();
+                },
+              }
+            : {}),
+        })
+      );
+      const { opts, events } = createOpts({ workspacePath: root, env, signal: controller.signal });
+      expect(await runAutoCommit(opts)).toEqual({ success: true });
+      expect(controller.signal.aborted).toBe(true);
+      expect(events.at(-1)?.data).toMatchObject({
+        success: true,
+        commitHash: await run(['rev-parse', 'HEAD']),
+        commitMessage: 'test commit\n',
+        pushStatus: 'not_attempted',
+      });
+      expect(mockGit.mock.calls.filter(([args]) => args[0] === 'commit')).toHaveLength(1);
+    } finally {
+      controller.abort();
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 

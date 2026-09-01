@@ -99,6 +99,8 @@ const mockSession = {
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getCommits: jest.fn(() => []),
+    clearCommits: jest.fn(),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),

@@ -136,13 +136,13 @@ function kiloListeners() {
     if (owners.size !== 1) continue;
     const [processId] = owners;
     try {
-      if (path.basename(fs.readlinkSync('/proc/' + processId + '/exe')) !== 'kilo') continue;
+      if (!['kilo', '.kilo', 'rosetta'].includes(path.basename(fs.readlinkSync('/proc/' + processId + '/exe')))) continue;
       const argv = fs.readFileSync('/proc/' + processId + '/cmdline', 'utf8').split('\0');
-      if (path.basename(argv[0]) !== 'kilo' || argv[1] !== 'serve') continue;
+      if (!['kilo', '.kilo'].includes(path.basename(argv[0])) || argv[1] !== 'serve') continue;
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
-      if (!fs.existsSync(path.join(directory, '.kilo-bootstrap-complete'))) continue;
+      if (!fs.existsSync(path.join(directory, '.kilo-bootstrap-complete')) && !fs.existsSync(path.join(directory, '.git'))) continue;
       listeners.push({ serverUrl, processId, directory });
     } catch {
       continue;

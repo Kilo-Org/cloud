@@ -6,6 +6,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { generateEphemeralDeploymentSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
   getSandboxProvider,
@@ -526,7 +527,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       ...(status === 'completed'
         ? {}
         : { clientError: projectTerminalClientError({ status, error }) }),
-      lastSeenBranch: metadata.repository?.upstreamBranch,
+      lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
@@ -2559,6 +2560,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       workspace: {
         ...input.workspace,
         sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
+        branchName: repository?.upstreamBranch ?? `kilo/${generateEphemeralDeploymentSlug()}`,
       },
       lifecycle: {
         version: now,

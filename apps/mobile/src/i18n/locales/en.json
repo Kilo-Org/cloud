@@ -139,6 +139,8 @@
     "providerEnterpriseSso": "Enterprise SSO"
   },
   "preferences": {
+    "biometricUnlock": "Unlock with biometrics",
+    "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background. Set up biometrics or a device passcode in device settings. Your device passcode is available as a fallback.",
     "title": "Preferences",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",

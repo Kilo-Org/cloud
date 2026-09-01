@@ -154,7 +154,9 @@
     "prReviewAttribution": "Engadir atribución da app ás revisións de PR",
     "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión.",
     "returnSendsMessage": "A tecla Intro envía a mensaxe",
-    "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes."
+    "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
+    "biometricUnlock": "Desbloquear con biometría",
+    "biometricUnlockSubtitle": "Require desbloquear ao iniciar a app e despois de cinco minutos en segundo plano. Configura a biometría ou un código de acceso do dispositivo nos axustes do dispositivo. O código de acceso do teu dispositivo está dispoñible como alternativa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",

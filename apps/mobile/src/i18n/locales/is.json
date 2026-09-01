@@ -154,7 +154,9 @@
     "prReviewAttribution": "Bæta við app-eignarmerki í PR-úttektir",
     "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt.",
     "returnSendsMessage": "Færslulykill sendir skilaboð",
-    "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða."
+    "returnSendsMessageSubtitle": "Þegar slökkt er setur færslulykillinn inn línuskil í ritlum umboða.",
+    "biometricUnlock": "Aflæsa með lífkennum",
+    "biometricUnlockSubtitle": "Aflæsingar er krafist við ræsingu og eftir fimm mínútur í bakgrunni. Settu upp lífkenni eða aðgangskóða tækisins í stillingum tækisins. Þú getur notað aðgangskóða tækisins sem varaleið."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",

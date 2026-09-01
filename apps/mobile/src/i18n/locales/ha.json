@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
     "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita.",
     "returnSendsMessage": "Maɓallin Komawa yana aika saƙo",
-    "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai."
+    "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai.",
+    "biometricUnlock": "Buɗe kulle da tantance halittar jiki",
+    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya. Saita tantance halittar jiki ko lambar buɗe kullen na'ura a saitunan na'ura. Za ka iya amfani da lambar buɗe kullen na'urarka a madadin tantance halittar jiki."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",

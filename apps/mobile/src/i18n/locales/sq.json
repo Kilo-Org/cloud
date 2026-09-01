@@ -154,7 +154,9 @@
     "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
     "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim.",
     "returnSendsMessage": "Tasti i kthimit dërgon mesazhin",
-    "returnSendsMessageSubtitle": "Kur çaktivizohet, tasti i kthimit shton një rresht të ri në fushat e mesazheve të agjentëve."
+    "returnSendsMessageSubtitle": "Kur çaktivizohet, tasti i kthimit shton një rresht të ri në fushat e mesazheve të agjentëve.",
+    "biometricUnlock": "Zhbllokimi me biometri",
+    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur nisni aplikacionin dhe pasi ai qëndron pesë minuta në sfond. Konfiguroni biometrinë ose një kodkalim të pajisjes te cilësimet e pajisjes. Kodkalimi i pajisjes suaj mbetet i disponueshëm si alternativë rezervë."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",

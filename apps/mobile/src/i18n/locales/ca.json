@@ -154,7 +154,9 @@
     "prReviewAttribution": "Afegiu l'atribució de l'aplicació a les revisions de PR",
     "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió.",
     "returnSendsMessage": "La tecla de retorn envia el missatge",
-    "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents."
+    "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
+    "biometricUnlock": "Desbloqueja amb biometria",
+    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla. Configura la biometria o un codi d'accés del dispositiu a la configuració del dispositiu. El codi d'accés del dispositiu continua disponible com a alternativa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",

@@ -9,14 +9,16 @@ import {
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
-import { Switch, View } from 'react-native';
+import { ActivityIndicator, Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { AppUnlockFeedback } from '@/components/app-unlock-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useAppUnlock } from '@/lib/app-unlock-context';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
@@ -41,6 +43,7 @@ type PreferenceRowProps = Readonly<{
   subtitle: string;
   value: boolean;
   disabled: boolean;
+  busy?: boolean;
   onValueChange: (next: boolean) => void;
 }>;
 
@@ -51,12 +54,17 @@ function PreferenceRow({
   subtitle,
   value,
   disabled,
+  busy = false,
   onValueChange,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Icon size={18} color={colors.secondaryForeground} />
+      {busy ? (
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      ) : (
+        <Icon size={18} color={colors.secondaryForeground} />
+      )}
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity — see the same
             pattern in notifications-screen's CategoryRow. */}
@@ -71,7 +79,7 @@ function PreferenceRow({
         value={value}
         disabled={disabled}
         accessibilityLabel={title}
-        accessibilityState={{ disabled }}
+        accessibilityState={{ disabled, busy }}
         onValueChange={onValueChange}
       />
     </View>
@@ -80,6 +88,8 @@ function PreferenceRow({
 
 export function PreferencesScreen() {
   const router = useRouter();
+  const unlock = useAppUnlock();
+  const { setEnabled: handleUnlockChange } = unlock;
   const { preference: themePreference } = useThemePreference();
   const {
     defaultExpanded,
@@ -116,6 +126,18 @@ export function PreferencesScreen() {
         contentContainerClassName="px-6 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        <View className="gap-2">
+          <PreferenceRow
+            icon={Shield}
+            title={t('preferences.biometricUnlock')}
+            subtitle={t('preferences.biometricUnlockSubtitle')}
+            value={unlock.enabled}
+            disabled={unlock.busy || unlock.status !== 'unlocked'}
+            busy={unlock.busy}
+            onValueChange={handleUnlockChange}
+          />
+          <AppUnlockFeedback outcome={unlock.purpose === 'setting' ? unlock.outcome : null} />
+        </View>
         <PreferenceRow
           icon={Brain}
           title={t('preferences.autoExpandThinking')}

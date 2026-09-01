@@ -154,7 +154,9 @@
     "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
     "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el.",
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
-    "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe."
+    "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
+    "biometricUnlock": "Feloldás biometrikus azonosítással",
+    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges. Állítson be biometrikus azonosítást vagy eszközjelkódot az eszköz beállításaiban. Az eszköz jelkódja tartalék lehetőségként használható."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",

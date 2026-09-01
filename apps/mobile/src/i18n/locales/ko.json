@@ -154,7 +154,9 @@
     "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
     "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다.",
     "returnSendsMessage": "리턴 키로 메시지 보내기",
-    "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다."
+    "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다.",
+    "biometricUnlock": "생체 인증으로 잠금 해제",
+    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다. 기기 설정에서 생체 인증 또는 기기 암호를 설정하세요. 생체 인증 대신 기기 암호로도 잠금을 해제할 수 있습니다."
   },
   "notifications": {
     "title": "알림",

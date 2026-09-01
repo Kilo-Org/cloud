@@ -154,7 +154,9 @@
     "prReviewAttribution": "Tinye nzere ngwa na nyocha PR",
     "prReviewAttributionSubtitle": "Gbakwunye nkebi 'Reviewed via Kilo' n'ala mgbe ị bipụtara nyocha.",
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
-    "returnSendsMessageSubtitle": "Mgbe agbanyụrụ ya, igodo nloghachi na-etinye ahịrị ọhụrụ n'ebe ntinye ozi ndị ọrụ."
+    "returnSendsMessageSubtitle": "Mgbe agbanyụrụ ya, igodo nloghachi na-etinye ahịrị ọhụrụ n'ebe ntinye ozi ndị ọrụ.",
+    "biometricUnlock": "Mepee mkpọchi site na njirimara ahụ",
+    "biometricUnlockSubtitle": "A chọrọ imepe mkpọchi mgbe ị malitere ngwa na mgbe ngwa nọrọ nkeji ise n'azụ. Hazie njirimara ahụ ma ọ bụ koodu mkpọchi ngwaọrụ na ntọala ngwaọrụ. Ị ka nwere ike iji koodu mkpọchi ngwaọrụ gị dị ka ụzọ ọzọ."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",

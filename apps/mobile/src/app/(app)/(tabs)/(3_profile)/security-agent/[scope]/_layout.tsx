@@ -1,10 +1,14 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { SecurityAgentCommandObserver } from '@/components/security-agent/security-agent-command-observer';
 import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
+
+const screenLayout: typeof privacyScreenLayout = props =>
+  appUnlockScreenLayout({ children: privacyScreenLayout(props) });
 
 // Mounts exactly one command observer per scope alongside a headerless Stack,
 // so it stays mounted across Dashboard/Findings/Settings navigation without
@@ -27,7 +31,7 @@ export default function SecurityAgentScopeLayout() {
       {/* Anchored entry needs a valid scope root, not a parameterless dismissal route. */}
       <Stack
         initialRouteName="index"
-        screenLayout={privacyScreenLayout}
+        screenLayout={screenLayout}
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen

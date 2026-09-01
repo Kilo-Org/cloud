@@ -154,7 +154,9 @@
     "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
     "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan.",
     "returnSendsMessage": "Kekunci Kembali menghantar mesej",
-    "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen."
+    "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen.",
+    "biometricUnlock": "Buka kunci dengan biometrik",
+    "biometricUnlockSubtitle": "Buka kunci apabila aplikasi dilancarkan dan selepas lima minit di latar belakang. Sediakan biometrik atau kod laluan peranti dalam tetapan peranti. Kod laluan peranti anda tersedia sebagai pilihan sandaran."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",

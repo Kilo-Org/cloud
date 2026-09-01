@@ -154,7 +154,9 @@
     "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
     "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu.",
     "returnSendsMessage": "Furtuun deebi'uu ergaa ergiti",
-    "returnSendsMessageSubtitle": "Yeroo cufamu, furtuun deebi'uu iddoo ergaa ejentii galchuu keessatti sarara haaraa galchiti."
+    "returnSendsMessageSubtitle": "Yeroo cufamu, furtuun deebi'uu iddoo ergaa ejentii galchuu keessatti sarara haaraa galchiti.",
+    "biometricUnlock": "Baayoometirikisiin qulfii bani",
+    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii banuun barbaachisa. Ejjannoo meeshaa keessatti baayoometirikisii yookaan koodii iccitii meeshaa qindeessi. Koodiin iccitii meeshaa keetii akka filannoo bakka bu'uutti fayyadamuuf ni jira."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",

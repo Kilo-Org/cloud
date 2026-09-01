@@ -154,7 +154,9 @@
     "prReviewAttribution": "Tāpiri te tautohu taupānga ki ngā arotake PR",
     "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake.",
     "returnSendsMessage": "Ka tuku karere te pātuhi Whakahoki",
-    "returnSendsMessageSubtitle": "Ina weto, ka whakauru te pātuhi Whakahoki i tētahi rārangi hōu ki ngā kaitito māngai."
+    "returnSendsMessageSubtitle": "Ina weto, ka whakauru te pātuhi Whakahoki i tētahi rārangi hōu ki ngā kaitito māngai.",
+    "biometricUnlock": "Wewete mā te tautuhi koiora",
+    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri. Whakaritea te tautuhi koiora, he waehere uru rānei mō te pūrere, i ngā tautuhinga o te pūrere. Ka taea tonu te whakamahi i te waehere uru o tō pūrere hei ara kē."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",

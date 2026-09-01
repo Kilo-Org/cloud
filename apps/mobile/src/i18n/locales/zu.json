@@ -154,7 +154,9 @@
     "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
     "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo.",
     "returnSendsMessage": "Ukhiye wokubuyela uthumela umlayezo",
-    "returnSendsMessageSubtitle": "Uma kuvaliwe, ukhiye wokubuyela ufaka umugqa omusha kuma-composer ama-ejenti."
+    "returnSendsMessageSubtitle": "Uma kuvaliwe, ukhiye wokubuyela ufaka umugqa omusha kuma-composer ama-ejenti.",
+    "biometricUnlock": "Vula ngebhayomethrikhi",
+    "biometricUnlockSubtitle": "Kudingeka uvule uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lungemuva. Setha ibhayomethrikhi noma ikhodi yokudlula yedivayisi kuzilungiselelo zedivayisi. Ikhodi yokudlula yedivayisi yakho iyatholakala njengenye indlela."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",

@@ -154,7 +154,9 @@
     "prReviewAttribution": "Cuir sonrú an aip le hathbhreithnithe PR",
     "prReviewAttributionSubtitle": "Cuir an chúlscríbhinn 'Athbhreithnithe trí Kilo' leis nuair a chuireann tú isteach athbhreithniú.",
     "returnSendsMessage": "Seolann an eochair Aisfhillte teachtaireacht",
-    "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair Aisfhillte líne nua isteach i réimsí ionchuir teachtaireachta na ngníomhairí."
+    "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair Aisfhillte líne nua isteach i réimsí ionchuir teachtaireachta na ngníomhairí.",
+    "biometricUnlock": "Díghlasáil le bithmhéadracht",
+    "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra. Socraigh bithmhéadracht nó paschód an ghléis i socruithe an ghléis. Tá paschód do ghléis ar fáil mar rogha chúltaca."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe ar fáil",

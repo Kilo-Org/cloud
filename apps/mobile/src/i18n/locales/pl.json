@@ -154,7 +154,9 @@
     "prReviewAttribution": "Dodaj atrybucję aplikacji do recenzji PR",
     "prReviewAttributionSubtitle": "Dodaj stopkę „Reviewed via Kilo”, gdy wysyłasz recenzję.",
     "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
-    "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów."
+    "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów.",
+    "biometricUnlock": "Odblokuj za pomocą biometrii",
+    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle. Skonfiguruj biometrię lub kod urządzenia w ustawieniach urządzenia. Kod urządzenia pozostaje dostępny jako metoda zapasowa."
   },
   "notifications": {
     "title": "Powiadomienia",

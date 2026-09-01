@@ -154,7 +154,9 @@
     "prReviewAttribution": "Pridėti programėlės atribuciją prie PR peržiūrų",
     "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“.",
     "returnSendsMessage": "Grįžimo klavišas siunčia žinutę",
-    "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose."
+    "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose.",
+    "biometricUnlock": "Atrakinti naudojant biometrinius duomenis",
+    "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti. Įrenginio nustatymuose nustatykite biometrinius duomenis arba įrenginio prieigos kodą. Įrenginio prieigos kodą galite naudoti kaip atsarginį atrakinimo būdą."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",

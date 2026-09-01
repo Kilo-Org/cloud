@@ -42,6 +42,9 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
 vi.mock('@/components/privacy-cover-overlay', () => ({
   privacyScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
+vi.mock('@/components/app-unlock-screen', () => ({
+  appUnlockScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
+}));
 vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;

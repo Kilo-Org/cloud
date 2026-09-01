@@ -154,7 +154,9 @@
     "prReviewAttribution": "Żid attribuzzjoni tal-app mar-reviżjonijiet tal-PR",
     "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni.",
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
-    "returnSendsMessageSubtitle": "Meta jkun mitfi, it-tast tar-ritorn idaħħal linja ġdida fl-oqsma tad-dħul tal-messaġġi tal-aġenti."
+    "returnSendsMessageSubtitle": "Meta jkun mitfi, it-tast tar-ritorn idaħħal linja ġdida fl-oqsma tad-dħul tal-messaġġi tal-aġenti.",
+    "biometricUnlock": "Żblokka bil-bijometrija",
+    "biometricUnlockSubtitle": "L-app teħtieġ li tiżblokkaha meta titnieda u wara ħames minuti fl-isfond. Ikkonfigura l-bijometrija jew kodiċi tal-aċċess tal-apparat fis-Settings tal-apparat. Il-kodiċi tal-aċċess tal-apparat tiegħek jibqa' disponibbli bħala alternattiva."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",

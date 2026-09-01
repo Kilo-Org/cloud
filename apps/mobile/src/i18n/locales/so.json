@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ku dar astaanta app dib-u-eegista PR",
     "prReviewAttributionSubtitle": "Ku dheji qoraal 'Reviewed via Kilo' oo hoose markaad gudbiso dib-u-eegis.",
     "returnSendsMessage": "Furaha soo noqoshada wuxuu diraa fariinta",
-    "returnSendsMessageSubtitle": "Marka uu dansan yahay, furaha soo noqoshada wuxuu geliyaa sadar cusub composer-ka wakiilka."
+    "returnSendsMessageSubtitle": "Marka uu dansan yahay, furaha soo noqoshada wuxuu geliyaa sadar cusub composer-ka wakiilka.",
+    "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
+    "biometricUnlockSubtitle": "Furitaanka ayaa loo baahan yahay marka barnaamijku bilaabmo iyo marka uu shan daqiiqo ku jiray asalka. Ku deji aqoonsiga astaamaha jirka ama koodhka furitaanka aaladda gudaha dejinta aaladda. Koodhka furitaanka aaladdaada ayaa weli loo isticmaali karaa hab beddel ah."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",

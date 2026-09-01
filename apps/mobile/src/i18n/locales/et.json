@@ -154,7 +154,9 @@
     "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
     "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'.",
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
-    "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse."
+    "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
+    "biometricUnlock": "Lukust avamine biomeetria abil",
+    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist. Seadista seadme seadetes biomeetria või seadme pääsukood. Seadme pääsukoodi saab kasutada varuvariandina."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",

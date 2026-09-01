@@ -154,7 +154,9 @@
     "prReviewAttribution": "在 PR 审查中添加应用署名",
     "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。",
     "returnSendsMessage": "回车键发送消息",
-    "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。"
+    "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。",
+    "biometricUnlock": "使用生物识别解锁",
+    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。请在设备设置中设置生物识别或设备密码。您仍可使用设备密码作为备用解锁方式。"
   },
   "notifications": {
     "title": "通知",

@@ -154,7 +154,9 @@
     "prReviewAttribution": "Gehitu aplikazioaren atribuzioa PR berrikuspenetan",
     "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean.",
     "returnSendsMessage": "Sartu teklak mezua bidaltzen du",
-    "returnSendsMessageSubtitle": "Desaktibatuta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen konpositoreetan."
+    "returnSendsMessageSubtitle": "Desaktibatuta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen konpositoreetan.",
+    "biometricUnlock": "Desblokeatu biometriarekin",
+    "biometricUnlockSubtitle": "Aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren desblokeatu behar duzu. Konfiguratu biometria edo gailuaren sarbide-kodea gailuaren ezarpenetan. Zure gailuaren sarbide-kodea erabil dezakezu ordezko aukera gisa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",

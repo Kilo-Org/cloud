@@ -154,7 +154,9 @@
     "prReviewAttribution": "Dodaj pripis aplikacije k pregledom PR",
     "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«.",
     "returnSendsMessage": "Tipka Enter pošlje sporočilo",
-    "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom."
+    "returnSendsMessageSubtitle": "Ko je možnost izklopljena, tipka Enter vstavi novo vrstico v polja za vnos sporočil agentom.",
+    "biometricUnlock": "Odklepanje z biometrijo",
+    "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju. V nastavitvah naprave nastavite biometrijo ali kodo naprave. Koda naprave ostaja na voljo kot nadomestni način odklepanja."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",

@@ -154,7 +154,9 @@
     "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
     "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun.",
     "returnSendsMessage": "Enter-näppäin lähettää viestin",
-    "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin."
+    "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin.",
+    "biometricUnlock": "Avaa lukitus biometrisellä tunnistuksella",
+    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia. Ota biometrinen tunnistus tai laitteen pääsykoodi käyttöön laitteen asetuksissa. Voit käyttää laitteen pääsykoodia varavaihtoehtona."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",

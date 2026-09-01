@@ -154,7 +154,9 @@
     "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
     "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et.",
     "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
-    "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir."
+    "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir.",
+    "biometricUnlock": "Biometrika ilə kilidi açın",
+    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur. Cihazın parametrlərində biometrikanı və ya cihazın giriş kodunu qurun. Cihazınızın giriş kodundan ehtiyat üsul kimi istifadə edə bilərsiniz."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",

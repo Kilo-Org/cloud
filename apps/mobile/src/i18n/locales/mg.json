@@ -154,7 +154,9 @@
     "prReviewAttribution": "Ampio ny attribution ny app amin'ny fandinihana PR",
     "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao.",
     "returnSendsMessage": "Mandefa hafatra ny bokotra Fiverenana",
-    "returnSendsMessageSubtitle": "Rehefa tsy alefa, ny bokotra Fiverenana dia mampiditra andalana vaovao ao amin'ny fampidirana hafatry ny mpanampy."
+    "returnSendsMessageSubtitle": "Rehefa tsy alefa, ny bokotra Fiverenana dia mampiditra andalana vaovao ao amin'ny fampidirana hafatry ny mpanampy.",
+    "biometricUnlock": "Mamaha hidy amin'ny biometrika",
+    "biometricUnlockSubtitle": "Ilaina ny mamaha hidy rehefa manomboka ny rindranasa sy rehefa avy nijanona dimy minitra tany ambadika. Apetraho ao amin'ny fika an'ny fitaovana ny biometrika na ny kaody fanokafana ny fitaovana. Azo ampiasaina ho solony ny kaody fanokafana ny fitaovanao."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",

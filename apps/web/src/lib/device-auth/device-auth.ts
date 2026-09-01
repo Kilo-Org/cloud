@@ -163,7 +163,7 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     throw new Error('Device authorization request is not pending');
   }
 
-  await db
+  const [expired] = await db
     .update(device_auth_requests)
     .set({ status: 'expired' })
     .where(
@@ -172,7 +172,12 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
         eq(device_auth_requests.status, 'pending'),
         lte(device_auth_requests.expires_at, now)
       )
-    );
+    )
+    .returning({ id: device_auth_requests.id });
+
+  if (!expired) {
+    throw new Error('Device authorization request is not pending');
+  }
   throw new Error('Device authorization request has expired');
 }
 

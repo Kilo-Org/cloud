@@ -290,6 +290,38 @@ describe('Device Auth', () => {
       }
     );
 
+    test('reports a conflict when denial wins before the expiry fallback', async () => {
+      const { code } = await createDeviceAuthRequest({});
+      await db
+        .update(device_auth_requests)
+        .set({
+          expires_at: new Date(Date.now() - 1000).toISOString(),
+          kilo_user_id: testUserId,
+        })
+        .where(eq(device_auth_requests.code, code));
+      const pendingRequest = await getDeviceAuthRequest(code);
+      const staleSelect = Object.assign(db.select({}), {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockImplementation(async () => {
+              await denyDeviceAuthRequest(code);
+              return [pendingRequest];
+            }),
+          }),
+        }),
+      });
+      const selectSpy = jest.spyOn(db, 'select').mockReturnValueOnce(staleSelect);
+
+      try {
+        await expect(approveDeviceAuthRequest(code, testUserId)).rejects.toThrow(
+          'Device authorization request is not pending'
+        );
+        expect((await getDeviceAuthRequest(code))?.status).toBe('denied');
+      } finally {
+        selectSpy.mockRestore();
+      }
+    });
+
     test('reports expiration when the atomic update reaches the expiry deadline', async () => {
       const { code } = await createDeviceAuthRequest({});
       const deadline = new Date();

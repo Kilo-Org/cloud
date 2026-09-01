@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Kör `kilo remote` i ett projekt på din dator, eller uppdatera Kilo CLI om en redan körs.",
       "instanceOnProject": "{{name}} på {{project}}",
       "instanceOnProjectSuffix": "{{name}} på {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Kör på Cloud Agent"
+      "runOnCloudAgent": "Kör på Cloud Agent",
+      "terminals": "Terminaler",
+      "remotes": "Fjärrinstanser"
     },
     "modePicker": {
       "title": "Välj läge",

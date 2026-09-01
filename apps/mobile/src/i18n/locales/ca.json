@@ -2295,7 +2295,9 @@
       "noCliInstancesDescription": "Executa `kilo remote` en un projecte del teu ordinador, o actualitza el CLI de Kilo si ja n'hi ha un en execució.",
       "instanceOnProject": "{{name}} a {{project}}",
       "instanceOnProjectSuffix": "{{name}} a {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Executa al Cloud Agent"
+      "runOnCloudAgent": "Executa al Cloud Agent",
+      "terminals": "Terminals",
+      "remotes": "Instàncies remotes"
     },
     "modePicker": {
       "title": "Selecciona un mode",

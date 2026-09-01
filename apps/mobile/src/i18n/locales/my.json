@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "သင့်ကွန်ပျူတာရှိ ပရောဂျက်တစ်ခုတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် တစ်ခုလုပ်ဆောင်နေပြီးသားဖြစ်ပါက Kilo CLI ကို မွမ်းမံပါ။",
       "instanceOnProject": "{{project}} ပေါ်ရှိ {{name}}",
       "instanceOnProjectSuffix": "{{project}} ပေါ်ရှိ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent တွင် လုပ်ဆောင်ပါ"
+      "runOnCloudAgent": "Cloud Agent တွင် လုပ်ဆောင်ပါ",
+      "terminals": "တာမင်နယ်များ",
+      "remotes": "အဝေးရှိ instance များ"
     },
     "modePicker": {
       "title": "မုဒ်ကို ရွေးချယ်ပါ",

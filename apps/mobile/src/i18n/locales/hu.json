@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Futtassa a `kilo remote` parancsot egy projekten a számítógépén, vagy frissítse a Kilo CLI-t, ha már fut egy.",
       "instanceOnProject": "{{name}} a {{project}} projekten",
       "instanceOnProjectSuffix": "{{name}} a {{project}} projekten ({{suffix}})",
-      "runOnCloudAgent": "Futtatás a Cloud Ageneten"
+      "runOnCloudAgent": "Futtatás a Cloud Ageneten",
+      "terminals": "Terminálok",
+      "remotes": "Távoli példányok"
     },
     "modePicker": {
       "title": "Mód kiválasztása",

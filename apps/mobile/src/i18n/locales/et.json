@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Käivita projektis arvutis käsk `kilo remote` või uuenda Kilo CLI-d, kui see juba töötab.",
       "instanceOnProject": "{{name}} saidil {{project}}",
       "instanceOnProjectSuffix": "{{name}} saidil {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Käita Cloud Agent'is"
+      "runOnCloudAgent": "Käita Cloud Agent'is",
+      "terminals": "Terminalid",
+      "remotes": "Kauginstantsid"
     },
     "modePicker": {
       "title": "Vali režiim",

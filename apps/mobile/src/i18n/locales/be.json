@@ -2311,7 +2311,9 @@
       "noCliInstancesDescription": "Выканайце `kilo remote` у праекце на вашым кампутары або абнавіце Kilo CLI, калі ён ужо працуе.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запуск на Cloud Agent"
+      "runOnCloudAgent": "Запуск на Cloud Agent",
+      "terminals": "Тэрміналы",
+      "remotes": "Аддаленыя экзэмпляры"
     },
     "modePicker": {
       "title": "Выбраць рэжым",

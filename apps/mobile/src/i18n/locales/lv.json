@@ -2295,7 +2295,9 @@
       "noCliInstancesDescription": "Palaid `kilo remote` projektā savā datorā vai atjaunini Kilo CLI, ja tā jau darbojas.",
       "instanceOnProject": "{{name}} uz {{project}}",
       "instanceOnProjectSuffix": "{{name}} uz {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Palaist uz Cloud Agent"
+      "runOnCloudAgent": "Palaist uz Cloud Agent",
+      "terminals": "Termināļi",
+      "remotes": "Attālinātās instances"
     },
     "modePicker": {
       "title": "Izvēlēties režīmu",

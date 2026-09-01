@@ -2295,7 +2295,9 @@
       "noCliInstancesDescription": "Rulează `kilo remote` într-un proiect de pe computerul tău sau actualizează Kilo CLI dacă unul rulează deja.",
       "instanceOnProject": "{{name}} pe {{project}}",
       "instanceOnProjectSuffix": "{{name}} pe {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rulează pe Cloud Agent"
+      "runOnCloudAgent": "Rulează pe Cloud Agent",
+      "terminals": "Terminale",
+      "remotes": "Instanțe la distanță"
     },
     "modePicker": {
       "title": "Selectează modul",

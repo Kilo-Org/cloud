@@ -1750,7 +1750,9 @@
       "instanceOnProject": "{{name}} sur {{project}}",
       "instanceOnProjectSuffix": "{{name}} sur {{project}} ({{suffix}})",
       "runOnCloudAgent": "Exécuter sur Agent cloud",
-      "runOnAccessibility": "Exécuter sur : {{label}}"
+      "runOnAccessibility": "Exécuter sur : {{label}}",
+      "terminals": "Terminaux",
+      "remotes": "Instances distantes"
     },
     "modePicker": {
       "title": "Sélectionner le mode",

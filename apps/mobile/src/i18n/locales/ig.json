@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Gbaa `kilo remote` n'ọrụ dị na kọmputa gị, ma ọ bụ melite Kilo CLI ma ọ bụrụ na otu na-agba ọsọ.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Gbaa na Cloud Agent"
+      "runOnCloudAgent": "Gbaa na Cloud Agent",
+      "terminals": "Terminal",
+      "remotes": "Ihe atụ dị anya"
     },
     "modePicker": {
       "title": "Họrọ ụdị",

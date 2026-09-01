@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "در یک پروژه روی رایانه خود `kilo remote` را اجرا کنید، یا اگر CLI کیلا در حال اجرا است آن را بهروزرسانی کنید.",
       "instanceOnProject": "{{name}} در {{project}}",
       "instanceOnProjectSuffix": "{{name}} در {{project}} ({{suffix}})",
-      "runOnCloudAgent": "اجرا بر روی Cloud Agent"
+      "runOnCloudAgent": "اجرا بر روی Cloud Agent",
+      "terminals": "پایانه‌ها",
+      "remotes": "نمونه‌های راه دور"
     },
     "modePicker": {
       "title": "انتخاب حالت",

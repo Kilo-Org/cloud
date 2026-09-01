@@ -1825,7 +1825,9 @@
       "noCliInstancesDescription": "컴퓨터의 프로젝트에서 `kilo remote`를 실행하거나, 이미 실행 중이라면 Kilo CLI를 업데이트하세요.",
       "instanceOnProject": "{{project}}의 {{name}}",
       "instanceOnProjectSuffix": "{{project}}의 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "클라우드 에이전트에서 실행"
+      "runOnCloudAgent": "클라우드 에이전트에서 실행",
+      "terminals": "터미널",
+      "remotes": "원격 인스턴스"
     },
     "modePicker": {
       "title": "모드 선택",

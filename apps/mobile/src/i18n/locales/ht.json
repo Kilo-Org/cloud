@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Kouri `kilo remote` nan yon pwojè sou òdinatè ou, oswa mete ajou Kilo CLI si youn deja k ap kouri.",
       "instanceOnProject": "{{name}} sou {{project}}",
       "instanceOnProjectSuffix": "{{name}} sou {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Kouri sou Cloud Agent"
+      "runOnCloudAgent": "Kouri sou Cloud Agent",
+      "terminals": "Tèminal yo",
+      "remotes": "Enstans adistans yo"
     },
     "modePicker": {
       "title": "Chwazi mòd",

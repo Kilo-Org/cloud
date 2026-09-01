@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್ನ ಒಂದು ಪ್ರಾಜೆಕ್ಟ್ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ, ಅಥವಾ ಒಂದು ಈಗಾಗಲೇ ಚಲಾಯಿಸುತ್ತಿದ್ದರೆ Kilo CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
       "instanceOnProject": "{{project}} ಮೇಲೆ {{name}}",
       "instanceOnProjectSuffix": "{{project}} ಮೇಲೆ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent ಮೇಲೆ ಚಲಾಯಿಸಿ"
+      "runOnCloudAgent": "Cloud Agent ಮೇಲೆ ಚಲಾಯಿಸಿ",
+      "terminals": "ಟರ್ಮಿನಲ್ಗಳು",
+      "remotes": "ದೂರಸ್ಥ ಇನ್ಸ್ಟನ್ಸ್ಗಳು"
     },
     "modePicker": {
       "title": "ಮೋಡ್ ಆಯ್ಕೆ ಮಾಡಿ",

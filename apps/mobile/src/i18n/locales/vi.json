@@ -1825,7 +1825,9 @@
       "noCliInstancesDescription": "Chạy `kilo remote` trong một dự án trên máy tính của bạn, hoặc cập nhật Kilo CLI nếu một phiên bản đang chạy.",
       "instanceOnProject": "{{name}} trên {{project}}",
       "instanceOnProjectSuffix": "{{name}} trên {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Chạy trên tác nhân đám mây"
+      "runOnCloudAgent": "Chạy trên tác nhân đám mây",
+      "terminals": "Thiết bị đầu cuối",
+      "remotes": "Phiên bản từ xa"
     },
     "modePicker": {
       "title": "Chọn chế độ",

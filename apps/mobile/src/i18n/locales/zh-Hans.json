@@ -1825,7 +1825,9 @@
       "noCliInstancesDescription": "在您电脑上的项目中运行 `kilo remote`，或如果已有 Kilo CLI 在运行，请更新它。",
       "instanceOnProject": "{{project}} 上的 {{name}}",
       "instanceOnProjectSuffix": "{{project}} 上的 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "在云端代理上运行"
+      "runOnCloudAgent": "在云端代理上运行",
+      "terminals": "终端",
+      "remotes": "远程实例"
     },
     "modePicker": {
       "title": "选择模式",

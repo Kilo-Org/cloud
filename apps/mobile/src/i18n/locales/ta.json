@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "உங்கள் கணினியில் ஒரு திட்டத்தில் `kilo remote` ஐ இயக்கவும், அல்லது ஒன்று ஏற்கனவே இயங்கினால் Kilo CLI ஐ புதுப்பிக்கவும்.",
       "instanceOnProject": "{{project}} இல் {{name}}",
       "instanceOnProjectSuffix": "{{project}} இல் {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent இல் இயக்கு"
+      "runOnCloudAgent": "Cloud Agent இல் இயக்கு",
+      "terminals": "முனையங்கள்",
+      "remotes": "தொலைநிலை நிகழ்வுகள்"
     },
     "modePicker": {
       "title": "முறையைத் தேர்ந்தெடு",

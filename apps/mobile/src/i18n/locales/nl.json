@@ -1825,7 +1825,9 @@
       "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Uitvoeren op Cloudagent"
+      "runOnCloudAgent": "Uitvoeren op Cloudagent",
+      "terminals": "Terminals",
+      "remotes": "Externe instanties"
     },
     "modePicker": {
       "title": "Selecteer modus",

@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Jalankan `kilo remote` dalam projek pada komputer anda, atau kemas kini Kilo CLI jika ia sudah berjalan.",
       "instanceOnProject": "{{name}} pada {{project}}",
       "instanceOnProjectSuffix": "{{name}} pada {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Jalankan pada Cloud Agent"
+      "runOnCloudAgent": "Jalankan pada Cloud Agent",
+      "terminals": "Terminal",
+      "remotes": "Contoh jauh"
     },
     "modePicker": {
       "title": "Pilih mod",

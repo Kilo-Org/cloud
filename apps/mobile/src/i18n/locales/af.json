@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Loop `kilo remote` in 'n projek op jou rekenaar, of werk Kilo CLI by as een reeds loop.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Loop op Cloud Agent"
+      "runOnCloudAgent": "Loop op Cloud Agent",
+      "terminals": "Terminale",
+      "remotes": "Afgeleë instansies"
     },
     "modePicker": {
       "title": "Kies modus",

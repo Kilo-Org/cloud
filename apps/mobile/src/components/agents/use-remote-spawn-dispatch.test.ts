@@ -115,6 +115,9 @@ const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 /** Stub payload for the ready-path-with-payload case. */
@@ -616,6 +619,9 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     connectionId: 'conn-live',
     name: 'laptop',
     projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
   };
 
   beforeEach(() => {

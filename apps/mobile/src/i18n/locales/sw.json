@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Endesha `kilo remote` kwenye mradi wa kompyuta yako, au sasisha Kilo CLI ikiwa moja tayari inaendelea.",
       "instanceOnProject": "{{name}} kwenye {{project}}",
       "instanceOnProjectSuffix": "{{name}} kwenye {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Endesha kwenye Cloud Agent"
+      "runOnCloudAgent": "Endesha kwenye Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Mifano ya mbali"
     },
     "modePicker": {
       "title": "Chagua hali",

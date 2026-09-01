@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിലെ ഒരു പ്രോജക്ടിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക, അല്ലെങ്കിൽ ഒരെണ്ണം ഇതിനകം പ്രവർത്തിക്കുന്നുണ്ടെങ്കിൽ Kilo CLI അപ്ഡേറ്റ് ചെയ്യുക.",
       "instanceOnProject": "{{project}}-ലെ {{name}}",
       "instanceOnProjectSuffix": "{{project}}-ലെ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent-ൽ പ്രവർത്തിപ്പിക്കുക"
+      "runOnCloudAgent": "Cloud Agent-ൽ പ്രവർത്തിപ്പിക്കുക",
+      "terminals": "ടെർമിനലുകൾ",
+      "remotes": "റിമോട്ട് ഇൻസ്റ്റൻസുകൾ"
     },
     "modePicker": {
       "title": "മോഡ് തിരഞ്ഞെടുക്കുക",

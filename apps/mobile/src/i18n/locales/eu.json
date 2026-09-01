@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Exekutatu `kilo remote` zure ordenagailuko projektuan, edo eguneratu Kilo CLI jada exekutatzen ari bada.",
       "instanceOnProject": "{{name}} {{project}}n",
       "instanceOnProjectSuffix": "{{name}} {{project}}n ({{suffix}})",
-      "runOnCloudAgent": "Exekutatu Cloud Agent-en"
+      "runOnCloudAgent": "Exekutatu Cloud Agent-en",
+      "terminals": "Terminalak",
+      "remotes": "Urruneko instantziak"
     },
     "modePicker": {
       "title": "Hautatu modua",

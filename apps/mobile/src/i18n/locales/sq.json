@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Ekzekutoni `kilo remote` në një projekt në kompjuterin tuaj, ose përditësoni Kilo CLI nëse tashmë po ekzekutohet një.",
       "instanceOnProject": "{{name}} në {{project}}",
       "instanceOnProjectSuffix": "{{name}} në {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ekzekuto në Cloud Agent"
+      "runOnCloudAgent": "Ekzekuto në Cloud Agent",
+      "terminals": "Terminalet",
+      "remotes": "Instancat në distancë"
     },
     "modePicker": {
       "title": "Zgjidhni mënyrën",

@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Компьютеріңіздегі жобада `kilo remote` іске қосыңыз немесе Kilo CLI жаңартылғанын тексеріңіз.",
       "instanceOnProject": "{{project}} жобасындағы {{name}}",
       "instanceOnProjectSuffix": "{{project}} жобасындағы {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent ішінде іске қосу"
+      "runOnCloudAgent": "Cloud Agent ішінде іске қосу",
+      "terminals": "Терминалдар",
+      "remotes": "Қашықтағы инстанстар"
     },
     "modePicker": {
       "title": "Режимді таңдау",

@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "Gudanar da `kilo remote` a cikin aiki a kwamfutarka, ko sabunta Kilo CLI idan ɗaya yana gudana.",
       "instanceOnProject": "{{name}} a {{project}}",
       "instanceOnProjectSuffix": "{{name}} a {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Gudanar a Cloud Agent"
+      "runOnCloudAgent": "Gudanar a Cloud Agent",
+      "terminals": "Tashoshin umarni",
+      "remotes": "Misalan nesa"
     },
     "modePicker": {
       "title": "Zaɓi yanayin",

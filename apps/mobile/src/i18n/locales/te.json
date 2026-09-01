@@ -2279,7 +2279,9 @@
       "noCliInstancesDescription": "మీ కంప్యూటర్‌లో ఒక ప్రాజెక్ట్‌లో `kilo remote` అమలు చేయండి, లేదా ఒకటి ఇప్పటికే నడుస్తుంటే Kilo CLIను నవీకరించండి.",
       "instanceOnProject": "{{project}}లో {{name}}",
       "instanceOnProjectSuffix": "{{project}}లో {{name}} ({{suffix}})",
-      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి"
+      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి",
+      "terminals": "టెర్మినల్‌లు",
+      "remotes": "రిమోట్ ఇన్‌స్టాన్స్‌లు"
     },
     "modePicker": {
       "title": "మోడ్ ఎంచుకోండి",

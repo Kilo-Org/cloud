@@ -1042,6 +1042,31 @@ describe('SessionService.prepareWorkspace', () => {
     portMocks.randomPort.mockReturnValue(4173);
   });
 
+  it.each([undefined, 1])(
+    'uses the persisted readable branch during workspace preparation with preparedAt=%s',
+    async preparedAt => {
+      const branchName = 'kilo/calm-cedar-az234567';
+      const session = createSession(false);
+      const result = await new SessionService().prepareWorkspace({
+        sandbox: createSandbox(session),
+        sandboxId: 'ses-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata: createMetadata({ branchName, preparedAt }),
+        kilocodeModel: 'test-model',
+      });
+
+      expect(workspaceMocks.manageBranch).toHaveBeenCalledWith(
+        session,
+        '/workspace/user/sessions/agent_test',
+        branchName,
+        false
+      );
+      expect(result.ready.branchName).toBe(branchName);
+    }
+  );
+
   it('prepares a cold workspace and returns ready metadata', async () => {
     const session = createSession(false);
     const sandbox = createSandbox(session);
@@ -2433,6 +2458,29 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.ready.workspacePath).toBe(workspacePath);
     expect(result.readyRequest.workspace.workspacePath).toBe(workspacePath);
   });
+
+  it.each([undefined, 1])(
+    'uses the persisted readable branch in wrapper readiness with preparedAt=%s',
+    async preparedAt => {
+      const branchName = 'kilo/calm-cedar-az234567';
+      const result = await buildPromptWrapperRequests(createMetadata({ branchName, preparedAt }));
+
+      expect(result.ready.branchName).toBe(branchName);
+      expect(result.readyRequest.workspace.branchName).toBe(branchName);
+      expect(result.readyRequest.workspace.upstreamBranch).toBeUndefined();
+    }
+  );
+
+  it.each([undefined, 'session/agent_existing'])(
+    'preserves historical branch selection with stored branch=%s',
+    async branchName => {
+      const result = await buildPromptWrapperRequests(createMetadata({ branchName }));
+      const expectedBranch = branchName ?? 'session/agent_test';
+
+      expect(result.ready.branchName).toBe(expectedBranch);
+      expect(result.readyRequest.workspace.branchName).toBe(expectedBranch);
+    }
+  );
 
   it('prefers and requires snapshot restore in wrapper readiness for clone metadata', async () => {
     const result = await buildPromptWrapperRequests(createCloneMetadata());

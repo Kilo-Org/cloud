@@ -1,11 +1,32 @@
-import { describe, expect, it } from 'bun:test';
-import type { WrapperKiloClient, WrapperPty } from '../kilo-api';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
+import { createKiloClient } from '@kilocode/sdk';
+import {
+  SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+  SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  type SessionEventPayload,
+} from '../../../src/shared/sandbox-control-protocol';
+import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
+import { materializeMessageAttachments } from '../session-bootstrap';
+import { runProcess } from '../utils';
+import { applySessionAttach } from './apply-attach';
+import { updateSessionSnapshots, unfilteredKiloEvents } from './feed';
+import {
+  rememberAttachedRoot,
+  rememberChildSession,
+  resetSessionDirectoryState,
+} from './session-directories';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
   buildHeartbeatPayload,
+  cancelControlTasks,
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
+import { KILO_CONTROL_REQUEST_TIMEOUT_MS } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime';
 
 const session = {
@@ -14,12 +35,38 @@ const session = {
   directory: '/workspace',
 };
 
+type Completion = Awaited<ReturnType<WrapperKiloClient['sendPrompt']>>;
+
+function completion(error?: Completion['info']['error']): Completion {
+  return {
+    info: {
+      id: 'assistant_1',
+      sessionID: session.kiloSessionId,
+      parentID: 'msg_1',
+      role: 'assistant',
+      time: { created: 1, completed: 2 },
+      modelID: 'kilo/example',
+      providerID: 'kilo',
+      mode: 'code',
+      agent: 'code',
+      path: { cwd: session.directory, root: session.directory },
+      cost: 0,
+      tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+      ...(error ? { error } : {}),
+    },
+    parts: [],
+  };
+}
+
 function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient {
   return {
     getSession: async id => ({ id }),
     ensureSession: async () => undefined,
+    sendPrompt: async () => completion(),
     sendPromptAsync: async () => {},
-    sendCommand: async () => undefined,
+    sendCommand: async () => completion(),
+    summarizeSession: async () => true,
+    generateCommitMessage: async () => ({ message: 'Apply normal control turn' }),
     abortSession: async () => true,
     answerPermission: async () => true,
     answerQuestion: async () => true,
@@ -36,11 +83,53 @@ function deps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
     kiloClient: fakeKilo(),
     version: '2.4.0',
     kiloReady: true,
-    getStatus: () => ({ state: 'idle', pendingMessages: [] }),
     sessions: [],
+    tasks: new Map(),
+    emitSessionEvent: () => {},
+    retireRuntime: () => {},
+    applyAttach: (session, payload, deps) =>
+      applySessionAttach(session, payload, { ...deps, sessionExists: async () => true }),
     ...overrides,
   };
 }
+
+function runtimeDeps(kiloClient: WrapperKiloClient) {
+  const abort = new AbortController();
+  const events: SessionEventPayload[] = [];
+  const retired: string[] = [];
+  let shuttingDown = false;
+  const handlerDeps: HandlerDeps = {
+    ...deps({ kiloClient }),
+    get kiloReady() {
+      return !shuttingDown;
+    },
+    signal: abort.signal,
+    emitSessionEvent: (_session, event) => events.push(event),
+    retireRuntime: reason => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      retired.push(reason);
+      void cancelControlTasks(handlerDeps, reason, 'failed');
+      abort.abort();
+    },
+  };
+  return { handlerDeps, events, retired };
+}
+
+async function waitForTasks(handlerDeps: HandlerDeps): Promise<void> {
+  await Promise.all([...handlerDeps.tasks.values()].map(task => task.done));
+}
+
+const promptPayload = {
+  messageId: 'msg_1',
+  turn: { type: 'prompt', prompt: 'hello' },
+  agent: { mode: 'architect', model: 'kilo/example', variant: 'high' },
+} as const;
+
+afterEach(() => {
+  setSystemTime();
+  resetSessionDirectoryState();
+});
 
 const pty: WrapperPty = {
   id: 'pty_1',
@@ -81,35 +170,42 @@ describe('handleControlRequest', () => {
     });
   });
 
-  it('calls sendPromptAsync with kiloSessionId and messageId', async () => {
+  it('calls the completion-returning prompt API with the owned message and directory', async () => {
     const calls: unknown[] = [];
+    const events: SessionEventPayload[] = [];
     const kiloClient = fakeKilo({
-      sendPromptAsync: async opts => {
+      sendPrompt: async opts => {
         calls.push(opts);
+        return completion();
       },
+    });
+    const handlerDeps = deps({
+      kiloClient,
+      emitSessionEvent: (_session, event) => events.push(event),
     });
 
     const result = await handleControlRequest(
       'session.prompt',
       session,
-      {
-        messageId: 'msg_1',
-        turn: { type: 'prompt', prompt: 'hello' },
-        agent: { mode: 'architect', model: 'kilo/example', variant: 'high' },
-      },
-      deps({ kiloClient })
+      promptPayload,
+      handlerDeps
     );
-
     expect(result).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+    await waitForTasks(handlerDeps);
     expect(calls).toEqual([
       {
         sessionId: 'kilo_1',
+        directory: session.directory,
+        signal: expect.any(AbortSignal),
         messageId: 'msg_1',
         prompt: 'hello',
         agent: 'architect',
         model: { providerID: 'kilo', modelID: 'kilo/example' },
         variant: 'high',
       },
+    ]);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
     ]);
   });
 
@@ -119,6 +215,7 @@ describe('handleControlRequest', () => {
     const kiloClient = fakeKilo({
       sendCommand: async opts => {
         commands.push(opts);
+        return completion();
       },
       sendPromptAsync: async opts => {
         prompts.push(opts);
@@ -140,6 +237,8 @@ describe('handleControlRequest', () => {
     expect(commands).toEqual([
       {
         sessionId: 'kilo_1',
+        directory: session.directory,
+        signal: expect.any(AbortSignal),
         command: 'review',
         args: '--all changes',
         messageId: 'msg_command',
@@ -156,6 +255,7 @@ describe('handleControlRequest', () => {
     const kiloClient = fakeKilo({
       sendCommand: async opts => {
         commands.push(opts);
+        return completion();
       },
     });
 
@@ -177,6 +277,8 @@ describe('handleControlRequest', () => {
     expect(commands).toEqual([
       {
         sessionId: 'kilo_1',
+        directory: session.directory,
+        signal: expect.any(AbortSignal),
         command: 'review',
         args: '',
         messageId: 'msg_command',
@@ -194,6 +296,7 @@ describe('handleControlRequest', () => {
       },
       sendCommand: async opts => {
         calls.push(opts);
+        return completion();
       },
     });
 
@@ -325,6 +428,16 @@ describe('handleControlRequest', () => {
   it('resolves a pending permission', async () => {
     const answered: unknown[] = [];
     const kiloClient = fakeKilo({
+      getPermissions: async () => [
+        {
+          id: 'perm_1',
+          sessionID: session.kiloSessionId,
+          permission: 'bash',
+          patterns: [],
+          metadata: {},
+          always: [],
+        },
+      ],
       answerPermission: async (permissionId, response) => {
         answered.push({ permissionId, response });
         return true;
@@ -341,7 +454,7 @@ describe('handleControlRequest', () => {
     expect(answered).toEqual([{ permissionId: 'perm_1', response: 'once' }]);
   });
 
-  it('aborts the kilo session', async () => {
+  it('does not send an unfenced abort when the wrapper owns no work', async () => {
     const aborted: string[] = [];
     const kiloClient = fakeKilo({
       abortSession: async opts => {
@@ -351,8 +464,8 @@ describe('handleControlRequest', () => {
     });
 
     const result = await handleControlRequest('session.abort', session, {}, deps({ kiloClient }));
-    expect(result).toEqual({ ok: true, result: { status: 'aborted' } });
-    expect(aborted).toEqual(['kilo_1']);
+    expect(result).toEqual({ ok: true, result: { status: 'already_idle' } });
+    expect(aborted).toEqual([]);
   });
 
   it('routes validated terminal lifecycle requests to the exact session', async () => {
@@ -556,20 +669,1699 @@ describe('handleControlRequest', () => {
   });
 });
 
-describe('buildHeartbeatPayload', () => {
-  it('includes kilo.ready and a sessions array', () => {
-    const payload = buildHeartbeatPayload(
-      deps({
-        kiloReady: true,
-        getStatus: () => ({ state: 'active', pendingMessages: ['msg_1'] }),
-        sessions: [{ kiloSessionId: 'kilo_1', state: 'active', idleForMs: 12, waitingOn: 'model' }],
+describe('owned control execution', () => {
+  it('admits a command before completion and does not redispatch it after the RPC deadline', async () => {
+    const finished = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    let submissions = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendCommand: () => {
+          submissions += 1;
+          return finished.promise;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const payload = {
+      ...promptPayload,
+      turn: { type: 'command', command: 'review', arguments: '' },
+    };
+    const admittedAt = Date.now();
+    expect(await handleControlRequest('session.prompt', session, payload, handlerDeps)).toEqual({
+      ok: true,
+      result: { messageId: 'msg_1', status: 'accepted' },
+    });
+    setSystemTime(admittedAt + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS + 1);
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
+      state: 'active',
+      pendingMessages: 1,
+    });
+    expect(await handleControlRequest('session.prompt', session, payload, handlerDeps)).toEqual({
+      ok: true,
+      result: { messageId: 'msg_1', status: 'existing' },
+    });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...payload, messageId: 'msg_2' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+    expect(submissions).toBe(1);
+    expect(events).toEqual([]);
+    finished.resolve(completion());
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({ state: 'idle', pendingMessages: 0 });
+  });
+
+  it('emits one message-scoped outcome even when completion precedes delivery of the acknowledgement', async () => {
+    const releaseAck = Promise.withResolvers<void>();
+    const events: SessionEventPayload[] = [];
+    const identities: unknown[] = [];
+    const handlerDeps = deps({
+      emitSessionEvent: (identity, event) => {
+        identities.push(identity);
+        events.push(event);
+      },
+    });
+    let acknowledged = false;
+    const response = handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps
+    ).then(async result => {
+      await releaseAck.promise;
+      acknowledged = true;
+      return result;
+    });
+    await waitForTasks(handlerDeps);
+    expect(acknowledged).toBe(false);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+    expect(identities).toEqual([session]);
+    releaseAck.resolve();
+    expect(await response).toMatchObject({ ok: true });
+    expect(events).toHaveLength(1);
+  });
+
+  it('reports asynchronous submission failures after admission without leaking API diagnostics', async () => {
+    const failed = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({ sendCommand: () => failed.promise }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const accepted = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        ...promptPayload,
+        turn: { type: 'command', command: 'review', arguments: '' },
+      },
+      handlerDeps
+    );
+    expect(accepted).toMatchObject({ ok: true });
+    failed.reject(new Error('private-token-from-upstream'));
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: {
+          messageId: 'msg_1',
+          status: 'failed',
+          reason: 'Kilo execution failed',
+        },
+      },
+    ]);
+    expect(JSON.stringify(events)).not.toContain('private-token-from-upstream');
+  });
+
+  it.each([
+    [{ name: 'MessageAbortedError', data: { message: 'aborted' } }, 'cancelled'],
+    [{ name: 'UnknownError', data: { message: 'model failed' } }, 'failed'],
+  ] as const)('classifies returned assistant error %j as %s', async (error, status) => {
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({ sendPrompt: async () => completion(error) }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toMatchObject({ ok: true });
+    await waitForTasks(handlerDeps);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'session.message.outcome',
+      properties: { messageId: 'msg_1', status },
+    });
+  });
+
+  it('does not classify raw recoverable errors or native session-parent closes as message outcomes', async () => {
+    const finished = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({ sendCommand: () => finished.promise }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        ...promptPayload,
+        turn: { type: 'command', command: 'review', arguments: '' },
+      },
+      handlerDeps
+    );
+    for await (const event of unfilteredKiloEvents([
+      {
+        directory: session.directory,
+        payload: {
+          type: 'session.error',
+          properties: { sessionID: session.kiloSessionId, error: { name: 'ContextOverflowError' } },
+        },
+      },
+      {
+        directory: session.directory,
+        payload: {
+          type: 'session.turn.close',
+          properties: {
+            sessionID: session.kiloSessionId,
+            parentID: 'parent-session',
+            reason: 'error',
+          },
+        },
+      },
+    ])) {
+      updateSessionSnapshots(event, handlerDeps.sessions);
+    }
+    expect(events).toEqual([]);
+    expect(handlerDeps.tasks.size).toBe(1);
+    finished.resolve(completion());
+    await waitForTasks(handlerDeps);
+    expect(events[0]?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('fences stale cancellation and late completion after admitting replacement work', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const replacement = Promise.withResolvers<Completion>();
+    const replacementStarted = Promise.withResolvers<void>();
+    const abortStarted = Promise.withResolvers<void>();
+    const remoteStopped = Promise.withResolvers<boolean>();
+    const finalized: Array<string | undefined> = [];
+    let taskSignal: AbortSignal | undefined;
+    let aborts = 0;
+    const { handlerDeps, events, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: opts => {
+          if (opts.messageId === 'newer') {
+            taskSignal = opts.signal;
+            started.resolve();
+            return running.promise;
+          }
+          replacementStarted.resolve();
+          return replacement.promise;
+        },
+        abortSession: opts => {
+          expect(opts.directory).toBe(session.directory);
+          expect(opts.signal?.aborted).toBe(false);
+          aborts += 1;
+          abortStarted.resolve();
+          return remoteStopped.promise;
+        },
       })
     );
-    expect(payload.kilo.ready).toBe(true);
-    expect(payload.sessions).toEqual([
-      { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 12, waitingOn: 'model' },
+    handlerDeps.runAutoCommit = async opts => {
+      finalized.push(opts.messageId);
+      return { success: true };
+    };
+    const payload = { ...promptPayload, finalization: { autoCommit: true } };
+    try {
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...payload, messageId: 'newer' },
+        handlerDeps
+      );
+      await started.promise;
+      expect(
+        await handleControlRequest('session.abort', session, { messageId: 'older' }, handlerDeps)
+      ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      expect(taskSignal?.aborted).toBe(false);
+      expect(aborts).toBe(0);
+      const aborting = handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'newer' },
+        handlerDeps
+      );
+      await abortStarted.promise;
+      expect(taskSignal?.aborted).toBe(true);
+      expect(
+        await handleControlRequest('session.prompt', session, payload, handlerDeps)
+      ).toMatchObject({ ok: false });
+      expect(events).toEqual([]);
+      expect(handlerDeps.tasks.get(session.kiloSessionId)?.messageId).toBe('newer');
+      remoteStopped.resolve(true);
+      expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(events).toEqual([
+        {
+          type: 'session.message.outcome',
+          properties: { messageId: 'newer', status: 'cancelled', reason: 'Session aborted' },
+        },
+      ]);
+      expect(handlerDeps.tasks.size).toBe(0);
+      expect(await handleControlRequest('session.prompt', session, payload, handlerDeps)).toEqual({
+        ok: true,
+        result: { messageId: 'msg_1', status: 'accepted' },
+      });
+      await replacementStarted.promise;
+      const replacementTask = handlerDeps.tasks.get(session.kiloSessionId);
+      expect(replacementTask?.messageId).toBe('msg_1');
+      const oldCompletion = completion();
+      running.resolve({
+        ...oldCompletion,
+        info: { ...oldCompletion.info, parentID: 'newer' },
+      });
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(handlerDeps.tasks.get(session.kiloSessionId)).toBe(replacementTask);
+      expect(replacementTask?.signal.aborted).toBe(false);
+      expect(finalized).toEqual([]);
+      expect(events).toHaveLength(1);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...payload, messageId: 'third' },
+          handlerDeps
+        )
+      ).toMatchObject({ ok: false });
+      const nextCompletion = completion();
+      replacement.resolve({
+        ...nextCompletion,
+        info: { ...nextCompletion.info, id: 'assistant_next' },
+      });
+      await waitForTasks(handlerDeps);
+      expect(finalized).toEqual(['assistant_next']);
+      expect(events).toHaveLength(2);
+      expect(events[1]?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+      expect(aborts).toBe(1);
+      expect(retired).toEqual([]);
+      expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
+        state: 'idle',
+        kilo: { ready: true },
+      });
+    } finally {
+      remoteStopped.resolve(true);
+      running.resolve(completion());
+      replacement.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it.each(['false', 'malformed', 'HTTP failure'] as const)(
+    'retires and rejects replacement work after an abort returns %s',
+    async response => {
+      const running = Promise.withResolvers<Completion>();
+      const submissions: Array<string | undefined> = [];
+      const { handlerDeps, events, retired } = runtimeDeps(
+        fakeKilo({
+          sendCommand: opts => {
+            submissions.push(opts.messageId);
+            return running.promise;
+          },
+          abortSession: async () => {
+            if (response === 'HTTP failure') throw new Error('HTTP 500');
+            return response === 'false' ? false : ({} as boolean);
+          },
+        })
+      );
+      const payload = {
+        ...promptPayload,
+        turn: { type: 'command', command: 'review', arguments: '' },
+      };
+      try {
+        await handleControlRequest('session.prompt', session, payload, handlerDeps);
+        expect(
+          await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
+        ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+        expect(retired).toEqual(['Kilo cancellation failed']);
+        expect(handlerDeps.signal?.aborted).toBe(true);
+        expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+        expect(handlerDeps.tasks.size).toBe(0);
+        expect(
+          await handleControlRequest(
+            'session.prompt',
+            session,
+            { ...payload, messageId: 'next' },
+            { ...handlerDeps }
+          )
+        ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+        expect(submissions).toEqual(['msg_1']);
+        running.resolve(completion());
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(events).toHaveLength(1);
+        expect(events[0]?.properties.messageId).toBe('msg_1');
+      } finally {
+        running.resolve(completion());
+        await waitForTasks(handlerDeps);
+      }
+    }
+  );
+
+  it('fails closed when the actual Kilo adapter receives an empty JSON abort response', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const submissions: string[] = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === `/session/${session.kiloSessionId}/message`) {
+          const body = (await request.json()) as { messageID: string };
+          submissions.push(body.messageID);
+          started.resolve();
+          return Response.json(await running.promise);
+        }
+        if (pathname === `/session/${session.kiloSessionId}/abort`) {
+          return new Response(null, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response(null, { status: 404 });
+      },
+    });
+    const url = server.url.toString();
+    const { handlerDeps, retired } = runtimeDeps(
+      createWrapperKiloClient(createKiloClient({ baseUrl: url }), url, session.directory)
+    );
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      expect(
+        await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
+      ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(handlerDeps.signal?.aborted).toBe(true);
+      expect(handlerDeps.tasks.size).toBe(0);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, messageId: 'next' },
+          { ...handlerDeps }
+        )
+      ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(submissions).toEqual(['msg_1']);
+    } finally {
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+      await server.stop(true);
+    }
+  });
+
+  it('bounds a hanging abort and cannot revive the runtime when its acknowledgement arrives late', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const running = Promise.withResolvers<Completion>();
+    const abortStarted = Promise.withResolvers<AbortSignal>();
+    const remoteStopped = Promise.withResolvers<boolean>();
+    const { handlerDeps, events, retired } = runtimeDeps(
+      fakeKilo({
+        sendCommand: () => running.promise,
+        abortSession: opts => {
+          if (!opts.signal) throw new Error('Missing abort request signal');
+          abortStarted.resolve(opts.signal);
+          return remoteStopped.promise;
+        },
+      })
+    );
+    try {
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, turn: { type: 'command', command: 'review', arguments: '' } },
+        handlerDeps
+      );
+      const aborting = handleControlRequest(
+        'session.abort',
+        session,
+        { messageId: 'msg_1' },
+        handlerDeps
+      );
+      const abortSignal = await abortStarted.promise;
+      expect(abortSignal.aborted).toBe(false);
+      expect(handlerDeps.tasks.get(session.kiloSessionId)?.messageId).toBe('msg_1');
+      expect(events).toEqual([]);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, messageId: 'next' },
+          handlerDeps
+        )
+      ).toMatchObject({ ok: false });
+      const deadline = timers.mock.calls.find(
+        ([, ms]) => ms === KILO_CONTROL_REQUEST_TIMEOUT_MS
+      )?.[0];
+      if (typeof deadline !== 'function') throw new Error('Missing abort request deadline');
+      deadline();
+      expect(await aborting).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(abortSignal.aborted).toBe(true);
+      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(handlerDeps.signal?.aborted).toBe(true);
+      remoteStopped.resolve(true);
+      running.resolve(completion());
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(handlerDeps.tasks.size).toBe(0);
+      expect(events).toHaveLength(1);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, messageId: 'next' },
+          { ...handlerDeps }
+        )
+      ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    } finally {
+      remoteStopped.resolve(true);
+      running.resolve(completion());
+      await waitForTasks(handlerDeps);
+      timers.mockRestore();
+    }
+  });
+
+  it('retires execution that exceeds the explicit maximum even while waiting for input', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const retired: string[] = [];
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+      retireRuntime: reason => {
+        retired.push(reason);
+        handlerDeps.kiloReady = false;
+      },
+    });
+    try {
+      rememberAttachedRoot(session.kiloSessionId, session.directory);
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      updateSessionSnapshots(
+        {
+          type: 'question.asked',
+          properties: { sessionID: session.kiloSessionId, id: 'question_1' },
+        },
+        handlerDeps.sessions
+      );
+      expect(buildHeartbeatPayload(handlerDeps).sessions[0]?.waitingOn).toBe('input');
+      const deadline = timers.mock.calls.find(
+        ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
+      )?.[0];
+      if (typeof deadline !== 'function') throw new Error('missing owned execution deadline');
+      deadline();
+      await waitForTasks(handlerDeps);
+      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(events[0]?.properties).toEqual({
+        messageId: 'msg_1',
+        status: 'failed',
+        reason: 'Execution exceeded the 60 minute limit',
+      });
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, messageId: 'next' },
+          handlerDeps
+        )
+      ).toMatchObject({ ok: false });
+    } finally {
+      running.resolve(completion());
+      timers.mockRestore();
+    }
+  });
+});
+
+describe('control finalization and compact', () => {
+  it.each([true, false])(
+    'keeps bootstrap state out of auto-commit with repository edits=%s',
+    async editRepository => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-autocommit-'));
+      const source = path.join(root, 'source');
+      const remote = path.join(root, 'remote.git');
+      const workspace = path.join(root, 'workspace');
+      const identity = { ...session, directory: workspace };
+      const events: SessionEventPayload[] = [];
+      const git = async (args: string[], cwd = root): Promise<string> => {
+        const result = await runProcess('git', args, { cwd });
+        if (result.exitCode !== 0) throw new Error(`Fixture git ${args[0]} failed`);
+        return result.stdout;
+      };
+      const handlerDeps = deps({
+        kiloClient: fakeKilo({
+          sendPrompt: async () => {
+            if (editRepository)
+              await fs.writeFile(path.join(workspace, 'result.txt'), 'normal control turn');
+            return completion();
+          },
+        }),
+        emitSessionEvent: (_session, event) => events.push(event),
+      });
+      try {
+        await git(['init', '--bare', remote]);
+        await git(['init', '--initial-branch=work', source]);
+        await fs.writeFile(path.join(source, 'initial.txt'), 'initial');
+        await git(['add', '.'], source);
+        await git(
+          [
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'initial',
+          ],
+          source
+        );
+        await git(['remote', 'add', 'origin', remote], source);
+        await git(['push', '-u', 'origin', 'work'], source);
+        await git(['symbolic-ref', 'HEAD', 'refs/heads/work'], remote);
+        expect(
+          await handleControlRequest(
+            'session.attach',
+            identity,
+            { git: { url: remote } },
+            handlerDeps
+          )
+        ).toMatchObject({ ok: true });
+        expect(await git(['status', '--porcelain'], workspace)).toBe('');
+        expect(
+          await handleControlRequest(
+            'session.prompt',
+            identity,
+            { ...promptPayload, finalization: { autoCommit: true } },
+            handlerDeps
+          )
+        ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+        await waitForTasks(handlerDeps);
+        const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
+        if (editRepository) {
+          expect(await git(['show', 'refs/heads/work:result.txt'], remote)).toBe(
+            'normal control turn'
+          );
+          expect((await git(['log', '-1', '--format=%an/%ae'], workspace)).trim()).toBe(
+            'Kilo Code Cloud/agent@kilocode.ai'
+          );
+          expect(committed).toMatchObject({
+            success: true,
+            messageId: 'assistant_1',
+            commitMessage: 'Apply normal control turn',
+          });
+        } else {
+          expect(committed).toMatchObject({ success: true, skipped: true });
+        }
+        expect(
+          (await git(['ls-tree', '-r', '--name-only', 'refs/heads/work'], remote)).trim()
+        ).toBe(editRepository ? 'initial.txt\nresult.txt' : 'initial.txt');
+        expect((await git(['rev-list', '--count', 'refs/heads/work'], remote)).trim()).toBe(
+          editRepository ? '2' : '1'
+        );
+        expect(await git(['status', '--porcelain'], workspace)).toBe('');
+        expect(events.at(-1)).toEqual({
+          type: 'session.message.outcome',
+          properties: { messageId: 'msg_1', status: 'completed' },
+        });
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('retains ownership and the finalizing heartbeat through auto-commit and condensation', async () => {
+    const committing = Promise.withResolvers<void>();
+    const committed = Promise.withResolvers<{ success: boolean }>();
+    const condensing = Promise.withResolvers<void>();
+    const condensed = Promise.withResolvers<boolean>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: async options => {
+        expect(options.workspacePath).toBe(session.directory);
+        expect(options.signal?.aborted).toBe(false);
+        options.onEvent({
+          streamEventType: 'autocommit_started',
+          timestamp: new Date().toISOString(),
+          data: { message: 'Committing', messageId: options.messageId },
+        });
+        committing.resolve();
+        const result = await committed.promise;
+        options.onEvent({
+          streamEventType: 'autocommit_completed',
+          timestamp: new Date().toISOString(),
+          data: { success: result.success, message: 'Committed', messageId: options.messageId },
+        });
+        return result;
+      },
+      kiloClient: fakeKilo({
+        summarizeSession: options => {
+          expect(options).toMatchObject({
+            sessionId: session.kiloSessionId,
+            directory: session.directory,
+            model: { providerID: 'kilo', modelID: promptPayload.agent.model },
+            auto: true,
+            signal: expect.any(AbortSignal),
+          });
+          condensing.resolve();
+          return condensed.promise;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const payload = {
+      ...promptPayload,
+      finalization: { autoCommit: true, condenseOnComplete: true },
+    };
+    expect(
+      await handleControlRequest('session.prompt', session, payload, handlerDeps)
+    ).toMatchObject({ ok: true });
+    await committing.promise;
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
+      state: 'finalizing',
+      pendingMessages: 1,
+      sessions: [{ state: 'finalizing', waitingOn: 'finalizing' }],
+    });
+    expect(
+      await handleControlRequest('session.prompt', session, payload, handlerDeps)
+    ).toMatchObject({ ok: true, result: { status: 'existing' } });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...payload, messageId: 'next' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+    committed.resolve({ success: true });
+    await condensing.promise;
+    expect(events.some(event => event.type === 'session.message.outcome')).toBe(false);
+    expect(buildHeartbeatPayload(handlerDeps).state).toBe('finalizing');
+    condensed.resolve(true);
+    await waitForTasks(handlerDeps);
+    expect(events.map(event => event.type)).toEqual([
+      'autocommit_started',
+      'autocommit_completed',
+      'status',
+      'status',
+      'session.message.outcome',
     ]);
-    expect(payload.state).toBe('active');
-    expect(payload.pendingMessages).toBe(1);
+    expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('cancels finalization without admitting a newer message before quiescence', async () => {
+    const committing = Promise.withResolvers<AbortSignal>();
+    const stopped = Promise.withResolvers<{ success: boolean }>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: options => {
+        if (!options.signal) throw new Error('Missing finalization signal');
+        committing.resolve(options.signal);
+        return stopped.promise;
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    const signal = await committing.promise;
+    const cancelled = handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    expect(signal.aborted).toBe(true);
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+    stopped.resolve({ success: false });
+    expect(await cancelled).toMatchObject({ ok: true });
+    expect(events.at(-1)?.properties).toMatchObject({ messageId: 'msg_1', status: 'cancelled' });
+  });
+
+  it.each(['commit', 'condense'] as const)(
+    'reports %s failure against the admitted user message',
+    async stage => {
+      const events: SessionEventPayload[] = [];
+      const handlerDeps = deps({
+        runAutoCommit: async () => ({ success: false }),
+        kiloClient: fakeKilo({ summarizeSession: async () => false }),
+        emitSessionEvent: (_session, event) => events.push(event),
+      });
+      const finalization = stage === 'commit' ? { autoCommit: true } : { condenseOnComplete: true };
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, finalization },
+          handlerDeps
+        )
+      ).toMatchObject({ ok: true });
+      await waitForTasks(handlerDeps);
+      expect(events.at(-1)?.properties).toEqual({
+        messageId: 'msg_1',
+        status: 'failed',
+        reason: stage === 'commit' ? 'Auto-commit failed' : 'Context condensation failed',
+      });
+    }
+  );
+
+  it('keeps the original execution deadline armed while finalization is running', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const committing = Promise.withResolvers<AbortSignal>();
+    const stopped = Promise.withResolvers<{ success: boolean }>();
+    const events: SessionEventPayload[] = [];
+    const retired: string[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: options => {
+        if (!options.signal) throw new Error('Missing finalization signal');
+        committing.resolve(options.signal);
+        return stopped.promise;
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+      retireRuntime: reason => {
+        retired.push(reason);
+        handlerDeps.kiloReady = false;
+      },
+    });
+    try {
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, finalization: { autoCommit: true } },
+        handlerDeps
+      );
+      const signal = await committing.promise;
+      const deadline = timers.mock.calls.find(
+        ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
+      )?.[0];
+      if (typeof deadline !== 'function') throw new Error('Missing owned execution deadline');
+      deadline();
+      expect(signal.aborted).toBe(true);
+      expect(handlerDeps.tasks.size).toBe(1);
+      stopped.resolve({ success: false });
+      await waitForTasks(handlerDeps);
+      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(events.at(-1)?.properties).toEqual({
+        messageId: 'msg_1',
+        status: 'failed',
+        reason: 'Execution exceeded the 60 minute limit',
+      });
+    } finally {
+      stopped.resolve({ success: false });
+      timers.mockRestore();
+    }
+  });
+
+  it('does not finalize a failed Kilo turn even when the normal autoCommit default is enabled', async () => {
+    let finalized = false;
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => completion({ name: 'UnknownError', data: { message: 'failed' } }),
+      }),
+      runAutoCommit: async () => {
+        finalized = true;
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    await waitForTasks(handlerDeps);
+    expect(finalized).toBe(false);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.properties).toMatchObject({ messageId: 'msg_1', status: 'failed' });
+  });
+
+  it('runs compact through the completion-returning summarize API without waiting for a close event', async () => {
+    const finished = Promise.withResolvers<boolean>();
+    const events: SessionEventPayload[] = [];
+    let commands = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        summarizeSession: options => {
+          expect(options).toEqual({
+            sessionId: session.kiloSessionId,
+            directory: session.directory,
+            signal: expect.any(AbortSignal),
+            model: { providerID: 'kilo', modelID: promptPayload.agent.model },
+          });
+          return finished.promise;
+        },
+        sendCommand: async () => {
+          commands += 1;
+          return completion();
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const payload = {
+      ...promptPayload,
+      turn: { type: 'command', command: 'compact', arguments: '' },
+    };
+    expect(
+      await handleControlRequest('session.prompt', session, payload, handlerDeps)
+    ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    expect(events.some(event => event.type === 'session.message.outcome')).toBe(false);
+    finished.resolve(true);
+    await waitForTasks(handlerDeps);
+    expect(commands).toBe(0);
+    expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('rejects compact without a model and reports an asynchronous summarize failure', async () => {
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        summarizeSession: async () => {
+          throw new Error('HTTP 500');
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    const payload = {
+      ...promptPayload,
+      turn: { type: 'command', command: 'compact', arguments: '' },
+    };
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...payload, agent: { mode: 'code' } },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'protocol_error' } });
+    expect(handlerDeps.tasks.size).toBe(0);
+    expect(
+      await handleControlRequest('session.prompt', session, payload, handlerDeps)
+    ).toMatchObject({ ok: true });
+    await waitForTasks(handlerDeps);
+    expect(events.at(-1)?.properties).toEqual({
+      messageId: 'msg_1',
+      status: 'failed',
+      reason: 'Context condensation failed',
+    });
+  });
+});
+
+describe('control cancellation and attachments', () => {
+  it.each(['preparation', 'execution'])(
+    'cancels owned %s before detaching its terminal',
+    async phase => {
+      const started = Promise.withResolvers<void>();
+      let workSignal: AbortSignal | undefined;
+      let detached = false;
+      const running = Promise.withResolvers<Completion>();
+      const handlerDeps = deps({
+        kiloClient: fakeKilo({
+          sendCommand: opts => {
+            workSignal = opts.signal;
+            started.resolve();
+            return running.promise;
+          },
+        }),
+        applyAttach: (identity, payload, dependencies) =>
+          applySessionAttach(identity, payload, {
+            ...dependencies,
+            hasBootstrapMarker: async () => false,
+            sessionExists: (_id, _directory, signal) => {
+              workSignal = signal;
+              started.resolve();
+              return new Promise<boolean>(() => {});
+            },
+          }),
+        terminalRuntime: fakeTerminalRuntime({
+          detachSession: async () => {
+            expect(workSignal?.aborted).toBe(true);
+            expect(handlerDeps.tasks.size).toBe(0);
+            detached = true;
+          },
+        }),
+      });
+      const admission =
+        phase === 'preparation'
+          ? handleControlRequest('session.attach', session, {}, handlerDeps)
+          : handleControlRequest(
+              'session.prompt',
+              session,
+              { ...promptPayload, turn: { type: 'command', command: 'review', arguments: '' } },
+              handlerDeps
+            );
+      await started.promise;
+      expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toEqual({
+        ok: true,
+        result: { detached: true },
+      });
+      await admission;
+      expect(detached).toBe(true);
+      running.resolve(completion());
+    }
+  );
+
+  it('shuts down pending preparation and execution together before completing shutdown', async () => {
+    const preparing = Promise.withResolvers<void>();
+    const running = Promise.withResolvers<Completion>();
+    const signals: AbortSignal[] = [];
+    const secondSession = {
+      ...session,
+      sessionId: 'ses_2',
+      kiloSessionId: 'kilo_2',
+      directory: '/workspace/second',
+    };
+    let terminalStopped = false;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendCommand: opts => {
+          if (opts.signal) signals.push(opts.signal);
+          return running.promise;
+        },
+      }),
+      applyAttach: (identity, payload, dependencies) =>
+        applySessionAttach(identity, payload, {
+          ...dependencies,
+          hasBootstrapMarker: async () => false,
+          sessionExists: (_id, _directory, signal) => {
+            signals.push(signal);
+            preparing.resolve();
+            return new Promise<boolean>(() => {});
+          },
+        }),
+      onShutdown: () => {
+        handlerDeps.kiloReady = false;
+      },
+      terminalRuntime: fakeTerminalRuntime({
+        shutdown: () => {
+          expect(handlerDeps.tasks.size).toBe(0);
+          terminalStopped = true;
+        },
+      }),
+    });
+    const attaching = handleControlRequest('session.attach', session, {}, handlerDeps);
+    await preparing.promise;
+    await handleControlRequest(
+      'session.prompt',
+      secondSession,
+      { ...promptPayload, turn: { type: 'command', command: 'review', arguments: '' } },
+      handlerDeps
+    );
+    expect(handlerDeps.tasks.size).toBe(2);
+    expect(await handleControlRequest('sandbox.shutdown', undefined, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { shuttingDown: true },
+    });
+    expect(await attaching).toMatchObject({ ok: false });
+    expect(signals).toHaveLength(2);
+    expect(signals.every(signal => signal.aborted)).toBe(true);
+    expect(terminalStopped).toBe(true);
+    expect(await handleControlRequest('session.attach', session, {}, handlerDeps)).toMatchObject({
+      ok: false,
+    });
+    running.resolve(completion());
+  });
+
+  it('keeps a timed-out attach fenced until its mutating phase has quiesced', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const started = Promise.withResolvers<void>();
+    const cancelled = Promise.withResolvers<void>();
+    const stopped = Promise.withResolvers<{ exitCode: number; stdout: string; stderr: string }>();
+    let markerWritten = false;
+    const retired: string[] = [];
+    const handlerDeps = deps({
+      retireRuntime: reason => {
+        retired.push(reason);
+        handlerDeps.kiloReady = false;
+      },
+      applyAttach: (identity, payload, dependencies) =>
+        applySessionAttach(identity, payload, {
+          ...dependencies,
+          mkdir: async () => {},
+          hasBootstrapMarker: async () => false,
+          writeBootstrapMarker: async () => {
+            markerWritten = true;
+          },
+          sessionExists: async () => true,
+          runSetup: (_command, _directory, _env, _output, signal) => {
+            signal?.addEventListener('abort', () => cancelled.resolve(), { once: true });
+            started.resolve();
+            return stopped.promise;
+          },
+        }),
+    });
+    try {
+      const attaching = handleControlRequest(
+        'session.attach',
+        session,
+        { setupCommands: ['setup'] },
+        handlerDeps
+      );
+      await started.promise;
+      const deadline = timers.mock.calls.find(
+        ([, ms]) => ms === SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+      )?.[0];
+      if (typeof deadline !== 'function') throw new Error('missing attachment deadline');
+      deadline();
+      await cancelled.promise;
+      expect(await handleControlRequest('session.attach', session, {}, handlerDeps)).toMatchObject({
+        ok: false,
+      });
+      expect(handlerDeps.tasks.size).toBe(1);
+      stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
+      expect(await attaching).toMatchObject({ ok: false });
+      expect(markerWritten).toBe(false);
+      expect(handlerDeps.tasks.size).toBe(0);
+      expect(retired).toEqual(['Session preparation timed out']);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(await handleControlRequest('session.attach', session, {}, handlerDeps)).toMatchObject({
+        ok: false,
+      });
+    } finally {
+      stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
+      timers.mockRestore();
+    }
+  });
+
+  it('advertises preparation before setup starts and waits for process quiescence before retry', async () => {
+    const started = Promise.withResolvers<void>();
+    const calls: string[] = [];
+    let quiesced = false;
+    const handlerDeps = deps({
+      applyAttach: (identity, payload, dependencies) =>
+        applySessionAttach(identity, payload, {
+          ...dependencies,
+          mkdir: async () => {},
+          hasBootstrapMarker: async () => false,
+          writeBootstrapMarker: async () => {
+            calls.push('marker');
+          },
+          sessionExists: async () => true,
+          runSetup: async (command, _directory, _env, _output, signal) => {
+            calls.push(command);
+            const result = await runProcess(
+              process.execPath,
+              ['-e', 'process.stdout.write("ready"); setInterval(() => {}, 1000)'],
+              {
+                cwd: os.tmpdir(),
+                signal,
+                onOutput: (_stream, output) => {
+                  if (output.includes('ready')) started.resolve();
+                },
+              }
+            );
+            quiesced = true;
+            return result;
+          },
+        }),
+    });
+    const payload = {
+      setupCommands: ['first', 'second'],
+      preparation: { attemptId: 'attempt_1', triggerMessageId: 'msg_1' },
+    };
+    const attaching = handleControlRequest('session.attach', session, payload, handlerDeps);
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
+      state: 'active',
+      pendingMessages: 1,
+      sessions: [{ kiloSessionId: 'kilo_1', state: 'active', waitingOn: 'preparation' }],
+    });
+    await started.promise;
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { status: { type: 'busy' }, questions: [], permissions: [] },
+    });
+    const aborting = handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    expect(await handleControlRequest('session.attach', session, {}, handlerDeps)).toMatchObject({
+      ok: false,
+    });
+    expect(await aborting).toMatchObject({ ok: true });
+    expect(await attaching).toMatchObject({ ok: false });
+    expect(quiesced).toBe(true);
+    expect(calls).toEqual(['first']);
+    expect(await handleControlRequest('session.attach', session, {}, handlerDeps)).toMatchObject({
+      ok: true,
+    });
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({ state: 'idle', pendingMessages: 0 });
+  });
+
+  it('materializes an attachment-only prompt after admission and passes a local file to Kilo', async () => {
+    const identity = { ...session, sessionId: `attachments-${crypto.randomUUID()}` };
+    const directory = path.join('/tmp/attachments', identity.sessionId);
+    const localPath = path.join(directory, 'image.png');
+    const downloadStarted = Promise.withResolvers<void>();
+    const download = Promise.withResolvers<Response>();
+    const prompts: unknown[] = [];
+    const handlerDeps = deps({
+      materializeAttachments: (message, options) =>
+        materializeMessageAttachments(message, {
+          ...options,
+          fetch: Object.assign(
+            () => {
+              downloadStarted.resolve();
+              return download.promise;
+            },
+            { preconnect: fetch.preconnect }
+          ),
+        }),
+      kiloClient: fakeKilo({
+        sendPrompt: async opts => {
+          prompts.push(opts);
+          return completion();
+        },
+      }),
+    });
+    try {
+      const accepted = await handleControlRequest(
+        'session.prompt',
+        identity,
+        {
+          ...promptPayload,
+          turn: { type: 'prompt', prompt: '' },
+          attachments: [
+            {
+              filename: 'image.png',
+              mime: 'image/png',
+              signedUrl: 'https://r2.example.test/signed',
+              localPath,
+            },
+          ],
+        },
+        handlerDeps
+      );
+      expect(accepted).toMatchObject({ ok: true });
+      await downloadStarted.promise;
+      expect(prompts).toEqual([]);
+      download.resolve(new Response('image bytes'));
+      await waitForTasks(handlerDeps);
+      expect(prompts).toEqual([
+        expect.objectContaining({
+          parts: [
+            { type: 'file', mime: 'image/png', filename: 'image.png', url: `file://${localPath}` },
+          ],
+        }),
+      ]);
+      expect(await fs.readFile(localPath, 'utf8')).toBe('image bytes');
+    } finally {
+      download.resolve(new Response('image bytes'));
+      await waitForTasks(handlerDeps);
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('cancels a blocked attachment stream and removes partial files without submitting to Kilo', async () => {
+    const identity = { ...session, sessionId: `attachments-${crypto.randomUUID()}` };
+    const directory = path.join('/tmp/attachments', identity.sessionId);
+    const localPath = path.join(directory, 'blocked.txt');
+    const reading = Promise.withResolvers<void>();
+    let cancelled = false;
+    let prompts = 0;
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      materializeAttachments: (message, options) =>
+        materializeMessageAttachments(message, {
+          ...options,
+          fetch: Object.assign(
+            async () =>
+              new Response(
+                new ReadableStream(
+                  {
+                    pull: () => {
+                      reading.resolve();
+                    },
+                    cancel: () => {
+                      cancelled = true;
+                    },
+                  },
+                  { highWaterMark: 0 }
+                )
+              ),
+            { preconnect: fetch.preconnect }
+          ),
+        }),
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          prompts += 1;
+          return completion();
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    try {
+      await handleControlRequest(
+        'session.prompt',
+        identity,
+        {
+          ...promptPayload,
+          attachments: [
+            {
+              filename: 'blocked.txt',
+              mime: 'text/plain',
+              signedUrl: 'https://r2.example.test/signed',
+              localPath,
+            },
+          ],
+        },
+        handlerDeps
+      );
+      await reading.promise;
+      expect((await fs.stat(localPath)).isFile()).toBe(true);
+      expect(
+        await handleControlRequest('session.abort', identity, { messageId: 'msg_1' }, handlerDeps)
+      ).toMatchObject({ ok: true });
+      expect(cancelled).toBe(true);
+      expect(prompts).toBe(0);
+      expect(events[0]?.properties).toMatchObject({ messageId: 'msg_1', status: 'cancelled' });
+      expect(
+        await fs.stat(localPath).then(
+          () => true,
+          () => false
+        )
+      ).toBe(false);
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects attachment path escapes before materialization', async () => {
+    let materialized = false;
+    const handlerDeps = deps({
+      materializeAttachments: async message => {
+        materialized = true;
+        return message;
+      },
+    });
+    for (const localPath of [
+      '/etc/profile',
+      '/tmp/attachments/ses_1/../../profile',
+      '/tmp/attachments/other/file.txt',
+    ]) {
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          {
+            ...promptPayload,
+            attachments: [
+              {
+                filename: 'file.txt',
+                mime: 'text/plain',
+                signedUrl: 'https://r2.example.test/signed',
+                localPath,
+              },
+            ],
+          },
+          handlerDeps
+        )
+      ).toMatchObject({ ok: false, error: { code: 'protocol_error' } });
+    }
+    expect(materialized).toBe(false);
+  });
+});
+
+describe('control interactions and sync', () => {
+  const question = {
+    id: 'question_1',
+    sessionID: 'kilo_1',
+    blocking: true,
+    questions: [
+      {
+        header: 'Target',
+        question: 'Which target?',
+        multiple: true,
+        custom: true,
+        options: [{ label: 'Cloud', description: 'Hosted target' }],
+      },
+    ],
+    tool: { messageID: 'assistant_1', callID: 'tool_1' },
+  };
+  const permission = {
+    id: 'perm_1',
+    sessionID: 'kilo_1',
+    permission: 'skill-shell',
+    patterns: ['*'],
+    metadata: { requiresHuman: true },
+    always: [],
+    tool: { messageID: 'assistant_1', callID: 'tool_2' },
+  };
+
+  it('syncs rooted child asks and answers them in their own directory without admitting sibling requests', async () => {
+    const childDirectory = '/workspace/child';
+    const childQuestion = { ...question, id: 'child_question', sessionID: 'child' };
+    const childPermission = { ...permission, id: 'child_permission', sessionID: 'grandchild' };
+    const siblingQuestion = { ...question, id: 'sibling_question', sessionID: 'sibling' };
+    const siblingPermission = { ...permission, id: 'sibling_permission', sessionID: 'sibling' };
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    rememberChildSession({
+      childId: 'child',
+      parentId: session.kiloSessionId,
+      directory: childDirectory,
+    });
+    rememberChildSession({ childId: 'grandchild', parentId: 'child', directory: childDirectory });
+    rememberAttachedRoot('sibling', session.directory);
+    const replies: unknown[] = [];
+    const queried = new Set<string>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getQuestions: async directory => {
+          if (directory) queried.add(directory);
+          return directory === childDirectory
+            ? [childQuestion]
+            : [question, siblingQuestion, { ...question, id: 'unmapped', sessionID: 'unmapped' }];
+        },
+        getPermissions: async directory => {
+          if (directory) queried.add(directory);
+          return directory === childDirectory ? [childPermission] : [permission, siblingPermission];
+        },
+        answerQuestion: async (...args) => {
+          replies.push(args);
+          return true;
+        },
+        rejectQuestion: async (...args) => {
+          replies.push(args);
+          return true;
+        },
+        answerPermission: async (...args) => {
+          replies.push(args);
+          return true;
+        },
+      }),
+    });
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: {
+        status: { type: 'idle' },
+        questions: [question, childQuestion],
+        permissions: [permission, childPermission],
+      },
+    });
+    expect(queried).toEqual(new Set([session.directory, childDirectory]));
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'answer', questionId: 'child_question', answers: [['Cloud']] },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'reject', questionId: 'child_question' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'child_permission', response: 'once' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(replies).toEqual([
+      ['child_question', [['Cloud']], childDirectory, expect.any(AbortSignal)],
+      ['child_question', childDirectory, expect.any(AbortSignal)],
+      ['child_permission', 'once', undefined, true, childDirectory, expect.any(AbortSignal)],
+    ]);
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'answer', questionId: 'sibling_question', answers: [] },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'sibling_permission', response: 'always' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'reject', questionId: 'unmapped' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+    expect(replies).toHaveLength(3);
+  });
+
+  it('does not hide a failed child-directory read behind a successful root snapshot', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    rememberChildSession({
+      childId: 'child',
+      parentId: session.kiloSessionId,
+      directory: '/workspace/child',
+    });
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getPermissions: async directory => {
+          if (directory === '/workspace/child') throw new Error('HTTP 500');
+          return [permission];
+        },
+      }),
+    });
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it('uses fresh directory-scoped reads and preserves the complete pending interaction shape', async () => {
+    const directories: unknown[] = [];
+    let calls = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getSessionStatuses: async (directory, signal) => {
+          directories.push(directory);
+          expect(signal?.aborted).toBe(false);
+          calls += 1;
+          return { kilo_1: { type: 'retry', attempt: calls } };
+        },
+        getQuestions: async (directory, signal) => {
+          directories.push(directory);
+          expect(signal?.aborted).toBe(false);
+          return [question, { ...question, sessionID: 'other' }];
+        },
+        getPermissions: async (directory, signal) => {
+          directories.push(directory);
+          expect(signal?.aborted).toBe(false);
+          return [permission, { ...permission, sessionID: 'other' }];
+        },
+      }),
+    });
+    for (const attempt of [1, 2]) {
+      expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+        ok: true,
+        result: {
+          status: { type: 'retry', attempt },
+          questions: [question],
+          permissions: [permission],
+        },
+      });
+    }
+    expect(directories).toEqual(Array(6).fill(session.directory));
+  });
+
+  it('reports owned work as busy before Kilo status starts and never hides a failed read', async () => {
+    const finished = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({ kiloClient: fakeKilo({ sendCommand: () => finished.promise }) });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, turn: { type: 'command', command: 'review', arguments: '' } },
+      handlerDeps
+    );
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { status: { type: 'busy' }, questions: [], permissions: [] },
+    });
+    handlerDeps.kiloClient = fakeKilo({
+      getQuestions: async () => {
+        throw new Error('HTTP 500');
+      },
+    });
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+      ok: false,
+    });
+    finished.resolve(completion());
+    await waitForTasks(handlerDeps);
+  });
+
+  it('routes human replies to the attached directory and retains asks until Kilo confirms resolution', async () => {
+    const calls: unknown[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        answerPermission: async (...args) => {
+          calls.push(args);
+          return true;
+        },
+        answerQuestion: async (...args) => {
+          calls.push(args);
+          return true;
+        },
+        rejectQuestion: async (...args) => {
+          calls.push(args);
+          return true;
+        },
+        getPermissions: async () => [permission],
+        getQuestions: async () => [question, { ...question, id: 'question_2' }],
+      }),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    handlerDeps.sessions.push({
+      kiloSessionId: session.kiloSessionId,
+      lastActivityAt: Date.now(),
+    });
+    updateSessionSnapshots(
+      { type: 'permission.asked', properties: permission },
+      handlerDeps.sessions
+    );
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'perm_1', response: 'once', message: 'Approved' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'answer', questionId: 'question_1', answers: [['Cloud']] },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'reject', questionId: 'question_2' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true });
+    expect(calls).toEqual([
+      ['perm_1', 'once', 'Approved', true, session.directory, expect.any(AbortSignal)],
+      ['question_1', [['Cloud']], session.directory, expect.any(AbortSignal)],
+      ['question_2', session.directory, expect.any(AbortSignal)],
+    ]);
+    expect(handlerDeps.sessions[0]?.pendingInputs).toEqual(new Set(['perm_1']));
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+      ok: true,
+      result: { permissions: [permission] },
+    });
+  });
+
+  it('returns failures for rejected interaction requests instead of reporting success', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getPermissions: async () => [permission],
+        getQuestions: async () => [question],
+        answerPermission: async () => false,
+        answerQuestion: async () => {
+          throw new Error('HTTP 500');
+        },
+        rejectQuestion: async () => false,
+      }),
+    });
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'perm_1', response: 'once' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'answer', questionId: 'question_1', answers: [] },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      await handleControlRequest(
+        'session.question.resolve',
+        session,
+        { action: 'reject', questionId: 'question_1' },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: false });
+  });
+});
+
+describe('buildHeartbeatPayload', () => {
+  it('ages owned input waits without treating content silence as runtime death', async () => {
+    const finished = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({ kiloClient: fakeKilo({ sendCommand: () => finished.promise }) });
+    setSystemTime(1_000);
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        ...promptPayload,
+        turn: { type: 'command', command: 'review', arguments: '' },
+      },
+      handlerDeps
+    );
+    updateSessionSnapshots(
+      {
+        type: 'question.asked',
+        properties: { sessionID: session.kiloSessionId, id: 'question_1' },
+      },
+      handlerDeps.sessions
+    );
+    setSystemTime(120_000);
+    expect(buildHeartbeatPayload(handlerDeps)).toEqual({
+      state: 'active',
+      activeKiloSessions: 1,
+      pendingMessages: 1,
+      kilo: { ready: true },
+      sessions: [
+        { kiloSessionId: 'kilo_1', state: 'active', idleForMs: 119_000, waitingOn: 'input' },
+      ],
+    });
+    finished.resolve(completion());
+    await waitForTasks(handlerDeps);
+    updateSessionSnapshots(
+      {
+        type: 'session.status',
+        properties: { sessionID: session.kiloSessionId, status: { type: 'busy' } },
+      },
+      handlerDeps.sessions
+    );
+    expect(buildHeartbeatPayload(handlerDeps)).toMatchObject({
+      state: 'idle',
+      activeKiloSessions: 0,
+      pendingMessages: 0,
+    });
   });
 });

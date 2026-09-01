@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { redactSecrets } from './redact-output';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output';
 
 describe('redactSecrets', () => {
   it('redacts bearer tokens in Authorization headers', () => {
@@ -81,11 +81,138 @@ describe('redactSecrets', () => {
     expect(result).toContain('SECRET_VALUE=[REDACTED]');
   });
 
+  it.each(['KILO_AUTH_CONTENT', 'KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT'])(
+    'redacts a %s environment dump',
+    name => {
+      expect(
+        redactSecrets(`${name}={"provider":{"apiKey":"fake-config-token","model":"test"}}`)
+      ).toBe(`${name}=[REDACTED]`);
+    }
+  );
+
   it('leaves non-secret content unchanged', () => {
     expect(redactSecrets('npm install')).toBe('npm install');
     expect(redactSecrets('added 42 packages in 3s')).toBe('added 42 packages in 3s');
     expect(redactSecrets('Error: ENOENT: no such file or directory')).toBe(
       'Error: ENOENT: no such file or directory'
     );
+  });
+});
+
+describe('known setup secret redaction', () => {
+  const environment = {
+    KILO_AUTH_CONTENT: JSON.stringify({
+      kilo: {
+        type: 'oauth',
+        key: 'fake-auth-key',
+        access: 'fake-access-token',
+        refresh: 'fake-refresh-token',
+      },
+    }),
+    KILO_CONFIG_CONTENT: JSON.stringify({
+      provider: {
+        kilo: {
+          options: {
+            apiKey: 'fake-config-key',
+            headers: { Authorization: 'Bearer fake-header-token' },
+          },
+        },
+      },
+    }),
+    OPENCODE_CONFIG_CONTENT: JSON.stringify({
+      provider: { test: { options: { apiKey: 'fake-opencode-key' } } },
+    }),
+    CUSTOM_API_KEY: 'fake-unlabeled-key',
+    NODE_ENV: 'development',
+  };
+  const tokens = [
+    'fake-auth-key',
+    'fake-access-token',
+    'fake-refresh-token',
+    'fake-config-key',
+    'fake-header-token',
+    'fake-opencode-key',
+    'fake-unlabeled-key',
+  ];
+
+  it('removes known tokens from reformatted JSON, bare output, and authorization values', () => {
+    const redact = createSecretRedactor(environment);
+    const output = [
+      ...Object.values(environment).map(value => {
+        try {
+          return JSON.stringify(JSON.parse(value), null, 2);
+        } catch {
+          return value;
+        }
+      }),
+      ...tokens,
+      'installed packages',
+    ].join('\n');
+    const result = redact(output);
+    for (const token of tokens) expect(result).not.toContain(token);
+    expect(result).toContain('[REDACTED]');
+    expect(result).toContain('installed packages');
+    expect(result).toContain('development');
+  });
+
+  it.each([1, 7, 2049])(
+    'redacts split chunks of %i characters on interleaved output streams',
+    chunkSize => {
+      const events: string[] = [];
+      const output = createOutputRedactor(createSecretRedactor(environment), text =>
+        events.push(text)
+      );
+      const stdout = `${Object.entries(environment)
+        .map(([name, value]) => `${name}=${value}`)
+        .join('\n')}\n${tokens.join('\n')}`;
+      const stderr = 'warning fake-header-token\n';
+      for (let index = 0; index < stdout.length; index += chunkSize) {
+        output.onOutput('stdout', stdout.slice(index, index + chunkSize));
+        if (index < stderr.length)
+          output.onOutput('stderr', stderr.slice(index, index + chunkSize));
+      }
+      output.flush();
+      const result = events.join('');
+      for (const token of tokens) expect(result).not.toContain(token);
+      expect(result).toContain('NODE_ENV=development');
+      expect(result).toContain('warning [REDACTED]');
+      expect(events.every(event => event.length <= 2048)).toBe(true);
+    }
+  );
+
+  it('redacts multiline and JSON-escaped secret values', () => {
+    const secret = 'fake-line-one\nfake-line-two"\\end';
+    const events: string[] = [];
+    const output = createOutputRedactor(
+      createSecretRedactor({ KILO_CONFIG_CONTENT: JSON.stringify({ apiKey: secret }) }),
+      text => events.push(text)
+    );
+    output.onOutput('stdout', `API_KEY=${secret}\n`);
+    output.onOutput('stderr', JSON.stringify({ copied: secret }, null, 2));
+    output.flush();
+    const result = events.join('');
+    expect(result).not.toContain('fake-line-one');
+    expect(result).not.toContain('fake-line-two');
+    expect(result).toContain('[REDACTED]');
+  });
+
+  it('redacts JSON-serialized environment objects containing escaped auth configuration', () => {
+    const environment = {
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: 'fake-quoted"key\\value' } }),
+    };
+    const result = createSecretRedactor(environment)(JSON.stringify(environment));
+    expect(result).not.toContain('fake-quoted');
+    expect(result).toContain('[REDACTED]');
+  });
+
+  it('drops oversized partial lines rather than emitting unredacted prefixes', () => {
+    const events: string[] = [];
+    const output = createOutputRedactor(createSecretRedactor(environment), text =>
+      events.push(text)
+    );
+    output.onOutput('stdout', 'fake-config-key'.repeat(6000));
+    output.onOutput('stdout', 'fake-auth-key\nnext safe line\n');
+    output.flush();
+    expect(events.join('')).toBe('[setup output truncated]\nnext safe line\n');
   });
 });

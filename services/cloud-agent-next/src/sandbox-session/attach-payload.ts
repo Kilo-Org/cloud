@@ -17,6 +17,20 @@ function rejectReservedControlRuntimeEnvironment(
   }
 }
 
+export function validateControlSessionOptions(metadata: Pick<SessionMetadata, 'profile'>): void {
+  const profile = readProfileBundle(metadata);
+  rejectReservedControlRuntimeEnvironment(profile.envVars);
+  rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
+  if (
+    Object.keys(profile.envVars ?? {}).length ||
+    Object.keys(profile.encryptedSecrets ?? {}).length
+  ) {
+    throw new Error(
+      'Custom profile environment variables and secrets are not supported by control-plane sessions'
+    );
+  }
+}
+
 function gitFromMetadata(
   metadata: SessionMetadata
 ): NonNullable<SessionAttachPayload['git']> | undefined {
@@ -56,8 +70,7 @@ export function buildSessionAttachPayload(
   const git = gitFromMetadata(metadata);
   const branch = metadata.workspace?.branchName ?? metadata.repository?.upstreamBranch;
   const profile = readProfileBundle(metadata);
-  rejectReservedControlRuntimeEnvironment(profile.envVars);
-  rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
+  validateControlSessionOptions(metadata);
   const env = {
     ...(profile.envVars ?? {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),

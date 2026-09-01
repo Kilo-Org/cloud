@@ -1,7 +1,7 @@
 import type { IngestEvent } from '../../src/shared/protocol.js';
 import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
-import { git, getCurrentBranch, hasGitUpstream, logToFile, withTimeoutAndAbort } from './utils.js';
+import { git, getCurrentBranch, hasGitUpstream, logToFile } from './utils.js';
 
 /** Timeout for local git operations (status, add, commit) */
 const GIT_LOCAL_TIMEOUT_MS = 30_000;
@@ -163,24 +163,30 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
 
     // Generate commit message via kilo server API, falling back to a generic message on failure
     logToFile('auto-commit: generating commit message');
+    const generationController = new AbortController();
+    const generationTimeout = setTimeout(
+      () => generationController.abort(new Error('Commit message generation timed out')),
+      COMMIT_MESSAGE_TIMEOUT_MS
+    );
     let commitMessage: string;
     try {
-      const result = await withTimeoutAndAbort(
-        kiloClient.generateCommitMessage({ path: workspacePath }),
-        {
-          timeoutMs: COMMIT_MESSAGE_TIMEOUT_MS,
-          timeoutMessage: 'Commit message generation timed out',
-          signal,
-          abortMessage: 'Commit message generation aborted',
-        }
-      );
+      const result = await kiloClient.generateCommitMessage({
+        path: workspacePath,
+        signal: signal
+          ? AbortSignal.any([signal, generationController.signal])
+          : generationController.signal,
+      });
       commitMessage = result.message.trim() || 'wip';
       logToFile(`auto-commit: generated commit message: ${commitMessage}`);
     } catch (err) {
+      signal?.throwIfAborted();
       const msg = err instanceof Error ? err.message : String(err);
       logToFile(`auto-commit: commit message generation failed, using fallback: ${msg}`);
       commitMessage = 'wip';
+    } finally {
+      clearTimeout(generationTimeout);
     }
+    signal?.throwIfAborted();
     commitMessage = appendCommitCoAuthor(commitMessage, opts.commitCoAuthor);
 
     emitStarted(onEvent, 'Committing changes...', messageId);

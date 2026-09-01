@@ -7,6 +7,8 @@ import type {
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { Env } from '../types.js';
+import type { SandboxAcquisition } from '../persistence/SandboxControl.js';
+import type { SandboxBillingInput } from '../container-usage-context.js';
 
 type SandboxControlRpc = {
   ensureReady(input: {
@@ -14,6 +16,8 @@ type SandboxControlRpc = {
     provider?: 'cloudflare' | 'vercel';
     kiloToken?: string;
     allowCreate?: boolean;
+    acquisition?: SandboxAcquisition;
+    billing?: SandboxBillingInput;
   }): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
@@ -24,6 +28,12 @@ type SandboxControlRpc = {
     physical: PhysicalState;
     wrapperInstanceId?: string;
   }>;
+  quarantineRuntime(input: {
+    ownerId: string;
+    sessionId: string;
+    wrapperInstanceId: string;
+    reason: string;
+  }): Promise<{ quarantined: boolean }>;
   attachSession(input: AttachRouteInput): Promise<unknown>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
@@ -32,5 +42,5 @@ type SandboxControlRpc = {
 };
 
 export function sandboxControlRpc(env: Env, sandboxId: string): SandboxControlRpc {
-  return env.SANDBOX_CONTROL.getByName(sandboxId) as unknown as SandboxControlRpc;
+  return env.SANDBOX_CONTROL.getByName(sandboxId);
 }

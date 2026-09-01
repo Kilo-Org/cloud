@@ -8,9 +8,7 @@ export type SessionRoute = {
   lastState: SessionActivityState | null;
   lastStateAt: number | null;
   idleForMs: number | null;
-  waitingOn: 'model' | 'tool' | 'finalizing' | null;
-  needsSync: boolean;
-  stalled: boolean;
+  waitingOn: 'model' | 'tool' | 'finalizing' | 'preparation' | 'input' | null;
 };
 
 export type AttachRouteInput = {
@@ -23,7 +21,7 @@ export type AttachRouteInput = {
 export type SessionStateReport = {
   state: SessionActivityState;
   idleForMs: number;
-  waitingOn?: 'model' | 'tool' | 'finalizing';
+  waitingOn?: NonNullable<SessionRoute['waitingOn']>;
 };
 
 export type SessionEventIdentity = {
@@ -71,8 +69,6 @@ export function attachRoute(
     lastStateAt: null,
     idleForMs: null,
     waitingOn: null,
-    needsSync: false,
-    stalled: false,
   };
   table.set(input.sessionId, route);
   return { table, route, changed: true };
@@ -133,24 +129,6 @@ export function resolveSessionEventRoute(
   return route;
 }
 
-export function markNeedsSync(
-  table: Map<string, SessionRoute>,
-  sessionId: string
-): Map<string, SessionRoute> {
-  const route = table.get(sessionId);
-  if (route) route.needsSync = true;
-  return table;
-}
-
-export function clearNeedsSync(
-  table: Map<string, SessionRoute>,
-  sessionId: string
-): Map<string, SessionRoute> {
-  const route = table.get(sessionId);
-  if (route) route.needsSync = false;
-  return table;
-}
-
 export function applyReportedSessionState(
   table: Map<string, SessionRoute>,
   kiloSessionId: string,
@@ -169,18 +147,8 @@ export function applyReportedSessionState(
   return { table, changed };
 }
 
-export function markStalled(
-  table: Map<string, SessionRoute>,
-  sessionId: string
-): Map<string, SessionRoute> {
-  const route = table.get(sessionId);
-  if (route) route.stalled = true;
-  return table;
-}
-
 export function hasActiveWork(table: Map<string, SessionRoute>): boolean {
   for (const route of table.values()) {
-    if (route.stalled) continue;
     if (route.lastState === 'active' || route.lastState === 'finalizing') return true;
   }
   return false;

@@ -607,14 +607,6 @@ export function createIngestHandler(
         const payload = JSON.stringify(publicEventData);
         const eventTypeStr: string = eventType;
 
-        const kiloEventName =
-          eventType === 'kilocode'
-            ? ((ingestEvent.data as Record<string, unknown> | undefined)?.event as
-                | string
-                | undefined)
-            : undefined;
-        const isSessionIdle = kiloEventName === 'session.idle';
-
         if (wrapperGeneration !== undefined && wrapperConnectionId) {
           if (eventType === 'pong') {
             await doContext.wrapperSupervisor.observePong(
@@ -622,11 +614,14 @@ export function createIngestHandler(
               wrapperConnectionId,
               now
             );
-          } else if (
-            eventTypeStr !== 'wrapper_resumed' &&
-            eventTypeStr !== 'heartbeat' &&
-            !isSessionIdle
-          ) {
+          } else if (eventType === 'kilocode') {
+            await doContext.wrapperSupervisor.observeMeaningfulOutput(
+              wrapperGeneration,
+              wrapperConnectionId,
+              now,
+              { wrapperRunId, data: ingestEvent.data }
+            );
+          } else if (eventTypeStr !== 'wrapper_resumed' && eventTypeStr !== 'heartbeat') {
             await doContext.wrapperSupervisor.observeMeaningfulOutput(
               wrapperGeneration,
               wrapperConnectionId,

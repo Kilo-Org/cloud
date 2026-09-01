@@ -689,108 +689,112 @@ export async function restoreSession(
   filePath?: string,
   options: RestoreSessionOptions = {}
 ): Promise<RestoreResult> {
-  const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
+  let tmpPath = filePath;
+  let tempDir: string | undefined;
+  if (!tmpPath) {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-export-'));
+    tmpPath = path.join(tempDir, 'snapshot.json');
+  }
   const downloaded = !filePath;
   const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
 
-  log(
-    `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
-  );
-
-  if (!filePath) {
-    const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
-    let token: string | undefined;
-    try {
-      token = resolveKilocodeToken();
-    } catch {
-      return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
-    }
-
-    if (!ingestUrl || !token) {
-      const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
-        .filter(Boolean)
-        .join(', ');
-      return fail(`missing env vars: ${missing}`, null, 'download');
-    }
-
-    log(`ingestUrl=${ingestUrl}`);
-
-    // ---- Step 1: Download snapshot (stream directly to disk) ----
-    log('downloading snapshot');
-    try {
-      const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
-      const downloadTimeoutSignal = AbortSignal.timeout(300_000);
-      const downloadSignal = options.signal
-        ? AbortSignal.any([options.signal, downloadTimeoutSignal])
-        : downloadTimeoutSignal;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: downloadSignal,
-      });
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          log('snapshot not found (404)');
-          return fail('snapshot not found (404)', 404, 'download');
-        }
-        log(`download failed status=${res.status}`);
-        return fail(`download failed status=${res.status}`, 502, 'download');
-      }
-
-      const bytesWritten = await Bun.write(tmpPath, res);
-      log(`snapshot downloaded bytes=${bytesWritten}`);
-
-      // Validate before handing off to `kilo import`: an upstream error
-      // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
-      // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
-      // and exit 1. Stream only the top-level metadata guardrail instead of
-      // materializing the full export in the wrapper heap.
-      const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
-      log(
-        `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
-      );
-      if (snapshotInfoValidation.validation === 'invalid') {
-        log('snapshot is not valid JSON before info.id metadata');
-        return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
-      }
-      if (snapshotInfoValidation.validation === 'empty') {
-        log('snapshot is an empty session export; treating it as not found');
-        return fail('snapshot not found (empty export)', 404, 'download');
-      }
-      if (snapshotInfoValidation.validation === 'missing') {
-        const result = fail(
-          `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
-          null,
-          'download'
-        );
-        if (
-          bytesWritten === EMPTY_SESSION_INGEST_EXPORT.length &&
-          (await Bun.file(tmpPath).text()) === EMPTY_SESSION_INGEST_EXPORT
-        ) {
-          log('snapshot contains no session metadata or history');
-          return { ...result, emptySnapshot: true };
-        }
-        log('snapshot missing info.id — likely an error response');
-        return result;
-      }
-    } catch {
-      tryUnlink(tmpPath);
-      return fail('snapshot download failed', null, 'download');
-    }
-  } else {
-    log(`using provided file=${filePath}`);
-    try {
-      const providedInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
-      log(
-        `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
-      );
-    } catch {
-      options.signal?.throwIfAborted();
-      log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
-    }
-  }
-
   try {
+    log(
+      `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
+    );
+
+    if (!filePath) {
+      const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
+      let token: string | undefined;
+      try {
+        token = resolveKilocodeToken();
+      } catch {
+        return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
+      }
+
+      if (!ingestUrl || !token) {
+        const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
+          .filter(Boolean)
+          .join(', ');
+        return fail(`missing env vars: ${missing}`, null, 'download');
+      }
+
+      log(`ingestUrl=${ingestUrl}`);
+
+      // ---- Step 1: Download snapshot (stream directly to disk) ----
+      log('downloading snapshot');
+      try {
+        const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
+        const downloadTimeoutSignal = AbortSignal.timeout(300_000);
+        const downloadSignal = options.signal
+          ? AbortSignal.any([options.signal, downloadTimeoutSignal])
+          : downloadTimeoutSignal;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: downloadSignal,
+        });
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            log('snapshot not found (404)');
+            return fail('snapshot not found (404)', 404, 'download');
+          }
+          log(`download failed status=${res.status}`);
+          return fail(`download failed status=${res.status}`, 502, 'download');
+        }
+
+        const bytesWritten = await Bun.write(tmpPath, res);
+        log(`snapshot downloaded bytes=${bytesWritten}`);
+
+        // Validate before handing off to `kilo import`: an upstream error
+        // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
+        // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
+        // and exit 1. Stream only the top-level metadata guardrail instead of
+        // materializing the full export in the wrapper heap.
+        const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
+        log(
+          `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
+        );
+        if (snapshotInfoValidation.validation === 'invalid') {
+          log('snapshot is not valid JSON before info.id metadata');
+          return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
+        }
+        if (snapshotInfoValidation.validation === 'empty') {
+          log('snapshot is an empty session export; treating it as not found');
+          return fail('snapshot not found (empty export)', 404, 'download');
+        }
+        if (snapshotInfoValidation.validation === 'missing') {
+          const result = fail(
+            `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
+            null,
+            'download'
+          );
+          if (
+            bytesWritten === EMPTY_SESSION_INGEST_EXPORT.length &&
+            (await Bun.file(tmpPath).text()) === EMPTY_SESSION_INGEST_EXPORT
+          ) {
+            log('snapshot contains no session metadata or history');
+            return { ...result, emptySnapshot: true };
+          }
+          log('snapshot missing info.id — likely an error response');
+          return result;
+        }
+      } catch {
+        return fail('snapshot download failed', null, 'download');
+      }
+    } else {
+      log(`using provided file=${filePath}`);
+      try {
+        const providedInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
+        log(
+          `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
+        );
+      } catch {
+        options.signal?.throwIfAborted();
+        log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
+      }
+    }
+
     await sanitizeSnapshot(tmpPath, options.signal);
 
     // ---- Step 2: Run kilo import ----
@@ -915,7 +919,11 @@ export async function restoreSession(
 
     return { ok: true, downloaded, imported: true, diffs: { applied, skipped, total } };
   } finally {
-    tryUnlink(tmpPath);
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } else {
+      tryUnlink(tmpPath);
+    }
   }
 }
 

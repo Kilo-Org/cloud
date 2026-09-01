@@ -32,7 +32,7 @@ describe('buildSessionAttachPayload', () => {
     });
   });
 
-  it('packs setup commands, profile env, and preparation identity', () => {
+  it('packs setup commands, injected auth env, and preparation identity', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: {
@@ -41,7 +41,7 @@ describe('buildSessionAttachPayload', () => {
       },
       auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
       agent: { mode: 'code', model: 'kilo/test' },
-      profile: { envVars: { FOO: 'bar' }, setupCommands: ['pnpm install'] },
+      profile: { envVars: {}, encryptedSecrets: {}, setupCommands: ['pnpm install'] },
       workspace: { workspacePath: '/workspace/a' },
       lifecycle: { version: 1, timestamp: 1 },
     });
@@ -50,7 +50,7 @@ describe('buildSessionAttachPayload', () => {
     ).toEqual({
       snapshotIdentity: 'kilo_1',
       directory: '/workspace/a',
-      env: { FOO: 'bar', KILOCODE_TOKEN: 'cap_1' },
+      env: { KILOCODE_TOKEN: 'cap_1' },
       setupCommands: ['pnpm install'],
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
     });

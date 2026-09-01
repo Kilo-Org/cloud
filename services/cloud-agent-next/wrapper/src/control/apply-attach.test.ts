@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'bun:test';
-import { applySessionAttach } from './apply-attach';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, expect, it, spyOn } from 'bun:test';
+import { applySessionAttach as applyAttach } from './apply-attach';
+import { KILO_CONTROL_REQUEST_TIMEOUT_MS } from './sandbox-control-runtime';
+import { runProcess } from '../utils';
 import type { WrapperKiloClient } from '../kilo-api';
 import type { PreparingEventDataV2 } from '../../../src/shared/protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { sessionPreparingPayloadSchema } from '../../../src/shared/sandbox-control-protocol';
 
 const session = {
   sessionId: 'workspace_1',
@@ -23,7 +29,38 @@ const noFs = {
   writeBootstrapMarker: async () => undefined,
 };
 
+function applySessionAttach(
+  ...args: Parameters<typeof applyAttach>
+): ReturnType<typeof applyAttach> {
+  const [session, payload, deps] = args;
+  return applyAttach(session, payload, { sessionExists: async () => true, ...deps });
+}
+
 describe('applySessionAttach', () => {
+  it('reuses setup-only workspaces without writing bootstrap state into their content', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-bootstrap-'));
+    const directory = path.join(root, 'workspace');
+    let setupRuns = 0;
+    const deps = {
+      kiloClient: fakeKilo(),
+      runSetup: async () => {
+        setupRuns += 1;
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    };
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        expect(
+          await applySessionAttach({ ...session, directory }, { setupCommands: ['true'] }, deps)
+        ).toEqual({ ok: true, result: { attached: true } });
+      }
+      expect(setupRuns).toBe(1);
+      expect(await fs.readdir(directory)).toEqual([]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('clones and checks out a non-default branch without mutating process.env', async () => {
     const gitCalls: string[][] = [];
     const mkdirCalls: string[] = [];
@@ -80,7 +117,10 @@ describe('applySessionAttach', () => {
       }
     );
     expect(result.ok).toBe(true);
-    expect(gitCalls).toEqual([]);
+    expect(gitCalls).toEqual([
+      ['config', 'user.name', 'Kilo Code Cloud'],
+      ['config', 'user.email', 'agent@kilocode.ai'],
+    ]);
   });
 
   it('checks out the requested branch when the directory already has git metadata', async () => {
@@ -103,6 +143,8 @@ describe('applySessionAttach', () => {
     expect(result).toEqual({ ok: true, result: { attached: true } });
     expect(gitCalls).toEqual([
       { args: ['checkout', '-B', 'feature/retry', 'origin/feature/retry'], cwd: '/workspace/a' },
+      { args: ['config', 'user.name', 'Kilo Code Cloud'], cwd: '/workspace/a' },
+      { args: ['config', 'user.email', 'agent@kilocode.ai'], cwd: '/workspace/a' },
     ]);
   });
 
@@ -135,6 +177,7 @@ describe('applySessionAttach', () => {
           gitExists = true;
           return { stdout: '', stderr: '', exitCode: 0 };
         }
+        if (args[0] !== 'checkout') return { stdout: '', stderr: '', exitCode: 0 };
         checkoutAttempts += 1;
         return {
           stdout: '',
@@ -168,6 +211,8 @@ describe('applySessionAttach', () => {
       ['clone', 'https://github.com/acme/demo.git', '/workspace/a'],
       ['checkout', '-B', 'feature/retry', 'origin/feature/retry'],
       ['checkout', '-B', 'feature/retry', 'origin/feature/retry'],
+      ['config', 'user.name', 'Kilo Code Cloud'],
+      ['config', 'user.email', 'agent@kilocode.ai'],
     ]);
     expect(setupCalls).toEqual(['pnpm install']);
     expect(markerWrites).toBe(1);
@@ -257,6 +302,59 @@ describe('applySessionAttach', () => {
     ).toBe(true);
   });
 
+  it('redacts injected auth/config tokens and split setup output before emitting any preparation fields', async () => {
+    const env = {
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: 'fake-auth-sentinel-123' } }),
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        provider: { kilo: { options: { apiKey: 'fake-config-sentinel-456' } } },
+      }),
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({
+        provider: {
+          kilo: { options: { headers: { Authorization: 'Bearer fake-header-sentinel-789' } } },
+        },
+      }),
+    };
+    const events: PreparingEventDataV2[] = [];
+    const dump = `${Object.entries(env)
+      .map(([name, value]) => `${name}=${value}`)
+      .join('\n')}\nextracted: fake-config-sentinel-456\ninstalled packages\n`;
+    const result = await applySessionAttach(
+      session,
+      {
+        env,
+        setupCommands: ['env; printf fake-config-sentinel-456'],
+        preparation: { attemptId: 'attempt_1', triggerMessageId: 'msg_1' },
+      },
+      {
+        ...noFs,
+        kiloClient: fakeKilo(),
+        mkdir: async () => {},
+        emitPreparing: event => events.push(event),
+        runSetup: async (_command, _directory, _env, onOutput) => {
+          for (let offset = 0; offset < dump.length; offset += 7) {
+            onOutput?.('stdout', dump.slice(offset, offset + 7));
+            if (offset === 0) onOutput?.('stderr', 'warning fake-auth-');
+          }
+          onOutput?.('stderr', 'sentinel-123\n');
+          return { stdout: dump, stderr: '', exitCode: 0 };
+        },
+      }
+    );
+    expect(result).toMatchObject({ ok: true });
+    const serialized = JSON.stringify(events);
+    for (const token of [
+      'fake-auth-sentinel-123',
+      'fake-config-sentinel-456',
+      'fake-header-sentinel-789',
+    ])
+      expect(serialized).not.toContain(token);
+    expect(serialized).toContain('[REDACTED]');
+    expect(serialized).toContain('installed packages');
+    expect(events.every(event => sessionPreparingPayloadSchema.safeParse(event).success)).toBe(
+      true
+    );
+  });
+
   it('fails attach when a setup command fails', async () => {
     const result = await applySessionAttach(
       session,
@@ -281,10 +379,8 @@ describe('applySessionAttach', () => {
       session,
       {},
       {
+        sessionExists: async () => false,
         kiloClient: fakeKilo({
-          getSession: async () => {
-            throw new Error('not found');
-          },
           ensureSession: async (sessionId, directory) => {
             ensured.push(`${sessionId}:${directory}`);
           },
@@ -496,14 +592,172 @@ describe('applySessionAttach', () => {
     expect(ids).toEqual(['ses_other', 'ses_other']);
   });
 
-  it('does not wait for a hanging kilo session probe', async () => {
-    const result = await Promise.race([
-      applySessionAttach(session, {}, { kiloClient: fakeKilo(), ...noFs }),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('attach hung on getSession')), 50);
-      }),
-    ]);
-    expect(result).toEqual({ ok: true, result: { attached: true } });
+  it('bounds a genuinely hanging session probe without restoring or creating an empty session', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const probing = Promise.withResolvers<void>();
+    let probeSignal: AbortSignal | undefined;
+    let restored = false;
+    let ensured = false;
+    try {
+      const attaching = applySessionAttach(
+        session,
+        {},
+        {
+          ...noFs,
+          kiloClient: fakeKilo({
+            ensureSession: async () => {
+              ensured = true;
+            },
+          }),
+          sessionExists: (_id, directory, signal) => {
+            expect(directory).toBe(session.directory);
+            probeSignal = signal;
+            probing.resolve();
+            return new Promise<boolean>(() => {});
+          },
+          restoreSession: async () => {
+            restored = true;
+            return { ok: false, step: 'download', code: 404, error: 'not found' };
+          },
+        }
+      );
+      await probing.promise;
+      const deadline = timers.mock.calls.find(
+        ([, ms]) => ms === KILO_CONTROL_REQUEST_TIMEOUT_MS
+      )?.[0];
+      if (typeof deadline !== 'function') throw new Error('missing bounded session probe deadline');
+      deadline();
+      expect(await attaching).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(probeSignal?.aborted).toBe(true);
+      expect(restored).toBe(false);
+      expect(ensured).toBe(false);
+    } finally {
+      timers.mockRestore();
+    }
+  });
+
+  it('does not turn HTTP 500 from the directory-scoped session probe into a restore attempt', async () => {
+    const requests: string[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        requests.push(request.url);
+        return new Response('failure', { status: 500 });
+      },
+    });
+    let restored = false;
+    try {
+      const result = await applyAttach(
+        session,
+        {},
+        {
+          ...noFs,
+          kiloClient: fakeKilo({ serverUrl: server.url.toString() }),
+          restoreSession: async () => {
+            restored = true;
+            return { ok: false, step: 'download', code: 404, error: 'not found' };
+          },
+        }
+      );
+      expect(result).toMatchObject({ ok: false });
+      expect(restored).toBe(false);
+      const request = new URL(requests[0] ?? '');
+      expect(request.pathname).toBe('/session/kilo_1');
+      expect(request.searchParams.get('directory')).toBe(session.directory);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  it('cancels a restore subprocess at its phase barrier and never starts session creation', async () => {
+    const controller = new AbortController();
+    const importing = Promise.withResolvers<void>();
+    let quiesced = false;
+    let ensured = false;
+    const attaching = applySessionAttach(
+      session,
+      {},
+      {
+        ...noFs,
+        signal: controller.signal,
+        kiloClient: fakeKilo({
+          ensureSession: async () => {
+            ensured = true;
+          },
+        }),
+        sessionExists: async () => false,
+        restoreSession: async (_id, _directory, _file, options) => {
+          expect(options?.signal).toBe(controller.signal);
+          await runProcess(
+            process.execPath,
+            ['-e', 'process.stdout.write("importing"); setInterval(() => {}, 1000)'],
+            {
+              signal: options?.signal,
+              onOutput: (_stream, output) => {
+                if (output.includes('importing')) importing.resolve();
+              },
+            }
+          );
+          quiesced = true;
+          return { ok: false, step: 'download', code: 404, error: 'not found' };
+        },
+      }
+    );
+    await importing.promise;
+    controller.abort();
+    expect(await attaching).toMatchObject({ ok: false });
+    expect(quiesced).toBe(true);
+    expect(ensured).toBe(false);
+  });
+
+  it('cancels clone before checkout, setup, or a bootstrap marker can run', async () => {
+    const controller = new AbortController();
+    const cloning = Promise.withResolvers<void>();
+    const calls: string[] = [];
+    let quiesced = false;
+    const attaching = applySessionAttach(
+      session,
+      {
+        git: { url: 'https://github.com/acme/demo.git' },
+        branch: 'branch',
+        setupCommands: ['setup'],
+      },
+      {
+        kiloClient: fakeKilo(),
+        signal: controller.signal,
+        hasBootstrapMarker: async () => false,
+        hasGit: async () => false,
+        mkdir: async () => {},
+        writeBootstrapMarker: async () => {
+          calls.push('marker');
+        },
+        runSetup: async () => {
+          calls.push('setup');
+          return { exitCode: 0, stdout: '', stderr: '' };
+        },
+        runGit: async (args, _cwd, signal) => {
+          calls.push(args[0] ?? '');
+          expect(signal).toBe(controller.signal);
+          const result = await runProcess(
+            process.execPath,
+            ['-e', 'process.stdout.write("cloning"); setInterval(() => {}, 1000)'],
+            {
+              signal,
+              onOutput: (_stream, output) => {
+                if (output.includes('cloning')) cloning.resolve();
+              },
+            }
+          );
+          quiesced = true;
+          return result;
+        },
+      }
+    );
+    await cloning.promise;
+    controller.abort();
+    expect(await attaching).toMatchObject({ ok: false });
+    expect(quiesced).toBe(true);
+    expect(calls).toEqual(['clone']);
   });
 
   it('returns protocol_error for invalid payload', async () => {

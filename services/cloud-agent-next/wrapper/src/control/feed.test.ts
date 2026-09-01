@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import {
   childFromSessionCreated,
   eventKiloSessionId,
-  permissionAskId,
   sessionEventIdentity,
   unfilteredKiloEvents,
   updateSessionSnapshots,
@@ -33,14 +32,29 @@ describe('unfilteredKiloEvents', () => {
     ]);
   });
 
-  it('extracts permission.asked ids and ignores other events', () => {
-    expect(permissionAskId({ type: 'permission.asked', properties: { id: 'perm_1' } })).toBe(
-      'perm_1'
-    );
-    expect(permissionAskId({ type: 'permission.asked', properties: {} })).toBeUndefined();
-    expect(
-      permissionAskId({ type: 'message.updated', properties: { id: 'msg_1' } })
-    ).toBeUndefined();
+  it('preserves human-required permissions and raw heartbeat events', async () => {
+    const permission = {
+      type: 'permission.asked',
+      properties: {
+        id: 'perm_1',
+        sessionID: 'root',
+        permission: 'skill-shell',
+        metadata: { requiresHuman: true },
+        patterns: ['*'],
+        always: [],
+      },
+    };
+    const events = [];
+    for await (const event of unfilteredKiloEvents([
+      { directory: '/ws', payload: permission },
+      { payload: { type: 'server.heartbeat' } },
+    ])) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      { ...permission, directory: '/ws' },
+      { type: 'server.heartbeat', properties: {} },
+    ]);
   });
 });
 
@@ -54,96 +68,107 @@ describe('eventKiloSessionId', () => {
   });
 });
 
-describe('session status snapshots', () => {
-  it('reflects root busy and idle transitions in the existing snapshot array', () => {
+describe('session activity snapshots', () => {
+  it('records observation time rather than caching a lease-renewing busy state', () => {
     rememberAttachedRoot('root', '/ws');
-    const sessions: HandlerSessionSnapshot[] = [];
-
+    const sessions: HandlerSessionSnapshot[] = [{ kiloSessionId: 'root', lastActivityAt: 0 }];
     updateSessionSnapshots(
       { type: 'session.status', properties: { sessionID: 'root', status: { type: 'busy' } } },
-      sessions
+      sessions,
+      1
     );
-
-    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
-
+    expect(sessions).toEqual([{ kiloSessionId: 'root', lastActivityAt: 1 }]);
     updateSessionSnapshots(
       { type: 'session.status', properties: { sessionID: 'root', status: { type: 'idle' } } },
-      sessions
+      sessions,
+      2
     );
-
-    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'idle', idleForMs: 0 }]);
+    expect(sessions).toEqual([{ kiloSessionId: 'root', lastActivityAt: 2 }]);
   });
 
-  it.each(['retry', 'offline'])('treats root %s status as active', status => {
+  it.each(['retry', 'offline'])('records a root %s event without inventing owned work', status => {
     rememberAttachedRoot('root', '/ws');
-    const sessions: HandlerSessionSnapshot[] = [];
-
+    const sessions: HandlerSessionSnapshot[] = [{ kiloSessionId: 'root', lastActivityAt: 0 }];
     updateSessionSnapshots(
       { type: 'session.status', properties: { sessionID: 'root', status: { type: status } } },
-      sessions
+      sessions,
+      1
     );
-
-    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+    expect(sessions).toEqual([{ kiloSessionId: 'root', lastActivityAt: 1 }]);
   });
 
-  it('does not let child idle status override an active root', () => {
+  it('tracks child questions and keeps them pending through child idle events', () => {
     rememberAttachedRoot('root', '/ws');
     rememberChildSession({ childId: 'child', parentId: 'root', directory: '/ws' });
-    const sessions: HandlerSessionSnapshot[] = [];
-
+    const sessions: HandlerSessionSnapshot[] = [{ kiloSessionId: 'root', lastActivityAt: 0 }];
     updateSessionSnapshots(
-      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'busy' } } },
-      sessions
+      { type: 'question.asked', properties: { sessionID: 'child', id: 'question_1' } },
+      sessions,
+      1
     );
     updateSessionSnapshots(
+      { type: 'permission.asked', properties: { sessionID: 'root', id: 'permission_1' } },
+      sessions,
+      2
+    );
+    updateSessionSnapshots(
+      { type: 'session.status', properties: { sessionID: 'child', status: { type: 'idle' } } },
+      sessions,
+      3
+    );
+    expect(sessions).toEqual([
       {
-        type: 'session.status',
-        directory: '/ws',
-        properties: { sessionID: 'child', status: { type: 'idle' } },
+        kiloSessionId: 'root',
+        lastActivityAt: 3,
+        pendingInputs: new Set(['question_1', 'permission_1']),
       },
-      sessions
+    ]);
+    updateSessionSnapshots(
+      { type: 'question.replied', properties: { sessionID: 'child', requestID: 'question_1' } },
+      sessions,
+      4
     );
-
-    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+    expect(sessions[0]?.pendingInputs).toEqual(new Set(['permission_1']));
+    updateSessionSnapshots(
+      { type: 'permission.replied', properties: { sessionID: 'root', requestID: 'permission_1' } },
+      sessions,
+      5
+    );
+    expect(sessions).toEqual([{ kiloSessionId: 'root', lastActivityAt: 5 }]);
   });
 
-  it('ignores malformed, unknown, unattached, and unrelated events', () => {
+  it('does not invent snapshots from unattached or unrelated events', () => {
     rememberAttachedRoot('root', '/ws');
-    const sessions: HandlerSessionSnapshot[] = [
-      { kiloSessionId: 'root', state: 'active', idleForMs: 0 },
-    ];
-
+    const sessions: HandlerSessionSnapshot[] = [{ kiloSessionId: 'root', lastActivityAt: 0 }];
     for (const event of [
-      { type: 'session.status', properties: { sessionID: 'root' } },
-      { type: 'session.status', properties: { sessionID: 'root', status: null } },
-      { type: 'session.status', properties: { sessionID: 'root', status: { type: 'unknown' } } },
-      { type: 'session.status', properties: { status: { type: 'idle' } } },
-      { type: 'session.status', properties: { sessionID: 'other', status: { type: 'idle' } } },
-      { type: 'session.idle', properties: { sessionID: 'root', status: { type: 'idle' } } },
-    ]) {
-      updateSessionSnapshots(event, sessions);
-    }
-
-    expect(sessions).toEqual([{ kiloSessionId: 'root', state: 'active', idleForMs: 0 }]);
+      { type: 'session.status', properties: { status: { type: 'busy' } } },
+      { type: 'session.status', properties: { sessionID: 'other', status: { type: 'busy' } } },
+      { type: 'server.heartbeat', properties: {} },
+    ])
+      updateSessionSnapshots(event, sessions, 1);
+    expect(sessions).toEqual([{ kiloSessionId: 'root', lastActivityAt: 0 }]);
   });
 
   it('tracks attached roots independently', () => {
     rememberAttachedRoot('root-a', '/a');
     rememberAttachedRoot('root-b', '/b');
-    const sessions: HandlerSessionSnapshot[] = [];
-
+    const sessions: HandlerSessionSnapshot[] = [
+      { kiloSessionId: 'root-a', lastActivityAt: 0 },
+      { kiloSessionId: 'root-b', lastActivityAt: 0 },
+    ];
     updateSessionSnapshots(
       { type: 'session.status', properties: { sessionID: 'root-a', status: { type: 'busy' } } },
-      sessions
+      sessions,
+      1
     );
     updateSessionSnapshots(
       { type: 'session.status', properties: { sessionID: 'root-b', status: { type: 'idle' } } },
-      sessions
+      sessions,
+      2
     );
-
     expect(sessions).toEqual([
-      { kiloSessionId: 'root-a', state: 'active', idleForMs: 0 },
-      { kiloSessionId: 'root-b', state: 'idle', idleForMs: 0 },
+      { kiloSessionId: 'root-a', lastActivityAt: 1 },
+      { kiloSessionId: 'root-b', lastActivityAt: 2 },
     ]);
   });
 });

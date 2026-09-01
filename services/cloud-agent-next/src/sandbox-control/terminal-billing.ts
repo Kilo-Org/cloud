@@ -1,4 +1,5 @@
 import { billingContextSchema } from '@kilocode/container-usage';
+import { isIsolatedSandboxId } from '../sandbox-id.js';
 import {
   SANDBOX_USAGE_SKUS,
   type SandboxClassName,
@@ -96,7 +97,7 @@ export function validateTerminalBillingRuntime(
     return { allowed: false, reason: 'billing_actor_mismatch' };
   }
 
-  const shared = sandboxClassName === 'Sandbox';
+  const shared = !isIsolatedSandboxId(input.sandboxId);
   if (
     (shared && context.sessionId !== undefined) ||
     (!shared && context.sessionId !== input.access.sessionId)

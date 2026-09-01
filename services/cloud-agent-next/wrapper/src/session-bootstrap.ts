@@ -22,7 +22,7 @@ import {
   type ProcessOptions,
   type ProcessOutputStream,
 } from './utils.js';
-import { redactSecrets } from './redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output.js';
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
@@ -83,37 +83,25 @@ function isPromptFileMime(mime: string): boolean {
 
 function createSetupOutputReporter(
   progress: BootstrapProgress | undefined,
-  stepId: string
+  stepId: string,
+  redact: (text: string) => string
 ): {
   onOutput: (stream: ProcessOutputStream, output: string) => void;
   flush: () => void;
 } {
-  const buffers: Record<ProcessOutputStream, string> = { stdout: '', stderr: '' };
-
-  const report = (text: string): void => {
-    const cleaned = cleanTerminalOutput(text).trim();
-    if (cleaned)
-      progress?.({
-        type: 'output',
-        step: 'setup_commands',
-        stepId,
-        output: `${redactSecrets(cleaned)}\n`,
-      });
-  };
-
-  return {
-    onOutput(stream, output) {
-      const lines = (buffers[stream] + output).split('\n');
-      buffers[stream] = lines.pop() ?? '';
-      report(lines.map(line => (line.endsWith('\r') ? line.slice(0, -1) : line)).join('\n'));
-    },
-    flush() {
-      report(buffers.stdout);
-      report(buffers.stderr);
-      buffers.stdout = '';
-      buffers.stderr = '';
-    },
-  };
+  return createOutputRedactor(
+    text => redact(cleanTerminalOutput(text)),
+    text => {
+      const cleaned = text.trim();
+      if (cleaned)
+        progress?.({
+          type: 'output',
+          step: 'setup_commands',
+          stepId,
+          output: `${cleaned}\n`,
+        });
+    }
+  );
 }
 
 export type BootstrapProgressStep =
@@ -571,22 +559,39 @@ async function cloneRepository(
     `bootstrap clone complete kiloSessionId=${request.kiloSessionId} mode=${cloneTelemetry.mode} attempts=${attempts} durationMs=${cloneTelemetry.durationMs} totalObjects=${cloneTelemetry.totalObjects ?? '(unknown)'} receivedBytes=${cloneTelemetry.receivedBytes ?? '(unknown)'}`
   );
 
-  const authorName =
-    repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
-  const authorEmail =
-    repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
-  const authorNameResult = await runGit(['config', 'user.name', authorName], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
+  await configureWorkspaceGitAuthor(
+    request.workspace.workspacePath,
+    runGit,
+    repo.kind === 'github' ? repo.gitAuthor : undefined
+  );
+  return cloneTelemetry;
+}
+
+export async function configureWorkspaceGitAuthor(
+  workspacePath: string,
+  runGit: GitRunner = git,
+  author?: { name: string; email: string },
+  signal?: AbortSignal
+): Promise<void> {
+  const authorNameResult = await runGit(
+    ['config', 'user.name', author?.name ?? 'Kilo Code Cloud'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
+  const authorEmailResult = await runGit(
+    ['config', 'user.email', author?.email ?? 'agent@kilocode.ai'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
   }
-  return cloneTelemetry;
 }
 
 async function branchExists(
@@ -935,14 +940,15 @@ async function runSetupCommands(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
+  const redact = createSecretRedactor({ ...process.env, ...request.materialized.env });
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );
   for (const [index, command] of setupCommands.entries()) {
     const startedAt = Date.now();
     const stepId = `setup_command:${index}`;
-    const safeCommand = redactSecrets(command);
-    const outputReporter = createSetupOutputReporter(progress, stepId);
+    const safeCommand = redact(command);
+    const outputReporter = createSetupOutputReporter(progress, stepId, redact);
     progress?.({
       type: 'started',
       step: 'setup_commands',
@@ -976,7 +982,7 @@ async function runSetupCommands(
       throw workspaceBootstrapError(
         timedOut ? 'setup_command_timeout' : 'setup_command_failed',
         safeError,
-        createSetupCommandDiagnostic(command, result),
+        createSetupCommandDiagnostic(command, result, redact),
         timedOut
       );
     }
@@ -987,14 +993,18 @@ async function runSetupCommands(
   );
 }
 
-function createSetupCommandDiagnostic(command: string, result: ExecResult): string {
+function createSetupCommandDiagnostic(
+  command: string,
+  result: ExecResult,
+  redact: (text: string) => string
+): string {
   const base = createSafeProcessDiagnostic(result);
   const safeCommand = boundedUtf8Tail(
-    redactSecrets(cleanTerminalOutput(command)).trim(),
+    redact(cleanTerminalOutput(command)).trim(),
     SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES
   );
   const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
-  const safeOutput = redactSecrets(cleanTerminalOutput(combinedOutput)).trim();
+  const safeOutput = redact(cleanTerminalOutput(combinedOutput)).trim();
   const outputTail = boundedUtf8Tail(safeOutput, SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES);
   const parts: string[] = [`command: ${safeCommand}`, base];
   if (outputTail) {
@@ -1021,20 +1031,32 @@ async function safeUnlink(filePath: string): Promise<void> {
  */
 async function downloadBounded(
   filePath: string,
-  response: Response
+  response: Response,
+  signal: AbortSignal
 ): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
   const body = response.body;
   if (!body) {
     throw new Error('Attachment download failed: empty body');
   }
 
-  const handle = await fs.open(filePath, 'w');
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  const reader = body.getReader();
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
   let bytesWritten = 0;
   let overflowed = false;
   try {
-    const reader = body.getReader();
+    signal.throwIfAborted();
     while (true) {
       const { value, done } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       if (!value) continue;
       const remaining = MAX_ATTACHMENT_DOWNLOAD_BYTES - bytesWritten;
@@ -1043,20 +1065,19 @@ async function downloadBounded(
         await handle.write(value.subarray(0, writable));
         bytesWritten += writable;
         overflowed = true;
-        try {
-          await reader.cancel();
-        } catch {
-          // Ignore: we're tearing the connection down anyway.
-        }
+        void reader.cancel().catch(() => {});
         break;
       }
       await handle.write(value);
+      signal.throwIfAborted();
       bytesWritten += value.byteLength;
     }
   } catch (error) {
     await safeUnlink(filePath);
     throw error;
   } finally {
+    signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
     await handle.close();
   }
 
@@ -1083,17 +1104,17 @@ export type DownloadResult =
 async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  abortController: AbortController
+  signal: AbortSignal
 ): Promise<DownloadResult> {
+  signal.throwIfAborted();
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
+  signal.throwIfAborted();
 
   let response: Response;
   try {
-    response = await fetchImpl(attachment.signedUrl, {
-      signal: abortController.signal,
-    });
+    response = await fetchImpl(attachment.signedUrl, { signal });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactSecrets(error instanceof Error ? error.message : String(error));
     return {
       kind: 'failed',
       part: {
@@ -1104,6 +1125,7 @@ async function downloadAndMaterializeAttachment(
   }
 
   if (!response.ok) {
+    void response.body?.cancel().catch(() => {});
     return {
       kind: 'failed',
       part: {
@@ -1115,9 +1137,10 @@ async function downloadAndMaterializeAttachment(
 
   let result: { bytesWritten: number };
   try {
-    result = await downloadBounded(attachment.localPath, response);
+    result = await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    void response.body?.cancel().catch(() => {});
+    const message = redactSecrets(error instanceof Error ? error.message : String(error));
     return {
       kind: 'failed',
       part: {
@@ -1155,25 +1178,32 @@ async function downloadAndMaterializeAttachment(
 
 export type MaterializeDeps = {
   fetch?: typeof fetch;
+  signal?: AbortSignal;
 };
 
-export async function materializePromptAttachments(
-  prompt: WrapperPromptRequest,
+export async function materializeMessageAttachments(
+  message: WrapperPromptRequest['message'],
   deps: MaterializeDeps = {}
-): Promise<WrapperPromptRequest> {
-  if (!prompt.message.attachments?.length) return prompt;
+): Promise<WrapperPromptRequest['message']> {
+  deps.signal?.throwIfAborted();
+  if (!message.attachments?.length) return message;
   const fetchImpl = deps.fetch ?? fetch;
 
   const parts: WrapperPromptPart[] = [];
-  for (const attachment of prompt.message.attachments) {
+  for (const attachment of message.attachments) {
+    deps.signal?.throwIfAborted();
     const abortController = new AbortController();
     const timeout = setTimeout(
       () => abortController.abort(new Error('attachment download timeout')),
       120_000
     );
+    const signal = deps.signal
+      ? AbortSignal.any([abortController.signal, deps.signal])
+      : abortController.signal;
     let result: DownloadResult;
     try {
-      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, abortController);
+      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, signal);
+      deps.signal?.throwIfAborted();
     } finally {
       clearTimeout(timeout);
     }
@@ -1181,17 +1211,22 @@ export async function materializePromptAttachments(
   }
 
   return {
-    ...prompt,
-    message: {
-      ...prompt.message,
-      parts: [
-        ...(prompt.message.parts ?? [{ type: 'text', text: prompt.message.prompt ?? '' }]),
-        ...parts,
-      ],
-      prompt: undefined,
-      attachments: undefined,
-    },
+    ...message,
+    parts: [
+      ...(message.parts ??
+        (message.prompt ? [{ type: 'text' as const, text: message.prompt }] : [])),
+      ...parts,
+    ],
+    prompt: undefined,
+    attachments: undefined,
   };
+}
+
+export async function materializePromptAttachments(
+  prompt: WrapperPromptRequest,
+  deps: MaterializeDeps = {}
+): Promise<WrapperPromptRequest> {
+  return { ...prompt, message: await materializeMessageAttachments(prompt.message, deps) };
 }
 
 async function prepareWrapperBootstrapWorkspaceWithinDeadline(

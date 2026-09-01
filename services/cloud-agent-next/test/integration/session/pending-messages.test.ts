@@ -14,6 +14,7 @@ import {
 } from '../../../src/session/pending-messages.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import { PENDING_FLUSH_DEBOUNCE_MS } from '../../../src/session/session-message-queue.js';
+import { WRAPPER_NO_OUTPUT_TIMEOUT_MS } from '../../../src/session/agent-runtime.js';
 import {
   getSessionMessageState,
   listMessagesWithPendingCallbacks,
@@ -29,6 +30,7 @@ import {
 import {
   getSandboxRecoveryState,
   getWrapperLease,
+  type WrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 
 const createMessage = (overrides: Partial<PendingSessionMessage>): PendingSessionMessage => ({
@@ -1899,6 +1901,108 @@ describe('pending session messages', () => {
     expect(result.healthy?.health).toBe('healthy');
     expect(result.stale?.health).toBe('stale');
   });
+
+  it.each(['question', 'permission'] as const)(
+    'keeps current pending %s health healthy beyond the no-output deadline without changing timestamps',
+    async kind => {
+      const userId = `user_pending_health_${kind}`;
+      const sessionId = `agent_pending_health_${kind}`;
+      const messageId = 'msg_018f1e2d3c4bHealthInputAbC';
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+
+      const result = await runInDurableObject(stub, async instance => {
+        const now = Date.now();
+        const acceptedAt = now - 451_000;
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId,
+          status: 'accepted',
+          prompt: 'waiting for human input',
+          createdAt: acceptedAt,
+          acceptedAt,
+          wrapperRunId: 'wr_health_input',
+        });
+        const request = {
+          kind,
+          requestId: 'request_health_input',
+          kiloSessionId: 'ses_health_input',
+          messageIds: [messageId],
+          pending: true,
+        };
+        const runtime: WrapperRuntimeState = {
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_health_input',
+          wrapperRunId: 'wr_health_input',
+          lastWrapperMessageAt: acceptedAt,
+          lastWrapperPongAt: now,
+          nextPingAt: now + 60_000,
+          noOutputDeadlineAt: acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+          inputRequests: [request],
+        };
+        const readHealth = async (state: WrapperRuntimeState) => {
+          await instance.ctx.storage.put('wrapper_runtime_state', state);
+          const health = await instance.getCurrentMessageWork();
+          expect(await instance.ctx.storage.get('wrapper_runtime_state')).toEqual(state);
+          return health;
+        };
+        const health = await readHealth(runtime);
+        expect(runtime.noOutputDeadlineAt).toBeLessThan(now);
+
+        const terminalMessageId = 'msg_018f1e2d3c4bHealthEndedAbC';
+        const otherRunMessageId = 'msg_018f1e2d3c4bHealthOtherAbC';
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId: terminalMessageId,
+          status: 'completed',
+          prompt: 'old completed work',
+          createdAt: acceptedAt - 1,
+          acceptedAt: acceptedAt - 1,
+          terminalAt: now - 1,
+          wrapperRunId: 'wr_health_input',
+        });
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId: otherRunMessageId,
+          status: 'accepted',
+          prompt: 'another wrapper run',
+          createdAt: now,
+          acceptedAt: now,
+          wrapperRunId: 'wr_health_other',
+        });
+        const staleCases: Array<{ label: string; state: WrapperRuntimeState }> = [
+          { label: 'expired ping', state: { ...runtime, pingDeadlineAt: now - 1 } },
+          { label: 'genuine silence', state: { ...runtime, inputRequests: [] } },
+          {
+            label: 'resolved input',
+            state: { ...runtime, inputRequests: [{ ...request, pending: false }] },
+          },
+          {
+            label: 'missing input owner',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: ['missing'] }] },
+          },
+          {
+            label: 'terminal input owner',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: [terminalMessageId] }] },
+          },
+          {
+            label: 'input owner from another run',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: [otherRunMessageId] }] },
+          },
+          { label: 'stale runtime', state: { ...runtime, wrapperRunId: 'wr_health_replacement' } },
+          { label: 'finalizing', state: { ...runtime, finalizingWrapperRunId: 'wr_health_input' } },
+        ];
+        for (const testCase of staleCases) {
+          expect(await readHealth(testCase.state), testCase.label).toEqual({
+            messageId,
+            status: 'running',
+            health: 'stale',
+          });
+        }
+        return health;
+      });
+
+      expect(result).toEqual({ messageId, status: 'running', health: 'healthy' });
+    }
+  );
 
   it('drains a pending current message while another accepted message shares the fenced wrapper run', async () => {
     const userId = 'user_pending_flush_active';

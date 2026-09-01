@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   applyReportedSessionState,
   attachRoute,
-  clearNeedsSync,
   detachRoute,
   emptyRouteTable,
   getRouteByDirectory,
   getRouteByKiloSessionId,
   getRouteBySessionId,
   hasActiveWork,
-  markNeedsSync,
-  markStalled,
   resolveSessionEventRoute,
 } from './session-routes.js';
 
@@ -37,8 +34,6 @@ describe('session routes', () => {
       lastStateAt: null,
       idleForMs: null,
       waitingOn: null,
-      needsSync: false,
-      stalled: false,
     });
     expect(getRouteBySessionId(table, 'ses_1')).toBe(route);
     expect(getRouteByDirectory(table, '/workspace/a')).toBe(route);
@@ -113,15 +108,6 @@ describe('session routes', () => {
     expect(detachRoute(table, 'ses_1')).toEqual({ table, existed: false });
   });
 
-  it('sets and clears needsSync', () => {
-    const { table } = attachedTable();
-    markNeedsSync(table, 'ses_1');
-    expect(getRouteBySessionId(table, 'ses_1')?.needsSync).toBe(true);
-    clearNeedsSync(table, 'ses_1');
-    expect(getRouteBySessionId(table, 'ses_1')?.needsSync).toBe(false);
-    expect(markNeedsSync(table, 'missing').size).toBe(1);
-  });
-
   it('applies a repeated session state without marking changed', () => {
     const { table } = attachedTable();
     const first = applyReportedSessionState(
@@ -164,19 +150,24 @@ describe('session routes', () => {
     });
   });
 
-  it('marks a route stalled', () => {
-    const { table } = attachedTable();
-    markStalled(table, 'ses_1');
-    expect(getRouteBySessionId(table, 'ses_1')?.stalled).toBe(true);
-    expect(markStalled(table, 'missing').size).toBe(1);
-  });
-
-  it('does not count a stalled session as active work', () => {
+  it('counts preparation and deliberate input waits as active work', () => {
     const { table } = attachedTable();
     expect(hasActiveWork(table)).toBe(false);
-    applyReportedSessionState(table, 'kilo_1', { state: 'active', idleForMs: 0 }, 1000);
+    applyReportedSessionState(
+      table,
+      'kilo_1',
+      { state: 'active', idleForMs: 360_000, waitingOn: 'preparation' },
+      1000
+    );
     expect(hasActiveWork(table)).toBe(true);
-    markStalled(table, 'ses_1');
+    applyReportedSessionState(
+      table,
+      'kilo_1',
+      { state: 'active', idleForMs: 360_000, waitingOn: 'input' },
+      2000
+    );
+    expect(hasActiveWork(table)).toBe(true);
+    applyReportedSessionState(table, 'kilo_1', { state: 'idle', idleForMs: 0 }, 3000);
     expect(hasActiveWork(table)).toBe(false);
   });
 });

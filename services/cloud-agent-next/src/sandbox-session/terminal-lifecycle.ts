@@ -69,7 +69,10 @@ const completedCreationSchema = z
   })
   .strict();
 
-type TerminalControl = ReturnType<typeof sandboxControlRpc>;
+type TerminalControl = Pick<
+  ReturnType<typeof sandboxControlRpc>,
+  'getStatus' | 'request' | 'detachSession' | 'validateTerminalAccess' | 'recordTerminalActivity'
+>;
 type LifecycleFence = z.infer<typeof lifecycleFenceSchema>;
 type AttachedSession = z.infer<typeof attachedSessionSchema>;
 type CompletedCreation = z.infer<typeof completedCreationSchema>;
@@ -196,7 +199,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     return parsed.success && parsed.data.ptyId === ptyId ? parsed.data : null;
   }
 
-  function matchesMetadata(record: SandboxTerminalRecord, metadata: SessionMetadata): boolean {
+  function matchesMetadata(record: AttachedSession, metadata: SessionMetadata): boolean {
     return (
       record.ownerId === metadata.identity.userId &&
       record.sessionId === metadata.identity.sessionId &&
@@ -205,6 +208,14 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
       record.sandboxId === metadata.workspace?.sandboxId &&
       record.organizationId === metadata.identity.orgId
     );
+  }
+
+  function getAttachedWrapperInstanceId(): string | undefined {
+    const current = snapshot();
+    const attached = readAttachedSession();
+    return current && attached && matchesMetadata(attached, current.metadata)
+      ? attached.wrapperInstanceId
+      : undefined;
   }
 
   function clearCompletedCreations(ptyId: string): void {
@@ -835,6 +846,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     cleanupSession,
     closeTerminal,
     createTerminal,
+    getAttachedWrapperInstanceId,
     getStoredMetadata,
     getTerminal,
     invalidateRuntime,

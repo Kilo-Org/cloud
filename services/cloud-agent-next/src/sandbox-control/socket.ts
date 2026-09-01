@@ -40,6 +40,7 @@ export type SandboxControlOutboundRequest = {
   session?: SessionRequestIdentity;
   payload: unknown;
   timeoutMs?: number;
+  expectedWrapperInstanceId?: string;
 };
 
 export type SandboxControlConnectionIdentity = {

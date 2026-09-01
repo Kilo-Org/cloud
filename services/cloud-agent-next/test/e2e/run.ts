@@ -24,11 +24,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
-import {
-  LIFECYCLE_SCENARIOS,
-  type ConversationScenario,
-  type LifecycleResult,
-} from './lifecycle.js';
+import { isControlPlaneOwner } from '../../src/session-plane.js';
+import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -115,20 +112,20 @@ export function printResult(result: LifecycleResult, opts?: { verbose?: boolean 
 function previewEventData(data: Record<string, unknown>): string {
   if (!data || typeof data !== 'object') return '';
   const pairs: string[] = [];
-  for (const [key, value] of Object.entries(data)) {
-    if (key === 'stack' || key === 'info') continue;
-    let rendered: string;
-    if (value === null || value === undefined) {
-      rendered = String(value);
-    } else if (typeof value === 'string') {
-      rendered =
-        value.length > 60 ? JSON.stringify(value.slice(0, 57) + '…') : JSON.stringify(value);
-    } else if (typeof value === 'object') {
-      const json = JSON.stringify(value);
-      rendered = json.length > 80 ? json.slice(0, 77) + '…' : json;
-    } else {
-      rendered = String(value);
-    }
+  for (const key of [
+    'type',
+    'messageId',
+    'sessionId',
+    'status',
+    'delivery',
+    'accepted',
+    'step',
+    'action',
+  ]) {
+    const value = data[key];
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+      continue;
+    const rendered = typeof value === 'string' ? JSON.stringify(value.slice(0, 80)) : String(value);
     pairs.push(`${key}=${rendered}`);
   }
   return pairs.join(' ');
@@ -155,7 +152,13 @@ async function main(): Promise<void> {
   const user = await ensureTestUser(process.env.DATABASE_URL, email, {
     funded: process.env.E2E_FUNDED === '1',
   });
-  console.log(`driver user: ${user.id} (${user.email}); api=${api}`);
+  const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
+  if (expectControlPlane && !isControlPlaneOwner(devVars, { userId: user.id })) {
+    throw new Error('The E2E user is not enrolled in CONTROL_PLANE_IDS; no session was started');
+  }
+  console.log(
+    `driver user: ${user.id} (${user.email}); api=${api}; controlPlane=${expectControlPlane}`
+  );
 
   const config: DriverConfig = {
     ...DEFAULT_CONFIG,
@@ -163,13 +166,15 @@ async function main(): Promise<void> {
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
     internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,
+    fakeLlmUrl: process.env.FAKE_LLM_URL ?? DEFAULT_CONFIG.fakeLlmUrl,
+    expectControlPlane,
     gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl,
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };
 
   const result = await scenario({
     config,
-    conversation: conversation as ConversationScenario,
+    conversation,
     api,
   });
   printResult(result, { verbose });

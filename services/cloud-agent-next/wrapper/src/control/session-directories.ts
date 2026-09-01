@@ -55,6 +55,16 @@ export function rootForSession(
   return directory ? rootByDirectory.get(directory) : undefined;
 }
 
+export function directoriesForRoot(rootKiloSessionId: string, directory: string): string[] {
+  const result = new Set([directories.get(rootKiloSessionId) ?? directory]);
+  for (const [sessionId, root] of rootBySessionId) {
+    if (root !== rootKiloSessionId) continue;
+    const childDirectory = directories.get(sessionId);
+    if (childDirectory) result.add(childDirectory);
+  }
+  return [...result];
+}
+
 export function resetSessionDirectoryState(): void {
   directories.clear();
   rootBySessionId.clear();

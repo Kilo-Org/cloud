@@ -5,7 +5,7 @@ import {
   initialPhysicalRecord,
   observe,
 } from '../../sandbox-control/physical-lifecycle.js';
-import { failureReasonFromControlStatus } from '../control-dispatch.js';
+import { controlDispatchDisposition } from '../control-dispatch.js';
 import { failWaitingMessages, nextQueuedMessageId } from '../session-message-queue.js';
 
 describe('warm death', () => {
@@ -15,7 +15,12 @@ describe('warm death', () => {
       'terminal'
     );
     expect(physical.state).toBe('failed');
-    const reason = failureReasonFromControlStatus(physical.state) ?? 'environment_failed';
+    const disposition = controlDispatchDisposition({
+      physical: physical.state,
+      connection: 'disconnected',
+    });
+    if (disposition.action !== 'fail') throw new Error('Expected a terminal disposition');
+    const { reason } = disposition;
     const { messages, failedIds } = failWaitingMessages(
       [
         { messageId: 'a', state: 'accepted', acceptedAt: 5 },

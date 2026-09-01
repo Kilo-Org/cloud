@@ -586,21 +586,30 @@ describe('applyVercelSettings managed requests', () => {
     }
   );
 
-  it.each(
-    [minimax_m3_free_model, minimax_m27_free_model].flatMap(model =>
-      (['chat_completions', 'messages', 'responses'] as const).map(kind => ({ model, kind }))
-    )
-  )(
-    'routes $model.public_id $kind requests with unrelated ignores when metadata is unavailable',
-    async ({ model, kind }) => {
-      const request = managedRequestForApi(kind, model.public_id);
-      applyKiloExclusiveModelSettings(request, model);
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'routes MiniMax M2.7 $kind requests with unrelated ignores when metadata is unavailable',
+    async kind => {
+      const request = managedRequestForApi(kind, minimax_m27_free_model.public_id);
+      applyKiloExclusiveModelSettings(request, minimax_m27_free_model);
 
-      await applyManagedVercelSettings(model.public_id, request, null);
+      await applyManagedVercelSettings(minimax_m27_free_model.public_id, request, null);
 
-      expect(request.body.model).toBe(model.internal_id);
+      expect(request.body.model).toBe(minimax_m27_free_model.internal_id);
       expect(request.body.provider).toBeUndefined();
       expect(request.body.providerOptions?.gateway?.only).toEqual(['gmicloud']);
+    }
+  );
+
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'does not inject a GMI provider-only setting for MiniMax M3 $kind requests',
+    kind => {
+      const request = managedRequestForApi(kind, minimax_m3_free_model.public_id);
+      const originalProvider = structuredClone(request.body.provider);
+
+      applyKiloExclusiveModelSettings(request, minimax_m3_free_model);
+
+      expect(request.body.model).toBe('minimax/minimax-m3:free');
+      expect(request.body.provider).toEqual(originalProvider);
     }
   );
 

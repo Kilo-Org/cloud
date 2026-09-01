@@ -2,20 +2,19 @@ import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusi
 
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m3';
 
-// Remove both routing overrides when Vercel's GMI Cloud promotion ends 2026-09-06.
 export const minimax_m3_free_model: KiloExclusiveModel = {
   public_id: 'minimax/minimax-m3:free',
   display_name: 'MiniMax: MiniMax M3 (free)',
   description:
-    'MiniMax-M3 is a frontier-class foundation model that combines a 1M-token context window, coding and agentic performance, and native multimodality. Available free through Vercel AI Gateway via GMI Cloud until September 6, 2026.',
+    'MiniMax-M3 is a frontier-class foundation model that combines a 1M-token context window, coding and agentic performance, and native multimodality. Available free through OpenRouter via GMI Cloud.',
   context_length: 1_048_576,
   max_completion_tokens: 1_048_576,
   status: 'public',
   flags: ['reasoning', 'vision'],
-  gateway: 'vercel',
-  internal_id: 'minimax/minimax-m3-free',
+  gateway: 'openrouter',
+  internal_id: 'minimax/minimax-m3:free',
   pricing: null,
-  inference_provider_restriction: ['gmicloud'],
+  inference_provider_restriction: [],
 };
 
 export const minimax_m27_free_model: KiloExclusiveModel = {

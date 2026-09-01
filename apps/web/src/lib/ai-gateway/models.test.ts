@@ -106,48 +106,46 @@ describe('isFreeModel', () => {
       expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
     });
 
-    test.each([
-      {
-        name: 'MiniMax M3',
-        model: minimax_m3_free_model,
-        publicId: 'minimax/minimax-m3:free',
-        internalId: 'minimax/minimax-m3-free',
-        contextLength: 1_048_576,
-        vision: true,
-        isAutoFree: true,
-      },
-      {
-        name: 'MiniMax M2.7',
-        model: minimax_m27_free_model,
-        publicId: 'minimax/minimax-m2.7:free',
-        internalId: 'minimax/minimax-m2.7-free',
-        contextLength: 196_608,
-        vision: false,
-        isAutoFree: false,
-      },
-    ])(
-      'registers $name as a free Vercel GMI Cloud model',
-      async ({ model, publicId, internalId, contextLength, vision, isAutoFree }) => {
-        expect(findKiloExclusiveModel(model.public_id)).toBe(model);
-        expect(await isFreeModel(model.public_id)).toBe(true);
-        expect(model).toMatchObject({
-          public_id: publicId,
-          internal_id: internalId,
-          gateway: 'vercel',
-          context_length: contextLength,
-          max_completion_tokens: contextLength,
-          status: 'public',
-          inference_provider_restriction: ['gmicloud'],
-        });
-        expect(model.flags.includes('reasoning')).toBe(true);
-        expect(model.flags.includes('vision')).toBe(vision);
-        expect(getInferenceProvider(model)?.slug).toBe('gmicloud');
-        expect(autoFreeModels.some(({ model: modelId }) => modelId === model.public_id)).toBe(
-          isAutoFree
-        );
-        expect(preferredModels.includes(model.public_id)).toBe(isAutoFree);
-      }
-    );
+    test('registers MiniMax M3 as a free OpenRouter model', async () => {
+      expect(findKiloExclusiveModel(minimax_m3_free_model.public_id)).toBe(minimax_m3_free_model);
+      expect(await isFreeModel(minimax_m3_free_model.public_id)).toBe(true);
+      expect(minimax_m3_free_model).toMatchObject({
+        public_id: 'minimax/minimax-m3:free',
+        internal_id: 'minimax/minimax-m3:free',
+        gateway: 'openrouter',
+        context_length: 1_048_576,
+        max_completion_tokens: 1_048_576,
+        status: 'public',
+        pricing: null,
+        inference_provider_restriction: [],
+      });
+      expect(minimax_m3_free_model.flags).toEqual(['reasoning', 'vision']);
+      expect(getInferenceProvider(minimax_m3_free_model)).toBeNull();
+      expect(autoFreeModels.some(({ model }) => model === minimax_m3_free_model.public_id)).toBe(
+        true
+      );
+      expect(preferredModels).toContain(minimax_m3_free_model.public_id);
+    });
+
+    test('registers MiniMax M2.7 as a free Vercel GMI Cloud model', async () => {
+      expect(findKiloExclusiveModel(minimax_m27_free_model.public_id)).toBe(minimax_m27_free_model);
+      expect(await isFreeModel(minimax_m27_free_model.public_id)).toBe(true);
+      expect(minimax_m27_free_model).toMatchObject({
+        public_id: 'minimax/minimax-m2.7:free',
+        internal_id: 'minimax/minimax-m2.7-free',
+        gateway: 'vercel',
+        context_length: 196_608,
+        max_completion_tokens: 196_608,
+        status: 'public',
+        inference_provider_restriction: ['gmicloud'],
+      });
+      expect(minimax_m27_free_model.flags).toEqual(['reasoning']);
+      expect(getInferenceProvider(minimax_m27_free_model)?.slug).toBe('gmicloud');
+      expect(autoFreeModels.some(({ model }) => model === minimax_m27_free_model.public_id)).toBe(
+        false
+      );
+      expect(preferredModels).not.toContain(minimax_m27_free_model.public_id);
+    });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');

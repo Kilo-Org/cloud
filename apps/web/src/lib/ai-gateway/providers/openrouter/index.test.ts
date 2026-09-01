@@ -17,7 +17,6 @@ import {
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
-import { minimax_m27_free_model, minimax_m3_free_model } from '@/lib/ai-gateway/providers/minimax';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -224,62 +223,43 @@ describe('auto models', () => {
   });
 });
 
-describe('MiniMax free models', () => {
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('replaces the MiniMax M3 OpenRouter catalog entry without duplicating free metadata', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: {
-            data: [
-              buildModel({
-                id: minimax_m3_free_model.public_id,
-                name: 'OpenRouter catalog name',
-              }),
-            ],
-          },
-        })
-      )
-    ) as unknown as typeof fetch;
-
-    const models = await getEnhancedOpenRouterModels();
-    const matches = models.data.filter(entry => entry.id === minimax_m3_free_model.public_id);
-
-    expect(matches).toHaveLength(1);
-    expect(matches[0]).toMatchObject({
-      id: minimax_m3_free_model.public_id,
-      name: minimax_m3_free_model.display_name,
-      isFree: true,
-      pricing: { prompt: '0.000000000000', completion: '0.000000000000' },
+describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
+  'OpenRouter catalog inheritance for %s',
+  modelId => {
+    afterEach(() => {
+      global.fetch = originalFetch;
     });
-  });
 
-  it('replaces the MiniMax M2.7 catalog entry without duplicating it', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve(
-        createMockResponse({
-          jsonData: {
-            data: [
-              buildModel({
-                id: minimax_m27_free_model.public_id,
-                name: 'OpenRouter catalog name',
-              }),
-            ],
-          },
-        })
-      )
-    ) as unknown as typeof fetch;
+    it('preserves the upstream metadata without duplicating or suppressing the free model', async () => {
+      const catalogModel = buildModel({
+        id: modelId,
+        name: 'OpenRouter catalog name',
+        pricing: { prompt: '0', completion: '0' },
+      });
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [catalogModel] } }))
+      ) as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
-    const matches = models.data.filter(entry => entry.id === minimax_m27_free_model.public_id);
+      const models = await getEnhancedOpenRouterModels();
+      const matches = models.data.filter(entry => entry.id === modelId);
 
-    expect(matches).toHaveLength(1);
-    expect(matches[0]?.name).toBe(minimax_m27_free_model.display_name);
-  });
-});
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ ...catalogModel, isFree: true });
+      expect(findKiloExclusiveModel(modelId)).toBeNull();
+      expect(isDisabledKiloExclusiveModel(modelId)).toBe(false);
+    });
+
+    it('does not inject the model when OpenRouter omits it', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [] } }))
+      ) as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels();
+
+      expect(models.data.some(model => model.id === modelId)).toBe(false);
+    });
+  }
+);
 
 describe('reasoning variants', () => {
   afterEach(() => {

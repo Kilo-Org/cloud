@@ -14,8 +14,6 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { minimax_m27_free_model, minimax_m3_free_model } from '@/lib/ai-gateway/providers/minimax';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -586,32 +584,24 @@ describe('applyVercelSettings managed requests', () => {
     }
   );
 
-  it.each(['chat_completions', 'messages', 'responses'] as const)(
-    'routes MiniMax M2.7 $kind requests with unrelated ignores when metadata is unavailable',
-    async kind => {
-      const request = managedRequestForApi(kind, minimax_m27_free_model.public_id);
-      applyKiloExclusiveModelSettings(request, minimax_m27_free_model);
+  describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])('%s', modelId => {
+    it.each(['chat_completions', 'messages', 'responses'] as const)(
+      'preserves the model ID and honors provider preferences for %s requests',
+      async kind => {
+        const request = managedRequestForApi(kind, modelId);
 
-      await applyManagedVercelSettings(minimax_m27_free_model.public_id, request, null);
+        const getVercelInferenceProvidersMock = await applyManagedVercelSettings(modelId, request, [
+          'minimax',
+          'openai',
+        ]);
 
-      expect(request.body.model).toBe(minimax_m27_free_model.internal_id);
-      expect(request.body.provider).toBeUndefined();
-      expect(request.body.providerOptions?.gateway?.only).toEqual(['gmicloud']);
-    }
-  );
-
-  it.each(['chat_completions', 'messages', 'responses'] as const)(
-    'does not inject a GMI provider-only setting for MiniMax M3 $kind requests',
-    kind => {
-      const request = managedRequestForApi(kind, minimax_m3_free_model.public_id);
-      const originalProvider = structuredClone(request.body.provider);
-
-      applyKiloExclusiveModelSettings(request, minimax_m3_free_model);
-
-      expect(request.body.model).toBe('minimax/minimax-m3:free');
-      expect(request.body.provider).toEqual(originalProvider);
-    }
-  );
+        expect(request.body.model).toBe(modelId);
+        expect(request.body.provider).toBeUndefined();
+        expect(request.body.providerOptions?.gateway?.only).toEqual(['minimax']);
+        expect(getVercelInferenceProvidersMock).toHaveBeenCalledWith(modelId);
+      }
+    );
+  });
 
   it('does not add managed Friendli credentials from the environment', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';

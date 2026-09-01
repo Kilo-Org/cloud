@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import logo from '@/../assets/images/logo.png';
+import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   AgentSessionsSection,
@@ -39,6 +41,15 @@ export function HomeScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={headerTitle}
+        titleContent={
+          <Image
+            source={logo}
+            className="size-[40px] shrink-0"
+            contentFit="contain"
+            transition={0}
+            accessible={false}
+          />
+        }
         size="large"
         showBackButton={false}
         className="px-[22px]"

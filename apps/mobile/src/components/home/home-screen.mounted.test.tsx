@@ -81,6 +81,8 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
@@ -236,11 +238,20 @@ afterEach(async () => {
 });
 
 describe('HomeScreen composition', () => {
-  it.each(['en', 'sr'])('shows only the Kilo brand as the Home title in %s', async language => {
+  it.each(['en', 'sr'])('shows an accessible Kilo logo as the Home title in %s', async language => {
     await i18n.changeLanguage(language);
     await renderHome();
-    const title = nodes('Text').find(node => node.props.accessibilityRole === 'header');
-    expect(title?.children).toEqual(['Kilo']);
+    const title = nodes('View').find(node => node.props.accessibilityRole === 'header');
+    expect(title?.props).toMatchObject({ accessible: true, accessibilityLabel: 'Kilo' });
+    expect(nodes('Image')).toHaveLength(1);
+    expect(nodes('Image')[0]?.props).toMatchObject({
+      source: 1,
+      className: 'size-[40px] shrink-0',
+      contentFit: 'contain',
+      transition: 0,
+      accessible: false,
+    });
+    expect(text()).not.toContain('Kilo');
     expect(text()).not.toContain(i18n.t('login.welcome'));
   });
 
@@ -256,7 +267,7 @@ describe('HomeScreen composition', () => {
     expect(contextSlot?.props.className).toContain('ms-6');
     expect(contextSlot?.props.className).toContain('items-end');
     expect(contextSlot?.props.className).not.toContain('w-2/5');
-    const title = nodes('Text').find(node => node.props.accessibilityRole === 'header');
+    const title = nodes('View').find(node => node.props.accessibilityRole === 'header');
     expect(title?.props.className).toContain('shrink-0');
     expect(title?.parent?.props.className).toContain('flex-none');
     expect(title?.parent?.parent?.props.className).toContain('flex-none');

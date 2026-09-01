@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
+  titleContent?: React.ReactNode;
   titleNumberOfLines?: number;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
@@ -45,6 +46,7 @@ type ScreenHeaderProps = {
 
 export function ScreenHeader({
   title,
+  titleContent,
   titleNumberOfLines = 2,
   eyebrow,
   reserveEyebrow = false,
@@ -83,7 +85,16 @@ export function ScreenHeader({
 
   let titleNode: React.ReactNode = null;
   if (title != null) {
-    const titleText = (
+    const titleText = titleContent ? (
+      <View
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel={title}
+        className={cn('shrink-0', centerTitle && 'items-center')}
+      >
+        {titleContent}
+      </View>
+    ) : (
       <Text
         className={cn(titleClass, centerTitle && 'text-center', hasRightContext && 'shrink-0')}
         numberOfLines={titleNumberOfLines}

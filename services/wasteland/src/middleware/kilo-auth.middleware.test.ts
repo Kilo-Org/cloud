@@ -2,14 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
 import { WASTELAND_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { kiloAuthMiddleware } from './kilo-auth.middleware';
+import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
 import type { WastelandEnv } from '../wasteland.worker';
+import { resolveSecret } from '../util/secret.util';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 function createApp() {
   let downstreamCalls = 0;
   const app = new Hono<WastelandEnv>();
+  const kiloAuthMiddleware = createKiloAuthMiddleware<WastelandEnv>({
+    resolveSecret,
+    audiencePolicy: { audience: WASTELAND_AUDIENCE, mode: 'allow-legacy' },
+  });
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
   const handler = (c: Context<WastelandEnv>) => {

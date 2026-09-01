@@ -156,7 +156,7 @@
     "returnSendsMessage": "د بېرته ستنېدو کیلي پیغام لېږي",
     "returnSendsMessageSubtitle": "کله چې بند وي، د بېرته ستنېدو کیلي د ایجنټ د پیغام لیکلو په ځایونو کې نوې کرښه دننه کوي.",
     "biometricUnlock": "د بایومیټریک له لارې قلف خلاصول",
-    "biometricUnlockSubtitle": "د ایپ د پیل پر مهال او په شالید کې د پنځو دقیقو تېرولو وروسته د قلف خلاصول اړین دي. د وسیلې په تنظیماتو کې بایومیټریک یا د وسیلې د تېرنښې کوډ تنظیم کړئ. ستاسو د وسیلې د تېرنښې کوډ د بدیل په توګه کارول کېدی شي."
+    "biometricUnlockSubtitle": "د ایپ د پیل پر مهال او په شالید کې د پنځو دقیقو تېرولو وروسته د قلف خلاصول اړین دي."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "نور",
-      "project": "پروژه",
-      "removeProjectFilter": "د {{label}} پروژې فلټر لرې کړئ",
-      "removePlatformFilter": "د {{label}} پلیټ فارم فلټر لرې کړئ"
+      "project": "پروژه"
     },
     "suggestion": {
       "title": "وړاندیز",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "د کوډ کولو نوې دنده",
     "explore": "وپلټئ",
     "seeAll": "ټول وګورئ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "اوس هېڅ شی نه چلېږي"
   },
   "imageViewer": {
     "close": "{{filename}} وتړئ",

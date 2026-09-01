@@ -156,7 +156,7 @@
     "returnSendsMessage": "Клавіша ўводу адпраўляе паведамленне",
     "returnSendsMessageSubtitle": "Калі выключана, клавіша ўводу ўстаўляе новы радок у кампазітарах агентаў.",
     "biometricUnlock": "Разблакіроўваць з дапамогай біяметрыі",
-    "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску дадатку і пасля пяці хвілін у фонавым рэжыме. Наладзьце біяметрыю або код доступу прылады ў наладах прылады. Код доступу вашай прылады застаецца даступным як запасны спосаб разблакіроўкі."
+    "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску дадатку і пасля пяці хвілін у фонавым рэжыме."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -1327,7 +1327,7 @@
       "transcriptWaiting": "Чаканне стэнаграмы праверкі.",
       "transcriptEmpty": "Няма стэнаграмы для гэтай праверкі.",
       "transcriptRetry": "Не ўдалося загрузіць стэнаграму праверкі.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Агент бяздзейнічае",
       "agentWorking": "Агент працуе...",
       "anErrorOccurred": "Узнікла памылка",
@@ -1455,7 +1455,7 @@
     "status": {
       "pending": "Чакае",
       "queued": "У чарзе",
-      "running": "ПРАЦУЕ",
+      "running": "Працуе",
       "completed": "Завершана",
       "failed": "Не атрымалася",
       "cancelled": "Адменена",
@@ -1721,12 +1721,12 @@
       "statusFixed": "Выпраўлена",
       "statusOpen": "Адкрыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Выпраўленне ўжо пачалося",
-      "reasonNoBandwidth": "Няма даступнай магчымасці",
-      "reasonTolerableRisk": "Рызыка прымальная",
-      "reasonInaccurate": "Знаходка недакладная",
-      "reasonNotUsed": "Уразлівы код не выкарыстоўваецца",
-      "reasonAfterReview": "Пасля праверкі"
+      "reasonFixStarted": "выпраўленне ўжо пачалося",
+      "reasonNoBandwidth": "няма даступнай магчымасці",
+      "reasonTolerableRisk": "рызыка прымальная",
+      "reasonInaccurate": "знаходка недакладная",
+      "reasonNotUsed": "уразлівы код не выкарыстоўваецца",
+      "reasonAfterReview": "пасля праверкі"
     },
     "settingsOverview": {
       "title": "Налады",
@@ -1904,7 +1904,7 @@
       "newFindingSeverityLabel": "Мінімальны ўзровень для новых знаходак",
       "newFindingSubtitle": "Адпраўляецца кожны раз, калі новая знаходка сінхранізуецца, уключаючы першую сінхранізацыю.",
       "readOnly": "Толькі ўладальнікі арганізацыі і менеджэры па аплаце могуць змяняць гэтыя налады.",
-      "slaLeadTimeAccessibility": "час папярэджання SLA у днях",
+      "slaLeadTimeAccessibility": "Час папярэджання SLA у днях",
       "slaLeadTimeError": "Увядзіце цэлы лік дзён ад 1 да 365.",
       "slaLeadTimeHint": "Увядзіце цэлы лік ад 1 да 365",
       "slaLeadTimeLabel": "Час папярэджання SLA (дні)",
@@ -2556,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Іншае",
-      "project": "Праект",
-      "removeProjectFilter": "Прыбраць фільтр праекта {{label}}",
-      "removePlatformFilter": "Прыбраць фільтр платформы {{label}}"
+      "project": "Праект"
     },
     "suggestion": {
       "title": "Прапанова",
@@ -2794,7 +2792,7 @@
     "newCodingTask": "Новая задача праграмавання",
     "explore": "Даследаваць",
     "seeAll": "Паказаць усё",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Зараз нічога не выконваецца"
   },
   "imageViewer": {
     "close": "Закрыць {{filename}}",
@@ -2839,7 +2837,7 @@
     "optionsExpiredDescription": "Вярніцеся назад і адкрыйце гэты выбар з папярэдняга экрана."
   },
   "sessionRow": {
-    "needsInput": "патрабуецца ўвод"
+    "needsInput": "ПАТРАБУЕЦЦА ЎВОД"
   },
   "voiceInput": {
     "listening": "Слухаю...",

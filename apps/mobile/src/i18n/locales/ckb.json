@@ -156,7 +156,7 @@
     "returnSendsMessage": "کلیلی گەڕانەوە پەیام دەنێرێت",
     "returnSendsMessageSubtitle": "کاتێک ناچالاکە، کلیلی گەڕانەوە دێڕێکی نوێ لە خانەکانی نووسینی پەیامی ئەرکەکان تێدەخات.",
     "biometricUnlock": "کردنەوەی قوفڵ بە بایۆمەتریک",
-    "biometricUnlockSubtitle": "لە کاتی دەستپێکردنی ئەپەکە و دوای پێنج خولەک مانەوەی لە پاشبنەمادا، کردنەوەی قوفڵ پێویستە. بایۆمەتریک یان کۆدی نهێنیی ئامێر لە ڕێکخستنەکانی ئامێرەکەدا ڕێک بخە. کۆدی نهێنیی ئامێرەکەت وەک ڕێگەیەکی جێگرەوە بەردەستە."
+    "biometricUnlockSubtitle": "لە کاتی دەستپێکردنی ئەپەکە و دوای پێنج خولەک مانەوەی لە پاشبنەمادا، کردنەوەی قوفڵ پێویستە."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "هی تر",
-      "project": "پرۆژە",
-      "removeProjectFilter": "لابردنی پاڵاوتی پرۆژەی {{label}}",
-      "removePlatformFilter": "لابردنی پاڵاوتی پلاتفۆرمی {{label}}"
+      "project": "پرۆژە"
     },
     "suggestion": {
       "title": "پێشنیار",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "ئەرکی کۆدکردنی نوێ",
     "explore": "گەڕان",
     "seeAll": "بینینی هەموو",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ئێستا هیچ شتێک کار ناکات"
   },
   "imageViewer": {
     "close": "داخستنی {{filename}}",

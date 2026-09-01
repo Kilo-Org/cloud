@@ -156,7 +156,7 @@
     "returnSendsMessage": "Maɓallin Komawa yana aika saƙo",
     "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai.",
     "biometricUnlock": "Buɗe kulle da tantance halittar jiki",
-    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya. Saita tantance halittar jiki ko lambar buɗe kullen na'ura a saitunan na'ura. Za ka iya amfani da lambar buɗe kullen na'urarka a madadin tantance halittar jiki."
+    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -1135,9 +1135,9 @@
       "destroying": "ANA RUSHEWA",
       "provisioned": "AN BAYAR",
       "restarting": "ANA SAKE FARWA",
-      "running": "Ana gudana",
+      "running": "ANA GUDANA",
       "shuttingDown": "ANA KASHEWA",
-      "starting": "Ana farawa",
+      "starting": "ANA FARAWA",
       "stopped": "YA TSAYA",
       "stopping": "ANA TSAYARWA",
       "unknown": "BA A SANI BA",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Jiran rubutun zaman na bita.",
       "transcriptEmpty": "Babu rubutun zaman ga wannan bita.",
       "transcriptRetry": "An kasa ɗora rubutun zaman na bita.",
-      "transcriptLive": "RAYA",
+      "transcriptLive": "Raya",
       "agentIdle": "Wakili baya aiki",
       "agentWorking": "Wakili yana aiki...",
       "anErrorOccurred": "An sami kuskure",
@@ -1701,11 +1701,11 @@
       "statusFixed": "An gyara",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "An riga an fara gyara",
-      "reasonNoBandwidth": "Babu damar aiki",
-      "reasonTolerableRisk": "Haɗarin ya zama abin ɗauka",
-      "reasonInaccurate": "Sakamakon bai yi daidai ba",
-      "reasonNotUsed": "Ba a yi amfani da lambar mai rauni ba",
+      "reasonFixStarted": "an riga an fara gyara",
+      "reasonNoBandwidth": "babu damar aiki",
+      "reasonTolerableRisk": "haɗarin ya zama abin ɗauka",
+      "reasonInaccurate": "sakamakon bai yi daidai ba",
+      "reasonNotUsed": "ba a yi amfani da lambar mai rauni ba",
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {
@@ -2095,8 +2095,8 @@
       "dollar_one": "dala",
       "dollar": "daloli",
       "dollar_other": "daloli",
-      "costSpoken": "Farashi {{cost}}",
-      "costSpokenWithTime": "Farashi {{cost}}, {{time}}",
+      "costSpoken": "farashi {{cost}}",
+      "costSpokenWithTime": "farashi {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Sauran",
-      "project": "Aiki",
-      "removeProjectFilter": "Cire tace aikin {{label}}",
-      "removePlatformFilter": "Cire tace dandamalin {{label}}"
+      "project": "Aiki"
     },
     "suggestion": {
       "title": "Shawara",
@@ -2673,7 +2671,7 @@
       "open": "buɗe buƙatar jan",
       "closed": "rufaffiyar pull request",
       "merged": "haɗaɗɗiyar pull request",
-      "draft": "Daftarin buƙatar jan",
+      "draft": "daftarin buƙatar jan",
       "updating": "Ana sabuntawa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "buƙatar jan"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Sabon aikin shirye-shirye",
     "explore": "Bincika",
     "seeAll": "Duba duka",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Babu abin da ke gudana a yanzu"
   },
   "imageViewer": {
     "close": "Rufe {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Koma baya sannan ka sake buɗe wannan zaɓin daga shafin da ya gabata."
   },
   "sessionRow": {
-    "needsInput": "yana buƙatar bayani"
+    "needsInput": "YANA BUƘATAR BAYANI"
   },
   "voiceInput": {
     "listening": "Ana sauraro...",

@@ -156,7 +156,7 @@
     "returnSendsMessage": "מקש החזרה שולח הודעה",
     "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש החזרה מוסיף שורה חדשה בשדות ההודעה של הסוכנים.",
     "biometricUnlock": "ביטול נעילה באמצעות זיהוי ביומטרי",
-    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע. הגדר זיהוי ביומטרי או קוד גישה למכשיר בהגדרות המכשיר. קוד הגישה למכשיר שלך זמין כאפשרות גיבוי."
+    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע."
   },
   "notifications": {
     "title": "התראות",
@@ -2075,9 +2075,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "אחר",
-      "project": "פרויקט",
-      "removeProjectFilter": "הסר מסנן פרויקט {{label}}",
-      "removePlatformFilter": "הסר מסנן פלטפורמה {{label}}"
+      "project": "פרויקט"
     },
     "suggestion": {
       "title": "הצעה",
@@ -2312,7 +2310,7 @@
     "newCodingTask": "משימת קידוד חדשה",
     "explore": "חקור",
     "seeAll": "ראה הכל",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "שום דבר לא פועל כרגע"
   },
   "imageViewer": {
     "close": "סגור את {{filename}}",

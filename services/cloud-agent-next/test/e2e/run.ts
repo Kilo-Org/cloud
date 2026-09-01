@@ -20,11 +20,12 @@
  * the session port offset is non-zero.
  */
 
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
-import { isControlPlaneOwner } from '../../src/session-plane.js';
+import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -148,11 +149,23 @@ async function main(): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const email =
-    process.env.E2E_USER_EMAIL ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`;
+    lifecycle === 'worktree-shared'
+      ? `kilo-worktree-e2e-${randomUUID()}${DRIVER_USER_EMAIL_SUFFIX}`
+      : (process.env.E2E_USER_EMAIL ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`);
   const user = await ensureTestUser(process.env.DATABASE_URL, email, {
     funded: process.env.E2E_FUNDED === '1',
   });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
+  if (
+    lifecycle === 'worktree-shared' &&
+    (!isControlPlaneOwner(devVars, { userId: user.id }) ||
+      !isWorktreeOwner(devVars, { userId: user.id }))
+  ) {
+    throw new Error(
+      'worktree-shared requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ' +
+        'in the Worker .dev.vars; no session was started'
+    );
+  }
   if (expectControlPlane && !isControlPlaneOwner(devVars, { userId: user.id })) {
     throw new Error('The E2E user is not enrolled in CONTROL_PLANE_IDS; no session was started');
   }

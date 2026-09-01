@@ -4,12 +4,26 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  controlErrorCodes,
   controlErrorSchema,
+  type ControlError,
   type ResponseFrame,
 } from '../shared/sandbox-control-protocol.js';
 
 export const SESSION_DELIVERY_TIMEOUT_MS =
   DEADLINE_MS.startup + SANDBOX_CONTROL_ATTACH_TIMEOUT_MS + 2 * SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
+
+export class ControlRequestError extends Error {
+  readonly code: string;
+  readonly retryable: boolean;
+
+  constructor(error: ControlError) {
+    super(error.message);
+    this.name = 'ControlRequestError';
+    this.code = error.code;
+    this.retryable = error.retryable;
+  }
+}
 
 export async function withDeliveryDeadline<T>(
   operation: () => Promise<T>,
@@ -27,6 +41,7 @@ export async function withDeliveryDeadline<T>(
       'Session delivery operation timed out'
     );
   } catch (error) {
+    if (error instanceof ControlRequestError) throw error;
     if (Date.now() >= operationDeadlineAt) {
       throw new Error('Session delivery operation timed out');
     }
@@ -36,8 +51,7 @@ export async function withDeliveryDeadline<T>(
 
 export function controlRequestResult(response: ResponseFrame): unknown {
   if (response.ok) return response.result;
-  const error = controlErrorSchema.parse(response.error);
-  throw Object.assign(new Error(error.message), error);
+  throw new ControlRequestError(controlErrorSchema.parse(response.error));
 }
 
 export function isRetryableDeliveryError(error: unknown): boolean {
@@ -48,6 +62,16 @@ export function isRetryableDeliveryError(error: unknown): boolean {
     error.retryable === true &&
     (!('overloaded' in error) || error.overloaded !== true)
   );
+}
+
+export function deliveryErrorLogFields(error: unknown) {
+  return {
+    errorCode:
+      error instanceof ControlRequestError
+        ? (controlErrorCodes.find(code => code === error.code) ?? 'unknown_control_error')
+        : 'transport_or_internal_error',
+    retryable: isRetryableDeliveryError(error),
+  };
 }
 
 export type ControlDispatchDisposition =

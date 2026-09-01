@@ -156,7 +156,7 @@
     "returnSendsMessage": "Qaytarish tugmasi xabar yuboradi",
     "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi.",
     "biometricUnlock": "Biometriya yordamida qulfni ochish",
-    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi. Qurilma sozlamalarida biometriya yoki qurilma parol kodini sozlang. Qurilmangizning parol kodidan zaxira usul sifatida foydalanishingiz mumkin."
+    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -1135,9 +1135,9 @@
       "destroying": "YO'Q QILINMOQDA",
       "provisioned": "TAYYORLANGAN",
       "restarting": "QAYTA ISHGA TUSHIRILMOQDA",
-      "running": "Ishlamoqda",
+      "running": "ISHLAMOQDA",
       "shuttingDown": "O'CHIRILMOQDA",
-      "starting": "Boshlanmoqda",
+      "starting": "BOSHLANMOQDA",
       "stopped": "TO'XTATILGAN",
       "stopping": "TO'XTATILMOQDA",
       "unknown": "NOMA'LUM",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Ko'rib chiqish transkripti kutilmoqda.",
       "transcriptEmpty": "Bu ko'rib chiqish uchun transkript yo'q.",
       "transcriptRetry": "Ko'rib chiqish transkriptini yuklab bo'lmadi.",
-      "transcriptLive": "JO'N",
+      "transcriptLive": "Jo'n",
       "agentIdle": "Agent bo'sh",
       "agentWorking": "Agent ishlamoqda...",
       "anErrorOccurred": "Xatolik yuz berdi",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Boshqa",
-      "project": "Loyiha",
-      "removeProjectFilter": "{{label}} loyiha filtrini olib tashlash",
-      "removePlatformFilter": "{{label}} platforma filtrini olib tashlash"
+      "project": "Loyiha"
     },
     "suggestion": {
       "title": "Taklif",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Yangi kodlash vazifasi",
     "explore": "O'rganish",
     "seeAll": "Barchasini ko'rish",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hozir hech narsa ishlamayapti"
   },
   "imageViewer": {
     "close": "{{filename}} ni yopish",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Orqaga qayting va bu tanlagichni oldingi ekrandan qayta oching."
   },
   "sessionRow": {
-    "needsInput": "kiritish kerak"
+    "needsInput": "KIRITISH KERAK"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",

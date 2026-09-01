@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { HomeScreen } from '@/components/home/home-screen';
 
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',

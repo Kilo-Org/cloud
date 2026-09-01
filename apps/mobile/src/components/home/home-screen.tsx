@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import logo from '@/../assets/images/logo.png';
+import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   AgentSessionsSection,
@@ -10,7 +12,6 @@ import {
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';
-import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
@@ -39,14 +40,18 @@ export function HomeScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={headerTitle}
+        titleContent={
+          <Image
+            source={logo}
+            className="size-[40px] shrink-0"
+            contentFit="contain"
+            transition={0}
+            accessible={false}
+          />
+        }
         size="large"
         showBackButton={false}
         className="px-[22px]"
-        context={
-          <ContextControl
-            scope={context.accountReady ? undefined : { organizationId: null, isResolved: false }}
-          />
-        }
       />
       <TabScreenScrollView
         className="flex-1"

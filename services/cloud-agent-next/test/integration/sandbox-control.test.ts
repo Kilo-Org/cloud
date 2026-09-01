@@ -8,12 +8,21 @@ import {
 } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { forceDestroyControlPlaneSandbox } from '../../src/container-usage-context.js';
+import type { BillingContext } from '@kilocode/container-usage';
+import {
+  forceDestroyControlPlaneSandbox,
+  SANDBOX_USAGE_SKUS,
+  type SandboxBillingInput,
+} from '../../src/container-usage-context.js';
 import type {
   VercelSandboxNetworkPolicy,
   VercelSandboxSession,
 } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config.js';
+import { TRPCError } from '@trpc/server';
+import { router } from '../../src/router/auth.js';
+import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
+import { requireCurrentSessionAccess } from '../../src/session-access.js';
 import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
@@ -52,6 +61,7 @@ import {
   type DeadlineId,
   type DeadlineTable,
 } from '../../src/sandbox-control/deadlines.js';
+import type { VercelProviderLocator } from '../../src/sandbox-control/vercel-provider.js';
 import {
   loadDeadlines,
   loadRouteTable,
@@ -71,7 +81,10 @@ import {
   type PhysicalRecord,
 } from '../../src/sandbox-control/physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from '../../src/sandbox-control/provider.js';
-import { applyReportedSessionState } from '../../src/sandbox-control/session-routes.js';
+import {
+  applyReportedSessionState,
+  attachRoute,
+} from '../../src/sandbox-control/session-routes.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from '../../src/sandbox-session/control-dispatch.js';
 import {
   createVercelProviderAdapter,
@@ -95,18 +108,29 @@ import {
   type SessionAttachPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
 
+vi.mock('../../src/session-access.js', () => ({
+  requireCurrentSessionAccess: vi.fn(),
+}));
+
+vi.mock('../../src/db/pg.js', () => ({
+  getPgDb: () => {
+    throw new Error('PostgreSQL is not used by sandbox control integration tests');
+  },
+}));
+
 const sandboxId = 'sbx__control_smoke';
 const ROOT_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
 const SECOND_ROOT_ID = 'ses_zyxwvutsrqponmlkjihgfedcba';
 const THIRD_ROOT_ID = 'ses_01234567890123456789012345';
 const GRANT_SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const SECOND_GRANT_SESSION_ID = 'workspace_22222222-2222-4222-8222-222222222222';
-const WORKTREE_ID = 'worktree_11111111-1111-4111-8111-111111111111';
-const OTHER_WORKTREE_ID = 'worktree_22222222-2222-4222-8222-222222222222';
+const WORKTREE_ID: `worktree_${string}` = 'worktree_11111111-1111-4111-8111-111111111111';
+const OTHER_WORKTREE_ID: `worktree_${string}` = 'worktree_22222222-2222-4222-8222-222222222222';
 type ProviderCreateResult = Awaited<ReturnType<ProviderAdapter['create']>>;
 const KILO_TOKEN = 'fixture-real-kilo-token';
 const GITHUB_TOKEN = 'fixture-real-github-token';
 const HOUR = 60 * 60 * 1000;
+const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 
 function cloudflareRef(id: string, instanceId = 'inst_1'): string {
   return encodeCloudflareProviderRef({ sandboxId: id, containment: true, instanceId });
@@ -124,6 +148,15 @@ async function seedRunningCloudflare(instance: SandboxControl): Promise<string> 
     );
   }
   if (physical.state !== 'running') await instance.confirmInstance(providerRef);
+  const running = await instance.getPhysicalRecord();
+  if (!running.createIntent) throw new Error('Missing fixture create intent');
+  await savePhysicalRecord(instance['ctx'].storage, {
+    ...running,
+    createIntent: {
+      ...running.createIntent,
+      createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+    },
+  });
   Object.assign(instance, { provider: fakeProvider() });
   return providerRef;
 }
@@ -160,10 +193,14 @@ async function seedGrant(
     preparedAt: now,
     expiresAt: now + 4 * HOUR,
   });
-  await saveSessionCredentialGrants(state.storage, [
-    ...(await loadSessionCredentialGrants(state.storage)),
-    grant,
-  ]);
+  await state.storage.transaction(async () => {
+    await saveSessionCredentialGrants(state.storage, [
+      ...(await loadSessionCredentialGrants(state.storage)).filter(
+        value => !value.members.some(member => member.sessionId === input.sessionId)
+      ),
+      grant,
+    ]);
+  });
   return grant;
 }
 
@@ -231,6 +268,61 @@ function nextMessage(ws: WebSocket): Promise<string> {
     ws.addEventListener('error', onError, { once: true });
     ws.addEventListener('close', onClose, { once: true });
   });
+}
+
+function nextMessages(ws: WebSocket, count: number): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const messages: string[] = [];
+    const onMessage = (event: MessageEvent) => {
+      messages.push(typeof event.data === 'string' ? event.data : String(event.data));
+      if (messages.length !== count) return;
+      ws.removeEventListener('message', onMessage);
+      ws.removeEventListener('error', onError);
+      resolve(messages);
+    };
+    const onError = () => {
+      ws.removeEventListener('message', onMessage);
+      reject(new Error('sandbox control websocket error'));
+    };
+    ws.addEventListener('message', onMessage);
+    ws.addEventListener('error', onError, { once: true });
+  });
+}
+
+type SessionStreamEvent = {
+  eventId: number;
+  sessionId: string;
+  streamEventType: string;
+  data: Record<string, unknown>;
+};
+
+async function connectSessionStream(
+  sessionId: string,
+  userId: string,
+  eventTypes: string[]
+): Promise<WebSocket> {
+  const url = new URL('http://worker.test/stream');
+  url.searchParams.set('sessionId', sessionId);
+  url.searchParams.set('userId', userId);
+  url.searchParams.set('eventTypes', eventTypes.join(','));
+  url.searchParams.set('replay', 'false');
+  const response = await SELF.fetch(url.toString(), { headers: { Upgrade: 'websocket' } });
+  if (response.status !== 101 || !response.webSocket) {
+    throw new Error(`Unexpected session stream upgrade: ${response.status}`);
+  }
+  response.webSocket.accept();
+  expect(JSON.parse(await nextMessage(response.webSocket))).toMatchObject({
+    sessionId,
+    streamEventType: 'connected',
+  });
+  return response.webSocket;
+}
+
+function persistedSessionEvents(state: DurableObjectState, eventTypes: string[]) {
+  return createEventQueries(
+    drizzle(state.storage, { logger: false }),
+    state.storage.sql
+  ).findByFilters({ eventTypes });
 }
 
 function sendHello(
@@ -1192,6 +1284,78 @@ function policyAuthorization(
     method,
     headers: new Headers({ authorization: `Bearer ${credential}` }),
   })?.headers.authorization;
+}
+
+type SandboxControlStub = ReturnType<(typeof env.SANDBOX_CONTROL)['getByName']>;
+
+type WrapperRequest = {
+  type: string;
+  requestId: string;
+  operation: string;
+  session?: { sessionId: string; kiloSessionId: string; directory: string };
+  payload?: Record<string, unknown>;
+};
+
+async function deliverWrapperEvent(
+  stub: SandboxControlStub,
+  event: string,
+  payload: unknown,
+  session?: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string }
+): Promise<void> {
+  await runInDurableObject(stub, async (instance, state) => {
+    const socket = state.getWebSockets('sandbox-control')[0];
+    if (!socket) throw new Error('Expected sandbox-control socket');
+    await instance.webSocketMessage(
+      socket,
+      JSON.stringify({
+        type: 'event',
+        event,
+        payload,
+        ...(session ? { session } : {}),
+      })
+    );
+  });
+}
+
+function respondToWrapperRequest(ws: WebSocket, request: WrapperRequest, result: unknown): void {
+  ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
+}
+
+function groupedRoute(sessionId: string, kiloSessionId: string, ownerId = 'owner_1') {
+  return {
+    sessionId,
+    kiloSessionId,
+    directory: '/workspace/shared',
+    ownerId,
+    worktreeId: WORKTREE_ID,
+  };
+}
+
+function groupedRegistration(input: {
+  ownerId: `user_${string}`;
+  sessionId: `workspace_${string}`;
+  kiloSessionId: string;
+  sandboxId: `usr-${string}` | `ses-${string}`;
+  provider?: 'cloudflare' | 'vercel';
+}) {
+  const repository = {
+    type: 'github' as const,
+    repo: 'Kilo-Org/cloud',
+    branch: 'feature/shared-worktree',
+  };
+  return {
+    identity: { sessionId: input.sessionId, userId: input.ownerId },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: KILO_TOKEN },
+    agent: { mode: 'code', model: 'test-model' },
+    repository,
+    workspace: {
+      sandboxId: input.sandboxId,
+      sandboxProvider: input.provider ?? 'cloudflare',
+      workspacePath: '/workspace/shared',
+      worktreeId: WORKTREE_ID,
+    },
+    finalization: { autoCommit: true, condenseOnComplete: true },
+  };
 }
 
 describe('SandboxControl in the Workers runtime', () => {
@@ -2298,8 +2462,8 @@ describe('SandboxControl contained Vercel lifecycle', () => {
   it.each(['unmarked', 'wrong-flags', 'wrong-reference', 'old-marker'] as const)(
     'fails closed and retains the exact reference for a %s warm instance',
     async markerKind => {
-      const requestedSandboxId = `sbx__containment_warm_${markerKind}`;
-      const stub = env.SANDBOX_CONTROL.getByName(requestedSandboxId);
+      const requestedSandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}` as const;
+      const { control: stub, registration } = await credentialFixture('vercel', requestedSandboxId);
       await runInDurableObject(stub, async (instance, state) => {
         const providerRef = encodeVercelProviderRef({
           sandboxName: requestedSandboxId,
@@ -2348,7 +2512,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
           ownerId: CONTAINMENT_OWNER,
           provider: 'vercel',
           allowCreate: true,
-          sessionId: GRANT_SESSION_ID,
+          sessionId: registration.identity.sessionId,
         });
         expect(status.physical).toBe('stopping');
         await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
@@ -2412,8 +2576,8 @@ describe('SandboxControl contained Vercel lifecycle', () => {
   });
 
   it('immediately reclaims an unmarked warm Vercel instance using its exact reference', async () => {
-    const requestedSandboxId = 'sbx__containment_warm_reclaimed';
-    const stub = env.SANDBOX_CONTROL.getByName(requestedSandboxId);
+    const requestedSandboxId = 'ses-abcd0002';
+    const { control: stub, registration } = await credentialFixture('vercel', requestedSandboxId);
     await runInDurableObject(stub, async (instance, state) => {
       const providerRef = encodeVercelProviderRef({
         sandboxName: requestedSandboxId,
@@ -2446,7 +2610,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         ownerId: CONTAINMENT_OWNER,
         provider: 'vercel',
         allowCreate: true,
-        sessionId: GRANT_SESSION_ID,
+        sessionId: registration.identity.sessionId,
       });
       expect(status.physical).toBe('stopped');
       await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
@@ -2459,8 +2623,8 @@ describe('SandboxControl contained Vercel lifecycle', () => {
   });
 
   it('never issues native cleanup using a logical-name-only Vercel reference', async () => {
-    const requestedSandboxId = 'sbx__containment_warm_logical_reference';
-    const stub = env.SANDBOX_CONTROL.getByName(requestedSandboxId);
+    const requestedSandboxId = 'ses-abcd0003';
+    const { control: stub, registration } = await credentialFixture('vercel', requestedSandboxId);
     await runInDurableObject(stub, async (instance, state) => {
       const nativeCalls: string[] = [];
       const provider = unresolvableVercelProvider(requestedSandboxId, nativeCalls);
@@ -2479,7 +2643,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         ownerId: CONTAINMENT_OWNER,
         provider: 'vercel',
         allowCreate: true,
-        sessionId: GRANT_SESSION_ID,
+        sessionId: registration.identity.sessionId,
       });
       expect(status.physical).toBe('stopping');
       await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
@@ -2492,8 +2656,8 @@ describe('SandboxControl contained Vercel lifecycle', () => {
   });
 
   it('fails closed when an existing creation intent requests different containment', async () => {
-    const requestedSandboxId = 'sbx__containment_wrong_intent';
-    const stub = env.SANDBOX_CONTROL.getByName(requestedSandboxId);
+    const requestedSandboxId = 'ses-abcd0004';
+    const { control: stub, registration } = await credentialFixture('vercel', requestedSandboxId);
     await runInDurableObject(stub, async (instance, state) => {
       const physical = claimCreate(initialPhysicalRecord(false), 'intent_previous', 1, undefined, {
         kilocode: false,
@@ -2508,7 +2672,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         ownerId: CONTAINMENT_OWNER,
         provider: 'vercel',
         allowCreate: true,
-        sessionId: GRANT_SESSION_ID,
+        sessionId: registration.identity.sessionId,
       });
       expect(status.physical).toBe('stopping');
       await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
@@ -2555,9 +2719,10 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
       expect(creates).toBe(0);
       await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'failed',
+        state: 'stopped',
         providerRef: null,
-        stopTombstone: { reason: 'environment_failed' },
+        createIntent: null,
+        stopTombstone: null,
       });
     });
   });
@@ -3204,11 +3369,13 @@ describe('SandboxControl mandatory worktree credentials', () => {
       expect(await storedGrants(control)).toEqual([]);
       expect(broker.kiloSubjects.size).toBe(0);
       expect(broker.githubSubjects.size).toBe(0);
+      expect(fixture.containers.launches).toEqual([]);
       await expect(control.getPhysicalRecord()).resolves.toMatchObject({
-        state: 'failed',
+        state: 'stopped',
         providerRef: null,
+        createIntent: null,
+        stopTombstone: null,
       });
-      await finishFailedCreation(control);
     }
   );
 
@@ -3575,6 +3742,7 @@ describe('SandboxControl native worktree containment', () => {
     ).resolves.toBeNull();
     const ws = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
     await completeHello(ws, 'hello-native-vercel', { providerInstanceId: providerRef });
+    captureAndAcceptControlRequests(ws);
 
     const rotatedKiloToken = 'fixture-rotated-kilo-token';
     broker.tokens.github = 'fixture-rotated-github-token';
@@ -4886,6 +5054,12 @@ describe('SandboxControl recovery watchdogs', () => {
     const id = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
     const control = env.SANDBOX_CONTROL.getByName(id);
     const { provider, allocations } = await installProvider(control, cloudflareRef(id));
+    await registerCredentialSession({
+      identity: { sessionId: GRANT_SESSION_ID, userId: 'owner_native_reaping' },
+      auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+      agent: {},
+      workspace: { sandboxId: id as SandboxId, workspacePath: '/workspace/reaping' },
+    });
     const firstNativeCall = Promise.withResolvers<void>();
     const nativeEntered = Promise.withResolvers<void>();
     let firstNativeSettled = false;
@@ -5159,6 +5333,13 @@ describe('SandboxControl acquisition receipts', () => {
       expect(provider.create).toHaveBeenCalledTimes(1);
       expect(provider.launch).toHaveBeenCalledTimes(1);
       expect(allocations.size).toBe(1);
+      const launch = provider.launch.mock.calls[0];
+      if (!launch) throw new Error('Expected acquisition wrapper launch');
+      const wrapper = await connect(launch[1].SANDBOX_CONTROL_CREDENTIAL, sandboxId);
+      await completeHello(wrapper, 'hello-lost-acquisition', {
+        providerInstanceId: launch[0],
+        wrapperInstanceId: crypto.randomUUID(),
+      });
       await control.beginStop('lost_acquisition_response');
       await fireControlDeadline(control, 'stopAttempt');
       await expect(control.getPhysicalRecord()).resolves.toMatchObject({
@@ -5349,6 +5530,12 @@ describe('SandboxControl durable remainder', () => {
     const stub = env.SANDBOX_CONTROL.getByName('sbx__control_routes');
     await runInDurableObject(stub, async (instance, state) => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       const route = await attachGrantedSession(instance, state, {
         sessionId: GRANT_SESSION_ID,
         kiloSessionId: ROOT_ID,
@@ -5717,7 +5904,7 @@ describe('SandboxControl durable remainder', () => {
     });
 
     const promptPayload = {
-      messageId: 'msg_a',
+      messageId: INITIAL_MESSAGE_ID,
       turn: { type: 'prompt', prompt: 'from a' },
       agent: { mode: 'code', model: 'test' },
     };
@@ -5909,7 +6096,9 @@ describe('SandboxSession control-plane regressions', () => {
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-        message: { initialTurn: { type: 'prompt', messageId: 'msg_cancelled_a', prompt: 'A' } },
+        message: {
+          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000001', prompt: 'A' },
+        },
       });
       const attachment = await attach.promise;
       const preparing = (await admissionState(session)).messages[0];
@@ -5996,7 +6185,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparing.preparationAttemptId,
       ]);
       expect(beforeReset.messages[0]).toMatchObject({
-        messageId: 'msg_cancelled_a',
+        messageId: 'msg_ffffffffffff00000000000001',
         state: 'cancelled',
       });
       expect(requests.filter(request => request.operation === 'session.prompt')).toEqual([]);
@@ -6018,7 +6207,7 @@ describe('SandboxSession control-plane regressions', () => {
         payload: {
           version: 2,
           attemptId: preparing.preparationAttemptId,
-          triggerMessageId: 'msg_cancelled_a',
+          triggerMessageId: 'msg_ffffffffffff00000000000001',
           revision: 1000,
           timestamp: Date.now(),
           step: 'ready',
@@ -6097,7 +6286,7 @@ describe('SandboxSession control-plane regressions', () => {
         })
       ).resolves.toEqual({ quarantined: false });
       expect((await admissionState(session)).messages).toMatchObject([
-        { messageId: 'msg_cancelled_a', state: 'cancelled' },
+        { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
         {
           ...b,
           state: 'accepted',
@@ -6187,7 +6376,13 @@ describe('SandboxSession control-plane regressions', () => {
             workspacePath: '/workspace/terminal',
             sandboxProvider,
           },
-          message: { initialTurn: { type: 'prompt', messageId: 'msg_delayed_a', prompt: 'A' } },
+          message: {
+            initialTurn: {
+              type: 'prompt',
+              messageId: 'msg_ffffffffffff00000000000002',
+              prompt: 'A',
+            },
+          },
         });
         await vi.waitFor(() => expect(heldRequest).toBeDefined());
         expect(heldRequest).toMatchObject({
@@ -6206,7 +6401,9 @@ describe('SandboxSession control-plane regressions', () => {
         });
         await vi.waitFor(() => expect(joined).toBe(true));
         await expect(session.interruptExecution()).resolves.toEqual({ success: true });
-        await expect(session.getMessageResult('msg_delayed_a')).resolves.toMatchObject({
+        await expect(
+          session.getMessageResult('msg_ffffffffffff00000000000002')
+        ).resolves.toMatchObject({
           type: 'found',
           result: { status: 'interrupted' },
         });
@@ -6282,7 +6479,7 @@ describe('SandboxSession control-plane regressions', () => {
         });
         const beforeDelivery = await admissionState(session);
         expect(beforeDelivery.messages).toMatchObject([
-          { messageId: 'msg_delayed_a', state: 'cancelled' },
+          { messageId: 'msg_ffffffffffff00000000000002', state: 'cancelled' },
           {
             messageId: 'msg_replacement_b',
             state: 'queued',
@@ -6322,10 +6519,11 @@ describe('SandboxSession control-plane regressions', () => {
         ).toEqual(['msg_replacement_b']);
         expect(oldRequests.filter(request => request.operation === operation)).toEqual([]);
         expect((await admissionState(session)).messages).toMatchObject([
-          { messageId: 'msg_delayed_a', state: 'cancelled' },
+          { messageId: 'msg_ffffffffffff00000000000002', state: 'cancelled' },
           {
             ...beforeDelivery.messages[1],
             state: 'accepted',
+            unresolvedDispatch: undefined,
             wrapperInstanceId: replacementFixture.wrapperInstanceId,
           },
         ]);
@@ -6378,7 +6576,13 @@ describe('SandboxSession control-plane regressions', () => {
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
           workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-          message: { initialTurn: { type: 'prompt', messageId: 'msg_stranded', prompt: 'head A' } },
+          message: {
+            initialTurn: {
+              type: 'prompt',
+              messageId: 'msg_ffffffffffff00000000000003',
+              prompt: 'head A',
+            },
+          },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
       await vi.waitFor(() => expect(entered).toBe(true));
@@ -6389,7 +6593,7 @@ describe('SandboxSession control-plane regressions', () => {
       expect(alarmAt).toBeGreaterThanOrEqual(admittedAt);
       expect(before.messages).toMatchObject([
         {
-          messageId: 'msg_stranded',
+          messageId: 'msg_ffffffffffff00000000000003',
           state: 'queued',
           deliveryDeadlineAt: expect.any(Number),
           preparationAttemptId: expect.any(String),
@@ -6415,7 +6619,7 @@ describe('SandboxSession control-plane regressions', () => {
           turn: { type: 'command', id: 'msg_fresh', command: 'status', arguments: '' },
         })
       ).resolves.toMatchObject({ success: true });
-      await waitForAccepted(session, 'msg_stranded');
+      await waitForAccepted(session, 'msg_ffffffffffff00000000000003');
       const recovered = await admissionState(session);
       expect(recovered.messages).toMatchObject([
         {
@@ -6426,13 +6630,13 @@ describe('SandboxSession control-plane regressions', () => {
         { messageId: 'msg_fresh', state: 'queued' },
       ]);
       expect(requests.filter(request => request.operation === 'session.prompt')).toHaveLength(1);
-      sendOutcome(socket, 'msg_stranded');
+      sendOutcome(socket, 'msg_ffffffffffff00000000000003');
       await waitForAccepted(session, 'msg_fresh');
       expect(
         requests
           .filter(request => request.operation === 'session.prompt')
           .map(request => sessionPromptPayloadSchema.parse(request.payload).messageId)
-      ).toEqual(['msg_stranded', 'msg_fresh']);
+      ).toEqual(['msg_ffffffffffff00000000000003', 'msg_fresh']);
       expect(provider.create).not.toHaveBeenCalled();
       expect(provider.launch).not.toHaveBeenCalled();
     } finally {
@@ -6456,7 +6660,8 @@ describe('SandboxSession control-plane regressions', () => {
         captureAndAcceptControlRequests(socket, request => {
           if (
             request.operation !== 'session.prompt' ||
-            sessionPromptPayloadSchema.parse(request.payload).messageId !== 'msg_early'
+            sessionPromptPayloadSchema.parse(request.payload).messageId !==
+              'msg_ffffffffffff00000000000004'
           )
             return false;
           held = request;
@@ -6471,7 +6676,7 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'command',
-              messageId: 'msg_early',
+              messageId: 'msg_ffffffffffff00000000000004',
               command: 'review',
               arguments: '--all',
             },
@@ -6488,9 +6693,11 @@ describe('SandboxSession control-plane regressions', () => {
           return instance.alarm();
         });
         await vi.waitFor(() => expect(joined).toBe(true));
-        sendOutcome(socket, 'msg_early', status);
+        sendOutcome(socket, 'msg_ffffffffffff00000000000004', status);
         await vi.waitFor(async () => {
-          await expect(session.getMessageResult('msg_early')).resolves.toMatchObject({
+          await expect(
+            session.getMessageResult('msg_ffffffffffff00000000000004')
+          ).resolves.toMatchObject({
             type: 'found',
             result: { status: status === 'cancelled' ? 'interrupted' : status },
           });
@@ -6498,11 +6705,13 @@ describe('SandboxSession control-plane regressions', () => {
         await waitForAccepted(session, 'msg_after_early');
         const terminal = await admissionState(session);
         const events = await lifecycleEvents(session);
-        expect(events.filter(event => event.data.messageId === 'msg_early')).toMatchObject([
+        expect(
+          events.filter(event => event.data.messageId === 'msg_ffffffffffff00000000000004')
+        ).toMatchObject([
           {
             type: status === 'completed' ? 'cloud.message.completed' : 'cloud.message.failed',
             data: {
-              messageId: 'msg_early',
+              messageId: 'msg_ffffffffffff00000000000004',
               status: status === 'cancelled' ? 'interrupted' : status,
               delivery: 'sent',
               accepted: true,
@@ -6517,7 +6726,12 @@ describe('SandboxSession control-plane regressions', () => {
         await expect(
           session.admitSubmittedMessage({
             userId: fixture.ownerId,
-            turn: { type: 'command', id: 'msg_early', command: 'review', arguments: '--all' },
+            turn: {
+              type: 'command',
+              id: 'msg_ffffffffffff00000000000004',
+              command: 'review',
+              arguments: '--all',
+            },
           })
         ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
         await expect(control.getStatus()).resolves.toMatchObject({
@@ -6547,19 +6761,21 @@ describe('SandboxSession control-plane regressions', () => {
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-        message: { initialTurn: { type: 'prompt', messageId: 'msg_old_a', prompt: 'A' } },
+        message: {
+          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000005', prompt: 'A' },
+        },
       });
-      await waitForAccepted(session, 'msg_old_a');
+      await waitForAccepted(session, 'msg_ffffffffffff00000000000005');
       const attemptId = (await admissionState(session)).messages[0]?.preparationAttemptId;
       expect(attemptId).toEqual(expect.any(String));
       await session.admitSubmittedMessage({
         userId: fixture.ownerId,
         turn: { type: 'command', id: 'msg_current_b', command: 'status', arguments: '' },
       });
-      sendOutcome(socket, 'msg_old_a');
+      sendOutcome(socket, 'msg_ffffffffffff00000000000005');
       await waitForAccepted(session, 'msg_current_b');
       const events = await lifecycleEvents(session);
-      sendOutcome(socket, 'msg_old_a');
+      sendOutcome(socket, 'msg_ffffffffffff00000000000005');
       socket.send(
         JSON.stringify({
           type: 'event',
@@ -6568,7 +6784,7 @@ describe('SandboxSession control-plane regressions', () => {
           payload: {
             version: 2,
             attemptId,
-            triggerMessageId: 'msg_old_a',
+            triggerMessageId: 'msg_ffffffffffff00000000000005',
             revision: 100,
             timestamp: Date.now(),
             step: 'workspace_setup',
@@ -6600,7 +6816,7 @@ describe('SandboxSession control-plane regressions', () => {
         });
       });
       expect((await admissionState(session)).messages).toMatchObject([
-        { messageId: 'msg_old_a', state: 'completed' },
+        { messageId: 'msg_ffffffffffff00000000000005', state: 'completed' },
         {
           messageId: 'msg_current_b',
           state: 'accepted',
@@ -6663,11 +6879,15 @@ describe('SandboxSession control-plane regressions', () => {
           agent: agentA,
           workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
           message: {
-            initialTurn: { type: 'prompt', messageId: 'msg_interrupt', prompt: 'interrupt me' },
+            initialTurn: {
+              type: 'prompt',
+              messageId: 'msg_ffffffffffff00000000000006',
+              prompt: 'interrupt me',
+            },
           },
         });
         await entered.promise;
-        if (phase === 'execution') await waitForAccepted(session, 'msg_interrupt');
+        if (phase === 'execution') await waitForAccepted(session, 'msg_ffffffffffff00000000000006');
         await session.admitSubmittedMessage({
           userId: fixture.ownerId,
           turn: { type: 'command', id: 'msg_cancel_follower', command: 'status', arguments: '' },
@@ -6682,7 +6902,7 @@ describe('SandboxSession control-plane regressions', () => {
         await expect(session.interruptExecution()).resolves.toMatchObject({ success: true });
         await vi.waitFor(() => expect(activeWork).toBe(false));
         expect((await admissionState(session)).messages).toMatchObject([
-          { messageId: 'msg_interrupt', state: 'cancelled' },
+          { messageId: 'msg_ffffffffffff00000000000006', state: 'cancelled' },
           { messageId: 'msg_cancel_follower', state: 'cancelled' },
         ]);
         if (phase === 'execution') {
@@ -6693,7 +6913,7 @@ describe('SandboxSession control-plane regressions', () => {
                 kiloSessionId: ROOT_ID,
                 directory: '/workspace/terminal',
               },
-              payload: { messageId: 'msg_interrupt' },
+              payload: { messageId: 'msg_ffffffffffff00000000000006' },
             },
           ]);
           expect(provider.stop).not.toHaveBeenCalled();
@@ -6712,10 +6932,10 @@ describe('SandboxSession control-plane regressions', () => {
         const failures = events.filter(event => event.type === 'cloud.message.failed');
         expect(failures.map(event => event.data.messageId).sort()).toEqual([
           'msg_cancel_follower',
-          'msg_interrupt',
+          'msg_ffffffffffff00000000000006',
         ]);
         expect(
-          failures.find(event => event.data.messageId === 'msg_interrupt')?.data
+          failures.find(event => event.data.messageId === 'msg_ffffffffffff00000000000006')?.data
         ).toMatchObject({
           status: 'interrupted',
           accepted: phase === 'execution',
@@ -6750,9 +6970,11 @@ describe('SandboxSession control-plane regressions', () => {
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-        message: { initialTurn: { type: 'prompt', messageId: 'msg_unhealthy', prompt: 'A' } },
+        message: {
+          initialTurn: { type: 'prompt', messageId: 'msg_ffffffffffff00000000000007', prompt: 'A' },
+        },
       });
-      await waitForAccepted(session, 'msg_unhealthy');
+      await waitForAccepted(session, 'msg_ffffffffffff00000000000007');
       socket.send(
         JSON.stringify({
           type: 'event',
@@ -6761,7 +6983,9 @@ describe('SandboxSession control-plane regressions', () => {
         })
       );
       await vi.waitFor(async () => {
-        await expect(session.getMessageResult('msg_unhealthy')).resolves.toMatchObject({
+        await expect(
+          session.getMessageResult('msg_ffffffffffff00000000000007')
+        ).resolves.toMatchObject({
           type: 'found',
           result: { status: 'failed' },
         });
@@ -6777,7 +7001,7 @@ describe('SandboxSession control-plane regressions', () => {
       ).toMatchObject([
         {
           data: {
-            messageId: 'msg_unhealthy',
+            messageId: 'msg_ffffffffffff00000000000007',
             accepted: true,
             delivery: 'sent',
             reason: 'kilo_unhealthy',
@@ -6843,7 +7067,11 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForAccepted(session, 'msg_recovered');
       await session.failWaitingMessages('late_old_runtime_failure', fixture.wrapperInstanceId);
       expect((await admissionState(session)).messages).toMatchObject([
-        { messageId: 'msg_unhealthy', state: 'failed', failedReason: 'kilo_unhealthy' },
+        {
+          messageId: 'msg_ffffffffffff00000000000007',
+          state: 'failed',
+          failedReason: 'kilo_unhealthy',
+        },
         {
           messageId: 'msg_recovered',
           state: 'accepted',
@@ -6886,14 +7114,14 @@ describe('SandboxSession control-plane regressions', () => {
           message: {
             initialTurn: {
               type: 'prompt',
-              messageId: 'msg_initial_model',
+              messageId: INITIAL_MESSAGE_ID,
               prompt: 'initial prompt',
             },
           },
         })
       ).resolves.toMatchObject({ success: true });
-      await waitForAccepted(session, 'msg_initial_model');
-      await completeTurn(session, 'msg_initial_model', fixture.wrapperInstanceId);
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
       await expect(
         session.admitSubmittedMessage({
           userId: fixture.ownerId,
@@ -6908,7 +7136,7 @@ describe('SandboxSession control-plane regressions', () => {
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: 'msg_initial_model',
+          messageId: INITIAL_MESSAGE_ID,
           turn: { type: 'prompt', prompt: 'initial prompt' },
           agent: { mode: 'architect', model: 'fake-deterministic', variant: 'high' },
           finalization: { autoCommit: true, condenseOnComplete: true },
@@ -6950,7 +7178,7 @@ describe('SandboxSession control-plane regressions', () => {
           auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
           agent: agentA,
           workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-          message: { initialTurn: { type: 'prompt', messageId: 'msg_a', prompt: 'A' } },
+          message: { initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' } },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
       await runInDurableObject(session, instance => instance.alarm());
@@ -6971,7 +7199,7 @@ describe('SandboxSession control-plane regressions', () => {
       expect(beforeReplay.metadata?.agent).toEqual({ mode: 'code', model: modelB });
       const replay: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_a', prompt: 'A' },
+        turn: { type: 'prompt', id: INITIAL_MESSAGE_ID, prompt: 'A' },
         agent: { model: 'anthropic/claude-sonnet-4' },
       };
       await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
@@ -7002,14 +7230,14 @@ describe('SandboxSession control-plane regressions', () => {
       signalWrapperReady(replacement);
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
-      await waitForAccepted(session, 'msg_a');
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
       const accepted = await admissionState(session);
       await expect(session.admitSubmittedMessage(replay)).resolves.toMatchObject({
         success: true,
         compatibilityDelivery: 'sent',
       });
       expect(await admissionState(session)).toEqual(accepted);
-      await completeTurn(session, 'msg_a', fixture.wrapperInstanceId);
+      await completeTurn(session, INITIAL_MESSAGE_ID, fixture.wrapperInstanceId);
       await waitForAccepted(session, 'msg_b');
       await completeTurn(session, 'msg_b', fixture.wrapperInstanceId);
       await waitForAccepted(session, 'msg_c');
@@ -7019,7 +7247,7 @@ describe('SandboxSession control-plane regressions', () => {
           .map(request => request.payload)
       ).toEqual([
         {
-          messageId: 'msg_a',
+          messageId: INITIAL_MESSAGE_ID,
           turn: { type: 'prompt', prompt: 'A' },
           agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
         },
@@ -7059,12 +7287,14 @@ describe('SandboxSession control-plane regressions', () => {
         identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: { mode: 'reviewer', model: agentA.model },
-        message: { initialTurn: { type: 'prompt', messageId: 'msg_initial', prompt: 'initial' } },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
+        },
       })
     ).resolves.toMatchObject({ success: true });
     const state = await admissionState(session);
     expect(state.messages[1]?.intent).toEqual({
-      turn: { type: 'prompt', messageId: 'msg_initial', prompt: 'initial' },
+      turn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
       agent: { mode: 'reviewer', model: agentA.model },
     });
     expect(state.metadata?.agent).toEqual({ mode: 'architect', model: agentA.model });
@@ -7572,7 +7802,9 @@ describe('SandboxSession control-plane regressions', () => {
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
         agent: agentA,
         workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
-        message: { initialTurn: { type: 'prompt', messageId: 'msg_retry_a', prompt: 'retry A' } },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'retry A' },
+        },
       });
       const firstRequest = await entered.promise;
       const original = (await admissionState(session)).messages[0]?.intent;
@@ -7584,7 +7816,7 @@ describe('SandboxSession control-plane regressions', () => {
       await vi.waitFor(() => expect(alarmStarted).toBe(true));
       const replay: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
-        turn: { type: 'prompt', id: 'msg_retry_a', prompt: 'retry A' },
+        turn: { type: 'prompt', id: INITIAL_MESSAGE_ID, prompt: 'retry A' },
       };
       await expect(
         Promise.all([session.admitSubmittedMessage(replay), session.admitSubmittedMessage(replay)])
@@ -7619,19 +7851,19 @@ describe('SandboxSession control-plane regressions', () => {
         })
       ).resolves.toMatchObject({ success: true });
       await runInDurableObject(session, instance => instance.alarm());
-      await waitForAccepted(session, 'msg_retry_a');
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
       await runInDurableObject(session, instance => instance.alarm());
       const delivered = requests.filter(request => request.operation === 'session.prompt');
       expect(delivered).toHaveLength(2);
       expect(delivered[0]?.payload).toEqual(delivered[1]?.payload);
       expect(delivered[1]?.payload).toEqual({
-        messageId: 'msg_retry_a',
+        messageId: INITIAL_MESSAGE_ID,
         turn: { type: 'prompt', prompt: 'retry A' },
         agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
       });
       const accepted = await admissionState(session);
       expect(accepted.messages).toMatchObject([
-        { messageId: 'msg_retry_a', state: 'accepted', promptFailures: 1, intent: original },
+        { messageId: INITIAL_MESSAGE_ID, state: 'accepted', promptFailures: 1, intent: original },
         { messageId: 'msg_retry_b', state: 'queued' },
       ]);
       expect(accepted.metadata?.agent).toEqual({ mode: 'code', model: modelB });
@@ -7693,151 +7925,150 @@ describe('SandboxSession control-plane regressions', () => {
     }
   });
 
-  it('aborts and detaches a deleted session without stopping active sibling work', async () => {
-    const userId = 'user_control_delete';
-    const sessionId = GRANT_SESSION_ID;
-    const siblingSessionId = SECOND_GRANT_SESSION_ID;
-    const controlId = 'usr-de1e7ed';
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(controlId);
-    const { provider } = await installProvider(control, cloudflareRef(controlId));
-    await runInDurableObject(control, async (instance, state) => {
-      await instance.initializeOwner(userId);
-      await seedRunningCloudflare(instance);
-      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
-      await attachGrantedSession(instance, state, {
-        sessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/deleted',
-        ownerId: userId,
-      });
-      await attachGrantedSession(instance, state, {
-        sessionId: siblingSessionId,
-        kiloSessionId: SECOND_ROOT_ID,
-        directory: '/workspace/sibling',
-        ownerId: userId,
-      });
-      const routes = await loadRouteTable(state.storage);
-      for (const kiloSessionId of [ROOT_ID, SECOND_ROOT_ID]) {
-        applyReportedSessionState(
-          routes,
-          kiloSessionId,
-          { state: 'active', idleForMs: 0 },
-          Date.now()
+  it.each(['accepted', 'failed', 'accepted_overdue'] as const)(
+    'detaches a deleted root with %s work while preserving its sibling and message-scoped interrupts',
+    async messageState => {
+      const userId = 'user_control_delete';
+      const sessionId = GRANT_SESSION_ID;
+      const siblingSessionId = SECOND_GRANT_SESSION_ID;
+      const controlId = `usr-${crypto.randomUUID().replaceAll('-', '')}` as const;
+      const wrapperInstanceId = crypto.randomUUID();
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(controlId);
+      const { provider } = await installProvider(control, cloudflareRef(controlId));
+      await runInDurableObject(control, async (instance, state) => {
+        await instance.initializeOwner(userId);
+        await seedRunningCloudflare(instance);
+        await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
+        await attachGrantedSession(instance, state, groupedRoute(sessionId, ROOT_ID, userId));
+        await attachGrantedSession(
+          instance,
+          state,
+          groupedRoute(siblingSessionId, SECOND_ROOT_ID, userId)
         );
-      }
-      await saveRouteTable(state.storage, routes);
-    });
-
-    const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
-    await runInDurableObject(session, async (instance, state) => {
-      await instance.registerSession({
-        identity: { sessionId, userId },
-        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
-        agent: { mode: 'code', model: 'test' },
-        workspace: { sandboxId: controlId, workspacePath: '/workspace/deleted' },
-      });
-      await state.storage.put('session_messages', [
-        {
-          messageId: 'msg_deleted',
-          state: 'accepted',
-          acceptedAt: 1,
-          lastActivityAt: 1,
-        } satisfies SessionMessageRecord,
-      ]);
-    });
-
-    const ws = await connect(credential, controlId);
-    await completeHello(ws, 'hello-shared-delete', {
-      providerInstanceId: cloudflareRef(controlId),
-      wrapperInstanceId: crypto.randomUUID(),
-    });
-    signalWrapperReady(ws);
-    await vi.waitFor(async () => {
-      await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
-    });
-    ws.send(
-      JSON.stringify({
-        type: 'event',
-        event: 'sandbox.heartbeat',
-        payload: {
-          state: 'active',
-          kilo: { ready: true },
-          sessions: [ROOT_ID, SECOND_ROOT_ID].map(kiloSessionId => ({
+        const routes = await loadRouteTable(state.storage);
+        for (const kiloSessionId of [ROOT_ID, SECOND_ROOT_ID]) {
+          applyReportedSessionState(
+            routes,
             kiloSessionId,
-            state: 'active',
-            idleForMs: 0,
-          })),
-        },
-      })
-    );
-    await vi.waitFor(async () => {
-      await runInDurableObject(control, async (_instance, state) => {
-        expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+            { state: 'active', idleForMs: 0 },
+            Date.now()
+          );
+        }
+        await saveRouteTable(state.storage, routes);
       });
-    });
-    const abortRequests: {
-      operation: string;
-      session: { sessionId: string; kiloSessionId: string; directory: string };
-    }[] = [];
-    ws.addEventListener('message', event => {
-      const request = JSON.parse(String(event.data)) as {
-        operation?: string;
-        requestId: string;
+
+      const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          identity: { sessionId, userId },
+          auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+          agent: { mode: 'code', model: 'test' },
+          workspace: {
+            sandboxId: controlId,
+            workspacePath: '/workspace/shared',
+            worktreeId: WORKTREE_ID,
+          },
+        });
+        const acceptedAt = messageState === 'accepted_overdue' ? 1 : Date.now();
+        await state.storage.put('session_messages', [
+          {
+            messageId: 'msg_deleted',
+            state: messageState === 'accepted' ? 'accepted' : 'failed',
+            ...(messageState === 'accepted_overdue' ? { failedReason: 'accepted_overdue' } : {}),
+            wrapperInstanceId,
+            acceptedAt,
+            lastActivityAt: acceptedAt,
+          } satisfies SessionMessageRecord,
+        ]);
+        if (messageState !== 'accepted') {
+          await expect(instance.getCurrentMessageWork()).resolves.toBeNull();
+        }
+      });
+
+      const ws = await connect(credential, controlId);
+      await completeHello(ws, 'hello-shared-delete', {
+        providerInstanceId: cloudflareRef(controlId),
+        wrapperInstanceId,
+      });
+      signalWrapperReady(ws);
+      await vi.waitFor(async () => {
+        await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+      });
+      ws.send(
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.heartbeat',
+          payload: {
+            state: 'active',
+            kilo: { ready: true },
+            sessions: [ROOT_ID, SECOND_ROOT_ID].map(kiloSessionId => ({
+              kiloSessionId,
+              state: 'active',
+              idleForMs: 0,
+            })),
+          },
+        })
+      );
+      await vi.waitFor(async () => {
+        await runInDurableObject(control, async (_instance, state) => {
+          expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+        });
+      });
+      const lifecycleRequests: {
+        operation: string;
         session: { sessionId: string; kiloSessionId: string; directory: string };
-      };
-      if (request.operation === 'session.abort') {
-        abortRequests.push({ operation: request.operation, session: request.session });
+      }[] = [];
+      ws.addEventListener('message', event => {
+        const request = JSON.parse(String(event.data)) as {
+          operation?: string;
+          requestId: string;
+          session: { sessionId: string; kiloSessionId: string; directory: string };
+        };
+        if (request.operation !== 'session.abort' && request.operation !== 'session.detach') return;
+        lifecycleRequests.push({ operation: request.operation, session: request.session });
         ws.send(
           JSON.stringify({
             type: 'response',
             requestId: request.requestId,
             ok: true,
-            result: { status: 'aborted' },
+            result:
+              request.operation === 'session.abort' ? { status: 'aborted' } : { detached: true },
           })
         );
-        return;
-      }
-      if (request.operation !== 'session.detach') return;
-      ws.send(
-        JSON.stringify({
-          type: 'response',
-          requestId: request.requestId,
-          ok: true,
-          result: { detached: true },
-        })
-      );
-    });
+      });
 
-    await runInDurableObject(session, instance => instance.deleteSession());
-    await runInDurableObject(control, async (instance, state) => {
-      await expect(instance.listRoutes()).resolves.toEqual([
-        expect.objectContaining({
-          sessionId: siblingSessionId,
-          kiloSessionId: SECOND_ROOT_ID,
-          lastState: 'active',
-        }),
-      ]);
-      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
-      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
-    });
-    await runInDurableObject(session, async instance => {
-      await expect(instance.getMetadata()).resolves.toBeNull();
-    });
-    expect(abortRequests).toEqual([
-      {
-        operation: 'session.abort',
-        session: {
-          sessionId,
-          kiloSessionId: ROOT_ID,
-          directory: '/workspace/deleted',
-        },
-      },
-    ]);
-    expect(provider.stop).not.toHaveBeenCalled();
-    expect(provider.create).not.toHaveBeenCalled();
-    ws.close();
-  });
+      await runInDurableObject(session, instance => instance.deleteSession());
+      await runInDurableObject(control, async (instance, state) => {
+        await expect(instance.listRoutes()).resolves.toEqual([
+          expect.objectContaining({
+            sessionId: siblingSessionId,
+            kiloSessionId: SECOND_ROOT_ID,
+            lastState: 'active',
+          }),
+        ]);
+        await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+        expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+        expect(
+          (await loadSessionCredentialGrants(state.storage)).flatMap(grant => grant.members)
+        ).toEqual([{ sessionId: siblingSessionId, kiloSessionId: SECOND_ROOT_ID }]);
+      });
+      await runInDurableObject(session, async instance => {
+        await expect(instance.getMetadata()).resolves.toBeNull();
+      });
+      const operations =
+        messageState === 'accepted' ? ['session.abort', 'session.detach'] : ['session.detach'];
+      expect(lifecycleRequests).toEqual(
+        operations.map(operation => ({
+          operation,
+          session: { sessionId, kiloSessionId: ROOT_ID, directory: '/workspace/shared' },
+        }))
+      );
+      expect(provider.stop).not.toHaveBeenCalled();
+      expect(provider.create).not.toHaveBeenCalled();
+      ws.close();
+    }
+  );
 
   it('preserves repository branches and structured initial and follow-up command turns', async () => {
     const userId = 'user_control_commands' as const;
@@ -7859,7 +8090,7 @@ describe('SandboxSession control-plane regressions', () => {
       } as const;
       const initialTurn = {
         type: 'command',
-        messageId: 'msg_initial_command',
+        messageId: INITIAL_MESSAGE_ID,
         command: 'review',
         arguments: '--all changes',
       } as const;
@@ -7976,6 +8207,143 @@ describe('SandboxSession control-plane regressions', () => {
 });
 
 describe('SandboxControl terminal runtime coordination', () => {
+  it('reuses one billed allocation for sibling roots and authorizes their terminals without weakening payer, actor, or physical identity', async () => {
+    const { control, registration, sandboxId } = await credentialFixture(
+      'cloudflare',
+      'ses-b111ed'
+    );
+    const { provider } = await installProvider(control);
+    const sibling: CredentialRegistration = {
+      ...registration,
+      identity: { ...registration.identity, sessionId: SECOND_GRANT_SESSION_ID },
+      auth: { ...registration.auth, kiloSessionId: SECOND_ROOT_ID },
+    };
+    await registerCredentialSession(sibling);
+    const organizationId = registration.identity.orgId;
+    if (!organizationId) throw new Error('Missing fixture payer');
+    const billing: SandboxBillingInput = {
+      sandboxId,
+      subject: { type: 'org', id: organizationId },
+      actor: { type: 'user', id: registration.identity.userId },
+      sessionId: registration.identity.sessionId,
+      enforcementRequested: true,
+    };
+    const first = await control.ensureReady({
+      ...credentialInput(registration),
+      allowCreate: true,
+      billing,
+    });
+    const physical = await control.getPhysicalRecord();
+    const second = await control.ensureReady({
+      ...credentialInput(sibling),
+      allowCreate: false,
+      billing: { ...billing, sessionId: sibling.identity.sessionId },
+    });
+    expect(provider.create).toHaveBeenCalledTimes(1);
+    expect(provider.launch).toHaveBeenCalledTimes(1);
+    expect(provider.create.mock.calls[0]?.[0].billing).toMatchObject({
+      ...billing,
+      sessionId: GRANT_SESSION_ID,
+    });
+    expect(provider.ensureBillingAdmission).toHaveBeenCalledWith(physical.providerRef, {
+      ...billing,
+      sessionId: GRANT_SESSION_ID,
+    });
+    expect(await control.getPhysicalRecord()).toEqual(physical);
+    for (const change of [
+      { subject: { type: 'org', id: 'other-org' } },
+      { actor: { type: 'bot', id: 'other-bot' }, onBehalfOf: billing.subject },
+    ] as const) {
+      const rejected = control
+        .ensureReady({
+          ...credentialInput(sibling),
+          allowCreate: false,
+          billing: { ...billing, ...change, sessionId: sibling.identity.sessionId },
+        })
+        .then(
+          () => null,
+          (error: unknown) => error
+        );
+      expect(await rejected).toMatchObject({ message: 'Sandbox billing allocation mismatch' });
+    }
+    if (!first.attachment || !second.attachment) throw new Error('Missing sibling attachments');
+    await control.attachSession(attachInput(registration, first.attachment));
+    await control.attachSession(attachInput(sibling, second.attachment));
+    const launch = provider.launch.mock.calls[0];
+    const native = decodeCloudflareProviderRef(physical.providerRef);
+    if (!launch || !native) throw new Error('Missing billed physical allocation');
+    const wrapperInstanceId = crypto.randomUUID();
+    const socket = await connect(launch[1].SANDBOX_CONTROL_CREDENTIAL, sandboxId);
+    try {
+      await completeHello(socket, 'hello-billed-siblings', {
+        providerInstanceId: launch[0],
+        wrapperInstanceId,
+      });
+      signalWrapperReady(socket);
+      await vi.waitFor(async () => {
+        await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+      });
+      await runInDurableObject(control, async instance => {
+        const namespace = instance['env'].SandboxSmallContainment;
+        const context: BillingContext = {
+          service: 'cloud-agent-next-sandbox-small-containment',
+          instanceId: native.sandboxId,
+          sku: SANDBOX_USAGE_SKUS.SandboxSmallContainment,
+          subject: billing.subject,
+          actor: billing.actor,
+          sessionId: GRANT_SESSION_ID,
+          metadata: {
+            container_class: 'SandboxSmallContainment',
+            durable_object_id: namespace.idFromName(native.sandboxId).toString(),
+          },
+          startEpochMs: Date.now(),
+          generation: crypto.randomUUID(),
+          measurementStarted: true,
+          nextSeq: 1,
+          usageMeasuredAtMs: Date.now(),
+        };
+        let measured = context;
+        const get = namespace.get.bind(namespace);
+        vi.spyOn(namespace, 'get').mockImplementation(id =>
+          Object.assign(get(id), {
+            getBillingRuntimeStatus: async () => ({
+              sandboxClassName: 'SandboxSmallContainment',
+              running: true,
+              blocked: false,
+              context: measured,
+            }),
+          })
+        );
+        Object.assign(instance['env'], {
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+          CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: organizationId,
+        });
+        for (const member of [registration, sibling]) {
+          const access = { ...credentialInput(member), organizationId, wrapperInstanceId };
+          await expect(instance.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
+          await expect(instance.recordTerminalActivity(access)).resolves.toEqual({ allowed: true });
+          for (const [change, reason] of [
+            [{ subject: { type: 'org', id: 'other-org' } }, 'billing_payer_mismatch'],
+            [{ actor: { type: 'user', id: 'other-user' } }, 'billing_actor_mismatch'],
+            [{ instanceId: 'ses-f0e1' }, 'billing_runtime_mismatch'],
+            [{ sessionId: SECOND_GRANT_SESSION_ID }, 'billing_session_mismatch'],
+          ] as const) {
+            measured = { ...context, ...change };
+            await expect(instance.validateTerminalAccess(access)).resolves.toEqual({
+              allowed: false,
+              reason,
+            });
+          }
+          measured = context;
+        }
+      });
+      expect(provider.create).toHaveBeenCalledTimes(1);
+      expect(provider.launch).toHaveBeenCalledTimes(1);
+    } finally {
+      socket.close();
+    }
+  });
+
   it.each(['cloudflare', 'vercel'] as const)(
     'renews near-expiry and expired %s grants through authenticated terminal activity',
     async provider => {
@@ -8233,6 +8601,14 @@ describe('SandboxControl terminal runtime coordination', () => {
     signalWrapperReady(socket);
     await waitForWrapperReady(fixture);
 
+    const detached = nextMessage(socket).then(message => {
+      const request = JSON.parse(message) as WrapperRequest;
+      expect(request).toMatchObject({
+        operation: 'session.detach',
+        session: { sessionId: fixture.sessionId },
+      });
+      respondToWrapperRequest(socket, request, { detached: true });
+    });
     await runInDurableObject(control, async instance => {
       const input = {
         sessionId: fixture.sessionId,
@@ -8258,6 +8634,7 @@ describe('SandboxControl terminal runtime coordination', () => {
         reason: 'session_not_attached',
       });
     });
+    await detached;
     socket.close();
   });
 
@@ -8271,12 +8648,16 @@ describe('SandboxControl terminal runtime coordination', () => {
 
     await runInDurableObject(control, async (instance, state) => {
       await instance.initializeOwner(input.ownerId);
-      await attachGrantedSession(instance, state, {
+      const attachment = {
         sessionId: input.sessionId,
         kiloSessionId: ROOT_ID,
         directory: '/workspace/terminal',
         ownerId: input.ownerId,
-      });
+      };
+      await seedGrant(instance, state, attachment);
+      const routes = await loadRouteTable(state.storage);
+      attachRoute(routes, attachment, input.ownerId);
+      await saveRouteTable(state.storage, routes);
       await expect(instance.validateTerminalAccess(input)).resolves.toEqual({
         allowed: false,
         reason: 'runtime_not_running',
@@ -8565,4 +8946,2403 @@ describe('SandboxControl terminal runtime coordination', () => {
       }
     }
   );
+});
+
+describe('SandboxControl worktree routes', () => {
+  it('durably preserves concurrent sibling attaches in one directory', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx__worktree_concurrent_attach');
+
+    const routes = await runInDurableObject(stub, async instance => {
+      await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await Promise.all([
+        attachGrantedSession(instance, instance['ctx'], groupedRoute(GRANT_SESSION_ID, ROOT_ID)),
+        attachGrantedSession(
+          instance,
+          instance['ctx'],
+          groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)
+        ),
+      ]);
+      return instance.listRoutes();
+    });
+
+    expect(routes).toHaveLength(2);
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining(groupedRoute(GRANT_SESSION_ID, ROOT_ID)),
+        expect.objectContaining(groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)),
+      ])
+    );
+  });
+
+  it('rejects mismatched groups, duplicate roots, and worktree directory divergence', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx__worktree_route_conflicts');
+
+    await runInDurableObject(stub, async instance => {
+      await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(GRANT_SESSION_ID, ROOT_ID)
+      );
+
+      await expect(
+        attachGrantedSession(instance, instance['ctx'], {
+          ...groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID),
+          worktreeId: OTHER_WORKTREE_ID,
+        })
+      ).rejects.toThrow('Directory already attached');
+      await expect(
+        attachGrantedSession(instance, instance['ctx'], {
+          ...groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID),
+          directory: '/workspace/other',
+        })
+      ).rejects.toThrow('Worktree already attached to another directory');
+      await expect(
+        attachGrantedSession(
+          instance,
+          instance['ctx'],
+          groupedRoute(SECOND_GRANT_SESSION_ID, ROOT_ID)
+        )
+      ).rejects.toThrow('Kilo session already attached');
+      await expect(
+        attachGrantedSession(instance, instance['ctx'], {
+          sessionId: SECOND_GRANT_SESSION_ID,
+          kiloSessionId: SECOND_ROOT_ID,
+          directory: '/workspace/shared',
+          ownerId: 'owner_1',
+        })
+      ).rejects.toThrow('Directory already attached');
+
+      expect(await instance.listRoutes()).toHaveLength(1);
+    });
+  });
+
+  it('retains ungrouped persisted routes without inventing a worktree', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx__worktree_legacy_route');
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await state.storage.put('session_routes', [
+        {
+          sessionId: 'workspace_legacy',
+          kiloSessionId: 'kilo_legacy',
+          directory: '/workspace/shared',
+          ownerId: 'owner_1',
+          lastState: null,
+          lastStateAt: null,
+          idleForMs: null,
+          waitingOn: null,
+          needsSync: false,
+          stalled: false,
+        },
+      ]);
+
+      expect(await instance.listRoutes()).toEqual([
+        expect.not.objectContaining({ worktreeId: expect.anything() }),
+      ]);
+      await expect(
+        attachGrantedSession(instance, instance['ctx'], groupedRoute(GRANT_SESSION_ID, ROOT_ID))
+      ).rejects.toThrow('Directory already attached');
+    });
+  });
+});
+
+describe('SandboxControl targeted detach', () => {
+  it('awaits live wrapper detach and preserves siblings attached during that request', async () => {
+    const targetSandboxId = 'sbx__worktree_live_detach';
+    const credential = generateSandboxCredential();
+    const stub = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedRunningCredential(credential, targetSandboxId);
+    await runInDurableObject(stub, async instance => {
+      await instance.initializeOwner('owner_1');
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(GRANT_SESSION_ID, ROOT_ID)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)
+      );
+    });
+
+    const ws = await connect(credential, targetSandboxId);
+    await completeHello(ws, 'hello-live-detach');
+    const inbound = nextMessage(ws);
+    const pending = runInDurableObject(stub, instance =>
+      instance.detachSession(SECOND_GRANT_SESSION_ID)
+    );
+    const request = JSON.parse(await inbound) as WrapperRequest;
+    expect(request).toMatchObject({
+      operation: 'session.detach',
+      session: {
+        sessionId: SECOND_GRANT_SESSION_ID,
+        kiloSessionId: SECOND_ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+
+    await runInDurableObject(stub, async instance => {
+      expect(await instance.listRoutes()).toHaveLength(2);
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute('workspace_33333333-3333-4333-8333-333333333333', THIRD_ROOT_ID)
+      );
+    });
+    respondToWrapperRequest(ws, request, { detached: true });
+    await expect(pending).resolves.toEqual({ existed: true });
+
+    await runInDurableObject(stub, async instance => {
+      expect((await instance.listRoutes()).map(route => route.sessionId).sort()).toEqual([
+        GRANT_SESSION_ID,
+        'workspace_33333333-3333-4333-8333-333333333333',
+      ]);
+    });
+    ws.close();
+  });
+
+  it('retains the durable route when a connected wrapper rejects detach', async () => {
+    const targetSandboxId = 'sbx__worktree_failed_detach';
+    const credential = generateSandboxCredential();
+    const stub = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedRunningCredential(credential, targetSandboxId);
+    await runInDurableObject(stub, async instance => {
+      await instance.initializeOwner('owner_1');
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(GRANT_SESSION_ID, ROOT_ID)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)
+      );
+    });
+
+    const ws = await connect(credential, targetSandboxId);
+    await completeHello(ws, 'hello-failed-detach');
+    const inbound = nextMessage(ws);
+    const pending = runInDurableObject(stub, instance =>
+      instance.detachSession(SECOND_GRANT_SESSION_ID)
+    );
+    const request = JSON.parse(await inbound) as WrapperRequest;
+    ws.send(
+      JSON.stringify({
+        type: 'response',
+        requestId: request.requestId,
+        ok: false,
+        error: { code: 'not_ready', message: 'detach rejected', retryable: true },
+      })
+    );
+
+    await expect(pending).rejects.toThrow('detach rejected');
+    await runInDurableObject(stub, async instance => {
+      expect((await instance.listRoutes()).map(route => route.sessionId).sort()).toEqual([
+        GRANT_SESSION_ID,
+        SECOND_GRANT_SESSION_ID,
+      ]);
+    });
+    ws.close();
+  });
+
+  it('removes a disconnected root without disturbing siblings or arming idle stop', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx__worktree_disconnected_detach');
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(GRANT_SESSION_ID, ROOT_ID)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)
+      );
+
+      await expect(instance.detachSession(SECOND_GRANT_SESSION_ID)).resolves.toEqual({
+        existed: true,
+      });
+      await expect(instance.detachSession(SECOND_GRANT_SESSION_ID)).resolves.toEqual({
+        existed: false,
+      });
+      expect(await instance.listRoutes()).toEqual([
+        expect.objectContaining({ sessionId: GRANT_SESSION_ID, kiloSessionId: ROOT_ID }),
+      ]);
+      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+    });
+  });
+});
+
+describe('SandboxControl worktree activity deadlines', () => {
+  it('tracks both roots, retains a prompt handoff deadline until heartbeat, and re-arms after detach', async () => {
+    const targetSandboxId = 'sbx__worktree_idle_deadlines';
+    const credential = generateSandboxCredential();
+    const stub = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedRunningCredential(credential, targetSandboxId);
+    await runInDurableObject(stub, async instance => {
+      await instance.initializeOwner('owner_1');
+      await seedRunningCloudflare(instance);
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(GRANT_SESSION_ID, ROOT_ID)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID)
+      );
+    });
+
+    const ws = await connect(credential, targetSandboxId);
+    await completeHello(ws, 'hello-idle-deadlines');
+    await deliverWrapperEvent(stub, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      const deadlines = await state.storage.get<{ idleStop?: number }>('deadlines');
+      expect(deadlines?.idleStop).toEqual(expect.any(Number));
+    });
+
+    await deliverWrapperEvent(stub, 'sandbox.heartbeat', {
+      state: 'finalizing',
+      kilo: { ready: true },
+      sessions: [
+        { kiloSessionId: ROOT_ID, state: 'idle', idleForMs: 15 },
+        {
+          kiloSessionId: SECOND_ROOT_ID,
+          state: 'finalizing',
+          idleForMs: 3,
+          waitingOn: 'finalizing',
+        },
+      ],
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await instance.listRoutes()).toEqual([
+        expect.objectContaining({ kiloSessionId: ROOT_ID, lastState: 'idle', idleForMs: 15 }),
+        expect.objectContaining({
+          kiloSessionId: SECOND_ROOT_ID,
+          lastState: 'finalizing',
+          waitingOn: 'finalizing',
+        }),
+      ]);
+      await expect(instance.getStatus()).resolves.toMatchObject({ work: 'finalizing' });
+      expect(
+        (await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop
+      ).toBeUndefined();
+    });
+
+    await deliverWrapperEvent(stub, 'sandbox.heartbeat', {
+      state: 'idle',
+      kilo: { ready: true },
+      sessions: [
+        { kiloSessionId: ROOT_ID, state: 'idle', idleForMs: 25 },
+        { kiloSessionId: SECOND_ROOT_ID, state: 'idle', idleForMs: 5 },
+      ],
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect((await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop).toEqual(
+        expect.any(Number)
+      );
+    });
+
+    const inboundPrompt = nextMessage(ws);
+    const prompt = runInDurableObject(stub, instance =>
+      instance.request({
+        operation: 'session.prompt',
+        session: {
+          sessionId: SECOND_GRANT_SESSION_ID,
+          kiloSessionId: SECOND_ROOT_ID,
+          directory: '/workspace/shared',
+        },
+        payload: {
+          messageId: 'msg_idle_handoff',
+          turn: { type: 'prompt', prompt: 'remain active' },
+          agent: { mode: 'code', model: 'test' },
+        },
+      })
+    );
+    const promptRequest = JSON.parse(await inboundPrompt) as WrapperRequest;
+    await runInDurableObject(stub, async (instance, state) => {
+      const deadline = (await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop;
+      expect(deadline).toBeGreaterThan(Date.now());
+      expect(deadline).toBeLessThanOrEqual(Date.now() + DEADLINE_MS.idleStop);
+      expect(await instance.listRoutes()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kiloSessionId: ROOT_ID, lastState: 'idle' }),
+          expect.objectContaining({ kiloSessionId: SECOND_ROOT_ID, lastState: 'active' }),
+        ])
+      );
+    });
+    respondToWrapperRequest(ws, promptRequest, {
+      messageId: 'msg_idle_handoff',
+      status: 'accepted',
+    });
+    await expect(prompt).resolves.toMatchObject({ ok: true });
+
+    await deliverWrapperEvent(stub, 'sandbox.heartbeat', {
+      state: 'active',
+      kilo: { ready: true },
+      sessions: [
+        { kiloSessionId: ROOT_ID, state: 'active', idleForMs: 0, waitingOn: 'tool' },
+        { kiloSessionId: SECOND_ROOT_ID, state: 'idle', idleForMs: 2 },
+      ],
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      await expect(instance.getStatus()).resolves.toMatchObject({ work: 'active' });
+      expect(
+        (await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop
+      ).toBeUndefined();
+    });
+
+    const inboundDetach = nextMessage(ws);
+    const detached = runInDurableObject(stub, instance => instance.detachSession(GRANT_SESSION_ID));
+    const detachRequest = JSON.parse(await inboundDetach) as WrapperRequest;
+    expect(detachRequest.session?.kiloSessionId).toBe(ROOT_ID);
+    respondToWrapperRequest(ws, detachRequest, { detached: true });
+    await expect(detached).resolves.toEqual({ existed: true });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await instance.listRoutes()).toEqual([
+        expect.objectContaining({ kiloSessionId: SECOND_ROOT_ID, lastState: 'idle' }),
+      ]);
+      expect((await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop).toEqual(
+        expect.any(Number)
+      );
+    });
+    ws.close();
+  });
+});
+
+describe('SandboxSession worktree admission', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each([true, false, undefined])(
+    'preserves repository branches, exact providers, and grouped auto-commit %s on registration',
+    async autoCommit => {
+      const ownerId = 'user_grouped_registration';
+      const sessionId = 'workspace_grouped_registration';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      const registration = {
+        ...groupedRegistration({
+          ownerId,
+          sessionId,
+          kiloSessionId: 'kilo_grouped_registration',
+          sandboxId: 'ses-acde1234',
+          provider: 'vercel',
+        }),
+        finalization: { autoCommit, condenseOnComplete: true },
+      };
+
+      const metadata = await runInDurableObject(stub, async instance => {
+        expect(await instance.registerSession(registration)).toEqual({ success: true });
+        const registered = await instance.getMetadata();
+        expect(
+          await instance.registerSession({
+            ...registration,
+            finalization: { autoCommit: !autoCommit, condenseOnComplete: false },
+          })
+        ).toEqual({ success: true });
+        expect(await instance.getMetadata()).toEqual(registered);
+        return registered;
+      });
+
+      expect(metadata).toMatchObject({
+        repository: {
+          type: 'github',
+          repo: 'Kilo-Org/cloud',
+          upstreamBranch: 'feature/shared-worktree',
+        },
+        workspace: {
+          sandboxId: 'ses-acde1234',
+          sandboxProvider: 'vercel',
+          workspacePath: '/workspace/shared',
+          worktreeId: WORKTREE_ID,
+        },
+        finalization: { autoCommit, condenseOnComplete: true },
+      });
+    }
+  );
+
+  it('persists canonical prompt identity and attachments during registration-only creation', async () => {
+    const ownerId = 'user_grouped_registered_prompt';
+    const sessionId = 'workspace_grouped_registered_prompt';
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+
+    await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegistration({
+          ownerId,
+          sessionId,
+          kiloSessionId: 'kilo_grouped_registered_prompt',
+          sandboxId: 'usr-abcdef123410',
+        }),
+        message: {
+          initialMessageId: INITIAL_MESSAGE_ID,
+          turn: {
+            type: 'prompt',
+            id: INITIAL_MESSAGE_ID,
+            prompt: 'inspect the document',
+            attachments,
+          },
+        },
+      });
+
+      expect((await instance.getMetadata())?.initialMessage).toEqual({
+        id: INITIAL_MESSAGE_ID,
+        prompt: 'inspect the document',
+        attachments,
+        turn: { type: 'prompt', prompt: 'inspect the document', attachments },
+      });
+    });
+  });
+
+  it('preserves auto-commit for ungrouped sessions', async () => {
+    const ownerId = 'user_ungrouped_registration';
+    const sessionId = 'workspace_ungrouped_registration';
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+
+    const metadata = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        identity: { sessionId, userId: ownerId },
+        auth: { kiloSessionId: 'kilo_ungrouped_registration' },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: { sandboxId: 'usr-abcdef12', workspacePath: '/workspace/legacy' },
+        finalization: { autoCommit: true },
+      });
+      return instance.getMetadata();
+    });
+
+    expect(metadata?.workspace?.worktreeId).toBeUndefined();
+    expect(metadata?.finalization?.autoCommit).toBe(true);
+  });
+
+  it.each([true, false, undefined])(
+    'resolves grouped auto-commit %s before first attach and prompt delivery',
+    async autoCommit => {
+      const ownerId = 'user_grouped_initial';
+      const sessionId = GRANT_SESSION_ID;
+      const targetSandboxId = 'usr-abcdef123401';
+      const kiloSessionId = ROOT_ID;
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+      await seedCredential(credential, targetSandboxId);
+      await runInDurableObject(control, async instance => {
+        await instance.initializeOwner(ownerId);
+        await seedRunningCloudflare(instance);
+      });
+      await installProvider(control, cloudflareRef(targetSandboxId));
+
+      const ws = await connect(credential, targetSandboxId);
+      await completeHello(ws, 'hello-grouped-initial', { wrapperInstanceId: crypto.randomUUID() });
+      await deliverWrapperEvent(control, 'sandbox.ready', {
+        kiloReady: true,
+        globalFeedAttached: true,
+      });
+
+      const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      const incomingAttach = nextMessage(ws);
+      const initialTurn = {
+        type: 'prompt',
+        messageId: INITIAL_MESSAGE_ID,
+        prompt: 'first grouped turn',
+      } as const;
+      const admitted = await runInDurableObject(session, instance =>
+        instance.createSessionWithInitialAdmission({
+          ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
+          finalization: { autoCommit, condenseOnComplete: true },
+          message: { initialTurn },
+        })
+      );
+      expect(admitted).toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+
+      const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+      expect(attach).toMatchObject({
+        operation: 'session.attach',
+        session: { sessionId, kiloSessionId, directory: '/workspace/shared' },
+        payload: { branch: 'feature/shared-worktree' },
+      });
+      await runInDurableObject(session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        expect(metadata?.finalization?.autoCommit).toBe(autoCommit);
+        expect(metadata?.initialMessage).toEqual({
+          id: INITIAL_MESSAGE_ID,
+          prompt: 'first grouped turn',
+          turn: { type: 'prompt', prompt: 'first grouped turn' },
+        });
+        expect(await state.storage.get('session_messages')).toEqual([
+          expect.objectContaining({
+            messageId: INITIAL_MESSAGE_ID,
+            intent: expect.objectContaining({
+              turn: {
+                type: 'prompt',
+                messageId: INITIAL_MESSAGE_ID,
+                prompt: 'first grouped turn',
+              },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: { autoCommit: autoCommit ?? true, condenseOnComplete: true },
+            }),
+          }),
+        ]);
+      });
+      await runInDurableObject(control, async instance => {
+        expect(await instance.listRoutes()).toEqual([
+          expect.objectContaining({ sessionId, kiloSessionId, worktreeId: WORKTREE_ID }),
+        ]);
+      });
+
+      const incomingPrompt = nextMessage(ws);
+      respondToWrapperRequest(ws, attach, { attached: true });
+      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      expect(prompt).toMatchObject({
+        operation: 'session.prompt',
+        session: { sessionId, kiloSessionId },
+        payload: {
+          messageId: INITIAL_MESSAGE_ID,
+          finalization: { autoCommit: autoCommit ?? true, condenseOnComplete: true },
+        },
+      });
+      respondToWrapperRequest(ws, prompt, {
+        messageId: INITIAL_MESSAGE_ID,
+        status: 'accepted',
+      });
+      ws.close();
+    }
+  );
+
+  it('persists and dispatches initial command turns with their agent and arguments', async () => {
+    const ownerId = 'user_grouped_initial_command';
+    const sessionId = GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123411';
+    const kiloSessionId = ROOT_ID;
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await seedRunningCloudflare(instance);
+    });
+    await installProvider(control, cloudflareRef(targetSandboxId));
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-grouped-command', {
+      wrapperInstanceId: crypto.randomUUID(),
+    });
+    await deliverWrapperEvent(control, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const incomingAttach = nextMessage(wrapper);
+    const initialTurn = {
+      type: 'command' as const,
+      messageId: INITIAL_MESSAGE_ID,
+      command: 'compact',
+      arguments: '--aggressive',
+    };
+    const registration = {
+      ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
+      agent: { mode: 'architect', model: 'kilo/command-model', variant: 'thinking' },
+      message: { initialTurn },
+    };
+    const admitted = await runInDurableObject(session, instance =>
+      instance.createSessionWithInitialAdmission(registration)
+    );
+    expect(admitted).toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+
+    const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+    await runInDurableObject(session, async (instance, state) => {
+      expect((await instance.getMetadata())?.initialMessage).toEqual({
+        id: INITIAL_MESSAGE_ID,
+        prompt: '/compact --aggressive',
+        turn: { type: 'command', command: 'compact', arguments: '--aggressive' },
+      });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({
+          version: 2,
+          intent: {
+            turn: initialTurn,
+            agent: { mode: 'architect', model: 'kilo/command-model', variant: 'thinking' },
+            finalization: { autoCommit: true, condenseOnComplete: true },
+          },
+        }),
+      ]);
+      await expect(instance.createSessionWithInitialAdmission(registration)).resolves.toMatchObject(
+        {
+          success: true,
+          messageId: INITIAL_MESSAGE_ID,
+        }
+      );
+      for (const finalization of [{ autoCommit: false }, { condenseOnComplete: false }]) {
+        await expect(
+          instance.createSessionWithInitialAdmission({ ...registration, finalization })
+        ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      }
+      await expect(
+        instance.createSessionWithInitialAdmission({ ...registration, finalization: undefined })
+      ).resolves.toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+      await expect(
+        instance.createSessionWithInitialAdmission({
+          ...registration,
+          message: {
+            initialTurn: { ...initialTurn, arguments: '--different' },
+          },
+        })
+      ).resolves.toMatchObject({
+        success: false,
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    const incomingCommand = nextMessage(wrapper);
+    respondToWrapperRequest(wrapper, attach, { attached: true });
+    const command = JSON.parse(await incomingCommand) as WrapperRequest;
+    expect(command).toMatchObject({
+      operation: 'session.prompt',
+      session: { sessionId, kiloSessionId },
+      payload: {
+        messageId: INITIAL_MESSAGE_ID,
+        turn: { type: 'command', command: 'compact', arguments: '--aggressive' },
+        agent: { mode: 'architect', model: 'command-model', variant: 'thinking' },
+        finalization: { autoCommit: true, condenseOnComplete: true },
+      },
+    });
+    respondToWrapperRequest(wrapper, command, {
+      messageId: INITIAL_MESSAGE_ID,
+      status: 'accepted',
+    });
+    wrapper.close();
+  });
+
+  it('dispatches signed prompt attachments and preserves follow-up agent overrides', async () => {
+    const ownerId = 'user_grouped_attachment';
+    const sessionId = GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123412';
+    const kiloSessionId = ROOT_ID;
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await seedRunningCloudflare(instance);
+    });
+    await installProvider(control, cloudflareRef(targetSandboxId));
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-grouped-attachment', {
+      wrapperInstanceId: crypto.randomUUID(),
+    });
+    await deliverWrapperEvent(control, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const incomingAttach = nextMessage(wrapper);
+    await runInDurableObject(session, async instance => {
+      Object.assign(instance['env'], {
+        R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID: 'test-access-key',
+        R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_ENDPOINT: 'https://attachments.example.test',
+        R2_ATTACHMENTS_BUCKET: 'test-attachments',
+      });
+      await instance.registerSession(
+        groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId })
+      );
+      await expect(
+        instance.admitSubmittedMessage({
+          userId: ownerId,
+          turn: {
+            type: 'prompt',
+            id: INITIAL_MESSAGE_ID,
+            prompt: 'review the document',
+            attachments,
+          },
+          agent: { mode: 'debug', model: 'kilo/override-model', variant: 'focused' },
+          finalization: { autoCommit: true, condenseOnComplete: false },
+        })
+      ).resolves.toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+    });
+
+    const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+    await runInDurableObject(session, async (_instance, state) => {
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({
+          intent: {
+            turn: {
+              type: 'prompt',
+              messageId: INITIAL_MESSAGE_ID,
+              prompt: 'review the document',
+              attachments,
+            },
+            agent: { mode: 'debug', model: 'kilo/override-model', variant: 'focused' },
+            finalization: { autoCommit: true, condenseOnComplete: false },
+          },
+        }),
+      ]);
+    });
+    const incomingPrompt = nextMessage(wrapper);
+    respondToWrapperRequest(wrapper, attach, { attached: true });
+    const prompt = JSON.parse(await incomingPrompt) as WrapperRequest & {
+      payload: {
+        attachments: Array<{
+          mime: string;
+          signedUrl: string;
+          filename: string;
+          localPath: string;
+        }>;
+      };
+    };
+    expect(prompt).toMatchObject({
+      operation: 'session.prompt',
+      payload: {
+        messageId: INITIAL_MESSAGE_ID,
+        turn: { type: 'prompt', prompt: 'review the document' },
+        agent: { mode: 'debug', model: 'override-model', variant: 'focused' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+      },
+    });
+    expect(prompt.payload.attachments).toHaveLength(1);
+    expect(prompt.payload.attachments[0]).toMatchObject({
+      mime: 'application/pdf',
+      filename: attachments.files[0],
+    });
+    const signedUrl = prompt.payload.attachments[0]?.signedUrl;
+    if (!signedUrl) throw new Error('Expected a signed attachment URL');
+    const parsed = new URL(signedUrl);
+    expect(parsed.origin).toBe('https://attachments.example.test');
+    expect(parsed.pathname).toBe(
+      `/test-attachments/${ownerId}/cloud-agent/${attachments.path}/${attachments.files[0]}`
+    );
+    expect(parsed.searchParams.has('X-Amz-Signature')).toBe(true);
+
+    respondToWrapperRequest(wrapper, prompt, {
+      messageId: INITIAL_MESSAGE_ID,
+      status: 'accepted',
+    });
+    wrapper.close();
+  });
+
+  it('dispatches follow-up commands and preserves ungrouped per-turn finalization', async () => {
+    const ownerId = 'user_ungrouped_followup_command';
+    const sessionId = GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123416';
+    const kiloSessionId = ROOT_ID;
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await seedRunningCloudflare(instance);
+    });
+    await installProvider(control, cloudflareRef(targetSandboxId));
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-ungrouped-followup-command', {
+      wrapperInstanceId: crypto.randomUUID(),
+    });
+    await deliverWrapperEvent(control, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const incomingAttach = nextMessage(wrapper);
+    await runInDurableObject(session, async instance => {
+      await instance.registerSession({
+        identity: { sessionId, userId: ownerId },
+        auth: { kiloSessionId, kilocodeToken: KILO_TOKEN },
+        agent: { mode: 'code', model: 'default-model' },
+        workspace: { sandboxId: targetSandboxId, workspacePath: '/workspace/shared' },
+        finalization: { autoCommit: false, condenseOnComplete: true },
+      });
+      await expect(
+        instance.admitSubmittedMessage({
+          userId: ownerId,
+          turn: {
+            type: 'command',
+            id: INITIAL_MESSAGE_ID,
+            command: 'review',
+            arguments: '--base main',
+          },
+          agent: { mode: 'architect', model: 'kilo/followup-model', variant: 'deep' },
+          finalization: { autoCommit: true, condenseOnComplete: false },
+        })
+      ).resolves.toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+    });
+
+    const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+    const incomingCommand = nextMessage(wrapper);
+    respondToWrapperRequest(wrapper, attach, { attached: true });
+    const command = JSON.parse(await incomingCommand) as WrapperRequest;
+    expect(command).toMatchObject({
+      operation: 'session.prompt',
+      payload: {
+        messageId: INITIAL_MESSAGE_ID,
+        turn: { type: 'command', command: 'review', arguments: '--base main' },
+        agent: { mode: 'architect', model: 'followup-model', variant: 'deep' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+      },
+    });
+    respondToWrapperRequest(wrapper, command, {
+      messageId: INITIAL_MESSAGE_ID,
+      status: 'accepted',
+    });
+    wrapper.close();
+  });
+
+  it('rejects attachments on command submissions without admitting a message', async () => {
+    const ownerId = 'user_grouped_command_attachments';
+    const sessionId = 'workspace_grouped_command_attachments';
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId,
+          kiloSessionId: 'kilo_grouped_command_attachments',
+          sandboxId: 'usr-abcdef123413',
+        })
+      );
+      await expect(
+        instance.admitSubmittedMessage({
+          userId: ownerId,
+          turn: {
+            type: 'command',
+            id: INITIAL_MESSAGE_ID,
+            command: 'compact',
+            arguments: '',
+            attachments: {
+              path: '123e4567-e89b-12d3-a456-426614174000',
+              files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+            },
+          },
+        })
+      ).resolves.toEqual({
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Attachments cannot be attached to slash commands',
+      });
+      expect(await state.storage.get('session_messages')).toBeUndefined();
+    });
+  });
+
+  it.each([
+    { persistedAutoCommit: true, inheritedAutoCommit: true },
+    { persistedAutoCommit: false, inheritedAutoCommit: false },
+    { persistedAutoCommit: undefined, inheritedAutoCommit: true },
+  ])(
+    'inherits grouped auto-commit $persistedAutoCommit and permits explicit new-turn overrides',
+    async ({ persistedAutoCommit, inheritedAutoCommit }) => {
+      const ownerId = 'user_grouped_followup';
+      const sessionId = 'workspace_grouped_followup';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId: 'kilo_grouped_followup',
+            sandboxId: 'usr-abcdef123402',
+          }),
+          finalization: { autoCommit: persistedAutoCommit, condenseOnComplete: true },
+        });
+        const metadata = await instance.getMetadata();
+        const blocker: SessionMessageRecord = {
+          messageId: 'msg_blocker',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+        };
+        state.storage.kv.put('session_messages', [blocker]);
+        const submissions = [
+          { finalization: undefined, autoCommit: inheritedAutoCommit, condenseOnComplete: true },
+          {
+            finalization: { autoCommit: undefined },
+            autoCommit: inheritedAutoCommit,
+            condenseOnComplete: true,
+          },
+          {
+            finalization: { condenseOnComplete: false },
+            autoCommit: inheritedAutoCommit,
+            condenseOnComplete: false,
+          },
+          { finalization: { autoCommit: true }, autoCommit: true, condenseOnComplete: true },
+          { finalization: { autoCommit: false }, autoCommit: false, condenseOnComplete: true },
+        ];
+        const expectedMessages: SessionMessageRecord[] = [blocker];
+        for (const [index, submission] of submissions.entries()) {
+          const messageId = `msg_grouped_followup_${index}`;
+          await expect(
+            instance.admitSubmittedMessage({
+              userId: ownerId,
+              turn: { type: 'prompt', id: messageId, prompt: 'follow-up' },
+              finalization: submission.finalization,
+            })
+          ).resolves.toMatchObject({ success: true, messageId });
+          expectedMessages.push(
+            createSessionMessageRecord({
+              turn: { type: 'prompt', messageId, prompt: 'follow-up' },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: {
+                autoCommit: submission.autoCommit,
+                condenseOnComplete: submission.condenseOnComplete,
+              },
+            })
+          );
+          expect(state.storage.kv.get('session_messages')).toEqual(expectedMessages);
+          expect(await instance.getMetadata()).toEqual(metadata);
+        }
+      });
+    }
+  );
+
+  it.each([
+    { state: 'queued', autoCommit: true },
+    { state: 'queued', autoCommit: false },
+    { state: 'accepted', autoCommit: true },
+    { state: 'accepted', autoCommit: false },
+  ] as const)(
+    'validates $state replays against frozen auto-commit $autoCommit rather than current metadata',
+    async ({ state: messageState, autoCommit }) => {
+      const ownerId = 'user_grouped_replay';
+      const sessionId = 'workspace_grouped_replay';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId: 'kilo_grouped_replay',
+            sandboxId: 'usr-abcdef123402',
+          }),
+          finalization: { autoCommit: !autoCommit, condenseOnComplete: false },
+        });
+        const metadata = await instance.getMetadata();
+        const messageId = 'msg_grouped_replay';
+        const messages: SessionMessageRecord[] = [
+          ...(messageState === 'queued'
+            ? [{ messageId: 'msg_blocker', state: 'accepted' as const, acceptedAt: Date.now() }]
+            : []),
+          {
+            ...createSessionMessageRecord({
+              turn: { type: 'prompt', messageId, prompt: 'frozen turn' },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: { autoCommit, condenseOnComplete: true },
+            }),
+            state: messageState,
+            ...(messageState === 'accepted' ? { acceptedAt: Date.now() } : {}),
+          },
+        ];
+        state.storage.kv.put('session_messages', messages);
+        const request: SubmittedSessionMessageRequest = {
+          userId: ownerId,
+          turn: { type: 'prompt', id: messageId, prompt: 'frozen turn' },
+        };
+        for (const finalization of [
+          undefined,
+          { autoCommit: undefined },
+          { autoCommit, condenseOnComplete: true },
+        ]) {
+          await expect(
+            instance.admitSubmittedMessage({ ...request, finalization })
+          ).resolves.toMatchObject({ success: true, messageId });
+        }
+        for (const finalization of [{ autoCommit: !autoCommit }, { condenseOnComplete: false }]) {
+          await expect(
+            instance.admitSubmittedMessage({ ...request, finalization })
+          ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+        }
+        expect(state.storage.kv.get('session_messages')).toEqual(messages);
+        expect(await instance.getMetadata()).toEqual(metadata);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+      });
+    }
+  );
+
+  it.each([
+    { format: 'legacy', stored: true, persisted: false, expected: true },
+    { format: 'legacy', stored: false, persisted: true, expected: false },
+    { format: 'legacy', stored: undefined, persisted: false, expected: false },
+    { format: 'legacy', stored: undefined, persisted: true, expected: true },
+    { format: 'frozen', stored: true, persisted: false, expected: true },
+    { format: 'frozen', stored: false, persisted: true, expected: false },
+  ] as const)(
+    'dispatches $format queued auto-commit $stored with persisted $persisted without changing the frozen intent',
+    async ({ format, stored, persisted, expected }) => {
+      const ownerId = 'user_grouped_legacy_record';
+      const sessionId = GRANT_SESSION_ID;
+      const targetSandboxId = 'usr-abcdef123414';
+      const kiloSessionId = ROOT_ID;
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+      await seedCredential(credential, targetSandboxId);
+      await runInDurableObject(control, async instance => {
+        await instance.initializeOwner(ownerId);
+        await seedRunningCloudflare(instance);
+      });
+      await installProvider(control, cloudflareRef(targetSandboxId));
+
+      const wrapper = await connect(credential, targetSandboxId);
+      await completeHello(wrapper, 'hello-grouped-legacy-record', {
+        wrapperInstanceId: crypto.randomUUID(),
+      });
+      await deliverWrapperEvent(control, 'sandbox.ready', {
+        kiloReady: true,
+        globalFeedAttached: true,
+      });
+
+      const messageId = 'msg_legacy_record';
+      const finalization = {
+        ...(stored !== undefined ? { autoCommit: stored } : {}),
+        condenseOnComplete: false,
+      };
+      const frozen = createSessionMessageRecord({
+        turn: { type: 'prompt', messageId, prompt: 'recover an older prompt' },
+        agent: { mode: 'code', model: 'test-model' },
+        finalization: { autoCommit: expected, condenseOnComplete: false },
+      });
+      const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
+          finalization: { autoCommit: persisted, condenseOnComplete: true },
+        });
+        state.storage.kv.put('session_messages', [
+          format === 'frozen'
+            ? frozen
+            : { messageId, state: 'queued', prompt: 'recover an older prompt', finalization },
+        ] satisfies SessionMessageRecord[]);
+      });
+
+      const incomingAttach = nextMessage(wrapper);
+      const dispatched = runInDurableObject(session, instance => instance.alarm());
+      const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+      await runInDurableObject(session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Expected grouped session metadata');
+        expect(metadata.finalization).toEqual({ autoCommit: persisted, condenseOnComplete: true });
+        expect(state.storage.kv.get('session_messages')).toEqual([expect.objectContaining(frozen)]);
+        state.storage.kv.put('session_metadata', {
+          ...metadata,
+          finalization: { autoCommit: !expected, condenseOnComplete: true },
+        });
+      });
+      const incomingPrompt = nextMessage(wrapper);
+      respondToWrapperRequest(wrapper, attach, { attached: true });
+      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      expect(prompt).toMatchObject({
+        operation: 'session.prompt',
+        payload: {
+          messageId,
+          turn: { type: 'prompt', prompt: 'recover an older prompt' },
+          agent: frozen.intent.agent,
+          finalization: frozen.intent.finalization,
+        },
+      });
+      respondToWrapperRequest(wrapper, prompt, { messageId, status: 'accepted' });
+      await expect(dispatched).resolves.toBeUndefined();
+      await runInDurableObject(session, async (instance, state) => {
+        expect(state.storage.kv.get('session_messages')).toEqual([
+          expect.objectContaining({ ...frozen, state: 'accepted' }),
+        ]);
+        expect((await instance.getMetadata())?.finalization).toEqual({
+          autoCommit: !expected,
+          condenseOnComplete: true,
+        });
+      });
+      wrapper.close();
+    }
+  );
+});
+
+describe('SandboxSession durable message lifecycle', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('persists and streams exactly one sent event per accepted sibling prompt', async () => {
+    const ownerId = 'user_grouped_sent';
+    const targetSandboxId = 'usr-abcdef123417';
+    const roots = [
+      {
+        sessionId: GRANT_SESSION_ID,
+        kiloSessionId: ROOT_ID,
+        messageId: INITIAL_MESSAGE_ID,
+        prompt: 'first root turn',
+      },
+      {
+        sessionId: SECOND_GRANT_SESSION_ID,
+        kiloSessionId: SECOND_ROOT_ID,
+        messageId: 'msg_018f1e2d3c4bNoPmLkJiHgFeDc',
+        prompt: 'second root turn',
+      },
+    ] as const;
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await seedRunningCloudflare(instance);
+    });
+    await installProvider(control, cloudflareRef(targetSandboxId));
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-grouped-sent', { wrapperInstanceId: crypto.randomUUID() });
+    await deliverWrapperEvent(control, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+
+    const sessions = await Promise.all(
+      roots.map(async root => {
+        const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${root.sessionId}`);
+        await runInDurableObject(stub, instance =>
+          instance.registerSession(
+            groupedRegistration({
+              ownerId,
+              sessionId: root.sessionId,
+              kiloSessionId: root.kiloSessionId,
+              sandboxId: targetSandboxId,
+            })
+          )
+        );
+        const stream = await connectSessionStream(root.sessionId, ownerId, ['cloud.message.sent']);
+        const observed: SessionStreamEvent[] = [];
+        stream.addEventListener('message', event => {
+          observed.push(JSON.parse(String(event.data)) as SessionStreamEvent);
+        });
+        return { ...root, stub, stream, observed };
+      })
+    );
+
+    for (const session of sessions) {
+      const incomingAttach = nextMessage(wrapper);
+      const admission = await runInDurableObject(session.stub, instance =>
+        instance.admitSubmittedMessage({
+          userId: ownerId,
+          turn: { type: 'prompt', id: session.messageId, prompt: session.prompt },
+        })
+      );
+      expect(admission).toMatchObject({
+        success: true,
+        messageId: session.messageId,
+        compatibilityDelivery: 'queued',
+      });
+
+      const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+      expect(attach).toMatchObject({
+        operation: 'session.attach',
+        session: {
+          sessionId: session.sessionId,
+          kiloSessionId: session.kiloSessionId,
+          directory: '/workspace/shared',
+        },
+      });
+      const incomingPrompt = nextMessage(wrapper);
+      respondToWrapperRequest(wrapper, attach, { attached: true });
+      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      expect(prompt).toMatchObject({
+        operation: 'session.prompt',
+        session: { sessionId: session.sessionId, kiloSessionId: session.kiloSessionId },
+        payload: { messageId: session.messageId },
+      });
+
+      const incomingSent = nextMessage(session.stream);
+      respondToWrapperRequest(wrapper, prompt, {
+        messageId: session.messageId,
+        status: 'accepted',
+      });
+      const sent = JSON.parse(await incomingSent) as SessionStreamEvent;
+      expect(sent).toMatchObject({
+        sessionId: session.sessionId,
+        streamEventType: 'cloud.message.sent',
+        data: { messageId: session.messageId, delivery: 'sent' },
+      });
+      expect(sent.eventId).toBeGreaterThan(0);
+
+      await runInDurableObject(session.stub, async (instance, state) => {
+        const events = persistedSessionEvents(state, ['cloud.message.sent']);
+        expect(events).toHaveLength(1);
+        expect(events[0]?.session_id).toBe(session.sessionId);
+        expect(JSON.parse(events[0]?.payload ?? '')).toEqual({
+          messageId: session.messageId,
+          delivery: 'sent',
+        });
+        await expect(
+          instance.admitSubmittedMessage({
+            userId: ownerId,
+            turn: { type: 'prompt', id: session.messageId, prompt: session.prompt },
+          })
+        ).resolves.toEqual({
+          success: true,
+          outcome: 'queued',
+          messageId: session.messageId,
+          compatibilityDelivery: 'sent',
+        });
+        expect(persistedSessionEvents(state, ['cloud.message.sent'])).toHaveLength(1);
+      });
+    }
+
+    for (const session of sessions) {
+      expect(
+        session.observed.map(event => ({ sessionId: event.sessionId, data: event.data }))
+      ).toEqual([
+        { sessionId: session.sessionId, data: { messageId: session.messageId, delivery: 'sent' } },
+      ]);
+      session.stream.close();
+    }
+    wrapper.close();
+  });
+});
+
+describe('SandboxSession root-owned terminal events', () => {
+  it('settles only the matching root once from a fenced outcome without generic terminals', async () => {
+    const wrapperInstanceId = crypto.randomUUID();
+    const ownerId = 'user_grouped_terminal';
+    const sessionId = GRANT_SESSION_ID;
+    const siblingSessionId = SECOND_GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123403';
+    const root = ROOT_ID;
+    const siblingRoot = SECOND_ROOT_ID;
+    const lifecycleTypes = ['cloud.message.completed', 'cloud.message.failed', 'complete', 'error'];
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await instance.claimCreate(
+        'grouped-terminal-intent',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await attachGrantedSession(instance, instance['ctx'], groupedRoute(sessionId, root, ownerId));
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(siblingSessionId, siblingRoot, ownerId)
+      );
+    });
+
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({ ownerId, sessionId, kiloSessionId: root, sandboxId: targetSandboxId })
+      );
+      await state.storage.put('session_messages', [
+        { messageId: 'msg_active', state: 'accepted', acceptedAt: Date.now(), wrapperInstanceId },
+        { messageId: 'msg_next', state: 'queued', prompt: 'next turn' },
+      ]);
+    });
+
+    const sibling = env.SANDBOX_SESSION.getByName(`${ownerId}:${siblingSessionId}`);
+    await runInDurableObject(sibling, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: siblingSessionId,
+          kiloSessionId: siblingRoot,
+          sandboxId: targetSandboxId,
+        })
+      );
+      await state.storage.put('session_messages', [
+        {
+          messageId: 'msg_sibling_active',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+          wrapperInstanceId,
+        },
+      ]);
+    });
+
+    const stream = await connectSessionStream(sessionId, ownerId, lifecycleTypes);
+    const siblingStream = await connectSessionStream(siblingSessionId, ownerId, lifecycleTypes);
+    const siblingEvents: SessionStreamEvent[] = [];
+    siblingStream.addEventListener('message', event => {
+      siblingEvents.push(JSON.parse(String(event.data)) as SessionStreamEvent);
+    });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      for (const type of ['session.turn.close', 'session.error']) {
+        await expect(
+          instance.receiveSandboxControlEvent({
+            identity: {
+              directory: '/workspace/shared',
+              kiloSessionId: THIRD_ROOT_ID,
+              rootKiloSessionId: root,
+            },
+            payload: { type, properties: { sessionID: THIRD_ROOT_ID } },
+          })
+        ).resolves.toEqual({ applied: true });
+      }
+      await expect(
+        instance.receiveSandboxControlEvent({
+          identity: {
+            directory: '/workspace/shared',
+            kiloSessionId: root,
+            rootKiloSessionId: siblingRoot,
+          },
+          payload: { type: 'session.turn.close', properties: { sessionID: root } },
+        })
+      ).resolves.toEqual({ applied: false });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_active', state: 'accepted' }),
+        expect.objectContaining({ messageId: 'msg_next', state: 'queued' }),
+      ]);
+      expect(persistedSessionEvents(state, lifecycleTypes)).toEqual([]);
+    });
+
+    await runInDurableObject(sibling, async (instance, state) => {
+      await expect(
+        instance.receiveSandboxControlEvent({
+          identity: {
+            directory: '/workspace/shared',
+            kiloSessionId: root,
+            rootKiloSessionId: root,
+          },
+          payload: { type: 'session.turn.close', properties: { sessionID: root } },
+        })
+      ).resolves.toEqual({ applied: false });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_sibling_active', state: 'accepted' }),
+      ]);
+      expect(persistedSessionEvents(state, lifecycleTypes)).toEqual([]);
+    });
+
+    const completedPayload = {
+      messageId: 'msg_active',
+      status: 'completed',
+      delivery: 'sent',
+      accepted: true,
+    };
+    const terminalInput = {
+      identity: {
+        directory: '/workspace/shared',
+        kiloSessionId: root,
+        rootKiloSessionId: root,
+      },
+      wrapperInstanceId,
+      payload: {
+        type: 'session.message.outcome',
+        properties: { messageId: 'msg_active', status: 'completed' },
+      },
+    };
+    await runInDurableObject(stub, async (instance, state) => {
+      for (const type of ['session.idle', 'session.turn.close', 'session.error']) {
+        await instance.receiveSandboxControlEvent({
+          identity: terminalInput.identity,
+          wrapperInstanceId,
+          payload: { type, properties: { sessionID: root } },
+        });
+      }
+      await expect(
+        instance.receiveSandboxControlEvent({
+          ...terminalInput,
+          wrapperInstanceId: crypto.randomUUID(),
+        })
+      ).resolves.toEqual({ applied: false });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_active', state: 'accepted' }),
+        expect.objectContaining({ messageId: 'msg_next', state: 'queued' }),
+      ]);
+      expect(persistedSessionEvents(state, lifecycleTypes)).toEqual([]);
+    });
+    const incomingTerminalEvents = nextMessages(stream, 1);
+    await runInDurableObject(stub, async (instance, state) => {
+      await expect(instance.receiveSandboxControlEvent(terminalInput)).resolves.toEqual({
+        applied: true,
+      });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_active', state: 'completed' }),
+        expect.objectContaining({ messageId: 'msg_next', state: 'queued' }),
+      ]);
+      await expect(instance.receiveSandboxControlEvent(terminalInput)).resolves.toEqual({
+        applied: true,
+      });
+      expect(
+        persistedSessionEvents(state, lifecycleTypes).map(event => ({
+          type: event.stream_event_type,
+          data: JSON.parse(event.payload),
+        }))
+      ).toEqual([{ type: 'cloud.message.completed', data: completedPayload }]);
+    });
+
+    const terminalEvents = (await incomingTerminalEvents).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(
+      terminalEvents.map(event => ({
+        sessionId: event.sessionId,
+        type: event.streamEventType,
+        data: event.data,
+      }))
+    ).toEqual([{ sessionId, type: 'cloud.message.completed', data: completedPayload }]);
+    expect(terminalEvents.every(event => event.eventId > 0)).toBe(true);
+
+    await runInDurableObject(sibling, async (_instance, state) => {
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_sibling_active', state: 'accepted' }),
+      ]);
+      expect(persistedSessionEvents(state, lifecycleTypes)).toEqual([]);
+    });
+    expect(siblingEvents).toEqual([]);
+    await runInDurableObject(stub, async instance => {
+      await instance.interruptExecution();
+      await Promise.all(instance['dispatches'].values());
+    });
+    siblingStream.close();
+    stream.close();
+  });
+
+  it('persists and streams one canonical failure only for a fenced root outcome', async () => {
+    const wrapperInstanceId = crypto.randomUUID();
+    const acceptedAt = Date.now();
+    const ownerId = 'user_grouped_terminal_error';
+    const sessionId = GRANT_SESSION_ID;
+    const root = ROOT_ID;
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId,
+          kiloSessionId: root,
+          sandboxId: 'usr-abcdef123418',
+        })
+      );
+      await state.storage.put('session_messages', [
+        { messageId: 'msg_grouped_failed', state: 'accepted', acceptedAt, wrapperInstanceId },
+      ]);
+    });
+
+    const lifecycleTypes = ['cloud.message.failed', 'error'];
+    const stream = await connectSessionStream(sessionId, ownerId, lifecycleTypes);
+    const incomingTerminalEvents = nextMessages(stream, 1);
+    const terminalInput = {
+      identity: {
+        directory: '/workspace/shared',
+        kiloSessionId: root,
+        rootKiloSessionId: root,
+      },
+      wrapperInstanceId,
+      payload: {
+        type: 'session.message.outcome',
+        properties: { messageId: 'msg_grouped_failed', status: 'failed' },
+      },
+    };
+    const failedPayload = {
+      messageId: 'msg_grouped_failed',
+      status: 'failed',
+      delivery: 'sent',
+      accepted: true,
+      timestamp: acceptedAt,
+    };
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.receiveSandboxControlEvent({
+        identity: terminalInput.identity,
+        wrapperInstanceId,
+        payload: { type: 'session.error', properties: { sessionID: root } },
+      });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_grouped_failed', state: 'accepted' }),
+      ]);
+      expect(persistedSessionEvents(state, lifecycleTypes)).toEqual([]);
+      await expect(instance.receiveSandboxControlEvent(terminalInput)).resolves.toEqual({
+        applied: true,
+      });
+      await expect(instance.receiveSandboxControlEvent(terminalInput)).resolves.toEqual({
+        applied: true,
+      });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_grouped_failed', state: 'failed' }),
+      ]);
+      expect(
+        persistedSessionEvents(state, lifecycleTypes).map(event => ({
+          type: event.stream_event_type,
+          data: JSON.parse(event.payload),
+        }))
+      ).toEqual([{ type: 'cloud.message.failed', data: failedPayload }]);
+    });
+
+    const streamed = (await incomingTerminalEvents).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(
+      streamed.map(event => ({
+        sessionId: event.sessionId,
+        type: event.streamEventType,
+        data: event.data,
+      }))
+    ).toEqual([{ sessionId, type: 'cloud.message.failed', data: failedPayload }]);
+    expect(streamed.every(event => event.eventId > 0)).toBe(true);
+    stream.close();
+  });
+});
+
+describe('SandboxSession running stream state', () => {
+  it('reconnects an accepted root as ready while preserving queued sibling turns', async () => {
+    const ownerId = 'user_grouped_running_stream';
+    const sessionId = GRANT_SESSION_ID;
+    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId,
+          kiloSessionId: ROOT_ID,
+          sandboxId: 'usr-abcdef123415',
+        })
+      );
+      await state.storage.put('session_messages', [
+        {
+          messageId: 'msg_running',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+          intent: {
+            turn: { type: 'prompt', messageId: 'msg_running', prompt: 'currently running' },
+            agent: { mode: 'code', model: 'test-model' },
+          },
+        },
+        {
+          messageId: 'msg_waiting',
+          state: 'queued',
+          intent: {
+            turn: {
+              type: 'command',
+              messageId: 'msg_waiting',
+              command: 'compact',
+              arguments: '--next',
+            },
+            agent: { mode: 'code', model: 'test-model' },
+          },
+        },
+      ]);
+    });
+
+    const response = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${sessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    if (response.status !== 101 || !response.webSocket) {
+      throw new Error(`Unexpected running-session stream status: ${response.status}`);
+    }
+    response.webSocket.accept();
+    const events = (await nextMessages(response.webSocket, 4)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+
+    expect(events[0]).toMatchObject({
+      eventId: 0,
+      sessionId,
+      streamEventType: 'connected',
+      data: { cloudStatus: { type: 'ready' } },
+    });
+    expect(events.slice(1)).toEqual([
+      expect.objectContaining({
+        eventId: 0,
+        sessionId,
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_running', content: 'currently running', delivery: 'queued' },
+      }),
+      expect.objectContaining({
+        eventId: 0,
+        sessionId,
+        streamEventType: 'cloud.message.sent',
+        data: { messageId: 'msg_running', delivery: 'sent' },
+      }),
+      expect.objectContaining({
+        eventId: 0,
+        sessionId,
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_waiting', content: '/compact --next', delivery: 'queued' },
+      }),
+    ]);
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: 'msg_running', state: 'accepted' }),
+        expect.objectContaining({ messageId: 'msg_waiting', state: 'queued' }),
+      ]);
+    });
+    response.webSocket.close();
+  });
+});
+
+describe('SandboxSession root-scoped reconnect sync', () => {
+  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
+    const wrapperInstanceId = crypto.randomUUID();
+    const ownerId = 'user_grouped_sync';
+    const activeSessionId = GRANT_SESSION_ID;
+    const emptySessionId = SECOND_GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123404';
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await seedRunningCloudflare(instance);
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(activeSessionId, ROOT_ID, ownerId)
+      );
+    });
+
+    const active = env.SANDBOX_SESSION.getByName(`${ownerId}:${activeSessionId}`);
+    await runInDurableObject(active, async (instance, state) => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: activeSessionId,
+          kiloSessionId: ROOT_ID,
+          sandboxId: targetSandboxId,
+        })
+      );
+      await state.storage.put('session_messages', [
+        {
+          messageId: INITIAL_MESSAGE_ID,
+          state: 'accepted',
+          acceptedAt: Date.now(),
+          wrapperInstanceId,
+        },
+      ]);
+    });
+    const empty = env.SANDBOX_SESSION.getByName(`${ownerId}:${emptySessionId}`);
+    await runInDurableObject(empty, async instance => {
+      await instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: emptySessionId,
+          kiloSessionId: SECOND_ROOT_ID,
+          sandboxId: targetSandboxId,
+        })
+      );
+    });
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-grouped-sync', { wrapperInstanceId });
+    await deliverWrapperEvent(control, 'sandbox.ready', {
+      kiloReady: true,
+      globalFeedAttached: true,
+    });
+    const incomingSync = nextMessage(wrapper);
+
+    const emptyResponse = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${emptySessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    if (emptyResponse.status !== 101 || !emptyResponse.webSocket) {
+      throw new Error(`Unexpected empty-session stream status: ${emptyResponse.status}`);
+    }
+    emptyResponse.webSocket.accept();
+    const emptyConnected = JSON.parse(await nextMessage(emptyResponse.webSocket)) as {
+      streamEventType: string;
+    };
+    expect(emptyConnected.streamEventType).toBe('connected');
+
+    const pendingActiveResponse = SELF.fetch(
+      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const sync = JSON.parse(await incomingSync) as WrapperRequest;
+    expect(sync).toMatchObject({
+      operation: 'session.sync',
+      session: {
+        sessionId: activeSessionId,
+        kiloSessionId: ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+    const questions = [
+      { id: 'question_root', sessionID: ROOT_ID, questions: [{ question: 'Root?' }] },
+      {
+        id: 'question_child',
+        sessionID: THIRD_ROOT_ID,
+        rootKiloSessionId: ROOT_ID,
+        questions: [{ question: 'Child?' }],
+      },
+    ];
+    const permissions = [
+      { id: 'permission_root', sessionID: ROOT_ID },
+      { id: 'permission_child', sessionID: THIRD_ROOT_ID, rootKiloSessionId: ROOT_ID },
+    ];
+    respondToWrapperRequest(wrapper, sync, {
+      status: { type: 'busy' },
+      questions: [
+        ...questions,
+        { id: 'question_sibling', sessionID: SECOND_ROOT_ID },
+        { id: 'question_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
+      ],
+      permissions: [
+        ...permissions,
+        { id: 'permission_sibling', sessionID: SECOND_ROOT_ID },
+        { id: 'permission_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
+      ],
+    });
+    const activeResponse = await pendingActiveResponse;
+    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
+      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
+    }
+    activeResponse.webSocket.accept();
+    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'kilocode',
+      'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'cloud.message.queued',
+      'cloud.message.sent',
+    ]);
+    expect(events[1]?.data).toMatchObject({
+      cloudStatus: { type: 'ready' },
+      activeMessageId: INITIAL_MESSAGE_ID,
+      pendingInteractions: { questions, permissions },
+    });
+    expect(events.slice(2, 4)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(4, 6)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
+    await runInDurableObject(active, async (_instance, state) => {
+      expect(await state.storage.get('session_pending_interactions')).toMatchObject({
+        questions,
+        permissions,
+      });
+      expect(await state.storage.get('session_messages')).toEqual([
+        expect.objectContaining({ messageId: INITIAL_MESSAGE_ID, state: 'accepted' }),
+      ]);
+    });
+    await runInDurableObject(control, async instance => {
+      expect(await instance.listRoutes()).toEqual([
+        expect.objectContaining({ sessionId: activeSessionId, kiloSessionId: ROOT_ID }),
+      ]);
+    });
+    await runInDurableObject(empty, async (_instance, state) => {
+      expect(await state.storage.get('session_messages')).toBeUndefined();
+    });
+
+    activeResponse.webSocket.close();
+    emptyResponse.webSocket.close();
+    wrapper.close();
+  });
+});
+
+describe('SandboxControl Vercel runtime identity', () => {
+  const ownerId = 'user_vercel_rotation';
+  const originalLocator: VercelProviderLocator = {
+    teamId: 'team_original',
+    projectId: 'project_original',
+    snapshotId: 'snapshot_original',
+    runtimeBuildId: 'build_original',
+    runtime: 'node24',
+  };
+  const currentLocator: VercelProviderLocator = {
+    teamId: 'team_current',
+    projectId: 'project_current',
+    snapshotId: 'snapshot_current',
+    runtimeBuildId: 'build_current',
+    runtime: 'node24',
+  };
+
+  function runtimeEnv(locator: VercelProviderLocator) {
+    return {
+      VERCEL_TOKEN: 'test-vercel-token',
+      VERCEL_TEAM_ID: locator.teamId,
+      VERCEL_PROJECT_ID: locator.projectId,
+      VERCEL_SANDBOX_SNAPSHOT_ID: locator.snapshotId,
+      VERCEL_SANDBOX_RUNTIME_BUILD_ID: locator.runtimeBuildId,
+      VERCEL_SANDBOX_RUNTIME: locator.runtime,
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
+      WORKER_URL: 'https://worker.test',
+      KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,
+      KILO_OPENROUTER_BASE: CONTAINMENT_TARGETS.providerBaseUrl,
+      KILO_SESSION_INGEST_URL: CONTAINMENT_TARGETS.sessionIngestBaseUrl,
+      GIT_TOKEN_SERVICE: fakeCredentialBroker().binding,
+    };
+  }
+
+  function providerEnvelope(name: string, locator: VercelProviderLocator, intentId: string) {
+    return {
+      sandbox: {
+        name,
+        currentSessionId: 'vsess_1',
+        status: 'running',
+        persistent: false,
+        createdAt: 1,
+        updatedAt: 1,
+        tags: {
+          'kilo-managed-by': 'cloud-agent-session',
+          'kilo-create-operation': intentId,
+          'kilo-runtime-build': locator.runtimeBuildId,
+        },
+      },
+      session: {
+        id: 'vsess_1',
+        sourceSandboxName: name,
+        projectId: locator.projectId,
+        sourceSnapshotId: locator.snapshotId,
+        runtime: locator.runtime,
+        status: 'running',
+        memory: 2048,
+        vcpus: 2,
+        region: 'iad1',
+        timeout: 300000,
+        requestedAt: 1,
+        cwd: '/',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      routes: [],
+    };
+  }
+
+  async function seedRuntime(physicalState: 'stopped' | 'running' | 'creating' | 'failed') {
+    const name = `ses-${crypto.randomUUID().replaceAll('-', '')}` as const;
+    const stub = env.SANDBOX_CONTROL.getByName(name);
+    await env.SANDBOX_SESSION.getByName(`${ownerId}:${GRANT_SESSION_ID}`).registerSession({
+      identity: { sessionId: GRANT_SESSION_ID, userId: ownerId },
+      auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+      agent: {},
+      workspace: {
+        sandboxId: name,
+        sandboxProvider: 'vercel',
+        workspacePath: '/workspace/contained',
+      },
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const originalEnv = instance['env'];
+      Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(originalLocator) } });
+      try {
+        await instance.ensureReady({
+          ownerId,
+          sessionId: GRANT_SESSION_ID,
+          provider: 'vercel',
+          allowCreate: false,
+        });
+        const physical = await instance.claimCreate(
+          'intent_original',
+          false,
+          name,
+          WORKTREE_CREDENTIAL_CONTAINMENT
+        );
+        if (!physical.createIntent) throw new Error('Missing persisted create intent');
+        await savePhysicalRecord(state.storage, {
+          ...physical,
+          createIntent: {
+            ...physical.createIntent,
+            createdAt: Date.now() - DEADLINE_MS.createSettle - 1,
+          },
+        });
+        if (physicalState !== 'creating') {
+          await instance.confirmInstance(
+            encodeVercelProviderRef({ sandboxName: name, sessionId: 'vsess_1' })
+          );
+          if (physicalState === 'stopped') {
+            await instance.beginStop('idle');
+            await instance.confirmStopped();
+          } else if (physicalState === 'failed') {
+            await instance.markFailed();
+          }
+        }
+        expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+      } finally {
+        Object.assign(instance, { env: originalEnv });
+      }
+    });
+    await abortAllDurableObjects();
+    return { name, stub: env.SANDBOX_CONTROL.getByName(name) };
+  }
+
+  it.each(['stopped', 'failed'] as const)(
+    'creates from the current image after a %s runtime and config rotation',
+    async physicalState => {
+      const { name, stub } = await seedRuntime(physicalState);
+      await runInDurableObject(stub, async (instance, state) => {
+        const originalEnv = instance['env'];
+        Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(currentLocator) } });
+        const requests: Request[] = [];
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          const request = new Request(input, init);
+          requests.push(request);
+          const pathname = new URL(request.url).pathname;
+          if (pathname.endsWith('/stop')) {
+            return Response.json({
+              session: {
+                ...providerEnvelope(name, originalLocator, 'intent_original').session,
+                status: 'stopped',
+              },
+            });
+          }
+          if (pathname === '/v2/sandboxes') {
+            const physical = await instance.getPhysicalRecord();
+            expect(physical.state).toBe('creating');
+            expect(await state.storage.get('provider_locator')).toEqual(currentLocator);
+            if (!physical.createIntent?.allocationName)
+              throw new Error('Missing persisted create intent');
+            return Response.json(
+              providerEnvelope(
+                physical.createIntent.allocationName,
+                currentLocator,
+                physical.createIntent.intentId
+              )
+            );
+          }
+          if (pathname.endsWith('/network-policy')) {
+            const physical = await instance.getPhysicalRecord();
+            if (!physical.createIntent?.allocationName)
+              throw new Error('Missing persisted create intent');
+            return Response.json({
+              session: providerEnvelope(
+                physical.createIntent.allocationName,
+                currentLocator,
+                physical.createIntent.intentId
+              ).session,
+            });
+          }
+          if (pathname.endsWith('/cmd')) {
+            return Response.json({
+              command: {
+                id: 'cmd_1',
+                name: 'sh',
+                args: [],
+                cwd: '/',
+                sessionId: 'vsess_1',
+                exitCode: null,
+                startedAt: 1,
+              },
+            });
+          }
+          throw new Error(`Unexpected provider request: ${pathname}`);
+        });
+        try {
+          await expect(
+            instance.ensureReady({
+              ownerId,
+              sessionId: GRANT_SESSION_ID,
+              provider: 'vercel',
+              allowCreate: true,
+            })
+          ).resolves.toMatchObject({ physical: 'running' });
+          const create = requests.find(
+            request => new URL(request.url).pathname === '/v2/sandboxes'
+          );
+          if (!create) throw new Error('Missing provider create request');
+          expect(new URL(create.url).searchParams.get('teamId')).toBe(currentLocator.teamId);
+          await expect(create.json()).resolves.toMatchObject({
+            projectId: currentLocator.projectId,
+            source: { type: 'snapshot', snapshotId: currentLocator.snapshotId },
+            runtime: currentLocator.runtime,
+            tags: { 'kilo-runtime-build': currentLocator.runtimeBuildId },
+          });
+          expect(await state.storage.get('provider_locator')).toEqual(currentLocator);
+          if (physicalState === 'failed') {
+            expect(new URL(requests[0].url).pathname).toBe('/v2/sandboxes/sessions/vsess_1/stop');
+            expect(new URL(requests[0].url).searchParams.get('teamId')).toBe(
+              originalLocator.teamId
+            );
+          }
+        } finally {
+          fetchMock.mockRestore();
+          Object.assign(instance, { env: originalEnv });
+        }
+      });
+    }
+  );
+
+  it.each(['running', 'creating'] as const)(
+    'preserves the original locator for %s runtime recovery and cleanup after config rotation',
+    async physicalState => {
+      const { name, stub } = await seedRuntime(physicalState);
+      await runInDurableObject(stub, async (instance, state) => {
+        const originalEnv = instance['env'];
+        Object.assign(instance, { env: { ...originalEnv, ...runtimeEnv(currentLocator) } });
+        const requests: URL[] = [];
+        const originalEnvelope = providerEnvelope(name, originalLocator, 'intent_original');
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          const url = new URL(new Request(input, init).url);
+          requests.push(url);
+          if (url.pathname === `/v2/sandboxes/${name}`) {
+            return Response.json({ ...originalEnvelope, resumed: false });
+          }
+          if (url.pathname === '/v2/sandboxes/sessions/vsess_1/stop') {
+            return Response.json({ session: { ...originalEnvelope.session, status: 'stopped' } });
+          }
+          if (url.pathname === '/v2/sandboxes/sessions/vsess_1/network-policy') {
+            return Response.json({ session: originalEnvelope.session });
+          }
+          throw new Error(`Unexpected provider request: ${url.pathname}`);
+        });
+        try {
+          await expect(
+            instance.ensureReady({
+              ownerId,
+              sessionId: GRANT_SESSION_ID,
+              provider: 'vercel',
+              allowCreate: false,
+            })
+          ).resolves.toMatchObject({ physical: physicalState });
+          expect(requests.map(url => url.pathname)).toEqual(
+            physicalState === 'running' ? ['/v2/sandboxes/sessions/vsess_1/network-policy'] : []
+          );
+          await expect(instance.claimCreate('intent_replacement')).rejects.toThrow(
+            `claimCreate from ${physicalState}`
+          );
+          expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+          if (physicalState === 'creating') {
+            const physical = await instance.getPhysicalRecord();
+            const provider = instance['provider'];
+            if (!physical.createIntent) throw new Error('Missing create recovery');
+            const resolved = await provider.observe(physical.providerRef, physical.createIntent);
+            if (!resolved.providerRef) throw new Error('Original creation was not recovered');
+            expect(resolved.status).toBe('active');
+            await instance.confirmInstance(resolved.providerRef);
+            expect(requests[0].searchParams.get('projectId')).toBe(originalLocator.projectId);
+            expect(requests[0].searchParams.get('resume')).toBe('false');
+          }
+          await saveDeadlines(state.storage, { idleStop: Date.now() - 1 });
+          await instance.alarm();
+          await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+          expect(await state.storage.get('provider_locator')).toEqual(originalLocator);
+          expect(requests.map(url => url.pathname)).toEqual([
+            ...(physicalState === 'creating'
+              ? [`/v2/sandboxes/${name}`]
+              : ['/v2/sandboxes/sessions/vsess_1/network-policy']),
+            '/v2/sandboxes/sessions/vsess_1/stop',
+          ]);
+          expect(
+            requests.every(url => url.searchParams.get('teamId') === originalLocator.teamId)
+          ).toBe(true);
+        } finally {
+          fetchMock.mockRestore();
+          Object.assign(instance, { env: originalEnv });
+        }
+      });
+    }
+  );
+});
+
+describe('SandboxSession targeted deletion', () => {
+  it('detaches the deleted root before removing metadata and preserves sibling state', async () => {
+    const ownerId = 'user_grouped_delete';
+    const sessionA = GRANT_SESSION_ID;
+    const sessionB = SECOND_GRANT_SESSION_ID;
+    const targetSandboxId = 'usr-abcdef123405';
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(sessionA, ROOT_ID, ownerId)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(sessionB, SECOND_ROOT_ID, ownerId)
+      );
+    });
+    const first = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionA}`);
+    const second = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionB}`);
+    await runInDurableObject(first, instance =>
+      instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: sessionA,
+          kiloSessionId: ROOT_ID,
+          sandboxId: targetSandboxId,
+        })
+      )
+    );
+    await runInDurableObject(second, instance =>
+      instance.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: sessionB,
+          kiloSessionId: SECOND_ROOT_ID,
+          sandboxId: targetSandboxId,
+        })
+      )
+    );
+
+    await runInDurableObject(second, instance => instance.deleteSession());
+
+    await runInDurableObject(control, async instance => {
+      expect(await instance.listRoutes()).toEqual([
+        expect.objectContaining({ sessionId: sessionA, kiloSessionId: ROOT_ID }),
+      ]);
+    });
+    await runInDurableObject(first, async instance => {
+      expect((await instance.getMetadata())?.identity.sessionId).toBe(sessionA);
+    });
+    await runInDurableObject(second, async instance => {
+      await expect(instance.getMetadata()).resolves.toBeNull();
+    });
+  });
+
+  it('revokes credentials on failed detach and resumes public deletion without exposing fenced metadata or deleting sibling state', async () => {
+    const ownerId = 'user_grouped_delete_failed';
+    const sessionId = GRANT_SESSION_ID;
+    const siblingSessionId = SECOND_GRANT_SESSION_ID;
+    const kiloSessionId = ROOT_ID;
+    const siblingKiloSessionId = SECOND_ROOT_ID;
+    const targetSandboxId = 'usr-abcdef123406';
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+    await seedRunningCredential(credential, targetSandboxId);
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(ownerId);
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(sessionId, kiloSessionId, ownerId)
+      );
+      await attachGrantedSession(
+        instance,
+        instance['ctx'],
+        groupedRoute(siblingSessionId, siblingKiloSessionId, ownerId)
+      );
+    });
+    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+    const sibling = env.SANDBOX_SESSION.getByName(`${ownerId}:${siblingSessionId}`);
+    for (const [stub, rootSessionId, rootKiloSessionId] of [
+      [session, sessionId, kiloSessionId],
+      [sibling, siblingSessionId, siblingKiloSessionId],
+    ] as const) {
+      await stub.registerSession(
+        groupedRegistration({
+          ownerId,
+          sessionId: rootSessionId,
+          kiloSessionId: rootKiloSessionId,
+          sandboxId: targetSandboxId,
+        })
+      );
+      await stub.receiveSandboxControlEvent({
+        identity: { directory: '/workspace/shared', kiloSessionId: rootKiloSessionId },
+        payload: {
+          type: 'message.updated',
+          properties: { info: { id: INITIAL_MESSAGE_ID, sessionID: rootKiloSessionId } },
+        },
+      });
+    }
+    const siblingState = await runInDurableObject(sibling, async (_instance, state) => ({
+      metadata: await state.storage.get('session_metadata'),
+      events: persistedSessionEvents(state, ['kilocode']),
+    }));
+    const originalRoutes = await control.listRoutes();
+    const siblingGrants = await runInDurableObject(control, async (_instance, state) =>
+      (await loadSessionCredentialGrants(state.storage)).filter(grant =>
+        grant.members.some(member => member.sessionId === siblingSessionId)
+      )
+    );
+    expect(siblingGrants).toHaveLength(1);
+    const authorization = vi.mocked(requireCurrentSessionAccess);
+    authorization.mockResolvedValue({ kiloSessionId, organizationId: null });
+    const caller = router(createSessionManagementHandlers()).createCaller({
+      env,
+      userId: ownerId,
+      authToken: 'test-token',
+      request: new Request('http://worker.test/trpc/deleteSession'),
+    });
+
+    const wrapper = await connect(credential, targetSandboxId);
+    await completeHello(wrapper, 'hello-grouped-delete-failure', {
+      providerInstanceId: cloudflareRef(targetSandboxId),
+      wrapperInstanceId: crypto.randomUUID(),
+    });
+    signalWrapperReady(wrapper);
+    await vi.waitFor(async () => {
+      await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+    });
+    const requests: RequestFrame[] = [];
+    let failDetach = true;
+    wrapper.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      wrapper.send(
+        JSON.stringify({
+          type: 'response',
+          requestId: request.requestId,
+          ...(request.operation === 'session.detach' && failDetach
+            ? {
+                ok: false,
+                error: { code: 'not_ready', message: 'live detach failed', retryable: true },
+              }
+            : { ok: true }),
+        })
+      );
+    });
+
+    try {
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to clean up session metadata',
+      });
+      await runInDurableObject(session, async (instance, state) => {
+        await expect(instance.getMetadata()).resolves.toBeNull();
+        await expect(instance.getRuntimeLocation()).resolves.toMatchObject({
+          cloudAgentSessionId: sessionId,
+          sessionId: kiloSessionId,
+          location: { sandboxId: targetSandboxId },
+        });
+        expect(await state.storage.get('session_metadata')).toMatchObject({
+          identity: { sessionId },
+        });
+        expect(await state.storage.get('session_lifecycle_fence')).toMatchObject({
+          state: 'deleted',
+        });
+        expect(persistedSessionEvents(state, ['kilocode'])).toHaveLength(1);
+      });
+      await expect(control.listRoutes()).resolves.toEqual(originalRoutes);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+      await expect(
+        session.registerSession(
+          groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId,
+            sandboxId: targetSandboxId,
+          })
+        )
+      ).resolves.toMatchObject({ success: false });
+
+      const requestsBeforeRetry = requests.length;
+      authorization.mockRejectedValueOnce(
+        new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+      );
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      expect(requests).toHaveLength(requestsBeforeRetry);
+
+      await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+      await expect(control.listRoutes()).resolves.toEqual(originalRoutes);
+      await expect(session.getRuntimeLocation()).resolves.not.toBeNull();
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+
+      failDetach = false;
+      await expect(caller.deleteSession({ sessionId })).resolves.toEqual({ success: true });
+      await expect(control.listRoutes()).resolves.toEqual(
+        originalRoutes.filter(route => route.sessionId === siblingSessionId)
+      );
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadSessionCredentialGrants(state.storage)).toEqual(siblingGrants);
+      });
+      await runInDurableObject(session, async (instance, state) => {
+        await expect(instance.getRuntimeLocation()).resolves.toBeNull();
+        expect(await state.storage.get('session_metadata')).toBeUndefined();
+        expect(persistedSessionEvents(state, ['kilocode'])).toEqual([]);
+        expect(await state.storage.get('session_lifecycle_fence')).toMatchObject({
+          state: 'deleted',
+        });
+      });
+      await expect(
+        runInDurableObject(sibling, async (_instance, state) => ({
+          metadata: await state.storage.get('session_metadata'),
+          events: persistedSessionEvents(state, ['kilocode']),
+        }))
+      ).resolves.toEqual(siblingState);
+      expect(requests.map(request => request.operation)).toEqual([
+        'session.detach',
+        'session.detach',
+        'session.detach',
+      ]);
+      expect(requests.every(request => request.session?.kiloSessionId === kiloSessionId)).toBe(
+        true
+      );
+      expect(authorization).toHaveBeenCalledTimes(4);
+
+      await expect(caller.deleteSession({ sessionId })).resolves.toEqual({
+        success: true,
+        message: 'Session not found or already deleted',
+      });
+      expect(authorization).toHaveBeenCalledTimes(4);
+      expect(requests).toHaveLength(3);
+    } finally {
+      wrapper.close();
+      authorization.mockReset();
+    }
+  });
 });

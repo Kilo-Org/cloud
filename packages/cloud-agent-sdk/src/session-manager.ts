@@ -229,6 +229,7 @@ type FetchedSessionData = {
   organizationId: string | null;
   gitUrl: string | null;
   gitBranch: string | null;
+  worktreeId?: string | null;
   mode: string | null;
   model: string | null;
   variant: string | null;

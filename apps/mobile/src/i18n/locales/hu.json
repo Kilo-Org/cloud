@@ -156,7 +156,7 @@
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
     "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
     "biometricUnlock": "Feloldás biometrikus azonosítással",
-    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges. Állítson be biometrikus azonosítást vagy eszközjelkódot az eszköz beállításaiban. Az eszköz jelkódja tartalék lehetőségként használható."
+    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -838,7 +838,7 @@
       "managedByAdmin": "A számlázást a szervezeted adminisztrátora kezeli.",
       "couldNotLoad": "Nem sikerült betölteni a számlázási adatokat",
       "manageOnWeb": "Számlázás kezelése a weben",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Korai madár",
       "finalCommitTermEndsOn": "Az utolsó Commit-időszakod {{date}}-kor ér véget. Folytasd Standard csomaggal {{price}} áron, vagy a tárhely megszűnik.",
       "freeTrial": "Ingyenes próba",
@@ -856,7 +856,7 @@
       "trialDaysRemaining": "Próba: {{remaining}} van hátra",
       "trialEndingSoon": "Próba hamarosan vége: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1135,7 +1135,7 @@
       "destroying": "MEGSEMMISÍTÉS",
       "provisioned": "LÉTREHOZVA",
       "restarting": "ÚJRAINDÍTÁS",
-      "running": "Folyamatban",
+      "running": "FOLYAMATBAN",
       "shuttingDown": "LEÁLLÍTÁS",
       "starting": "INDÍTÁS",
       "stopped": "LEÁLLÍTVA",
@@ -1307,7 +1307,7 @@
       "threshold": "Küszöb",
       "pullRequest": "pull request",
       "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
-      "transcriptLive": "ÉLŐ",
+      "transcriptLive": "Élő",
       "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
       "transcriptWaiting": "Várakozás az áttekintés átiratára.",
       "agentIdle": "Ügynök tétlen",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Egyéb",
-      "project": "Projekt",
-      "removeProjectFilter": "{{label}} projekt szűrő eltávolítása",
-      "removePlatformFilter": "{{label}} platform szűrő eltávolítása"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Javaslat",
@@ -2673,7 +2671,7 @@
       "open": "nyitott lekérési kérelem",
       "closed": "lezárt lekérési kérelem",
       "merged": "egybeolvasztott lekérési kérelem",
-      "draft": "Piszkozat pull request",
+      "draft": "piszkozat pull request",
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Új kódolási feladat",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Jelenleg semmi sem fut"
   },
   "imageViewer": {
     "close": "{{filename}} bezárása",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Menj vissza, és nyisd meg újra ezt a választót az előző képernyőről."
   },
   "sessionRow": {
-    "needsInput": "bemenetet igényel"
+    "needsInput": "BEMENETET IGÉNYEL"
   },
   "voiceInput": {
     "listening": "Figyelés...",

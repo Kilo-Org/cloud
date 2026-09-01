@@ -335,6 +335,30 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
   });
 });
 
+describe('ChildSessionMessage visibility', () => {
+  it.each([
+    [],
+    [{ type: 'step-start', id: 'step', sessionID: 's1', messageID: 'm1' }],
+    [{ type: 'text', text: '  ', id: 'text', sessionID: 's1', messageID: 'm1' }],
+    [makeToolPart('plan_exit', completedState)],
+  ] satisfies Part[][])('renders no gray wrapper for hidden parts %j', async (...parts) => {
+    const { renderer, unmount } = await renderWithProviders(
+      React.createElement(ChildSessionMessage, {
+        message: makeStoredMessage(parts),
+        depth: 0,
+        getChildMessages: () => [],
+        renderPart: () => null,
+        onOpenChildSession: vi.fn<(sessionId: string, title: string) => void>(),
+      })
+    );
+    try {
+      expect(renderer.toJSON()).toBeNull();
+    } finally {
+      unmount();
+    }
+  });
+});
+
 describe('ToolPartRenderer routing', () => {
   it.each(routingTable)('routes tool %s to its card', (tool, card) => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call

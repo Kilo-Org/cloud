@@ -156,7 +156,7 @@
     "returnSendsMessage": "Returtasten sender meldingen",
     "returnSendsMessageSubtitle": "Når dette er av, setter returtasten inn et linjeskift i agentenes meldingsfelt.",
     "biometricUnlock": "Lås opp med biometri",
-    "biometricUnlockSubtitle": "Lås opp ved oppstart og etter fem minutter i bakgrunnen. Konfigurer biometri eller en kode for enheten i enhetens innstillinger. Du kan bruke enhetens kode som reserve."
+    "biometricUnlockSubtitle": "Lås opp ved oppstart og etter fem minutter i bakgrunnen."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -839,7 +839,7 @@
       "managedByAdmin": "Fakturering administreres av organisasjonsadministratoren din.",
       "couldNotLoad": "Kunne ikke laste faktureringsinformasjon",
       "manageOnWeb": "Administrer fakturering på nettet",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Den siste bindende perioden din slutter {{date}}. Fortsett som Standard til {{price}}, eller slutten på hosting.",
       "freeTrial": "Gratis prøveperiode",
@@ -856,7 +856,7 @@
       "trialDaysRemaining": "Prøveperiode: {{remaining}}",
       "trialEndingSoon": "Prøveperioden slutter snart: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Venter på gjennomgangsutskriften.",
       "transcriptEmpty": "Ingen utskrift for denne gjennomgangen.",
       "transcriptRetry": "Kunne ikke laste gjennomgangsutskriften.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agenten er inaktiv",
       "agentWorking": "Agenten jobber...",
       "anErrorOccurred": "Det oppstod en feil",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Annet",
-      "project": "Prosjekt",
-      "removeProjectFilter": "Fjern {{label}}-prosjektfilteret",
-      "removePlatformFilter": "Fjern {{label}}-plattformfilteret"
+      "project": "Prosjekt"
     },
     "suggestion": {
       "title": "Forslag",
@@ -2673,7 +2671,7 @@
       "open": "åpen pull request",
       "closed": "lukket pull request",
       "merged": "slått sammen pull request",
-      "draft": "Utkast til pull request",
+      "draft": "utkast til pull request",
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Ny kodeoppgave",
     "explore": "Utforsk",
     "seeAll": "Se alle",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ingenting kjører akkurat nå"
   },
   "imageViewer": {
     "close": "Lukk {{filename}}",

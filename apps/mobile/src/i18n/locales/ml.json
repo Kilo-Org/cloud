@@ -156,7 +156,7 @@
     "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
     "returnSendsMessageSubtitle": "ഓഫായിരിക്കുമ്പോൾ, റിട്ടേൺ ഏജന്റ് സന്ദേശ ഇൻപുട്ടുകളിൽ പുതിയ വരി ചേർക്കുന്നു.",
     "biometricUnlock": "ബയോമെട്രിക്സ് ഉപയോഗിച്ച് അൺലോക്ക് ചെയ്യുക",
-    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം. ഉപകരണത്തിന്റെ ക്രമീകരണങ്ങളിൽ ബയോമെട്രിക്സ് അല്ലെങ്കിൽ ഉപകരണത്തിന്റെ പാസ്‌കോഡ് സജ്ജീകരിക്കുക. പകരം ഉപയോഗിക്കാൻ നിങ്ങളുടെ ഉപകരണത്തിന്റെ പാസ്‌കോഡ് ലഭ്യമാണ്."
+    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റിനായി കാത്തിരിക്കുന്നു.",
       "transcriptEmpty": "ഈ അവലോകനത്തിന് ട്രാൻസ്ക്രിപ്റ്റ് ഇല്ല.",
       "transcriptRetry": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "ഏജന്റ് നിഷ്ക്രിയം",
       "agentWorking": "ഏജന്റ് പ്രവർത്തിക്കുന്നു...",
       "anErrorOccurred": "ഒരു പിശക് സംഭവിച്ചു",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "മറ്റുള്ളവ",
-      "project": "പ്രോജക്റ്റ്",
-      "removeProjectFilter": "{{label}} പ്രോജക്റ്റ് ഫിൽട്ടർ നീക്കം ചെയ്യുക",
-      "removePlatformFilter": "{{label}} പ്ലാറ്റ്ഫോം ഫിൽട്ടർ നീക്കം ചെയ്യുക"
+      "project": "പ്രോജക്റ്റ്"
     },
     "suggestion": {
       "title": "നിർദ്ദേശം",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "പുതിയ കോഡിംഗ് ടാസ്ക്",
     "explore": "പര്യവേക്ഷണം ചെയ്യുക",
     "seeAll": "എല്ലാം കാണുക",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ഇപ്പോൾ ഒന്നും പ്രവർത്തിക്കുന്നില്ല"
   },
   "imageViewer": {
     "close": "{{filename}} അടയ്ക്കുക",

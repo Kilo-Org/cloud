@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  baseCreateWorktreeChatNextOutputSchema,
+  baseCreateWorktreeChatNextSchema,
   basePrepareSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
@@ -263,6 +265,65 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
       cloneFromKiloSessionId: undefined,
     });
     expect(result.success).toBe(true);
+  });
+
+  it('does not accept client provenance from public session preparation input', () => {
+    const result = basePrepareSessionNextSchema.parse({
+      githubRepo: 'acme/repo',
+      prompt: 'Create a session',
+      mode: 'code',
+      model: 'kilo/test-model',
+      clientProvenance: 'browser',
+    });
+
+    expect(result).not.toHaveProperty('clientProvenance');
+  });
+});
+
+describe('createWorktreeChat schemas', () => {
+  const operationKey = '12345678-1234-4234-9234-123456789abc';
+  const workspaceId = `workspace_${operationKey}`;
+  const worktreeId = `worktree_${operationKey}`;
+
+  it('accepts only a canonical source session and operation UUID', () => {
+    expect(
+      baseCreateWorktreeChatNextSchema.parse({
+        sourceKiloSessionId: KILO_SESSION_ID,
+        operationKey,
+      })
+    ).toEqual({ sourceKiloSessionId: KILO_SESSION_ID, operationKey });
+
+    for (const input of [
+      { sourceKiloSessionId: 'agent_not_a_kilo_session', operationKey },
+      { sourceKiloSessionId: KILO_SESSION_ID, operationKey: 'not-a-uuid' },
+      { sourceKiloSessionId: KILO_SESSION_ID, operationKey, clientProvenance: 'browser' },
+      {
+        sourceKiloSessionId: KILO_SESSION_ID,
+        operationKey,
+        sourceCloudAgentSessionId: workspaceId,
+      },
+    ]) {
+      expect(baseCreateWorktreeChatNextSchema.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('requires canonical workspace/worktree output and rejects private runtime paths', () => {
+    const output = {
+      kiloSessionId: KILO_SESSION_ID,
+      cloudAgentSessionId: workspaceId,
+      worktreeId,
+      replayed: true,
+    };
+
+    expect(baseCreateWorktreeChatNextOutputSchema.parse(output)).toEqual(output);
+
+    for (const invalidOutput of [
+      { ...output, cloudAgentSessionId: `agent_${operationKey}` },
+      { ...output, worktreeId: 'worktree_../../private' },
+      { ...output, workspacePath: '/private/shared-checkout' },
+    ]) {
+      expect(baseCreateWorktreeChatNextOutputSchema.safeParse(invalidOutput).success).toBe(false);
+    }
   });
 });
 

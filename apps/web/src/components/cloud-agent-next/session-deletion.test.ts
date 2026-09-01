@@ -15,6 +15,7 @@ function makeSession(session_id: string): ApiSession {
     session_id,
     title: session_id,
     cloud_agent_session_id: null,
+    cloud_agent_worktree_id: null,
     created_on_platform: 'cloud-agent',
     organization_id: null,
     git_url: null,
@@ -50,6 +51,10 @@ function createFixture() {
   const recentKey = trpc.cliSessionsV2.recentRepositories.queryKey({
     updatedSince: '2026-08-01T00:00:00.000Z',
   });
+  const worktreeDetailsKey = trpc.cliSessionsV2.worktreeDetails.queryKey({
+    worktreeIds: ['worktree_12345678-1234-4234-9234-123456789abc'],
+    organizationId: null,
+  });
   const sessions = ['ses_a', 'ses_b', 'ses_c'].map(makeSession);
   const persisted = new Set(sessions.map(session => session.session_id));
   const seedSessions = (rows: ApiSession[]) => {
@@ -71,6 +76,20 @@ function createFixture() {
   };
   seedSessions(sessions);
   queryClient.setQueryData(recentKey, { repositories: [] });
+  queryClient.setQueryData(worktreeDetailsKey, {
+    worktrees: {
+      'worktree_12345678-1234-4234-9234-123456789abc': {
+        name: null,
+        defaultTitle: sessions[0].title,
+        prSession: null,
+        sessions: sessions.map(session => ({
+          sessionId: session.session_id,
+          sessionStatus: session.status,
+          sessionStatusUpdatedAt: session.status_updated_at,
+        })),
+      },
+    },
+  });
   queryClient.setQueryData(['unrelated'], { cliSessions: sessions });
 
   const context = {
@@ -90,6 +109,7 @@ function createFixture() {
     searchKeys,
     activeKey,
     recentKey,
+    worktreeDetailsKey,
     seedSessions,
   };
 }
@@ -206,14 +226,23 @@ describe('session deletion', () => {
   });
 
   it('reconciles queries without rolling back current data or another successful deletion', async () => {
-    const { context, sessions, seedSessions, listKeys, searchKeys, activeKey, recentKey } = fixture;
+    const {
+      context,
+      sessions,
+      seedSessions,
+      listKeys,
+      searchKeys,
+      activeKey,
+      recentKey,
+      worktreeDetailsKey,
+    } = fixture;
     await removeDeletedSession({ ...context, sessionId: 'ses_b' });
     seedSessions([
       { ...sessions[0], title: 'New live title' },
       sessions[2],
       makeSession('ses_new'),
     ]);
-    const keys: QueryKey[] = [...listKeys, ...searchKeys, activeKey, recentKey];
+    const keys: QueryKey[] = [...listKeys, ...searchKeys, activeKey, recentKey, worktreeDetailsKey];
     const currentData = keys.map(key => context.queryClient.getQueryData(key));
 
     await invalidateSessionQueries(context);

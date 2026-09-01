@@ -5868,6 +5868,43 @@ export const sharedCliSessions = pgTable(
 
 export type SharedCliSession = typeof sharedCliSessions.$inferSelect;
 
+export const cloud_agent_worktrees = pgTable(
+  'cloud_agent_worktrees',
+  {
+    worktree_id: text().primaryKey().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    name: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    deletion_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deletion_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    runtime_locations: jsonb()
+      .$type<unknown>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    deletion_manifest: jsonb().$type<unknown>(),
+    deleted_session_ids: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+  },
+  table => [
+    index('IDX_cloud_agent_worktrees_owner_scope').on(table.kilo_user_id, table.organization_id),
+    check(
+      'cloud_agent_worktrees_deletion_check',
+      sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`
+    ),
+  ]
+);
+
+export type CloudAgentWorktree = typeof cloud_agent_worktrees.$inferSelect;
+
 export const cli_sessions_v2 = pgTable(
   'cli_sessions_v2',
   {
@@ -5884,6 +5921,7 @@ export const cli_sessions_v2 = pgTable(
     }),
     cloud_agent_session_id: text(),
     cloud_agent_session_scope_id: text(),
+    cloud_agent_worktree_id: text(),
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),
@@ -5927,6 +5965,10 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_user_created')
       .on(table.kilo_user_id, table.created_at)
       .concurrently(),
+    index('IDX_cli_sessions_v2_user_worktree_updated')
+      .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
+      .concurrently()
+      .where(isNotNull(table.cloud_agent_worktree_id)),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]

@@ -9,6 +9,7 @@ function session(id: string, over: Partial<StoredSession> = {}): StoredSession {
     session_id: id,
     title: id,
     cloud_agent_session_id: null,
+    cloud_agent_worktree_id: null,
     parent_session_id: null,
     organization_id: null,
     created_on_platform: 'cloud-agent',

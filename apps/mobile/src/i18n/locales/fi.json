@@ -156,7 +156,7 @@
     "returnSendsMessage": "Enter-näppäin lähettää viestin",
     "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin.",
     "biometricUnlock": "Avaa lukitus biometrisellä tunnistuksella",
-    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia. Ota biometrinen tunnistus tai laitteen pääsykoodi käyttöön laitteen asetuksissa. Voit käyttää laitteen pääsykoodia varavaihtoehtona."
+    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Odotetaan tarkistuksen transkriptiota.",
       "transcriptEmpty": "Ei transkriptiota tälle tarkistukselle.",
       "transcriptRetry": "Tarkistuksen transkriptiota ei voitu ladata.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agentti vapaalla",
       "agentWorking": "Agentti työstää...",
       "anErrorOccurred": "Tapahtui virhe",
@@ -2253,7 +2253,7 @@
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "Tehtävä",
+      "toolTask": "tehtävä",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
       "linesBadge": "{{displayCount}} riviä",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
-      "project": "Projekti",
-      "removeProjectFilter": "Poista {{label}} projektisuodatin",
-      "removePlatformFilter": "Poista {{label}} alustasuodatin"
+      "project": "Projekti"
     },
     "suggestion": {
       "title": "Ehdotus",
@@ -2673,7 +2671,7 @@
       "open": "avoin pull request",
       "closed": "suljettu pull request",
       "merged": "yhdistetty pull request",
-      "draft": "Luonnos-pull request",
+      "draft": "luonnos-pull request",
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Mitään ei ole käynnissä juuri nyt"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "vaatii syötettä"
+    "needsInput": "VAATII SYÖTETTÄ"
   },
   "voiceInput": {
     "listening": "Kuunnellaan...",

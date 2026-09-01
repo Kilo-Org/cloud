@@ -156,7 +156,7 @@
     "returnSendsMessage": "Nagpapadala ng mensahe ang Return key",
     "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent.",
     "biometricUnlock": "I-unlock gamit ang biometrika",
-    "biometricUnlockSubtitle": "Kailangang i-unlock sa pagbukas ng app at matapos ang limang minuto sa background. Magtakda ng biometrika o kodigong pang-unlock ng device sa Settings ng device. Maaari pa ring gamitin ang iyong kodigong pang-unlock ng device bilang alternatibo."
+    "biometricUnlockSubtitle": "Kailangang i-unlock sa pagbukas ng app at matapos ang limang minuto sa background."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",
@@ -839,7 +839,7 @@
       "managedByAdmin": "Ang billing ay pinamamahalaan ng admin ng iyong organisasyon.",
       "couldNotLoad": "Hindi maload ang impormasyon ng billing",
       "manageOnWeb": "Pamahalaan ang Billing sa Web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Magtatapos ang iyong huling termino sa Commit sa {{date}}. Magpatuloy bilang Standard sa {{price}}, o magtatapos ang hosting.",
       "freeTrial": "Libreng Subok",
@@ -1294,7 +1294,7 @@
       "started": "Nagsimula",
       "completed": "Nakumpleto",
       "cost": "Halaga",
-      "tokens": "mga token",
+      "tokens": "Mga token",
       "tokensInOut": "{{input}} in / {{output}} out",
       "openPullRequest": "Buksan ang pull request",
       "council": "Council",
@@ -2246,14 +2246,14 @@
       "contentTruncated": "Na-truncate ang content",
       "truncated": "Na-truncate",
       "toolRead": "read",
-      "toolEdit": "I-edit",
+      "toolEdit": "i-edit",
       "toolWrite": "write",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "Gawain",
+      "toolTask": "gawain",
       "readTodos": "Basahin ang mga todo",
       "updateTodos": "I-update ang mga todo",
       "linesBadge": "{{displayCount}} na linya",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Iba pa",
-      "project": "Proyekto",
-      "removeProjectFilter": "Alisin ang {{label}} na filter ng proyekto",
-      "removePlatformFilter": "Alisin ang {{label}} na filter ng platform"
+      "project": "Proyekto"
     },
     "suggestion": {
       "title": "Mungkahi",
@@ -2673,7 +2671,7 @@
       "open": "buksan ang pull request",
       "closed": "isinara ang pull request",
       "merged": "ni-merge ang pull request",
-      "draft": "Draft na pull request",
+      "draft": "draft na pull request",
       "updating": "Ina-update, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Bagong coding task",
     "explore": "Mag-explore",
     "seeAll": "Tingnan lahat",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Walang tumatakbo sa ngayon"
   },
   "imageViewer": {
     "close": "Isara ang {{filename}}",

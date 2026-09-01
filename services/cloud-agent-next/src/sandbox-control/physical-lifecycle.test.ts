@@ -6,6 +6,7 @@ import {
   confirmStopped,
   exhaustStopRetries,
   fail,
+  getWorktreeCredentialContainment,
   initialPhysicalRecord,
   observe,
   recordStopAttempt,
@@ -18,7 +19,8 @@ const INTENT_ID = 'intent_1';
 const PROVIDER_REF = 'ref_1';
 const CONTAINMENT_CASES = [
   { name: 'legacy flags', containment: { kilocode: true, github: false } },
-  { name: 'worktree scope', containment: WORKTREE_CREDENTIAL_CONTAINMENT },
+  { name: 'worktree scope', containment: getWorktreeCredentialContainment(true) },
+  { name: 'uncontained worktree scope', containment: getWorktreeCredentialContainment(false) },
 ];
 
 function stopped(resumable = true): PhysicalRecord {
@@ -37,6 +39,15 @@ function running(): PhysicalRecord {
 }
 
 describe('physical sandbox lifecycle', () => {
+  it('keeps worktree credential scope independent of containment enforcement', () => {
+    expect(getWorktreeCredentialContainment(true)).toBe(WORKTREE_CREDENTIAL_CONTAINMENT);
+    expect(getWorktreeCredentialContainment(false)).toEqual({
+      kilocode: false,
+      github: false,
+      worktreeScoped: true,
+    });
+  });
+
   it('starts stopped with no handles', () => {
     expect(stopped(false)).toEqual({
       state: 'stopped',

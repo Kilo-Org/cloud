@@ -59,7 +59,7 @@ describe('cli-sessions-v2 cloud-agent token source', () => {
   beforeEach(async () => {
     mockedCreateCloudAgentNextClient.mockClear();
     mockGetSession.mockReset();
-    mockDeleteCloudAgentSession.mockReset().mockResolvedValue(undefined);
+    mockDeleteCloudAgentSession.mockReset().mockResolvedValue({ success: true });
     mockFetchSessionMessagesPage.mockReset().mockResolvedValue({
       kiloSessionId: sessions.page.sessionId,
       history: { messages: [], nextCursor: null, omittedItemCount: 0 },
@@ -80,7 +80,7 @@ describe('cli-sessions-v2 cloud-agent token source', () => {
     await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, user.id));
   });
 
-  it('uses non-exchangeable cloud-agent tokens for all Cloud Agent session paths', async () => {
+  it('uses non-exchangeable tokens for watermark, runtime, and session deletion', async () => {
     mockGetSession.mockResolvedValue({
       sessionId: sessions.runtime.cloudAgentSessionId,
       userId: user.id,

@@ -16,6 +16,7 @@
  * handle pattern.
  */
 
+import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 
@@ -43,6 +44,32 @@ type GateWaiter = {
   cleanup: () => void;
 };
 
+type ToolKind = 'write' | 'read' | 'edit' | 'question';
+
+type AdvertisedTool = {
+  name: string;
+  parameters: Record<string, unknown>;
+};
+
+type ToolResult = {
+  id: string;
+  content: string;
+};
+
+type ScenarioCounters = Record<ToolKind, number>;
+
+export type FakeScenarioStatus = {
+  tag: string;
+  requests: number;
+  toolCalls: ScenarioCounters;
+  toolResults: ScenarioCounters;
+  unsupportedToolSchema: boolean;
+};
+
+type InternalScenarioStatus = FakeScenarioStatus & {
+  seenToolResults: Set<string>;
+};
+
 const RELEASED_GATE_FOLLOWUP_TTL_MS = 10_000;
 
 type ServerState = {
@@ -60,6 +87,7 @@ type ServerState = {
   nextRequestId: number;
   /** Count of dispatched completions, exposed for fail-fast scenario assertions. */
   chatCompletionRequests: number;
+  scenarios: Map<string, InternalScenarioStatus>;
 };
 
 type LogFields = Record<string, string | number | boolean | undefined>;
@@ -110,7 +138,11 @@ export function parseDirective(text: string): Directive | null {
 }
 
 type MessagePart = { type?: string; text?: string };
-type Message = { role?: string; content?: string | MessagePart[] };
+type Message = {
+  role?: string;
+  content?: string | MessagePart[];
+  tool_call_id?: string;
+};
 
 /**
  * Extract the text of the last user message in an OpenAI-shape request body.
@@ -148,6 +180,207 @@ export function extractLastUserMessageText(body: unknown): string {
  */
 export function stripKiloPromptWrapping(text: string): string {
   return text.replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, '').trim();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stripPromptContext(value: string): string {
+  const contextIndex = value.indexOf('<environment_details>');
+  return (contextIndex < 0 ? value : value.slice(0, contextIndex)).trimEnd();
+}
+
+function directiveTag(directive: Directive | null): string | undefined {
+  if (
+    directive === null ||
+    !['gate', 'write-then-gate', 'read-edit-then-gate', 'question'].includes(directive.scenario)
+  ) {
+    return undefined;
+  }
+  return directive.args[0]?.match(/^([A-Za-z0-9_-]+)/)?.[1];
+}
+
+function createCounters(): ScenarioCounters {
+  return { write: 0, read: 0, edit: 0, question: 0 };
+}
+
+function scenarioStatus(state: ServerState, tag: string): InternalScenarioStatus {
+  const existing = state.scenarios.get(tag);
+  if (existing) return existing;
+  const created: InternalScenarioStatus = {
+    tag,
+    requests: 0,
+    toolCalls: createCounters(),
+    toolResults: createCounters(),
+    unsupportedToolSchema: false,
+    seenToolResults: new Set(),
+  };
+  state.scenarios.set(tag, created);
+  return created;
+}
+
+function advertisedTools(body: unknown): AdvertisedTool[] {
+  if (!isRecord(body) || !Array.isArray(body.tools)) return [];
+  const tools: AdvertisedTool[] = [];
+  for (const entry of body.tools) {
+    if (!isRecord(entry) || !isRecord(entry.function)) continue;
+    const { name, parameters } = entry.function;
+    if (typeof name !== 'string' || !isRecord(parameters)) continue;
+    tools.push({ name, parameters });
+  }
+  return tools;
+}
+
+function toolCallId(tag: string, kind: ToolKind): string {
+  const fingerprint = createHash('sha256').update(tag).digest('hex').slice(0, 12);
+  return `call_${fingerprint}_${kind}`;
+}
+
+function toolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter(isRecord)
+    .map(part => (typeof part.text === 'string' ? part.text : ''))
+    .join('');
+}
+
+function toolResults(body: unknown, tag: string, state: ServerState): ToolResult[] {
+  if (!isRecord(body) || !Array.isArray(body.messages)) return [];
+  const result: ToolResult[] = [];
+  const status = scenarioStatus(state, tag);
+  for (const message of body.messages) {
+    if (!isRecord(message) || message.role !== 'tool') continue;
+    const id = message.tool_call_id;
+    if (typeof id !== 'string') continue;
+    const kind = (['write', 'read', 'edit', 'question'] as const).find(
+      candidate => id === toolCallId(tag, candidate)
+    );
+    if (!kind) continue;
+    if (!status.seenToolResults.has(id)) {
+      status.seenToolResults.add(id);
+      status.toolResults[kind] += 1;
+    }
+    result.push({ id, content: toolResultContent(message.content) });
+  }
+  return result;
+}
+
+function toolProperties(tool: AdvertisedTool): Record<string, unknown> | null {
+  return isRecord(tool.parameters.properties) ? tool.parameters.properties : null;
+}
+
+function propertyName(properties: Record<string, unknown>, candidates: string[]): string | null {
+  return candidates.find(candidate => candidate in properties) ?? null;
+}
+
+function supportsRequiredArguments(
+  tool: AdvertisedTool,
+  argumentsByName: Record<string, unknown>
+): boolean {
+  if (!Array.isArray(tool.parameters.required)) return true;
+  return tool.parameters.required.every(
+    required => typeof required === 'string' && required in argumentsByName
+  );
+}
+
+function resolveTool(
+  tools: AdvertisedTool[],
+  kind: ToolKind,
+  input: { path?: string; contents?: string; replacement?: string; question?: string }
+): { tool: AdvertisedTool; arguments: Record<string, unknown> } | null {
+  const names: Record<ToolKind, string[]> = {
+    write: ['write', 'write_file', 'write_to_file'],
+    read: ['read', 'read_file'],
+    edit: ['edit', 'edit_file', 'search_and_replace', 'replace'],
+    question: ['question', 'ask_followup_question', 'ask_follow_up_question'],
+  };
+  const tool = tools.find(candidate => names[kind].includes(candidate.name));
+  if (!tool) return null;
+  const properties = toolProperties(tool);
+  if (!properties) return null;
+
+  const args: Record<string, unknown> = {};
+  if (kind === 'question') {
+    if ('questions' in properties && input.question !== undefined) {
+      args.questions = [
+        {
+          question: input.question,
+          header: 'E2E',
+          options: [{ label: 'Continue', description: 'Continue the E2E scenario' }],
+        },
+      ];
+    } else if ('question' in properties && input.question !== undefined) {
+      args.question = input.question;
+      if ('options' in properties) {
+        args.options = [{ label: 'Continue', description: 'Continue the E2E scenario' }];
+      }
+    } else {
+      return null;
+    }
+    return supportsRequiredArguments(tool, args) ? { tool, arguments: args } : null;
+  }
+
+  const pathProperty = propertyName(properties, ['filePath', 'file_path', 'path', 'filename']);
+  if (!pathProperty || input.path === undefined) return null;
+  args[pathProperty] = input.path;
+
+  if (kind === 'write') {
+    const contentProperty = propertyName(properties, ['content', 'contents', 'text']);
+    if (!contentProperty || input.contents === undefined) return null;
+    args[contentProperty] = input.contents;
+  }
+
+  if (kind === 'edit') {
+    const previousProperty = propertyName(properties, [
+      'oldString',
+      'old_string',
+      'oldText',
+      'old_text',
+      'search',
+      'old',
+    ]);
+    const replacementProperty = propertyName(properties, [
+      'newString',
+      'new_string',
+      'newText',
+      'new_text',
+      'replace',
+      'replacement',
+      'new',
+    ]);
+    if (
+      !previousProperty ||
+      !replacementProperty ||
+      input.contents === undefined ||
+      input.replacement === undefined
+    ) {
+      return null;
+    }
+    args[previousProperty] = input.contents;
+    args[replacementProperty] = input.replacement;
+  }
+
+  return supportsRequiredArguments(tool, args) ? { tool, arguments: args } : null;
+}
+
+function readFileContents(result: string): string {
+  let content = result;
+  try {
+    const parsed: unknown = JSON.parse(result);
+    if (isRecord(parsed) && typeof parsed.output === 'string') content = parsed.output;
+  } catch {
+    content = result;
+  }
+  const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
+  if (enclosed?.[1] !== undefined) content = enclosed[1];
+  return content
+    .split(/\r?\n/)
+    .filter(line => !/^\s*\((?:End of file|Showing lines)/.test(line))
+    .map(line => line.replace(/^\s*\d+\s*[:|]\s?/, ''))
+    .join('\n')
+    .trimEnd();
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +429,21 @@ function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
 // SSE framing helpers
 // ---------------------------------------------------------------------------
 
+type ToolCallDelta = {
+  index: number;
+  id?: string;
+  type?: 'function';
+  function: { name?: string; arguments: string };
+};
+
+type ChunkDelta = {
+  role?: string;
+  content?: string;
+  tool_calls?: ToolCallDelta[];
+};
+
+type FinishReason = 'stop' | 'tool_calls';
+
 type Chunk = {
   id: string;
   object: 'chat.completion.chunk';
@@ -203,8 +451,8 @@ type Chunk = {
   model: string;
   choices: Array<{
     index: number;
-    delta: { role?: string; content?: string };
-    finish_reason: null | 'stop';
+    delta: ChunkDelta;
+    finish_reason: null | FinishReason;
   }>;
   usage?: {
     prompt_tokens: number;
@@ -229,8 +477,8 @@ function ensureStreamHeaders(res: ServerResponse): void {
 function makeChunk(
   id: string,
   model: string,
-  delta: { role?: string; content?: string },
-  finishReason: null | 'stop' = null
+  delta: ChunkDelta,
+  finishReason: null | FinishReason = null
 ): Chunk {
   return {
     id,
@@ -260,10 +508,11 @@ function writeFinish(
   res: ServerResponse,
   id: string,
   model: string,
-  completionTokens: number
+  completionTokens: number,
+  finishReason: FinishReason = 'stop'
 ): void {
   const finalChunk: Chunk = {
-    ...makeChunk(id, model, {}, 'stop'),
+    ...makeChunk(id, model, {}, finishReason),
     usage: {
       prompt_tokens: 10,
       completion_tokens: completionTokens,
@@ -302,6 +551,8 @@ export type ScenarioContext = {
   id: string;
   model: string;
   state: ServerState;
+  body: unknown;
+  tools: AdvertisedTool[];
   /** Correlation id for log entries of this request. */
   reqLogId: number;
 };
@@ -316,6 +567,134 @@ function emitEcho(ctx: ScenarioContext, text: string): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function writeAssistantResponse(ctx: ScenarioContext, content: string): void {
+  writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content }));
+  writeFinish(ctx.res, ctx.id, ctx.model, content.length);
+  ctx.res.end();
+}
+
+function parkGate(ctx: ScenarioContext, tag: string, completion: string): void {
+  const releasedFollowupExpiresAt = ctx.state.releasedGateFollowups.get(tag);
+  if (releasedFollowupExpiresAt !== undefined) {
+    ctx.state.releasedGateFollowups.delete(tag);
+    if (Date.now() <= releasedFollowupExpiresAt) {
+      writeAssistantResponse(ctx, completion);
+      logEvent('scenario.unparked', {
+        reqId: ctx.reqLogId,
+        scenario: 'gate',
+        tag,
+        reason: 'released-followup',
+      });
+      return;
+    }
+  }
+
+  ensureStreamHeaders(ctx.res);
+  ctx.state.liveResponses.add(ctx.res);
+  let releasedByTest = false;
+
+  const cleanup = (): void => {
+    ctx.state.liveResponses.delete(ctx.res);
+    const waiters = ctx.state.gates.get(tag);
+    if (!waiters) return;
+    const remaining = waiters.filter(waiter => waiter.res !== ctx.res);
+    if (remaining.length === 0) {
+      ctx.state.gates.delete(tag);
+    } else {
+      ctx.state.gates.set(tag, remaining);
+    }
+  };
+
+  const release = (): void => {
+    releasedByTest = true;
+    cleanup();
+    writeAssistantResponse(ctx, completion);
+    logEvent('scenario.unparked', {
+      reqId: ctx.reqLogId,
+      scenario: 'gate',
+      tag,
+      reason: 'released',
+    });
+  };
+
+  ctx.res.on('close', () => {
+    cleanup();
+    if (!releasedByTest) {
+      logEvent('scenario.unparked', {
+        reqId: ctx.reqLogId,
+        scenario: 'gate',
+        tag,
+        reason: 'client-closed',
+      });
+    }
+  });
+
+  const waiters = ctx.state.gates.get(tag) ?? [];
+  waiters.push({ res: ctx.res, req: ctx.req, model: ctx.model, release, cleanup });
+  ctx.state.gates.set(tag, waiters);
+  logEvent('scenario.parked', {
+    reqId: ctx.reqLogId,
+    scenario: 'gate',
+    tag,
+    waiterCount: waiters.length,
+  });
+}
+
+function writeToolCall(
+  ctx: ScenarioContext,
+  tag: string,
+  kind: ToolKind,
+  resolved: { tool: AdvertisedTool; arguments: Record<string, unknown> }
+): void {
+  scenarioStatus(ctx.state, tag).toolCalls[kind] += 1;
+  writeChunk(
+    ctx.res,
+    makeChunk(ctx.id, ctx.model, {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id: toolCallId(tag, kind),
+          type: 'function',
+          function: { name: resolved.tool.name, arguments: '' },
+        },
+      ],
+    })
+  );
+  writeChunk(
+    ctx.res,
+    makeChunk(ctx.id, ctx.model, {
+      tool_calls: [{ index: 0, function: { arguments: JSON.stringify(resolved.arguments) } }],
+    })
+  );
+  writeFinish(ctx.res, ctx.id, ctx.model, 1, 'tool_calls');
+  ctx.res.end();
+}
+
+function writeUnsupportedToolSchema(ctx: ScenarioContext, tag: string, kind: ToolKind): void {
+  scenarioStatus(ctx.state, tag).unsupportedToolSchema = true;
+  writeJsonError(ctx.res, 422, `unsupported ${kind} tool schema`, 'unsupported_tool_schema');
+  logEvent('scenario.unsupported', {
+    reqId: ctx.reqLogId,
+    tag,
+    advertisedTools: ctx.tools.length,
+  });
+}
+
+function runToolScenario(
+  ctx: ScenarioContext,
+  tag: string,
+  kind: ToolKind,
+  input: { path?: string; contents?: string; replacement?: string; question?: string }
+): void {
+  const resolved = resolveTool(ctx.tools, kind, input);
+  if (!resolved) {
+    writeUnsupportedToolSchema(ctx, tag, kind);
+    return;
+  }
+  writeToolCall(ctx, tag, kind, resolved);
 }
 
 /**
@@ -379,91 +758,102 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   },
 
   gate(args, ctx) {
-    const rawArg = args[0] ?? '';
-    // Kilo augments the user message with `<environment_details>...` and other
-    // system context. Strip anything past the first non-tag character so both
-    // the title-model call and the primary code call share the same tag.
-    const tag = rawArg.match(/^([A-Za-z0-9_-]+)/)?.[1] ?? '';
+    const match = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+)(?::([A-Za-z0-9_-]+))?/
+    );
+    const tag = match?.[1];
     if (!tag) {
       writeJsonError(ctx.res, 402, 'gate directive requires a tag', 'invalid_request');
       return;
     }
+    parkGate(ctx, tag, match[2] ?? 'done');
+  },
 
-    const releasedFollowupExpiresAt = ctx.state.releasedGateFollowups.get(tag);
-    if (releasedFollowupExpiresAt !== undefined) {
-      ctx.state.releasedGateFollowups.delete(tag);
-      if (Date.now() <= releasedFollowupExpiresAt) {
-        ensureStreamHeaders(ctx.res);
-        writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: 'done' }));
-        writeFinish(ctx.res, ctx.id, ctx.model, 4);
-        ctx.res.end();
-        logEvent('scenario.unparked', {
-          reqId: ctx.reqLogId,
-          scenario: 'gate',
-          tag,
-          reason: 'released-followup',
-        });
+  'write-then-gate'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):([^:]+):([\s\S]+)$/);
+    if (!parsed?.[1] || !parsed[2] || parsed[3] === undefined) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'write-then-gate directive requires tag, path, and contents',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, path, contents] = parsed;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const results = toolResults(ctx.body, tag, ctx.state);
+    if (!results.some(result => result.id === toolCallId(tag, 'write'))) {
+      runToolScenario(ctx, tag, 'write', { path, contents });
+      return;
+    }
+    parkGate(ctx, tag, `done-${tag}`);
+  },
+
+  'read-edit-then-gate'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):([^:]+):([\s\S]+)$/);
+    if (!parsed?.[1] || !parsed[2] || parsed[3] === undefined) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'read-edit-then-gate directive requires tag, path, and replacement',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, path, replacement] = parsed;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const results = toolResults(ctx.body, tag, ctx.state);
+    const readResult = results.find(result => result.id === toolCallId(tag, 'read'));
+    if (!readResult) {
+      runToolScenario(ctx, tag, 'read', { path });
+      return;
+    }
+    if (!results.some(result => result.id === toolCallId(tag, 'edit'))) {
+      const contents = readFileContents(readResult.content);
+      if (!contents) {
+        writeJsonError(
+          ctx.res,
+          422,
+          'read tool returned no editable file contents',
+          'invalid_tool_result'
+        );
         return;
       }
+      runToolScenario(ctx, tag, 'edit', { path, contents, replacement });
+      return;
     }
+    parkGate(ctx, tag, `done-${tag}`);
+  },
 
-    ensureStreamHeaders(ctx.res);
-    ctx.state.liveResponses.add(ctx.res);
-
-    let releasedByTest = false;
-
-    const cleanup = (): void => {
-      ctx.state.liveResponses.delete(ctx.res);
-      const waiters = ctx.state.gates.get(tag);
-      if (!waiters) return;
-      const next = waiters.filter(w => w.res !== ctx.res);
-      if (next.length === 0) {
-        ctx.state.gates.delete(tag);
-      } else {
-        ctx.state.gates.set(tag, next);
-      }
-    };
-
-    const release = (): void => {
-      releasedByTest = true;
-      cleanup();
-      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: 'done' }));
-      writeFinish(ctx.res, ctx.id, ctx.model, 4);
-      ctx.res.end();
-      logEvent('scenario.unparked', {
-        reqId: ctx.reqLogId,
-        scenario: 'gate',
-        tag,
-        reason: 'released',
-      });
-    };
-
-    ctx.res.on('close', () => {
-      cleanup();
-      if (!releasedByTest) {
-        logEvent('scenario.unparked', {
-          reqId: ctx.reqLogId,
-          scenario: 'gate',
-          tag,
-          reason: 'client-closed',
-        });
-      }
-    });
-    const existing = ctx.state.gates.get(tag) ?? [];
-    existing.push({
-      res: ctx.res,
-      req: ctx.req,
-      model: ctx.model,
-      release,
-      cleanup,
-    });
-    ctx.state.gates.set(tag, existing);
-    logEvent('scenario.parked', {
-      reqId: ctx.reqLogId,
-      scenario: 'gate',
-      tag,
-      waiterCount: existing.length,
-    });
+  question(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):([\s\S]+)$/);
+    if (!parsed?.[1] || !parsed[2]) {
+      writeJsonError(
+        ctx.res,
+        402,
+        'question directive requires a tag and question text',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, question] = parsed;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${tag}`);
+      return;
+    }
+    const results = toolResults(ctx.body, tag, ctx.state);
+    if (!results.some(result => result.id === toolCallId(tag, 'question'))) {
+      runToolScenario(ctx, tag, 'question', { question });
+      return;
+    }
+    writeAssistantResponse(ctx, `done-${tag}`);
   },
 };
 
@@ -510,11 +900,14 @@ async function handleChatCompletions(
     return;
   }
 
-  const messages = (body as { messages?: unknown }).messages;
+  const messages = isRecord(body) ? body.messages : undefined;
   const messageCount = Array.isArray(messages) ? messages.length : 0;
-  const bodyModel = (body as { model?: string }).model;
+  const bodyModel = isRecord(body) && typeof body.model === 'string' ? body.model : undefined;
   const prompt = extractLastUserMessageText(body);
   const directive = parseDirective(prompt);
+  const tools = advertisedTools(body);
+  const tag = directiveTag(directive);
+  if (tag) scenarioStatus(state, tag).requests += 1;
 
   logEvent('request.start', {
     reqId: reqLogId,
@@ -522,7 +915,9 @@ async function handleChatCompletions(
     model: bodyModel,
     messages: messageCount,
     scenario: directive?.scenario ?? 'echo',
-    args: directive ? directive.args.join('|') : '(default)',
+    args: directive === null ? '(default)' : undefined,
+    tag,
+    tools: tools.length,
   });
 
   const ctx: ScenarioContext = {
@@ -531,6 +926,8 @@ async function handleChatCompletions(
     id: randomId(),
     model: FAKE_MODEL.id,
     state,
+    body,
+    tools,
     reqLogId,
   };
 
@@ -658,6 +1055,25 @@ function handleRequestCounts(res: ServerResponse, state: ServerState): void {
   res.end(JSON.stringify({ chatCompletions: state.chatCompletionRequests }));
 }
 
+function handleScenarioStatus(req: IncomingMessage, res: ServerResponse, state: ServerState): void {
+  const tag = new URL(req.url ?? '/', 'http://localhost').searchParams.get('tag');
+  if (!tag || !/^[A-Za-z0-9_-]+$/.test(tag)) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'valid tag query param required' }));
+    return;
+  }
+  const status = scenarioStatus(state, tag);
+  const response: FakeScenarioStatus = {
+    tag,
+    requests: status.requests,
+    toolCalls: status.toolCalls,
+    toolResults: status.toolResults,
+    unsupportedToolSchema: status.unsupportedToolSchema,
+  };
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(response));
+}
+
 /**
  * Snapshot of all currently parked gate waiters, grouped by tag. Tests use
  * this after expected completions to assert the fake server has no stale
@@ -689,6 +1105,7 @@ export async function startFakeLlmServer(opts?: {
     liveResponses: new Set(),
     nextRequestId: 0,
     chatCompletionRequests: 0,
+    scenarios: new Map(),
   };
 
   const sockets = new Set<Socket>();
@@ -743,6 +1160,10 @@ export async function startFakeLlmServer(opts?: {
       handleRequestCounts(res, state);
       return;
     }
+    if (route === 'GET /test/scenario-status') {
+      handleScenarioStatus(req, res, state);
+      return;
+    }
 
     logEvent('request.unknown', { method: req.method, path: url.pathname });
     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -773,6 +1194,7 @@ export async function startFakeLlmServer(opts?: {
     }
     state.gates.clear();
     state.releasedGateFollowups.clear();
+    state.scenarios.clear();
     // End any in-flight hang responses.
     for (const res of state.liveResponses) {
       if (!res.writableEnded) res.end();

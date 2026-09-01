@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
@@ -236,11 +239,8 @@ const MetadataWorkspaceSchema = z
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
+    worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
-    worktreeId: z
-      .string()
-      .regex(/^worktree_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
-      .optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
@@ -353,28 +353,29 @@ export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
 
 export function getControlPlaneCredentialContainment(
   sessionId: string,
-  repository: SessionMetadata['repository']
+  repository: SessionMetadata['repository'],
+  enabled = true
 ): CredentialContainment | undefined {
   if (sessionPlaneFromId(sessionId) !== 'control') return undefined;
   return {
-    github: repository?.type === 'github',
-    gitlab: repository?.type === 'gitlab',
-    bitbucket: repository?.type === 'bitbucket',
-    kilocode: true,
+    github: enabled && repository?.type === 'github',
+    gitlab: enabled && repository?.type === 'gitlab',
+    bitbucket: enabled && repository?.type === 'bitbucket',
+    kilocode: enabled,
   };
 }
 
 export function getEffectiveCredentialContainment(
   metadata: SessionMetadata
 ): CredentialContainment {
+  if (metadata.workspace?.credentialContainment) {
+    return metadata.workspace.credentialContainment;
+  }
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     metadata.identity.sessionId,
     metadata.repository
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  if (metadata.workspace?.credentialContainment) {
-    return metadata.workspace.credentialContainment;
-  }
   const legacyContainment = metadata.workspace?.managedScmContainment === true;
   return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
 }

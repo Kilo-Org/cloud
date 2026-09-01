@@ -418,7 +418,7 @@ export function createWrapperKiloClient(
           id: sessionId,
           projectID: project.id,
           slug: sessionId.slice(0, 24),
-          title: 'Cloud Agent',
+          title: 'New session - ' + new Date(now).toISOString(),
           version: '7.4.20',
           timeCreated: now,
           timeUpdated: now,

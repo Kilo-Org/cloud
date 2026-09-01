@@ -12,7 +12,8 @@ import {
   fetchSessionMetadata,
 } from '../../session-service.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { getSandboxSessionStub, resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { sessionPlaneFromId } from '../../session-plane.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
   sessionIdSchema,
@@ -78,7 +79,15 @@ async function deleteSessionResources(
 
   try {
     const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    if (!metadata) {
+    const retainedRuntime =
+      !metadata && sessionPlaneFromId(sessionId) === 'control'
+        ? await withDORetry(
+            () => getSandboxSessionStub(env, userId, sessionId),
+            stub => stub.getRuntimeLocation(),
+            'getRuntimeLocation'
+          )
+        : null;
+    if (!metadata && !retainedRuntime) {
       logger.info('Session not found or already deleted');
       return { success: true, message: 'Session not found or already deleted' };
     }

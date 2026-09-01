@@ -477,6 +477,42 @@ describe('freezeLegacyQueuedMessages', () => {
     const frozen = freezeLegacyQueuedMessages([msg('missing', 'queued')], defaultAgent);
     expect(frozen).toEqual([{ messageId: 'missing', state: 'queued', legacyIntentInvalid: true }]);
   });
+
+  it('preserves unversioned intents and freezes legacy finalization before defaults change', () => {
+    const existing: SessionMessageRecord = {
+      messageId: commandTurn.messageId,
+      state: 'queued',
+      intent: {
+        turn: commandTurn,
+        agent: { mode: 'reviewer' },
+        finalization: { autoCommit: false },
+      },
+    };
+    const frozen = freezeLegacyQueuedMessages(
+      [
+        existing,
+        {
+          messageId: promptTurn.messageId,
+          state: 'queued',
+          turn: promptTurn,
+          finalization: { condenseOnComplete: false },
+        },
+      ],
+      defaultAgent,
+      { autoCommit: false, condenseOnComplete: true }
+    );
+    expect(frozen).toEqual([
+      existing,
+      createSessionMessageRecord({
+        turn: promptTurn,
+        agent: defaultAgent,
+        finalization: { autoCommit: false, condenseOnComplete: false },
+      }),
+    ]);
+    expect(
+      freezeLegacyQueuedMessages(frozen, { model: 'other-model' }, { autoCommit: true })
+    ).toEqual(frozen);
+  });
 });
 
 describe('nextQueuedMessageId', () => {
@@ -578,7 +614,7 @@ describe('acceptQueuedMessage', () => {
     });
   });
 
-  it('preserves structured prompt attachments and command arguments', () => {
+  it('preserves upstream turns and durable intents with attachments, commands, and finalization', () => {
     const prompt = {
       type: 'prompt' as const,
       messageId: 'a',
@@ -591,13 +627,37 @@ describe('acceptQueuedMessage', () => {
       command: 'review',
       arguments: '--all changes',
     };
+    const messages: SessionMessageRecord[] = [
+      { messageId: prompt.messageId, state: 'queued', turn: prompt },
+      { messageId: command.messageId, state: 'queued', turn: command },
+      {
+        messageId: prompt.messageId,
+        state: 'queued',
+        intent: {
+          turn: prompt,
+          agent: { mode: 'debug', model: 'attachment-model', variant: 'focused' },
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        },
+      },
+      {
+        messageId: command.messageId,
+        state: 'queued',
+        intent: {
+          turn: command,
+          agent: { mode: 'plan', model: 'command-model' },
+          finalization: { autoCommit: true, condenseOnComplete: false },
+        },
+      },
+    ];
 
-    expect(
-      acceptQueuedMessage([{ messageId: 'a', state: 'queued', turn: prompt }], 'a', 10)?.[0]
-    ).toMatchObject({ state: 'accepted', turn: prompt });
-    expect(
-      acceptQueuedMessage([{ messageId: 'b', state: 'queued', turn: command }], 'b', 20)?.[0]
-    ).toMatchObject({ state: 'accepted', turn: command });
+    for (const message of messages) {
+      expect(acceptQueuedMessage([message], message.messageId, 10)?.[0]).toEqual({
+        ...message,
+        state: 'accepted',
+        acceptedAt: 10,
+        lastActivityAt: 10,
+      });
+    }
   });
 
   it('does not resurrect a cancelled message after interrupt', () => {
@@ -687,7 +747,7 @@ describe('streamQueuedSnapshots', () => {
     ]);
   });
 
-  it('surfaces queued and accepted legacy prompts for /stream catch-up', () => {
+  it('marks accepted legacy prompts as sent without changing genuinely queued snapshots', () => {
     expect(
       streamQueuedSnapshots(
         [
@@ -703,7 +763,7 @@ describe('streamQueuedSnapshots', () => {
     ]);
   });
 
-  it('renders structured prompts and commands for queued-message reconnect', () => {
+  it('renders upstream structured turns and durable command or attachment intents on reconnect', () => {
     expect(
       streamQueuedSnapshots(
         [
@@ -723,6 +783,33 @@ describe('streamQueuedSnapshots', () => {
             state: 'queued',
             turn: { type: 'command', messageId: 'c', command: 'status', arguments: '' },
           },
+          {
+            messageId: 'command',
+            state: 'queued',
+            intent: {
+              turn: {
+                type: 'command',
+                messageId: 'command',
+                command: 'compact',
+                arguments: '--aggressive',
+              },
+              agent: { mode: 'plan', model: 'override-model' },
+            },
+          },
+          {
+            messageId: 'attachment',
+            state: 'queued',
+            intent: {
+              turn: {
+                type: 'prompt',
+                messageId: 'attachment',
+                prompt: 'inspect attachment',
+                attachments: { path: 'attachment-path', files: ['document.pdf'] },
+              },
+              agent: { mode: 'debug', model: 'attachment-model' },
+              finalization: { autoCommit: false },
+            },
+          },
         ],
         99
       )
@@ -730,6 +817,80 @@ describe('streamQueuedSnapshots', () => {
       { messageId: 'a', content: 'hello', timestamp: 20, delivery: 'sent' },
       { messageId: 'b', content: '/review --all', timestamp: 99 },
       { messageId: 'c', content: '/status', timestamp: 99 },
+      { messageId: 'command', content: '/compact --aggressive', timestamp: 99 },
+      { messageId: 'attachment', content: 'inspect attachment', timestamp: 99 },
+    ]);
+  });
+
+  it('prefers the canonical durable turn over stale upstream turns and compatibility prompts', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          {
+            messageId: 'prompt',
+            state: 'accepted',
+            prompt: 'stale compatibility text',
+            turn: { type: 'prompt', messageId: 'prompt', prompt: 'stale upstream text' },
+            intent: {
+              turn: { type: 'prompt', messageId: 'prompt', prompt: 'canonical text' },
+              agent: { mode: 'code', model: 'selected-model' },
+            },
+          },
+        ],
+        50
+      )
+    ).toEqual([
+      { messageId: 'prompt', content: 'canonical text', timestamp: 50, delivery: 'sent' },
+    ]);
+  });
+
+  it('keeps failed snapshots on their existing queued-then-terminal delivery path', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          {
+            messageId: 'queued_failure',
+            state: 'failed',
+            prompt: 'never sent',
+            failedReason: 'preparation_failed',
+          },
+          {
+            messageId: 'accepted_failure',
+            state: 'failed',
+            prompt: 'already sent',
+            acceptedAt: 20,
+            failedReason: 'wrapper_failed',
+          },
+        ],
+        99
+      )
+    ).toEqual([
+      {
+        messageId: 'queued_failure',
+        content: 'never sent',
+        timestamp: 99,
+        terminalFailure: {
+          messageId: 'queued_failure',
+          status: 'failed',
+          delivery: 'queued',
+          accepted: false,
+          reason: 'preparation_failed',
+          timestamp: 99,
+        },
+      },
+      {
+        messageId: 'accepted_failure',
+        content: 'already sent',
+        timestamp: 20,
+        terminalFailure: {
+          messageId: 'accepted_failure',
+          status: 'failed',
+          delivery: 'sent',
+          accepted: true,
+          reason: 'wrapper_failed',
+          timestamp: 20,
+        },
+      },
     ]);
   });
 });
@@ -740,7 +901,7 @@ const RUNTIME_ID = '22222222-2222-4222-8222-222222222222';
 const NEXT_RUNTIME_ID = '33333333-3333-4333-8333-333333333333';
 const DIRECTORY = '/workspace/session';
 const KILO_CREDENTIAL = createControlPlaneCredential(SANDBOX_ID, 'kilo');
-const ATTACHMENT: SessionAttachPayload = {
+const ATTACHMENT = {
   directory: DIRECTORY,
   env: { KILOCODE_TOKEN: KILO_CREDENTIAL },
   kilo: {
@@ -752,7 +913,7 @@ const ATTACHMENT: SessionAttachPayload = {
       sessionIngestBaseUrl: 'https://ingest.example.test',
     },
   },
-};
+} satisfies SessionAttachPayload;
 
 type Control = ReturnType<typeof sandboxControlRpc>;
 type ControlStatus = Awaited<ReturnType<Control['ensureReady']>>;
@@ -771,16 +932,16 @@ function controlResponse(result: unknown): ResponseFrame {
   return { type: 'response', requestId: 'request', ok: true, result };
 }
 
-function controlFailure(retryable: boolean): ResponseFrame {
+function controlFailure(retryable: boolean, code = 'not_ready'): ResponseFrame {
   return {
     type: 'response',
     requestId: 'request',
     ok: false,
-    error: { code: 'not_ready', message: 'Control request failed', retryable },
+    error: { code, message: 'Control request failed', retryable },
   };
 }
 
-function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
+function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?: Control) {
   const values = new Map<string, unknown>();
   let alarmAt: number | null = null;
   const errors: unknown[] = [];
@@ -829,7 +990,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
     }),
   } as unknown as DurableObjectStorage;
   const ctx = {
-    id: { name: `user_1:${SESSION_ID}` },
+    id: { name: `user_1:${metadata.identity.sessionId}` },
     storage,
     blockConcurrencyWhile: async (callback: () => Promise<void>) => callback(),
     getWebSockets: () => [],
@@ -875,7 +1036,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
     request,
   } satisfies Control;
   const env = {
-    SANDBOX_CONTROL: { getByName: () => control },
+    SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -898,6 +1059,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
       const now = Date.now();
       vi.clearAllTimers();
       vi.setSystemTime(now);
+      orchestrationMocks.eventQueries.mockReturnValue(eventQueries);
       session = new SandboxSession(ctx, env);
     },
     fireAlarm: () => {
@@ -947,9 +1109,9 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}) {
     ) =>
       session.receiveSandboxControlEvent({
         identity: {
-          directory: DIRECTORY,
-          kiloSessionId: 'kilo_root',
-          rootKiloSessionId: 'kilo_root',
+          directory: metadata.workspace?.workspacePath ?? DIRECTORY,
+          kiloSessionId: metadata.auth.kiloSessionId,
+          rootKiloSessionId: metadata.auth.kiloSessionId,
         },
         wrapperInstanceId,
         payload: { type: 'session.message.outcome', properties: { messageId, status: outcome } },
@@ -1354,6 +1516,14 @@ describe('SandboxSession orchestration', () => {
           await fixture.flush();
           expect(fixture.record('b')?.state).toBe('accepted');
           expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+        } else if (source === 'response') {
+          expect(fixture.record('a')?.failedReason).toBe(reason);
+          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.terminalEvents()).toHaveLength(1);
+          expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+          fixture.control.request.mockImplementation(original);
+          await fixture.fireAlarm();
+          expect(fixture.record('b')?.state).toBe('accepted');
         } else {
           expect(fixture.record('a')?.failedReason).toBe(reason);
           expect(fixture.record('b')?.state).toBe('failed');
@@ -1367,6 +1537,7 @@ describe('SandboxSession orchestration', () => {
 
     it.each([
       'permanent response',
+      'unhealthy response',
       'malformed response',
       'unmarked exception',
       'overloaded exception',
@@ -1378,6 +1549,8 @@ describe('SandboxSession orchestration', () => {
       await fixture.admit('b');
       await fixture.flush();
       if (failure === 'permanent response') response.resolve(controlFailure(false));
+      else if (failure === 'unhealthy response')
+        response.resolve(controlFailure(false, 'runtime_unhealthy'));
       else if (failure === 'malformed response') {
         response.resolve({ type: 'response', requestId: 'request', ok: false });
       } else {
@@ -1390,6 +1563,12 @@ describe('SandboxSession orchestration', () => {
       }
       await fixture.flush();
       expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: reason });
+      if (failure === 'permanent response') {
+        expect(fixture.record('b')?.state).toBe('queued');
+        expect(fixture.terminalEvents()).toHaveLength(1);
+        expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+        return;
+      }
       expect(fixture.record('b')?.state).toBe('failed');
       expect(fixture.terminalEvents()).toHaveLength(2);
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
@@ -1402,7 +1581,7 @@ describe('SandboxSession orchestration', () => {
     });
 
     it.each(['response', 'exception'] as const)(
-      'fails at the operation cutoff even when a retryable peer %s wins the timer race',
+      'distinguishes a peer %s from a transport timeout at the operation cutoff',
       async source => {
         const fixture = sessionFixture();
         delegateRequest(
@@ -1425,6 +1604,16 @@ describe('SandboxSession orchestration', () => {
         expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
         await fixture.flush();
+        if (source === 'response') {
+          expect(fixture.record('a')).toMatchObject({
+            state: 'queued',
+            deliveryRetryScope: 'message',
+          });
+          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+          expect(fixture.terminalEvents()).toHaveLength(0);
+          return;
+        }
         expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: reason });
         expect(fixture.record('b')?.state).toBe('failed');
         expect(fixture.terminalEvents()).toHaveLength(2);
@@ -1435,6 +1624,470 @@ describe('SandboxSession orchestration', () => {
         ).toHaveLength(1);
       }
     );
+  });
+
+  describe.each(['session.attach', 'session.prompt'] as const)(
+    '%s failure isolation',
+    operation => {
+      function sharedSessions() {
+        const writer = sessionFixture();
+        const sibling = sessionFixture(
+          {
+            identity: {
+              ...writer.metadata.identity,
+              sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+            },
+            auth: { ...writer.metadata.auth, kiloSessionId: 'kilo_sibling' },
+          },
+          writer.control
+        );
+        writer.control.quarantineRuntime.mockImplementation(async input => {
+          writer.setStatus({ physical: 'stopped', connection: 'disconnected' });
+          await writer.session.failWaitingMessages(input.reason, input.wrapperInstanceId);
+          return { quarantined: true };
+        });
+        return { writer, sibling };
+      }
+
+      it.each(['accepted', 'expired'] as const)(
+        'keeps an accepted sibling alive while contention retries become %s across resets',
+        async outcome => {
+          const { writer, sibling } = sharedSessions();
+          await writer.admit('writer');
+          await writer.flush();
+          expect(writer.record('writer')?.state).toBe('accepted');
+          let busy = true;
+          const requests: SandboxControlOutboundRequest[] = [];
+          const original = writer.control.request.getMockImplementation();
+          if (!original) throw new Error('Missing control fixture');
+          delegateRequest(writer, operation, async input => {
+            if (input.session?.sessionId !== sibling.metadata.identity.sessionId)
+              return original(input);
+            requests.push(structuredClone(input));
+            return busy ? controlFailure(true, 'session_busy') : original(input);
+          });
+          await sibling.admit('waiting');
+          await sibling.flush();
+          const acquisition = sibling.acquisition('waiting');
+          for (let attempt = 0; attempt < 6; attempt++) {
+            sibling.reload();
+            const retryAt = sibling.alarmAt();
+            if (retryAt === null) throw new Error('Missing contention retry alarm');
+            vi.setSystemTime(retryAt);
+            await sibling.fireAlarm();
+            expect(sibling.record('waiting')).toMatchObject({
+              state: 'queued',
+              deliveryRetryScope: 'message',
+              deliveryDeadlineAt: acquisition.deadlineAt,
+              preparationAttemptId: acquisition.id,
+            });
+            expect(sibling.record('waiting')?.attachFailures).toBeUndefined();
+            expect(sibling.record('waiting')?.promptFailures).toBeUndefined();
+            expect(writer.record('writer')?.state).toBe('accepted');
+            expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+          }
+          expect(requests).toEqual(Array.from({ length: 7 }, () => requests[0]));
+          if (outcome === 'expired') {
+            sibling.reload();
+            vi.setSystemTime(acquisition.deadlineAt);
+            await sibling.fireAlarm();
+            expect(sibling.record('waiting')).toMatchObject({
+              state: 'failed',
+              failedReason: 'preparation_timeout',
+              terminalAt: acquisition.deadlineAt,
+            });
+            expect(sibling.terminalEvents()).toHaveLength(1);
+            expect(await sibling.session.getCurrentMessageWork()).toBeNull();
+            expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
+            expect(await sibling.snapshot()).toMatchObject({
+              sessionStatus: { type: 'idle' },
+              cloudStatus: { type: 'ready' },
+              pendingInteractions: { questions: [], permissions: [] },
+              queuedMessages: [
+                {
+                  messageId: 'waiting',
+                  terminalFailure: { accepted: false, reason: 'preparation_timeout' },
+                },
+              ],
+            });
+            expect(await writer.session.getCurrentMessageWork()).toMatchObject({
+              messageId: 'writer',
+              status: 'running',
+            });
+            await sibling.fireAlarm();
+            expect(requests).toHaveLength(7);
+            expect(sibling.alarmAt()).toBeNull();
+            busy = false;
+            await sibling.admit('follow-up');
+            await sibling.flush();
+            expect(sibling.record('follow-up')?.state).toBe('accepted');
+          } else {
+            busy = false;
+            await sibling.fireAlarm();
+            expect(sibling.record('waiting')).toMatchObject({
+              state: 'accepted',
+              deliveryDeadlineAt: acquisition.deadlineAt,
+              wrapperInstanceId: RUNTIME_ID,
+            });
+            await sibling.outcome('waiting', 'completed');
+          }
+          await writer.fireAlarm();
+          expect(writer.record('writer')?.state).toBe('accepted');
+          expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+          expect(writer.terminalEvents()).toHaveLength(0);
+          await writer.outcome('writer', 'completed');
+          expect(writer.record('writer')?.state).toBe('completed');
+        }
+      );
+
+      it('expires only the contending head and preserves its queued follow-up', async () => {
+        const { writer, sibling } = sharedSessions();
+        await writer.admit('writer');
+        await writer.flush();
+        const original = writer.control.request.getMockImplementation();
+        if (!original) throw new Error('Missing control fixture');
+        delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+        await sibling.admit('waiting');
+        await sibling.admit('next');
+        await sibling.flush();
+        const deadlineAt = sibling.acquisition('waiting').deadlineAt;
+        sibling.reload();
+        vi.setSystemTime(deadlineAt);
+        await sibling.fireAlarm();
+        expect(sibling.record('waiting')).toMatchObject({
+          state: 'failed',
+          failedReason: 'preparation_timeout',
+        });
+        expect(sibling.record('next')?.state).toBe('queued');
+        expect(sibling.record('next')?.deliveryDeadlineAt).toBeUndefined();
+        expect(await sibling.session.getCurrentMessageWork()).toMatchObject({
+          messageId: 'next',
+          status: 'pending',
+        });
+        expect(writer.record('writer')?.state).toBe('accepted');
+        writer.control.request.mockImplementation(original);
+        await sibling.fireAlarm();
+        expect(sibling.record('next')).toMatchObject({
+          state: 'accepted',
+          deliveryDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+          wrapperInstanceId: RUNTIME_ID,
+        });
+        expect(sibling.terminalEvents()).toHaveLength(1);
+        expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+      });
+
+      it.each([false, true])(
+        'isolates application rejection with retryable=%s from a running sibling',
+        async retryable => {
+          const { writer, sibling } = sharedSessions();
+          await writer.admit('writer');
+          await writer.flush();
+          delegateRequest(writer, operation, async () => controlFailure(retryable));
+          await sibling.admit('rejected');
+          await sibling.flush();
+          for (let attempt = 1; attempt < (operation === 'session.attach' ? 2 : 5); attempt++) {
+            sibling.reload();
+            await sibling.fireAlarm();
+          }
+          expect(sibling.record('rejected')).toMatchObject({
+            state: 'failed',
+            failedReason: operation === 'session.attach' ? 'attach_exhausted' : 'prompt_exhausted',
+          });
+          expect(sibling.terminalEvents()).toHaveLength(1);
+          expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
+          expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+          await writer.outcome('writer', 'completed');
+          expect(writer.record('writer')?.state).toBe('completed');
+        }
+      );
+
+      it('cancels a busy retry without quarantining the accepted sibling', async () => {
+        const { writer, sibling } = sharedSessions();
+        await writer.admit('writer');
+        await writer.flush();
+        delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+        await sibling.admit('waiting');
+        await sibling.flush();
+        sibling.reload();
+        await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
+        await sibling.fireAlarm();
+        expect(sibling.record('waiting')?.state).toBe('cancelled');
+        expect(sibling.terminalEvents()).toHaveLength(1);
+        expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+        await writer.outcome('writer', 'completed');
+        expect(writer.record('writer')?.state).toBe('completed');
+      });
+
+      it.each(['ensureReady', 'attachSession'] as const)(
+        'preserves the accepted sibling when a busy retry is cancelled during %s',
+        async stage => {
+          const { writer, sibling } = sharedSessions();
+          await writer.admit('writer');
+          await writer.flush();
+          const ready = {
+            physical: 'running',
+            connection: 'ready',
+            wrapperInstanceId: RUNTIME_ID,
+            attachment: {
+              ...ATTACHMENT,
+              kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+            },
+          } satisfies ControlStatus;
+          writer.control.ensureReady.mockResolvedValue(ready);
+          delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+          await sibling.admit('waiting');
+          await sibling.flush();
+          expect(sibling.record('waiting')).toMatchObject({
+            state: 'queued',
+            deliveryRetryScope: 'message',
+            wrapperInstanceId: RUNTIME_ID,
+          });
+          expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+          sibling.reload();
+          writer.control.ensureReady.mockClear();
+          writer.control.attachSession.mockClear();
+          writer.control.request.mockClear();
+          const pending = deferred<void>();
+          if (stage === 'ensureReady') {
+            writer.control.ensureReady.mockImplementationOnce(async () => {
+              await pending.promise;
+              return ready;
+            });
+          } else {
+            writer.control.attachSession.mockImplementationOnce(async () => {
+              await pending.promise;
+              return {};
+            });
+          }
+          const retry = sibling.fireAlarm();
+          await sibling.flush();
+          try {
+            expect(writer.control.ensureReady).toHaveBeenCalledOnce();
+            expect(writer.control.attachSession).toHaveBeenCalledTimes(
+              stage === 'attachSession' ? 1 : 0
+            );
+            expect(writer.control.request).not.toHaveBeenCalled();
+            expect(sibling.record('waiting')?.unresolvedDispatch).toBeUndefined();
+            await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
+            expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+            expect(writer.record('writer')?.state).toBe('accepted');
+            expect(writer.terminalEvents()).toHaveLength(0);
+            expect(sibling.record('waiting')?.state).toBe('cancelled');
+            expect(sibling.terminalEvents()).toHaveLength(1);
+            expect(await sibling.session.isSandboxCleanupScheduled()).toBe(false);
+          } finally {
+            pending.resolve(undefined);
+            await retry;
+            await sibling.flush();
+          }
+          await sibling.fireAlarm();
+          expect(writer.control.request).not.toHaveBeenCalled();
+          expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+          expect(sibling.record('waiting')?.state).toBe('cancelled');
+          expect(sibling.terminalEvents()).toHaveLength(1);
+          expect(writer.record('writer')?.state).toBe('accepted');
+          await writer.outcome('writer', 'completed');
+          expect(writer.record('writer')?.state).toBe('completed');
+        }
+      );
+
+      it('quarantines a busy retry interrupted during wrapper dispatch', async () => {
+        const { writer, sibling } = sharedSessions();
+        await writer.admit('writer');
+        await writer.flush();
+        delegateRequest(writer, operation, async () => controlFailure(true, 'session_busy'));
+        await sibling.admit('waiting');
+        await sibling.flush();
+        expect(sibling.record('waiting')?.deliveryRetryScope).toBe('message');
+        const pending = deferred<ResponseFrame>();
+        delegateRequest(writer, operation, () => pending.promise);
+        writer.control.request.mockClear();
+        sibling.reload();
+        const retry = sibling.fireAlarm();
+        await sibling.flush();
+        try {
+          expect(writer.control.request).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ operation, expectedWrapperInstanceId: RUNTIME_ID })
+          );
+          expect(sibling.record('waiting')).toMatchObject({
+            state: 'queued',
+            unresolvedDispatch: true,
+            wrapperInstanceId: RUNTIME_ID,
+          });
+          expect(sibling.record('waiting')?.deliveryRetryScope).toBeUndefined();
+          await expect(sibling.session.interruptExecution()).resolves.toEqual({ success: true });
+          expect(writer.control.quarantineRuntime).toHaveBeenCalledExactlyOnceWith({
+            ownerId: writer.metadata.identity.userId,
+            sessionId: sibling.metadata.identity.sessionId,
+            wrapperInstanceId: RUNTIME_ID,
+            reason: 'preparation_interrupted',
+          });
+          expect(sibling.record('waiting')?.state).toBe('cancelled');
+          expect(writer.record('writer')?.state).toBe('failed');
+        } finally {
+          pending.resolve(
+            controlResponse(
+              operation === 'session.attach'
+                ? { attached: true }
+                : { messageId: 'waiting', status: 'accepted' }
+            )
+          );
+          await retry;
+          await sibling.flush();
+        }
+        await sibling.fireAlarm();
+        expect(writer.control.request).toHaveBeenCalledOnce();
+        expect(sibling.record('waiting')?.state).toBe('cancelled');
+        expect(sibling.terminalEvents()).toHaveLength(1);
+      });
+
+      it.each(['stop', 'expiry'] as const)(
+        'retains unresolved dispatch ownership through a lost acknowledgement, busy replay, and %s',
+        async action => {
+          const fixture = sessionFixture();
+          const lostAcknowledgement = deferred<ResponseFrame>();
+          let requests = 0;
+          let remoteWorkRunning = false;
+          delegateRequest(fixture, operation, async () => {
+            requests++;
+            if (requests === 1) {
+              remoteWorkRunning = true;
+              return lostAcknowledgement.promise;
+            }
+            return controlFailure(true, 'session_busy');
+          });
+          fixture.control.quarantineRuntime.mockImplementation(async () => {
+            remoteWorkRunning = false;
+            return { quarantined: true };
+          });
+          await fixture.admit('waiting');
+          await fixture.flush();
+          const acquisition = fixture.acquisition('waiting');
+          expect(fixture.record('waiting')?.unresolvedDispatch).toBe(true);
+          for (let attempt = 0; attempt < 3; attempt++) {
+            fixture.reload();
+            await fixture.fireAlarm();
+            expect(fixture.record('waiting')).toMatchObject({
+              state: 'queued',
+              unresolvedDispatch: true,
+              deliveryRetryScope: 'runtime',
+              wrapperInstanceId: RUNTIME_ID,
+            });
+          }
+          expect(remoteWorkRunning).toBe(true);
+          expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+          fixture.reload();
+          if (action === 'stop') {
+            await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
+          } else {
+            vi.setSystemTime(acquisition.deadlineAt);
+            await fixture.fireAlarm();
+          }
+          expect(remoteWorkRunning).toBe(false);
+          expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith({
+            ownerId: 'user_1',
+            sessionId: SESSION_ID,
+            wrapperInstanceId: RUNTIME_ID,
+            reason: action === 'stop' ? 'preparation_interrupted' : 'preparation_timeout',
+          });
+          expect(fixture.record('waiting')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+          lostAcknowledgement.resolve(
+            controlResponse(
+              operation === 'session.attach'
+                ? { attached: true }
+                : { messageId: 'waiting', status: 'accepted' }
+            )
+          );
+          await fixture.flush();
+          expect(fixture.record('waiting')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+          expect(fixture.terminalEvents()).toHaveLength(1);
+          expect(await fixture.session.getCurrentMessageWork()).toBeNull();
+        }
+      );
+
+      it('quarantines a transport failure after a busy retry rather than retaining the previous isolation scope', async () => {
+        const { writer, sibling } = sharedSessions();
+        await writer.admit('writer');
+        await writer.flush();
+        let busy = true;
+        delegateRequest(writer, operation, async () => {
+          if (busy) return controlFailure(true, 'session_busy');
+          throw new Error('Control transport disconnected');
+        });
+        await sibling.admit('waiting');
+        await sibling.flush();
+        expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
+        busy = false;
+        sibling.reload();
+        await sibling.fireAlarm();
+        expect(sibling.record('waiting')?.state).toBe('failed');
+        expect(writer.record('writer')?.state).toBe('failed');
+        expect(writer.control.quarantineRuntime).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sessionId: sibling.metadata.identity.sessionId,
+            wrapperInstanceId: RUNTIME_ID,
+          })
+        );
+      });
+    }
+  );
+
+  it('retains acknowledged prompt ownership until acceptance is persisted atomically', async () => {
+    const fixture = sessionFixture();
+    let acknowledged = false;
+    delegateRequest(fixture, 'session.prompt', async () => {
+      acknowledged = true;
+      return controlResponse({ messageId: 'waiting', status: 'accepted' });
+    });
+    const writes: SessionMessageRecord[] = [];
+    const put = fixture.storage.kv.put.bind(fixture.storage.kv);
+    vi.spyOn(fixture.storage.kv, 'put').mockImplementation((key, value) => {
+      if (key === 'session_messages' && acknowledged) {
+        writes.push(...structuredClone(value as SessionMessageRecord[]));
+      }
+      put(key, value);
+    });
+    await fixture.admit('waiting');
+    await fixture.flush();
+    expect(writes.some(message => message.state === 'accepted')).toBe(true);
+    expect(
+      writes
+        .filter(message => message.state === 'queued')
+        .every(message => message.unresolvedDispatch)
+    ).toBe(true);
+    expect(fixture.record('waiting')?.unresolvedDispatch).toBeUndefined();
+  });
+
+  it('clears acknowledged attachment ownership before a fresh prompt contention rejection', async () => {
+    const fixture = sessionFixture();
+    const lostAcknowledgement = deferred<ResponseFrame>();
+    let attachments = 0;
+    delegateRequest(fixture, 'session.attach', async () => {
+      attachments++;
+      if (attachments === 1) return lostAcknowledgement.promise;
+      return attachments === 2
+        ? controlFailure(true, 'session_busy')
+        : controlResponse({ attached: true });
+    });
+    delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'session_busy'));
+    await fixture.admit('waiting');
+    await fixture.flush();
+    fixture.reload();
+    await fixture.fireAlarm();
+    expect(fixture.record('waiting')?.unresolvedDispatch).toBe(true);
+    await fixture.fireAlarm();
+    expect(fixture.record('waiting')).toMatchObject({
+      state: 'queued',
+      deliveryRetryScope: 'message',
+    });
+    expect(fixture.record('waiting')?.unresolvedDispatch).toBeUndefined();
+    fixture.reload();
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
+    expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+    expect(fixture.record('waiting')?.state).toBe('cancelled');
+    lostAcknowledgement.resolve(controlResponse({ attached: true }));
+    await fixture.flush();
+    expect(fixture.record('waiting')?.state).toBe('cancelled');
   });
 
   it.each(['acknowledged', 'rejected'] as const)(
@@ -2385,6 +3038,122 @@ describe('SandboxSession orchestration', () => {
     expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
   });
 
+  it.each(['cloudflare', 'vercel'] as const)(
+    'applies fresh direct credentials before a warm prompt across eviction on %s',
+    async sandboxProvider => {
+      const fixture = sessionFixture({
+        workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider },
+      });
+      const initial = {
+        ...ATTACHMENT,
+        kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+      };
+      const ready: ControlStatus = {
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        attachment: initial,
+      };
+      fixture.control.ensureReady.mockResolvedValue(ready);
+      await fixture.admit('cold');
+      await fixture.flush();
+      await fixture.outcome('cold', 'completed');
+      await fixture.flush();
+      fixture.reload();
+      const refreshed = {
+        ...initial,
+        kilo: { ...initial.kilo, token: 'fresh-direct-kilo-token' },
+        env: { KILOCODE_TOKEN: 'fresh-direct-kilo-token', GH_TOKEN: 'fresh-direct-git-token' },
+        git: { url: 'https://github.com/acme/repo.git', token: 'fresh-direct-git-token' },
+      };
+      fixture.control.ensureReady.mockResolvedValue({ ...ready, attachment: refreshed });
+      fixture.control.request.mockClear();
+      const attached = deferred<ResponseFrame>();
+      delegateRequest(fixture, 'session.attach', () => attached.promise);
+      await fixture.admit('warm');
+      await fixture.flush();
+      expect(fixture.control.request).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          operation: 'session.attach',
+          expectedWrapperInstanceId: RUNTIME_ID,
+          payload: {
+            ...refreshed,
+            preparation: {
+              attemptId: fixture.record('warm')?.preparationAttemptId,
+              triggerMessageId: 'warm',
+            },
+          },
+        })
+      );
+      expect(fixture.record('warm')).toMatchObject({ state: 'queued', unresolvedDispatch: true });
+      attached.resolve(controlResponse({ attached: true }));
+      await fixture.flush();
+      expect(fixture.control.request.mock.calls.map(([input]) => input.operation)).toEqual([
+        'session.attach',
+        'session.prompt',
+      ]);
+      expect(fixture.record('warm')).toMatchObject({
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+      });
+      expect(fixture.record('warm')?.unresolvedDispatch).toBeUndefined();
+      expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['stop', 'expiry'] as const)(
+    'retains ambiguous warm prompt ownership through direct reattachment and %s',
+    async action => {
+      const fixture = sessionFixture();
+      fixture.control.ensureReady.mockResolvedValue({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        attachment: {
+          ...ATTACHMENT,
+          kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+        },
+      });
+      await fixture.admit('cold');
+      await fixture.flush();
+      await fixture.outcome('cold', 'completed');
+      await fixture.flush();
+      const lostPrompt = deferred<ResponseFrame>();
+      let prompts = 0;
+      delegateRequest(fixture, 'session.prompt', async () => {
+        prompts++;
+        return prompts === 1 ? lostPrompt.promise : controlFailure(true, 'session_busy');
+      });
+      await fixture.admit('warm');
+      await fixture.flush();
+      const acquisition = fixture.acquisition('warm');
+      expect(fixture.record('warm')?.unresolvedDispatch).toBe(true);
+      fixture.reload();
+      await fixture.fireAlarm();
+      expect(fixture.record('warm')).toMatchObject({
+        state: 'queued',
+        unresolvedDispatch: true,
+        deliveryRetryScope: 'runtime',
+        wrapperInstanceId: RUNTIME_ID,
+      });
+      expect(fixture.control.attachSession).toHaveBeenCalledTimes(3);
+      if (action === 'stop') {
+        await fixture.session.interruptExecution();
+      } else {
+        vi.setSystemTime(acquisition.deadlineAt);
+        await fixture.fireAlarm();
+      }
+      expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
+      );
+      expect(fixture.record('warm')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+      lostPrompt.resolve(controlResponse({ messageId: 'warm', status: 'accepted' }));
+      await fixture.flush();
+      expect(fixture.record('warm')?.state).toBe(action === 'stop' ? 'cancelled' : 'failed');
+      expect(fixture.terminalEvents()).toHaveLength(2);
+    }
+  );
+
   it.each(['replacement runtime', 'missing legacy attachment'] as const)(
     'performs real preparation for a %s instead of assuming warmth from prior messages',
     async reason => {
@@ -2569,6 +3338,7 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     fixture.values.delete('session_metadata');
     const finalization = { autoCommit: true, condenseOnComplete: true };
+    const messageId = 'msg_123456789abcABCDEFGHIJKLMN';
     await expect(
       fixture.session.createSessionWithInitialAdmission({
         identity: fixture.metadata.identity,
@@ -2576,11 +3346,14 @@ describe('SandboxSession orchestration', () => {
         agent: fixture.metadata.agent,
         workspace: fixture.metadata.workspace,
         finalization,
-        message: { initialTurn: { type: 'prompt', messageId: 'a', prompt: 'Initial web prompt' } },
+        message: { initialTurn: { type: 'prompt', messageId, prompt: 'Initial web prompt' } },
       })
     ).resolves.toMatchObject({ success: true });
     await fixture.flush();
-    expect(fixture.record('a')).toMatchObject({ state: 'accepted', intent: { finalization } });
+    expect(fixture.record(messageId)).toMatchObject({
+      state: 'accepted',
+      intent: { finalization },
+    });
     expect((await fixture.session.getMetadata())?.finalization).toEqual(finalization);
     expect(fixture.control.request).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2739,6 +3512,9 @@ describe('SandboxSession orchestration', () => {
 describe('streamCloudStatus', () => {
   it('is ready for accepted work even with queued followers', () => {
     expect(streamCloudStatus([msg('a', 'queued')])).toEqual({ type: 'preparing' });
+    expect(streamCloudStatus([msg('a', 'completed'), msg('b', 'queued')])).toEqual({
+      type: 'preparing',
+    });
     expect(streamCloudStatus([msg('a', 'accepted'), msg('b', 'queued')])).toEqual({
       type: 'ready',
     });

@@ -12,6 +12,7 @@ import {
 } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
+import { suggestionToolMetadataSchema } from './suggestion-card-state';
 
 export type ToolDisplay = {
   title: string;
@@ -50,6 +51,7 @@ const toolInputSchema = z.object({
   query: optionalString,
   url: optionalString,
   prompt: optionalString,
+  suggest: optionalString,
 });
 
 /**
@@ -194,13 +196,17 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return { title: i18n.t('agentChat.toolCard.toolTask'), subtitle };
     }
     case 'suggest': {
-      return {
-        title: i18n.t('agentChat.suggestion.title'),
-        subtitle:
-          status === 'error'
-            ? i18n.t('agentChat.suggestion.dismissed')
-            : i18n.t('agentChat.suggestion.title'),
-      };
+      const metadata =
+        status === 'completed' ? suggestionToolMetadataSchema.safeParse(part.state.metadata) : null;
+      const dismissed = metadata?.success && metadata.data.dismissed;
+      const title = i18n.t('agentChat.suggestion.title');
+      let subtitle = fields.suggest?.trim() ?? title;
+      if (status === 'error' || dismissed) {
+        subtitle = i18n.t('agentChat.suggestion.dismissed');
+      } else if (subtitle === '') {
+        subtitle = title;
+      }
+      return { title, subtitle };
     }
     default: {
       const stateTitle =
@@ -210,15 +216,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
   }
 }
 
-/**
- * Whether a tool part has content that a detail sheet could show. Suggest parts
- * are never detailed. Everything else is detailed when input, completed output,
- * error content, or any attachment exists.
- */
 export function toolPartHasDetails(part: ToolPart): boolean {
-  if (part.tool === 'suggest') {
-    return false;
-  }
   if (Object.keys(part.state.input).length > 0) {
     return true;
   }

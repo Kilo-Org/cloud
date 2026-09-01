@@ -156,7 +156,7 @@
     "returnSendsMessage": "Returtasten sender beskeden",
     "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter.",
     "biometricUnlock": "Lås op med biometri",
-    "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter. Indstil biometri eller en adgangskode til enheden i enhedens indstillinger. Du kan altid bruge enhedens adgangskode som alternativ."
+    "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgængelig",
@@ -786,7 +786,7 @@
       "retrySend": "Prøv at sende igen",
       "moreReactions": "Flere reaktioner",
       "reply": "Svar",
-      "edit": "redigér",
+      "edit": "Redigér",
       "sendFailed": "Kunne ikke sende besked",
       "retrySendFailed": "Kunne ikke prøve at sende igen",
       "editFailed": "Kunne ikke redigere besked",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Venter på gennemgangens transskription.",
       "transcriptEmpty": "Ingen transskription for denne gennemgang.",
       "transcriptRetry": "Kunne ikke indlæse gennemgangens transskription.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent inaktiv",
       "agentWorking": "Agent arbejder...",
       "anErrorOccurred": "Der opstod en fejl",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Andet",
-      "project": "Projekt",
-      "removeProjectFilter": "Fjern {{label}} projektfilter",
-      "removePlatformFilter": "Fjern {{label}} platformfilter"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Forslag",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Ny kodningsopgave",
     "explore": "Udforsk",
     "seeAll": "Se alle",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Intet kører lige nu"
   },
   "imageViewer": {
     "close": "Luk {{filename}}",

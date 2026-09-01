@@ -3,7 +3,7 @@ import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
-import { SessionFilterChips, SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
@@ -42,8 +42,6 @@ export function SessionHistoryScreen() {
     hasLoaded: filtersLoaded,
     setFilters,
     clearFilters,
-    setPlatformFilter,
-    setProjectFilter,
   } = usePersistedAgentSessionFilters(SESSION_FILTERS_KEY);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
@@ -174,6 +172,7 @@ export function SessionHistoryScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('tabs.agents')}
+        className="pb-2"
         showBackButton
         headerRight={
           <SessionListHeaderActions
@@ -185,17 +184,6 @@ export function SessionHistoryScreen() {
             }}
           />
         }
-      />
-      <SessionFilterChips
-        platformFilter={platformFilter}
-        projectFilter={projectFilter}
-        projectOptions={projectOptions}
-        onRemovePlatform={platform => {
-          setPlatformFilter(prev => prev.filter(p => p !== platform));
-        }}
-        onRemoveProject={selectedGitUrl => {
-          setProjectFilter(prev => prev.filter(gitUrlValue => gitUrlValue !== selectedGitUrl));
-        }}
       />
       {hasAnySessions ? (
         <SessionListSearchHeader

@@ -33,7 +33,7 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
-import { ingestItems } from '../db/sqlite-schema';
+import { ingestItems, ingestMeta } from '../db/sqlite-schema';
 
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
@@ -1519,21 +1519,30 @@ describe('SessionIngestDO clone primitives', () => {
           })
         ),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn((table: unknown) => ({
+        run: () => {
+          if (table === ingestItems) items.length = 0;
+          if (table === ingestMeta) meta.clear();
+        },
+        where: () => ({
+          run: () => {
+            if (table === ingestMeta) {
+              for (const key of meta.keys()) if (key !== 'deleted') meta.delete(key);
+            }
+          },
+        }),
+      })),
     };
     drizzleMocks.db = db;
 
     const deleteObject = vi.fn(async () => {});
     const deleteAlarm = vi.fn(async () => {});
-    const deleteAll = vi.fn(async () => {
-      items.length = 0;
-      meta.clear();
-    });
+    const clearSqlite = vi.fn((fn: () => unknown) => fn());
     const state = {
       storage: {
         setAlarm: vi.fn(),
         deleteAlarm,
-        deleteAll,
+        transactionSync: clearSqlite,
       },
       waitUntil: vi.fn(),
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
@@ -1546,7 +1555,7 @@ describe('SessionIngestDO clone primitives', () => {
       meta,
       deleteObject,
       deleteAlarm,
-      deleteAll,
+      clearSqlite,
       get orderByArgs() {
         return orderByArgs;
       },
@@ -1979,7 +1988,7 @@ describe('SessionIngestDO clone primitives', () => {
     await harness.durableObject.resetCloneStage();
 
     // The SQLite wipe must complete before the R2 delete await opens the input gate.
-    expect(harness.deleteAll.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(harness.clearSqlite.mock.invocationCallOrder[0]).toBeLessThan(
       harness.deleteObject.mock.invocationCallOrder[0]
     );
     expect(harness.deleteObject).toHaveBeenCalledWith(['items/staged-blob']);
@@ -2000,20 +2009,24 @@ describe('SessionIngestDO clone primitives', () => {
 
     await expect(harness.durableObject.resetCloneStage()).resolves.toBeUndefined();
 
-    expect(harness.deleteAll).toHaveBeenCalled();
+    expect(harness.clearSqlite).toHaveBeenCalled();
     expect(harness.items).toHaveLength(0);
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
 
-  it('marks the DO deleted even when the clear R2 delete fails', async () => {
+  it('fences writes and retains R2 discovery after a failed clear, then retries cleanup', async () => {
     const harness = makeCloneHarness([itemRow(1, 'message/src', 'message', 1, 'items/blob')]);
     harness.deleteObject.mockRejectedValueOnce(new Error('r2 unavailable'));
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(harness.durableObject.clear()).rejects.toThrow('r2 unavailable');
+    expect(harness.meta.get('deleted')).toBe('true');
+    expect(harness.items).toHaveLength(1);
+    expect(harness.clearSqlite).not.toHaveBeenCalled();
 
     await expect(harness.durableObject.clear()).resolves.toBeUndefined();
-
+    expect(harness.items).toHaveLength(0);
     expect(harness.meta.get('deleted')).toBe('true');
-    consoleError.mockRestore();
+    expect(harness.deleteObject).toHaveBeenCalledTimes(2);
   });
 });

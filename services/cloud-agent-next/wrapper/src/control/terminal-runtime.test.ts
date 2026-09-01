@@ -377,54 +377,141 @@ describe('control terminal PTY ownership', () => {
     expect(deleted).toEqual([{ ptyId: 'pty_first', directory: firstSession.directory }]);
   });
 
-  it('fences every PTY operation to its owning session and preserves unrelated sessions on detach', async () => {
-    const resized: Array<{ ptyId: string; directory?: string }> = [];
-    const deleted: Array<{ ptyId: string; directory?: string }> = [];
-    let createdCount = 0;
-    const kiloClient = fakeKilo({
-      createPty: async input => makePty(input.cwd, `pty_${++createdCount}`),
-      resizePty: async (ptyId, _size, directory) => {
-        resized.push({ ptyId, directory });
-        return makePty(directory ?? '', ptyId);
-      },
-      deletePty: async (ptyId, directory) => {
-        deleted.push({ ptyId, directory });
-        return true;
-      },
-    });
-    const runtime = createRuntime(kiloClient);
-    attach(runtime, firstSession);
-    attach(runtime, secondSession);
-    await runtime.create(firstSession, creationPayload(firstOperationId));
-    await runtime.create(secondSession, creationPayload(secondOperationId));
+  it.each([secondSession, { ...secondSession, directory: firstSession.directory }])(
+    'fences every PTY operation from a sibling in $directory',
+    async secondSession => {
+      const resized: Array<{ ptyId: string; directory?: string }> = [];
+      const deleted: Array<{ ptyId: string; directory?: string }> = [];
+      let createdCount = 0;
+      const kiloClient = fakeKilo({
+        createPty: async input => makePty(input.cwd, `pty_${++createdCount}`),
+        resizePty: async (ptyId, _size, directory) => {
+          resized.push({ ptyId, directory });
+          return makePty(directory ?? '', ptyId);
+        },
+        deletePty: async (ptyId, directory) => {
+          deleted.push({ ptyId, directory });
+          return true;
+        },
+      });
+      const runtime = createRuntime(kiloClient);
+      attach(runtime, firstSession);
+      attach(runtime, secondSession);
+      await runtime.create(firstSession, creationPayload(firstOperationId));
+      await runtime.create(secondSession, creationPayload(secondOperationId));
 
-    expect(
-      await terminalFailure(runtime.resize(secondSession, { ptyId: 'pty_1', cols: 100, rows: 30 }))
-    ).toMatchObject({ code: 'unauthorized', retryable: false });
-    expect(await terminalFailure(runtime.close(secondSession, { ptyId: 'pty_1' }))).toMatchObject({
-      code: 'unauthorized',
-      retryable: false,
-    });
-    expect(
-      await terminalFailure(
-        runtime.resize(
-          { ...firstSession, directory: secondSession.directory },
-          { ptyId: 'pty_1', cols: 100, rows: 30 }
+      expect(
+        await terminalFailure(
+          runtime.resize(secondSession, { ptyId: 'pty_1', cols: 100, rows: 30 })
         )
-      )
-    ).toMatchObject({ code: 'unauthorized', retryable: false });
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
+      expect(await terminalFailure(runtime.close(secondSession, { ptyId: 'pty_1' }))).toMatchObject(
+        {
+          code: 'unauthorized',
+          retryable: false,
+        }
+      );
+      expect(
+        await terminalFailure(runtime.connect(secondSession, connectionPayload({ ptyId: 'pty_1' })))
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
+      expect(
+        await terminalFailure(runtime.create(secondSession, creationPayload(firstOperationId)))
+      ).toMatchObject({ code: 'idempotency_conflict', retryable: false });
+      expect(
+        await terminalFailure(
+          runtime.resize(
+            { ...firstSession, directory: '/workspace/unowned' },
+            { ptyId: 'pty_1', cols: 100, rows: 30 }
+          )
+        )
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
 
-    await runtime.detachSession(firstSession);
-    expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
-    expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
-      code: 'not_ready',
-      message: 'Terminal session is not attached',
-    });
+      await runtime.detachSession(firstSession);
+      expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
+      expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+        code: 'not_ready',
+        message: 'Terminal session is not attached',
+      });
 
-    expect(await runtime.resize(secondSession, { ptyId: 'pty_2', cols: 110, rows: 40 })).toEqual({
-      pty: makePty(secondSession.directory, 'pty_2'),
+      expect(await runtime.resize(secondSession, { ptyId: 'pty_2', cols: 110, rows: 40 })).toEqual({
+        pty: makePty(secondSession.directory, 'pty_2'),
+      });
+      expect(resized).toEqual([{ ptyId: 'pty_2', directory: secondSession.directory }]);
+      attach(runtime, firstSession);
+      expect(await runtime.create(firstSession, creationPayload(firstOperationId))).toEqual({
+        pty: makePty(firstSession.directory, 'pty_3'),
+      });
+    }
+  );
+
+  it('fences all same-directory PTYs before waiting for pending creation and preserves another worktree', async () => {
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    const unrelated = {
+      ...secondSession,
+      sessionId: 'workspace_other',
+      kiloSessionId: 'kilo_other',
+    };
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const deleted: Array<{ ptyId: string; directory?: string }> = [];
+    let created = 0;
+    const runtime = createRuntime(
+      fakeKilo({
+        createPty: async input => {
+          const id = `pty_${++created}`;
+          if (id === 'pty_3') {
+            started.resolve();
+            await release.promise;
+          }
+          return makePty(input.cwd, id);
+        },
+        deletePty: async (ptyId, directory) => {
+          deleted.push({ ptyId, directory });
+          return true;
+        },
+      })
+    );
+    for (const identity of [firstSession, sibling, unrelated]) attach(runtime, identity);
+    await runtime.create(sibling, creationPayload(secondOperationId));
+    await runtime.create(unrelated, creationPayload(crypto.randomUUID()));
+    const creation = terminalFailure(
+      runtime.create(firstSession, creationPayload(firstOperationId))
+    );
+    await started.promise;
+    let settled = false;
+    const detaching = runtime.detachDirectory(firstSession.directory).then(() => {
+      settled = true;
     });
-    expect(resized).toEqual([{ ptyId: 'pty_2', directory: secondSession.directory }]);
+    try {
+      expect(
+        await terminalFailure(runtime.resize(sibling, { ptyId: 'pty_1', cols: 90, rows: 30 }))
+      ).toMatchObject({ code: 'not_ready' });
+      expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+        code: 'not_ready',
+      });
+      expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
+      expect(settled).toBe(false);
+      expect(await runtime.resize(unrelated, { ptyId: 'pty_2', cols: 90, rows: 30 })).toEqual({
+        pty: makePty(unrelated.directory, 'pty_2'),
+      });
+      release.resolve();
+      expect(await creation).toMatchObject({
+        code: 'not_ready',
+        message: 'Terminal session is no longer attached',
+      });
+      await detaching;
+      expect(deleted).toEqual([
+        { ptyId: 'pty_1', directory: firstSession.directory },
+        { ptyId: 'pty_3', directory: firstSession.directory },
+      ]);
+      attach(runtime, sibling);
+      expect(await runtime.create(sibling, creationPayload(secondOperationId))).toEqual({
+        pty: makePty(sibling.directory, 'pty_4'),
+      });
+    } finally {
+      release.resolve();
+      await Promise.allSettled([creation, detaching]);
+    }
   });
 
   it('keeps independent same-worktree roots eligible when a sibling detaches', async () => {
@@ -580,6 +667,50 @@ describe('control terminal PTY ownership', () => {
 });
 
 describe('control terminal reverse WebSocket bridge', () => {
+  it('closes every bridge in a deleted directory without closing an unrelated worktree', async () => {
+    const servers = createBridgeServers();
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    const unrelated = {
+      ...secondSession,
+      sessionId: 'workspace_other',
+      kiloSessionId: 'kilo_other',
+    };
+    let count = 0;
+    const deleted: string[] = [];
+    const runtime = createRuntime(
+      fakeKilo({
+        serverUrl: servers.localUrl,
+        createPty: async input => makePty(input.cwd, `pty_${++count}`),
+        deletePty: async id => {
+          deleted.push(id);
+          return true;
+        },
+      }),
+      servers.controlUrl
+    );
+    try {
+      for (const identity of [firstSession, sibling, unrelated]) {
+        attach(runtime, identity);
+        const { pty } = await runtime.create(identity, creationPayload(crypto.randomUUID()));
+        await runtime.connect(identity, connectionPayload({ ptyId: pty.id }));
+      }
+      await runtime.detachDirectory(firstSession.directory);
+      expect(deleted).toEqual(['pty_1', 'pty_2']);
+      for (let index = 0; index < 2; index++) {
+        expect((await servers.reverseCloses.next()).code).toBe(1000);
+        expect((await servers.localCloses.next()).code).toBe(1000);
+      }
+      const unrelatedSocket = servers.reverseSockets[2];
+      if (!unrelatedSocket) throw new Error('Expected unrelated bridge');
+      unrelatedSocket.send('still connected');
+      expect(await servers.localFrames.next()).toBe('still connected');
+      expect(await servers.reverseFrames.next()).toBe('still connected');
+    } finally {
+      runtime.shutdown();
+      servers.stop();
+    }
+  });
+
   it('authenticates the trusted reverse origin and relays initial, text, control, and binary frames unchanged', async () => {
     const servers = createBridgeServers('initial output');
     const kiloClient = fakeKilo({ serverUrl: servers.localUrl });

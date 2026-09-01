@@ -156,7 +156,7 @@
     "returnSendsMessage": "ରିଟର୍ନ କୀ ବାର୍ତ୍ତା ପଠାଏ",
     "returnSendsMessageSubtitle": "ବନ୍ଦ ଥିଲେ, ରିଟର୍ନ କୀ ଏଜେଣ୍ଟର ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ନୂଆ ଧାଡ଼ି ଯୋଡ଼େ।",
     "biometricUnlock": "ବାୟୋମେଟ୍ରିକ୍ସ ସହିତ ଅନଲକ୍ କରନ୍ତୁ",
-    "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ। ଉପକରଣର ସେଟିଂସ୍ ରେ ବାୟୋମେଟ୍ରିକ୍ସ କିମ୍ବା ଉପକରଣର ପାସକୋଡ୍ ସେଟ୍ ଅପ୍ କରନ୍ତୁ। ବିକଳ୍ପ ଭାବେ ଆପଣଙ୍କ ଉପକରଣର ପାସକୋଡ୍ ଉପଲବ୍ଧ ରହିବ।"
+    "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ଅନ୍ୟ",
-      "project": "ପ୍ରୋଜେକ୍ଟ",
-      "removeProjectFilter": "{{label}} ପ୍ରୋଜେକ୍ଟ ଫିଲ୍ଟର ଅପସାରଣ କରନ୍ତୁ",
-      "removePlatformFilter": "{{label}} ପ୍ଲାଟଫର୍ମ ଫିଲ୍ଟର ଅପସାରଣ କରନ୍ତୁ"
+      "project": "ପ୍ରୋଜେକ୍ଟ"
     },
     "suggestion": {
       "title": "ପରାମର୍ଶ",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "ନୂତନ କୋଡିଂ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",
     "seeAll": "ସବୁ ଦେଖନ୍ତୁ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ଏବେ କିଛି ଚାଲୁନାହିଁ"
   },
   "imageViewer": {
     "close": "{{filename}} ବନ୍ଦ କରନ୍ତୁ",

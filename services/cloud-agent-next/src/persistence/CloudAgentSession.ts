@@ -6,6 +6,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { generateEphemeralDeploymentSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
   getSandboxProvider,
@@ -13,6 +14,10 @@ import {
   serializeSessionMetadata,
   type SessionMetadata,
 } from './session-metadata.js';
+import {
+  sessionRuntimeLocator,
+  type SessionRuntimeLocator,
+} from '../sandbox-control/worktree-ownership.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
@@ -38,7 +43,6 @@ import {
   type EventSourceId,
   type EventId,
   type SessionId,
-  type UserId,
 } from '../types/ids.js';
 import type {
   ExecutionMetadata,
@@ -523,7 +527,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       ...(status === 'completed'
         ? {}
         : { clientError: projectTerminalClientError({ status, error }) }),
-      lastSeenBranch: metadata.repository?.upstreamBranch,
+      lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
@@ -1115,7 +1119,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     return {
       sessionId: metadata.identity.sessionId as SessionId,
-      userId: metadata.identity.userId as UserId,
+      userId: metadata.identity.userId,
       orgId: metadata.identity.orgId,
       sandboxId,
       kiloSessionId: metadata.auth.kiloSessionId,
@@ -1661,6 +1665,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getMetadata(): Promise<SessionMetadata | null> {
     if (await this.hasDeletionIntent()) return null;
     return this.getStoredMetadata();
+  }
+
+  async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
+    const metadata = await this.getStoredMetadata();
+    return metadata ? sessionRuntimeLocator(metadata) : null;
   }
 
   async validateKiloGlobalFeedProducer(params: {
@@ -2551,6 +2560,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       workspace: {
         ...input.workspace,
         sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
+        branchName: repository?.upstreamBranch ?? `kilo/${generateEphemeralDeploymentSlug()}`,
       },
       lifecycle: {
         version: now,
@@ -2599,7 +2609,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const initialTurn = input.message.initialTurn;
     const admitInitialTurn = () =>
       this.getSessionMessageQueue().admitAcceptedMessage({
-        userId: input.identity.userId as UserId,
+        userId: input.identity.userId,
         botId: input.identity.botId,
         turn: initialTurn,
         agent: input.agent,

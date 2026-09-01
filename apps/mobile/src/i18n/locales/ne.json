@@ -156,7 +156,7 @@
     "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
     "returnSendsMessageSubtitle": "बन्द हुँदा, रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति घुसाउँछ।",
     "biometricUnlock": "बायोमेट्रिक्स प्रयोग गरी अनलक गर्नुहोस्",
-    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ। यन्त्रको सेटिङमा बायोमेट्रिक्स वा यन्त्रको पासकोड सेट अप गर्नुहोस्। वैकल्पिक उपायका रूपमा तपाईंको यन्त्रको पासकोड उपलब्ध छ।"
+    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "समीक्षा ट्रान्सक्रिप्टको पर्खाइमा।",
       "transcriptEmpty": "यस समीक्षाको लागि कुनै ट्रान्सक्रिप्ट छैन।",
       "transcriptRetry": "समीक्षा ट्रान्सक्रिप्ट लोड गर्न सकिएन।",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "एजेन्ट निष्क्रिय",
       "agentWorking": "एजेन्ट काम गर्दैछ…",
       "anErrorOccurred": "एउटा त्रुटि भयो",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "अन्य",
-      "project": "परियोजना",
-      "removeProjectFilter": "{{label}} परियोजना फिल्टर हटाउनुहोस्",
-      "removePlatformFilter": "{{label}} प्लेटफर्म फिल्टर हटाउनुहोस्"
+      "project": "परियोजना"
     },
     "suggestion": {
       "title": "सुझाव",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "explore": "अन्वेषण",
     "seeAll": "सबै हेर्नुहोस्",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "अहिले केही पनि चलिरहेको छैन"
   },
   "imageViewer": {
     "close": "{{filename}} बन्द गर्नुहोस्",

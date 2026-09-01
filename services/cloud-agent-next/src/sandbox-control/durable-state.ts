@@ -8,7 +8,7 @@ import {
 } from './session-credentials.js';
 import { emptyTransitionLog, type TransitionRow } from './transition-log.js';
 
-const PHYSICAL_KEY = 'physical_record';
+export const PHYSICAL_KEY = 'physical_record';
 const ROUTES_KEY = 'session_routes';
 const DEADLINES_KEY = 'deadlines';
 const LOG_KEY = 'transition_log';

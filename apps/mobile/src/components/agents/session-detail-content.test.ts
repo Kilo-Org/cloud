@@ -33,7 +33,6 @@ import { ContextControl } from '@/components/context-control';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -209,8 +208,14 @@ vi.mock('@/components/agents/use-session-config-sync', () => ({
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
 vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: ({ serverTitle }: { serverTitle?: string }) => ({
-    title: serverTitle,
+  useSessionDetailRename: ({
+    serverTitle,
+    fallbackTitle,
+  }: {
+    serverTitle?: string;
+    fallbackTitle: string;
+  }) => ({
+    title: serverTitle ?? fallbackTitle,
     isTitleInteractive: serverTitle !== undefined,
     openModal: openRenameModal,
   }),
@@ -520,18 +525,18 @@ describe('SessionDetailContent display scope', () => {
     { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
     { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
     { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
-  ])('renders a read-only $label and preserves header actions', async state => {
+  ])('omits the $label context label and preserves header actions', async state => {
     const { renderer } = await mountDetails([], undefined, {
       organizationId: state.organizationId,
       isResolved: state.isResolved,
     });
     const header = renderer.root.findByType(ScreenHeader);
-    const context = header.findByType(ContextControl);
-    const label = context.findByProps({ accessibilityRole: 'text' });
-    expect(label.props).toMatchObject({
-      accessibilityLabel: state.label,
-      accessibilityState: { busy: !state.isResolved },
+    expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
+      numberOfLines: 1,
+      ellipsizeMode: 'tail',
     });
+    expect(header.props.context).toBeUndefined();
+    expect(header.findAllByType(ContextControl)).toHaveLength(0);
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
@@ -543,11 +548,6 @@ describe('SessionDetailContent display scope', () => {
     }).props as { onPress: () => void };
     act(onPress);
     expect(openRenameModal).toHaveBeenCalledOnce();
-    if (state.organizationId === 'missing-org') {
-      expect(context.findByType(AccessibleStatus).props.message).toBe(
-        i18n.t('organization.boundary.organizationUnavailable')
-      );
-    }
     pressHeaderBack(renderer);
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
@@ -612,6 +612,11 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       expect(renderedText(view.renderer.root)).toContain('Copy');
     }
 
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
+      numberOfLines: 1,
+      ellipsizeMode: 'tail',
+    });
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']

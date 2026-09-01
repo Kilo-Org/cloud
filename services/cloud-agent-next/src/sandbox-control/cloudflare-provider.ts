@@ -19,7 +19,7 @@ const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
 const providerRefSchema = z
   .object({
     sandboxId: z.string().min(1).max(256),
-    containment: z.literal(true),
+    containment: z.boolean(),
     instanceId: z.string().min(1).max(128),
   })
   .strict();
@@ -60,7 +60,11 @@ export function createCloudflareProviderAdapter(deps: {
     if (ref !== null || !intent) return ref;
     const sandboxId = intent.allocationName ?? deps.sandboxId;
     return intent.containment?.worktreeScoped
-      ? encodeCloudflareProviderRef({ sandboxId, containment: true, instanceId: intent.intentId })
+      ? encodeCloudflareProviderRef({
+          sandboxId,
+          containment: intent.containment.kilocode || intent.containment.github,
+          instanceId: intent.intentId,
+        })
       : sandboxId;
   };
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
@@ -94,7 +98,9 @@ export function createCloudflareProviderAdapter(deps: {
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeCloudflareProviderRef({
         sandboxId: intent.allocationName ?? deps.sandboxId,
-        containment: true,
+        containment: intent.containment
+          ? intent.containment.kilocode || intent.containment.github
+          : true,
         instanceId: intent.intentId,
       });
       await ensureBillingAdmission(providerRef, intent.billing);
@@ -103,10 +109,10 @@ export function createCloudflareProviderAdapter(deps: {
     async launch(ref, env) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
-        throw new Error('Invalid contained Cloudflare sandbox allocation');
+        throw new Error('Invalid Cloudflare sandbox allocation');
       }
-      const sandbox = deps.getSandbox(parsed.sandboxId, { containment: true });
-      await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
+      const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
+      if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
       await sandbox.startProcess(`bun run ${CONTROL_WRAPPER_PATH}`, {
         cwd: '/',
         env: {

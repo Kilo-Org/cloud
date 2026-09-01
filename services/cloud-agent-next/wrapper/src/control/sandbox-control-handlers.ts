@@ -21,6 +21,7 @@ import {
   sessionTerminalCreateResultSchema,
   sessionTerminalResizePayloadSchema,
   sessionTerminalResizeResultSchema,
+  worktreeDeletePayloadSchema,
   type SandboxHeartbeatPayload,
   type SessionEventPayload,
   type SessionMessageOutcome,
@@ -47,6 +48,14 @@ import {
   type WorktreeKiloRuntime,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime.js';
+import { assertDirectoryActive, fenceDirectoryOperations } from './worktree-operations';
+import {
+  createWorktreeKiloCleanupClient,
+  deleteWorktree,
+  prepareWorktreeDeletion,
+  validateWorktreeDirectory,
+  type WorktreeKiloCleanupClient,
+} from './delete-worktree';
 
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
@@ -65,13 +74,140 @@ export type OwnedSessionTask = TaskIdentity & {
   done: Promise<ControlHandlerResult>;
 };
 
+type SessionActivity = {
+  revision: symbol;
+  state: 'idle' | 'active' | 'finalizing';
+  lastActivityAt: number;
+  waitingOn?: 'model' | 'tool' | 'finalizing';
+};
+
+type KiloSessionStatuses = Awaited<ReturnType<WrapperKiloClient['getSessionStatuses']>>;
+
+export type SessionActivityRegistry = {
+  attach(rootKiloSessionId: string): void;
+  detach(rootKiloSessionId: string): void;
+  markActive(rootKiloSessionId: string): void;
+  observeEvent(
+    type: string,
+    kiloSessionId: string | undefined,
+    rootKiloSessionId: string | undefined,
+    properties: Record<string, unknown>
+  ): void;
+  reconcile(statuses: KiloSessionStatuses, roots?: readonly string[]): void;
+  revision(rootKiloSessionId: string): symbol | undefined;
+  snapshots(): NonNullable<SandboxHeartbeatPayload['sessions']>;
+  state(): 'idle' | 'active';
+};
+
+export function createSessionActivityRegistry(
+  now: () => number = Date.now
+): SessionActivityRegistry {
+  const sessions = new Map<string, SessionActivity>();
+
+  function update(
+    rootKiloSessionId: string,
+    state: SessionActivity['state'],
+    waitingOn?: SessionActivity['waitingOn'],
+    refresh = false
+  ): void {
+    const session = sessions.get(rootKiloSessionId);
+    if (!session) return;
+    session.revision = Symbol();
+    if (!refresh && session.state === state && session.waitingOn === waitingOn) return;
+    session.state = state;
+    session.lastActivityAt = now();
+    if (waitingOn) {
+      session.waitingOn = waitingOn;
+    } else {
+      delete session.waitingOn;
+    }
+  }
+
+  function applyStatus(rootKiloSessionId: string, status: { type: string; waitingOn?: unknown }) {
+    if (status.type === 'idle') {
+      update(rootKiloSessionId, 'idle');
+      return;
+    }
+    if (status.type === 'finalizing') {
+      update(rootKiloSessionId, 'finalizing', 'finalizing');
+      return;
+    }
+    update(rootKiloSessionId, 'active', status.waitingOn === 'tool' ? 'tool' : 'model');
+  }
+
+  return {
+    attach(rootKiloSessionId) {
+      if (!sessions.has(rootKiloSessionId)) {
+        sessions.set(rootKiloSessionId, {
+          revision: Symbol(),
+          state: 'idle',
+          lastActivityAt: now(),
+        });
+      }
+    },
+    detach(rootKiloSessionId) {
+      sessions.delete(rootKiloSessionId);
+    },
+    markActive(rootKiloSessionId) {
+      update(rootKiloSessionId, 'active', 'model', true);
+    },
+    observeEvent(type, kiloSessionId, rootKiloSessionId, properties) {
+      if (!rootKiloSessionId || kiloSessionId !== rootKiloSessionId) return;
+      if (type === 'session.turn.open') {
+        update(rootKiloSessionId, 'active', 'model', true);
+        return;
+      }
+      if (type === 'session.status') {
+        const status = properties.status;
+        if (typeof status === 'object' && status !== null && 'type' in status) {
+          if (typeof status.type === 'string') {
+            applyStatus(rootKiloSessionId, {
+              type: status.type,
+              waitingOn: 'waitingOn' in status ? status.waitingOn : undefined,
+            });
+          }
+        }
+        return;
+      }
+      if (type === 'session.idle' || type === 'session.turn.close' || type === 'session.error') {
+        update(rootKiloSessionId, 'idle');
+      }
+    },
+    reconcile(statuses, roots = [...sessions.keys()]) {
+      for (const rootKiloSessionId of roots) {
+        applyStatus(rootKiloSessionId, statuses[rootKiloSessionId] ?? { type: 'idle' });
+      }
+    },
+    revision(rootKiloSessionId) {
+      return sessions.get(rootKiloSessionId)?.revision;
+    },
+    snapshots() {
+      const observedAt = now();
+      return [...sessions.entries()].map(([kiloSessionId, session]) => ({
+        kiloSessionId,
+        state: session.state,
+        idleForMs: Math.max(0, Math.trunc(observedAt - session.lastActivityAt)),
+        ...(session.waitingOn ? { waitingOn: session.waitingOn } : {}),
+      }));
+    },
+    state() {
+      for (const session of sessions.values()) {
+        if (session.state === 'active' || session.state === 'finalizing') return 'active';
+      }
+      return 'idle';
+    },
+  };
+}
+
 export type HandlerDeps = {
   kiloRuntimes?: WorktreeKiloRuntimes;
+  worktreeCleanupClient?: WorktreeKiloCleanupClient;
   version: string;
   kiloReady: boolean;
   sessions: HandlerSessionSnapshot[];
   tasks: Map<string, OwnedSessionTask>;
   signal?: AbortSignal;
+  activity?: SessionActivityRegistry;
   emitSessionEvent: (session: SessionRequestIdentity, payload: SessionEventPayload) => void;
   retireRuntime: (reason: string) => void;
   onShutdown?: () => void;
@@ -111,35 +247,87 @@ function kiloFailure(error: unknown): ControlHandlerResult {
 
 export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayload {
   const now = Date.now();
-  const tasks = [...deps.tasks.values()];
+  const snapshots = new Map(
+    deps.activity?.snapshots().map(snapshot => [snapshot.kiloSessionId, snapshot])
+  );
+  for (const snapshot of deps.sessions) {
+    const task = deps.tasks.get(snapshot.kiloSessionId);
+    if (!task && snapshots.has(snapshot.kiloSessionId)) continue;
+    const waitingOn =
+      task?.kind === 'preparation'
+        ? 'preparation'
+        : task?.kind === 'finalizing'
+          ? 'finalizing'
+          : snapshot.pendingInputs?.size
+            ? 'input'
+            : 'model';
+    snapshots.set(snapshot.kiloSessionId, {
+      kiloSessionId: snapshot.kiloSessionId,
+      state: task?.kind === 'finalizing' ? 'finalizing' : task ? 'active' : 'idle',
+      idleForMs: Math.max(0, now - snapshot.lastActivityAt),
+      ...(task ? { waitingOn } : {}),
+    });
+  }
+  const sessions = [...snapshots.values()];
+  const active = sessions.filter(snapshot => snapshot.state !== 'idle');
   return {
     state:
-      tasks.length === 0
+      active.length === 0
         ? 'idle'
-        : tasks.every(task => task.kind === 'finalizing')
+        : active.every(snapshot => snapshot.state === 'finalizing')
           ? 'finalizing'
           : 'active',
-    activeKiloSessions: deps.tasks.size,
+    activeKiloSessions: active.length,
     pendingMessages: deps.tasks.size,
     kilo: { ready: deps.kiloReady && !deps.signal?.aborted },
-    sessions: deps.sessions.map(snapshot => {
-      const task = deps.tasks.get(snapshot.kiloSessionId);
-      const waitingOn =
-        task?.kind === 'preparation'
-          ? 'preparation'
-          : task?.kind === 'finalizing'
-            ? 'finalizing'
-            : snapshot.pendingInputs?.size
-              ? 'input'
-              : 'model';
-      return {
-        kiloSessionId: snapshot.kiloSessionId,
-        state: task?.kind === 'finalizing' ? 'finalizing' : task ? 'active' : 'idle',
-        idleForMs: Math.max(0, now - snapshot.lastActivityAt),
-        ...(task ? { waitingOn } : {}),
-      };
-    }),
+    sessions,
   };
+}
+
+export async function refreshHeartbeatPayload(deps: HandlerDeps): Promise<SandboxHeartbeatPayload> {
+  const { activity, kiloRuntimes } = deps;
+  if (activity && kiloRuntimes) {
+    const rootsByDirectory = new Map<string, string[]>();
+    for (const { kiloSessionId } of activity.snapshots()) {
+      const directory = directoryForSession(kiloSessionId);
+      if (!directory) continue;
+      const roots = rootsByDirectory.get(directory) ?? [];
+      roots.push(kiloSessionId);
+      rootsByDirectory.set(directory, roots);
+    }
+    await Promise.all(
+      [...rootsByDirectory].map(async ([directory, roots]) => {
+        const runtime = kiloRuntimes.get(directory);
+        if (!runtime) return;
+        const revisions = new Map(roots.map(root => [root, activity.revision(root)]));
+        const kiloClient = runtime.kiloClient;
+        try {
+          const statuses = await withKiloRequestDeadline(
+            signal => kiloClient.getSessionStatuses(directory, signal),
+            deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal
+          );
+          if (
+            runtime.signal.aborted ||
+            deps.signal?.aborted ||
+            kiloRuntimes.get(directory) !== runtime ||
+            runtime.kiloClient !== kiloClient
+          )
+            return;
+          activity.reconcile(
+            statuses,
+            roots.filter(
+              root =>
+                directoryForSession(root) === directory &&
+                activity.revision(root) === revisions.get(root)
+            )
+          );
+        } catch {
+          return;
+        }
+      })
+    );
+  }
+  return buildHeartbeatPayload(deps);
 }
 
 function startSessionTask(
@@ -158,6 +346,7 @@ function startSessionTask(
     done: completion.promise,
   };
   deps.tasks.set(session.kiloSessionId, task);
+  if (identity.kind !== 'preparation') deps.activity?.markActive(session.kiloSessionId);
   const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
   if (snapshot) {
     snapshot.lastActivityAt = Date.now();
@@ -185,6 +374,7 @@ function startSessionTask(
       clearTimeout(timeout);
       if (deps.tasks.get(session.kiloSessionId) === task) {
         deps.tasks.delete(session.kiloSessionId);
+        deps.activity?.reconcile({}, [session.kiloSessionId]);
         const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
         if (snapshot) {
           snapshot.lastActivityAt = Date.now();
@@ -231,6 +421,59 @@ export async function handleControlRequest(
     deps.kiloRuntimes?.shutdown();
     return ok({ shuttingDown: true });
   }
+  if (operation === 'worktree.prepareDeletion' || operation === 'worktree.delete') {
+    const parsed = worktreeDeletePayloadSchema.safeParse(payload);
+    if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+    const input = parsed.data;
+    try {
+      validateWorktreeDirectory(input);
+    } catch {
+      return fail('protocol_error', 'Invalid worktree directory', false);
+    }
+    const kiloRuntimes = deps.kiloRuntimes;
+    if (!kiloRuntimes) return missingKilo();
+    try {
+      const fenced = fenceDirectoryOperations(input.directory);
+      const tasks = [...deps.tasks.values()].filter(
+        task => task.session.directory === input.directory
+      );
+      for (const task of tasks) {
+        task.controller.abort(new ControlTaskCancellation('cancelled', 'Worktree deleted'));
+      }
+      const results = await Promise.all(tasks.map(task => task.done));
+      await fenced;
+      if (results.some((result, index) => !result.ok && tasks[index]?.kind !== 'preparation')) {
+        return fail('not_ready', 'Worktree cancellation is incomplete', true);
+      }
+      const runtime = kiloRuntimes.get(input.directory);
+      const client =
+        deps.worktreeCleanupClient ??
+        (runtime ? createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl) : undefined);
+      const cleanupDeps = {
+        client,
+        detachRoot: (id: string) => {
+          deps.activity?.detach(id);
+          const index = deps.sessions.findIndex(snapshot => snapshot.kiloSessionId === id);
+          if (index !== -1) deps.sessions.splice(index, 1);
+        },
+        detachTerminals: async (directory: string) => {
+          await deps.terminalRuntime?.detachDirectory(directory);
+        },
+        retireDirectory: async (directory: string) => {
+          await kiloRuntimes.deleteDirectory(directory);
+        },
+      };
+      if (operation === 'worktree.prepareDeletion') {
+        return ok({
+          prepared: true,
+          sessionIds: await prepareWorktreeDeletion(input, cleanupDeps),
+        });
+      }
+      return ok(await deleteWorktree(input, cleanupDeps));
+    } catch {
+      return fail('not_ready', 'Worktree cleanup is incomplete', true);
+    }
+  }
   if (!SESSION_OPERATION_SET.has(operation)) {
     return fail('unknown_operation', 'Unknown operation', false);
   }
@@ -245,6 +488,14 @@ export async function handleControlRequest(
     return missingKilo();
   }
 
+  const attachedDirectory = directoryForSession(session.kiloSessionId);
+  if (
+    operation === 'session.detach' &&
+    attachedDirectory !== undefined &&
+    attachedDirectory !== session.directory
+  ) {
+    return fail('unauthorized', 'Session directory mismatch', false);
+  }
   const current = deps.tasks.get(session.kiloSessionId);
   if (
     current &&
@@ -254,6 +505,20 @@ export async function handleControlRequest(
     return fail('unauthorized', 'Session task ownership mismatch', false);
   }
 
+  try {
+    assertDirectoryActive(session.directory);
+    return await handleSessionControlRequest(operation, session, payload, deps);
+  } catch {
+    return fail('not_ready', 'Worktree is being deleted', false);
+  }
+}
+
+async function handleSessionControlRequest(
+  operation: string,
+  session: SessionRequestIdentity,
+  payload: unknown,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult> {
   switch (operation) {
     case 'session.attach':
       return handleAttach(session, payload, deps);
@@ -348,7 +613,7 @@ async function handleAttach(
     return fail('protocol_error', 'Reserved control runtime environment variable', false);
   }
   if (deps.tasks.has(session.kiloSessionId)) {
-    return fail('not_ready', 'Session has work in progress', true);
+    return fail('session_busy', 'Session has work in progress', true);
   }
 
   const task = startSessionTask(
@@ -359,12 +624,23 @@ async function handleAttach(
       const result = await (deps.applyAttach ?? applySessionAttach)(session, parsed.data, {
         kiloRuntimes: deps.kiloRuntimes,
         signal: owned.signal,
+        canRefreshCredentials: () =>
+          !owned.signal.aborted &&
+          ![...deps.tasks.values()].some(
+            task => task !== owned && task.session.directory === session.directory
+          ) &&
+          !(deps.activity?.snapshots() ?? []).some(
+            snapshot =>
+              snapshot.state !== 'idle' &&
+              directoryForSession(snapshot.kiloSessionId) === session.directory
+          ),
         ...(deps.terminalRuntime ? { terminalRuntime: deps.terminalRuntime } : {}),
         ...(deps.emitPreparing ? { emitPreparing: deps.emitPreparing } : {}),
       });
       if (owned.signal.aborted) {
         return fail('not_ready', 'Session attachment cancelled', true);
       }
+      if (result.ok) deps.activity?.attach(session.kiloSessionId);
       return result;
     }
   );
@@ -386,9 +662,14 @@ async function handleDetach(
     if (!result.ok && task.kind !== 'preparation') return result;
   }
   try {
+    if (!task) {
+      const runtime = sessionKiloRuntime(session, deps);
+      if (runtime) await abortKiloSession(session, runtime.kiloClient);
+    }
     deps.kiloRuntimes?.detach(session);
     const terminalCleanup = deps.terminalRuntime?.detachSession(session);
     forgetAttachedRoot(session.kiloSessionId, session.directory);
+    deps.activity?.detach(session.kiloSessionId);
     const index = deps.sessions.findIndex(item => item.kiloSessionId === session.kiloSessionId);
     if (index !== -1) deps.sessions.splice(index, 1);
     await terminalCleanup;
@@ -452,7 +733,22 @@ function handlePrompt(
   deps: HandlerDeps
 ): ControlHandlerResult {
   const runtime = sessionKiloRuntime(session, deps);
-  if (!runtime) return missingKilo();
+  if (!runtime) {
+    if (
+      deps.kiloRuntimes?.isHealthy() &&
+      directoryForSession(session.kiloSessionId) === session.directory &&
+      rootForSession(session.kiloSessionId) === session.kiloSessionId &&
+      [...deps.tasks.values()].some(
+        task =>
+          task.kind === 'preparation' &&
+          task.session.directory === session.directory &&
+          !task.signal.aborted
+      )
+    ) {
+      return fail('session_busy', 'Worktree has preparation in progress', true);
+    }
+    return missingKilo();
+  }
   const parsed = sessionPromptPayloadSchema.safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const request = parsed.data;
@@ -482,7 +778,7 @@ function handlePrompt(
     ) {
       return ok({ messageId: request.messageId, status: 'existing' });
     }
-    return fail('not_ready', 'Session has work in progress', true);
+    return fail('session_busy', 'Session has work in progress', true);
   }
   startSessionTask(
     session,
@@ -838,8 +1134,16 @@ async function handleSync(
       status: deps.tasks.has(session.kiloSessionId)
         ? { type: 'busy' }
         : (statuses[session.kiloSessionId] ?? { type: 'idle' }),
-      questions: questions.map(item => item.request),
-      permissions: permissions.map(item => item.request),
+      questions: questions.map(({ request }) =>
+        request.sessionID === session.kiloSessionId
+          ? request
+          : { ...request, rootKiloSessionId: session.kiloSessionId }
+      ),
+      permissions: permissions.map(({ request }) =>
+        request.sessionID === session.kiloSessionId
+          ? request
+          : { ...request, rootKiloSessionId: session.kiloSessionId }
+      ),
     });
   } catch (error) {
     return kiloFailure(error);

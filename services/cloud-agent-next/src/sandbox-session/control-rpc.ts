@@ -11,6 +11,8 @@ import type {
 import type { Env } from '../types.js';
 import type { SandboxAcquisition } from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 
 type SandboxControlRpc = {
   prepareSessionCredentials(input: {
@@ -24,6 +26,7 @@ type SandboxControlRpc = {
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
+    worktreeId?: string;
   }): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
@@ -54,5 +57,26 @@ type SandboxControlRpc = {
 };
 
 export function sandboxControlRpc(env: Env, sandboxId: string): SandboxControlRpc {
-  return env.SANDBOX_CONTROL.getByName(sandboxId);
+  const stub = () => getSandboxControlStub(env, sandboxId);
+  return {
+    prepareSessionCredentials: input =>
+      withDORetry(
+        stub,
+        control => control.prepareSessionCredentials(input),
+        'prepareSessionCredentials'
+      ),
+    ensureReady: input => stub().ensureReady(input),
+    getStatus: () => stub().getStatus(),
+    quarantineRuntime: input => stub().quarantineRuntime(input),
+    attachSession: input => stub().attachSession(input),
+    detachSession: sessionId =>
+      withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
+    validateTerminalAccess: input =>
+      withDORetry(stub, control => control.validateTerminalAccess(input), 'validateTerminalAccess'),
+    recordTerminalActivity: input =>
+      withDORetry(stub, control => control.recordTerminalActivity(input), 'recordTerminalActivity'),
+    updateNetworkPolicy: input =>
+      withDORetry(stub, control => control.updateNetworkPolicy(input), 'updateNetworkPolicy'),
+    request: input => stub().request(input),
+  };
 }

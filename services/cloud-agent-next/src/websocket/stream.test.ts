@@ -109,6 +109,18 @@ function processSdkFrame(
   if (event && !isChatEvent(event)) state.process(event);
 }
 
+type SentStreamMessage = {
+  eventId: number;
+  sessionId: SessionId;
+  streamEventType: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+};
+
+function parseSentMessages(webSocket: { sentMessages: string[] }): SentStreamMessage[] {
+  return webSocket.sentMessages.map(message => JSON.parse(message) as SentStreamMessage);
+}
+
 describe('stream handler replayEvents', () => {
   it('sends all events when total size is within byte budget', async () => {
     const events = [makeEvent(1), makeEvent(2), makeEvent(3)];
@@ -967,6 +979,259 @@ describe('stream handler handleStreamRequest', () => {
     expect(frames.map(frame => frame.streamEventType)).toEqual([
       'cloud.message.failed',
       'connected',
+    ]);
+  });
+
+  it('corrects accepted delivery immediately after reconnect user-message materialization', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const messageId = 'msg_accepted';
+    const timestamp = 1_700_000_000_000;
+    const persistedSentEvent: StoredEvent = {
+      ...makeEvent(7, JSON.stringify({ messageId, delivery: 'sent' })),
+      execution_id: '',
+      stream_event_type: 'cloud.message.sent',
+      timestamp,
+    };
+    const handler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([persistedSentEvent]),
+      SESSION_ID,
+      {
+        deriveQueuedMessages: async () => [
+          { messageId, content: 'already running', timestamp, delivery: 'sent' },
+        ],
+      }
+    );
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    const events = parseSentMessages(serverWs);
+    expect(events.map(event => [event.eventId, event.streamEventType])).toEqual([
+      [7, 'cloud.message.sent'],
+      [0, 'connected'],
+      [0, 'cloud.message.queued'],
+      [0, 'cloud.message.sent'],
+    ]);
+    expect(events[2]).toEqual({
+      eventId: 0,
+      sessionId: SESSION_ID,
+      streamEventType: 'cloud.message.queued',
+      timestamp: new Date(timestamp).toISOString(),
+      data: { messageId, content: 'already running', delivery: 'queued' },
+    });
+    expect(events[3]).toEqual({
+      eventId: 0,
+      sessionId: SESSION_ID,
+      streamEventType: 'cloud.message.sent',
+      timestamp: new Date(timestamp).toISOString(),
+      data: { messageId, delivery: 'sent' },
+    });
+  });
+
+  it('leaves genuinely queued and legacy snapshots queued without a sent correction', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        { messageId: 'msg_queued', content: 'waiting', timestamp: 1000 },
+        { messageId: 'msg_legacy', content: 'legacy pending', timestamp: 1001 },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    const events = parseSentMessages(serverWs).filter(
+      event => event.streamEventType !== 'connected'
+    );
+    expect(
+      events.map(event => ({ streamEventType: event.streamEventType, data: event.data }))
+    ).toEqual([
+      {
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_queued', content: 'waiting', delivery: 'queued' },
+      },
+      {
+        streamEventType: 'cloud.message.queued',
+        data: { messageId: 'msg_legacy', content: 'legacy pending', delivery: 'queued' },
+      },
+    ]);
+  });
+
+  it.each([
+    { accepted: false, delivery: 'queued' as const },
+    { accepted: true, delivery: 'sent' as const },
+  ])('preserves queued-then-failed ordering for $delivery terminal failures', async failure => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const messageId = `msg_failed_${failure.delivery}`;
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        {
+          messageId,
+          content: 'failed message',
+          timestamp: 1000,
+          terminalFailure: {
+            messageId,
+            status: 'failed',
+            delivery: failure.delivery,
+            accepted: failure.accepted,
+            reason: 'wrapper_failed',
+            timestamp: 1005,
+          },
+        },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request(
+        'https://example.com/stream?replay=false&eventTypes=cloud.message.queued,cloud.message.failed',
+        {
+          headers: { Upgrade: 'websocket' },
+        }
+      )
+    );
+
+    const events = parseSentMessages(serverWs).filter(
+      event => event.streamEventType !== 'connected'
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'cloud.message.queued',
+      'cloud.message.failed',
+    ]);
+    expect(events[1]?.data).toEqual({
+      messageId,
+      status: 'failed',
+      delivery: failure.delivery,
+      accepted: failure.accepted,
+      reason: 'wrapper_failed',
+    });
+  });
+
+  it.each([
+    {
+      query: 'eventTypes=cloud.message.queued,cloud.message.sent',
+      expected: ['cloud.message.queued', 'cloud.message.sent'],
+    },
+    { query: 'eventTypes=cloud.message.queued', expected: ['cloud.message.queued'] },
+    { query: 'eventTypes=cloud.message.sent', expected: ['cloud.message.sent'] },
+    { query: 'eventTypes=output', expected: [] },
+    { query: 'executionIds=exec_other', expected: [] },
+    { query: 'startTime=1001', expected: [] },
+    { query: 'endTime=999', expected: [] },
+  ])('preserves existing accepted snapshot filters for $query', async ({ query, expected }) => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      deriveQueuedMessages: async () => [
+        {
+          messageId: 'msg_accepted',
+          content: 'already running',
+          timestamp: 1000,
+          delivery: 'sent',
+        },
+      ],
+    });
+
+    await handler.handleStreamRequest(
+      new Request(`https://example.com/stream?replay=false&${query}`, {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    expect(
+      parseSentMessages(serverWs)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => event.streamEventType)
+    ).toEqual(expected);
+  });
+
+  it('keeps accepted delivery corrections isolated to their owning session', async () => {
+    const siblingSessionId = 'sess_sibling' as SessionId;
+    const acceptedSocket = makeFakeWebSocket();
+    const queuedSocket = makeFakeWebSocket();
+    const acceptedHandler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([]),
+      SESSION_ID,
+      {
+        deriveQueuedMessages: async () => [
+          {
+            messageId: 'msg_accepted',
+            content: 'first session',
+            timestamp: 1000,
+            delivery: 'sent',
+          },
+        ],
+      }
+    );
+    const queuedHandler = createStreamHandler(
+      makeFakeState(),
+      makeFakeEventQueries([]),
+      siblingSessionId,
+      {
+        deriveQueuedMessages: async () => [
+          { messageId: 'msg_sibling', content: 'second session', timestamp: 1000 },
+        ],
+      }
+    );
+
+    mockWebSocketPair(acceptedSocket);
+    await acceptedHandler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    mockWebSocketPair(queuedSocket);
+    await queuedHandler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+
+    expect(
+      parseSentMessages(acceptedSocket)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => ({
+          sessionId: event.sessionId,
+          streamEventType: event.streamEventType,
+          messageId: event.data.messageId,
+        }))
+    ).toEqual([
+      {
+        sessionId: SESSION_ID,
+        streamEventType: 'cloud.message.queued',
+        messageId: 'msg_accepted',
+      },
+      { sessionId: SESSION_ID, streamEventType: 'cloud.message.sent', messageId: 'msg_accepted' },
+    ]);
+    expect(
+      parseSentMessages(queuedSocket)
+        .filter(event => event.streamEventType !== 'connected')
+        .map(event => ({
+          sessionId: event.sessionId,
+          streamEventType: event.streamEventType,
+          messageId: event.data.messageId,
+        }))
+    ).toEqual([
+      {
+        sessionId: siblingSessionId,
+        streamEventType: 'cloud.message.queued',
+        messageId: 'msg_sibling',
+      },
     ]);
   });
 });

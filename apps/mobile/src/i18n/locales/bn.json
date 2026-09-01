@@ -156,7 +156,7 @@
     "returnSendsMessage": "রিটার্ন কী বার্তা পাঠায়",
     "returnSendsMessageSubtitle": "বন্ধ থাকলে, রিটার্ন কী এজেন্টের বার্তা লেখার ঘরে নতুন লাইন যোগ করে।",
     "biometricUnlock": "বায়োমেট্রিক্স দিয়ে আনলক করুন",
-    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে। ডিভাইসের সেটিংসে বায়োমেট্রিক্স বা ডিভাইসের পাসকোড সেট আপ করুন। বিকল্প উপায় হিসেবে আপনার ডিভাইসের পাসকোড ব্যবহার করতে পারবেন।"
+    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "পর্যালোচনার ট্রান্সক্রিপ্টের জন্য অপেক্ষা করছে।",
       "transcriptEmpty": "এই পর্যালোচনার জন্য কোনো ট্রান্সক্রিপ্ট নেই।",
       "transcriptRetry": "পর্যালোচনার ট্রান্সক্রিপ্ট লোড করা যায়নি।",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "এজেন্ট নিষ্ক্রিয়",
       "agentWorking": "এজেন্ট কাজ করছে...",
       "anErrorOccurred": "একটি ত্রুটি ঘটেছে",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "অন্যান্য",
-      "project": "প্রজেক্ট",
-      "removeProjectFilter": "{{label}} প্রজেক্ট ফিল্টার সরান",
-      "removePlatformFilter": "{{label}} প্ল্যাটফর্ম ফিল্টার সরান"
+      "project": "প্রজেক্ট"
     },
     "suggestion": {
       "title": "পরামর্শ",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "নতুন কোডিং কাজ",
     "explore": "অন্বেষণ",
     "seeAll": "সব দেখুন",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "এই মুহূর্তে কিছু চলছে না"
   },
   "imageViewer": {
     "close": "{{filename}} বন্ধ করুন",

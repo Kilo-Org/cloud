@@ -361,6 +361,41 @@ type LegacySessionMessage = {
   toolExecutions?: ToolExecution[];
 };
 
+export type CloudSessionCreationOperation = {
+  intent: string;
+  operationKey: string;
+};
+
+export function getCloudSessionCreationOperation(
+  current: CloudSessionCreationOperation | null | undefined,
+  intent: string,
+  createOperationKey: () => string
+): CloudSessionCreationOperation {
+  if (current?.intent === intent) return current;
+  return { intent, operationKey: createOperationKey() };
+}
+
+export function isAmbiguousCloudSessionCreationError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return true;
+  if (typeof error.data !== 'object' || error.data === null || !('code' in error.data)) return true;
+  if (typeof error.data.code !== 'string') return true;
+
+  if (error.data.code === 'CONFLICT') {
+    return (
+      'message' in error &&
+      (error.message === 'creation_in_progress' || error.message === 'operation_in_progress')
+    );
+  }
+
+  return [
+    'TIMEOUT',
+    'INTERNAL_SERVER_ERROR',
+    'BAD_GATEWAY',
+    'SERVICE_UNAVAILABLE',
+    'GATEWAY_TIMEOUT',
+  ].includes(error.data.code);
+}
+
 export type StoredSession = {
   sessionId: string;
   repository: string;
@@ -380,6 +415,7 @@ export type StoredSession = {
   createdOnPlatform?: string | null;
   /** Git branch name, shown separately from repository in the sidebar */
   branch?: string | null;
+  worktreeId?: string | null;
   sessionStatus?: string | null;
   sessionStatusUpdatedAt?: string | null;
   /**

@@ -156,7 +156,7 @@
     "returnSendsMessage": "A tecla Intro envía a mensaxe",
     "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
     "biometricUnlock": "Desbloquear con biometría",
-    "biometricUnlockSubtitle": "Require desbloquear ao iniciar a app e despois de cinco minutos en segundo plano. Configura a biometría ou un código de acceso do dispositivo nos axustes do dispositivo. O código de acceso do teu dispositivo está dispoñible como alternativa."
+    "biometricUnlockSubtitle": "Require desbloquear ao iniciar a app e despois de cinco minutos en segundo plano."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -201,7 +201,7 @@
       "diffTooLarge": "Diff demasiado grande para mostrar",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir o diff deste arquivo en GitHub",
-      "githubDiff": "diff de GitHub"
+      "githubDiff": "Diff de GitHub"
     },
     "floatingActions": {
       "clearSelection": "Limpar selección",
@@ -838,7 +838,7 @@
       "managedByAdmin": "A facturación xestiónaa o administrador da túa organización.",
       "couldNotLoad": "Non se puido cargar a información de facturación",
       "manageOnWeb": "Xestionar a facturación na web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Madrugador",
       "finalCommitTermEndsOn": "O teu prazo final de Commit remata o {{date}}. Continúa como Standard por {{price}}, ou a hospedaxe remata.",
       "freeTrial": "Probas gratuítas",
@@ -1135,7 +1135,7 @@
       "destroying": "DESTRUÍNDO",
       "provisioned": "APROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "Executando",
+      "running": "EXECUTANDO",
       "shuttingDown": "APAGANDO",
       "starting": "INICIANDO",
       "stopped": "DETIDO",
@@ -1309,7 +1309,7 @@
       "transcriptWaiting": "Agardando pola transcrición da revisión.",
       "transcriptEmpty": "Non hai transcrición para esta revisión.",
       "transcriptRetry": "Non se puido cargar a transcrición da revisión.",
-      "transcriptLive": "EN DIRECTO",
+      "transcriptLive": "En directo",
       "agentIdle": "Axente inactivo",
       "agentWorking": "Axente traballando...",
       "anErrorOccurred": "Ocorreu un erro",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Outro",
-      "project": "Proxecto",
-      "removeProjectFilter": "Eliminar o filtro de proxecto {{label}}",
-      "removePlatformFilter": "Eliminar o filtro de plataforma {{label}}"
+      "project": "Proxecto"
     },
     "suggestion": {
       "title": "Suxestión",
@@ -2670,10 +2668,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Pull request aberta",
+      "open": "pull request aberta",
       "closed": "solicitude de pull pechada",
       "merged": "solicitude de pull fusionada",
-      "draft": "Pull request en borrador",
+      "draft": "pull request en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Nova tarefa de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Non hai nada en execución agora mesmo"
   },
   "imageViewer": {
     "close": "Pechar {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Volve e reabre este selector desde a pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "precisa entrada"
+    "needsInput": "PRECISA ENTRADA"
   },
   "voiceInput": {
     "listening": "Escoitando...",

@@ -156,7 +156,7 @@
     "returnSendsMessage": "Клавиша ввода отправляет сообщение",
     "returnSendsMessageSubtitle": "Если выключено, клавиша ввода вставляет новую строку в полях ввода сообщений агентам.",
     "biometricUnlock": "Разблокировать с помощью биометрии",
-    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме. Настройте биометрию или код-пароль устройства в настройках устройства. Код-пароль устройства доступен как запасной способ разблокировки."
+    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме."
   },
   "notifications": {
     "title": "Уведомления",
@@ -252,7 +252,7 @@
       "leaveFailed": "Не удалось покинуть беседу"
     },
     "reactions": {
-      "title": "реакций",
+      "title": "Реакций",
       "close": "Закрыть реакции",
       "recent": "Недавние",
       "common": "Обычные",
@@ -730,7 +730,7 @@
       "destroying": "УНИЧТОЖЕНИЕ",
       "provisioned": "ПОДГОТОВЛЕН",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "Выполняется",
+      "running": "ВЫПОЛНЯЕТСЯ",
       "shuttingDown": "ЗАВЕРШЕНИЕ РАБОТЫ",
       "starting": "ЗАПУСК",
       "stopped": "ОСТАНОВЛЕН",
@@ -912,7 +912,7 @@
       "transcriptWaiting": "Ожидание протокола проверки.",
       "transcriptEmpty": "Для этой проверки нет протокола.",
       "transcriptRetry": "Не удалось загрузить протокол проверки.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Агент простаивает",
       "agentWorking": "Агент работает...",
       "anErrorOccurred": "Произошла ошибка",
@@ -1812,7 +1812,7 @@
       "contentTruncated": "Содержимое обрезано",
       "truncated": "Обрезано",
       "toolRead": "читать",
-      "toolEdit": "Редактировать",
+      "toolEdit": "редактировать",
       "toolWrite": "записать",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2088,9 +2088,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Другое",
-      "project": "Проект",
-      "removeProjectFilter": "Убрать фильтр проекта {{label}}",
-      "removePlatformFilter": "Убрать фильтр платформы {{label}}"
+      "project": "Проект"
     },
     "suggestion": {
       "title": "Предложение",
@@ -2326,7 +2324,7 @@
     "newCodingTask": "Новая задача кодирования",
     "explore": "Исследовать",
     "seeAll": "Смотреть все",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Сейчас ничего не запущено"
   },
   "imageViewer": {
     "close": "Закрыть {{filename}}",
@@ -2371,7 +2369,7 @@
     "optionsExpiredDescription": "Вернитесь и снова откройте этот выбор с предыдущего экрана."
   },
   "sessionRow": {
-    "needsInput": "требует ввода"
+    "needsInput": "ТРЕБУЕТ ВВОДА"
   },
   "voiceInput": {
     "listening": "Слушаю...",
@@ -2667,7 +2665,7 @@
       "reaction": "реакций",
       "reaction_other": "реакций",
       "reaction_one": "реакция",
-      "reactionsTitle": "реакций",
+      "reactionsTitle": "Реакций",
       "reply": "Ответить",
       "replyBadRequest": "Этот ответ нельзя отправить. Возможно, ветка изменилась.",
       "replyBody": "Текст ответа",

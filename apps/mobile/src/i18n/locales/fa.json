@@ -156,7 +156,7 @@
     "returnSendsMessage": "کلید بازگشت پیام را ارسال می‌کند",
     "returnSendsMessageSubtitle": "وقتی خاموش است، کلید بازگشت در کادرهای ورودی پیام عامل یک خط جدید درج می‌کند.",
     "biometricUnlock": "باز کردن قفل با احراز هویت زیست‌سنجی",
-    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است. احراز هویت زیست‌سنجی یا رمز عبور دستگاه را در تنظیمات دستگاه راه‌اندازی کنید. رمز عبور دستگاه شما به‌عنوان روش جایگزین در دسترس است."
+    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "سایر",
-      "project": "پروژه",
-      "removeProjectFilter": "حذف فیلتر پروژه {{label}}",
-      "removePlatformFilter": "حذف فیلتر پلتفرم {{label}}"
+      "project": "پروژه"
     },
     "suggestion": {
       "title": "پیشنهاد",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "در حال حاضر چیزی در حال اجرا نیست"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",

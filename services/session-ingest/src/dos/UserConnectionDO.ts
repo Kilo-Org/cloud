@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
@@ -36,6 +37,17 @@ type HeartbeatSession = {
     prNumber: number;
   };
 };
+
+const cleanupAttachmentSchema = z.discriminatedUnion('role', [
+  z
+    .object({
+      role: z.literal('cli'),
+      sessions: z.array(z.object({ id: z.string() }).passthrough()),
+    })
+    .passthrough(),
+  z.object({ role: z.literal('web'), subscribedSessions: z.array(z.string()) }).passthrough(),
+]);
+const pendingSessionSchema = z.object({ sessionId: z.string().optional() });
 
 type ConnectionCapabilities = {
   attachments?: boolean;
@@ -594,6 +606,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     capabilities: ConnectionCapabilities | undefined,
     instance: Instance | undefined
   ): void {
+    sessions = sessions.filter(session => !this.isSessionDeleted(session.id));
     const { connectionId } = attachment;
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
@@ -749,12 +762,13 @@ export class UserConnectionDO extends DurableObject<Env> {
    * first-sights do not slide fireAt or reset attempts.
    */
   private scheduleSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
-    if (this.readyPushFireAt.has(sessionId)) return;
+    if (this.readyPushFireAt.has(sessionId) || this.isSessionDeleted(sessionId)) return;
 
     const key = `${READY_PUSH_KEY_PREFIX}${sessionId}`;
     this.ctx.waitUntil(
       (async () => {
         const existing = await this.ctx.storage.get<ReadyPushEntry>(key);
+        if (this.isSessionDeleted(sessionId)) return;
         if (existing) {
           this.readyPushFireAt.set(sessionId, existing.fireAt);
           this.scheduleNextAlarm(Date.now());
@@ -823,6 +837,7 @@ export class UserConnectionDO extends DurableObject<Env> {
         await this.ctx.storage.delete(key);
         this.readyPushFireAt.delete(sessionId);
       } catch (error: unknown) {
+        if (this.isSessionDeleted(sessionId)) continue;
         const attempts = (entry.attempts ?? 0) + 1;
         if (attempts >= READY_PUSH_MAX_ATTEMPTS) {
           await this.ctx.storage.delete(key);
@@ -911,6 +926,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     event: string,
     data: unknown
   ): void {
+    if (
+      this.isSessionDeleted(sessionId) ||
+      (parentSessionId && this.isSessionDeleted(parentSessionId))
+    )
+      return;
     const childSubs = this.webSubscriptions.get(sessionId);
     const parentSubs = parentSessionId ? this.webSubscriptions.get(parentSessionId) : undefined;
     if (!childSubs && !parentSubs) return;
@@ -1049,6 +1069,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     // this try block. The finally clears any reservation that survives
     // a throw.
     try {
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) return;
       // Validate catalog result size for rehydrated entries too.
       if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
         const serializedResult = JSON.stringify(result);
@@ -1321,7 +1342,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       kiloUserId,
       kiloSessionId: sessionId,
     });
-    if (!accessible) {
+    if (!accessible || this.isSessionDeleted(sessionId)) {
       return;
     }
 
@@ -1663,6 +1684,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     webConnectionId: string,
     now: number
   ): Promise<void> {
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) return;
     const correlationId = msg.mutationId ?? crypto.randomUUID();
     this.pendingCommands.set(correlationId, {
       ws,
@@ -1684,6 +1706,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       webConnectionId,
       state: 'pending' as const,
     } satisfies PendingCommandEntry);
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) {
+      this.ctx.storage.kv.delete(`${PENDING_COMMAND_KEY_PREFIX}${correlationId}`);
+      return;
+    }
     this.scheduleNextAlarm(now);
     this.scheduleDurablePendingAlarm();
 
@@ -1713,6 +1739,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     webConnectionId: string,
     now: number
   ): void {
+    if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) return;
     const correlationId = crypto.randomUUID();
     const pendingCommandKey = `${PENDING_COMMAND_KEY_PREFIX}${correlationId}`;
     this.pendingCommands.set(correlationId, {
@@ -1739,6 +1766,10 @@ export class UserConnectionDO extends DurableObject<Env> {
           state: 'pending' as const,
         } satisfies PendingCommandEntry)
         .then(async () => {
+          if (msg.sessionId && this.isSessionDeleted(msg.sessionId)) {
+            this.ctx.storage.kv.delete(pendingCommandKey);
+            return;
+          }
           const terminalEntry = this.terminalDuringInitialWrite.get(correlationId);
           if (terminalEntry) {
             await this.ctx.storage.put(pendingCommandKey, terminalEntry);
@@ -1990,6 +2021,72 @@ export class UserConnectionDO extends DurableObject<Env> {
     return sockets.length;
   }
 
+  private isSessionDeleted(sessionId: string): boolean {
+    return this.ctx.storage.kv.get(`deletedSession/${sessionId}`) === true;
+  }
+
+  async clearSession(sessionId: string): Promise<void> {
+    this.ensureState();
+    this.ctx.storage.kv.put(`deletedSession/${sessionId}`, true);
+    this.sessionOwners.delete(sessionId);
+    this.webSubscriptions.delete(sessionId);
+    this.readyPushFireAt.delete(sessionId);
+    this.ctx.storage.kv.delete(`${READY_PUSH_KEY_PREFIX}${sessionId}`);
+    this.ctx.storage.kv.delete(`${RENAME_KEY_PREFIX}${sessionId}`);
+    for (const [id, entry] of this.pendingCommands) {
+      if (entry.sessionId !== sessionId) continue;
+      this.pendingCommands.delete(id);
+      this.terminalDuringInitialWrite.delete(id);
+      this.completedCorrelationIds.delete(id);
+      this.sendToWeb(entry.ws, {
+        type: 'response',
+        id: entry.originalId,
+        error: { code: 'SESSION_DELETED', message: 'Session deleted' },
+      });
+    }
+    for (const [id, entry] of this.terminalDuringInitialWrite) {
+      if (entry.sessionId === sessionId) this.terminalDuringInitialWrite.delete(id);
+    }
+    for (const [key, value] of this.ctx.storage.kv.list({ prefix: PENDING_COMMAND_KEY_PREFIX })) {
+      const parsed = pendingSessionSchema.safeParse(value);
+      if (parsed.success && parsed.data.sessionId === sessionId) this.ctx.storage.kv.delete(key);
+    }
+    for (const [id, sessions] of this.connectionSessions) {
+      this.connectionSessions.set(
+        id,
+        sessions.filter(session => session.id !== sessionId)
+      );
+    }
+    for (const socket of this.ctx.getWebSockets()) {
+      const parsed = cleanupAttachmentSchema.safeParse(socket.deserializeAttachment());
+      if (!parsed.success) continue;
+      const attachment = parsed.data;
+      if (attachment.role === 'cli') {
+        socket.serializeAttachment({
+          ...attachment,
+          sessions: attachment.sessions.filter(session => session.id !== sessionId),
+        });
+        this.sendToCli(socket, { type: 'unsubscribe', sessionId });
+      } else {
+        socket.serializeAttachment({
+          ...attachment,
+          subscribedSessions: attachment.subscribedSessions.filter(id => id !== sessionId),
+        });
+      }
+    }
+    const pending = [...this.ctx.storage.kv.list({ prefix: PENDING_COMMAND_KEY_PREFIX })];
+    if (
+      this.lastHeartbeatAt.size === 0 &&
+      this.readyPushFireAt.size === 0 &&
+      pending.length === 0
+    ) {
+      await this.ctx.storage.deleteAlarm();
+    } else {
+      this.scheduleNextAlarm(Date.now());
+      this.scheduleDurablePendingAlarm();
+    }
+  }
+
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -2018,6 +2115,7 @@ export class UserConnectionDO extends DurableObject<Env> {
    */
   async notifySessionRenamed(sessionId: string, title: string): Promise<{ delivered: boolean }> {
     this.ensureState();
+    if (this.isSessionDeleted(sessionId)) return { delivered: false };
     await this.ctx.storage.put(`${RENAME_KEY_PREFIX}${sessionId}`, {
       title,
       at: Date.now(),
@@ -2183,6 +2281,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // If storage.put fails, no live send occurs. A waitUntil retry keeps
       // the terminal outcome fenced while the loop continues.
       const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) continue;
       const durableEntry: PendingCommandEntry = {
         sessionId: entry.sessionId,
         originalId: entry.originalId,
@@ -2286,6 +2385,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // If storage.put fails, no live send occurs. A waitUntil retry keeps
       // the terminal outcome fenced while the loop continues.
       const webAtt = entry.ws.deserializeAttachment() as WSAttachment | null;
+      if (entry.sessionId && this.isSessionDeleted(entry.sessionId)) continue;
       const durableEntry: PendingCommandEntry = {
         sessionId: entry.sessionId,
         originalId: entry.originalId,
@@ -2453,9 +2553,10 @@ export class UserConnectionDO extends DurableObject<Env> {
   private async getDurablePendingCommand(
     correlationId: string
   ): Promise<PendingCommandEntry | undefined> {
-    return this.ctx.storage.get<PendingCommandEntry>(
+    const entry = await this.ctx.storage.get<PendingCommandEntry>(
       `${PENDING_COMMAND_KEY_PREFIX}${correlationId}`
     );
+    return entry?.sessionId && this.isSessionDeleted(entry.sessionId) ? undefined : entry;
   }
 
   private async countDurablePendingCommands(): Promise<number> {
@@ -2485,7 +2586,12 @@ export class UserConnectionDO extends DurableObject<Env> {
     });
     await Promise.all(
       [...entries].flatMap(([key, entry]) => {
-        if (entry.state !== 'pending' || !matches(entry)) return [];
+        if (
+          entry.state !== 'pending' ||
+          !matches(entry) ||
+          (entry.sessionId && this.isSessionDeleted(entry.sessionId))
+        )
+          return [];
         const correlationId = key.slice(PENDING_COMMAND_KEY_PREFIX.length);
         // Skip entries already delivered live by the in-memory sweep.
         // Prevents a duplicate delivery when the in-memory storage.put and
@@ -2589,6 +2695,10 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
         for (const [key, durable] of entries) {
           if (!durable || typeof durable.expiresAt !== 'number') continue;
+          if (durable.sessionId && this.isSessionDeleted(durable.sessionId)) {
+            this.ctx.storage.kv.delete(key);
+            continue;
+          }
           if (durable.expiresAt > now) continue;
 
           if (durable.state === 'pending') {

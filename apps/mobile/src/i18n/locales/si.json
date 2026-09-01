@@ -156,7 +156,7 @@
     "returnSendsMessage": "ආපසු යතුර පණිවිඩය යවයි",
     "returnSendsMessageSubtitle": "ක්‍රියා විරහිත විට, ආපසු යතුර නියෝජිත පණිවිඩ ආදාන කොටුවල නව පේළියක් ඇතුළත් කරයි.",
     "biometricUnlock": "ජෛවමිතික දත්ත භාවිතයෙන් අගුළු හරින්න",
-    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ. උපාංග සැකසුම් තුළ ජෛවමිතික දත්ත හෝ උපාංග මුරකේතයක් සකසන්න. විකල්පයක් ලෙස ඔබේ උපාංග මුරකේතය භාවිතා කළ හැක."
+    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "වෙනත්",
-      "project": "ව්‍යාපෘතිය",
-      "removeProjectFilter": "{{label}} ව්‍යාපෘති පෙරහන ඉවත් කරන්න",
-      "removePlatformFilter": "{{label}} වේදිකා පෙරහන ඉවත් කරන්න"
+      "project": "ව්‍යාපෘතිය"
     },
     "suggestion": {
       "title": "යෝජනාව",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "මේ මොහොතේ කිසිවක් ක්‍රියාත්මක නොවේ"
   },
   "imageViewer": {
     "close": "{{filename}} වසන්න",

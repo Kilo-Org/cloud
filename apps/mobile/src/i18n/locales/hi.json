@@ -156,7 +156,7 @@
     "returnSendsMessage": "रिटर्न कुंजी संदेश भेजती है",
     "returnSendsMessageSubtitle": "बंद होने पर, रिटर्न कुंजी एजेंट के संदेश इनपुट में नई पंक्ति डालती है।",
     "biometricUnlock": "बायोमेट्रिक्स से अनलॉक करें",
-    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है। डिवाइस की सेटिंग में बायोमेट्रिक्स या डिवाइस का पासकोड सेट करें। वैकल्पिक तरीके के रूप में आपके डिवाइस का पासकोड उपलब्ध है।"
+    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -2035,9 +2035,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "अन्य",
-      "project": "प्रोजेक्ट",
-      "removeProjectFilter": "{{label}} प्रोजेक्ट फ़िल्टर हटाएँ",
-      "removePlatformFilter": "{{label}} प्लेटफ़ॉर्म फ़िल्टर हटाएँ"
+      "project": "प्रोजेक्ट"
     },
     "modelPicker": {
       "title": "मॉडल चुनें",
@@ -2298,7 +2296,7 @@
     "newCodingTask": "नया कोडिंग कार्य",
     "explore": "एक्सप्लोर करें",
     "seeAll": "सभी देखें",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "अभी कुछ भी नहीं चल रहा है"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करें",

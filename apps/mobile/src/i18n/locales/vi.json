@@ -156,7 +156,7 @@
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
     "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng chèn dòng mới trong ô nhập tin nhắn của tác nhân.",
     "biometricUnlock": "Mở khóa bằng sinh trắc học",
-    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút. Thiết lập sinh trắc học hoặc mật mã thiết bị trong cài đặt thiết bị. Bạn vẫn có thể dùng mật mã thiết bị làm phương thức dự phòng."
+    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút."
   },
   "notifications": {
     "title": "Thông báo",
@@ -908,7 +908,7 @@
       "transcriptWaiting": "Đang chờ bản ghi phiên đánh giá.",
       "transcriptEmpty": "Không có bản ghi phiên cho đánh giá này.",
       "transcriptRetry": "Không thể tải bản ghi phiên đánh giá.",
-      "transcriptLive": "TRỰC TIẾP",
+      "transcriptLive": "Trực tiếp",
       "agentIdle": "Tác nhân rảnh rỗi",
       "agentWorking": "Tác nhân đang làm việc...",
       "anErrorOccurred": "Đã xảy ra lỗi",
@@ -1792,7 +1792,7 @@
       "contentTruncated": "Nội dung bị cắt bớt",
       "truncated": "Đã cắt bớt",
       "toolRead": "đọc",
-      "toolEdit": "Chỉnh sửa",
+      "toolEdit": "chỉnh sửa",
       "toolWrite": "ghi",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2062,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Khác",
-      "project": "Dự án",
-      "removeProjectFilter": "Xóa bộ lọc dự án {{label}}",
-      "removePlatformFilter": "Xóa bộ lọc nền tảng {{label}}"
+      "project": "Dự án"
     },
     "suggestion": {
       "title": "Gợi ý",
@@ -2219,7 +2217,7 @@
       "open": "yêu cầu kéo đang mở",
       "closed": "yêu cầu kéo đã đóng",
       "merged": "yêu cầu kéo đã hợp nhất",
-      "draft": "Yêu cầu hợp nhất nháp",
+      "draft": "yêu cầu hợp nhất nháp",
       "updating": "Đang cập nhật, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "yêu cầu hợp nhất"
@@ -2298,7 +2296,7 @@
     "newCodingTask": "Tác vụ lập trình mới",
     "explore": "Khám phá",
     "seeAll": "Xem tất cả",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hiện không có gì đang chạy"
   },
   "imageViewer": {
     "close": "Đóng {{filename}}",
@@ -2343,7 +2341,7 @@
     "optionsExpiredDescription": "Quay lại và mở lại bộ chọn này từ màn hình trước đó."
   },
   "sessionRow": {
-    "needsInput": "cần nhập"
+    "needsInput": "CẦN NHẬP"
   },
   "voiceInput": {
     "listening": "Đang nghe...",

@@ -156,7 +156,7 @@
     "returnSendsMessage": "Ukhiye wokubuyela uthumela umlayezo",
     "returnSendsMessageSubtitle": "Uma kuvaliwe, ukhiye wokubuyela ufaka umugqa omusha kuma-composer ama-ejenti.",
     "biometricUnlock": "Vula ngebhayomethrikhi",
-    "biometricUnlockSubtitle": "Kudingeka uvule uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lungemuva. Setha ibhayomethrikhi noma ikhodi yokudlula yedivayisi kuzilungiselelo zedivayisi. Ikhodi yokudlula yedivayisi yakho iyatholakala njengenye indlela."
+    "biometricUnlockSubtitle": "Kudingeka uvule uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lungemuva."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -1307,7 +1307,7 @@
       "threshold": "Umkhawulo",
       "pullRequest": "isicelo sokudonsa",
       "transcriptEmpty": "Awukho umbhalo walokhu kubuyekezwa.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "transcriptRetry": "Ayikwazanga ukulayisha umbhalo wokubuyekezwa.",
       "transcriptWaiting": "Ilinde umbhalo wokubuyekezwa.",
       "agentIdle": "I-agent ibanga",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Okunye",
-      "project": "Iphrojekthi",
-      "removeProjectFilter": "Susa isihlungi sephrojekthi {{label}}",
-      "removePlatformFilter": "Susa isihlungi sephatifomu {{label}}"
+      "project": "Iphrojekthi"
     },
     "suggestion": {
       "title": "Isiphakamiso",
@@ -2670,10 +2668,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Vula isicelo sokudonsa",
+      "open": "vula isicelo sokudonsa",
       "closed": "ivaliwe i-pull request",
       "merged": "ihlanganisiwe i-pull request",
-      "draft": "Isicelo sokudonsa esidrafuthiwe",
+      "draft": "isicelo sokudonsa esidrafuthiwe",
       "updating": "Iyabuyekezwa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "isicelo sokudonsa"
@@ -2752,7 +2750,7 @@
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "explore": "Hlola",
     "seeAll": "Bona konke",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Akukho okusebenzayo njengamanje"
   },
   "imageViewer": {
     "close": "Vala {{filename}}",
@@ -2797,7 +2795,7 @@
     "optionsExpiredDescription": "Buyela emuva bese uvula kabusha lesi sikhethi kusukela esikrinini esandulele."
   },
   "sessionRow": {
-    "needsInput": "idinga okokufaka"
+    "needsInput": "IDINGA OKOKUFAKA"
   },
   "voiceInput": {
     "listening": "Iyalalela...",
@@ -2991,7 +2989,7 @@
   "feedback": {
     "noEmailApp": "Akukho app ye-imeyili etholakalayo. Ungasithola ku-{{email}}",
     "couldNotOpenStore": "Ayikwazanga ukuvula isitolo.",
-    "emailSubject": "Impendulo ye-mobile app",
+    "emailSubject": "impendulo ye-mobile app",
     "neutralTitle": "Linganisa uhlelo lokusebenza lwe-Kilo",
     "rateTheApp": "Linganisa uhlelo lokusebenza",
     "sendFeedback": "Thumela impendulo"

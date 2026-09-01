@@ -294,6 +294,35 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     }
   }
 
+  it('reads directory-scoped status without treating another checkout as empty', async () => {
+    const directory = '/workspace/shared checkout & tools';
+    const requests: Array<{ method: string; pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: request => {
+        const url = new URL(request.url);
+        requests.push({
+          method: request.method,
+          pathname: url.pathname,
+          directory: url.searchParams.get('directory'),
+        });
+        return Response.json(
+          url.searchParams.get('directory') === directory
+            ? { root_a: { type: 'busy', waitingOn: 'tool' } }
+            : {}
+        );
+      },
+    });
+    startedServers.push(server);
+    const client = createClient(server.url.toString());
+
+    expect(await client.getSessionStatuses(directory)).toEqual({
+      root_a: { type: 'busy', waitingOn: 'tool' },
+    });
+    expect(requests).toEqual([{ method: 'GET', pathname: '/session/status', directory }]);
+    expect(await client.getSessionStatuses()).toEqual({});
+  });
+
   it.each([
     { name: 'empty object', body: {} },
     { name: 'success-shaped object', body: { success: true } },
@@ -537,6 +566,99 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       } finally {
         await server.stop(true);
       }
+    }
+  );
+
+  it('accepts genuinely empty successful session status and pending-input results', async () => {
+    expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
+    expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);
+    expect(await createClient(startStub(200, []).url).getPermissions()).toEqual([]);
+  });
+
+  it('scopes question lists, answers, and rejections to the owning checkout directory', async () => {
+    const directory = '/workspace/shared checkout & tools';
+    const pending = new Map(questions.map(question => [question.id, question]));
+    const requests: Array<{ pathname: string; directory: string | null }> = [];
+    const server = Bun.serve({
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        requests.push({ pathname: url.pathname, directory: url.searchParams.get('directory') });
+        if (url.searchParams.get('directory') !== directory) {
+          return Response.json({ message: 'Wrong checkout' }, { status: 404 });
+        }
+        if (url.pathname === '/question') return Response.json([...pending.values()]);
+        if (url.pathname === '/question/question_1/reply') {
+          expect(await request.json()).toEqual({ answers: [['All']] });
+          pending.delete('question_1');
+          return Response.json(true);
+        }
+        if (url.pathname === '/question/question_1/reject') {
+          pending.delete('question_1');
+          return Response.json(true);
+        }
+        return new Response(null, { status: 404 });
+      },
+    });
+    startedServers.push(server);
+    const client = createClient(server.url.toString());
+
+    expect(await client.getQuestions(directory)).toEqual(questions);
+    expect(await client.answerQuestion('question_1', [['All']], directory)).toBe(true);
+    expect(await client.getQuestions(directory)).toEqual([]);
+    pending.set(questions[0].id, questions[0]);
+    expect(await client.rejectQuestion('question_1', directory)).toBe(true);
+    expect(await client.getQuestions(directory)).toEqual([]);
+    expect(requests).toEqual([
+      { pathname: '/question', directory },
+      { pathname: '/question/question_1/reply', directory },
+      { pathname: '/question', directory },
+      { pathname: '/question/question_1/reject', directory },
+      { pathname: '/question', directory },
+    ]);
+  });
+
+  it.each(['prompt', 'command'] as const)(
+    'preserves the durable message ID and terminal assistant response for a synchronous %s',
+    async operation => {
+      const completion: Awaited<ReturnType<WrapperKiloClient['sendPrompt']>> = {
+        info: {
+          id: 'assistant_1',
+          sessionID: 'ses_1',
+          parentID: 'message_durable',
+          role: 'assistant',
+          time: { created: 1, completed: 2 },
+          modelID: 'example',
+          providerID: 'kilo',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: '/checkout', root: '/checkout' },
+          cost: 0,
+          tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          error: { name: 'MessageAbortedError', data: { message: 'Cancelled' } },
+        },
+        parts: [],
+      };
+      const stub = startStub(200, completion);
+      const client = createClient(stub.url);
+      const options = { sessionId: 'ses_1', messageId: 'message_durable', directory: '/checkout' };
+      const result =
+        operation === 'prompt'
+          ? await client.sendPrompt({ ...options, prompt: 'hello' })
+          : await client.sendCommand({ ...options, command: 'review' });
+
+      expect(result).toEqual(completion);
+      expect(stub.requests).toEqual([
+        {
+          method: 'POST',
+          pathname: operation === 'prompt' ? '/session/ses_1/message' : '/session/ses_1/command',
+          directory: '/checkout',
+          body:
+            operation === 'prompt'
+              ? { messageID: 'message_durable', parts: [{ type: 'text', text: 'hello' }] }
+              : { messageID: 'message_durable', command: 'review', arguments: '' },
+        },
+      ]);
     }
   );
 

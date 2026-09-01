@@ -156,7 +156,7 @@
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
     "returnSendsMessageSubtitle": "ఆఫ్లో ఉన్నప్పుడు, రిటర్న్ ఏజెంట్ సందేశ ఇన్పుట్లలో కొత్త పంక్తిని చేర్చుతుంది.",
     "biometricUnlock": "బయోమెట్రిక్స్తో అన్లాక్ చేయండి",
-    "biometricUnlockSubtitle": "యాప్ను ప్రారంభించినప్పుడు, అలాగే నేపథ్యంగా ఐదు నిమిషాలు ఉన్న తర్వాత అన్లాక్ చేయాలి. పరికరం సెట్టింగ్స్లో బయోమెట్రిక్స్ లేదా పరికర పాస్కోడ్ను ఏర్పాటు చేయండి. ప్రత్యామ్నాయంగా మీ పరికర పాస్కోడ్ను ఉపయోగించవచ్చు."
+    "biometricUnlockSubtitle": "యాప్ను ప్రారంభించినప్పుడు, అలాగే నేపథ్యంగా ఐదు నిమిషాలు ఉన్న తర్వాత అన్లాక్ చేయాలి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2516,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ఇతర",
-      "project": "ప్రాజెక్ట్",
-      "removeProjectFilter": "{{label}} ప్రాజెక్ట్ ఫిల్టర్ను తీసివేయండి",
-      "removePlatformFilter": "{{label}} ప్లాట్ఫారమ్ ఫిల్టర్ను తీసివేయండి"
+      "project": "ప్రాజెక్ట్"
     },
     "suggestion": {
       "title": "సూచన",
@@ -2752,7 +2750,7 @@
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ప్రస్తుతం ఏదీ అమలులో లేదు"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",

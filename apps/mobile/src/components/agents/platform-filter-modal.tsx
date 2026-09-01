@@ -1,10 +1,11 @@
-import { Check, X } from '@/components/ui/icons';
+import { Check } from '@/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
 import {
+  formatGitUrlProject,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
@@ -17,12 +18,6 @@ import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
-
-type SessionFilterChipsProps = AgentSessionFilters & {
-  projectOptions: ProjectFilterOption[];
-  onRemovePlatform: (platform: string) => void;
-  onRemoveProject: (gitUrl: string) => void;
-};
 
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
@@ -69,10 +64,6 @@ function platformFilterLabel(p: string): string {
   }
 }
 
-function projectFilterLabel(gitUrl: string, projectOptions: ProjectFilterOption[]): string {
-  return projectOptions.find(project => project.gitUrl === gitUrl)?.displayName ?? gitUrl;
-}
-
 function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckboxRowProps>) {
   const colors = useThemeColors();
 
@@ -98,74 +89,6 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
   );
 }
 
-export function SessionFilterChips({
-  platformFilter,
-  projectFilter,
-  projectOptions,
-  onRemovePlatform,
-  onRemoveProject,
-}: Readonly<SessionFilterChipsProps>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-
-  if (platformFilter.length === 0 && projectFilter.length === 0) {
-    return null;
-  }
-
-  return (
-    <ScrollView
-      horizontal
-      className="grow-0 shrink-0"
-      showsHorizontalScrollIndicator={false}
-      contentContainerClassName="items-center gap-2 px-[22px] py-2"
-    >
-      {projectFilter.map(gitUrl => {
-        const label = projectFilterLabel(gitUrl, projectOptions);
-        return (
-          <Pressable
-            key={`project-${gitUrl}`}
-            className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
-            onPress={() => {
-              onRemoveProject(gitUrl);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('agentChat.sessionFilter.removeProjectFilter', { label })}
-          >
-            <Text
-              className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-            <X size={12} color={colors.accentSoftForeground} />
-          </Pressable>
-        );
-      })}
-      {platformFilter.map(platform => (
-        <Pressable
-          key={`platform-${platform}`}
-          className="min-h-[48px] min-w-[48px] shrink-0 flex-row items-center self-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
-          onPress={() => {
-            onRemovePlatform(platform);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.sessionFilter.removePlatformFilter', {
-            label: platformFilterLabel(platform),
-          })}
-        >
-          <Text
-            className="max-w-[220px] font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
-            numberOfLines={1}
-          >
-            {platformFilterLabel(platform)}
-          </Text>
-          <X size={12} color={colors.accentSoftForeground} />
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-}
-
 export function SessionFilterModal({
   selectedPlatforms,
   selectedProjects,
@@ -177,6 +100,13 @@ export function SessionFilterModal({
   const { t } = useTranslation();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
+  const platforms = [...new Set([...platformOptions, ...selectedPlatforms])];
+  const projectsByUrl = new Map(projectOptions.map(project => [project.gitUrl, project]));
+  for (const gitUrl of selectedProjects) {
+    if (!projectsByUrl.has(gitUrl)) {
+      projectsByUrl.set(gitUrl, { gitUrl, displayName: formatGitUrlProject(gitUrl) });
+    }
+  }
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -214,14 +144,16 @@ export function SessionFilterModal({
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">{t('agentChat.sessionFilter.title')}</Text>
+          <Text accessibilityRole="header" className="text-center text-base font-semibold">
+            {t('agentChat.sessionFilter.title')}
+          </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
                   {t('agentChat.sessionFilter.platform')}
                 </Text>
-                {platformOptions.map(platform => (
+                {platforms.map(platform => (
                   <FilterCheckboxRow
                     key={platform}
                     label={platformFilterLabel(platform)}
@@ -232,12 +164,12 @@ export function SessionFilterModal({
                   />
                 ))}
               </View>
-              {projectOptions.length > 0 && (
+              {projectsByUrl.size > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">
                     {t('agentChat.sessionFilter.project')}
                   </Text>
-                  {projectOptions.map(project => (
+                  {[...projectsByUrl.values()].map(project => (
                     <FilterCheckboxRow
                       key={project.gitUrl}
                       label={project.displayName}

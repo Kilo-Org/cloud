@@ -177,14 +177,7 @@ logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
 
 `sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
 
-Internal API authentication is required to list or download these archives:
-
-```text
-GET /internal/sandbox-logs/<sandboxId>?cursor=<optional-cursor>
-GET /internal/sandbox-logs/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>
-```
-
-Listing returns at most 100 objects and a continuation cursor. Download paths omit the `.json` suffix. These reads use R2 only and work after the container disappears. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these JSON archives.
+List and download these JSON batches directly from R2 using local tooling and the key prefix above. Uploaded batches remain available after the container disappears, subject to the bucket's retention policy. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these JSON archives.
 
 Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Successful `message.part.delta` forwarding is summarized in heartbeat counters and peak queue/RPC/total forwarding times instead of per-frame Worker logs. These counters and peaks reset when the DO is reconstructed. Failure and lifecycle records remain verbose, and wrapper archive logging is unchanged. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
 

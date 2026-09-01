@@ -225,7 +225,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
   return null;
 }
 
-registerControlLogRoutes(app, requireInternalApi);
+registerControlLogRoutes(app);
 
 app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);

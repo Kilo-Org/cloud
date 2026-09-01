@@ -5,7 +5,6 @@ import {
   CONTROL_LOG_MAX_BATCH_BYTES,
   controlLogBatchSchema,
   controlLogIdentitySchema,
-  controlLogSandboxIdSchema,
   controlLogWrapperIdSchema,
   type ControlLogIdentity,
 } from '../shared/control-diagnostics.js';
@@ -51,10 +50,7 @@ function routeIdentity(c: Context<HonoContext>) {
   });
 }
 
-export function registerControlLogRoutes(
-  app: Hono<HonoContext>,
-  requireInternalApi: (c: Context<HonoContext>) => Response | null
-): void {
+export function registerControlLogRoutes(app: Hono<HonoContext>): void {
   app.put('/sandbox-logs/:sandboxId/:allocationId/:wrapperInstanceId/:batchId', async c => {
     const identity = routeIdentity(c);
     const batchId = controlLogWrapperIdSchema.safeParse(c.req.param('batchId'));
@@ -105,60 +101,4 @@ export function registerControlLogRoutes(
     }
     return c.body(null, 204);
   });
-
-  app.get('/internal/sandbox-logs/:sandboxId', async c => {
-    const unauthorized = requireInternalApi(c);
-    if (unauthorized) return unauthorized;
-    const sandboxId = controlLogSandboxIdSchema.safeParse(c.req.param('sandboxId'));
-    const cursor = c.req.query('cursor');
-    if (!sandboxId.success || (cursor && cursor.length > 4096)) {
-      return c.text('Invalid log query', 400);
-    }
-    try {
-      const listed = await c.env.R2_BUCKET.list({
-        prefix: `logs/control/${encodeURIComponent(sandboxId.data)}/`,
-        limit: 100,
-        ...(cursor ? { cursor } : {}),
-        include: ['customMetadata'],
-      });
-      c.header('Cache-Control', 'no-store');
-      return c.json({
-        objects: listed.objects.map(object => ({
-          key: object.key,
-          size: object.size,
-          uploaded: object.uploaded.toISOString(),
-          sequence: object.customMetadata?.sequence,
-        })),
-        cursor: listed.truncated ? listed.cursor : null,
-      });
-    } catch {
-      return c.text('Log storage unavailable', 503);
-    }
-  });
-
-  app.get(
-    '/internal/sandbox-logs/:sandboxId/:allocationId/:wrapperInstanceId/:batchId',
-    async c => {
-      const unauthorized = requireInternalApi(c);
-      if (unauthorized) return unauthorized;
-      const identity = routeIdentity(c);
-      const batchId = controlLogWrapperIdSchema.safeParse(c.req.param('batchId'));
-      if (!identity.success || !batchId.success) return c.text('Invalid log identity', 400);
-      try {
-        const object = await c.env.R2_BUCKET.get(
-          `${archivePrefix(identity.data)}${batchId.data}.json`
-        );
-        if (!object) return c.text('Not found', 404);
-        return new Response(object.body, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store',
-            'X-Content-Type-Options': 'nosniff',
-          },
-        });
-      } catch {
-        return c.text('Log storage unavailable', 503);
-      }
-    }
-  );
 }

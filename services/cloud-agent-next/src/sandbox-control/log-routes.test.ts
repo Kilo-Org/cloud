@@ -22,35 +22,16 @@ const batch = {
 };
 
 function fixture() {
-  const objects = new Map<string, { body: string; sequence: string }>();
+  const objects = new Map<string, { body: string }>();
   const put = vi.fn(async (key: string, body: string, options: R2PutOptions) => {
     expect(options.onlyIf).toEqual({ etagDoesNotMatch: '*' });
     if (objects.has(key)) return null;
-    objects.set(key, { body, sequence: options.customMetadata?.sequence ?? '' });
+    objects.set(key, { body });
     return { key };
   });
-  const get = vi.fn(async (key: string) => {
-    const object = objects.get(key);
-    return object ? { body: new Response(object.body).body } : null;
-  });
-  const list = vi.fn(async (options: R2ListOptions) => ({
-    objects: [...objects]
-      .filter(([key]) => key.startsWith(options.prefix ?? ''))
-      .map(([key, value]) => ({
-        key,
-        size: value.body.length,
-        uploaded: new Date(1000),
-        customMetadata: { sequence: value.sequence },
-      })),
-    truncated: false,
-  }));
-  const env = { NEXTAUTH_SECRET: secret, R2_BUCKET: { put, get, list } } as unknown as Env;
+  const env = { NEXTAUTH_SECRET: secret, R2_BUCKET: { put } } as unknown as Env;
   const app = new Hono<HonoContext>();
-  registerControlLogRoutes(app, c =>
-    c.req.header('x-internal-api-key') === 'internal-secret'
-      ? null
-      : new Response('Unauthorized', { status: 401 })
-  );
+  registerControlLogRoutes(app);
   const request = (path: string, init?: RequestInit) =>
     app.request(`http://worker.test${path}`, init, env);
   const upload = (
@@ -63,27 +44,17 @@ function fixture() {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-  return { request, upload, objects, put, get, list };
+  return { request, upload, objects, put };
 }
 
 describe('control log routes', () => {
-  it('stores validated immutable batches and retrieves them without any provider or DO binding', async () => {
+  it('stores validated immutable batches without any provider or DO binding', async () => {
     const f = fixture();
     expect((await f.upload()).status).toBe(204);
     const key = `logs/control/${suffix}.json`;
     expect(JSON.parse(f.objects.get(key)!.body)).toEqual(batch);
     expect((await f.upload({ ...batch, sequence: 42 })).status).toBe(204);
     expect(JSON.parse(f.objects.get(key)!.body).sequence).toBe(0);
-    const response = await f.request(`/internal/sandbox-logs/${suffix}`, {
-      headers: { 'x-internal-api-key': 'internal-secret' },
-    });
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(await response.json()).toEqual(batch);
-    const listing = await f.request(`/internal/sandbox-logs/${identity.sandboxId}`, {
-      headers: { 'x-internal-api-key': 'internal-secret' },
-    });
-    expect(await listing.json()).toMatchObject({ objects: [{ key, sequence: '0' }], cursor: null });
   });
 
   it('rejects cross-allocation, cross-wrapper and cross-sandbox writes', async () => {
@@ -97,14 +68,10 @@ describe('control log routes', () => {
     expect(f.put).not.toHaveBeenCalled();
   });
 
-  it('rejects raw control credentials and unauthenticated retrieval', async () => {
+  it('rejects raw control credentials', async () => {
     const f = fixture();
     expect((await f.upload(batch, suffix, 'raw-control-credential')).status).toBe(401);
-    expect((await f.request(`/internal/sandbox-logs/${suffix}`)).status).toBe(401);
-    expect((await f.request(`/internal/sandbox-logs/${identity.sandboxId}`)).status).toBe(401);
     expect(f.put).not.toHaveBeenCalled();
-    expect(f.get).not.toHaveBeenCalled();
-    expect(f.list).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -180,7 +147,7 @@ describe('control log routes', () => {
     expect(f.put).not.toHaveBeenCalled();
   });
 
-  it('preserves earlier wrapper archives and forwards bounded pagination', async () => {
+  it('preserves earlier wrapper archives', async () => {
     const f = fixture();
     await f.upload();
     const nextIdentity = { ...identity, wrapperInstanceId: '2b6e33c0-20f8-4676-ad18-eedc478b161d' };
@@ -189,12 +156,6 @@ describe('control log routes', () => {
       (await f.upload(batch, nextPath, mintControlLogUploadGrant(nextIdentity, secret))).status
     ).toBe(204);
     expect(f.objects.size).toBe(2);
-    await f.request(`/internal/sandbox-logs/${identity.sandboxId}?cursor=next-page`, {
-      headers: { 'x-internal-api-key': 'internal-secret' },
-    });
-    expect(f.list).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 100, cursor: 'next-page' })
-    );
   });
 
   it('rejects archives, malformed JSON and path injection', async () => {
@@ -223,12 +184,5 @@ describe('control log routes', () => {
     const response = await f.upload();
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('private-secret');
-    expect(
-      (
-        await f.request(`/internal/sandbox-logs/${suffix}`, {
-          headers: { 'x-internal-api-key': 'internal-secret' },
-        })
-      ).status
-    ).toBe(404);
   });
 });

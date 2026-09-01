@@ -1539,18 +1539,20 @@ describe('server control log routes', () => {
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
   });
 
-  it('protects durable retrieval with the internal API secret', async () => {
-    const env = Object.assign(createEnv(), {
-      R2_BUCKET: { list: vi.fn().mockResolvedValue({ objects: [], truncated: false }) },
-    });
-    const url = 'http://worker.test/internal/sandbox-logs/sandbox_test';
-    expect((await fetchWorker(new Request(url), env)).status).toBe(401);
-    expect(env.R2_BUCKET.list).not.toHaveBeenCalled();
-    const response = await fetchWorker(
-      new Request(url, { headers: { 'x-internal-api-key': 'test-internal-secret' } }),
-      env
-    );
-    expect(response.status).toBe(200);
+  it('does not expose log archives over HTTP', async () => {
+    const env = createEnv();
+    for (const path of [
+      '/internal/sandbox-logs/sandbox_test',
+      '/internal/sandbox-logs/sandbox_test/allocation_test/0fce125c-54a3-4143-b503-b7775c4d2135/5886f962-cc33-43f7-bd94-a31c0ed6c13b',
+    ]) {
+      const response = await fetchWorker(
+        new Request(`http://worker.test${path}`, {
+          headers: { 'x-internal-api-key': 'test-internal-secret' },
+        }),
+        env
+      );
+      expect(response.status).toBe(404);
+    }
     expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
   });
 });

@@ -2575,8 +2575,13 @@ describe('control finalization and compact', () => {
         ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
         await waitForTasks(handlerDeps);
         const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
+        const branch = editRepository ? `session/${kilo.scopeId}` : 'work';
+        expect((await git(['branch', '--show-current'], workspace)).trim()).toBe(
+          `session/${kilo.scopeId}`
+        );
+        expect((await git(['rev-list', '--count', 'refs/heads/work'], remote)).trim()).toBe('1');
         if (editRepository) {
-          expect(await git(['show', 'refs/heads/work:result.txt'], remote)).toBe(
+          expect(await git(['show', `refs/heads/${branch}:result.txt`], remote)).toBe(
             'normal control turn'
           );
           expect((await git(['log', '-1', '--format=%an/%ae'], workspace)).trim()).toBe(
@@ -2591,9 +2596,9 @@ describe('control finalization and compact', () => {
           expect(committed).toMatchObject({ success: true, skipped: true });
         }
         expect(
-          (await git(['ls-tree', '-r', '--name-only', 'refs/heads/work'], remote)).trim()
+          (await git(['ls-tree', '-r', '--name-only', `refs/heads/${branch}`], remote)).trim()
         ).toBe(editRepository ? 'initial.txt\nresult.txt' : 'initial.txt');
-        expect((await git(['rev-list', '--count', 'refs/heads/work'], remote)).trim()).toBe(
+        expect((await git(['rev-list', '--count', `refs/heads/${branch}`], remote)).trim()).toBe(
           editRepository ? '2' : '1'
         );
         expect(await git(['status', '--porcelain'], workspace)).toBe('');

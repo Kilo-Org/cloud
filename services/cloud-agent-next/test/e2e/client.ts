@@ -302,7 +302,7 @@ export type WorktreeSessionResult = {
 
 export async function prepareBrowserSession(
   config: DriverConfig,
-  input: { prompt: string; operationKey?: string }
+  input: { prompt: string; operationKey?: string; autoCommit?: boolean }
 ): Promise<WorktreeSessionResult> {
   if (!config.internalApiSecret) {
     throw new Error('browser-equivalent prepareSession requires INTERNAL_API_SECRET');
@@ -320,7 +320,7 @@ export async function prepareBrowserSession(
       clientProvenance: 'browser',
       autoInitiate: true,
       operationKey: input.operationKey ?? randomUUID(),
-      autoCommit: true,
+      autoCommit: input.autoCommit ?? true,
       ...(config.kilocodeOrganizationId
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),

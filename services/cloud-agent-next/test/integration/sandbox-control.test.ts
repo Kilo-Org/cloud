@@ -9355,40 +9355,52 @@ describe('SandboxSession worktree admission', () => {
     vi.restoreAllMocks();
   });
 
-  it('preserves repository branches and exact providers while forcing grouped auto-commit off', async () => {
-    const ownerId = 'user_grouped_registration';
-    const sessionId = 'workspace_grouped_registration';
-    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
-
-    const metadata = await runInDurableObject(stub, async instance => {
-      const registered = await instance.registerSession(
-        groupedRegistration({
+  it.each([true, false, undefined])(
+    'preserves repository branches, exact providers, and grouped auto-commit %s on registration',
+    async autoCommit => {
+      const ownerId = 'user_grouped_registration';
+      const sessionId = 'workspace_grouped_registration';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      const registration = {
+        ...groupedRegistration({
           ownerId,
           sessionId,
           kiloSessionId: 'kilo_grouped_registration',
           sandboxId: 'ses-acde1234',
           provider: 'vercel',
-        })
-      );
-      expect(registered.success).toBe(true);
-      return instance.getMetadata();
-    });
+        }),
+        finalization: { autoCommit, condenseOnComplete: true },
+      };
 
-    expect(metadata).toMatchObject({
-      repository: {
-        type: 'github',
-        repo: 'Kilo-Org/cloud',
-        upstreamBranch: 'feature/shared-worktree',
-      },
-      workspace: {
-        sandboxId: 'ses-acde1234',
-        sandboxProvider: 'vercel',
-        workspacePath: '/workspace/shared',
-        worktreeId: WORKTREE_ID,
-      },
-      finalization: { autoCommit: false, condenseOnComplete: true },
-    });
-  });
+      const metadata = await runInDurableObject(stub, async instance => {
+        expect(await instance.registerSession(registration)).toEqual({ success: true });
+        const registered = await instance.getMetadata();
+        expect(
+          await instance.registerSession({
+            ...registration,
+            finalization: { autoCommit: !autoCommit, condenseOnComplete: false },
+          })
+        ).toEqual({ success: true });
+        expect(await instance.getMetadata()).toEqual(registered);
+        return registered;
+      });
+
+      expect(metadata).toMatchObject({
+        repository: {
+          type: 'github',
+          repo: 'Kilo-Org/cloud',
+          upstreamBranch: 'feature/shared-worktree',
+        },
+        workspace: {
+          sandboxId: 'ses-acde1234',
+          sandboxProvider: 'vercel',
+          workspacePath: '/workspace/shared',
+          worktreeId: WORKTREE_ID,
+        },
+        finalization: { autoCommit, condenseOnComplete: true },
+      });
+    }
+  );
 
   it('persists canonical prompt identity and attachments during registration-only creation', async () => {
     const ownerId = 'user_grouped_registered_prompt';
@@ -9447,94 +9459,98 @@ describe('SandboxSession worktree admission', () => {
     expect(metadata?.finalization?.autoCommit).toBe(true);
   });
 
-  it('forces grouped auto-commit off before first attach and prompt delivery', async () => {
-    const ownerId = 'user_grouped_initial';
-    const sessionId = GRANT_SESSION_ID;
-    const targetSandboxId = 'usr-abcdef123401';
-    const kiloSessionId = ROOT_ID;
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
-    await seedCredential(credential, targetSandboxId);
-    await runInDurableObject(control, async instance => {
-      await instance.initializeOwner(ownerId);
-      await seedRunningCloudflare(instance);
-    });
-    await installProvider(control, cloudflareRef(targetSandboxId));
-
-    const ws = await connect(credential, targetSandboxId);
-    await completeHello(ws, 'hello-grouped-initial', { wrapperInstanceId: crypto.randomUUID() });
-    await deliverWrapperEvent(control, 'sandbox.ready', {
-      kiloReady: true,
-      globalFeedAttached: true,
-    });
-
-    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
-    const incomingAttach = nextMessage(ws);
-    const initialTurn = {
-      type: 'prompt',
-      messageId: INITIAL_MESSAGE_ID,
-      prompt: 'first grouped turn',
-    } as const;
-    const admitted = await runInDurableObject(session, instance =>
-      instance.createSessionWithInitialAdmission({
-        ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
-        message: { initialTurn },
-      })
-    );
-    expect(admitted).toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
-
-    const attach = JSON.parse(await incomingAttach) as WrapperRequest;
-    expect(attach).toMatchObject({
-      operation: 'session.attach',
-      session: { sessionId, kiloSessionId, directory: '/workspace/shared' },
-      payload: { branch: 'feature/shared-worktree' },
-    });
-    await runInDurableObject(session, async (instance, state) => {
-      const metadata = await instance.getMetadata();
-      expect(metadata?.finalization?.autoCommit).toBe(false);
-      expect(metadata?.initialMessage).toEqual({
-        id: INITIAL_MESSAGE_ID,
-        prompt: 'first grouped turn',
-        turn: { type: 'prompt', prompt: 'first grouped turn' },
+  it.each([true, false, undefined])(
+    'resolves grouped auto-commit %s before first attach and prompt delivery',
+    async autoCommit => {
+      const ownerId = 'user_grouped_initial';
+      const sessionId = GRANT_SESSION_ID;
+      const targetSandboxId = 'usr-abcdef123401';
+      const kiloSessionId = ROOT_ID;
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+      await seedCredential(credential, targetSandboxId);
+      await runInDurableObject(control, async instance => {
+        await instance.initializeOwner(ownerId);
+        await seedRunningCloudflare(instance);
       });
-      expect(await state.storage.get('session_messages')).toEqual([
-        expect.objectContaining({
-          messageId: INITIAL_MESSAGE_ID,
-          intent: expect.objectContaining({
-            turn: {
-              type: 'prompt',
-              messageId: INITIAL_MESSAGE_ID,
-              prompt: 'first grouped turn',
-            },
-            agent: { mode: 'code', model: 'test-model' },
-            finalization: { autoCommit: false, condenseOnComplete: true },
-          }),
-        }),
-      ]);
-    });
-    await runInDurableObject(control, async instance => {
-      expect(await instance.listRoutes()).toEqual([
-        expect.objectContaining({ sessionId, kiloSessionId, worktreeId: WORKTREE_ID }),
-      ]);
-    });
+      await installProvider(control, cloudflareRef(targetSandboxId));
 
-    const incomingPrompt = nextMessage(ws);
-    respondToWrapperRequest(ws, attach, { attached: true });
-    const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
-    expect(prompt).toMatchObject({
-      operation: 'session.prompt',
-      session: { sessionId, kiloSessionId },
-      payload: {
+      const ws = await connect(credential, targetSandboxId);
+      await completeHello(ws, 'hello-grouped-initial', { wrapperInstanceId: crypto.randomUUID() });
+      await deliverWrapperEvent(control, 'sandbox.ready', {
+        kiloReady: true,
+        globalFeedAttached: true,
+      });
+
+      const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      const incomingAttach = nextMessage(ws);
+      const initialTurn = {
+        type: 'prompt',
         messageId: INITIAL_MESSAGE_ID,
-        finalization: { autoCommit: false, condenseOnComplete: true },
-      },
-    });
-    respondToWrapperRequest(ws, prompt, {
-      messageId: INITIAL_MESSAGE_ID,
-      status: 'accepted',
-    });
-    ws.close();
-  });
+        prompt: 'first grouped turn',
+      } as const;
+      const admitted = await runInDurableObject(session, instance =>
+        instance.createSessionWithInitialAdmission({
+          ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
+          finalization: { autoCommit, condenseOnComplete: true },
+          message: { initialTurn },
+        })
+      );
+      expect(admitted).toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
+
+      const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+      expect(attach).toMatchObject({
+        operation: 'session.attach',
+        session: { sessionId, kiloSessionId, directory: '/workspace/shared' },
+        payload: { branch: 'feature/shared-worktree' },
+      });
+      await runInDurableObject(session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        expect(metadata?.finalization?.autoCommit).toBe(autoCommit);
+        expect(metadata?.initialMessage).toEqual({
+          id: INITIAL_MESSAGE_ID,
+          prompt: 'first grouped turn',
+          turn: { type: 'prompt', prompt: 'first grouped turn' },
+        });
+        expect(await state.storage.get('session_messages')).toEqual([
+          expect.objectContaining({
+            messageId: INITIAL_MESSAGE_ID,
+            intent: expect.objectContaining({
+              turn: {
+                type: 'prompt',
+                messageId: INITIAL_MESSAGE_ID,
+                prompt: 'first grouped turn',
+              },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: { autoCommit: autoCommit ?? true, condenseOnComplete: true },
+            }),
+          }),
+        ]);
+      });
+      await runInDurableObject(control, async instance => {
+        expect(await instance.listRoutes()).toEqual([
+          expect.objectContaining({ sessionId, kiloSessionId, worktreeId: WORKTREE_ID }),
+        ]);
+      });
+
+      const incomingPrompt = nextMessage(ws);
+      respondToWrapperRequest(ws, attach, { attached: true });
+      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      expect(prompt).toMatchObject({
+        operation: 'session.prompt',
+        session: { sessionId, kiloSessionId },
+        payload: {
+          messageId: INITIAL_MESSAGE_ID,
+          finalization: { autoCommit: autoCommit ?? true, condenseOnComplete: true },
+        },
+      });
+      respondToWrapperRequest(ws, prompt, {
+        messageId: INITIAL_MESSAGE_ID,
+        status: 'accepted',
+      });
+      ws.close();
+    }
+  );
 
   it('persists and dispatches initial command turns with their agent and arguments', async () => {
     const ownerId = 'user_grouped_initial_command';
@@ -9590,7 +9606,7 @@ describe('SandboxSession worktree admission', () => {
           intent: {
             turn: initialTurn,
             agent: { mode: 'architect', model: 'kilo/command-model', variant: 'thinking' },
-            finalization: { autoCommit: false, condenseOnComplete: true },
+            finalization: { autoCommit: true, condenseOnComplete: true },
           },
         }),
       ]);
@@ -9600,6 +9616,14 @@ describe('SandboxSession worktree admission', () => {
           messageId: INITIAL_MESSAGE_ID,
         }
       );
+      for (const finalization of [{ autoCommit: false }, { condenseOnComplete: false }]) {
+        await expect(
+          instance.createSessionWithInitialAdmission({ ...registration, finalization })
+        ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+      }
+      await expect(
+        instance.createSessionWithInitialAdmission({ ...registration, finalization: undefined })
+      ).resolves.toMatchObject({ success: true, messageId: INITIAL_MESSAGE_ID });
       await expect(
         instance.createSessionWithInitialAdmission({
           ...registration,
@@ -9623,7 +9647,7 @@ describe('SandboxSession worktree admission', () => {
         messageId: INITIAL_MESSAGE_ID,
         turn: { type: 'command', command: 'compact', arguments: '--aggressive' },
         agent: { mode: 'architect', model: 'command-model', variant: 'thinking' },
-        finalization: { autoCommit: false, condenseOnComplete: true },
+        finalization: { autoCommit: true, condenseOnComplete: true },
       },
     });
     respondToWrapperRequest(wrapper, command, {
@@ -9699,7 +9723,7 @@ describe('SandboxSession worktree admission', () => {
               attachments,
             },
             agent: { mode: 'debug', model: 'kilo/override-model', variant: 'focused' },
-            finalization: { autoCommit: false, condenseOnComplete: false },
+            finalization: { autoCommit: true, condenseOnComplete: false },
           },
         }),
       ]);
@@ -9722,7 +9746,7 @@ describe('SandboxSession worktree admission', () => {
         messageId: INITIAL_MESSAGE_ID,
         turn: { type: 'prompt', prompt: 'review the document' },
         agent: { mode: 'debug', model: 'override-model', variant: 'focused' },
-        finalization: { autoCommit: false, condenseOnComplete: false },
+        finalization: { autoCommit: true, condenseOnComplete: false },
       },
     });
     expect(prompt.payload.attachments).toHaveLength(1);
@@ -9850,110 +9874,234 @@ describe('SandboxSession worktree admission', () => {
     });
   });
 
-  it('overrides a submitted grouped turn that requests auto-commit', async () => {
-    const ownerId = 'user_grouped_followup';
-    const sessionId = 'workspace_grouped_followup';
-    const targetSandboxId = 'usr-abcdef123402';
-    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
-    await runInDurableObject(control, async instance => {
-      await instance.initializeOwner(ownerId);
-      await instance.claimCreate('grouped-followup-intent');
-    });
-    const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+  it.each([
+    { persistedAutoCommit: true, inheritedAutoCommit: true },
+    { persistedAutoCommit: false, inheritedAutoCommit: false },
+    { persistedAutoCommit: undefined, inheritedAutoCommit: true },
+  ])(
+    'inherits grouped auto-commit $persistedAutoCommit and permits explicit new-turn overrides',
+    async ({ persistedAutoCommit, inheritedAutoCommit }) => {
+      const ownerId = 'user_grouped_followup';
+      const sessionId = 'workspace_grouped_followup';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
 
-    await runInDurableObject(stub, async (instance, state) => {
-      await instance.registerSession(
-        groupedRegistration({
-          ownerId,
-          sessionId,
-          kiloSessionId: 'kilo_grouped_followup',
-          sandboxId: targetSandboxId,
-        })
-      );
-      const staleMetadata = await instance.getMetadata();
-      if (!staleMetadata) throw new Error('Expected grouped session metadata');
-      await state.storage.put('session_metadata', {
-        ...staleMetadata,
-        finalization: { ...staleMetadata.finalization, autoCommit: true },
-      });
-      const admitted = await instance.admitSubmittedMessage({
-        userId: ownerId,
-        turn: { type: 'prompt', id: 'msg_grouped_followup', prompt: 'follow-up' },
-        finalization: { autoCommit: true, condenseOnComplete: false },
-      });
-      expect(admitted).toMatchObject({ success: true, messageId: 'msg_grouped_followup' });
-      expect(await state.storage.get('session_messages')).toEqual([
-        expect.objectContaining({
-          messageId: 'msg_grouped_followup',
-          intent: expect.objectContaining({
-            finalization: { autoCommit: false, condenseOnComplete: false },
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId: 'kilo_grouped_followup',
+            sandboxId: 'usr-abcdef123402',
           }),
-        }),
-      ]);
-      expect((await instance.getMetadata())?.finalization?.autoCommit).toBe(false);
-    });
-  });
+          finalization: { autoCommit: persistedAutoCommit, condenseOnComplete: true },
+        });
+        const metadata = await instance.getMetadata();
+        const blocker: SessionMessageRecord = {
+          messageId: 'msg_blocker',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+        };
+        state.storage.kv.put('session_messages', [blocker]);
+        const submissions = [
+          { finalization: undefined, autoCommit: inheritedAutoCommit, condenseOnComplete: true },
+          {
+            finalization: { autoCommit: undefined },
+            autoCommit: inheritedAutoCommit,
+            condenseOnComplete: true,
+          },
+          {
+            finalization: { condenseOnComplete: false },
+            autoCommit: inheritedAutoCommit,
+            condenseOnComplete: false,
+          },
+          { finalization: { autoCommit: true }, autoCommit: true, condenseOnComplete: true },
+          { finalization: { autoCommit: false }, autoCommit: false, condenseOnComplete: true },
+        ];
+        const expectedMessages: SessionMessageRecord[] = [blocker];
+        for (const [index, submission] of submissions.entries()) {
+          const messageId = `msg_grouped_followup_${index}`;
+          await expect(
+            instance.admitSubmittedMessage({
+              userId: ownerId,
+              turn: { type: 'prompt', id: messageId, prompt: 'follow-up' },
+              finalization: submission.finalization,
+            })
+          ).resolves.toMatchObject({ success: true, messageId });
+          expectedMessages.push(
+            createSessionMessageRecord({
+              turn: { type: 'prompt', messageId, prompt: 'follow-up' },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: {
+                autoCommit: submission.autoCommit,
+                condenseOnComplete: submission.condenseOnComplete,
+              },
+            })
+          );
+          expect(state.storage.kv.get('session_messages')).toEqual(expectedMessages);
+          expect(await instance.getMetadata()).toEqual(metadata);
+        }
+      });
+    }
+  );
 
-  it('dispatches older prompt-only queue records with their stored finalization fallback', async () => {
-    const ownerId = 'user_grouped_legacy_record';
-    const sessionId = GRANT_SESSION_ID;
-    const targetSandboxId = 'usr-abcdef123414';
-    const kiloSessionId = ROOT_ID;
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
-    await seedCredential(credential, targetSandboxId);
-    await runInDurableObject(control, async instance => {
-      await instance.initializeOwner(ownerId);
-      await seedRunningCloudflare(instance);
-    });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+  it.each([
+    { state: 'queued', autoCommit: true },
+    { state: 'queued', autoCommit: false },
+    { state: 'accepted', autoCommit: true },
+    { state: 'accepted', autoCommit: false },
+  ] as const)(
+    'validates $state replays against frozen auto-commit $autoCommit rather than current metadata',
+    async ({ state: messageState, autoCommit }) => {
+      const ownerId = 'user_grouped_replay';
+      const sessionId = 'workspace_grouped_replay';
+      const stub = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
 
-    const wrapper = await connect(credential, targetSandboxId);
-    await completeHello(wrapper, 'hello-grouped-legacy-record', {
-      wrapperInstanceId: crypto.randomUUID(),
-    });
-    await deliverWrapperEvent(control, 'sandbox.ready', {
-      kiloReady: true,
-      globalFeedAttached: true,
-    });
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({
+            ownerId,
+            sessionId,
+            kiloSessionId: 'kilo_grouped_replay',
+            sandboxId: 'usr-abcdef123402',
+          }),
+          finalization: { autoCommit: !autoCommit, condenseOnComplete: false },
+        });
+        const metadata = await instance.getMetadata();
+        const messageId = 'msg_grouped_replay';
+        const messages: SessionMessageRecord[] = [
+          ...(messageState === 'queued'
+            ? [{ messageId: 'msg_blocker', state: 'accepted' as const, acceptedAt: Date.now() }]
+            : []),
+          {
+            ...createSessionMessageRecord({
+              turn: { type: 'prompt', messageId, prompt: 'frozen turn' },
+              agent: { mode: 'code', model: 'test-model' },
+              finalization: { autoCommit, condenseOnComplete: true },
+            }),
+            state: messageState,
+            ...(messageState === 'accepted' ? { acceptedAt: Date.now() } : {}),
+          },
+        ];
+        state.storage.kv.put('session_messages', messages);
+        const request: SubmittedSessionMessageRequest = {
+          userId: ownerId,
+          turn: { type: 'prompt', id: messageId, prompt: 'frozen turn' },
+        };
+        for (const finalization of [
+          undefined,
+          { autoCommit: undefined },
+          { autoCommit, condenseOnComplete: true },
+        ]) {
+          await expect(
+            instance.admitSubmittedMessage({ ...request, finalization })
+          ).resolves.toMatchObject({ success: true, messageId });
+        }
+        for (const finalization of [{ autoCommit: !autoCommit }, { condenseOnComplete: false }]) {
+          await expect(
+            instance.admitSubmittedMessage({ ...request, finalization })
+          ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+        }
+        expect(state.storage.kv.get('session_messages')).toEqual(messages);
+        expect(await instance.getMetadata()).toEqual(metadata);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+      });
+    }
+  );
 
-    const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
-    await runInDurableObject(session, async (instance, state) => {
-      await instance.registerSession(
-        groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId })
-      );
-      await state.storage.put('session_messages', [
-        {
-          messageId: 'msg_legacy_record',
-          state: 'queued',
-          prompt: 'recover an older prompt',
-          finalization: { autoCommit: true, condenseOnComplete: false },
-        },
-      ]);
-    });
+  it.each([
+    { format: 'legacy', stored: true, persisted: false, expected: true },
+    { format: 'legacy', stored: false, persisted: true, expected: false },
+    { format: 'legacy', stored: undefined, persisted: false, expected: false },
+    { format: 'legacy', stored: undefined, persisted: true, expected: true },
+    { format: 'frozen', stored: true, persisted: false, expected: true },
+    { format: 'frozen', stored: false, persisted: true, expected: false },
+  ] as const)(
+    'dispatches $format queued auto-commit $stored with persisted $persisted without changing the frozen intent',
+    async ({ format, stored, persisted, expected }) => {
+      const ownerId = 'user_grouped_legacy_record';
+      const sessionId = GRANT_SESSION_ID;
+      const targetSandboxId = 'usr-abcdef123414';
+      const kiloSessionId = ROOT_ID;
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
+      await seedCredential(credential, targetSandboxId);
+      await runInDurableObject(control, async instance => {
+        await instance.initializeOwner(ownerId);
+        await seedRunningCloudflare(instance);
+      });
+      await installProvider(control, cloudflareRef(targetSandboxId));
 
-    const incomingAttach = nextMessage(wrapper);
-    const dispatched = runInDurableObject(session, instance => instance.alarm());
-    const attach = JSON.parse(await incomingAttach) as WrapperRequest;
-    const incomingPrompt = nextMessage(wrapper);
-    respondToWrapperRequest(wrapper, attach, { attached: true });
-    const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
-    expect(prompt).toMatchObject({
-      operation: 'session.prompt',
-      payload: {
-        messageId: 'msg_legacy_record',
-        turn: { type: 'prompt', prompt: 'recover an older prompt' },
+      const wrapper = await connect(credential, targetSandboxId);
+      await completeHello(wrapper, 'hello-grouped-legacy-record', {
+        wrapperInstanceId: crypto.randomUUID(),
+      });
+      await deliverWrapperEvent(control, 'sandbox.ready', {
+        kiloReady: true,
+        globalFeedAttached: true,
+      });
+
+      const messageId = 'msg_legacy_record';
+      const finalization = {
+        ...(stored !== undefined ? { autoCommit: stored } : {}),
+        condenseOnComplete: false,
+      };
+      const frozen = createSessionMessageRecord({
+        turn: { type: 'prompt', messageId, prompt: 'recover an older prompt' },
         agent: { mode: 'code', model: 'test-model' },
-        finalization: { autoCommit: false, condenseOnComplete: false },
-      },
-    });
-    respondToWrapperRequest(wrapper, prompt, {
-      messageId: 'msg_legacy_record',
-      status: 'accepted',
-    });
-    await expect(dispatched).resolves.toBeUndefined();
-    wrapper.close();
-  });
+        finalization: { autoCommit: expected, condenseOnComplete: false },
+      });
+      const session = env.SANDBOX_SESSION.getByName(`${ownerId}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          ...groupedRegistration({ ownerId, sessionId, kiloSessionId, sandboxId: targetSandboxId }),
+          finalization: { autoCommit: persisted, condenseOnComplete: true },
+        });
+        state.storage.kv.put('session_messages', [
+          format === 'frozen'
+            ? frozen
+            : { messageId, state: 'queued', prompt: 'recover an older prompt', finalization },
+        ] satisfies SessionMessageRecord[]);
+      });
+
+      const incomingAttach = nextMessage(wrapper);
+      const dispatched = runInDurableObject(session, instance => instance.alarm());
+      const attach = JSON.parse(await incomingAttach) as WrapperRequest;
+      await runInDurableObject(session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Expected grouped session metadata');
+        expect(metadata.finalization).toEqual({ autoCommit: persisted, condenseOnComplete: true });
+        expect(state.storage.kv.get('session_messages')).toEqual([expect.objectContaining(frozen)]);
+        state.storage.kv.put('session_metadata', {
+          ...metadata,
+          finalization: { autoCommit: !expected, condenseOnComplete: true },
+        });
+      });
+      const incomingPrompt = nextMessage(wrapper);
+      respondToWrapperRequest(wrapper, attach, { attached: true });
+      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      expect(prompt).toMatchObject({
+        operation: 'session.prompt',
+        payload: {
+          messageId,
+          turn: { type: 'prompt', prompt: 'recover an older prompt' },
+          agent: frozen.intent.agent,
+          finalization: frozen.intent.finalization,
+        },
+      });
+      respondToWrapperRequest(wrapper, prompt, { messageId, status: 'accepted' });
+      await expect(dispatched).resolves.toBeUndefined();
+      await runInDurableObject(session, async (instance, state) => {
+        expect(state.storage.kv.get('session_messages')).toEqual([
+          expect.objectContaining({ ...frozen, state: 'accepted' }),
+        ]);
+        expect((await instance.getMetadata())?.finalization).toEqual({
+          autoCommit: !expected,
+          condenseOnComplete: true,
+        });
+      });
+      wrapper.close();
+    }
+  );
 });
 
 describe('SandboxSession durable message lifecycle', () => {

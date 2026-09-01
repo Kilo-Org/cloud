@@ -150,6 +150,185 @@ const noFs = {
 };
 
 describe('applySessionAttach', () => {
+  describe('working branches', () => {
+    let repository: string;
+    let directory: string;
+    let deps: ApplyAttachDeps;
+    const payload = { kilo, git: { url: 'https://github.com/acme/demo.git' } };
+    const runGit = (args: string[], cwd: string) =>
+      runProcess('git', args, {
+        cwd,
+        env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+      });
+    const currentBranch = async () =>
+      (await runGit(['branch', '--show-current'], directory)).stdout.trim();
+
+    beforeEach(async () => {
+      repository = path.join(homeRoot, 'repository');
+      directory = path.join(homeRoot, 'checkout');
+      fs.mkdirSync(repository);
+      expect((await runGit(['init', '--initial-branch=main'], repository)).exitCode).toBe(0);
+      expect(
+        (
+          await runGit(
+            [
+              '-c',
+              'user.name=Test',
+              '-c',
+              'user.email=test@example.com',
+              'commit',
+              '--allow-empty',
+              '-m',
+              'Initial commit',
+            ],
+            repository
+          )
+        ).exitCode
+      ).toBe(0);
+      expect((await runGit(['branch', 'feature/existing'], repository)).exitCode).toBe(0);
+      deps = {
+        kiloRuntimes: fakeKiloRuntimes(),
+        sessionExists: async () => true,
+        runGit: (args, cwd, signal) =>
+          runProcess('git', args[0] === 'clone' ? ['clone', repository, args[2]] : args, {
+            cwd,
+            signal,
+            env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+          }),
+      };
+    });
+
+    it('creates a stable working branch before setup when no branch was requested', async () => {
+      const setupBranches: string[] = [];
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, setupCommands: ['prepare'] },
+        {
+          ...deps,
+          runSetup: async () => {
+            setupBranches.push(await currentBranch());
+            return { stdout: '', stderr: '', exitCode: 0 };
+          },
+        }
+      );
+      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(await currentBranch()).toBe('session/worktree_a');
+      expect(setupBranches).toEqual(['session/worktree_a']);
+    });
+
+    it.each(['main', 'feature/existing'])(
+      'honors the explicitly requested branch %s',
+      async branch => {
+        const result = await applySessionAttach(
+          { ...session, directory },
+          { ...payload, branch },
+          deps
+        );
+        expect(result).toEqual({ ok: true, result: { attached: true } });
+        expect(await currentBranch()).toBe(branch);
+      }
+    );
+
+    it('fails preparation rather than falling back to main for a missing requested branch', async () => {
+      let setupRan = false;
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch: 'missing', setupCommands: ['prepare'] },
+        {
+          ...deps,
+          runSetup: async () => {
+            setupRan = true;
+            return { stdout: '', stderr: '', exitCode: 0 };
+          },
+        }
+      );
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
+      });
+      expect(setupRan).toBe(false);
+    });
+
+    it('preserves generated-branch commits when retrying failed setup', async () => {
+      let setupRuns = 0;
+      let commit = '';
+      const retryDeps: ApplyAttachDeps = {
+        ...deps,
+        runSetup: async () => {
+          setupRuns += 1;
+          if (setupRuns === 1) {
+            expect(
+              (await runGit(['commit', '--allow-empty', '-m', 'Setup work'], directory)).exitCode
+            ).toBe(0);
+            commit = (await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim();
+          }
+          return { stdout: '', stderr: '', exitCode: setupRuns === 1 ? 1 : 0 };
+        },
+      };
+      const attach = () =>
+        applySessionAttach(
+          { ...session, directory },
+          { ...payload, setupCommands: ['prepare'] },
+          retryDeps
+        );
+      expect((await attach()).ok).toBe(false);
+      expect((await attach()).ok).toBe(true);
+      expect(await currentBranch()).toBe('session/worktree_a');
+      expect((await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim()).toBe(commit);
+    });
+
+    it('does not switch a warm sibling away from a user-selected branch or discard edits', async () => {
+      expect((await applySessionAttach({ ...session, directory }, payload, deps)).ok).toBe(true);
+      expect((await runGit(['checkout', '-b', 'user-selected'], directory)).exitCode).toBe(0);
+      fs.writeFileSync(path.join(directory, 'work.txt'), 'shared work');
+      expect((await applySessionAttach({ ...siblingSession, directory }, payload, deps)).ok).toBe(
+        true
+      );
+      expect(await currentBranch()).toBe('user-selected');
+      expect(fs.readFileSync(path.join(directory, 'work.txt'), 'utf8')).toBe('shared work');
+    });
+
+    it('restores pushed working-branch commits when a sibling bootstraps a replacement checkout', async () => {
+      expect((await applySessionAttach({ ...session, directory }, payload, deps)).ok).toBe(true);
+      fs.writeFileSync(path.join(directory, 'saved.txt'), 'committed shared work');
+      expect((await runGit(['add', 'saved.txt'], directory)).exitCode).toBe(0);
+      expect((await runGit(['commit', '-m', 'Save shared work'], directory)).exitCode).toBe(0);
+      expect(
+        (await runGit(['push', '-u', 'origin', 'session/worktree_a'], directory)).exitCode
+      ).toBe(0);
+      const commit = (await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim();
+
+      directory = path.join(homeRoot, 'replacement');
+      expect((await applySessionAttach({ ...siblingSession, directory }, payload, deps)).ok).toBe(
+        true
+      );
+      expect(await currentBranch()).toBe('session/worktree_a');
+      expect((await runGit(['rev-parse', 'HEAD'], directory)).stdout.trim()).toBe(commit);
+      expect(
+        (
+          await runGit(
+            ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+            directory
+          )
+        ).stdout.trim()
+      ).toBe('origin/session/worktree_a');
+      expect(fs.readFileSync(path.join(directory, 'saved.txt'), 'utf8')).toBe(
+        'committed shared work'
+      );
+    });
+
+    it('uses the same working branch when a sibling bootstraps a replacement checkout', async () => {
+      expect((await applySessionAttach({ ...session, directory }, payload, deps)).ok).toBe(true);
+      const branch = await currentBranch();
+      directory = path.join(homeRoot, 'replacement');
+      expect((await applySessionAttach({ ...siblingSession, directory }, payload, deps)).ok).toBe(
+        true
+      );
+      expect(await currentBranch()).toBe('session/worktree_a');
+      expect(await currentBranch()).toBe(branch);
+    });
+  });
+
   it('reuses setup-only workspaces without writing bootstrap state into their content', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'control-bootstrap-'));
     const directory = path.join(root, 'workspace');
@@ -274,6 +453,8 @@ describe('applySessionAttach', () => {
     );
     expect(result.ok).toBe(true);
     expect(gitCalls).toEqual([
+      ['show-ref', '--verify', '--quiet', 'refs/heads/session/worktree_a'],
+      ['checkout', 'session/worktree_a'],
       ['config', 'user.name', 'Kilo Code Cloud'],
       ['config', 'user.email', 'agent@kilocode.ai'],
     ]);
@@ -417,99 +598,108 @@ describe('applySessionAttach', () => {
     expect(setupCalls).toEqual([]);
   });
 
-  it('serializes sibling cold clone/setup but allows their Kilo restores to run independently', async () => {
-    const cloneStarted = Promise.withResolvers<void>();
-    const releaseClone = Promise.withResolvers<void>();
-    const setupStarted = Promise.withResolvers<void>();
-    const releaseSetup = Promise.withResolvers<void>();
-    const bothRestoring = Promise.withResolvers<void>();
-    const releaseRestore = Promise.withResolvers<void>();
-    let gitExists = false;
-    let bootstrapComplete = false;
-    let markerWrites = 0;
-    const gitOperations: string[] = [];
-    const setupCommands: string[] = [];
-    const restoredRoots: string[] = [];
-    const payload = {
-      kilo,
-      git: { url: 'https://github.com/acme/demo.git' },
-      branch: 'main',
-      setupCommands: ['prepare'],
-    };
-    const deps: ApplyAttachDeps = {
-      kiloRuntimes: fakeKiloRuntimes(),
-      mkdir: async () => {},
-      hasGit: async () => gitExists,
-      hasBootstrapMarker: async () => bootstrapComplete,
-      writeBootstrapMarker: async () => {
-        markerWrites += 1;
-        bootstrapComplete = true;
-      },
-      runGit: async args => {
-        gitOperations.push(args[0]);
-        if (args[0] === 'clone') {
-          cloneStarted.resolve();
-          await releaseClone.promise;
-          gitExists = true;
-        }
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      runSetup: async command => {
-        setupCommands.push(command);
-        setupStarted.resolve();
-        await releaseSetup.promise;
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      sessionExists: async () => false,
-      restoreSession: async id => {
-        restoredRoots.push(id);
-        if (restoredRoots.length === 2) bothRestoring.resolve();
-        await releaseRestore.promise;
-        return {
-          ok: true,
-          downloaded: true,
-          imported: true,
-          diffs: { applied: 0, skipped: 0, total: 0 },
-        };
-      },
-    };
-    const attaches = [applySessionAttach(session, payload, deps)];
-    try {
-      await cloneStarted.promise;
-      attaches.push(
-        applySessionAttach(
-          { ...session, sessionId: 'workspace_2', kiloSessionId: 'kilo_2' },
-          payload,
-          deps
-        )
-      );
-      await Bun.sleep(0);
-      expect(gitOperations).toEqual(['clone']);
-      releaseClone.resolve();
-      await setupStarted.promise;
-      await Bun.sleep(0);
-      expect(gitOperations).toEqual(['clone', 'checkout', 'config', 'config']);
-      expect(setupCommands).toEqual(['prepare']);
-      releaseSetup.resolve();
-      await withTimeoutAndAbort(bothRestoring.promise, {
-        timeoutMs: 1_000,
-        timeoutMessage: 'Sibling restore was serialized with workspace preparation',
-        abortMessage: 'Sibling restore cancelled',
-      });
-      releaseRestore.resolve();
-      expect(await Promise.all(attaches)).toEqual([
-        { ok: true, result: { attached: true } },
-        { ok: true, result: { attached: true } },
-      ]);
-      expect(markerWrites).toBe(1);
-      expect(restoredRoots.sort()).toEqual(['kilo_1', 'kilo_2']);
-    } finally {
-      releaseClone.resolve();
-      releaseSetup.resolve();
-      releaseRestore.resolve();
-      await Promise.allSettled(attaches);
+  it.each([undefined, 'main'])(
+    'serializes sibling cold clone/setup but allows independent Kilo restores (branch: %s)',
+    async branch => {
+      const cloneStarted = Promise.withResolvers<void>();
+      const releaseClone = Promise.withResolvers<void>();
+      const setupStarted = Promise.withResolvers<void>();
+      const releaseSetup = Promise.withResolvers<void>();
+      const bothRestoring = Promise.withResolvers<void>();
+      const releaseRestore = Promise.withResolvers<void>();
+      let gitExists = false;
+      let bootstrapComplete = false;
+      let markerWrites = 0;
+      const gitOperations: string[] = [];
+      const setupCommands: string[] = [];
+      const restoredRoots: string[] = [];
+      const payload = {
+        kilo,
+        git: { url: 'https://github.com/acme/demo.git' },
+        branch,
+        setupCommands: ['prepare'],
+      };
+      const deps: ApplyAttachDeps = {
+        kiloRuntimes: fakeKiloRuntimes(),
+        mkdir: async () => {},
+        hasGit: async () => gitExists,
+        hasBootstrapMarker: async () => bootstrapComplete,
+        writeBootstrapMarker: async () => {
+          markerWrites += 1;
+          bootstrapComplete = true;
+        },
+        runGit: async args => {
+          gitOperations.push(args[0]);
+          if (args[0] === 'clone') {
+            cloneStarted.resolve();
+            await releaseClone.promise;
+            gitExists = true;
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runSetup: async command => {
+          setupCommands.push(command);
+          setupStarted.resolve();
+          await releaseSetup.promise;
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        sessionExists: async () => false,
+        restoreSession: async id => {
+          restoredRoots.push(id);
+          if (restoredRoots.length === 2) bothRestoring.resolve();
+          await releaseRestore.promise;
+          return {
+            ok: true,
+            downloaded: true,
+            imported: true,
+            diffs: { applied: 0, skipped: 0, total: 0 },
+          };
+        },
+      };
+      const attaches = [applySessionAttach(session, payload, deps)];
+      try {
+        await cloneStarted.promise;
+        attaches.push(
+          applySessionAttach(
+            { ...session, sessionId: 'workspace_2', kiloSessionId: 'kilo_2' },
+            payload,
+            deps
+          )
+        );
+        await Bun.sleep(0);
+        expect(gitOperations).toEqual(['clone']);
+        releaseClone.resolve();
+        await setupStarted.promise;
+        await Bun.sleep(0);
+        expect(gitOperations).toEqual([
+          'clone',
+          ...(branch ? [] : ['show-ref']),
+          'checkout',
+          'config',
+          'config',
+        ]);
+        expect(setupCommands).toEqual(['prepare']);
+        releaseSetup.resolve();
+        await withTimeoutAndAbort(bothRestoring.promise, {
+          timeoutMs: 1_000,
+          timeoutMessage: 'Sibling restore was serialized with workspace preparation',
+          abortMessage: 'Sibling restore cancelled',
+        });
+        releaseRestore.resolve();
+        expect(await Promise.all(attaches)).toEqual([
+          { ok: true, result: { attached: true } },
+          { ok: true, result: { attached: true } },
+        ]);
+        expect(markerWrites).toBe(1);
+        expect(restoredRoots.sort()).toEqual(['kilo_1', 'kilo_2']);
+      } finally {
+        releaseClone.resolve();
+        releaseSetup.resolve();
+        releaseRestore.resolve();
+        await Promise.allSettled(attaches);
+      }
     }
-  });
+  );
 
   it('releases failed cold setup so a waiting sibling can retry and warm attaches skip it', async () => {
     const started = Promise.withResolvers<void>();

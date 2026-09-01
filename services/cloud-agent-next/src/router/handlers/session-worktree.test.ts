@@ -131,7 +131,7 @@ function sourceMetadata(options?: {
     },
     agent: { mode: 'code', model: 'test-model', appendSystemPrompt: 'Stay focused' },
     profile: { envVars: { PROFILE_SETTING: 'preserved' }, setupCommands: ['pnpm install'] },
-    finalization: { autoCommit: false, condenseOnComplete: true },
+    finalization: { autoCommit: true, condenseOnComplete: true },
     workspace: {
       sandboxId: SHARED_SANDBOX_ID,
       sandboxProvider: 'cloudflare',
@@ -182,7 +182,6 @@ function destinationMetadata(source: SessionMetadata): SessionMetadata {
     auth: { kiloSessionId: DESTINATION_KILO_SESSION_ID, kilocodeToken: CURRENT_AUTH_TOKEN },
     ...(repository ? { repository } : {}),
     workspace,
-    finalization: { ...source.finalization, autoCommit: false },
   };
 }
 
@@ -498,13 +497,6 @@ describe('createWorktreeChat request validation and authorization', () => {
       }),
     ],
     [
-      'enabled auto-commit',
-      (metadata: SessionMetadata) => ({
-        ...metadata,
-        finalization: { ...metadata.finalization, autoCommit: true },
-      }),
-    ],
-    [
       'repository mismatch',
       (metadata: SessionMetadata) => ({
         ...metadata,
@@ -529,6 +521,20 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it.each([
+    { autoCommit: true, condenseOnComplete: true },
+    { autoCommit: false, condenseOnComplete: true },
+    { condenseOnComplete: true },
+    undefined,
+  ])('inherits source finalization without coercion: %j', async finalization => {
+    const metadata = { ...sourceMetadata(), finalization };
+    const { caller, input, destinationStub } = fixture({ metadata });
+
+    await caller.createWorktreeChat(input);
+
+    expect(destinationStub.registerSession.mock.calls[0]?.[0]?.finalization).toEqual(finalization);
+  });
+
   it('records canonical IDs and source routing while new worktree creation is disabled', async () => {
     const {
       caller,
@@ -615,7 +621,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       },
       workspace: metadata.workspace,
       profile: metadata.profile,
-      finalization: { autoCommit: false, condenseOnComplete: true },
+      finalization: { autoCommit: true, condenseOnComplete: true },
     });
     expect(sandboxSessionNamespace.idFromName).toHaveBeenCalledWith(
       `${USER_ID}:${DESTINATION_WORKSPACE_ID}`
@@ -797,41 +803,48 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
   });
 
-  it('keeps ambiguous registration ownership and reconciles existing metadata on the same-key retry', async () => {
-    const { caller, input, metadata, destinationStub } = fixture({
-      ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
-    });
-    destinationStub.registerSession.mockRejectedValueOnce(
-      new Error('registration outcome unknown')
-    );
+  it.each([true, false, undefined])(
+    'reconciles ambiguous registration without changing stored autoCommit=%s',
+    async autoCommit => {
+      const { caller, input, metadata, destinationStub } = fixture({
+        ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
+      });
+      destinationStub.registerSession.mockRejectedValueOnce(
+        new Error('registration outcome unknown')
+      );
 
-    await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration outcome unknown');
-    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.anything(), {
-      rowId: LEDGER_ROW_ID,
-    });
-    expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
-    expect(settleOperationMock).not.toHaveBeenCalled();
+      await expect(caller.createWorktreeChat(input)).rejects.toThrow(
+        'registration outcome unknown'
+      );
+      expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.anything(), {
+        rowId: LEDGER_ROW_ID,
+      });
+      expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
+      expect(settleOperationMock).not.toHaveBeenCalled();
 
-    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_reconcile_pending',
-      row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
-    });
-    destinationStub.getMetadata.mockResolvedValueOnce(destinationMetadata(metadata));
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+      });
+      const registered = destinationMetadata(metadata);
+      registered.finalization = { ...registered.finalization, autoCommit };
+      destinationStub.getMetadata.mockResolvedValueOnce(registered);
 
-    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
-      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
-      kiloSessionId: DESTINATION_KILO_SESSION_ID,
-      worktreeId: WORKTREE_ID,
-      replayed: true,
-    });
-    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
-    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
-    expect(settleOperationMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ status: 'completed' })
-    );
-  });
+      await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+        cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+        kiloSessionId: DESTINATION_KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
+        replayed: true,
+      });
+      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(settleOperationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: 'completed' })
+      );
+    }
+  );
 
   it('reads committed metadata before retrying a retryable registration transport failure', async () => {
     const { caller, input, metadata, destinationStub } = fixture();

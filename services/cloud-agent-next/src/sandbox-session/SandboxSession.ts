@@ -843,19 +843,18 @@ export class SandboxSession extends DurableObject<Env> {
       : undefined;
     const existing = this.terminalLifecycle.getStoredMetadata();
     if (existing) {
-      const metadata = this.enforceGroupedFinalization(existing);
       try {
-        validateControlSessionOptions(metadata);
+        validateControlSessionOptions(existing);
       } catch (error) {
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unsupported session options',
         };
       }
-      if (initialMessage && !metadata.initialMessage) {
+      if (initialMessage && !existing.initialMessage) {
         this.ctx.storage.kv.put(
           METADATA_KEY,
-          serializeSessionMetadata({ ...metadata, initialMessage })
+          serializeSessionMetadata({ ...existing, initialMessage })
         );
       }
       return { success: true };
@@ -877,9 +876,6 @@ export class SandboxSession extends DurableObject<Env> {
             upstreamBranch: input.repository.upstreamBranch ?? input.repository.branch,
           }
         : input.repository;
-    const finalization = input.workspace?.worktreeId
-      ? { ...input.finalization, autoCommit: false }
-      : input.finalization;
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: input.identity,
@@ -890,7 +886,7 @@ export class SandboxSession extends DurableObject<Env> {
       workspace: input.workspace ?? {},
       ...(input.callback ? { callback: input.callback } : {}),
       ...(input.profile ? { profile: input.profile } : {}),
-      ...(finalization ? { finalization } : {}),
+      ...(input.finalization ? { finalization: input.finalization } : {}),
       lifecycle: { version: 1, timestamp: Date.now() },
     });
     if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
@@ -1095,18 +1091,18 @@ export class SandboxSession extends DurableObject<Env> {
     origin: 'initial' | 'followup'
   ): Promise<SessionMessageAdmissionResult> {
     const epoch = this.terminalLifecycle.captureEpoch();
-    const storedMetadata = this.terminalLifecycle.getStoredMetadata();
-    if (epoch === null || !storedMetadata || this.deletedWorktreeId) {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (epoch === null || !metadata || this.deletedWorktreeId) {
       return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     }
-    const metadata = this.enforceGroupedFinalization(storedMetadata);
-    const replayInput = metadata.workspace?.worktreeId
-      ? { ...input, finalization: { ...input.finalization, autoCommit: false } }
-      : input;
     const admissionInput = metadata.workspace?.worktreeId
       ? {
           ...input,
-          finalization: { ...metadata.finalization, ...input.finalization, autoCommit: false },
+          finalization: {
+            ...metadata.finalization,
+            ...input.finalization,
+            autoCommit: input.finalization?.autoCommit ?? metadata.finalization?.autoCommit ?? true,
+          },
         }
       : input;
     const messageId = input.turn.messageId;
@@ -1173,7 +1169,7 @@ export class SandboxSession extends DurableObject<Env> {
           latestMetadata.workspace?.worktreeId ? latestMetadata.finalization : undefined
         );
         if (
-          !matchesSessionMessageReplay(frozen, intent ?? replayInput) ||
+          !matchesSessionMessageReplay(frozen, intent ?? input) ||
           (intent &&
             frozen.intent &&
             (intent.agent.variant !== frozen.intent.agent.variant ||
@@ -1250,8 +1246,7 @@ export class SandboxSession extends DurableObject<Env> {
     options?: { allowCreate?: boolean }
   ): Promise<void> {
     if (this.deletedWorktreeId) return;
-    const storedMetadata = this.terminalLifecycle.getStoredMetadata();
-    const metadata = storedMetadata ? this.enforceGroupedFinalization(storedMetadata) : null;
+    const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
@@ -1540,9 +1535,6 @@ export class SandboxSession extends DurableObject<Env> {
       this.terminalLifecycle.recordAttachment({ metadata, sandboxId, wrapperInstanceId, epoch });
       recorder.finalize({ status: 'completed' });
       phase = 'prompt';
-      const finalization = metadata.workspace?.worktreeId
-        ? { ...intent.finalization, autoCommit: false }
-        : intent.finalization;
       await dispatch('prompt', async () => {
         const prompt = await wait(async () =>
           controlRequestResult(
@@ -1565,7 +1557,7 @@ export class SandboxSession extends DurableObject<Env> {
                   ...(model !== undefined ? { model } : {}),
                   ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
                 },
-                ...(finalization ? { finalization } : {}),
+                ...(intent.finalization ? { finalization: intent.finalization } : {}),
                 ...(attachments.length ? { attachments } : {}),
               },
             })
@@ -1976,19 +1968,6 @@ export class SandboxSession extends DurableObject<Env> {
       initialMessage.turn.prompt === turn.prompt &&
       JSON.stringify(initialMessage.turn.attachments) === JSON.stringify(turn.attachments)
     );
-  }
-
-  private enforceGroupedFinalization(metadata: SessionMetadata): SessionMetadata {
-    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) return metadata;
-    if (!metadata.workspace?.worktreeId || metadata.finalization?.autoCommit === false) {
-      return metadata;
-    }
-    const updated = serializeSessionMetadata({
-      ...metadata,
-      finalization: { ...metadata.finalization, autoCommit: false },
-    });
-    this.ctx.storage.kv.put(METADATA_KEY, updated);
-    return updated;
   }
 
   private async requestSessionOperation(

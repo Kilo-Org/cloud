@@ -236,7 +236,6 @@ async function loadWorktreeSource(
     workspace.worktreeId !== worktreeId ||
     workspace.workspacePath !==
       getWorktreeWorkspacePath(input.kilocodeOrganizationId, ctx.userId, worktreeId) ||
-    metadata.finalization?.autoCommit !== false ||
     (ownership.gitUrl !== null &&
       normalizeGitUrl(ownership.gitUrl) !== canonicalRepositoryUrl(repository))
   ) {
@@ -315,7 +314,7 @@ function buildRegistrationInput(
     repository,
     workspace,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
-    finalization: { ...source.metadata.finalization, autoCommit: false },
+    ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
   };
 }
 
@@ -335,7 +334,6 @@ function assertRegisteredMetadata(
     metadata.identity.orgId !== source.metadata.identity.orgId ||
     metadata.identity.createdOnPlatform !== source.metadata.identity.createdOnPlatform ||
     metadata.auth.kiloSessionId !== progress.kiloSessionId ||
-    metadata.finalization?.autoCommit !== false ||
     !workspace ||
     workspace.worktreeId !== source.worktreeId ||
     workspace.workspacePath !== source.workspace.workspacePath ||

@@ -658,6 +658,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
     rootA = await prepareBrowserSession(kiloConfig, {
       prompt: bootstrapPrompt,
       operationKey: createOperationKey,
+      autoCommit: false,
     });
     requireWorktreeSessionIdentity(rootA, 'first chat');
     const streamA = connect(rootA.cloudAgentSessionId);
@@ -686,6 +687,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
     const replayedFirstChat = await prepareBrowserSession(kiloConfig, {
       prompt: bootstrapPrompt,
       operationKey: createOperationKey,
+      autoCommit: false,
     });
     if (
       replayedFirstChat.cloudAgentSessionId !== rootA.cloudAgentSessionId ||
@@ -1115,7 +1117,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
         'targetedRuntimeDeletion=true',
         `eventWatermarks=${persistedA.latestEventId}/${persistedB.latestEventId}`,
         'publicDirectories=isolated',
-        'autoCommit=false',
+        'autoCommit=explicit-false',
       ].join('; '),
       events,
       durationMs: Date.now() - startedAt,

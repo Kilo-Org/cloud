@@ -601,105 +601,118 @@ describe('runAutoCommit', () => {
     }
   });
 
-  it('serializes same-worktree auto-commit through push and skips a clean sibling', async () => {
-    const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shared-worktree-autocommit-'));
-    const workspacePath = path.join(root, 'workspace');
-    const remote = path.join(root, 'remote.git');
-    const home = path.join(root, 'home');
-    const env = { PATH: process.env.PATH, HOME: home };
-    const generating = Promise.withResolvers<void>();
-    const generated = Promise.withResolvers<{ message: string }>();
-    const pushing = Promise.withResolvers<void>();
-    const pushed = Promise.withResolvers<void>();
-    const controllers = [new AbortController(), new AbortController()];
-    const pending: ReturnType<typeof runAutoCommit>[] = [];
-    const first = createOpts({
-      workspacePath,
-      env,
-      messageId: 'first',
-      signal: controllers[0].signal,
-    });
-    const second = createOpts({
-      workspacePath,
-      env,
-      messageId: 'second',
-      signal: controllers[1].signal,
-    });
-    let secondSettled = false;
-    vi.mocked(first.opts.kiloClient.generateCommitMessage).mockImplementation(() => {
-      generating.resolve();
-      return generated.promise;
-    });
-    mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
-    mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
-    mockGit.mockImplementation(async (args, options) => {
-      if (args[0] === 'push') {
-        pushing.resolve();
-        await pushed.promise;
-      }
-      return actual.git(args, options);
-    });
-    const git = async (args: string[]) => {
-      const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
-      expect(result.exitCode).toBe(0);
-      return result.stdout;
-    };
-    try {
-      await fs.mkdir(workspacePath);
-      await fs.mkdir(home);
-      await git(['init', '--bare', remote]);
-      await git(['init', '--initial-branch=work']);
-      await git(['config', 'user.name', 'Test Agent']);
-      await git(['config', 'user.email', 'test@example.com']);
-      await git(['config', 'commit.gpgsign', 'false']);
-      await git(['remote', 'add', 'origin', remote]);
-      await fs.writeFile(path.join(workspacePath, 'result.txt'), 'shared changes\n');
-
-      const firstCommit = runAutoCommit(first.opts);
-      pending.push(firstCommit);
-      await generating.promise;
-      const secondCommit = runAutoCommit(second.opts).then(result => {
-        secondSettled = true;
-        return result;
+  it.each([false, true])(
+    'serializes same-worktree auto-commit through push with new sibling edits=%s',
+    async siblingEdits => {
+      const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'shared-worktree-autocommit-'));
+      const workspacePath = path.join(root, 'workspace');
+      const remote = path.join(root, 'remote.git');
+      const home = path.join(root, 'home');
+      const env = { PATH: process.env.PATH, HOME: home };
+      const generating = Promise.withResolvers<void>();
+      const generated = Promise.withResolvers<{ message: string }>();
+      const pushing = Promise.withResolvers<void>();
+      const pushed = Promise.withResolvers<void>();
+      const controllers = [new AbortController(), new AbortController()];
+      const pending: ReturnType<typeof runAutoCommit>[] = [];
+      const first = createOpts({
+        workspacePath,
+        env,
+        messageId: 'first',
+        signal: controllers[0].signal,
       });
-      pending.push(secondCommit);
-      await new Promise<void>(resolve => setImmediate(resolve));
-      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
-      expect(second.events).toEqual([]);
-      expect(secondSettled).toBe(false);
+      const second = createOpts({
+        workspacePath,
+        env,
+        messageId: 'second',
+        signal: controllers[1].signal,
+      });
+      let secondSettled = false;
+      vi.mocked(first.opts.kiloClient.generateCommitMessage).mockImplementation(() => {
+        generating.resolve();
+        return generated.promise;
+      });
+      mockGetCurrentBranch.mockImplementation(actual.getCurrentBranch);
+      mockHasGitUpstream.mockImplementation(actual.hasGitUpstream);
+      mockGit.mockImplementation(async (args, options) => {
+        if (args[0] === 'push') {
+          pushing.resolve();
+          await pushed.promise;
+        }
+        return actual.git(args, options);
+      });
+      const git = async (args: string[]) => {
+        const result = await actual.git(args, { cwd: workspacePath, env, inheritEnv: false });
+        expect(result.exitCode).toBe(0);
+        return result.stdout;
+      };
+      try {
+        await fs.mkdir(workspacePath);
+        await fs.mkdir(home);
+        await git(['init', '--bare', remote]);
+        await git(['init', '--initial-branch=work']);
+        await git(['config', 'user.name', 'Test Agent']);
+        await git(['config', 'user.email', 'test@example.com']);
+        await git(['config', 'commit.gpgsign', 'false']);
+        await git(['remote', 'add', 'origin', remote]);
+        await fs.writeFile(path.join(workspacePath, 'result.txt'), 'shared changes\n');
 
-      generated.resolve({ message: 'Commit shared changes' });
-      await pushing.promise;
-      expect(await git(['status', '--porcelain'])).toBe('');
-      expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
-      expect(secondSettled).toBe(false);
-      pushed.resolve();
-      expect(await firstCommit).toEqual({ success: true });
-      expect(await secondCommit).toEqual({ success: true, skipped: true });
-      expect(second.events).toEqual([
-        expect.objectContaining({
-          streamEventType: 'autocommit_completed',
-          data: expect.objectContaining({ success: true, skipped: true, messageId: 'second' }),
-        }),
-      ]);
-      expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
-        'shared changes\n'
-      );
-      expect(
-        (await git(['--git-dir', remote, 'rev-list', '--count', 'refs/heads/work'])).trim()
-      ).toBe('1');
-    } finally {
-      for (const controller of controllers) controller.abort();
-      generated.resolve({ message: 'Commit shared changes' });
-      pushed.resolve();
-      await Promise.allSettled(pending);
-      mockGit.mockReset();
-      mockGetCurrentBranch.mockReset();
-      mockHasGitUpstream.mockReset();
-      await fs.rm(root, { recursive: true, force: true });
+        const firstCommit = runAutoCommit(first.opts);
+        pending.push(firstCommit);
+        await generating.promise;
+        const secondCommit = runAutoCommit(second.opts).then(result => {
+          secondSettled = true;
+          return result;
+        });
+        pending.push(secondCommit);
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+        expect(second.events).toEqual([]);
+        expect(secondSettled).toBe(false);
+
+        generated.resolve({ message: 'Commit shared changes' });
+        await pushing.promise;
+        expect(await git(['status', '--porcelain'])).toBe('');
+        expect(mockGetCurrentBranch).toHaveBeenCalledTimes(1);
+        expect(secondSettled).toBe(false);
+        if (siblingEdits) {
+          await fs.writeFile(path.join(workspacePath, 'sibling.txt'), 'later sibling changes\n');
+        }
+        pushed.resolve();
+        expect(await firstCommit).toEqual({ success: true });
+        expect(await secondCommit).toEqual(
+          siblingEdits ? { success: true } : { success: true, skipped: true }
+        );
+        expect(
+          second.events.find(event => event.streamEventType === 'autocommit_completed')?.data
+        ).toMatchObject({ success: true, messageId: 'second' });
+        if (siblingEdits) {
+          expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:sibling.txt'])).toBe(
+            'later sibling changes\n'
+          );
+        } else {
+          expect(second.events).toHaveLength(1);
+          expect(second.events[0].data.skipped).toBe(true);
+        }
+        expect(await git(['--git-dir', remote, 'show', 'refs/heads/work:result.txt'])).toBe(
+          'shared changes\n'
+        );
+        expect(
+          (await git(['--git-dir', remote, 'rev-list', '--count', 'refs/heads/work'])).trim()
+        ).toBe(siblingEdits ? '2' : '1');
+      } finally {
+        for (const controller of controllers) controller.abort();
+        generated.resolve({ message: 'Commit shared changes' });
+        pushed.resolve();
+        await Promise.allSettled(pending);
+        mockGit.mockReset();
+        mockGetCurrentBranch.mockReset();
+        mockHasGitUpstream.mockReset();
+        await fs.rm(root, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
   it('commits and pushes with the isolated worktree environment instead of wrapper credentials', async () => {
     const actual = await vi.importActual<typeof Utils>('../../../wrapper/src/utils.js');

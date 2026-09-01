@@ -146,8 +146,14 @@ repository.
 6. Each chat MUST keep its own streamed output, transcript, questions,
    permissions, stop control, and recovery. Stopping or answering one chat MUST
    NOT affect another chat in the worktree.
-7. Grouped chats MUST NOT create platform-managed auto-commits. An agent MAY
-   still perform explicit Git operations during its chat.
+7. Grouped chats MUST support platform-managed auto-commit and push after
+   successful turns, enabled by default for new worktrees and honoring explicit
+   opt-out. New sibling chats MUST inherit the source chat's auto-commit setting.
+   Platform-managed commit and push operations MUST be serialized per worktree.
+   Each commit captures the shared checkout and MAY include sibling-chat edits.
+   Rebuilt worktrees MUST restore their pushed working branch rather than restart
+   from the repository's default branch. An agent MAY still perform explicit Git
+   operations during its chat.
 8. Deleting one chat MUST leave its siblings usable. Deleting the final chat
    MUST remove the worktree group from the session list.
 9. Existing ungrouped and legacy chats MUST remain individual sidebar rows and
@@ -227,6 +233,13 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-01 -- Shared worktree auto-commit
+
+- Restored automatic commit and push for shared worktrees, enabled by default,
+  with explicit opt-out, inherited sibling settings, and serialized per-worktree
+  Git finalization. Commits are checkpoints of the shared checkout, not isolated
+  changes belonging to one chat.
 
 ### 2026-08-26 -- Shared worktree pilot
 

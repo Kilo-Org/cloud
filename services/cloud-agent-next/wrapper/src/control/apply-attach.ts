@@ -323,37 +323,62 @@ async function executeSessionAttach(
           if (attach.git) {
             const needsClone = !(await hasGit(directory));
             signal.throwIfAborted();
-            if (needsClone || attach.branch) {
-              const cloneStepId = 'phase:cloning';
-              progress.start('cloning', cloneStepId, 'Cloning repository…');
-              if (needsClone) {
-                progress.progress('cloning', cloneStepId, 'Cloning repository…');
-                const cloneUrl = authenticatedGitUrl(
-                  attach.git.url,
-                  attach.git.token,
-                  attach.git.platform
-                );
-                const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
-                signal.throwIfAborted();
-                if (cloned.exitCode !== 0) {
-                  progress.fail('cloning', cloneStepId, 'git clone failed');
-                  return fail('not_ready', 'git clone failed', true);
-                }
+            const cloneStepId = 'phase:cloning';
+            progress.start('cloning', cloneStepId, 'Cloning repository…');
+            if (needsClone) {
+              progress.progress('cloning', cloneStepId, 'Cloning repository…');
+              const cloneUrl = authenticatedGitUrl(
+                attach.git.url,
+                attach.git.token,
+                attach.git.platform
+              );
+              const cloned = await runGit(['clone', cloneUrl, directory], undefined, signal);
+              signal.throwIfAborted();
+              if (cloned.exitCode !== 0) {
+                progress.fail('cloning', cloneStepId, 'git clone failed');
+                return fail('not_ready', 'git clone failed', true);
               }
-              if (attach.branch) {
-                const checked = await runGit(
-                  ['checkout', '-B', attach.branch, `origin/${attach.branch}`],
+            }
+            const branch = attach.branch ?? `session/${attach.kilo.scopeId}`;
+            let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
+            if (!attach.branch) {
+              const existingBranch = await runGit(
+                ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
+                directory,
+                signal
+              );
+              signal.throwIfAborted();
+              if (existingBranch.exitCode !== 0 && existingBranch.exitCode !== 1) {
+                progress.fail('cloning', cloneStepId, 'git branch lookup failed');
+                return fail('not_ready', 'git branch lookup failed', true);
+              }
+              checkoutArgs = ['checkout', branch];
+              if (existingBranch.exitCode === 1) {
+                const remoteBranch = await runGit(
+                  ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
                   directory,
                   signal
                 );
                 signal.throwIfAborted();
-                if (checked.exitCode !== 0) {
-                  progress.fail('cloning', cloneStepId, 'git checkout failed');
-                  return fail('not_ready', 'git checkout failed', true);
+                if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+                  progress.fail('cloning', cloneStepId, 'git branch lookup failed');
+                  return fail('not_ready', 'git branch lookup failed', true);
                 }
+                checkoutArgs = [
+                  'checkout',
+                  '-b',
+                  branch,
+                  ...(remoteBranch.exitCode === 0 ? ['--track', `origin/${branch}`] : []),
+                ];
               }
-              progress.complete('cloning', cloneStepId);
             }
+            const checked = await runGit(checkoutArgs, directory, signal);
+            signal.throwIfAborted();
+            if (checked.exitCode !== 0) {
+              progress.fail('cloning', cloneStepId, 'git checkout failed');
+              return fail('not_ready', 'git checkout failed', true);
+            }
+            progress.complete('cloning', cloneStepId);
             await configureWorkspaceGitAuthor(
               directory,
               (args, options) => runGit(args, options?.cwd, options?.signal),

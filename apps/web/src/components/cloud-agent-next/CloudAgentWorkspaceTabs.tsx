@@ -47,7 +47,7 @@ const tabTriggerClassName =
   'h-full min-w-0 gap-1.5 px-2 text-xs hover:bg-accent/60 focus-visible:ring-offset-0 focus-visible:ring-inset data-[state=active]:border-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none [@media(any-pointer:coarse)]:min-w-11';
 const tabActionClassName =
   'text-muted-foreground h-full w-8 shrink-0 rounded-none px-0 focus-visible:ring-inset [@media(any-pointer:coarse)]:w-11';
-const renameHint = 'Double-click to rename. Press F2 when focused.';
+const renameHint = 'Double-click to rename.';
 
 export function CloudAgentWorkspaceTabs({
   activeTabId,

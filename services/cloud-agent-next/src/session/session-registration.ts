@@ -206,6 +206,7 @@ type SessionCreationLedgerHooks = {
   db: WorkerDb;
   rowId: string;
   worktreeEnabled: boolean;
+  finalizationVersion: 1 | 2;
   /** Settle the row `failed` at the given stage. */
   onFailure: (stage: SessionLedgerFailureStage, outcomeCode: string) => Promise<void>;
   /** The DO RPC threw; the commit outcome is unknown. */
@@ -501,11 +502,21 @@ function worktreeEnabledForCreate(
   return sessionPlaneForNewOwner(ctx.env, owner) === 'control' && isWorktreeOwner(ctx.env, owner);
 }
 
+function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
+  const recorded = row.canonical_result?.[SESSION_CREATE_FINALIZATION_VERSION_KEY];
+  if (recorded !== undefined) {
+    if (recorded !== 1 && recorded !== 2) throw creationInProgressError();
+    return recorded;
+  }
+  return canonicalSessionIds(row) ? 1 : 2;
+}
+
 function effectiveSessionRegistrationInput(
   input: SessionRegistrationInput,
-  worktreeEnabled: boolean
+  worktreeEnabled: boolean,
+  finalizationVersion: 1 | 2
 ): SessionRegistrationInput {
-  if (!worktreeEnabled) return input;
+  if (!worktreeEnabled || finalizationVersion === 2) return input;
   return {
     ...input,
     finalization: { ...input.finalization, autoCommit: false },
@@ -553,6 +564,7 @@ async function allocateNewSession(
         ...(initialTurn ? { initialMessageId: initialTurn.messageId } : {}),
         ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
         [SESSION_CREATE_WORKTREE_ENABLED_KEY]: worktreeId !== undefined,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: ledger.finalizationVersion,
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       });
     }
@@ -1228,6 +1240,7 @@ export async function startNewSession(
  */
 export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
 export const SESSION_CREATE_WORKTREE_ENABLED_KEY = 'worktreeEnabled';
+export const SESSION_CREATE_FINALIZATION_VERSION_KEY = 'finalizationVersion';
 
 /**
  * Deterministic JSON serialization: object keys are sorted and undefined
@@ -1445,7 +1458,8 @@ export async function createSessionWithLedger(
   });
   const effectiveInput = effectiveSessionRegistrationInput(
     input,
-    worktreeEnabledForCreate(input, ctx, admission.row)
+    worktreeEnabledForCreate(input, ctx, admission.row),
+    finalizationVersionForCreate(admission.row)
   );
 
   switch (admission.admission) {
@@ -1521,6 +1535,7 @@ async function buildLedgerHooks(
     db,
     rowId: row.id,
     worktreeEnabled,
+    finalizationVersion: finalizationVersionForCreate(row),
     onFailure: (stage, outcomeCode) =>
       bestEffortLedgerWrite(() =>
         settleOperation(db, {

@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Bidalitako mezuei erantsi gabeko igotako fitxategiak ezabatuko dira.",
       "discardAttachmentsTitle": "Baztertu eranskinak?",
       "charactersRemaining": "{{count}} karaktere geratzen dira",
-      "insertNewline": "Txertatu lerro-jauzia",
-      "starterChipBuild": "Garatu eginbide bat",
-      "starterChipEmpty": "Hasi ideia batekin",
-      "starterChipFix": "Konpondu akats bat",
-      "starterChipPrepare": "Konfiguratu nire ingurunea",
-      "starterChipWrapUp": "Amaitu nire saioa",
-      "starterChipWriteTests": "Idatzi probak"
+      "insertNewline": "Txertatu lerro-jauzia"
     },
     "chatLink": {
       "linkCopied": "Esteka kopiatuta",

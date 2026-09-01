@@ -2186,13 +2186,7 @@
       "discardAttachmentsMessage": "سيتم حذف الملفات المرفوعة غير المرفقة برسائل مرسلة.",
       "discardAttachmentsTitle": "تجاهل المرفقات؟",
       "charactersRemaining": "الأحرف المتبقية: {{count}}",
-      "insertNewline": "إدراج سطر جديد",
-      "starterChipBuild": "أنشئ ميزة",
-      "starterChipEmpty": "ابدأ بفكرة",
-      "starterChipFix": "أصلح خللًا",
-      "starterChipPrepare": "جهّز بيئتي",
-      "starterChipWrapUp": "أنهِ جلستي",
-      "starterChipWriteTests": "اكتب اختبارات"
+      "insertNewline": "إدراج سطر جديد"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",

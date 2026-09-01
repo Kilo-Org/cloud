@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
       "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?",
       "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
-      "insertNewline": "புதிய வரியைச் செருகவும்",
-      "starterChipBuild": "ஓர் அம்சத்தை உருவாக்கு",
-      "starterChipEmpty": "ஓர் யோசனையுடன் தொடங்கு",
-      "starterChipFix": "ஒரு பிழையைச் சரிசெய்",
-      "starterChipPrepare": "எனது சூழலை அமை",
-      "starterChipWrapUp": "எனது அமர்வை முடி",
-      "starterChipWriteTests": "சோதனைகளை எழுது"
+      "insertNewline": "புதிய வரியைச் செருகவும்"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",

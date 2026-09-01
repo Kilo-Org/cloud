@@ -2162,13 +2162,7 @@
       "discardAttachmentsMessage": "Загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены.",
       "discardAttachmentsTitle": "Удалить вложения?",
       "charactersRemaining": "Осталось символов: {{count}}",
-      "insertNewline": "Вставить новую строку",
-      "starterChipBuild": "Создай функцию",
-      "starterChipEmpty": "Начни с идеи",
-      "starterChipFix": "Исправь ошибку",
-      "starterChipPrepare": "Настрой мое окружение",
-      "starterChipWrapUp": "Заверши мой сеанс",
-      "starterChipWriteTests": "Напиши тесты"
+      "insertNewline": "Вставить новую строку"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",

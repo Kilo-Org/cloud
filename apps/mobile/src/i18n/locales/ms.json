@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardAttachmentsTitle": "Buang lampiran?",
       "charactersRemaining": "{{count}} aksara berbaki",
-      "insertNewline": "Sisipkan baris baharu",
-      "starterChipBuild": "Bina ciri",
-      "starterChipEmpty": "Mulakan dengan idea",
-      "starterChipFix": "Baiki pepijat",
-      "starterChipPrepare": "Sediakan persekitaran saya",
-      "starterChipWrapUp": "Tamatkan sesi saya",
-      "starterChipWriteTests": "Tulis ujian"
+      "insertNewline": "Sisipkan baris baharu"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",

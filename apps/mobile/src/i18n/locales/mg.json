@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Hofafana ny rakitra nampidirina nefa tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardAttachmentsTitle": "Ario ve ny firaiketana?",
       "charactersRemaining": "Soratra {{count}} sisa",
-      "insertNewline": "Ampidiro andalana vaovao",
-      "starterChipBuild": "Mamoròna fiasa",
-      "starterChipEmpty": "Atombohy amin'ny hevitra iray",
-      "starterChipFix": "Ahitsio ny hadisoana",
-      "starterChipPrepare": "Amboary ny tontolo iainako",
-      "starterChipWrapUp": "Farano ny session-ko",
-      "starterChipWriteTests": "Manorata fitsapana"
+      "insertNewline": "Ampidiro andalana vaovao"
     },
     "chatLink": {
       "linkCopied": "Adika ny rohy",

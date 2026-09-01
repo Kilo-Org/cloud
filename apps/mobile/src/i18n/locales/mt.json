@@ -2649,13 +2649,7 @@
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
       "discardAttachmentsTitle": "Twarrab l-annessi?",
       "charactersRemaining": "Fadal {{count}} karattru",
-      "insertNewline": "Daħħal linja ġdida",
-      "starterChipBuild": "Ibni funzjoni",
-      "starterChipEmpty": "Ibda b'idea",
-      "starterChipFix": "Irranġa żball",
-      "starterChipPrepare": "Ħejji l-ambjent tiegħi",
-      "starterChipWrapUp": "Temm is-sessjoni tiegħi",
-      "starterChipWriteTests": "Ikteb testijiet"
+      "insertNewline": "Daħħal linja ġdida"
     },
     "chatLink": {
       "linkCopied": "Ir-rabta ġiet ikkupjata",

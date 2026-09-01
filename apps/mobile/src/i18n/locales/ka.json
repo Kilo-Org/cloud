@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "აიტვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardAttachmentsTitle": "გავაუქმოთ დანართები?",
       "charactersRemaining": "დარჩენილია {{count}} სიმბოლო",
-      "insertNewline": "ახალი ხაზის ჩასმა",
-      "starterChipBuild": "შექმენი ფუნქცია",
-      "starterChipEmpty": "დაიწყე იდეით",
-      "starterChipFix": "შეასწორე შეცდომა",
-      "starterChipPrepare": "გამართე ჩემი გარემო",
-      "starterChipWrapUp": "დაასრულე ჩემი სესია",
-      "starterChipWriteTests": "დაწერე ტესტები"
+      "insertNewline": "ახალი ხაზის ჩასმა"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",

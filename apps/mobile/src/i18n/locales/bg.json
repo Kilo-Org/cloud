@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardAttachmentsTitle": "Да отхвърлим прикачените файлове?",
       "charactersRemaining": "Остават {{count}} знака",
-      "insertNewline": "Вмъкнете нов ред",
-      "starterChipBuild": "Разработи функция",
-      "starterChipEmpty": "Започни с идея",
-      "starterChipFix": "Отстрани грешка",
-      "starterChipPrepare": "Настрой моята среда",
-      "starterChipWrapUp": "Приключи моята сесия",
-      "starterChipWriteTests": "Напиши тестове"
+      "insertNewline": "Вмъкнете нов ред"
     },
     "chatLink": {
       "linkCopied": "Линкът е копиран",

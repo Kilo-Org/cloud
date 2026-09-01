@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે.",
       "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?",
       "charactersRemaining": "{{count}} અક્ષરો બાકી",
-      "insertNewline": "નવી લાઇન દાખલ કરો",
-      "starterChipBuild": "સુવિધા બનાવ",
-      "starterChipEmpty": "વિચારથી શરૂઆત કર",
-      "starterChipFix": "ભૂલ સુધાર",
-      "starterChipPrepare": "મારું એન્વાયર્નમેન્ટ સેટ કર",
-      "starterChipWrapUp": "મારું સત્ર પૂર્ણ કર",
-      "starterChipWriteTests": "પરીક્ષણો લખ"
+      "insertNewline": "નવી લાઇન દાખલ કરો"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",

@@ -2138,13 +2138,7 @@
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
       "charactersRemaining": "残り{{count}}文字",
-      "insertNewline": "改行を挿入",
-      "starterChipBuild": "機能を作って",
-      "starterChipEmpty": "アイデアから始めて",
-      "starterChipFix": "バグを直して",
-      "starterChipPrepare": "私の環境をセットアップして",
-      "starterChipWrapUp": "私のセッションを締めくくって",
-      "starterChipWriteTests": "テストを書いて"
+      "insertNewline": "改行を挿入"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",

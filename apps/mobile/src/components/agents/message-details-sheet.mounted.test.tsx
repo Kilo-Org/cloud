@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The mounted sheet suite shares native boundaries across actions, selection, and announcements. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import {
   type AssistantMessage,
@@ -5,16 +6,24 @@ import {
   type StoredMessage,
   type UserMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { createElement, type ReactElement } from 'react';
+import { type ComponentProps, createElement, type ReactElement } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SheetHeader } from '@/components/sheet-header';
+import { SelectableText } from '@/components/ui/selectable-text';
+import { Text } from '@/components/ui/text';
 
 import { MessageDetailsSheet } from './message-details-sheet';
 
+const native = vi.hoisted(() => ({ clipboard: '', announce: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ background: '#000' }),
+  useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility: native.announce },
+  ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Modal: 'Modal',
   ScrollView: 'ScrollView',
@@ -24,7 +33,13 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ mutate: vi.fn() }),
+  useMutation: (options: {
+    onSuccess: (result: { receiptId: string }, input: unknown) => void;
+  }) => ({
+    mutate: (input: unknown) => {
+      options.onSuccess({ receiptId: 'receipt-1' }, input);
+    },
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -52,9 +67,22 @@ vi.mock('@/components/ui/text', async () => {
 vi.mock('@/components/ui/selectable-text', () => ({
   SelectableText: 'SelectableText',
 }));
-vi.mock('./message-details-copy', () => ({
-  handleMessageDetailsCopy: vi.fn(),
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: (text: string) => {
+    native.clipboard = text;
+  },
 }));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Success: 'success' },
+}));
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+beforeEach(() => {
+  native.clipboard = '';
+  native.announce.mockClear();
+  vi.mocked(Alert.alert).mockClear();
+});
 
 function userInfo(overrides: Partial<UserMessage> = {}): UserMessage {
   return {
@@ -120,12 +148,15 @@ function storedMessage(info: AssistantMessage | UserMessage, parts: Part[] = [])
   return { info, parts };
 }
 
-function sheetElement(message: StoredMessage | null): ReactElement {
+type SheetOverrides = Partial<ComponentProps<typeof MessageDetailsSheet>>;
+
+function sheetElement(message: StoredMessage | null, overrides: SheetOverrides = {}): ReactElement {
   return createElement(MessageDetailsSheet, {
     visible: true,
     message,
     modelOptions: [],
     onClose: vi.fn<() => void>(),
+    ...overrides,
   });
 }
 
@@ -147,11 +178,14 @@ function press(instance: TestRenderer.ReactTestInstance | undefined): void {
   onPress();
 }
 
-async function mountSheet(message: StoredMessage | null): Promise<TestRenderer.ReactTestRenderer> {
+async function mountSheet(
+  message: StoredMessage | null,
+  overrides: SheetOverrides = {}
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(sheetElement(message));
+    ref.current = TestRenderer.create(sheetElement(message, overrides));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -168,6 +202,157 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 }
 
 describe('MessageDetailsSheet mounted', () => {
+  it('presses cancellation and follows eligible, busy, ineligible, empty, and file-only states', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const selected: StoredMessage[] = [];
+    const onCancelQueued = (value: StoredMessage) => {
+      selected.push(value);
+    };
+    const renderer = await mountSheet(message, { canCancelQueued: true, onCancelQueued });
+    const row = () => findByTestID(renderer.root, 'message-details-cancel-queued')[0];
+    act(() => {
+      press(row());
+    });
+    expect(selected).toEqual([message]);
+    act(() => {
+      renderer.update(
+        sheetElement(message, { canCancelQueued: false, isCancelingQueued: true, onCancelQueued })
+      );
+    });
+    expect(row()?.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(row()?.props.accessibilityLabel).toBe('Cancel queued message');
+    expect(row()?.props.disabled).toBe(true);
+    expect(renderer.root.findAllByType(ActivityIndicator)).toHaveLength(1);
+    act(() => {
+      press(row());
+    });
+    expect(selected).toEqual([message]);
+    act(() => {
+      renderer.update(sheetElement(message, { canCancelQueued: false, onCancelQueued }));
+    });
+    expect(row()).toBeUndefined();
+    act(() => {
+      renderer.update(sheetElement(null, { canCancelQueued: true, onCancelQueued }));
+    });
+    expect(row()).toBeUndefined();
+    const fileOnly = storedMessage(userInfo({ id: 'file-message' }), [
+      {
+        id: 'file-1',
+        sessionID: 'ses-1',
+        messageID: 'file-message',
+        type: 'file',
+        mime: 'text/plain',
+        url: 'file:///attachment.txt',
+      },
+    ]);
+    act(() => {
+      renderer.update(sheetElement(fileOnly, { canCancelQueued: true, onCancelQueued }));
+    });
+    expect(findByTestID(renderer.root, 'message-details-copy')).toHaveLength(0);
+    expect(findByTestID(renderer.root, 'message-details-select-text')).toHaveLength(0);
+    act(() => {
+      press(row());
+    });
+    expect(selected).toEqual([message, fileOnly]);
+    await unmount(renderer);
+  });
+
+  it('announces an identical failure again after a cleared retry, without speech on hiding', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const failure = 'Could not cancel the queued message.';
+    const renderer = await mountSheet(message, {
+      cancelQueuedFeedback: { message: failure, attempt: 1 },
+    });
+    expect(
+      renderer.root.findAll(node => node.type === Text && node.props.children === failure)
+    ).toHaveLength(1);
+    expect(native.announce.mock.calls).toEqual([[failure]]);
+    act(() => {
+      renderer.update(
+        sheetElement(message, { cancelQueuedFeedback: null, isCancelingQueued: true })
+      );
+    });
+    expect(
+      renderer.root.findAll(node => node.type === Text && node.props.children === failure)
+    ).toHaveLength(0);
+    expect(native.announce.mock.calls).toEqual([[failure]]);
+    act(() => {
+      renderer.update(
+        sheetElement(message, { cancelQueuedFeedback: { message: failure, attempt: 2 } })
+      );
+    });
+    expect(native.announce.mock.calls).toEqual([[failure], [failure]]);
+    act(() => {
+      renderer.update(
+        sheetElement(message, {
+          visible: false,
+          cancelQueuedFeedback: { message: failure, attempt: 2 },
+        })
+      );
+    });
+    expect(native.announce.mock.calls).toEqual([[failure], [failure]]);
+    await unmount(renderer);
+  });
+
+  it('keeps upgrade guidance readable on reopening without announcing the outcome again', async () => {
+    const message = storedMessage(userInfo(), [textPart('queued')]);
+    const guidance =
+      'Canceling queued messages requires a newer Kilo CLI. Update Kilo CLI and reconnect.';
+    const renderer = await mountSheet(message, {
+      cancelQueuedGuidance: guidance,
+      cancelQueuedFeedback: { message: guidance, attempt: 1 },
+    });
+    const guidanceNodes = () =>
+      renderer.root.findAll(node => node.type === Text && node.props.children === guidance);
+    expect(guidanceNodes()).toHaveLength(1);
+    expect(native.announce.mock.calls).toEqual([[guidance]]);
+    act(() => {
+      renderer.update(sheetElement(message, { visible: false, cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(0);
+    act(() => {
+      renderer.update(sheetElement(message, { cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(1);
+    expect(guidanceNodes()[0]?.props.accessibilityLiveRegion).toBeUndefined();
+    expect(native.announce.mock.calls).toEqual([[guidance]]);
+    expect(findByTestID(renderer.root, 'message-details-cancel-queued')).toHaveLength(0);
+    act(() => {
+      renderer.update(sheetElement(null, { cancelQueuedGuidance: guidance }));
+    });
+    expect(guidanceNodes()).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('keeps real Copy and confirmed Report outcomes on the details sheet', async () => {
+    const message = storedMessage(assistantInfo(), [textPart('copy this response')]);
+    const renderer = await mountSheet(message);
+    await act(async () => {
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+      await Promise.resolve();
+    });
+    expect(native.clipboard).toBe('copy this response');
+    act(() => {
+      press(findByTestID(renderer.root, 'message-details-report')[0]);
+    });
+    expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
+    const confirm = vi
+      .mocked(Alert.alert)
+      .mock.calls.at(-1)?.[2]
+      ?.find(button => button.style === 'destructive');
+    act(() => confirm?.onPress?.());
+    expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(0);
+    act(() => {
+      renderer.update(
+        sheetElement(
+          storedMessage(assistantInfo({ id: 'another-response' }), [textPart('another response')])
+        )
+      );
+    });
+    expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
+    await unmount(renderer);
+  });
+
   it('renders Copy message and Select text for a finished copyable user message', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
 
@@ -180,9 +365,7 @@ describe('MessageDetailsSheet mounted', () => {
   it('sizes the details ScrollView to fill the sheet surface with flex-1', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
 
-    const scrollViews = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
-    );
+    const scrollViews = renderer.root.findAll(node => node.type === ScrollView);
     expect(scrollViews).toHaveLength(1);
     expect(scrollViews[0]?.props.className).toBe('flex-1');
 
@@ -192,13 +375,10 @@ describe('MessageDetailsSheet mounted', () => {
   it('swaps the details Modal content to the select view when Select text is pressed', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
-    const modals = () =>
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      );
+    const modals = () => renderer.root.findAll(node => node.type === Modal);
     const sheetHeaderTitles = () =>
       renderer.root
-        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .findAll(node => node.type === SheetHeader)
         .map(node => node.props.title as string | undefined);
 
     // Before press: a single Modal shows the details content.
@@ -215,9 +395,7 @@ describe('MessageDetailsSheet mounted', () => {
     expect(sheetHeaderTitles()).toContain('Select text');
     expect(sheetHeaderTitles()).not.toContain('Message details');
 
-    const selectable = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'SelectableText'
-    );
+    const selectable = renderer.root.findAll(node => node.type === SelectableText);
     expect(selectable).toHaveLength(1);
     expect(selectable[0]?.props.children).toBe('selectable body');
 
@@ -228,9 +406,7 @@ describe('MessageDetailsSheet mounted', () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
     const modal = () => {
-      const found = renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      );
+      const found = renderer.root.findAll(node => node.type === Modal);
       if (!found[0]) {
         throw new Error('Modal not found');
       }
@@ -252,7 +428,7 @@ describe('MessageDetailsSheet mounted', () => {
 
     const sheetHeaderTitles = () =>
       renderer.root
-        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'SheetHeader')
+        .findAll(node => node.type === SheetHeader)
         .map(node => node.props.title as string | undefined);
     expect(sheetHeaderTitles()).toContain('Message details');
     expect(sheetHeaderTitles()).not.toContain('Select text');

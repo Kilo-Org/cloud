@@ -22,7 +22,7 @@ import { gpt_5_6_sol_discounted_model } from './providers/openai-exclusive';
 import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { longcat_2_free_model } from './providers/longcat';
-import { minimax_m27_free_model, minimax_m3_free_model } from './providers/minimax';
+import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
 describe('rate-limited Kilo-exclusive models', () => {
@@ -81,11 +81,13 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test('registers Tencent Hy3 as an Auto Free model', () => {
-      expect(findKiloExclusiveModel('tencent/hy3:free')).toBe(tencent_hy3_free_model);
-      expect(tencent_hy3_free_model.internal_id).toBe('tencent/hy3');
-      expect(tencent_hy3_free_model.inference_provider_restriction).toEqual(['tencent']);
-      expect(autoFreeModels.map(({ model }) => model)).toContain(tencent_hy3_free_model.public_id);
+    test('disables Tencent Hy3 free and excludes it from Auto Free and preferred models', () => {
+      expect(tencent_hy3_free_model.status).toBe('disabled');
+      expect(findKiloExclusiveModel('tencent/hy3:free')).toBeNull();
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        tencent_hy3_free_model.public_id
+      );
+      expect(preferredModels).not.toContain(tencent_hy3_free_model.public_id);
     });
 
     test('registers LongCat 2.0 as an Auto Free model', async () => {
@@ -104,43 +106,27 @@ describe('isFreeModel', () => {
       expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
     });
 
-    test.each([
-      {
-        name: 'MiniMax M3',
-        model: minimax_m3_free_model,
-        publicId: 'minimax/minimax-m3:free',
-        internalId: 'minimax/minimax-m3-free',
-        contextLength: 1_048_576,
-        vision: true,
-      },
-      {
-        name: 'MiniMax M2.7',
-        model: minimax_m27_free_model,
-        publicId: 'minimax/minimax-m2.7:free',
-        internalId: 'minimax/minimax-m2.7-free',
-        contextLength: 196_608,
-        vision: false,
-      },
-    ])(
-      'registers $name as a free Vercel GMI Cloud model',
-      async ({ model, publicId, internalId, contextLength, vision }) => {
-        expect(findKiloExclusiveModel(model.public_id)).toBe(model);
-        expect(await isFreeModel(model.public_id)).toBe(true);
-        expect(model).toMatchObject({
-          public_id: publicId,
-          internal_id: internalId,
-          gateway: 'vercel',
-          context_length: contextLength,
-          max_completion_tokens: contextLength,
-          status: 'public',
-          inference_provider_restriction: ['gmicloud'],
-        });
-        expect(model.flags.includes('reasoning')).toBe(true);
-        expect(model.flags.includes('vision')).toBe(vision);
-        expect(getInferenceProvider(model)?.slug).toBe('gmicloud');
-        expect(preferredModels).not.toContain(model.public_id);
+    test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
+      'inherits %s without an exclusive definition or availability restriction',
+      async model => {
+        expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
+        expect(findKiloExclusiveModel(model)).toBeNull();
+        expect(getKiloExclusiveInferenceProviderRestriction(model)).toBeUndefined();
+        expect(isUnavailableModel(model)).toBe(false);
+        expect(await isFreeModel(model)).toBe(true);
       }
     );
+
+    test('preserves MiniMax Auto Free and preferred model membership', () => {
+      expect(autoFreeModels).toContainEqual({
+        model: 'minimax/minimax-m3:free',
+        weight: 1,
+        reasoning: { enabled: true, effort: 'high' },
+      });
+      expect(preferredModels).toContain('minimax/minimax-m3:free');
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain('minimax/minimax-m2.7:free');
+      expect(preferredModels).not.toContain('minimax/minimax-m2.7:free');
+    });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
       expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');
@@ -231,20 +217,20 @@ describe('isFreeModel', () => {
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
-        'tencent/hy3:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
+        'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Auto Free models at 70% StepFun and 10% each for Hy3, Laguna, and LongCat', () => {
+    test('weights every Auto Free model equally', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': 7,
-        'tencent/hy3:free': 1,
+        'stepfun/step-3.7-flash:free': 1,
         'poolside/laguna-s-2.1:free': 1,
         'meituan/longcat-2.0-free': 1,
+        'minimax/minimax-m3:free': 1,
       });
     });
 
@@ -409,12 +395,12 @@ describe('getKiloExclusiveInferenceProviderRestriction', () => {
     expect(
       getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
     ).toEqual(new Set(['openai']));
-    expect(getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)).toEqual(
-      new Set(['tencent'])
-    );
   });
 
-  test('does not treat unrestricted exclusives or unknown ids as restricted', () => {
+  test('does not treat disabled or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)
+    ).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();

@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно.",
       "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?",
       "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
-      "insertNewline": "Шинэ мөр оруулах",
-      "starterChipBuild": "Шинэ функц бүтээ",
-      "starterChipEmpty": "Санаанаас эхэл",
-      "starterChipFix": "Алдаа зас",
-      "starterChipPrepare": "Миний орчныг тохируул",
-      "starterChipWrapUp": "Миний сессийг дуусга",
-      "starterChipWriteTests": "Тест бич"
+      "insertNewline": "Шинэ мөр оруулах"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",

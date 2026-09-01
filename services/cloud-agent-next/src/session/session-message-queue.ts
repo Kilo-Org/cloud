@@ -164,6 +164,10 @@ export type SessionMessageQueueDependencies = {
   > | null>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
   reportQueuedState?: (state: SessionMessageState) => void;
+  persistCloneQueuedMessage: (
+    intent: SessionMessageIntent,
+    callbackSnapshot?: PendingSessionMessage['callbackSnapshot']
+  ) => Promise<void>;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
   persistTerminalTransition: (
     messageId: string,
@@ -861,9 +865,13 @@ export function createSessionMessageQueue(
       ? { required: true, target: callbackTarget }
       : undefined;
 
-    await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
-    const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
-    await putSessionMessageState(storage, messageState);
+    if (metadata?.clone?.reportingCreatedAt) {
+      await dependencies.persistCloneQueuedMessage(intent, callbackSnapshot);
+    } else {
+      await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
+      const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
+      await putSessionMessageState(storage, messageState);
+    }
     await completeQueuedAdmissionEffects(intent);
     return buildAdmissionAck(turn.messageId);
   }

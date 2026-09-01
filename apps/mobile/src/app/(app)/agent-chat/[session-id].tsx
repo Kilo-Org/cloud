@@ -1,8 +1,15 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSyncExternalStore } from 'react';
+
+import {
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+  subscribeAuthenticatedOwner,
+} from '@/lib/context-scope';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import {
@@ -12,6 +19,7 @@ import {
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
+import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -26,6 +34,10 @@ import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
+  const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
+  const confirmation = useIdentityConfirmation();
+  const identityPending = !isAuthenticatedOwner(owner);
+  const identityFailed = identityPending && confirmation.isError;
   const {
     'session-id': rawSessionId,
     organizationId: routeOrganizationId,
@@ -34,7 +46,6 @@ export default function SessionDetailScreen() {
     shareId: shareIdParam,
     autoSend: autoSendRaw,
     mode: modeParam,
-    title: titleParam,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -54,7 +65,7 @@ export default function SessionDetailScreen() {
     autoSend?: string;
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
     mode?: string;
-    /** Title the list row already showed; paints the header on the first frame. */
+    /** Legacy title hints remain accepted but carry no account ownership, so ignore them. */
     title?: string;
   }>();
   // `session-id` is required: a malformed deep link can hand us `undefined`
@@ -65,10 +76,6 @@ export default function SessionDetailScreen() {
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
-  // The row the user tapped already showed this title, so the header opens
-  // with it instead of a generic label that swaps a beat later. Deep links
-  // and push opens carry no title and keep the fallback.
-  const cachedTitle = Array.isArray(titleParam) ? titleParam[0] : titleParam;
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
@@ -104,7 +111,14 @@ export default function SessionDetailScreen() {
         retryDelay: 1000,
       }
     ),
-    enabled: routeOrganizationId === undefined && sessionId !== null,
+    // Isolate account metadata while preserving the typed tRPC key and prefix invalidation.
+    queryHash: hashKey([
+      ...trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
+      owner.authEpoch,
+      owner.generation,
+      owner.userId,
+    ]),
+    enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
   });
 
   const displayScope = {
@@ -116,14 +130,18 @@ export default function SessionDetailScreen() {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
 
-  if (routeOrganizationId === undefined && sessionQuery.isPending) {
+  if (
+    !identityFailed &&
+    (identityPending || (routeOrganizationId === undefined && sessionQuery.isPending))
+  ) {
     // The composer placeholder holds its own height: nothing may shift when
-    // the query resolves.
+    // the query resolves. Route title hints are not bound to an account.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={cachedTitle ?? t('agentChat.session.title')}
+          title={t('agentChat.session.title')}
           context={<ContextControl scope={displayScope} />}
+          backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -140,17 +158,25 @@ export default function SessionDetailScreen() {
     );
   }
 
-  if (routeOrganizationId === undefined && sessionQuery.isError) {
+  if (identityFailed || (routeOrganizationId === undefined && sessionQuery.isError)) {
     // A NOT_FOUND (e.g. the stored session was deleted) or UNAUTHORIZED
     // (org-access denial) can't be recovered by retrying — show a permanent
     // state with no Retry. Other errors stay transient and retriable. All
     // get Back and Copy.
-    const errorCode = sessionQuery.error.data?.code;
+    const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED';
-    let title = t('agentChat.session.couldNotLoad');
-    let message = t('agentChat.session.failedToLoadDetails');
-    let variant: 'not-found' | 'permission' | 'server' = 'server';
+    let title = t(
+      identityFailed ? 'bootstrap.couldNotLoadAccount' : 'agentChat.session.couldNotLoad'
+    );
+    let message = t(
+      identityFailed
+        ? 'bootstrap.couldNotLoadAccountDescription'
+        : 'agentChat.session.failedToLoadDetails'
+    );
+    let variant: 'neutral' | 'not-found' | 'permission' | 'server' = identityFailed
+      ? 'neutral'
+      : 'server';
     if (notFound) {
       title = t('agentChat.session.notFound');
       message = t('agentChat.session.notFoundDescription');
@@ -160,12 +186,14 @@ export default function SessionDetailScreen() {
       message = t('agentChat.session.accessDeniedDescription');
       variant = 'permission';
     }
+    const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
     const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
           context={<ContextControl scope={displayScope} />}
+          backFallback="/(app)/(tabs)/(2_agents)"
         />
         <SessionConnectionIndicator />
         <View className="flex-1 items-center justify-center gap-3 px-6">
@@ -175,8 +203,8 @@ export default function SessionDetailScreen() {
             className="px-0 pt-0"
             title={title}
             message={message}
-            onRetry={notFound || unauthorized ? undefined : () => void sessionQuery.refetch()}
-            isRetrying={sessionQuery.isFetching}
+            onRetry={notFound || unauthorized ? undefined : retry}
+            isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
           />
           <View className="flex-row gap-3">
             <Button
@@ -206,13 +234,12 @@ export default function SessionDetailScreen() {
 
   return (
     <AgentSessionProvider
-      key={`${sessionId}:${organizationId ?? 'personal'}`}
+      key={`${owner.generation}:${owner.userId}:${sessionId}:${organizationId ?? 'personal'}`}
       organizationId={organizationId}
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
         displayScope={displayScope}
-        cachedTitle={cachedTitle}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
         autoSend={autoSendParam === '1'}

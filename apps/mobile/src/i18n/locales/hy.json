@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
       "discardAttachmentsTitle": "Մերժե՞լ կցորդները",
       "charactersRemaining": "Մնացել է {{count}} նիշ",
-      "insertNewline": "Տեղադրել նոր տող",
-      "starterChipBuild": "Ստեղծիր գործառույթ",
-      "starterChipEmpty": "Սկսիր գաղափարից",
-      "starterChipFix": "Շտկիր սխալը",
-      "starterChipPrepare": "Կարգավորիր իմ միջավայրը",
-      "starterChipWrapUp": "Ավարտիր իմ նիստը",
-      "starterChipWriteTests": "Գրիր թեստեր"
+      "insertNewline": "Տեղադրել նոր տող"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",

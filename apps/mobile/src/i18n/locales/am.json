@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተጫኑ ፋይሎች ይሰረዛሉ።",
       "discardAttachmentsTitle": "አባሪዎችን ያስወግዱ?",
       "charactersRemaining": "{{count}} ቁምፊዎች ይቀራሉ",
-      "insertNewline": "አዲስ መስመር ያስገቡ",
-      "starterChipBuild": "ባህሪ ገንባ",
-      "starterChipEmpty": "በሀሳብ ጀምር",
-      "starterChipFix": "ስህተት አስተካክል",
-      "starterChipPrepare": "የስራ አካባቢዬን አዋቅር",
-      "starterChipWrapUp": "ክፍለ ጊዜዬን አጠናቅቅ",
-      "starterChipWriteTests": "ሙከራዎችን ጻፍ"
+      "insertNewline": "አዲስ መስመር ያስገቡ"
     },
     "chatLink": {
       "linkCopied": "አገናኝ ተቀድቷል",

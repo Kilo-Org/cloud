@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək.",
       "discardAttachmentsTitle": "Əlavələr ləğv edilsin?",
       "charactersRemaining": "{{count}} simvol qalıb",
-      "insertNewline": "Yeni sətir daxil edin",
-      "starterChipBuild": "Funksiya yarat",
-      "starterChipEmpty": "Bir ideya ilə başla",
-      "starterChipFix": "Səhvi düzəlt",
-      "starterChipPrepare": "Mühitimi qur",
-      "starterChipWrapUp": "Sessiyamı tamamla",
-      "starterChipWriteTests": "Testlər yaz"
+      "insertNewline": "Yeni sətir daxil edin"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",

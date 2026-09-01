@@ -1,7 +1,4 @@
-import { createMiddleware } from 'hono/factory';
-import { seconds } from 'itty-time';
 import { z } from 'zod';
-import type { GastownEnv } from '../gastown.worker';
 
 /**
  * Validate a raw Request against Cloudflare Access.
@@ -21,27 +18,6 @@ export async function validateCfAccessRequest(
     throw new Error('Missing CF Access JWT');
   }
   await validateAccessJWT({ request, accessTeamDomain, accessAud });
-}
-
-export function withCloudflareAccess({
-  team,
-  audience,
-}: {
-  team: AccessTeam;
-  audience: AccessAudience;
-}) {
-  return createMiddleware<GastownEnv>(async (c, next) => {
-    try {
-      await validateCfAccessRequest(c.req.raw, { team, audience });
-    } catch (e) {
-      console.warn(`validateAccessJWT failed ${e instanceof Error ? e.message : 'unknown'}`, {
-        error: e,
-      });
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
-
-    await next();
-  });
 }
 
 // Access validation code adapted from:
@@ -81,6 +57,18 @@ function asciiToUint8Array(s: string): ArrayBuffer {
   return new Uint8Array(chars).buffer;
 }
 
+// The certs endpoint supports Cloudflare's edge-cache `cf` fetch options, which
+// are a Workers-only RequestInit extension absent from the standard webworker
+// lib, so the fetch init is typed locally rather than adding workers-types here.
+type CloudflareFetchInit = RequestInit & {
+  cf?: {
+    cacheEverything?: boolean;
+    cacheTtl?: number;
+  };
+};
+
+const CF_ACCESS_CERTS_CACHE_TTL_SECONDS = 86_400; // 1 day
+
 async function validateAccessJWT({
   request,
   accessTeamDomain,
@@ -101,12 +89,13 @@ async function validateAccessJWT({
   const textDecoder = new TextDecoder('utf-8');
   const { kid } = AccessHeader.parse(JSON.parse(textDecoder.decode(base64URLDecode(header))));
   const certsURL = new URL('/cdn-cgi/access/certs', accessTeamDomain);
-  const certsResponse = await fetch(certsURL.toString(), {
+  const certsFetchInit: CloudflareFetchInit = {
     cf: {
       cacheEverything: true,
-      cacheTtl: seconds('1 day'),
+      cacheTtl: CF_ACCESS_CERTS_CACHE_TTL_SECONDS,
     },
-  });
+  };
+  const certsResponse = await fetch(certsURL.toString(), certsFetchInit);
   const { keys } = AccessCertsResponse.parse(await certsResponse.json());
   const jwk = keys.find(key => key.kid === kid);
   if (!jwk) {

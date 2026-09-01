@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Ide-delete ang mga na-upload na file na hindi nakalakip sa mga naipadalang mensahe.",
       "discardAttachmentsTitle": "I-discard ang mga attachment?",
       "charactersRemaining": "{{count}} na character ang natitira",
-      "insertNewline": "Magpasok ng bagong linya",
-      "starterChipBuild": "Gumawa ng feature",
-      "starterChipEmpty": "Magsimula sa isang ideya",
-      "starterChipFix": "Ayusin ang bug",
-      "starterChipPrepare": "Ihanda ang environment ko",
-      "starterChipWrapUp": "Tapusin ang session ko",
-      "starterChipWriteTests": "Sumulat ng mga test"
+      "insertNewline": "Magpasok ng bagong linya"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",

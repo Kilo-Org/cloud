@@ -2630,13 +2630,7 @@
       "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
       "discardAttachmentsTitle": "Zavreči priloge?",
       "charactersRemaining": "Preostalo znakov: {{count}}",
-      "insertNewline": "Vstavite novo vrstico",
-      "starterChipBuild": "Razvij funkcijo",
-      "starterChipEmpty": "Začni z zamislijo",
-      "starterChipFix": "Odpravi napako",
-      "starterChipPrepare": "Nastavi moje okolje",
-      "starterChipWrapUp": "Zaključi mojo sejo",
-      "starterChipWriteTests": "Napiši preizkuse"
+      "insertNewline": "Vstavite novo vrstico"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",

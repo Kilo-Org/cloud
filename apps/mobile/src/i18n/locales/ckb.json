@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
       "discardAttachmentsTitle": "فڕێدانی هاوپێچەکان؟",
       "charactersRemaining": "{{count}} پیت ماوە",
-      "insertNewline": "تێخستنی دێڕێکی نوێ",
-      "starterChipBuild": "تایبەتمەندییەک دروست بکە",
-      "starterChipEmpty": "بە بیرۆکەیەک دەست پێ بکە",
-      "starterChipFix": "هەڵەیەک چاک بکەرەوە",
-      "starterChipPrepare": "ژینگەکەم ڕێک بخە",
-      "starterChipWrapUp": "سێشنەکەم تەواو بکە",
-      "starterChipWriteTests": "تاقیکردنەوەکان بنووسە"
+      "insertNewline": "تێخستنی دێڕێکی نوێ"
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",

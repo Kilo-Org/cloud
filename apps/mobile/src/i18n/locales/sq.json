@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?",
       "charactersRemaining": "Mbeten {{count}} karaktere",
-      "insertNewline": "Shtoni një rresht të ri",
-      "starterChipBuild": "Krijo një veçori",
-      "starterChipEmpty": "Fillo me një ide",
-      "starterChipFix": "Rregullo një gabim",
-      "starterChipPrepare": "Konfiguro mjedisin tim",
-      "starterChipWrapUp": "Përfundo seancën time",
-      "starterChipWriteTests": "Shkruaj teste"
+      "insertNewline": "Shtoni një rresht të ri"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",

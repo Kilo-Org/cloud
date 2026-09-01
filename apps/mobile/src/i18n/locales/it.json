@@ -2130,13 +2130,7 @@
       "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
       "discardAttachmentsTitle": "Scartare gli allegati?",
       "charactersRemaining": "{{count}} caratteri rimanenti",
-      "insertNewline": "Inserisci un'interruzione di riga",
-      "starterChipBuild": "Crea una funzionalità",
-      "starterChipEmpty": "Inizia con un'idea",
-      "starterChipFix": "Correggi un errore",
-      "starterChipPrepare": "Configura il mio ambiente",
-      "starterChipWrapUp": "Concludi la mia sessione",
-      "starterChipWriteTests": "Scrivi test"
+      "insertNewline": "Inserisci un'interruzione di riga"
     },
     "chatLink": {
       "linkCopied": "Link copiato",

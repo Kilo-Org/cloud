@@ -2150,13 +2150,7 @@
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
       "charactersRemaining": "נותרו {{count}} תווים",
-      "insertNewline": "הוסף שורה חדשה",
-      "starterChipBuild": "פתח תכונה",
-      "starterChipEmpty": "התחל ברעיון",
-      "starterChipFix": "תקן באג",
-      "starterChipPrepare": "הגדר את הסביבה שלי",
-      "starterChipWrapUp": "סיים את ההפעלה שלי",
-      "starterChipWriteTests": "כתוב בדיקות"
+      "insertNewline": "הוסף שורה חדשה"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",

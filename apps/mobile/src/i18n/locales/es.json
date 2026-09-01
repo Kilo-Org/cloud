@@ -2150,13 +2150,7 @@
       "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardAttachmentsTitle": "¿Descartar adjuntos?",
       "charactersRemaining": "Quedan {{count}} caracteres",
-      "insertNewline": "Insertar salto de línea",
-      "starterChipBuild": "Crea una función",
-      "starterChipEmpty": "Empieza con una idea",
-      "starterChipFix": "Corrige un error",
-      "starterChipPrepare": "Configura mi entorno",
-      "starterChipWrapUp": "Finaliza mi sesión",
-      "starterChipWriteTests": "Escribe pruebas"
+      "insertNewline": "Insertar salto de línea"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",

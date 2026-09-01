@@ -19,6 +19,7 @@
  */
 
 import { trimPayload } from './trim-payload.js';
+import { projectSafeAssistantError } from './assistant-failure.js';
 import type { IngestEvent, StreamEventType, WrapperEventTruncatedData } from './protocol.js';
 
 /** Cloudflare's per-WebSocket-message receive limit. Documentation/logging only. */
@@ -185,7 +186,7 @@ function compactMessageUpdated(data: Record<string, unknown>): Record<string, un
       if (typeof info.sessionID === 'string') compactInfo.sessionID = info.sessionID;
       if (typeof info.role === 'string') compactInfo.role = info.role;
       if (isRecord(info.time)) compactInfo.time = info.time;
-      const safeError = safeString(info.error, 2000);
+      const safeError = projectSafeAssistantError(info.error);
       if (safeError !== undefined) compactInfo.error = safeError;
       out.properties = { info: compactInfo };
     }

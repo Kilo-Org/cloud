@@ -17,6 +17,7 @@ const CLI = {
   id: 'cli',
   title: 'Bump deps',
   gitUrl: 'git@github.com:kilo/app.git',
+  gitBranch: 'feature/session-search',
   createdOnPlatform: 'cli',
 };
 const VSCODE = {
@@ -24,6 +25,7 @@ const VSCODE = {
   title: 'Rename the module',
   gitUrl: 'https://github.com/kilo/cloud.git',
   createdOnPlatform: 'vscode',
+  associatedPr: { number: 42, title: 'Harden live search' },
 };
 const BARE = { id: 'bare', title: '', gitUrl: null, createdOnPlatform: 'unknown' };
 
@@ -111,10 +113,19 @@ describe('filterLiveSessions', () => {
     ).toEqual(['cli']);
   });
 
-  it('searches the title case-insensitively', () => {
+  it('searches mid-string in the title case-insensitively', () => {
     expect(
-      filterLiveSessions(sessions, query({ searchQuery: '  FIX the ' })).map(s => s.id)
+      filterLiveSessions(sessions, query({ searchQuery: '  LOGIN REDI ' })).map(s => s.id)
     ).toEqual(['cloud']);
+  });
+
+  it('searches mid-string in other session metadata case-insensitively', () => {
+    expect(
+      filterLiveSessions(sessions, query({ searchQuery: 'SSION-SEA' })).map(s => s.id)
+    ).toEqual(['cli']);
+    expect(filterLiveSessions(sessions, query({ searchQuery: 'LIVE SEA' })).map(s => s.id)).toEqual(
+      ['vscode']
+    );
   });
 
   it('searches the repository name too', () => {

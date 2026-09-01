@@ -2138,13 +2138,7 @@
       "discardAttachmentsMessage": "Geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd.",
       "discardAttachmentsTitle": "Bijlagen weggooien?",
       "charactersRemaining": "{{count}} tekens resterend",
-      "insertNewline": "Nieuwe regel invoegen",
-      "starterChipBuild": "Bouw een functie",
-      "starterChipEmpty": "Begin met een idee",
-      "starterChipFix": "Los een fout op",
-      "starterChipPrepare": "Stel mijn omgeving in",
-      "starterChipWrapUp": "Rond mijn sessie af",
-      "starterChipWriteTests": "Schrijf tests"
+      "insertNewline": "Nieuwe regel invoegen"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",

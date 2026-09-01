@@ -2138,13 +2138,7 @@
       "discardAttachmentsMessage": "Unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus.",
       "discardAttachmentsTitle": "Buang lampiran?",
       "charactersRemaining": "{{count}} karakter tersisa",
-      "insertNewline": "Sisipkan baris baru",
-      "starterChipBuild": "Buat fitur",
-      "starterChipEmpty": "Mulai dengan ide",
-      "starterChipFix": "Perbaiki kesalahan",
-      "starterChipPrepare": "Siapkan lingkungan saya",
-      "starterChipWrapUp": "Akhiri sesi saya",
-      "starterChipWriteTests": "Tulis pengujian"
+      "insertNewline": "Sisipkan baris baru"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",

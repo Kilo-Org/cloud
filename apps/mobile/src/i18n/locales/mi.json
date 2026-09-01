@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukua ake kāore anō kia whakapirihia ki ngā karere kua tukua.",
       "discardAttachmentsTitle": "Whakarere i ngā whakapirihanga?",
       "charactersRemaining": "E {{count}} ngā pū e toe ana",
-      "insertNewline": "Whakauru rārangi hōu",
-      "starterChipBuild": "Hangaia he āhuatanga",
-      "starterChipEmpty": "Tīmata ki tētahi whakaaro",
-      "starterChipFix": "Whakatikahia he hapa",
-      "starterChipPrepare": "Whakaritea taku taiao",
-      "starterChipWrapUp": "Whakakapia taku wātū",
-      "starterChipWriteTests": "Tuhia ngā whakamātau"
+      "insertNewline": "Whakauru rārangi hōu"
     },
     "chatLink": {
       "linkCopied": "Kua tāruatia te hononga",

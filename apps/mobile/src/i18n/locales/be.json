@@ -2630,13 +2630,7 @@
       "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
       "discardAttachmentsTitle": "Выдаліць укладанні?",
       "charactersRemaining": "Засталося сімвалаў: {{count}}",
-      "insertNewline": "Уставіць новы радок",
-      "starterChipBuild": "Ствары функцыю",
-      "starterChipEmpty": "Пачні з ідэі",
-      "starterChipFix": "Выправі памылку",
-      "starterChipPrepare": "Наладзь маё асяроддзе",
-      "starterChipWrapUp": "Завяршы мой сеанс",
-      "starterChipWriteTests": "Напішы тэсты"
+      "insertNewline": "Уставіць новы радок"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіраваная",

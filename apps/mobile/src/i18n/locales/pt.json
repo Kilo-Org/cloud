@@ -2611,13 +2611,7 @@
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam anexados a mensagens enviadas serão eliminados.",
       "discardAttachmentsTitle": "Descartar anexos?",
       "charactersRemaining": "{{count}} caracteres restantes",
-      "insertNewline": "Inserir nova linha",
-      "starterChipBuild": "Cria uma funcionalidade",
-      "starterChipEmpty": "Começa com uma ideia",
-      "starterChipFix": "Corrige um erro",
-      "starterChipPrepare": "Configura o meu ambiente",
-      "starterChipWrapUp": "Conclui a minha sessão",
-      "starterChipWriteTests": "Escreve testes"
+      "insertNewline": "Inserir nova linha"
     },
     "chatLink": {
       "linkCopied": "Ligação copiada",

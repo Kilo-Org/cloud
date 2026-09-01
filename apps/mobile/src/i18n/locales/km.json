@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង ហើយមិនបានភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវបានលុប។",
       "discardAttachmentsTitle": "បោះបង់ឯកសារភ្ជាប់?",
       "charactersRemaining": "នៅសល់ {{count}} តួអក្សរ",
-      "insertNewline": "បញ្ចូលបន្ទាត់ថ្មី",
-      "starterChipBuild": "បង្កើតមុខងារ",
-      "starterChipEmpty": "ចាប់ផ្តើមជាមួយគំនិត",
-      "starterChipFix": "ជួសជុលកំហុស",
-      "starterChipPrepare": "រៀបចំបរិស្ថានរបស់ខ្ញុំ",
-      "starterChipWrapUp": "បញ្ចប់វគ្គរបស់ខ្ញុំ",
-      "starterChipWriteTests": "សរសេរការធ្វើតេស្ត"
+      "insertNewline": "បញ្ចូលបន្ទាត់ថ្មី"
     },
     "chatLink": {
       "linkCopied": "បានចម្លងតំណ",

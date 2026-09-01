@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardAttachmentsTitle": "ضمیمې لغوه کړئ؟",
       "charactersRemaining": "{{count}} توري پاتې دي",
-      "insertNewline": "نوې کرښه دننه کړئ",
-      "starterChipBuild": "یوه ځانګړتیا جوړه کړه",
-      "starterChipEmpty": "له یوې مفکورې پیل وکړه",
-      "starterChipFix": "یوه تېروتنه سمه کړه",
-      "starterChipPrepare": "زما چاپېریال چمتو کړه",
-      "starterChipWrapUp": "زما ناسته پای ته ورسوه",
-      "starterChipWriteTests": "ازموینې ولیکه"
+      "insertNewline": "نوې کرښه دننه کړئ"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",

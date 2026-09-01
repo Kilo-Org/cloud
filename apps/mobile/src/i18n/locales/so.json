@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Faylasha la soo gudbiyay ee aan lagu lifaaqin fariimo la diray waa la tirtiri doonaa.",
       "discardAttachmentsTitle": "Tuur lifaaqyada?",
       "charactersRemaining": "{{count}} xaraf ayaa harsan",
-      "insertNewline": "Geli sadar cusub",
-      "starterChipBuild": "Dhis sifo",
-      "starterChipEmpty": "Ku bilow fikrad",
-      "starterChipFix": "Hagaaji cilad",
-      "starterChipPrepare": "Diyaari deegaankayga",
-      "starterChipWrapUp": "Dhammee kalfadhigayga",
-      "starterChipWriteTests": "Qor tijaabooyin"
+      "insertNewline": "Geli sadar cusub"
     },
     "chatLink": {
       "linkCopied": "Xiriirka waa la koobiyay",

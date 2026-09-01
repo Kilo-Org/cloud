@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "A yoo paarẹ awọn faili ti a gbe soke ti a ko so mọ awọn ifiranṣẹ ti a fi ranṣẹ.",
       "discardAttachmentsTitle": "Jù awọn asomọ silẹ?",
       "charactersRemaining": "Ohun kikọ {{count}} ku",
-      "insertNewline": "Fi ila tuntun sii",
-      "starterChipBuild": "Ṣẹda ẹya kan",
-      "starterChipEmpty": "Bẹrẹ pẹlu imọran kan",
-      "starterChipFix": "Ṣatunṣe aṣiṣe kan",
-      "starterChipPrepare": "Ṣeto ayika mi",
-      "starterChipWrapUp": "Pari igba-ijiroro mi",
-      "starterChipWriteTests": "Kọ awọn idanwo"
+      "insertNewline": "Fi ila tuntun sii"
     },
     "chatLink": {
       "linkCopied": "Ọna asopọ ti daakọ",

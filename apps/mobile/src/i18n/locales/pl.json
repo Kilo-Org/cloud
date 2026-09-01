@@ -2162,13 +2162,7 @@
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
       "discardAttachmentsTitle": "Odrzucić załączniki?",
       "charactersRemaining": "Pozostała liczba znaków: {{count}}",
-      "insertNewline": "Wstaw nowy wiersz",
-      "starterChipBuild": "Utwórz funkcję",
-      "starterChipEmpty": "Zacznij od pomysłu",
-      "starterChipFix": "Napraw błąd",
-      "starterChipPrepare": "Skonfiguruj moje środowisko",
-      "starterChipWrapUp": "Zakończ moją sesję",
-      "starterChipWriteTests": "Napisz testy"
+      "insertNewline": "Wstaw nowy wiersz"
     },
     "chatLink": {
       "linkCopied": "Link skopiowany",

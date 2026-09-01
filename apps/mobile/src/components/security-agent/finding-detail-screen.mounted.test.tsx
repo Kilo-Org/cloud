@@ -1,16 +1,15 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
-// Finding-detail dismiss retry-card contract: the card shows only when the
-// stored draft carries a non-null `lastError` (a pre-accept failure no command
-// observer will reconcile). A retryable failure offers Retry, a non-retryable
-// one hides it, and a cleared/absent draft (accept or empty) shows no card.
-// The screen stays mounted while the dismiss sheet is open, so it re-reads the
-// draft on focus.
+// Finding-detail load/back states and dismiss retry cards. The screen stays
+// mounted while the dismiss sheet is open, so it re-reads the draft on focus.
 
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { QueryError } from '@/components/query-error';
+import { Skeleton } from '@/components/ui/skeleton';
+import { type SecurityFinding } from '@/lib/security-agent';
 import { FindingDetailScreen } from './finding-detail-screen';
 
 type Draft = {
@@ -32,7 +31,7 @@ const finding = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   error: null as unknown,
-  data: { status: 'open', repo_full_name: 'org/repo' },
+  data: undefined as Pick<SecurityFinding, 'status' | 'repo_full_name'> | undefined,
   refetch: vi.fn(),
 }));
 
@@ -50,9 +49,8 @@ const capability = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
-const trackInteraction = vi.hoisted(() => ({
-  mutate: vi.fn(),
-}));
+const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
+const navigation = vi.hoisted(() => ({ history: [] as string[] }));
 
 // Captures the useFocusEffect callback so a test can simulate a focus event.
 const focusEffect = vi.hoisted(() => ({
@@ -72,14 +70,33 @@ const retryCards = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
 }));
 vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
+  ChevronDown: 'ChevronDown',
+  AlertCircle: 'AlertCircle',
+  Lock: 'Lock',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
 }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronLeft: 'ChevronLeft' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
-  useNavigation: () => ({ getState: vi.fn(() => ({})) }),
+  useRouter: () => ({
+    push: (href: string) => navigation.history.push(href),
+    back: () => navigation.history.pop(),
+    replace: (href: string) => navigation.history.splice(-1, 1, href),
+    // Parent history must not override the detail Stack's own history signal.
+    canGoBack: () => true,
+  }),
+  useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
   useFocusEffect: (effect: () => void) => {
     focusEffect.effect = effect;
   },
@@ -109,11 +126,11 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
     return null;
   },
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: () => null }));
-vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
+vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn() }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children,
   useTabBarBottomPadding: () => 0,
@@ -127,56 +144,62 @@ vi.mock('@/components/security-agent/finding-details-panel', () => ({
 vi.mock('@/components/security-agent/finding-remediation-panel', () => ({
   FindingRemediationPanel: () => null,
 }));
-vi.mock('@/lib/finding-detail-back', () => ({
-  findingDetailBackTarget: vi.fn(() => ({ kind: 'pop' })),
-  findingDetailHasLocalHistory: vi.fn(() => false),
-}));
-vi.mock('@/lib/security-agent', () => ({
-  getSecurityAgentPath: (scope: string, section: string) => `/security/${scope}/${section}`,
-}));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 type R = TestRenderer.ReactTestRenderer;
+let renderer: R | undefined = undefined;
+const scopeRoot = '/(app)/(tabs)/(3_profile)/security-agent/personal';
+const detailPath = `${scopeRoot}/findings/finding-1`;
 
 function renderScreen(): R {
-  const ref: { current: R | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(
+    renderer = TestRenderer.create(
       createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' })
     );
   });
-  const r = ref.current;
-  if (!r) {
+  if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return r;
+  return renderer;
 }
 
-describe('FindingDetailScreen dismiss retry card states', () => {
-  beforeEach(() => {
-    dismissDraft.draft = null;
-    dismissDraft.hydrated = true;
-    dismissDraft.persist.mockClear();
-    dismissDraft.clear.mockClear();
-    dismissDraft.refresh.mockClear();
-    finding.isLoading = false;
-    finding.isError = false;
-    finding.data = { status: 'open', repo_full_name: 'org/repo' };
-    analysis.isLoading = false;
-    analysis.isError = false;
-    analysis.data = undefined;
-    capability.canManage = true;
-    capability.isLoading = false;
-    capability.isError = false;
-    trackInteraction.mutate.mockClear();
-    retryCards.cards = [];
-    focusEffect.effect = undefined;
-  });
+function press(tree: R, accessibilityLabel: string) {
+  const { onPress } = tree.root.findByProps({ accessibilityLabel }).props as {
+    onPress: () => void;
+  };
+  act(onPress);
+}
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  dismissDraft.draft = null;
+  dismissDraft.hydrated = true;
+  finding.isLoading = false;
+  finding.isError = false;
+  finding.error = null;
+  finding.data = { status: 'open', repo_full_name: 'org/repo' };
+  finding.refetch.mockReset();
+  analysis.isLoading = false;
+  analysis.isError = false;
+  analysis.data = undefined;
+  capability.canManage = true;
+  capability.isLoading = false;
+  capability.isError = false;
+  retryCards.cards = [];
+  focusEffect.effect = undefined;
+  navigation.history = [detailPath];
+});
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  vi.unstubAllGlobals();
+});
+
+describe('FindingDetailScreen dismiss retry card states', () => {
   it('renders no retry card when there is no draft (empty)', () => {
-    dismissDraft.draft = null;
     renderScreen();
 
     expect(retryCards.cards).toHaveLength(0);
@@ -242,5 +265,83 @@ describe('FindingDetailScreen dismiss retry card states', () => {
     });
 
     expect(dismissDraft.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each([true, false])('finding load states with local history=%s', hasLocalHistory => {
+  beforeEach(() => {
+    navigation.history = hasLocalHistory ? [scopeRoot, detailPath] : [detailPath];
+  });
+
+  function expectSafeBack(tree: R) {
+    press(tree, 'screenHeader.goBack');
+    expect(navigation.history).toEqual(
+      hasLocalHistory ? [scopeRoot] : ['/(app)/(tabs)/(3_profile)']
+    );
+  }
+
+  it('keeps Back available during loading without offering Retry', () => {
+    finding.isLoading = true;
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
+    expectSafeBack(tree);
+  });
+
+  it('keeps Back safe while a transient load failure remains visible', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
+    expectSafeBack(tree);
+  });
+
+  it('recovers the finding through Retry after a transient load failure', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    finding.refetch.mockImplementationOnce(() => {
+      finding.isError = false;
+      finding.error = null;
+      finding.data = { status: 'open', repo_full_name: 'org/recovered' };
+    });
+    const tree = renderScreen();
+    expect(
+      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.couldNotLoad' })
+    ).toHaveLength(1);
+
+    press(tree, 'common.retry');
+    act(() => {
+      tree.update(
+        createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' })
+      );
+    });
+
+    expect(tree.root.findAllByProps({ children: 'org/recovered' })).toHaveLength(1);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
+    expectSafeBack(tree);
+  });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN'])('shows unavailable guidance and safe Back for %s', code => {
+    finding.isError = true;
+    finding.error = { data: { code } };
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(
+      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.notFound' })
+    ).toHaveLength(1);
+    expect(
+      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.notFoundDescription' })
+    ).toHaveLength(1);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expectSafeBack(tree);
   });
 });

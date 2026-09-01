@@ -2592,13 +2592,7 @@
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardAttachmentsTitle": "Kassér vedhæftninger?",
       "charactersRemaining": "{{count}} tegn tilbage",
-      "insertNewline": "Indsæt linjeskift",
-      "starterChipBuild": "Byg en funktion",
-      "starterChipEmpty": "Start med en idé",
-      "starterChipFix": "Ret en fejl",
-      "starterChipPrepare": "Konfigurér mit miljø",
-      "starterChipWrapUp": "Afslut min session",
-      "starterChipWriteTests": "Skriv test"
+      "insertNewline": "Indsæt linjeskift"
     },
     "chatLink": {
       "linkCopied": "Link kopieret",

@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
 import { ScreenHeader } from '@/components/screen-header';
 
@@ -61,8 +62,10 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: appState.addEventListener },
   FlatList: 'FlatList',
+  Modal: 'Modal',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  ScrollView: 'ScrollView',
   View: 'View',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
@@ -89,15 +92,17 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: { label: string }) => (options ? `${key}: ${options.label}` : key),
+  }),
 }));
 vi.mock('@/i18n', () => ({
   i18n: { t: (key: string) => key, language: 'en' },
 }));
 // The real persisted-filters hook runs; only its native edges are stubbed, so
 // the apply/clear transitions below exercise the actual filter state. The
-// stored record resolves through `filterRecord` so a test can hold it pending.
-const readFilterRecord = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
+// stored record resolves through `readFilterRecord` so a test can hold it pending.
+const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -114,6 +119,8 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
   Plus: 'Plus',
   Bot: 'Bot',
+  Check: 'Check',
+  X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/empty-state', () => ({
@@ -133,8 +140,8 @@ vi.mock('@/components/agents/session-list-content', () => ({
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
-vi.mock('@/components/agents/platform-filter-modal', () => ({
-  SessionFilterChips: 'SessionFilterChips',
+vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
+  ...(await importOriginal<typeof PlatformFilterModule>()),
   SessionFilterModal: 'SessionFilterModal',
 }));
 vi.mock('@/components/agents/active-now-section', () => ({
@@ -457,6 +464,147 @@ describe('AgentSessionListScreen live tab', () => {
     expect(filterButton.props.activeCount).toBe(0);
   });
 
+  it('keeps real pills, counts, results, and search placement in sync through removal', async () => {
+    const workflow = 'https://github.com/iscekic/kilo-workflow.git';
+    const code = 'https://github.com/Kilo-Org/kilocode.git';
+    sessionListState.activeSessions = [
+      {
+        id: 'workflow',
+        organizationId: null,
+        gitUrl: workflow,
+        createdOnPlatform: 'cloud-agent-web',
+      },
+      { id: 'code-cloud', organizationId: null, gitUrl: code, createdOnPlatform: 'cloud-agent' },
+      { id: 'code-cli', organizationId: null, gitUrl: code, createdOnPlatform: 'cli' },
+      {
+        id: 'other',
+        organizationId: null,
+        gitUrl: 'https://github.com/example/other.git',
+        createdOnPlatform: 'cloud-agent',
+      },
+    ];
+    const renderer = await renderScreen();
+    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
+    act(() => {
+      (requireHeaderAction(renderer, 'agents-open-filters').props.onPress as () => void)();
+    });
+    const modal = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SessionFilterModal'
+    );
+    act(() => {
+      (modal.props.onApply as (filters: unknown) => void)({
+        projectFilter: [workflow, code],
+        platformFilter: ['cloud-agent'],
+      });
+      (modal.props.onClose as () => void)();
+    });
+    const visibleIds = () => {
+      const rows = renderer.root.find(
+        node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+      ).props.data as MockActiveSession[];
+      return rows.map(row => row.id);
+    };
+    expect(visibleIds()).toEqual(['workflow', 'code-cloud']);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(3);
+    const strip = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'ScrollView'
+    );
+    expect((strip.props.className as string | undefined)?.split(' ')).toEqual(
+      expect.arrayContaining(['grow-0', 'shrink-0'])
+    );
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.parent?.children[0]).toBe(header);
+    const selectedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
+    expect(
+      selectedTree.children
+        ?.slice(0, 3)
+        .map(child => (typeof child === 'string' ? child : child.type))
+    ).toEqual(['View', 'SessionListSearchHeader', 'ScrollView']);
+
+    for (const step of [
+      {
+        label: 'agentChat.sessionFilter.removeProjectFilter: iscekic/kilo-workflow',
+        count: 2,
+        ids: ['code-cloud'],
+      },
+      {
+        label:
+          'agentChat.sessionFilter.removePlatformFilter: agentChat.sessionFilter.platformCloud',
+        count: 1,
+        ids: ['code-cloud', 'code-cli'],
+      },
+      {
+        label: 'agentChat.sessionFilter.removeProjectFilter: Kilo-Org/kilocode',
+        count: 0,
+        ids: ['workflow', 'code-cloud', 'code-cli', 'other'],
+      },
+    ]) {
+      act(() => {
+        const pill = renderer.root.findByProps({ accessibilityLabel: step.label });
+        (pill.props.onPress as () => void)();
+      });
+      expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(
+        step.count
+      );
+      expect(visibleIds()).toEqual(step.ids);
+    }
+    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
+    const clearedTree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
+    expect(
+      clearedTree.children
+        ?.slice(0, 3)
+        .map(child => (typeof child === 'string' ? child : child.type))
+    ).toEqual(['View', 'SessionListSearchHeader', 'FlatList']);
+  });
+
+  it('keeps saved repository and platform selections after a successful list retry', async () => {
+    const gitUrl = 'https://github.com/example/a-long-saved-repository-name.git';
+    readFilterRecord.mockImplementation(async storageKey => {
+      await Promise.resolve();
+      return storageKey === 'live-session-filters'
+        ? JSON.stringify({ projectFilter: [gitUrl], platformFilter: ['cloud-agent'] })
+        : null;
+    });
+    sessionListState.isError = true;
+    const renderer = await renderScreen();
+    const error = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'QueryError'
+    );
+    expect(error.props.message).toBe('agents.sessionList.couldNotLoadActive');
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(2);
+    refetchSpy.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      sessionListState.isError = false;
+      sessionListState.activeSessions = [
+        { id: 'matching', organizationId: null, gitUrl, createdOnPlatform: 'cloud-agent-web' },
+        { id: 'wrong-platform', organizationId: null, gitUrl, createdOnPlatform: 'cli' },
+        {
+          id: 'wrong-repository',
+          organizationId: null,
+          gitUrl: 'https://github.com/example/other.git',
+          createdOnPlatform: 'cloud-agent',
+        },
+      ];
+      return true;
+    });
+    await act(async () => {
+      (error.props.onRetry as () => void)();
+      await Promise.resolve();
+      renderer.update(createElement(AgentSessionListScreen));
+    });
+    expect(findTypeCount(renderer, 'QueryError')).toBe(0);
+    const rows = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    ).props.data as MockActiveSession[];
+    expect(rows.map(row => row.id)).toEqual(['matching']);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(2);
+    expect(
+      renderer.root
+        .find(node => typeof node.type === 'string' && (node.type as string) === 'ScrollView')
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Pressable')
+    ).toHaveLength(2);
+  });
+
   it('filters the live list down to the applied repository', async () => {
     sessionListState.activeSessions = [
       { id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
@@ -511,12 +659,16 @@ describe('AgentSessionListScreen live tab', () => {
       node => typeof node.type === 'string' && (node.type as string) === 'EmptyState'
     );
     expect(emptyState.props.title).toBe('agents.sessionList.noMatches');
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(1);
+    expect(findTypeCount(renderer, 'ScrollView')).toBe(1);
 
     const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
       clearAction.props.onPress();
     });
     expect(findTypeCount(renderer, 'FlatList')).toBe(1);
+    expect(requireHeaderAction(renderer, 'agents-open-filters').props.activeCount).toBe(0);
+    expect(findTypeCount(renderer, 'ScrollView')).toBe(0);
   });
 
   it('hides the FAB when there are no live rows', async () => {

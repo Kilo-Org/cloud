@@ -20,17 +20,15 @@ jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
 }));
 
-const request = {
-  kind: 'chat_completions',
-  body: { model: 'fake-deterministic', messages: [] },
-} as GatewayRequest;
-
 const user = { id: 'user-id' } as User;
 
 function providerInput(requestedModel: string) {
   return {
     requestedModel,
-    request,
+    request: {
+      kind: 'chat_completions',
+      body: { model: requestedModel, messages: [] },
+    } satisfies GatewayRequest,
     user,
     organizationId: undefined,
     taskId: undefined,
@@ -116,24 +114,29 @@ describe('getProvider local fake deterministic routing', () => {
     missingUrl.restore();
   });
 
-  test('routes MiniMax M3 through its declared OpenRouter gateway regardless of Vercel routing', async () => {
-    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+  describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])('%s', modelId => {
+    test.each([
+      { routeToVercel: false, provider: OPENROUTER },
+      { routeToVercel: true, provider: VERCEL_AI_GATEWAY },
+    ])(
+      'uses normal routing when Vercel selection is $routeToVercel',
+      async ({ routeToVercel, provider }) => {
+        jest.mocked(shouldRouteToVercel).mockResolvedValue(routeToVercel);
+        const input = providerInput(modelId);
 
-    expect(await getProvider(providerInput('minimax/minimax-m3:free'))).toEqual({
-      kind: 'provider',
-      provider: OPENROUTER,
-      userByok: null,
-      bypassAccessCheck: false,
-    });
-    expect(shouldRouteToVercel).not.toHaveBeenCalled();
-  });
-
-  test('routes MiniMax M2.7 through its declared Vercel AI Gateway', async () => {
-    expect(await getProvider(providerInput('minimax/minimax-m2.7:free'))).toEqual({
-      kind: 'provider',
-      provider: VERCEL_AI_GATEWAY,
-      userByok: null,
-      bypassAccessCheck: false,
-    });
+        expect(await getProvider(input)).toEqual({
+          kind: 'provider',
+          provider,
+          userByok: null,
+          bypassAccessCheck: false,
+        });
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(
+          modelId,
+          input.request,
+          user.id,
+          expect.any(Function)
+        );
+      }
+    );
   });
 });

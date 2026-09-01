@@ -21,6 +21,7 @@ import {
   CurrentSessionMetadataSchema,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
+import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { generateSessionId, isControlPlaneOwner } from '../../session-plane.js';
 import {
@@ -350,9 +351,25 @@ function assertRegisteredMetadata(
 }
 
 async function markPending(db: WorkerDb, rowId: string): Promise<void> {
+  const startedAt = Date.now();
   try {
-    await markReconcilePending(db, { rowId });
+    const row = await markReconcilePending(db, { rowId });
+    logControlDiagnostic('worktree_chat_reconciliation', {
+      operationRowId: rowId,
+      result: row?.status === 'reconcile_pending' ? 'pending' : 'not_pending',
+      durationMs: Date.now() - startedAt,
+    });
   } catch {
+    logControlDiagnostic(
+      'worktree_chat_reconciliation',
+      {
+        operationRowId: rowId,
+        result: 'mark_failed',
+        stage: 'reconciliation_mark',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     return;
   }
 }
@@ -364,6 +381,15 @@ async function createOwnershipRow(
   ctx: TRPCContext,
   progress: OperationProgress
 ): Promise<void> {
+  const startedAt = Date.now();
+  const diagnostic = {
+    operationRowId: rowId,
+    worktreeId: source.worktreeId,
+    sourceCloudAgentSessionId: source.ownership.cloudAgentSessionId,
+    sourceKiloSessionId: source.ownership.kiloSessionId,
+    cloudAgentSessionId: progress.cloudAgentSessionId,
+    kiloSessionId: progress.kiloSessionId,
+  };
   let response: unknown;
   try {
     response = await ctx.env.SESSION_INGEST.createSessionForCloudAgent({
@@ -381,23 +407,92 @@ async function createOwnershipRow(
       gitUrl: source.ownership.gitUrl ?? canonicalRepositoryUrl(source.repository),
     });
   } catch (error) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'ownership',
+        reason: 'ownership_outcome_unknown',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw error;
   }
 
   const parsed = ingestResultSchema.safeParse(response);
   if (!parsed.success || parsed.data.status === 'in_progress') {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'ownership',
+        reason: parsed.success ? 'ownership_in_progress' : 'ownership_response_invalid',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw creationInProgress();
   }
   if (parsed.data.status === 'rejected') {
-    await settleOperation(db, { rowId, status: 'failed', outcomeCode: 'ownership_row_rejected' });
+    try {
+      const settlement = await settleOperation(db, {
+        rowId,
+        status: 'failed',
+        outcomeCode: 'ownership_row_rejected',
+      });
+      logControlDiagnostic('worktree_chat_settlement', {
+        ...diagnostic,
+        requestedStatus: 'failed',
+        outcomeCode: 'ownership_row_rejected',
+        settled: settlement.settled,
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      logControlDiagnostic(
+        'worktree_chat_settlement',
+        {
+          ...diagnostic,
+          result: 'failed',
+          stage: 'ownership_settlement',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      throw error;
+    }
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'rejected',
+        stage: 'ownership',
+        reason: 'ownership_row_rejected',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     throw creationFailed();
   }
   if (
     parsed.data.clone.sessionId !== progress.kiloSessionId ||
     parsed.data.clone.copiedItemCount !== 0
   ) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'ownership',
+        reason: 'ownership_result_mismatch',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw creationInProgress();
   }
@@ -408,6 +503,18 @@ async function completeOperation(
   rowId: string,
   progress: OperationProgress
 ): Promise<void> {
+  const startedAt = Date.now();
+  const diagnostic = {
+    operationRowId: rowId,
+    worktreeId: progress.worktreeId,
+    cloudAgentSessionId: progress.cloudAgentSessionId,
+    kiloSessionId: progress.kiloSessionId,
+  };
+  logControlDiagnostic('worktree_chat_settlement', {
+    ...diagnostic,
+    requestedStatus: 'completed',
+    result: 'started',
+  });
   try {
     const settlement = await settleOperation(db, {
       rowId,
@@ -415,8 +522,25 @@ async function completeOperation(
       outcomeCode: 'ok',
       canonicalResult: resultFromProgress(progress),
     });
+    logControlDiagnostic('worktree_chat_settlement', {
+      ...diagnostic,
+      requestedStatus: 'completed',
+      outcomeCode: 'ok',
+      settled: settlement.settled,
+      durationMs: Date.now() - startedAt,
+    });
     if (!settlement.settled) throw creationInProgress();
   } catch (error) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'completion_settlement',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw error;
   }
@@ -429,6 +553,15 @@ async function registerWorktreeSession(
   ctx: TRPCContext,
   progress: OperationProgress
 ): Promise<void> {
+  const startedAt = Date.now();
+  const diagnostic = {
+    operationRowId: rowId,
+    worktreeId: source.worktreeId,
+    sourceCloudAgentSessionId: source.ownership.cloudAgentSessionId,
+    sourceKiloSessionId: source.ownership.kiloSessionId,
+    cloudAgentSessionId: progress.cloudAgentSessionId,
+    kiloSessionId: progress.kiloSessionId,
+  };
   const registrationInput = buildRegistrationInput(source, ctx, progress);
   let registrationAttempted = false;
   let response: unknown;
@@ -441,6 +574,11 @@ async function registerWorktreeSession(
           const existing = await stub.getMetadata();
           if (existing) {
             assertRegisteredMetadata(existing, source, progress);
+            logControlDiagnostic('worktree_chat_reconciliation', {
+              ...diagnostic,
+              result: 'registration_recovered',
+              durationMs: Date.now() - startedAt,
+            });
             return { success: true };
           }
         }
@@ -450,12 +588,34 @@ async function registerWorktreeSession(
       'registerSession'
     );
   } catch (error) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'registration',
+        reason: 'registration_outcome_unknown',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw error;
   }
 
   const result = registrationResultSchema.safeParse(response);
   if (!result.success) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'registration',
+        reason: 'registration_response_invalid',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     await markPending(db, rowId);
     throw creationInProgress();
   }
@@ -467,14 +627,56 @@ async function registerWorktreeSession(
         onlyIfEmpty: true,
       });
     } catch (error) {
+      logControlDiagnostic(
+        'worktree_chat_result',
+        {
+          ...diagnostic,
+          result: 'reconciliation_pending',
+          stage: 'registration_cleanup',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
       await markPending(db, rowId);
       throw error;
     }
-    await settleOperation(db, {
-      rowId,
-      status: 'failed',
-      outcomeCode: 'registration_rejected',
-    });
+    try {
+      const settlement = await settleOperation(db, {
+        rowId,
+        status: 'failed',
+        outcomeCode: 'registration_rejected',
+      });
+      logControlDiagnostic('worktree_chat_settlement', {
+        ...diagnostic,
+        requestedStatus: 'failed',
+        outcomeCode: 'registration_rejected',
+        settled: settlement.settled,
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      logControlDiagnostic(
+        'worktree_chat_settlement',
+        {
+          ...diagnostic,
+          result: 'failed',
+          stage: 'registration_settlement',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      throw error;
+    }
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'rejected',
+        stage: 'registration',
+        reason: 'registration_rejected',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'worktree_chat_registration_failed',
@@ -491,16 +693,49 @@ async function executeWorktreeCreate(
   ctx: TRPCContext,
   fingerprint: string
 ): Promise<WorktreeResult> {
+  const startedAt = Date.now();
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: generateSessionId('control'),
     kiloSessionId: generateKiloSessionId(),
     worktreeId: source.worktreeId,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,
   });
-  const recorded = await recordOperationProgress(db, row.id, progress);
-  if (!recorded) throw creationInProgress();
+  const diagnostic = {
+    operationRowId: row.id,
+    worktreeId: source.worktreeId,
+    sourceCloudAgentSessionId: source.ownership.cloudAgentSessionId,
+    sourceKiloSessionId: source.ownership.kiloSessionId,
+    cloudAgentSessionId: progress.cloudAgentSessionId,
+    kiloSessionId: progress.kiloSessionId,
+  };
+  try {
+    const recorded = await recordOperationProgress(db, row.id, progress);
+    if (!recorded) throw creationInProgress();
+  } catch (error) {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        ...diagnostic,
+        result: 'reconciliation_pending',
+        stage: 'progress_recording',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
+    throw error;
+  }
+  logControlDiagnostic('worktree_chat_progress', {
+    ...diagnostic,
+    result: 'recorded',
+    durationMs: Date.now() - startedAt,
+  });
   await createOwnershipRow(db, row.id, source, ctx, progress);
   await registerWorktreeSession(db, row.id, source, ctx, progress);
+  logControlDiagnostic('worktree_chat_result', {
+    ...diagnostic,
+    result: 'new',
+    durationMs: Date.now() - startedAt,
+  });
   return resultFromProgress(progress);
 }
 
@@ -512,21 +747,81 @@ async function reconcileWorktreeCreate(
   progress: OperationProgress | undefined,
   fingerprint: string
 ): Promise<WorktreeResult> {
+  const startedAt = Date.now();
+  const diagnostic = {
+    operationRowId: row.id,
+    worktreeId: source.worktreeId,
+    sourceCloudAgentSessionId: source.ownership.cloudAgentSessionId,
+    sourceKiloSessionId: source.ownership.kiloSessionId,
+    cloudAgentSessionId: progress?.cloudAgentSessionId,
+    kiloSessionId: progress?.kiloSessionId,
+  };
+  logControlDiagnostic('worktree_chat_reconciliation', {
+    ...diagnostic,
+    result: progress ? 'started' : 'no_progress',
+  });
   if (!progress) return executeWorktreeCreate(db, row, source, ctx, fingerprint);
 
   const existingMetadata = await withDORetry(
     () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
     stub => stub.getMetadata(),
     'getMetadata'
-  );
-  if (existingMetadata) assertRegisteredMetadata(existingMetadata, source, progress);
+  ).catch(error => {
+    logControlDiagnostic(
+      'worktree_chat_reconciliation',
+      {
+        ...diagnostic,
+        result: 'failed',
+        stage: 'reconciliation_metadata_read',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
+    throw error;
+  });
+  if (existingMetadata) {
+    try {
+      assertRegisteredMetadata(existingMetadata, source, progress);
+    } catch (error) {
+      logControlDiagnostic(
+        'worktree_chat_result',
+        {
+          ...diagnostic,
+          result: 'rejected',
+          stage: 'reconciliation_metadata',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      throw error;
+    }
+  }
 
   const ownership = await findOwnershipRow(
     db,
     ctx.userId,
     progress.kiloSessionId,
     progress.cloudAgentSessionId
-  );
+  ).catch(error => {
+    logControlDiagnostic(
+      'worktree_chat_reconciliation',
+      {
+        ...diagnostic,
+        result: 'failed',
+        stage: 'reconciliation_ownership_read',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
+    throw error;
+  });
+  logControlDiagnostic('worktree_chat_reconciliation', {
+    ...diagnostic,
+    result: 'observed',
+    hasRegisteredMetadata: Boolean(existingMetadata),
+    hasOwnership: Boolean(ownership),
+    durationMs: Date.now() - startedAt,
+  });
   if (ownership) {
     if (
       ownership.organizationId !== source.ownership.organizationId ||
@@ -534,6 +829,16 @@ async function reconcileWorktreeCreate(
       ownership.parentSessionId !== null ||
       ownership.cloudAgentSessionScopeId !== progress.cloudAgentSessionId
     ) {
+      logControlDiagnostic(
+        'worktree_chat_result',
+        {
+          ...diagnostic,
+          result: 'rejected',
+          stage: 'reconciliation_ownership',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
       throw operationConflict();
     }
   } else {
@@ -546,6 +851,11 @@ async function reconcileWorktreeCreate(
     await registerWorktreeSession(db, row.id, source, ctx, progress);
   }
 
+  logControlDiagnostic('worktree_chat_result', {
+    ...diagnostic,
+    result: 'replayed',
+    durationMs: Date.now() - startedAt,
+  });
   return resultFromProgress(progress, true);
 }
 
@@ -553,6 +863,7 @@ const createWorktreeChatHandler = internalApiProtectedProcedure
   .input(CreateWorktreeChatInput)
   .output(CreateWorktreeChatOutput)
   .mutation(async ({ input, ctx }) => {
+    const startedAt = Date.now();
     const db = getPgDb(ctx.env);
     const source = await loadWorktreeSource(db, ctx, input);
     const fingerprint = await worktreeIntentFingerprint(input, source.worktreeId);
@@ -565,25 +876,109 @@ const createWorktreeChatHandler = internalApiProtectedProcedure
       resourceKey: source.worktreeId,
       taxonomy: 'safe-retry',
       leaseSeconds: WORKTREE_CREATE_LEDGER_LEASE_SECONDS,
+    }).catch(error => {
+      logControlDiagnostic(
+        'worktree_chat_admission',
+        {
+          operationKey: input.operationKey,
+          worktreeId: source.worktreeId,
+          sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+          sourceKiloSessionId: input.sourceKiloSessionId,
+          result: 'failed',
+          stage: 'admission',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      throw error;
+    });
+    const diagnostic = {
+      operationKey: input.operationKey,
+      operationRowId: admission.row.id,
+      worktreeId: source.worktreeId,
+      sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
+      sourceKiloSessionId: input.sourceKiloSessionId,
+      admission: admission.admission,
+    };
+    logControlDiagnostic('worktree_chat_admission', {
+      ...diagnostic,
+      durationMs: Date.now() - startedAt,
     });
 
-    assertSessionOperationIdentity(admission.row, {
-      userId: ctx.userId,
-      intent: 'create_worktree_chat',
-      organizationId: input.kilocodeOrganizationId,
-      resourceKey: source.worktreeId,
-    });
-    const progress = readOperationProgress(admission.row, source, fingerprint);
+    let progress: OperationProgress | undefined;
+    try {
+      assertSessionOperationIdentity(admission.row, {
+        userId: ctx.userId,
+        intent: 'create_worktree_chat',
+        organizationId: input.kilocodeOrganizationId,
+        resourceKey: source.worktreeId,
+      });
+      progress = readOperationProgress(admission.row, source, fingerprint);
+    } catch (error) {
+      logControlDiagnostic(
+        'worktree_chat_result',
+        {
+          ...diagnostic,
+          result: 'rejected',
+          stage: 'operation_identity',
+          durationMs: Date.now() - startedAt,
+        },
+        'warn'
+      );
+      throw error;
+    }
+    const resultDiagnostic = {
+      ...diagnostic,
+      cloudAgentSessionId: progress?.cloudAgentSessionId,
+      kiloSessionId: progress?.kiloSessionId,
+    };
 
     switch (admission.admission) {
       case 'admitted':
-        if (progress) throw operationConflict();
+        if (progress) {
+          logControlDiagnostic(
+            'worktree_chat_result',
+            {
+              ...resultDiagnostic,
+              result: 'rejected',
+              stage: 'admission',
+              reason: 'unexpected_progress',
+              durationMs: Date.now() - startedAt,
+            },
+            'warn'
+          );
+          throw operationConflict();
+        }
         return executeWorktreeCreate(db, admission.row, source, ctx, fingerprint);
       case 'duplicate_settled':
-        if (admission.row.status !== 'completed' || !progress) throw creationFailed();
+        if (admission.row.status !== 'completed' || !progress) {
+          logControlDiagnostic(
+            'worktree_chat_result',
+            {
+              ...resultDiagnostic,
+              result: 'rejected',
+              stage: 'replay',
+              reason: 'settled_result_unavailable',
+              durationMs: Date.now() - startedAt,
+            },
+            'warn'
+          );
+          throw creationFailed();
+        }
+        logControlDiagnostic('worktree_chat_result', {
+          ...resultDiagnostic,
+          result: 'replayed',
+          durationMs: Date.now() - startedAt,
+        });
         return resultFromProgress(progress, true);
       case 'duplicate_in_flight':
       case 'duplicate_reconcile_in_progress':
+        logControlDiagnostic('worktree_chat_result', {
+          ...resultDiagnostic,
+          result: 'reconciliation_pending',
+          stage: 'admission',
+          durationMs: Date.now() - startedAt,
+        });
         throw creationInProgress();
       case 'takeover':
       case 'duplicate_reconcile_pending':

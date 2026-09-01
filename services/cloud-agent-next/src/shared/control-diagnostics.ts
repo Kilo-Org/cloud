@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { CONTROL_OPERATIONS, controlErrorCodes } from './sandbox-control-protocol.js';
+import {
+  CONTROL_OPERATIONS,
+  controlErrorCodes,
+  worktreeDeletePayloadSchema,
+} from './sandbox-control-protocol.js';
 
 export const CONTROL_LOG_MAX_BATCH_BYTES = 256 * 1024;
 export const CONTROL_LOG_MAX_BATCH_RECORDS = 128;
@@ -80,6 +84,40 @@ export const controlDiagnosticFieldsSchema = z
       'response_skipped',
       'skipped',
     ]),
+    stage: z
+      .enum([
+        'attach_validation',
+        'runtime_attach',
+        'workspace_prepare',
+        'git_setup',
+        'setup_commands',
+        'bootstrap_marker',
+        'git_credentials',
+        'session_registration',
+        'session_probe',
+        'session_restore',
+        'session_create',
+        'attachment_commit',
+        'deletion_fence',
+        'task_cancellation',
+        'runtime_lookup',
+        'directory_validation',
+        'manifest_discovery',
+        'session_abort',
+        'manifest_growth',
+        'process_cleanup',
+        'terminal_cleanup',
+        'session_delete',
+        'session_delete_confirmation',
+        'session_delete_unconfirmed',
+        'directory_dispose',
+        'runtime_retirement',
+        'directory_removal',
+        'root_detach',
+      ])
+      .optional(),
+    workspaceAction: z.enum(['reuse', 'bootstrap', 'not_needed']).optional(),
+    sessionResolution: z.enum(['existing', 'restored', 'created']).optional(),
     kind: z.enum(['preparation', 'execution', 'finalizing']).optional(),
     status: z.enum(['completed', 'failed', 'cancelled']).optional(),
     category: z
@@ -97,6 +135,8 @@ export const controlDiagnosticFieldsSchema = z
     retirementCause: z
       .enum([
         'event_feed_unhealthy',
+        'process_exited',
+        'credential_refresh_failed',
         'control_disconnected',
         'preparation_delivery_failed',
         'requested_shutdown',
@@ -114,6 +154,7 @@ export const controlDiagnosticFieldsSchema = z
     errorCode: z.enum([...controlErrorCodes, 'other']).optional(),
     retryable: z.boolean().optional(),
     scopeId: identifier.optional(),
+    worktreeId: worktreeDeletePayloadSchema.shape.worktreeId.optional(),
     sessionId: identifier.optional(),
     kiloSessionId: identifier.optional(),
     messageId: identifier.optional(),
@@ -128,6 +169,7 @@ export const controlDiagnosticFieldsSchema = z
     delayMs: milliseconds.optional(),
     sequence: count.optional(),
     eventsReceived: count.optional(),
+    sessionCount: count.optional(),
     bufferedBytes: count.optional(),
     bytes: count.optional(),
     attempt: count.optional(),

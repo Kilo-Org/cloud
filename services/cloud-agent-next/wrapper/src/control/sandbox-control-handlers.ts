@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {
   emitControlDiagnostic,
+  type ControlDiagnosticRecord,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
 import {
@@ -450,8 +451,24 @@ export async function handleControlRequest(
     }
     const kiloRuntimes = deps.kiloRuntimes;
     if (!kiloRuntimes) return missingKilo();
+    const startedAt = Date.now();
+    let failureStage: ControlDiagnosticRecord['fields']['stage'] = 'deletion_fence';
+    const diagnostic = (
+      phase: 'started' | 'completed' | 'failed',
+      stage: NonNullable<ControlDiagnosticRecord['fields']['stage']>
+    ): void =>
+      emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+        operation,
+        phase,
+        stage,
+        worktreeId: input.worktreeId,
+        sessionCount: input.sessionIds.length,
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      });
     try {
       const fenced = fenceDirectoryOperations(input.directory);
+      diagnostic('started', 'deletion_fence');
+      failureStage = 'task_cancellation';
       const tasks = [...deps.tasks.values()].filter(
         task => task.session.directory === input.directory
       );
@@ -459,15 +476,20 @@ export async function handleControlRequest(
         task.controller.abort(new ControlTaskCancellation('cancelled', 'Worktree deleted'));
       }
       const results = await Promise.all(tasks.map(task => task.done));
+      failureStage = 'deletion_fence';
       await fenced;
+      diagnostic('completed', 'deletion_fence');
       if (results.some((result, index) => !result.ok && tasks[index]?.kind !== 'preparation')) {
+        diagnostic('failed', 'task_cancellation');
         return fail('not_ready', 'Worktree cancellation is incomplete', true);
       }
+      failureStage = 'runtime_lookup';
       const runtime = kiloRuntimes.get(input.directory);
       const client =
         deps.worktreeCleanupClient ??
         (runtime ? createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl) : undefined);
       const cleanupDeps = {
+        onDiagnostic: deps.onDiagnostic,
         client,
         detachRoot: (id: string) => {
           deps.activity?.detach(id);
@@ -481,6 +503,7 @@ export async function handleControlRequest(
           await kiloRuntimes.deleteDirectory(directory);
         },
       };
+      failureStage = undefined;
       if (operation === 'worktree.prepareDeletion') {
         return ok({
           prepared: true,
@@ -489,6 +512,7 @@ export async function handleControlRequest(
       }
       return ok(await deleteWorktree(input, cleanupDeps));
     } catch {
+      if (failureStage) diagnostic('failed', failureStage);
       return fail('not_ready', 'Worktree cleanup is incomplete', true);
     }
   }
@@ -640,6 +664,7 @@ async function handleAttach(
     deps,
     async owned => {
       const result = await (deps.applyAttach ?? applySessionAttach)(session, parsed.data, {
+        onDiagnostic: deps.onDiagnostic,
         kiloRuntimes: deps.kiloRuntimes,
         signal: owned.signal,
         canRefreshCredentials: () =>

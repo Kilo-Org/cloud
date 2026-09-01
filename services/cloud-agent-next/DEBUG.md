@@ -190,6 +190,14 @@ Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archive
 
 Uploads are best effort: an abrupt kill or network failure can lose unuploaded records. The buffer holds 512 records and each batch holds up to 128 records or 256 KiB. A recorded WebSocket send is a local handoff, not proof that a session DO applied the event; correlate it with the Worker forwarding and durable message-transition logs.
 
+### Shared-worktree Lifecycle
+
+`worktreeId` identifies the shared checkout and chat group; `sessionId` is the Cloud Agent chat ID and `kiloSessionId` is the Kilo session ID. Worker `worktree_chat_*` events cover admission, progress, reconciliation, settlement, and the result, correlating the source and resulting chats with the existing worktree. Their durations are phase-local; a reconciliation-pending result describes required recovery, while the separate reconciliation and settlement records report persistence outcomes. Wrapper attachment does not receive an explicit worktree ID, so join its chat IDs with Worker records rather than treating a credential `scopeId` or directory as the worktree identity.
+
+Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unresolved` decisions and identify the evidence used. Unresolved ownership is not proof of sharing or permission to destroy a sandbox. `worktree_runtime_cleanup` records the cleanup strategy, failure stage, and confirmed journal flags. `worktree_cleanup_location` confirms resources cleaned at one runtime location; it is not overall deletion completion. Only `worktree_deletion` with `result=completed` or `result=replayed` confirms the complete deletion request.
+
+Wrapper `control.request` attachment summaries separate `workspaceAction` (reuse or bootstrap) from `sessionResolution` (existing, restored, or created chat). Worktree deletion records include the first fence/drain, preparation/deletion outcome, stage, and session count. These records contain IDs and fixed outcomes, not repository paths, credentials, or session content.
+
 ## Interpreting Common States
 
 - Worker queueing succeeds, but no wrapper logs appear:

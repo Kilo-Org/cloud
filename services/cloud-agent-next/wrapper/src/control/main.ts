@@ -21,6 +21,8 @@ import { controlLogWrapperIdSchema } from '../../../src/shared/control-diagnosti
 
 const retirementCauses = new Map([
   ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
+  ['process_exited', 'process_exited'],
+  ['credential_refresh_failed', 'credential_refresh_failed'],
   ['Sandbox control connection lost', 'control_disconnected'],
   ['Preparation event delivery failed', 'preparation_delivery_failed'],
   ['Sandbox shutting down', 'requested_shutdown'],
@@ -146,6 +148,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       exitCode,
       retirementCause:
         retirementCauses.get(reason) ??
+        retirementCauses.get(diagnosticReason) ??
         (diagnosticReason.startsWith('feed_') ? 'event_feed_unhealthy' : 'unknown'),
     });
     void diagnostics.flush();

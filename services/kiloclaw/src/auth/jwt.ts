@@ -11,6 +11,7 @@ export type ValidateResult =
  * Verify a Kilo JWT using HS256 symmetric secret.
  *
  * Checks: signature, expiration (built into jose), version === 3 (via shared schema),
+ * KILOCLAW_AUDIENCE when an audience is present (legacy audience-less tokens are accepted),
  * and optional env match against the worker's WORKER_ENV.
  */
 export async function validateKiloToken(

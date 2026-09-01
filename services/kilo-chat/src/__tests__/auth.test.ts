@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signKiloToken } from '@kilocode/worker-utils';
+import { getWorkerDb } from '@kilocode/db/client';
 import {
   EVENT_SERVICE_AUDIENCE,
   KILO_CHAT_AUDIENCE,
@@ -23,7 +24,7 @@ const userRow = vi.hoisted(() => ({
 }));
 
 vi.mock('@kilocode/db/client', () => ({
-  getWorkerDb: () => ({
+  getWorkerDb: vi.fn(() => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -35,7 +36,7 @@ vi.mock('@kilocode/db/client', () => ({
         }),
       }),
     }),
-  }),
+  })),
 }));
 
 const defaultEnv: MockEnv = {
@@ -58,6 +59,8 @@ function makeApp() {
 async function signToken(
   params: {
     audience?: string;
+    secret?: string;
+    expiresInSeconds?: number;
     pepper?: string | null;
     env?: string;
     extra?: { tokenSource?: string; botId?: string; deviceSessionId?: string };
@@ -67,8 +70,8 @@ async function signToken(
     await signKiloToken({
       userId: 'user-xyz-789',
       pepper: 'pepper' in params ? params.pepper : 'pepper-current',
-      secret: TEST_JWT_SECRET,
-      expiresInSeconds: 3600,
+      secret: params.secret ?? TEST_JWT_SECRET,
+      expiresInSeconds: params.expiresInSeconds ?? 3600,
       env: 'env' in params ? params.env : 'production',
       audience: params.audience,
       extra: params.extra,
@@ -116,6 +119,7 @@ async function request(token: string, env = defaultEnv) {
 
 describe('authMiddleware', () => {
   beforeEach(() => {
+    vi.mocked(getWorkerDb).mockClear();
     dbState.lookupCount = 0;
     dbState.fails = false;
     userRow.pepper = 'pepper-current';
@@ -131,6 +135,10 @@ describe('authMiddleware', () => {
 
   it.each([
     ['a matching string audience', () => signToken({ audience: KILO_CHAT_AUDIENCE })],
+    [
+      'a legacy token from another source',
+      () => signToken({ extra: { tokenSource: 'cloud-agent' } }),
+    ],
     ['a matching array audience', () => signWithAudience([KILO_CHAT_AUDIENCE, 'other-service'])],
     [
       'a legacy kilo-chat token with bot and device-session claims',
@@ -147,6 +155,27 @@ describe('authMiddleware', () => {
     const { response } = await request(await createToken());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ callerId: 'user-xyz-789', callerKind: 'user' });
+  });
+
+  it.each([
+    ['an expired JWT', () => signToken({ audience: KILO_CHAT_AUDIENCE, expiresInSeconds: -60 })],
+    ['a malformed bearer', () => 'not-a-jwt'],
+    [
+      'a JWT signed with the wrong secret',
+      () =>
+        signToken({
+          audience: KILO_CHAT_AUDIENCE,
+          secret: 'wrong-test-secret-at-least-32-characters',
+        }),
+    ],
+  ])('returns 401 for %s before database or downstream access', async (_name, createToken) => {
+    const { response, downstreamCalls } = await request(await createToken());
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(dbState.lookupCount).toBe(0);
+    expect(downstreamCalls()).toBe(0);
   });
 
   it.each([

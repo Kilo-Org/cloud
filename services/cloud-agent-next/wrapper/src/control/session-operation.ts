@@ -768,6 +768,7 @@ export class SessionOperation {
             kiloClient,
             env,
             messageId: completion?.info.id ?? messageId,
+            userMessageId: messageId,
             signal,
             onEvent: event => this.emitFinalizationEvent(event),
           });

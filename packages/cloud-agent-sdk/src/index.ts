@@ -160,6 +160,7 @@ export type {
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
+  SessionCommit,
   PreparationAttempt,
   PreparationAttemptStatus,
   PreparationStepKind,

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { atom } from 'jotai';
 import type {
   PreparationAttempt,
+  SessionCommit,
   SessionManager,
   StandaloneQuestion,
   StandaloneSuggestion,
@@ -11,6 +12,7 @@ import type { AssistantMessage } from '@/types/opencode.gen';
 import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
 import type * as ToolCardShellModule from './ToolCardShell';
 import { useOptionalManager } from './CloudAgentProvider';
+import { CommitDetails } from './CommitCard';
 
 let mockExpanded = false;
 
@@ -37,6 +39,7 @@ jest.mock('react-markdown', () => ({
 jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
 
 import { ConversationMessages } from './ConversationMessages';
+import { commitsByMessageAnchor } from './message-presentation';
 import { PartRenderer } from './PartRenderer';
 
 Object.assign(globalThis, { React });
@@ -108,8 +111,14 @@ function toolPart(
 
 function renderConversation(
   staticMessages: StoredMessage[],
-  overrides: Partial<React.ComponentProps<typeof ConversationMessages>> = {}
+  overrides: Partial<React.ComponentProps<typeof ConversationMessages>> & {
+    commits?: readonly SessionCommit[];
+  } = {}
 ): string {
+  const { commits = [], ...props } = overrides;
+  const commitsAfterMessage =
+    props.commitsAfterMessage ??
+    commitsByMessageAnchor([...staticMessages, ...(props.dynamicMessages ?? [])], commits);
   return renderToStaticMarkup(
     React.createElement(ConversationMessages, {
       active: true,
@@ -119,7 +128,8 @@ function renderConversation(
       pendingMessages: new Map(),
       preparationByMessageId: new Map(),
       onOpenPreparationDetails: jest.fn(),
-      ...overrides,
+      commitsAfterMessage,
+      ...props,
     })
   );
 }
@@ -134,6 +144,169 @@ beforeEach(() => {
 });
 
 describe('ConversationMessages', () => {
+  const commit: SessionCommit = {
+    commitHash: 'a'.repeat(40),
+    commitMessage: 'Fix the actual issue\n\nKeep the complete body accessible.',
+    messageId: 'assistant-1',
+    userMessageId: 'user-1',
+    committedAt: '2026-09-01T10:00:00.000Z',
+    pushStatus: 'failed',
+  };
+
+  it('renders one compact commit line at its anchor without diff actions, preserving later rows', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('first', 'First answer')])],
+      {
+        dynamicMessages: [assistantMessage('assistant-2', [textPart('second', 'Later answer')])],
+        commits: [commit, { ...commit }],
+      }
+    );
+    expect(html.match(/data-commit-hash=/g)).toHaveLength(1);
+    const trigger = buttons(html).find(button => button.includes('data-commit-hash='));
+    expect(trigger).toContain(`data-commit-hash="${commit.commitHash}"`);
+    expect(trigger).toContain('Fix the actual issue');
+    expect(trigger).toContain('truncate');
+    expect(trigger).toContain('aria-label="Commit aaaaaaa details"');
+    expect(trigger).toContain('aria-haspopup="dialog"');
+    expect(trigger).toContain('aria-expanded="false"');
+    expect(trigger).toContain('focus-visible:ring-2');
+    expect(trigger).toContain('[@media(any-pointer:coarse)]:min-h-11');
+    expect(trigger).not.toMatch(/\b(?:border|bg-|flex-wrap)/);
+    expect(html).not.toContain('View diff');
+    expect(html).not.toContain('Keep the complete body accessible.');
+    expect(html).not.toContain('Push failed');
+    expect(html).not.toContain('may include changes from other chats');
+    expect(html.indexOf('First answer')).toBeLessThan(html.indexOf('data-commit-hash='));
+    expect(html.indexOf('data-commit-hash=')).toBeLessThan(html.indexOf('Later answer'));
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
+  });
+
+  it('shares one combined anchor map across transcript chunks without fallback duplicates', () => {
+    const staticMessages: StoredMessage[] = [
+      {
+        info: {
+          id: 'user-1',
+          role: 'user',
+          sessionID: 'ses-1',
+          time: { created: 0 },
+          agent: 'code',
+          model: { providerID: 'test', modelID: 'test' },
+        },
+        parts: [],
+      },
+      assistantMessage('assistant-1', [textPart('first', 'First answer')]),
+    ];
+    const dynamicMessages = [
+      assistantMessage('assistant-2', [textPart('second', 'Second answer')]),
+    ];
+    const anchoredCommit = { ...commit, messageId: 'assistant-2' };
+    const commitsAfterMessage = commitsByMessageAnchor(
+      [...staticMessages, ...dynamicMessages],
+      [anchoredCommit]
+    );
+    const staticHtml = renderConversation(staticMessages, { commitsAfterMessage });
+    const dynamicHtml = renderConversation([], { dynamicMessages, commitsAfterMessage });
+    expect(staticHtml).not.toContain('data-commit-hash=');
+    expect(dynamicHtml.match(/data-commit-hash=/g)).toHaveLength(1);
+    expect(dynamicHtml.indexOf('Second answer')).toBeLessThan(
+      dynamicHtml.indexOf('data-commit-hash=')
+    );
+    expect(commitsAfterMessage.get('assistant-2')).toEqual([anchoredCommit]);
+  });
+
+  it.each([
+    ['pushed', false],
+    ['failed', true],
+    ['not_attempted', true],
+    ['unknown', false],
+  ] as const)(
+    'keeps commit metadata and shows only a confirmed non-push for %s',
+    (pushStatus, showsNotPushed) => {
+      const html = renderToStaticMarkup(
+        React.createElement(CommitDetails, { commit: { ...commit, pushStatus } })
+      );
+      expect(html).toContain('Fix the actual issue</p>');
+      expect(html).toContain('Keep the complete body accessible.</p>');
+      expect(html).toContain(commit.commitHash);
+      expect(html).toContain(`dateTime="${commit.committedAt}"`);
+      expect(html.includes('>Not pushed<')).toBe(showsNotPushed);
+      expect(html).not.toContain('Workspace commit');
+      expect(html).not.toContain('Push status');
+      expect(html).not.toContain('>Pushed<');
+      expect(html).not.toContain('may include changes from other chats');
+      expect(html).not.toContain('text-destructive');
+      expect(html).not.toContain('View diff');
+    }
+  );
+
+  it('keeps long commit messages as plain text in details without embedding them in the trigger name', () => {
+    const longCommit = {
+      ...commit,
+      commitMessage: `${'Long subject '.repeat(100)}\n\n<script>not markup</script>\n${'Body '.repeat(1000)}`,
+    };
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('answer', 'Answer')])],
+      { commits: [longCommit] }
+    );
+    expect(html).toContain('aria-label="Commit aaaaaaa details"');
+    expect(html).not.toContain('Body ');
+    const details = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: longCommit })
+    );
+    expect(details).toContain('Body '.repeat(1000));
+    expect(details).toContain('&lt;script&gt;not markup&lt;/script&gt;');
+    expect(details).not.toContain('<script>');
+  });
+
+  it('does not append a commit whose known assistant anchor is unloaded', () => {
+    const html = renderConversation(
+      [
+        {
+          info: {
+            id: 'user-1',
+            role: 'user',
+            sessionID: 'ses-1',
+            time: { created: 0 },
+            agent: 'code',
+            model: { providerID: 'test', modelID: 'test' },
+          },
+          parts: [],
+        },
+        assistantMessage('assistant-2', [textPart('later', 'Unrelated later answer')]),
+      ],
+      { commits: [commit] }
+    );
+    expect(html).not.toContain('data-commit-hash=');
+    expect(html).toContain('Unrelated later answer');
+  });
+
+  it('keeps different full SHAs with the same display prefix and defers saved-message truncation to details', () => {
+    const html = renderConversation(
+      [assistantMessage('assistant-1', [textPart('answer', 'Answer')])],
+      {
+        commits: [
+          commit,
+          {
+            ...commit,
+            commitHash: `${'a'.repeat(39)}b`,
+            pushStatus: 'not_attempted',
+            commitMessageTruncated: true,
+          },
+        ],
+      }
+    );
+    expect(html.match(/data-commit-hash=/g)).toHaveLength(2);
+    expect(html).not.toContain('Not pushed');
+    expect(html).not.toContain('Message truncated.');
+    const details = renderToStaticMarkup(
+      React.createElement(CommitDetails, { commit: { ...commit, commitMessageTruncated: true } })
+    );
+    expect(details).toContain('Message truncated.');
+    expect(renderToStaticMarkup(React.createElement(CommitDetails, { commit }))).not.toContain(
+      'Message truncated.'
+    );
+  });
+
   it('shows individual rows in transcript order with collapsed details and metadata after the answer', () => {
     const html = renderConversation([
       assistantMessage('assistant-1', [

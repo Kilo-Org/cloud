@@ -127,6 +127,16 @@ export {
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
 
+export { createKiloAuthMiddleware } from './kilo-auth-middleware.js';
+export type {
+  KiloAuthEnv,
+  KiloAuthMiddlewareOptions,
+  KiloAuthOrgMembership,
+  KiloAuthVariables,
+  ResolveSecret,
+  SecretBinding,
+} from './kilo-auth-middleware.js';
+
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
 

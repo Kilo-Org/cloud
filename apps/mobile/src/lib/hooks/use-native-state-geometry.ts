@@ -1,0 +1,105 @@
+import { captureException } from '@sentry/react-native';
+import { useEffect, useState } from 'react';
+import { findNodeHandle, type View } from 'react-native';
+
+import {
+  addSurfaceGeometryListener,
+  isNativeSurfaceGeometryAvailable,
+  type NativeSurfaceGeometry,
+  observeSurface,
+  unobserveSurface,
+} from '@/lib/native-surface-geometry';
+
+type Observation = {
+  node: View | null;
+  status: 'pending' | 'ready' | 'failed';
+  geometry: NativeSurfaceGeometry | null;
+};
+
+function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGeometry) {
+  return (
+    left?.tag === right.tag &&
+    left.visibleTop === right.visibleTop &&
+    left.visibleBottom === right.visibleBottom &&
+    left.boundsHeight === right.boundsHeight &&
+    left.keyboardOverlap === right.keyboardOverlap &&
+    left.safeAreaTop === right.safeAreaTop &&
+    left.safeAreaBottom === right.safeAreaBottom
+  );
+}
+
+export function useNativeStateGeometry(node: View | null) {
+  const [observation, setObservation] = useState<Observation>({
+    node: null,
+    status: 'pending',
+    geometry: null,
+  });
+
+  useEffect(() => {
+    if (!isNativeSurfaceGeometryAvailable || !node) {
+      return undefined;
+    }
+    const tag = findNodeHandle(node);
+    if (tag === null) {
+      setObservation({ node, status: 'failed', geometry: null });
+      return undefined;
+    }
+    let active = true;
+    const publish = (geometry: NativeSurfaceGeometry) => {
+      if (!active || geometry.tag !== tag) {
+        return;
+      }
+      const valid =
+        Number.isFinite(geometry.visibleTop) &&
+        Number.isFinite(geometry.visibleBottom) &&
+        Number.isFinite(geometry.boundsHeight) &&
+        Number.isFinite(geometry.safeAreaTop) &&
+        Number.isFinite(geometry.safeAreaBottom) &&
+        geometry.visibleBottom >= geometry.visibleTop &&
+        geometry.boundsHeight >= 0;
+      if (!valid) {
+        setObservation({ node, status: 'failed', geometry: null });
+        return;
+      }
+      setObservation(previous =>
+        previous.node === node && sameGeometry(previous.geometry, geometry)
+          ? previous
+          : { node, status: 'ready', geometry }
+      );
+    };
+    setObservation({ node, status: 'pending', geometry: null });
+    const listener = addSurfaceGeometryListener(publish);
+    const start = async () => {
+      try {
+        publish(await observeSurface(tag));
+      } catch {
+        if (active) {
+          setObservation({ node, status: 'failed', geometry: null });
+        }
+      }
+    };
+    const stop = async () => {
+      try {
+        await unobserveSurface(tag);
+      } catch (error) {
+        captureException(error, {
+          tags: { 'error.subsystem': 'surface_geometry', 'error.operation': 'unobserve' },
+        });
+      }
+    };
+    void start();
+    return () => {
+      active = false;
+      listener?.remove();
+      void stop();
+    };
+  }, [node]);
+
+  if (!isNativeSurfaceGeometryAvailable) {
+    return { status: 'unavailable' as const, geometry: null };
+  }
+  if (observation.node !== node) {
+    return { status: 'pending' as const, geometry: null };
+  }
+  return observation;
+}

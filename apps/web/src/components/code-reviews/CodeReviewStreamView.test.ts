@@ -266,6 +266,7 @@ describe('CodeReviewStreamView', () => {
   let createRoot: typeof createReactRoot;
   let CodeReviewStreamView: typeof CodeReviewStreamViewComponent;
   let props: ViewProps;
+  let committedText: string[];
 
   async function renderView(nextProps: Partial<ViewProps> = {}) {
     props = { ...props, ...nextProps };
@@ -274,7 +275,11 @@ describe('CodeReviewStreamView', () => {
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(CodeReviewStreamView, props)
+          createElement(
+            React.Profiler,
+            { id: 'review-stream', onRender: () => committedText.push(text()) },
+            createElement(CodeReviewStreamView, props)
+          )
         )
       )
     );
@@ -303,6 +308,7 @@ describe('CodeReviewStreamView', () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     eventId = 0;
+    committedText = [];
     mockSockets.length = 0;
     mockSearchParams = new URLSearchParams();
     mockGetStreamInfo.mockReset().mockResolvedValue(streamInfo());
@@ -372,8 +378,8 @@ describe('CodeReviewStreamView', () => {
 
     snapshot = transcript();
     await advanceTime(2000);
-    expect(text()).not.toContain('Found a nullability regression.');
-    expect(text()).toContain('Waiting for events');
+    expect(text()).toContain('Found a nullability regression.');
+    expect(text()).not.toContain('Waiting for events');
 
     snapshot = transcript('Checking the remaining files.');
     await advanceTime(2000);
@@ -400,13 +406,13 @@ describe('CodeReviewStreamView', () => {
 
     const completed = streamInfo({ status: 'completed' });
     mockGetStreamInfo.mockResolvedValue(completed);
-    mockGetMessages.mockResolvedValue(transcript('Persisted organization assessment.'));
+    mockGetMessages.mockResolvedValue(transcript());
     await settle(() => terminalStatus.resolve(completed));
     expect(status()).toBe('Complete');
     expect(text()).toContain('Session Log');
-    expect(text()).toContain('Persisted organization assessment.');
+    expect(text()).toContain('Partial organization progress.');
+    expect(text()).not.toContain('No session logs available.');
     expect(text()).not.toContain('Final verdict.');
-    expect(text()).not.toContain('Partial organization progress.');
     expect(text()).not.toContain('Live');
     expect(mockGetMessages.mock.calls.length).toBeGreaterThan(liveRequests);
     expect(mockOnComplete).toHaveBeenCalledTimes(1);
@@ -486,6 +492,42 @@ describe('CodeReviewStreamView', () => {
     expect(text()).toContain('Persisted personal assessment.');
   });
 
+  it.each([true, false])(
+    'preserves personal text across empty reconciliation responses (ingest recovers: %s)',
+    async recovers => {
+      mockGetStreamInfo.mockResolvedValue(streamInfo({ organizationId: undefined }));
+      await renderView();
+      const live = socket();
+      await settle(() => live.config.onEvent(textPart('Live personal assessment.')));
+      mockGetStreamInfo.mockResolvedValue(
+        streamInfo({ organizationId: undefined, status: 'completed' })
+      );
+      await settle(() => live.config.onEvent(streamEvent('complete')));
+      expect(status()).toBe('Complete');
+      expect(mockGetMessages).toHaveBeenCalled();
+      expect(text()).toContain('Live personal assessment.');
+      expect(text()).not.toContain('No session logs available.');
+      expect(live.manager.disconnect).toHaveBeenCalled();
+
+      await advanceTime(2000);
+      expect(text()).toContain('Live personal assessment.');
+      if (recovers) {
+        mockGetMessages.mockResolvedValue(transcript('Persisted personal assessment.'));
+        await advanceTime(2000);
+        expect(text()).toContain('Persisted personal assessment.');
+        expect(text()).not.toContain('Live personal assessment.');
+        mockGetMessages.mockResolvedValue(transcript());
+      }
+      await advanceTime(12_000);
+      expect(text()).toContain(
+        recovers ? 'Persisted personal assessment.' : 'Live personal assessment.'
+      );
+      const requests = mockGetMessages.mock.calls.length;
+      await advanceTime(6000);
+      expect(mockGetMessages).toHaveBeenCalledTimes(requests);
+    }
+  );
+
   it('shows running metadata and transcript errors, then hides revoked data and stops polling', async () => {
     mockGetMessages.mockResolvedValue(transcript('Organization-only transcript.'));
     await renderView();
@@ -513,6 +555,9 @@ describe('CodeReviewStreamView', () => {
     expect(text()).toContain('Organization-only transcript.');
     expect(text()).not.toContain('Review transcript unavailable.');
     expect(status()).toBe('Running');
+    mockGetMessages.mockResolvedValue(transcript());
+    await advanceTime(2000);
+    expect(text()).toContain('Organization-only transcript.');
 
     mockGetMessages.mockRejectedValue(
       TRPCClientError.from<RootRouter>({
@@ -619,6 +664,42 @@ describe('CodeReviewStreamView', () => {
     expect(status()).toBe('Running');
     expect(mockFetchStreamTicket).not.toHaveBeenCalled();
   });
+
+  it.each(['review', 'attempt'])(
+    'clears retained logs before committing a cached %s',
+    async identity => {
+      mockGetMessages.mockResolvedValue(transcript('Retained organization progress.'));
+      await renderView({ attempts });
+      mockGetMessages.mockResolvedValue(transcript());
+      await advanceTime(2000);
+      expect(text()).toContain('Retained organization progress.');
+
+      queryClient.setDefaultOptions({
+        queries: { retry: false, gcTime: Infinity, staleTime: 60_000 },
+      });
+      const input = {
+        reviewId: identity === 'review' ? '00000000-0000-4000-8000-000000000005' : reviewId,
+        attemptId: identity === 'attempt' ? previousAttemptId : currentAttemptId,
+      };
+      queryClient.setQueryData(
+        mockTrpc.codeReviews.getReviewStreamInfo.queryOptions(input).queryKey,
+        streamInfo()
+      );
+      queryClient.setQueryData(
+        mockTrpc.codeReviews.getSessionMessages.queryOptions(input).queryKey,
+        transcript()
+      );
+      committedText.length = 0;
+      if (identity === 'review') {
+        await renderView({ reviewId: input.reviewId });
+      } else {
+        await navigateToAttempt(input.attemptId);
+      }
+      expect(committedText.length).toBeGreaterThan(0);
+      expect(committedText.join('\n')).not.toContain('Retained organization progress.');
+      expect(text()).toContain('Waiting for events');
+    }
+  );
 
   it('reconciles completion after switching between cached running attempts', async () => {
     queryClient.setDefaultOptions({

@@ -102,7 +102,11 @@ export function CodeReviewStreamView({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [events, setEvents] = useState<DisplayEvent[]>([]);
+  const [events, setEvents] = useState<{
+    reviewId: string;
+    attemptId?: string;
+    entries: DisplayEvent[];
+  }>({ reviewId, entries: [] });
   const [accessDenied, setAccessDenied] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>({
     status: 'disconnected',
@@ -154,7 +158,7 @@ export function CodeReviewStreamView({
   }, [attemptIds, effectiveAttemptId, orderedAttempts.length, queryAttemptId, updateAttemptParam]);
 
   useEffect(() => {
-    setEvents([]);
+    setEvents({ reviewId, attemptId: effectiveAttemptId, entries: [] });
     setAccessDenied(false);
     setConnectionState({ status: 'disconnected' });
     setWsError(null);
@@ -222,13 +226,20 @@ export function CodeReviewStreamView({
       setWsError(null);
       const displayEvent = toCodeReviewDisplayEvent(event);
       if (displayEvent) {
-        setEvents(prev => appendCodeReviewDisplayEvent(prev, displayEvent));
+        setEvents(prev => ({
+          reviewId,
+          attemptId: effectiveAttemptId,
+          entries: appendCodeReviewDisplayEvent(
+            prev.reviewId === reviewId && prev.attemptId === effectiveAttemptId ? prev.entries : [],
+            displayEvent
+          ),
+        }));
       }
       if (event.streamEventType === 'complete' || event.streamEventType === 'interrupted') {
         void refetchStreamInfo();
       }
     },
-    [refetchStreamInfo]
+    [reviewId, effectiveAttemptId, refetchStreamInfo]
   );
 
   const handleWsError = useCallback((error: StreamError) => {
@@ -321,6 +332,12 @@ export function CodeReviewStreamView({
   });
 
   useEffect(() => {
+    if (shouldLoadMessages && sessionMessages?.success && sessionMessages.entries.length > 0) {
+      setEvents({ reviewId, attemptId: effectiveAttemptId, entries: sessionMessages.entries });
+    }
+  }, [reviewId, effectiveAttemptId, shouldLoadMessages, sessionMessages]);
+
+  useEffect(() => {
     if (displayBehavior?.shouldPollStatus) {
       wasRunningRef.current = true;
     } else if (isComplete && wasRunningRef.current && !accessDenied) {
@@ -344,7 +361,11 @@ export function CodeReviewStreamView({
   }, [streamInfoError, sessionMessagesError]);
 
   const displayEvents: DisplayEvent[] =
-    shouldLoadMessages && sessionMessages?.success ? sessionMessages.entries : events;
+    shouldLoadMessages && sessionMessages?.success && sessionMessages.entries.length > 0
+      ? sessionMessages.entries
+      : events.reviewId === reviewId && events.attemptId === effectiveAttemptId
+        ? events.entries
+        : [];
   const displayError =
     streamInfoError?.message ??
     (streamInfo && !streamInfo.success ? streamInfo.error : null) ??

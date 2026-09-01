@@ -244,7 +244,9 @@ describe('Agents live count surfaces', () => {
     expectCounts(renderer);
 
     fetchSessions.mockResolvedValue({ sessions: sessions(1) });
-    const retry = node(renderer, 'QueryError').props.onRetry as () => void;
+    const retry = renderer.root.find(
+      item => isHostType(item, 'Button') && item.props.accessibilityLabel === 'Retry'
+    ).props.onPress as () => void;
     act(retry);
     await waitFor(() => agentsOptions(renderer).tabBarBadge === 1);
     expectCounts(renderer, 1, '1 LIVE');
@@ -298,9 +300,13 @@ describe('Agents live count surfaces', () => {
 
     act(() => {
       queryClient.setQueryData(key('org-a'), { sessions: sessions(12, 'org-a') });
-      queryClient.setQueryData(key('org-b'), {
-        sessions: [...sessions(1, 'org-b'), ...sessions(4, 'org-a')],
-      });
+    });
+    expectCounts(result.renderer);
+    fetchSessions.mockResolvedValue({
+      sessions: [...sessions(1, 'org-b'), ...sessions(4, 'org-a')],
+    });
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: key('org-b') });
     });
     await waitFor(() => agentsOptions(result.renderer).tabBarBadge === 1);
     expectCounts(result.renderer, 1, '1 LIVE');

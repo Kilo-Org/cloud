@@ -48,6 +48,7 @@ export type AttachPreparingEmitter = (event: PreparingEventDataV2) => void;
 
 export type ApplyAttachDeps = {
   kiloRuntimes?: WorktreeKiloRuntimes;
+  canRefreshCredentials?: () => boolean;
   signal?: AbortSignal;
   terminalRuntime?: Pick<ControlTerminalRuntime, 'rememberAttachedSession'>;
   mkdir?: (directory: string) => Promise<void>;
@@ -282,7 +283,12 @@ async function executeSessionAttach(
   const taskSignal = deps.signal ?? AbortSignal.timeout(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS);
   try {
     taskSignal.throwIfAborted();
-    attachment = deps.kiloRuntimes.attach(session, attach.kilo, attach.env);
+    attachment = deps.kiloRuntimes.attach(
+      session,
+      attach.kilo,
+      attach.env,
+      deps.canRefreshCredentials
+    );
     const signal = AbortSignal.any([taskSignal, attachment.signal]);
     const { kiloClient, env } = await withTimeoutAndAbort(attachment.ready, {
       signal,
@@ -387,6 +393,22 @@ async function executeSessionAttach(
           signal.throwIfAborted();
           await writeBootstrapMarker(directory);
           signal.throwIfAborted();
+        }
+        if (attach.kilo.containmentEnabled === false && attach.git?.token) {
+          const refreshed = await runGit(
+            [
+              'remote',
+              'set-url',
+              'origin',
+              authenticatedGitUrl(attach.git.url, attach.git.token, attach.git.platform),
+            ],
+            directory,
+            signal
+          );
+          signal.throwIfAborted();
+          if (refreshed.exitCode !== 0) {
+            return fail('not_ready', 'Worktree Git credential refresh failed', true);
+          }
         }
       } catch {
         return fail(

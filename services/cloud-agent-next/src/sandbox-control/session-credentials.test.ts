@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -6,6 +7,7 @@ import type { Env, GitTokenService } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
 import {
   buildControlNetworkPolicy,
+  isContainedSessionCredentialGrant,
   prepareSessionCredentials,
   removeSessionCredentialMembership,
   resolveSessionCredential,
@@ -72,7 +74,17 @@ function createBroker() {
       appType: 'standard',
     })),
     getToken: vi.fn<GitTokenService['getToken']>(async () => GITHUB_TOKEN),
-    getCloudAgentAuthForRepo: vi.fn<NonNullable<GitTokenService['getCloudAgentAuthForRepo']>>(),
+    getCloudAgentAuthForRepo: vi.fn<NonNullable<GitTokenService['getCloudAgentAuthForRepo']>>(
+      async () => ({
+        success: true,
+        githubToken: GITHUB_TOKEN,
+        installationId: '42',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'user',
+        gitAuthor: { name: 'bot', email: 'bot@example.com' },
+      })
+    ),
     issueKiloSessionCapability: vi.fn<GitTokenService['issueKiloSessionCapability']>(
       async subject => {
         const capability = `kka1.test-${++serial}`;
@@ -112,8 +124,16 @@ function createBroker() {
       capability: `kbb1.test-${++serial}`,
       gitUrl: 'https://bitbucket.org/acme/canonical-repo.git',
     })),
-    getGitLabToken: vi.fn<GitTokenService['getGitLabToken']>(),
-    getBitbucketToken: vi.fn<NonNullable<GitTokenService['getBitbucketToken']>>(),
+    getGitLabToken: vi.fn<GitTokenService['getGitLabToken']>(async () => ({
+      success: true,
+      token: 'test-real-gitlab-token',
+      instanceUrl: 'https://gitlab.example.com:8443/gitlab',
+      glabIsOAuth2: false,
+    })),
+    getBitbucketToken: vi.fn<NonNullable<GitTokenService['getBitbucketToken']>>(async () => ({
+      success: true,
+      token: 'test-real-bitbucket-token',
+    })),
     redeemKiloSessionCapability: vi.fn<GitTokenService['redeemKiloSessionCapability']>(),
     redeemGitHubSessionCapability: vi.fn<GitTokenService['redeemGitHubSessionCapability']>(),
     redeemGitLabSessionCapability: vi.fn<GitTokenService['redeemGitLabSessionCapability']>(),
@@ -177,13 +197,13 @@ function secondRoot(overrides: Partial<SessionMetadata> = {}): SessionMetadata {
   });
 }
 
-function prepare(
+async function prepare(
   env: CredentialEnv,
   data = metadata(),
   existing?: SessionCredentialGrant,
   now = NOW
 ) {
-  return prepareSessionCredentials({
+  const result = await prepareSessionCredentials({
     env,
     metadata: data,
     sandboxId: data.workspace?.sandboxId ?? SANDBOX_ID,
@@ -193,6 +213,8 @@ function prepare(
     existing,
     now,
   });
+  if (!isContainedSessionCredentialGrant(result.grant)) throw new Error('Expected contained grant');
+  return { ...result, grant: result.grant };
 }
 
 function resolve(
@@ -203,7 +225,7 @@ function resolve(
   return resolveSessionCredential({
     env,
     grant,
-    credential: grant.kilo.alias,
+    credential: grant.kilo.alias ?? grant.kilo.token,
     url: 'https://provider.example.com/api/openrouter/chat/completions',
     method: 'POST',
     outboundContainerId: OUTBOUND_CONTAINER_ID,
@@ -892,6 +914,646 @@ describe('trusted worktree credential preparation', () => {
     await expect(prepare(env, vercelMetadata())).rejects.toThrow(
       'Invalid contained worktree credentials'
     );
+  });
+});
+
+function directMetadata(overrides: Partial<SessionMetadata> = {}): SessionMetadata {
+  return metadata({
+    ...overrides,
+    workspace: {
+      ...overrides.workspace,
+      credentialContainment: { kilocode: false, github: false, gitlab: false, bitbucket: false },
+    },
+  });
+}
+
+function prepareDirect(
+  env: CredentialEnv,
+  data = directMetadata(),
+  existing?: SessionCredentialGrant,
+  now = NOW
+) {
+  return prepareSessionCredentials({
+    env,
+    metadata: data,
+    sandboxId: data.workspace?.sandboxId ?? SANDBOX_ID,
+    existing,
+    now,
+  });
+}
+
+function expectNoCapabilities(broker: ReturnType<typeof createBroker>['broker']): void {
+  expect(broker.issueKiloSessionCapability).not.toHaveBeenCalled();
+  expect(broker.issueGitHubSessionCapability).not.toHaveBeenCalled();
+  expect(broker.issueGitLabSessionCapability).not.toHaveBeenCalled();
+  expect(broker.issueBitbucketSessionCapability).not.toHaveBeenCalled();
+}
+
+describe('direct worktree credentials', () => {
+  it.each(['cloudflare', 'vercel'] as const)(
+    'prepares real credentials without aliases or capabilities on %s',
+    async provider => {
+      const { broker } = createBroker();
+      const env = environment(broker);
+      const data = directMetadata({
+        workspace: {
+          sandboxProvider: provider,
+          sandboxId: provider === 'vercel' ? VERCEL_SANDBOX_ID : SANDBOX_ID,
+        },
+      });
+      const { grant, payload } = await prepareDirect(env, data);
+      expect(grant.containmentEnabled).toBe(false);
+      expect(isContainedSessionCredentialGrant(grant)).toBe(false);
+      expect(grant.kilo.alias).toBeUndefined();
+      expect(grant.kilo.capabilities).toEqual({});
+      expect(grant.scm?.alias).toBeUndefined();
+      expect(grant.scm?.capability).toBeUndefined();
+      expect(payload.kilo).toEqual({
+        scopeId: grant.scopeId,
+        token: KILO_TOKEN,
+        containmentEnabled: false,
+        targets: grant.kilo.targets,
+        organizationId: INTEGRATION_ID,
+      });
+      expect(payload.git).toEqual({
+        url: 'https://github.com/acme/repo.git',
+        platform: 'github',
+        token: GITHUB_TOKEN,
+      });
+      expect(payload.env).toMatchObject({
+        KILOCODE_TOKEN: KILO_TOKEN,
+        GH_TOKEN: GITHUB_TOKEN,
+        KILOCODE_ORGANIZATION_ID: INTEGRATION_ID,
+      });
+      expect(broker.getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+        githubRepo: 'acme/repo',
+        userId: 'user-a',
+        orgId: INTEGRATION_ID,
+        expectedIntegrationId: INTEGRATION_ID,
+        allowUserAuthorization: true,
+      });
+      expectNoCapabilities(broker);
+      expect(sessionCredentialGrantSchema.parse(JSON.parse(JSON.stringify(grant)))).toEqual(grant);
+      expect(await resolve(env, grant)).toBeNull();
+      expect(() => buildControlNetworkPolicy([grant])).toThrow(
+        'Invalid contained worktree credentials'
+      );
+    }
+  );
+
+  it('prepares repository-free worktrees without a broker', async () => {
+    const { grant, payload } = await prepareDirect(
+      environment(),
+      directMetadata({ repository: undefined })
+    );
+    expect(payload.kilo.token).toBe(KILO_TOKEN);
+    expect(payload.git).toBeUndefined();
+    expect(grant.scm).toBeUndefined();
+  });
+
+  it('preserves profile overrides while trusting metadata for Kilo identity and scope', async () => {
+    const { broker } = createBroker();
+    const token = `https://selected-provider.example.com/api/openrouter:${KILO_TOKEN}`;
+    const data = directMetadata({
+      auth: { kiloSessionId: ROOT_ID, kilocodeToken: token },
+      profile: {
+        envVars: {
+          GH_TOKEN: 'custom-gh',
+          GITHUB_TOKEN: 'custom-github',
+          KILOCODE_TOKEN: 'untrusted-kilo',
+          KILOCODE_ORGANIZATION_ID: 'untrusted-org',
+          PUBLIC_VALUE: 'kept',
+        },
+        setupCommands: ['run --token=custom-gh'],
+      },
+    });
+    const { payload } = await prepareDirect(environment(broker), data);
+    expect(payload.env).toMatchObject({
+      GH_TOKEN: 'custom-gh',
+      GITHUB_TOKEN: 'custom-github',
+      KILOCODE_TOKEN: token,
+      KILOCODE_ORGANIZATION_ID: INTEGRATION_ID,
+      PUBLIC_VALUE: 'kept',
+    });
+    expect(payload.kilo.targets.providerBaseUrl).toBe(
+      'https://selected-provider.example.com/api/openrouter'
+    );
+    expect(payload.kilo.organizationId).toBe(INTEGRATION_ID);
+    expect(payload.setupCommands).toEqual(['run --token=custom-gh']);
+    expect(payload.git?.token).toBe(GITHUB_TOKEN);
+    const personal = await prepareDirect(
+      environment(broker),
+      directMetadata({
+        identity: { ...data.identity, orgId: undefined },
+        profile: {
+          envVars: { GITHUB_TOKEN: 'custom-github', KILOCODE_ORGANIZATION_ID: 'untrusted-org' },
+        },
+      })
+    );
+    expect(personal.payload.env?.GH_TOKEN).toBe('custom-github');
+    expect(personal.payload.kilo.organizationId).toBeUndefined();
+    expect(personal.payload.env?.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+    expectNoCapabilities(broker);
+  });
+
+  it('keeps explicit GitHub authentication without calling a broker', async () => {
+    const { broker } = createBroker();
+    const { payload } = await prepareDirect(
+      environment(broker),
+      directMetadata({ repository: { type: 'github', repo: 'acme/repo', token: GITHUB_TOKEN } })
+    );
+    expect(payload.git?.token).toBe(GITHUB_TOKEN);
+    expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    expect(broker.getTokenForRepo).not.toHaveBeenCalled();
+    expectNoCapabilities(broker);
+  });
+
+  it('resolves scoped managed GitLab tokens and rotates only managed profile carriers', async () => {
+    const { broker } = createBroker();
+    const data = directMetadata({
+      repository: {
+        type: 'gitlab',
+        url: 'https://gitlab.example.com:8443/gitlab/acme/repo.git',
+        token: 'old-managed-token',
+        gitlabTokenManaged: true,
+      },
+      profile: {
+        envVars: {
+          GITLAB_TOKEN: 'old-managed-token',
+          GITLAB_HOST: 'stale.example.com',
+          GLAB_IS_OAUTH2: 'true',
+        },
+      },
+    });
+    const { payload } = await prepareDirect(environment(broker), data);
+    expect(payload.git?.token).toBe('test-real-gitlab-token');
+    expect(payload.env).toMatchObject({
+      GITLAB_TOKEN: 'test-real-gitlab-token',
+      GITLAB_HOST: 'gitlab.example.com:8443',
+      GITLAB_SUBFOLDER: 'gitlab',
+      GLAB_IS_OAUTH2: 'false',
+    });
+    expect(broker.getGitLabToken).toHaveBeenCalledWith({
+      userId: 'user-a',
+      orgId: INTEGRATION_ID,
+      repositoryUrl: 'https://gitlab.example.com:8443/gitlab/acme/repo.git',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    const custom = await prepareDirect(environment(broker), {
+      ...data,
+      profile: { envVars: { GITLAB_TOKEN: 'custom-gitlab', GITLAB_HOST: 'custom.example.com' } },
+    });
+    expect(custom.payload.env).toMatchObject({
+      GITLAB_TOKEN: 'custom-gitlab',
+      GITLAB_HOST: 'custom.example.com',
+    });
+    expectNoCapabilities(broker);
+  });
+
+  it.each([
+    'https://other.example.com/gitlab',
+    'https://gitlab.example.com/gitlab',
+    'https://gitlab.example.com:8443/gitlab-other',
+  ])('rejects GitLab instance scope mismatch: %s', async instanceUrl => {
+    const { broker } = createBroker();
+    broker.getGitLabToken.mockResolvedValue({
+      success: true,
+      token: 'test-real-gitlab-token',
+      instanceUrl,
+      glabIsOAuth2: false,
+    });
+    await expect(
+      prepareDirect(
+        environment(broker),
+        directMetadata({
+          repository: {
+            type: 'gitlab',
+            url: 'https://gitlab.example.com:8443/gitlab/acme/repo.git',
+          },
+        })
+      )
+    ).rejects.toThrow('Invalid contained worktree credentials');
+    expectNoCapabilities(broker);
+  });
+
+  it('resolves Bitbucket tokens with organization, UUID, URL and integration authorization', async () => {
+    const { broker } = createBroker();
+    const data = directMetadata({
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/repo.git',
+        workspaceUuid: WORKSPACE_UUID,
+        repositoryUuid: REPOSITORY_UUID,
+        bitbucketIntegrationId: INTEGRATION_ID,
+      },
+    });
+    const { payload } = await prepareDirect(environment(broker), data);
+    expect(payload.git?.token).toBe('test-real-bitbucket-token');
+    expect(payload.env).toMatchObject({
+      BITBUCKET_TOKEN: 'test-real-bitbucket-token',
+      KILO_BITBUCKET_WORKSPACE_SLUG: 'acme',
+      KILO_BITBUCKET_REPOSITORY_SLUG: 'repo',
+      KILO_BITBUCKET_WORKSPACE_UUID: `{${WORKSPACE_UUID}}`,
+      KILO_BITBUCKET_REPOSITORY_UUID: `{${REPOSITORY_UUID}}`,
+    });
+    expect(broker.getBitbucketToken).toHaveBeenCalledWith({
+      userId: 'user-a',
+      orgId: INTEGRATION_ID,
+      expectedIntegrationId: INTEGRATION_ID,
+      repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: WORKSPACE_UUID,
+      repositoryUuid: REPOSITORY_UUID,
+    });
+    await expect(
+      prepareDirect(environment(broker), {
+        ...data,
+        identity: { ...data.identity, orgId: undefined },
+      })
+    ).rejects.toThrow('Invalid contained worktree credentials');
+    expect(broker.getBitbucketToken).toHaveBeenCalledTimes(1);
+    expectNoCapabilities(broker);
+  });
+
+  it('shares only authorized memberships and renews the bounded lease', async () => {
+    const { broker } = createBroker();
+    const env = environment(broker);
+    const first = await prepareDirect(env);
+    const second = await prepareDirect(
+      env,
+      directMetadata({ identity: secondRoot().identity, auth: secondRoot().auth }),
+      first.grant,
+      NOW + HOUR
+    );
+    expect(second.grant.members).toHaveLength(2);
+    expect(second.grant.expiresAt).toBe(NOW + 5 * HOUR);
+    expect(
+      removeSessionCredentialMembership([second.grant], SECOND_SESSION_ID)[0]?.members
+    ).toEqual(first.grant.members);
+    for (const changed of [
+      directMetadata({ identity: { ...metadata().identity, userId: 'other-user' } }),
+      directMetadata({ identity: { ...metadata().identity, orgId: REPOSITORY_UUID } }),
+      directMetadata({ workspace: { workspacePath: '/workspace/other' } }),
+      directMetadata({
+        workspace: { worktreeId: 'worktree_22222222-2222-4222-8222-222222222222' },
+      }),
+      directMetadata({ auth: { kiloSessionId: SECOND_ROOT_ID, kilocodeToken: KILO_TOKEN } }),
+      directMetadata({ repository: { type: 'github', repo: 'acme/other' } }),
+    ]) {
+      await expect(prepareDirect(env, changed, first.grant)).rejects.toThrow(
+        'Invalid contained worktree credentials'
+      );
+    }
+    expect(broker.getCloudAgentAuthForRepo).toHaveBeenCalledTimes(2);
+    expectNoCapabilities(broker);
+  });
+
+  it('rejects contained/direct grant reuse in both directions', async () => {
+    const { broker } = createBroker();
+    const env = environment(broker);
+    const direct = await prepareDirect(env);
+    const contained = await prepare(env);
+    await expect(prepareDirect(env, directMetadata(), contained.grant)).rejects.toThrow(
+      'Invalid contained worktree credentials'
+    );
+    await expect(prepare(env, metadata(), direct.grant)).rejects.toThrow(
+      'Invalid contained worktree credentials'
+    );
+    expect(broker.getCloudAgentAuthForRepo).toHaveBeenCalledTimes(1);
+    expect(broker.issueKiloSessionCapability).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, '', 'invalid\nvalue', 'kcp1.alias', 'kka1.capability'])(
+    'rejects invalid direct Kilo token %s',
+    async kilocodeToken => {
+      const { broker } = createBroker();
+      await expect(
+        prepareDirect(
+          environment(broker),
+          directMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken } })
+        )
+      ).rejects.toThrow('Invalid contained worktree credentials');
+      expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+      expectNoCapabilities(broker);
+    }
+  );
+
+  it.each(['github', 'gitlab', 'bitbucket'] as const)(
+    'fails closed on %s token errors and invalid token results',
+    async platform => {
+      const { broker } = createBroker();
+      const data = directMetadata({
+        repository:
+          platform === 'github'
+            ? metadata().repository
+            : platform === 'gitlab'
+              ? { type: 'gitlab', url: 'https://gitlab.example.com:8443/gitlab/acme/repo.git' }
+              : {
+                  type: 'bitbucket',
+                  url: 'https://bitbucket.org/acme/repo.git',
+                  workspaceUuid: WORKSPACE_UUID,
+                  repositoryUuid: REPOSITORY_UUID,
+                },
+      });
+      await expect(prepareDirect(environment(), data)).rejects.toThrow('credential is unavailable');
+      if (platform === 'github') {
+        broker.getCloudAgentAuthForRepo.mockResolvedValue({
+          success: false,
+          reason: 'integration_mismatch',
+        });
+      }
+      if (platform === 'gitlab') {
+        broker.getGitLabToken.mockResolvedValue({
+          success: false,
+          reason: 'no_matching_integration',
+        });
+      }
+      if (platform === 'bitbucket') {
+        broker.getBitbucketToken.mockResolvedValue({
+          success: false,
+          reason: 'integration_mismatch',
+        });
+      }
+      await expect(prepareDirect(environment(broker), data)).rejects.toThrow(
+        'credential is unavailable'
+      );
+      expect(broker.getTokenForRepo).not.toHaveBeenCalled();
+      if (platform === 'github') {
+        broker.getCloudAgentAuthForRepo.mockResolvedValue({
+          success: true,
+          githubToken: 'kgh2.not-real',
+          installationId: '42',
+          accountLogin: 'acme',
+          appType: 'standard',
+          source: 'user',
+          gitAuthor: { name: 'bot', email: 'bot@example.com' },
+        });
+      }
+      if (platform === 'gitlab') {
+        broker.getGitLabToken.mockResolvedValue({
+          success: true,
+          token: '',
+          instanceUrl: 'https://gitlab.example.com:8443/gitlab',
+          glabIsOAuth2: false,
+        });
+      }
+      if (platform === 'bitbucket') {
+        broker.getBitbucketToken.mockResolvedValue({ success: true, token: 'bad\ntoken' });
+      }
+      await expect(prepareDirect(environment(broker), data)).rejects.toThrow(
+        'Invalid contained worktree credentials'
+      );
+      expectNoCapabilities(broker);
+      expectSecretSafeLogs();
+    }
+  );
+
+  it('rejects aliases and capabilities in persisted direct grants and missing aliases in contained grants', async () => {
+    const { broker } = createBroker();
+    const direct = await prepareDirect(environment(broker));
+    const contained = await prepare(environment(broker));
+    for (const invalid of [
+      { ...direct.grant, kilo: { ...direct.grant.kilo, alias: contained.grant.kilo.alias } },
+      {
+        ...direct.grant,
+        kilo: { ...direct.grant.kilo, capabilities: contained.grant.kilo.capabilities },
+      },
+      { ...direct.grant, scm: { ...direct.grant.scm, alias: contained.grant.scm?.alias } },
+      {
+        ...direct.grant,
+        scm: { ...direct.grant.scm, capability: contained.grant.scm?.capability },
+      },
+      { ...direct.grant, containmentEnabled: undefined },
+      { ...direct.grant, expiresAt: NOW + 5 * HOUR },
+      { ...contained.grant, kilo: { ...contained.grant.kilo, alias: undefined } },
+    ]) {
+      expect(sessionCredentialGrantSchema.safeParse(invalid).success).toBe(false);
+    }
+    expect(isContainedSessionCredentialGrant(contained.grant)).toBe(true);
+    const explicitlyContained = { ...contained.grant, containmentEnabled: true };
+    expect(sessionCredentialGrantSchema.parse(explicitlyContained)).toEqual(explicitlyContained);
+    expect(isContainedSessionCredentialGrant(explicitlyContained)).toBe(true);
+    expect(
+      sessionCredentialGrantSchema.safeParse({ ...direct.grant, containmentEnabled: true }).success
+    ).toBe(false);
+  });
+});
+
+describe('direct worktree Kilo token stability', () => {
+  const secret = 'worktree-jwt-test-secret';
+  const env = { ...environment(), NEXTAUTH_SECRET: secret };
+  const token = (issuedAt = NOW, claims: Record<string, unknown> = {}, signingSecret = secret) => {
+    const payload = {
+      env: 'production',
+      kiloUserId: 'user-a',
+      apiTokenPepper: 'test-pepper',
+      version: 3,
+      tokenSource: 'cloud-agent',
+      iat: issuedAt / 1000,
+      exp: (issuedAt + 24 * HOUR) / 1000,
+      ...claims,
+    };
+    return jwt.sign(
+      Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)),
+      signingSecret,
+      { algorithm: 'HS256' }
+    );
+  };
+  const data = (kilocodeToken: string, sessionId = SESSION_ID, kiloSessionId = ROOT_ID) =>
+    directMetadata({
+      repository: undefined,
+      identity: { ...metadata().identity, sessionId },
+      auth: { kilocodeToken, kiloSessionId },
+      profile: {
+        envVars: {
+          KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }),
+        },
+        setupCommands: [`authenticate --token=${kilocodeToken}`],
+      },
+    });
+
+  it('keeps identical runtime credentials across three siblings and alternating reattaches', async () => {
+    const siblings = [
+      data(token()),
+      data(token(NOW + 1000), SECOND_SESSION_ID, SECOND_ROOT_ID),
+      data(token(NOW + 2000), THIRD_SESSION_ID, THIRD_ROOT_ID),
+    ];
+    expect(new Set(siblings.map(sibling => sibling.auth.kilocodeToken)).size).toBe(3);
+    const first = await prepareDirect(env, siblings[0]);
+    let current = first;
+    for (const sibling of [...siblings, ...siblings.toReversed(), ...siblings]) {
+      current = await prepareDirect(env, sibling, current.grant, NOW + 3000);
+      expect(current.grant.kilo.token).toBe(first.grant.kilo.token);
+      expect(current.payload.kilo).toEqual(first.payload.kilo);
+      expect(current.payload.env).toEqual(first.payload.env);
+      expect(current.payload.setupCommands).toEqual(first.payload.setupCommands);
+    }
+    expect(current.grant.members).toHaveLength(3);
+    expect(first.grant.members).toHaveLength(1);
+    expect(siblings[1].auth.kilocodeToken).not.toBe(first.grant.kilo.token);
+  });
+
+  it.each([60_000, 120_000])('refreshes when the retained JWT expires in %i ms', async lifetime => {
+    const original = token(NOW, { exp: (NOW + lifetime) / 1000 });
+    const fresh = token(NOW + 1000);
+    const first = await prepareDirect(env, data(original));
+    const refreshed = await prepareDirect(
+      env,
+      data(fresh, SECOND_SESSION_ID, SECOND_ROOT_ID),
+      first.grant,
+      NOW + 60_000
+    );
+    expect(refreshed.payload.kilo.token).toBe(fresh);
+    expect(refreshed.payload.env?.KILOCODE_TOKEN).toBe(fresh);
+  });
+
+  it.each([false, true])(
+    'does not slide the selection window when renewing a lease (legacy grant: %s)',
+    async legacy => {
+      const original = token();
+      const fresh = token(NOW + 1000);
+      const first = await prepareDirect(env, data(original));
+      if (legacy) delete first.grant.kilo.tokenSelectedAt;
+      const sibling = data(fresh, SECOND_SESSION_ID, SECOND_ROOT_ID);
+      const renewed = await prepareDirect(env, sibling, first.grant, NOW + 3 * HOUR);
+      expect(renewed.grant.kilo.token).toBe(original);
+      expect(renewed.grant.kilo.tokenSelectedAt).toBe(NOW);
+      expect(renewed.grant.expiresAt).toBe(NOW + 7 * HOUR);
+      const persisted = sessionCredentialGrantSchema.parse(
+        JSON.parse(JSON.stringify(renewed.grant))
+      );
+      const refreshed = await prepareDirect(env, sibling, persisted, NOW + 4 * HOUR);
+      expect(refreshed.grant.kilo.token).toBe(fresh);
+      expect(refreshed.grant.kilo.tokenSelectedAt).toBe(NOW + 4 * HOUR);
+      const reattached = await prepareDirect(
+        env,
+        data(original),
+        refreshed.grant,
+        NOW + 4 * HOUR + 1
+      );
+      expect(reattached.grant.kilo.token).toBe(fresh);
+    }
+  );
+
+  it('refreshes an expired grant even when its JWT remains valid', async () => {
+    const first = await prepareDirect(env, data(token()));
+    const fresh = token(NOW + 1000);
+    const refreshed = await prepareDirect(env, data(fresh), first.grant, first.grant.expiresAt);
+    expect(refreshed.payload.kilo.token).toBe(fresh);
+  });
+
+  it.each([
+    ['pepper', { apiTokenPepper: 'rotated-pepper' }],
+    ['nullable pepper', { apiTokenPepper: null }],
+    ['user', { kiloUserId: 'other-user' }],
+    ['environment', { env: 'development' }],
+    ['version', { version: 4 }],
+    ['source', { tokenSource: 'other-source' }],
+    ['organization', { organizationId: INTEGRATION_ID }],
+    ['role', { organizationRole: 'member' }],
+    ['bot', { botId: 'bot-a' }],
+    ['audience', { aud: 'internal-service' }],
+    ['unknown authorization', { futurePermission: 'restricted' }],
+  ])('does not substitute the retained token after a change to %s', async (_name, claims) => {
+    const first = await prepareDirect(env, data(token()));
+    const changed = token(NOW + 1000, claims);
+    const refreshed = await prepareDirect(env, data(changed), first.grant, NOW + 2000);
+    expect(refreshed.payload.kilo.token).toBe(changed);
+    expect(refreshed.payload.env?.KILOCODE_TOKEN).toBe(changed);
+  });
+
+  it.each([
+    ['expired', () => token(NOW - HOUR, { exp: NOW / 1000 })],
+    ['future-issued', () => token(NOW + HOUR)],
+    ['not yet valid', () => token(NOW, { nbf: (NOW + HOUR) / 1000 })],
+    ['missing expiry', () => token(NOW, { exp: undefined })],
+    ['invalid signature', () => token(NOW, {}, 'different-test-secret')],
+    ['opaque', () => 'opaque-replacement-token'],
+  ])(
+    'does not mask %s incoming credentials with a retained valid JWT',
+    async (_name, changedToken) => {
+      const first = await prepareDirect(env, data(token()));
+      const changed = changedToken();
+      const refreshed = await prepareDirect(env, data(changed), first.grant, NOW + 2000);
+      expect(refreshed.payload.kilo.token).toBe(changed);
+    }
+  );
+
+  it.each([
+    ['invalid signature', () => token(NOW, {}, 'different-test-secret')],
+    ['future-issued', () => token(NOW + HOUR)],
+    ['unknown claims', () => token(NOW, { futurePermission: 'restricted' })],
+    ['opaque', () => 'opaque-original-token'],
+  ])('does not retain %s credentials', async (_name, originalToken) => {
+    const first = await prepareDirect(env, data(originalToken()));
+    const fresh = token(NOW + 1000);
+    const refreshed = await prepareDirect(env, data(fresh), first.grant, NOW + 2000);
+    expect(refreshed.payload.kilo.token).toBe(fresh);
+  });
+
+  it('does not coalesce equivalent claims for a different metadata owner', async () => {
+    const first = await prepareDirect(env, data(token(NOW, { kiloUserId: 'other-user' })));
+    const fresh = token(NOW + 1000, { kiloUserId: 'other-user' });
+    const refreshed = await prepareDirect(env, data(fresh), first.grant, NOW + 2000);
+    expect(refreshed.payload.kilo.token).toBe(fresh);
+  });
+
+  it('still checks managed SCM authorization when retaining an equivalent Kilo token', async () => {
+    const { broker } = createBroker();
+    const brokerEnv = { ...environment(broker), NEXTAUTH_SECRET: secret };
+    const first = await prepareDirect(brokerEnv, {
+      ...data(token()),
+      repository: metadata().repository,
+    });
+    broker.getCloudAgentAuthForRepo.mockResolvedValue({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    await expect(
+      prepareDirect(
+        brokerEnv,
+        { ...data(token(NOW + 1000)), repository: metadata().repository },
+        first.grant,
+        NOW + 2000
+      )
+    ).rejects.toThrow('GitHub credential is unavailable');
+  });
+
+  it('leaves contained backing-token rotation unchanged for equivalent JWTs', async () => {
+    const { broker } = createBroker();
+    const brokerEnv = { ...environment(broker), NEXTAUTH_SECRET: secret };
+    const first = await prepare(brokerEnv, metadata({ auth: data(token()).auth }));
+    const fresh = token(NOW + 1000);
+    const refreshed = await prepare(
+      brokerEnv,
+      metadata({ auth: data(fresh).auth }),
+      first.grant,
+      NOW + 2000
+    );
+    expect(refreshed.grant.kilo.token).toBe(fresh);
+    expect(refreshed.grant.kilo.tokenSelectedAt).toBeUndefined();
+    expect(refreshed.grant.kilo.capabilities[SESSION_ID]).not.toEqual(
+      first.grant.kilo.capabilities[SESSION_ID]
+    );
+    expect(refreshed.payload.kilo).toEqual(first.payload.kilo);
+  });
+
+  it('keeps the incoming token when the signing secret is unavailable', async () => {
+    const first = await prepareDirect(env, data(token()));
+    const fresh = token(NOW + 1000);
+    for (const unavailable of [
+      environment(),
+      {
+        ...environment(),
+        NEXTAUTH_SECRET: {
+          get: async () => {
+            throw new Error('unavailable');
+          },
+        },
+      },
+    ]) {
+      const refreshed = await prepareDirect(unavailable, data(fresh), first.grant, NOW + 2000);
+      expect(refreshed.payload.kilo.token).toBe(fresh);
+    }
   });
 });
 

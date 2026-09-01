@@ -121,17 +121,11 @@ describe('session metadata boundary', () => {
           expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
         },
       ])(
-        'requires only Kilo and the typed $name repository despite false metadata',
+        'defaults missing policy to Kilo and the typed $name repository',
         ({ repository, expected }) => {
           const workspace = {
             sandboxId: 'ses-abcdef',
             sandboxProvider,
-            credentialContainment: {
-              github: false,
-              gitlab: false,
-              bitbucket: false,
-              kilocode: false,
-            },
             managedScmContainment: true,
           };
           const metadata = parseSessionMetadata({
@@ -150,22 +144,38 @@ describe('session metadata boundary', () => {
       );
 
       it.each([
+        { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        { github: true, gitlab: true, bitbucket: true, kilocode: true },
+        { github: false, gitlab: true, bitbucket: true, kilocode: false },
+      ])('honors historical explicit flags without rewriting them: %j', credentialContainment => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'github', repo: 'acme/repo' },
+          workspace: {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            credentialContainment,
+            managedScmContainment: true,
+          },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual(credentialContainment);
+        expect(requiresContainmentSandbox(metadata)).toBe(
+          Object.values(credentialContainment).some(Boolean)
+        );
+        expect(serializeSessionMetadata(metadata).workspace?.credentialContainment).toEqual(
+          credentialContainment
+        );
+      });
+
+      it.each([
         { name: 'missing policy', fields: {} },
         { name: 'disabled legacy alias', fields: { managedScmContainment: false } },
         { name: 'enabled legacy alias', fields: { managedScmContainment: true } },
-        {
-          name: 'mixed policy',
-          fields: {
-            credentialContainment: {
-              github: false,
-              gitlab: true,
-              bitbucket: true,
-              kilocode: false,
-            },
-            managedScmContainment: false,
-          },
-        },
-      ])('ignores $name without rewriting stored fields', ({ fields }) => {
+      ])('defaults $name without rewriting stored fields', ({ fields }) => {
         const workspace = { sandboxId: 'ses-abcdef', sandboxProvider, ...fields };
         const metadata = parseSessionMetadata({
           metadataSchemaVersion: 2,

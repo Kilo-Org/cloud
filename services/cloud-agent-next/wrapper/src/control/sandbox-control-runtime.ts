@@ -35,6 +35,15 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 export const KILO_FEED_FRESHNESS_TIMEOUT_MS = 30_000;
 export const KILO_CONTROL_REQUEST_TIMEOUT_MS = 10_000;
 
+export class KiloEventFeedError extends Error {
+  constructor(
+    readonly reason: 'feed_stale' | 'feed_reconnected' | 'feed_ended' | 'feed_failed',
+    message: string
+  ) {
+    super(message);
+  }
+}
+
 export async function withKiloRequestDeadline<T>(
   request: (signal: AbortSignal) => Promise<T>,
   externalSignal?: AbortSignal
@@ -111,7 +120,8 @@ export async function startSandboxControlEventFeed(
     options.onUnexpectedClose(error);
   };
   const freshnessTimer = setInterval(() => {
-    if (!isFresh()) fail(new Error('Kilo global event feed stopped responding'));
+    if (!isFresh())
+      fail(new KiloEventFeedError('feed_stale', 'Kilo global event feed stopped responding'));
   }, 10_000);
   freshnessTimer.unref();
   signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
@@ -123,7 +133,10 @@ export async function startSandboxControlEventFeed(
         const next = await iterator.next();
         if (signal.aborted || next.done) return;
         if (isFeedConnectedEvent(next.value)) {
-          throw new Error('Kilo global event feed reconnected with a delivery gap');
+          throw new KiloEventFeedError(
+            'feed_reconnected',
+            'Kilo global event feed reconnected with a delivery gap'
+          );
         }
         lastEventAt = now();
         yield next.value;
@@ -134,7 +147,7 @@ export async function startSandboxControlEventFeed(
   }
 
   void options.consume(establishedFeed()).then(
-    () => fail(new Error('Kilo global event feed ended')),
+    () => fail(new KiloEventFeedError('feed_ended', 'Kilo global event feed ended')),
     error => fail(error)
   );
   return { isFresh };

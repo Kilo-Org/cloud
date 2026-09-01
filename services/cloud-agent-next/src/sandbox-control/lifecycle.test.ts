@@ -17,11 +17,12 @@ import type {
   SandboxControlSocketHooks,
 } from './socket.js';
 import { DEADLINE_MS } from './deadlines.js';
-import { loadDeadlines } from './durable-state.js';
+import { loadDeadlines, loadRouteTable, loadSessionCredentialGrants } from './durable-state.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
+import { logger } from '../logger.js';
 
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
@@ -105,9 +106,10 @@ function allocation() {
   const configureBilling = vi.fn().mockResolvedValue(undefined);
   const ensureBillingAdmission = vi.fn().mockResolvedValue({ success: true });
   const getBillingRuntimeStatus = vi.fn();
+  const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
   const handle = {
     startProcess,
-    setOutboundHandler: vi.fn().mockResolvedValue(undefined),
+    setOutboundHandler,
     destroy,
     forceDestroyForControlPlane: destroy,
     renewActivityTimeout,
@@ -121,6 +123,7 @@ function allocation() {
     state,
     handle,
     startProcess,
+    setOutboundHandler,
     destroy,
     renewActivityTimeout,
     isContainerRunning,
@@ -132,6 +135,7 @@ function allocation() {
 
 async function harness(
   options: {
+    containmentEnabled?: boolean;
     env?: Partial<Env>;
     configureAllocation?: (value: ReturnType<typeof allocation>, id: string) => void;
   } = {}
@@ -215,22 +219,30 @@ async function harness(
     }
     return value.handle;
   };
-  const namespace = {
-    idFromName: (id: string) => ({ toString: () => `do:${id}` }),
-    getByName: vi.fn(getAllocation),
+  const containmentEnabled = options.containmentEnabled ?? true;
+  const expectedNamespace = containmentEnabled ? 'SandboxSmallContainment' : 'SandboxSmall';
+  const makeNamespace = (name: string) => ({
+    idFromName: (id: string) => ({ toString: () => `do:${name}:${id}` }),
+    getByName: vi.fn((id: string) => {
+      expect(name).toBe(expectedNamespace);
+      return getAllocation(id);
+    }),
+  });
+  const namespaces = {
+    Sandbox: makeNamespace('Sandbox'),
+    SandboxSmall: makeNamespace('SandboxSmall'),
+    SandboxContainment: makeNamespace('SandboxContainment'),
+    SandboxSmallContainment: makeNamespace('SandboxSmallContainment'),
   };
+  const namespace = namespaces[expectedNamespace];
+  const issueKiloSessionCapability = vi.fn(async () => ({
+    success: true,
+    capability: 'kka1.test-capability',
+  }));
   const env = {
     WORKER_URL: 'https://example.test',
-    Sandbox: { ...namespace, getByName: vi.fn(getAllocation) },
-    SandboxSmall: { ...namespace, getByName: vi.fn(getAllocation) },
-    SandboxContainment: namespace,
-    SandboxSmallContainment: namespace,
-    GIT_TOKEN_SERVICE: {
-      issueKiloSessionCapability: vi.fn(async () => ({
-        success: true,
-        capability: 'kka1.test-capability',
-      })),
-    },
+    ...namespaces,
+    GIT_TOKEN_SERVICE: { issueKiloSessionCapability },
     KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
     KILO_OPENROUTER_BASE: 'https://provider.example.test',
     KILO_SESSION_INGEST_URL: 'https://ingest.example.test',
@@ -250,6 +262,16 @@ async function harness(
           sandboxId: SANDBOX_ID,
           workspacePath: ROUTE.directory,
           sandboxProvider: options.env?.VERCEL_TOKEN ? 'vercel' : 'cloudflare',
+          ...(options.containmentEnabled === undefined
+            ? {}
+            : {
+                credentialContainment: {
+                  github: false,
+                  gitlab: false,
+                  bitbucket: false,
+                  kilocode: containmentEnabled,
+                },
+              }),
         },
         lifecycle: { version: 1, timestamp: Date.now() },
       })
@@ -300,6 +322,8 @@ async function harness(
     records,
     env,
     namespace,
+    namespaces,
+    issueKiloSessionCapability,
     get transactionActive() {
       return transactionActive;
     },
@@ -376,6 +400,294 @@ afterEach(() => {
 });
 
 describe('SandboxControl lifecycle boundaries', () => {
+  describe.each(['create', 'acquire'] as const)('%s credential policy', createPath => {
+    it.each([false, undefined])(
+      'launches and attaches using persisted containment %s',
+      async containmentEnabled => {
+        const h = await harness({
+          containmentEnabled,
+          env: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
+        });
+        if (createPath === 'create') await h.create();
+        else {
+          await h.acquire({
+            id: 'credential_attempt',
+            deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+          });
+        }
+        const physical = await h.control.getPhysicalRecord();
+        const native = decodeCloudflareProviderRef(physical.providerRef);
+        if (!native) throw new Error('Missing native allocation');
+        const contained = containmentEnabled !== false;
+        expect(native.containment).toBe(contained);
+        expect(physical.createIntent?.containment).toEqual({
+          kilocode: contained,
+          github: contained,
+          worktreeScoped: true,
+        });
+        expect(mocks.getSandbox).toHaveBeenCalledWith(
+          contained ? h.namespaces.SandboxSmallContainment : h.namespaces.SandboxSmall,
+          native.sandboxId
+        );
+        const runtime = h.runtime(physical.providerRef ?? '');
+        if (!runtime) throw new Error('Missing runtime');
+        expect(runtime.startProcess).toHaveBeenCalledOnce();
+        expect(runtime.configureBilling).toHaveBeenCalledWith({
+          ...BILLING,
+          sandboxId: native.sandboxId,
+        });
+        if (contained) expect(runtime.setOutboundHandler).toHaveBeenCalled();
+        else expect(runtime.setOutboundHandler).not.toHaveBeenCalled();
+        await expect(h.hooks.validateHandshake?.(physical.providerRef ?? '')).resolves.toBe(true);
+        const identity = await h.ready();
+        const payload = await h.control.prepareSessionCredentials({
+          ownerId: OWNER,
+          sessionId: ROUTE.sessionId,
+        });
+        const token = contained ? expect.stringMatching(/^kcp1\./) : 'test-token';
+        expect(payload).toMatchObject({
+          directory: ROUTE.directory,
+          env: { KILOCODE_TOKEN: token },
+          kilo: { scopeId: ROUTE.sessionId, token },
+        });
+        await expect(
+          h.control.request({
+            operation: 'session.attach',
+            session: ROUTE,
+            payload,
+            expectedWrapperInstanceId: identity.wrapperInstanceId,
+          })
+        ).resolves.toMatchObject({ ok: true });
+        expect(h.sendRequest).toHaveBeenCalledWith(
+          expect.objectContaining({ operation: 'session.attach', payload })
+        );
+        await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+        if (!contained) {
+          expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+          expect(await loadSessionCredentialGrants(h.storage)).toEqual([
+            expect.objectContaining({ containmentEnabled: false, scopeId: ROUTE.sessionId }),
+          ]);
+        }
+      }
+    );
+
+    it.each([
+      { state: 'creating', containmentEnabled: true },
+      { state: 'creating', containmentEnabled: false },
+      { state: 'running', containmentEnabled: true },
+      { state: 'running', containmentEnabled: false },
+    ] as const)(
+      'preserves the $state allocation with containment $containmentEnabled when another worktree conflicts',
+      async ({ state, containmentEnabled }) => {
+        const billingEntered = deferred<void>();
+        const releaseBilling = deferred<void>();
+        const h = await harness({
+          containmentEnabled,
+          configureAllocation: runtime => {
+            if (state === 'creating') {
+              runtime.configureBilling.mockImplementationOnce(() => {
+                billingEntered.resolve();
+                return releaseBilling.promise;
+              });
+            }
+          },
+        });
+        const originalAcquisition = {
+          id: 'original_attempt',
+          deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+        };
+        const acquireOriginal = () =>
+          h.control.ensureReady({
+            ownerId: OWNER,
+            sessionId: ROUTE.sessionId,
+            acquisition: originalAcquisition,
+            billing: { ...BILLING, sessionId: undefined },
+          });
+        const acquiring = acquireOriginal();
+        if (state === 'creating') await billingEntered.promise;
+        else await acquiring;
+        const identity = state === 'running' ? await h.ready() : undefined;
+        const physical = await h.control.getPhysicalRecord();
+        expect(physical.state).toBe(state);
+        const runtime = [...h.allocations.values()][0];
+        if (!runtime) throw new Error('Missing runtime');
+        const originalMetadata = await h.session.getCredentialMetadata();
+        const otherSessionId = 'workspace_22222222-2222-4222-8222-222222222222';
+        const otherSession = {
+          ...h.session,
+          getCredentialMetadata: vi.fn(async () =>
+            parseSessionMetadata({
+              ...originalMetadata,
+              identity: { ...originalMetadata.identity, sessionId: otherSessionId },
+              auth: { ...originalMetadata.auth, kiloSessionId: 'ses_22222222222222222222222222' },
+              workspace: {
+                ...originalMetadata.workspace,
+                workspacePath: '/workspace/b',
+                worktreeId: 'worktree_22222222-2222-4222-8222-222222222222',
+                credentialContainment: {
+                  github: false,
+                  gitlab: false,
+                  bitbucket: false,
+                  kilocode: !containmentEnabled,
+                },
+              },
+            })
+          ),
+        };
+        mocks.session.mockImplementation((_env, ownerId: string, sessionId: string) => {
+          expect(ownerId).toBe(OWNER);
+          if (sessionId === otherSessionId) return otherSession;
+          expect(sessionId).toBe(ROUTE.sessionId);
+          return h.session;
+        });
+        const closeAll = vi.spyOn(h.socket, 'closeAll');
+        const closeCount = closeAll.mock.calls.length;
+        const receipts = structuredClone(h.records.get('acquisition_receipts'));
+        const grants = await loadSessionCredentialGrants(h.storage);
+        const routes = await h.control.listRoutes();
+        const deadlines = await loadDeadlines(h.storage);
+        const alarmAt = h.alarmAt;
+        await expect(
+          h.control.ensureReady({
+            ownerId: OWNER,
+            sessionId: otherSessionId,
+            ...(createPath === 'acquire'
+              ? { acquisition: { ...originalAcquisition, id: 'conflicting_attempt' } }
+              : { allowCreate: true }),
+          })
+        ).rejects.toThrow('Sandbox containment mode conflicts with the session');
+        await h.flush();
+        expect(await h.control.getPhysicalRecord()).toEqual(physical);
+        expect(h.records.get('acquisition_receipts')).toEqual(receipts);
+        expect(await loadSessionCredentialGrants(h.storage)).toEqual(grants);
+        expect(await h.control.listRoutes()).toEqual(routes);
+        expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+        expect(h.alarmAt).toBe(alarmAt);
+        expect(runtime.destroy).not.toHaveBeenCalled();
+        expect(runtime.state.running).toBe(state === 'running');
+        expect(closeAll).toHaveBeenCalledTimes(closeCount);
+        expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+        expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+        expect(h.allocations.size).toBe(1);
+        expect(mocks.providerCreate).toHaveBeenCalledOnce();
+        await h.evict();
+        expect(await h.control.getPhysicalRecord()).toEqual(physical);
+        expect(h.records.get('acquisition_receipts')).toEqual(receipts);
+        releaseBilling.resolve();
+        await acquiring;
+        await acquireOriginal();
+        const current = identity ?? (await h.ready());
+        await expect(
+          h.control.request({
+            operation: 'session.prompt',
+            session: ROUTE,
+            payload: PROMPT,
+            expectedWrapperInstanceId: current.wrapperInstanceId,
+          })
+        ).resolves.toMatchObject({ ok: true });
+        expect(runtime.startProcess).toHaveBeenCalledOnce();
+        expect(runtime.destroy).not.toHaveBeenCalled();
+        expect(h.allocations.size).toBe(1);
+      }
+    );
+  });
+
+  it('retains direct credentials and the uncontained namespace across eviction, flag flips, and replacement', async () => {
+    const h = await harness({
+      containmentEnabled: false,
+      env: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
+    });
+    await h.create();
+    const original = await h.ready();
+    const grants = await loadSessionCredentialGrants(h.storage);
+    h.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
+    await h.evict();
+    await expect(h.create()).resolves.toMatchObject({ reported: 'ready' });
+    await expect(
+      h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
+    ).resolves.toMatchObject({ kilo: { token: 'test-token' } });
+    expect(await loadSessionCredentialGrants(h.storage)).toEqual(grants);
+    expect(h.allocations.size).toBe(1);
+    await h.control.beginStop('execution_failed');
+    await h.control.recordStopAttempt();
+    await h.flush();
+    const oldNative = decodeCloudflareProviderRef(original.providerInstanceId);
+    expect(h.namespaces.SandboxSmall.getByName).toHaveBeenCalledWith(oldNative?.sandboxId);
+    expect(h.runtime(original.providerInstanceId)?.state.running).toBe(false);
+    await h.create();
+    const replacement = await h.ready();
+    expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
+    expect(decodeCloudflareProviderRef(replacement.providerInstanceId)?.containment).toBe(false);
+    await expect(
+      h.control.validateTerminalAccess({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        wrapperInstanceId: replacement.wrapperInstanceId ?? '',
+      })
+    ).resolves.toEqual({ allowed: true });
+    for (const runtime of h.allocations.values()) {
+      expect(runtime.setOutboundHandler).not.toHaveBeenCalled();
+    }
+    expect(h.namespaces.SandboxSmallContainment.getByName).not.toHaveBeenCalled();
+    expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+  });
+
+  it('requires reattachment instead of renewing an expired direct terminal grant alone', async () => {
+    const h = await harness({ containmentEnabled: false });
+    await h.create();
+    const identity = await h.ready();
+    const grants = await loadSessionCredentialGrants(h.storage);
+    const nearExpiry = grants.map(grant => ({ ...grant, expiresAt: Date.now() + 1 }));
+    h.records.set('worktree_credential_grants', nearExpiry);
+    const access = {
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+    };
+    await expect(h.control.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
+    expect(await loadSessionCredentialGrants(h.storage)).toEqual(nearExpiry);
+    vi.setSystemTime(Date.now() + 2);
+    await expect(h.control.validateTerminalAccess(access)).resolves.toEqual({
+      allowed: false,
+      reason: 'credential_reattach_required',
+    });
+    expect(await loadSessionCredentialGrants(h.storage)).toEqual(nearExpiry);
+    expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+    expect(h.runtime(identity.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+  });
+
+  it.each(['flags', 'scope', 'provider'] as const)(
+    'fails closed on a contained runtime with mismatched %s',
+    async mismatch => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const physical = await h.control.getPhysicalRecord();
+      h.records.set('physical_record', {
+        ...physical,
+        containment: {
+          ...physical.containment,
+          ...(mismatch === 'flags' ? { kilocode: false } : {}),
+          ...(mismatch === 'scope' ? { worktreeScoped: false } : {}),
+          ...(mismatch === 'provider' ? { providerRef: 'other_provider' } : {}),
+        },
+      });
+      await expect(h.hooks.validateHandshake?.(identity.providerInstanceId)).resolves.toBe(false);
+      await expect(
+        h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
+      ).rejects.toThrow('containment is unavailable');
+      await expect(h.control.attachSession(ROUTE)).rejects.toThrow('containment mismatch');
+      await expect(
+        h.control.validateTerminalAccess({
+          ownerId: OWNER,
+          sessionId: ROUTE.sessionId,
+          wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        })
+      ).resolves.toEqual({ allowed: false, reason: 'credential_containment_unavailable' });
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    }
+  );
+
   it('binds concurrent acquisition replays to one allocation before provider I/O', async () => {
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
     const h = await harness({
@@ -952,6 +1264,71 @@ describe('SandboxControl lifecycle boundaries', () => {
     await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'working' });
   });
 
+  it.each(['session.attach', 'session.prompt'] as const)(
+    'clears rejected %s activity without disturbing a sibling and retires once all work is idle',
+    async operation => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      await h.control.request({ operation: 'session.prompt', session: ROUTE, payload: PROMPT });
+      const sibling = {
+        ...ROUTE,
+        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+        kiloSessionId: 'ses_44444444444444444444444444',
+        directory: '/workspace/b',
+      };
+      const metadata = await h.session.getCredentialMetadata();
+      h.session.getCredentialMetadata.mockResolvedValue({
+        ...metadata,
+        identity: { ...metadata.identity, sessionId: sibling.sessionId },
+        auth: { ...metadata.auth, kiloSessionId: sibling.kiloSessionId },
+        workspace: { ...metadata.workspace, workspacePath: sibling.directory },
+      });
+      await h.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: sibling.sessionId,
+        allowCreate: false,
+      });
+      await h.control.attachSession(sibling);
+      h.session.getCredentialMetadata.mockResolvedValue(metadata);
+      h.sendRequest.mockResolvedValueOnce({
+        type: 'response',
+        requestId: 'busy',
+        ok: false,
+        error: { code: 'session_busy', message: 'Session has work in progress', retryable: true },
+      });
+      await expect(
+        h.control.request({
+          operation,
+          session: sibling,
+          payload: operation === 'session.prompt' ? { ...PROMPT, messageId: 'rejected' } : {},
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        })
+      ).resolves.toMatchObject({ ok: false, error: { code: 'session_busy' } });
+      await h.hooks.onHeartbeat?.({ ...activeHeartbeat, pendingMessages: 0 }, identity);
+      const routes = await loadRouteTable(h.storage);
+      expect(routes.get(ROUTE.sessionId)?.lastState).toBe('active');
+      expect(routes.get(sibling.sessionId)).toMatchObject({ lastState: 'idle', waitingOn: null });
+      expect((await loadDeadlines(h.storage)).idleStop).toBeUndefined();
+      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(true);
+      expect(h.runtime(identity.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+      expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+      const idleStart = Date.now();
+      for (let elapsed = 0; elapsed <= DEADLINE_MS.idleStop; elapsed += 30_000) {
+        vi.setSystemTime(idleStart + elapsed);
+        await h.hooks.onHeartbeat?.(
+          { state: 'idle', kilo: { ready: true }, pendingMessages: 0, sessions: [] },
+          identity
+        );
+        await h.control.alarm();
+        await h.flush();
+      }
+      expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
+      expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledOnce();
+      expect(await h.control.getPhysicalRecord()).toMatchObject({ state: 'stopped' });
+    }
+  );
+
   it('does not renew idle or heartbeat deadlines for polling or invalid demand', async () => {
     const h = await harness();
     await h.create();
@@ -1108,30 +1485,34 @@ describe('SandboxControl lifecycle boundaries', () => {
     await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
   });
 
-  it('does not start compute when enforced billing denies admission', async () => {
-    const h = await harness({
-      configureAllocation: runtime => {
-        runtime.ensureBillingAdmission.mockResolvedValue({
-          success: false,
-          code: 'insufficient_credits',
-          message: 'denied',
-        });
-      },
-    });
-    const result = await h.control.ensureReady({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      allowCreate: true,
-      billing: { ...BILLING, enforcementRequested: true },
-    });
-    expect(result.physical).toBe('failed');
-    expect(h.alarmAt).not.toBeNull();
-    for (const runtime of h.allocations.values()) {
-      expect(runtime.state.running).toBe(false);
-      expect(runtime.startProcess).not.toHaveBeenCalled();
+  it.each([true, false])(
+    'does not start compute when billing denies admission with containment %s',
+    async containmentEnabled => {
+      const h = await harness({
+        containmentEnabled,
+        configureAllocation: runtime => {
+          runtime.ensureBillingAdmission.mockResolvedValue({
+            success: false,
+            code: 'insufficient_credits',
+            message: 'denied',
+          });
+        },
+      });
+      const result = await h.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        allowCreate: true,
+        billing: { ...BILLING, enforcementRequested: true },
+      });
+      expect(result.physical).toBe('failed');
+      expect(h.alarmAt).not.toBeNull();
+      for (const runtime of h.allocations.values()) {
+        expect(runtime.state.running).toBe(false);
+        expect(runtime.startProcess).not.toHaveBeenCalled();
+      }
+      await h.flush();
     }
-    await h.flush();
-  });
+  );
 
   it('adopts billing for an already-running unmetered Cloudflare allocation without waking it again', async () => {
     const h = await harness();
@@ -1170,43 +1551,50 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.flush();
   });
 
-  it('checks enforcement toggles before each warm Cloudflare handoff and denies without execution or wake', async () => {
-    const h = await harness();
-    await h.control.ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, allowCreate: true });
-    const connection = await h.ready();
-    const runtime = h.runtime(connection.providerInstanceId);
-    if (!runtime) throw new Error('Missing runtime');
-    h.env.CLOUD_AGENT_CONTAINER_BILLING_ENABLED = 'true';
-    h.env.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS = OWNER;
-    runtime.ensureBillingAdmission.mockResolvedValueOnce({
-      success: false,
-      code: 'insufficient_credits',
-      message: 'denied',
-    });
-    const handoff = () =>
-      h.control
-        .ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, billing: BILLING })
-        .then(() =>
-          h.control.request({
-            operation: 'session.prompt',
-            session: ROUTE,
-            payload: { ...PROMPT, messageId: 'message_B' },
-          })
-        );
-    await expect(handoff()).rejects.toThrow('additional credits');
-    expect(runtime.ensureBillingAdmission).toHaveBeenCalledWith({
-      ...BILLING,
-      sandboxId: decodeCloudflareProviderRef(connection.providerInstanceId)?.sandboxId,
-      enforcementRequested: true,
-    });
-    expect(h.sendRequest).not.toHaveBeenCalled();
-    expect(runtime.startProcess).toHaveBeenCalledTimes(1);
-    expect(runtime.renewActivityTimeout).not.toHaveBeenCalled();
-    expect(h.allocations.size).toBe(1);
-    await expect(handoff()).resolves.toMatchObject({ ok: true });
-    expect(runtime.ensureBillingAdmission).toHaveBeenCalledTimes(2);
-    expect(h.sendRequest).toHaveBeenCalledTimes(1);
-  });
+  it.each([true, false])(
+    'checks warm Cloudflare billing enforcement without execution or wake with containment %s',
+    async containmentEnabled => {
+      const h = await harness({ containmentEnabled });
+      await h.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        allowCreate: true,
+      });
+      const connection = await h.ready();
+      const runtime = h.runtime(connection.providerInstanceId);
+      if (!runtime) throw new Error('Missing runtime');
+      h.env.CLOUD_AGENT_CONTAINER_BILLING_ENABLED = 'true';
+      h.env.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS = OWNER;
+      runtime.ensureBillingAdmission.mockResolvedValueOnce({
+        success: false,
+        code: 'insufficient_credits',
+        message: 'denied',
+      });
+      const handoff = () =>
+        h.control
+          .ensureReady({ ownerId: OWNER, sessionId: ROUTE.sessionId, billing: BILLING })
+          .then(() =>
+            h.control.request({
+              operation: 'session.prompt',
+              session: ROUTE,
+              payload: { ...PROMPT, messageId: 'message_B' },
+            })
+          );
+      await expect(handoff()).rejects.toThrow('additional credits');
+      expect(runtime.ensureBillingAdmission).toHaveBeenCalledWith({
+        ...BILLING,
+        sandboxId: decodeCloudflareProviderRef(connection.providerInstanceId)?.sandboxId,
+        enforcementRequested: true,
+      });
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(runtime.startProcess).toHaveBeenCalledTimes(1);
+      expect(runtime.renewActivityTimeout).not.toHaveBeenCalled();
+      expect(h.allocations.size).toBe(1);
+      await expect(handoff()).resolves.toMatchObject({ ok: true });
+      expect(runtime.ensureBillingAdmission).toHaveBeenCalledTimes(2);
+      expect(h.sendRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('rejects enforced warm Vercel reuse without provider I/O or a new handoff', async () => {
     const fetchProvider = vi.fn();
@@ -1390,6 +1778,56 @@ describe('SandboxControl lifecycle boundaries', () => {
       h.control.request({ operation: 'session.prompt', session: ROUTE, payload: PROMPT })
     ).resolves.toMatchObject({ ok: true });
   });
+
+  it.each([undefined, 'feed_stale', 'credential_refresh_failed'] as const)(
+    'logs unhealthy heartbeat reason %s before quarantine without changing stop semantics',
+    async reason => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const runtime = h.runtime(identity.providerInstanceId);
+      const closeAll = vi.spyOn(h.socket, 'closeAll');
+      closeAll.mockClear();
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
+        expect(closeAll).not.toHaveBeenCalled();
+        expect(runtime?.state.running).toBe(true);
+      });
+      try {
+        const payload: SandboxHeartbeatPayload = {
+          ...activeHeartbeat,
+          kilo: { ready: false, ...(reason ? { reason } : {}) },
+        };
+        await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+        await h.hooks.onHeartbeat?.(payload, {
+          ...identity,
+          connectionId: crypto.randomUUID(),
+        });
+        expect(warn).not.toHaveBeenCalled();
+        await h.hooks.onHeartbeat?.(payload, identity);
+        expect(fields).toHaveBeenCalledExactlyOnceWith({
+          sandboxId: SANDBOX_ID,
+          wrapperInstanceId: identity.wrapperInstanceId,
+          connectionId: identity.connectionId,
+          reason: reason ?? 'unknown',
+        });
+        expect(warn).toHaveBeenCalledExactlyOnceWith(
+          'Sandbox control received unhealthy heartbeat'
+        );
+        await h.flush();
+        expect(runtime?.state.running).toBe(false);
+        expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+          'kilo_unhealthy',
+          identity.wrapperInstanceId
+        );
+        expect(runtime?.renewActivityTimeout).toHaveBeenCalledTimes(1);
+      } finally {
+        fields.mockRestore();
+        warn.mockRestore();
+        closeAll.mockRestore();
+      }
+    }
+  );
 
   it('transfers a fenced quarantine durably before stop I/O and survives eviction', async () => {
     const stop = deferred<void>();
@@ -1721,139 +2159,157 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.flush();
   });
 
-  it('reconciles a lost Vercel create response with a non-waking lookup across runtime config rotation', async () => {
-    const remote = new Map<string, VercelSandboxCreateEnvelope>();
-    const inspected: URL[] = [];
-    const allocated = deferred<void>();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string, init?: RequestInit) => {
-        const url = new URL(input);
-        if (url.pathname === '/v2/sandboxes' && init?.method === 'POST') {
-          if (typeof init.body !== 'string') throw new Error('Expected JSON request body');
-          const body = JSON.parse(init.body) as {
-            name: string;
-            projectId: string;
-            runtime: string;
-            timeout: number;
-            source: { snapshotId: string };
-            tags: Record<string, string>;
-          };
-          if (remote.has(body.name)) throw new Error('Name is retained');
-          const sessionId = `vsess_${remote.size + 1}`;
-          const created: VercelSandboxCreateEnvelope = {
-            sandbox: {
-              name: body.name,
-              currentSessionId: sessionId,
-              status: 'running',
-              persistent: false,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              tags: body.tags,
-            },
-            session: {
-              id: sessionId,
-              sourceSandboxName: body.name,
-              projectId: body.projectId,
-              sourceSnapshotId: body.source.snapshotId,
-              runtime: body.runtime,
-              status: 'running',
-              memory: 2048,
-              vcpus: 2,
-              region: 'iad1',
-              timeout: body.timeout,
-              requestedAt: Date.now(),
-              cwd: '/',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            },
-            routes: [],
-            runtime: { sandboxName: body.name, sessionId },
-          };
-          remote.set(body.name, created);
-          if (remote.size === 1) {
-            allocated.resolve();
-            return new Promise<Response>(() => undefined);
+  it.each([true, false])(
+    'reconciles a lost Vercel create response across runtime config rotation with containment %s',
+    async containmentEnabled => {
+      const remote = new Map<string, VercelSandboxCreateEnvelope>();
+      const inspected: URL[] = [];
+      const policyUpdates: URL[] = [];
+      const allocated = deferred<void>();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string, init?: RequestInit) => {
+          const url = new URL(input);
+          if (url.pathname.endsWith('/network-policy')) policyUpdates.push(url);
+          if (url.pathname === '/v2/sandboxes' && init?.method === 'POST') {
+            if (typeof init.body !== 'string') throw new Error('Expected JSON request body');
+            const body = JSON.parse(init.body) as {
+              name: string;
+              projectId: string;
+              runtime: string;
+              timeout: number;
+              source: { snapshotId: string };
+              tags: Record<string, string>;
+              networkPolicy?: unknown;
+            };
+            if (!containmentEnabled) expect(body.networkPolicy).toBeUndefined();
+            if (remote.has(body.name)) throw new Error('Name is retained');
+            const sessionId = `vsess_${remote.size + 1}`;
+            const created: VercelSandboxCreateEnvelope = {
+              sandbox: {
+                name: body.name,
+                currentSessionId: sessionId,
+                status: 'running',
+                persistent: false,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                tags: body.tags,
+              },
+              session: {
+                id: sessionId,
+                sourceSandboxName: body.name,
+                projectId: body.projectId,
+                sourceSnapshotId: body.source.snapshotId,
+                runtime: body.runtime,
+                status: 'running',
+                memory: 2048,
+                vcpus: 2,
+                region: 'iad1',
+                timeout: body.timeout,
+                requestedAt: Date.now(),
+                cwd: '/',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              },
+              routes: [],
+              runtime: { sandboxName: body.name, sessionId },
+            };
+            remote.set(body.name, created);
+            if (remote.size === 1) {
+              allocated.resolve();
+              return new Promise<Response>(() => undefined);
+            }
+            return Response.json(created);
           }
-          return Response.json(created);
-        }
-        if (!url.pathname.startsWith('/v2/sandboxes/sessions/')) {
-          inspected.push(url);
-          const created = remote.get(url.pathname.split('/').at(-1) ?? '');
-          return created
-            ? Response.json({ ...created, resumed: false })
-            : new Response(null, { status: 404 });
-        }
-        const sessionId = url.pathname.split('/')[4];
-        const created = [...remote.values()].find(value => value.session.id === sessionId);
-        if (!created) return new Response(null, { status: 404 });
-        if (url.pathname.endsWith('/stop')) {
-          created.session.status = 'stopped';
-          return Response.json({ session: created.session });
-        }
-        if (url.pathname.endsWith('/cmd')) {
-          return Response.json({
-            command: {
-              id: 'cmd_1',
-              name: 'sh',
-              args: [],
-              cwd: '/',
-              sessionId,
-              exitCode: null,
-              startedAt: Date.now(),
-            },
-          });
-        }
-        return Response.json({ session: created.session, routes: [] });
-      })
-    );
-    const h = await harness({
-      env: {
-        VERCEL_TOKEN: 'test-token',
-        VERCEL_TEAM_ID: 'team_1',
-        VERCEL_PROJECT_ID: 'project_1',
-        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
-        VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot_1',
-        VERCEL_SANDBOX_RUNTIME: 'node24',
-        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-        VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
-      },
-    });
-    const creating = h.control.ensureReady({
-      ownerId: OWNER,
-      sessionId: ROUTE.sessionId,
-      provider: 'vercel',
-      allowCreate: true,
-      billing: BILLING,
-    });
-    await allocated.promise;
-    await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
-    await expect(creating).resolves.toMatchObject({ physical: 'failed' });
-    const uncertain = await h.control.getPhysicalRecord();
-    expect(uncertain.providerRef).toBeNull();
-    expect(uncertain.createIntent).toMatchObject({
-      allocationName: [...remote.keys()][0],
-      vercel: { runtimeBuildId: 'build_1', snapshotId: 'snapshot_1' },
-    });
-    h.env.VERCEL_SANDBOX_RUNTIME_BUILD_ID = 'build_2';
-    h.env.VERCEL_SANDBOX_SNAPSHOT_ID = 'snapshot_2';
-    await h.evict();
-    await h.fireAlarm();
-    expect(inspected).toHaveLength(1);
-    expect(inspected[0]?.searchParams.get('resume')).toBe('false');
-    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
-    expect([...remote.values()][0]?.session.status).toBe('stopped');
-    await h.create();
-    await h.ready();
-    expect(remote.size).toBe(2);
-    expect([...remote.values()][1]?.session.sourceSnapshotId).toBe('snapshot_2');
-    expect((await h.control.getPhysicalRecord()).createIntent?.vercel?.runtimeBuildId).toBe(
-      'build_2'
-    );
-    expect(mocks.getSandbox).not.toHaveBeenCalled();
-    await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
-    await h.flush();
-  });
+          if (!url.pathname.startsWith('/v2/sandboxes/sessions/')) {
+            inspected.push(url);
+            const created = remote.get(url.pathname.split('/').at(-1) ?? '');
+            return created
+              ? Response.json({ ...created, resumed: false })
+              : new Response(null, { status: 404 });
+          }
+          const sessionId = url.pathname.split('/')[4];
+          const created = [...remote.values()].find(value => value.session.id === sessionId);
+          if (!created) return new Response(null, { status: 404 });
+          if (url.pathname.endsWith('/stop')) {
+            created.session.status = 'stopped';
+            return Response.json({ session: created.session });
+          }
+          if (url.pathname.endsWith('/cmd')) {
+            return Response.json({
+              command: {
+                id: 'cmd_1',
+                name: 'sh',
+                args: [],
+                cwd: '/',
+                sessionId,
+                exitCode: null,
+                startedAt: Date.now(),
+              },
+            });
+          }
+          return Response.json({ session: created.session, routes: [] });
+        })
+      );
+      const h = await harness({
+        containmentEnabled,
+        env: {
+          VERCEL_TOKEN: 'test-token',
+          VERCEL_TEAM_ID: 'team_1',
+          VERCEL_PROJECT_ID: 'project_1',
+          VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
+          VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot_1',
+          VERCEL_SANDBOX_RUNTIME: 'node24',
+          VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+          VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
+        },
+      });
+      const creating = h.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        provider: 'vercel',
+        allowCreate: true,
+        billing: BILLING,
+      });
+      await allocated.promise;
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
+      await expect(creating).resolves.toMatchObject({ physical: 'failed' });
+      const uncertain = await h.control.getPhysicalRecord();
+      expect(uncertain.providerRef).toBeNull();
+      expect(uncertain.createIntent).toMatchObject({
+        allocationName: [...remote.keys()][0],
+        vercel: { runtimeBuildId: 'build_1', snapshotId: 'snapshot_1' },
+      });
+      h.env.VERCEL_SANDBOX_RUNTIME_BUILD_ID = 'build_2';
+      h.env.VERCEL_SANDBOX_SNAPSHOT_ID = 'snapshot_2';
+      h.env.CREDENTIAL_CONTAINMENT_ENABLED = containmentEnabled ? 'false' : 'true';
+      await h.evict();
+      await h.fireAlarm();
+      expect(inspected).toHaveLength(1);
+      expect(inspected[0]?.searchParams.get('resume')).toBe('false');
+      expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+      expect([...remote.values()][0]?.session.status).toBe('stopped');
+      await h.create();
+      await h.ready();
+      expect(remote.size).toBe(2);
+      expect([...remote.values()][1]?.session.sourceSnapshotId).toBe('snapshot_2');
+      expect((await h.control.getPhysicalRecord()).createIntent?.vercel?.runtimeBuildId).toBe(
+        'build_2'
+      );
+      expect(mocks.getSandbox).not.toHaveBeenCalled();
+      await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
+      if (!containmentEnabled) {
+        await expect(
+          h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
+        ).resolves.toMatchObject({ kilo: { token: 'test-token' } });
+        await h.control.detachSession(ROUTE.sessionId);
+        expect(await loadDeadlines(h.storage)).not.toHaveProperty('credentialExpiry');
+        expect(policyUpdates).toEqual([]);
+        expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+      }
+      await h.flush();
+    }
+  );
 
   it('quarantines an established control disconnect even when the provider remains active', async () => {
     const h = await harness({
@@ -2468,62 +2924,96 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(mocks.getSandbox).not.toHaveBeenCalled();
   });
 
-  it('validates terminal billing against the physical allocation rather than the logical route', async () => {
-    const h = await harness({
-      env: {
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: OWNER,
-      },
-    });
-    await h.create();
-    const connection = await h.ready();
-    const runtime = h.runtime(connection.providerInstanceId);
-    const native = decodeCloudflareProviderRef(connection.providerInstanceId);
-    if (!native) throw new Error('Missing native allocation');
-    const context: BillingContext = {
-      service: 'cloud-agent-next-sandbox-small-containment',
-      instanceId: native.sandboxId,
-      sku: SANDBOX_USAGE_SKUS.SandboxSmallContainment,
-      subject: BILLING.subject,
-      actor: BILLING.actor,
-      sessionId: ROUTE.sessionId,
-      metadata: {
-        origin: 'cloud-agent',
-        container_class: 'SandboxSmallContainment',
-        durable_object_id: `do:${native.sandboxId}`,
-      },
-      startEpochMs: Date.now(),
-      generation: crypto.randomUUID(),
-      measurementStarted: true,
-      nextSeq: 1,
-      usageMeasuredAtMs: Date.now(),
-    };
-    runtime?.getBillingRuntimeStatus.mockResolvedValue({
-      sandboxClassName: 'SandboxSmallContainment',
-      running: true,
-      blocked: false,
-      context,
-    });
-    await expect(
-      h.control.validateTerminalAccess({
+  it.each([true, false])(
+    'validates terminal authorization and physical billing with containment %s',
+    async containmentEnabled => {
+      const h = await harness({
+        containmentEnabled,
+        env: {
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: OWNER,
+        },
+      });
+      await h.create();
+      const connection = await h.ready();
+      const runtime = h.runtime(connection.providerInstanceId);
+      const native = decodeCloudflareProviderRef(connection.providerInstanceId);
+      if (!native) throw new Error('Missing native allocation');
+      const sandboxClassName = containmentEnabled ? 'SandboxSmallContainment' : 'SandboxSmall';
+      const context: BillingContext = {
+        service: containmentEnabled
+          ? 'cloud-agent-next-sandbox-small-containment'
+          : 'cloud-agent-next-sandbox-small',
+        instanceId: native.sandboxId,
+        sku: SANDBOX_USAGE_SKUS[sandboxClassName],
+        subject: BILLING.subject,
+        actor: BILLING.actor,
+        sessionId: ROUTE.sessionId,
+        metadata: {
+          origin: 'cloud-agent',
+          container_class: sandboxClassName,
+          durable_object_id: h.namespace.idFromName(native.sandboxId).toString(),
+        },
+        startEpochMs: Date.now(),
+        generation: crypto.randomUUID(),
+        measurementStarted: true,
+        nextSeq: 1,
+        usageMeasuredAtMs: Date.now(),
+      };
+      runtime?.getBillingRuntimeStatus.mockResolvedValue({
+        sandboxClassName,
+        running: true,
+        blocked: false,
+        context,
+      });
+      await expect(
+        h.control.validateTerminalAccess({
+          ownerId: OWNER,
+          sessionId: ROUTE.sessionId,
+          wrapperInstanceId: connection.wrapperInstanceId ?? '',
+        })
+      ).resolves.toEqual({ allowed: true });
+      expect(h.allocations.has(SANDBOX_ID)).toBe(false);
+      const access = {
         ownerId: OWNER,
         sessionId: ROUTE.sessionId,
         wrapperInstanceId: connection.wrapperInstanceId ?? '',
-      })
-    ).resolves.toEqual({ allowed: true });
-    expect(h.allocations.has(SANDBOX_ID)).toBe(false);
-    runtime?.getBillingRuntimeStatus.mockResolvedValue({
-      sandboxClassName: 'SandboxSmallContainment',
-      running: true,
-      blocked: false,
-      context: { ...context, instanceId: SANDBOX_ID },
-    });
-    await expect(
-      h.control.validateTerminalAccess({
-        ownerId: OWNER,
-        sessionId: ROUTE.sessionId,
-        wrapperInstanceId: connection.wrapperInstanceId ?? '',
-      })
-    ).resolves.toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
-  });
+      };
+      for (const [override, reason] of [
+        [{ ownerId: 'other_owner' }, 'owner_mismatch'],
+        [{ sessionId: 'other_session' }, 'session_not_attached'],
+        [{ wrapperInstanceId: crypto.randomUUID() }, 'wrapper_instance_mismatch'],
+        [{ organizationId: 'other_org' }, 'credential_scope_unavailable'],
+      ] as const) {
+        await expect(h.control.validateTerminalAccess({ ...access, ...override })).resolves.toEqual(
+          {
+            allowed: false,
+            reason,
+          }
+        );
+      }
+      await expect(h.control.attachSession({ ...ROUTE, ownerId: 'other_owner' })).rejects.toThrow(
+        'owner mismatch'
+      );
+      await expect(h.control.attachSession({ ...ROUTE, directory: '/other' })).rejects.toThrow();
+      expect(runtime?.getBillingRuntimeStatus).toHaveBeenCalledOnce();
+      if (!containmentEnabled) {
+        expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+        expect(runtime?.setOutboundHandler).not.toHaveBeenCalled();
+      }
+      runtime?.getBillingRuntimeStatus.mockResolvedValue({
+        sandboxClassName,
+        running: true,
+        blocked: false,
+        context: { ...context, instanceId: SANDBOX_ID },
+      });
+      await expect(
+        h.control.validateTerminalAccess({
+          ownerId: OWNER,
+          sessionId: ROUTE.sessionId,
+          wrapperInstanceId: connection.wrapperInstanceId ?? '',
+        })
+      ).resolves.toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+    }
+  );
 });

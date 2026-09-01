@@ -383,8 +383,8 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
-  describe.each([undefined, 'true', 'false', ''] as const)(
-    'workspace containment ignores CREDENTIAL_CONTAINMENT_ENABLED=%s',
+  describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
+    'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
     flag => {
       it.each([
         {
@@ -421,7 +421,12 @@ describe('createSessionWithLedger admission ladder', () => {
           expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
             expect.objectContaining({
               identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
-              workspace: expect.objectContaining({ credentialContainment: expected }),
+              workspace: expect.objectContaining({
+                credentialContainment:
+                  flag === 'false'
+                    ? { github: false, gitlab: false, bitbucket: false, kilocode: false }
+                    : expected,
+              }),
             })
           );
         }
@@ -429,7 +434,7 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it('keeps mandatory workspace containment when CREDENTIAL_CONTAINMENT_ENABLED=false', async () => {
+  it('persists disabled workspace containment independently of later flag changes', async () => {
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
@@ -440,15 +445,17 @@ describe('createSessionWithLedger admission ladder', () => {
       makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
     );
 
+    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
+
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
         workspace: expect.objectContaining({
           credentialContainment: {
             github: false,
-            gitlab: true,
+            gitlab: false,
             bitbucket: false,
-            kilocode: true,
+            kilocode: false,
           },
         }),
       })

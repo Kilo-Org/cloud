@@ -300,15 +300,17 @@ export async function refreshHeartbeatPayload(deps: HandlerDeps): Promise<Sandbo
         const runtime = kiloRuntimes.get(directory);
         if (!runtime) return;
         const revisions = new Map(roots.map(root => [root, activity.revision(root)]));
+        const kiloClient = runtime.kiloClient;
         try {
           const statuses = await withKiloRequestDeadline(
-            signal => runtime.kiloClient.getSessionStatuses(directory, signal),
+            signal => kiloClient.getSessionStatuses(directory, signal),
             deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal
           );
           if (
             runtime.signal.aborted ||
             deps.signal?.aborted ||
-            kiloRuntimes.get(directory) !== runtime
+            kiloRuntimes.get(directory) !== runtime ||
+            runtime.kiloClient !== kiloClient
           )
             return;
           activity.reconcile(
@@ -611,7 +613,7 @@ async function handleAttach(
     return fail('protocol_error', 'Reserved control runtime environment variable', false);
   }
   if (deps.tasks.has(session.kiloSessionId)) {
-    return fail('not_ready', 'Session has work in progress', true);
+    return fail('session_busy', 'Session has work in progress', true);
   }
 
   const task = startSessionTask(
@@ -622,6 +624,16 @@ async function handleAttach(
       const result = await (deps.applyAttach ?? applySessionAttach)(session, parsed.data, {
         kiloRuntimes: deps.kiloRuntimes,
         signal: owned.signal,
+        canRefreshCredentials: () =>
+          !owned.signal.aborted &&
+          ![...deps.tasks.values()].some(
+            task => task !== owned && task.session.directory === session.directory
+          ) &&
+          !(deps.activity?.snapshots() ?? []).some(
+            snapshot =>
+              snapshot.state !== 'idle' &&
+              directoryForSession(snapshot.kiloSessionId) === session.directory
+          ),
         ...(deps.terminalRuntime ? { terminalRuntime: deps.terminalRuntime } : {}),
         ...(deps.emitPreparing ? { emitPreparing: deps.emitPreparing } : {}),
       });
@@ -721,7 +733,22 @@ function handlePrompt(
   deps: HandlerDeps
 ): ControlHandlerResult {
   const runtime = sessionKiloRuntime(session, deps);
-  if (!runtime) return missingKilo();
+  if (!runtime) {
+    if (
+      deps.kiloRuntimes?.isHealthy() &&
+      directoryForSession(session.kiloSessionId) === session.directory &&
+      rootForSession(session.kiloSessionId) === session.kiloSessionId &&
+      [...deps.tasks.values()].some(
+        task =>
+          task.kind === 'preparation' &&
+          task.session.directory === session.directory &&
+          !task.signal.aborted
+      )
+    ) {
+      return fail('session_busy', 'Worktree has preparation in progress', true);
+    }
+    return missingKilo();
+  }
   const parsed = sessionPromptPayloadSchema.safeParse(payload);
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   const request = parsed.data;
@@ -751,7 +778,7 @@ function handlePrompt(
     ) {
       return ok({ messageId: request.messageId, status: 'existing' });
     }
-    return fail('not_ready', 'Session has work in progress', true);
+    return fail('session_busy', 'Session has work in progress', true);
   }
   startSessionTask(
     session,

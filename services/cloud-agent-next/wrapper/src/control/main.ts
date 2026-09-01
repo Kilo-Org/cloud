@@ -1,3 +1,4 @@
+import type { SandboxHeartbeatPayload } from '../../../src/shared/sandbox-control-protocol.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { logToFile } from '../utils.js';
 import {
@@ -29,6 +30,7 @@ function main(): void {
   const abort = new AbortController();
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
+  let heartbeatReason: SandboxHeartbeatPayload['kilo']['reason'];
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onEvent: (runtime, event) => {
       const identity = sessionEventIdentity({
@@ -54,7 +56,12 @@ function main(): void {
         throw new Error('Sandbox control event delivery failed');
       }
     },
-    onUnexpectedClose: () => shutdown(1, 'Kilo event feed is no longer healthy'),
+    onUnexpectedClose: failure =>
+      shutdown(
+        1,
+        `Kilo worktree failed reason=${failure.reason} directory=${failure.directory}`,
+        failure.reason
+      ),
   });
   const terminalRuntime = controlConfig.SANDBOX_CONTROL_URL
     ? createControlTerminalRuntime({
@@ -89,11 +96,25 @@ function main(): void {
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   };
 
-  function shutdown(exitCode: number, reason: string): void {
+  function withHeartbeatReason(payload: SandboxHeartbeatPayload): SandboxHeartbeatPayload {
+    if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;
+    return payload;
+  }
+
+  function shutdown(
+    exitCode: number,
+    reason: string,
+    diagnosticReason: NonNullable<SandboxHeartbeatPayload['kilo']['reason']> = 'shutdown'
+  ): void {
     if (shuttingDown) return;
     shuttingDown = true;
+    heartbeatReason = diagnosticReason;
     logToFile(`control-plane wrapper retiring: ${reason}`);
-    control?.sendEvent?.('sandbox.heartbeat', buildHeartbeatPayload(deps));
+    try {
+      control?.sendEvent?.('sandbox.heartbeat', withHeartbeatReason(buildHeartbeatPayload(deps)));
+    } catch {
+      logToFile('control-plane final heartbeat delivery failed');
+    }
     const stopped = cancelControlTasks(deps, reason, exitCode === 0 ? 'cancelled' : 'failed');
     abort.abort();
     terminalRuntime?.shutdown();
@@ -114,7 +135,7 @@ function main(): void {
   control = maybeStartSandboxControlClient(controlConfig, logToFile, {
     wrapperVersion: WRAPPER_VERSION,
     isReady: () => deps.kiloReady,
-    onDisconnected: () => shutdown(1, 'Sandbox control connection lost'),
+    onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected'),
     onRequest: (operation, session, payload) =>
       handleControlRequest(operation, session, payload, {
         ...deps,
@@ -127,11 +148,11 @@ function main(): void {
               rootKiloSessionId: session.kiloSessionId,
             })
           ) {
-            shutdown(1, 'Preparation event delivery failed');
+            shutdown(1, 'Preparation event delivery failed', 'control_disconnected');
           }
         },
       }),
-    getHeartbeatPayload: () => refreshHeartbeatPayload(deps),
+    getHeartbeatPayload: async () => withHeartbeatReason(await refreshHeartbeatPayload(deps)),
   });
 
   logToFile(`control-plane wrapper ready callHome=${Boolean(control)}`);

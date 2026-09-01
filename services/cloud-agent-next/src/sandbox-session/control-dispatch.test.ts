@@ -5,8 +5,10 @@ import {
   type ResponseFrame,
 } from '../shared/sandbox-control-protocol.js';
 import {
+  ControlRequestError,
   controlDispatchDisposition,
   controlRequestResult,
+  deliveryErrorLogFields,
   isRetryableDeliveryError,
   observeControlAfterStopping,
   SESSION_DELIVERY_TIMEOUT_MS,
@@ -30,6 +32,25 @@ describe('controlDispatchDisposition', () => {
 });
 
 describe('controlRequestResult', () => {
+  it('preserves validated application rejections separately from transport exceptions', () => {
+    const error = {
+      code: 'session_busy',
+      message: 'Session has work in progress',
+      retryable: true,
+    };
+    const response: ResponseFrame = { type: 'response', requestId: 'request', ok: false, error };
+    let failure: unknown;
+    try {
+      controlRequestResult(response);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(ControlRequestError);
+    expect(failure).toMatchObject(error);
+    expect(isRetryableDeliveryError(failure)).toBe(true);
+    expect(Object.assign(new Error(error.message), error)).not.toBeInstanceOf(ControlRequestError);
+  });
+
   it.each([undefined, { retryable: true }, { code: '', message: 'Invalid', retryable: true }])(
     'does not turn a malformed rejection %j into a retryable failure',
     error => {
@@ -47,6 +68,53 @@ describe('controlRequestResult', () => {
       }
       expect(failure).toBeInstanceOf(Error);
       expect(isRetryableDeliveryError(failure)).toBe(false);
+    }
+  );
+});
+
+describe('deliveryErrorLogFields', () => {
+  it.each(['session_busy', 'not_ready', 'runtime_unhealthy'])(
+    'logs only the allowlisted %s code and retry classification',
+    code => {
+      const error = Object.assign(
+        new ControlRequestError({ code, message: 'sensitive-message', retryable: true }),
+        {
+          cause: 'sensitive-cause',
+          stack: 'sensitive-stack',
+          auth: 'sensitive-auth',
+          env: 'sensitive-env',
+        }
+      );
+      expect(deliveryErrorLogFields(error)).toEqual({ errorCode: code, retryable: true });
+    }
+  );
+
+  it('does not log an arbitrary response code', () => {
+    expect(
+      deliveryErrorLogFields(
+        new ControlRequestError({
+          code: 'sensitive-untrusted-code',
+          message: 'sensitive-message',
+          retryable: false,
+        })
+      )
+    ).toEqual({ errorCode: 'unknown_control_error', retryable: false });
+  });
+
+  it.each([false, true])(
+    'classifies transport exceptions without copying fields when overloaded=%s',
+    overloaded => {
+      const error = Object.assign(new Error('sensitive-message'), {
+        code: 'session_busy',
+        retryable: true,
+        overloaded,
+        stack: 'sensitive-stack',
+        cause: 'sensitive-cause',
+      });
+      expect(deliveryErrorLogFields(error)).toEqual({
+        errorCode: 'transport_or_internal_error',
+        retryable: !overloaded,
+      });
     }
   );
 });
@@ -97,6 +165,20 @@ describe('withDeliveryDeadline', () => {
       expect(isRetryableDeliveryError(await failure)).toBe(false);
     }
   );
+
+  it('preserves a confirmed rejection that arrives at the head deadline', async () => {
+    const rejection = new ControlRequestError({
+      code: 'session_busy',
+      message: 'Session has work in progress',
+      retryable: true,
+    });
+    const failure = withDeliveryDeadline(
+      () => new Promise<never>((_resolve, reject) => setTimeout(() => reject(rejection), 1_000)),
+      Date.now() + 1_000
+    ).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await failure).toBe(rejection);
+  });
 
   it('preserves an explicit transient failure before the operation cutoff', async () => {
     const failure = Object.assign(new Error('Transient control failure'), {

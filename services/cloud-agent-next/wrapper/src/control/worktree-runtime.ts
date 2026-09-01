@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
+import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
 import type {
   ControlErrorCode,
@@ -19,9 +20,18 @@ import {
 import { withTimeoutAndAbort } from '../utils.js';
 import { unfilteredKiloEvents } from './feed.js';
 import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
-import { startSandboxControlEventFeed } from './sandbox-control-runtime.js';
+import {
+  KiloEventFeedError,
+  startSandboxControlEventFeed,
+  withKiloRequestDeadline,
+} from './sandbox-control-runtime.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
+
+type WorktreeKiloFailure = {
+  directory: string;
+  reason: KiloEventFeedError['reason'] | 'process_exited' | 'credential_refresh_failed';
+};
 
 export type WorktreeKiloRuntime = {
   readonly scopeId: string;
@@ -42,7 +52,8 @@ export type WorktreeKiloRuntimes = {
   attach(
     identity: SessionRequestIdentity,
     kilo: WorktreeKiloAuth,
-    env?: Record<string, string>
+    env?: Record<string, string>,
+    canRefreshCredentials?: () => boolean
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
   deleteDirectory(directory: string): Promise<void>;
@@ -73,6 +84,9 @@ type RuntimeEntry = {
   abort: AbortController;
   roots: Set<RootAttachment>;
   runtime?: WorktreeKiloRuntime;
+  kiloClient?: WrapperKiloClient;
+  processAbort?: AbortController;
+  pendingPtys: number;
   feed?: Awaited<ReturnType<typeof startSandboxControlEventFeed>>;
   starting?: Promise<WorktreeKiloRuntime>;
   stopped?: Promise<void>;
@@ -147,6 +161,7 @@ export function buildWorktreeKiloEnvironment(
         options: {
           apiKey: kilo.token,
           kilocodeToken: kilo.token,
+          ...(kilo.organizationId ? { kilocodeOrganizationId: kilo.organizationId } : {}),
           baseURL: kilo.targets.providerBaseUrl,
         },
       },
@@ -166,6 +181,7 @@ export function buildWorktreeKiloEnvironment(
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DEBUG_SESSION_INGEST: '1',
     KILOCODE_TOKEN: kilo.token,
+    ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),
     KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilo.token } }),
     KILOCODE_BACKEND_BASE_URL: kilo.targets.backendBaseUrl,
     KILO_API_URL: kilo.targets.backendBaseUrl,
@@ -242,7 +258,9 @@ export async function startWorktreeKiloServer(
 function sameAuth(left: WorktreeKiloAuth, right: WorktreeKiloAuth): boolean {
   return (
     left.scopeId === right.scopeId &&
-    left.token === right.token &&
+    (left.containmentEnabled !== false) === (right.containmentEnabled !== false) &&
+    (left.containmentEnabled === false || left.token === right.token) &&
+    left.organizationId === right.organizationId &&
     left.targets.backendBaseUrl === right.targets.backendBaseUrl &&
     left.targets.providerBaseUrl === right.targets.providerBaseUrl &&
     left.targets.sessionIngestBaseUrl === right.targets.sessionIngestBaseUrl
@@ -254,7 +272,7 @@ export function createWorktreeKiloRuntimes(options: {
   inheritedEnv?: NodeJS.ProcessEnv;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => void;
-  onUnexpectedClose: () => void;
+  onUnexpectedClose: (failure: WorktreeKiloFailure) => void;
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const directoriesByScope = new Map<string, string>();
@@ -311,11 +329,26 @@ export function createWorktreeKiloRuntimes(options: {
     if (root.entry.roots.size === 0) void retire(root.entry);
   }
 
+  function failRuntime(entry: RuntimeEntry, reason: WorktreeKiloFailure['reason']): void {
+    if (entry.abort.signal.aborted) return;
+    entry.abort.abort();
+    options.onUnexpectedClose({ directory: entry.directory, reason });
+  }
+
   async function start(
     entry: RuntimeEntry,
     retiring: Promise<void> | undefined
   ): Promise<WorktreeKiloRuntime> {
-    const { abort } = entry;
+    const abort = new AbortController();
+    entry.processAbort = abort;
+    const stopProcess = () => abort.abort();
+    entry.abort.signal.addEventListener('abort', stopProcess, { once: true });
+    abort.signal.addEventListener(
+      'abort',
+      () => entry.abort.signal.removeEventListener('abort', stopProcess),
+      { once: true }
+    );
+    if (entry.abort.signal.aborted) abort.abort();
     let server: WorktreeKiloServerHandle | undefined;
     let serverClosed = false;
     const closeServer = (): void => {
@@ -341,28 +374,70 @@ export function createWorktreeKiloRuntimes(options: {
         signal: abort.signal,
       });
       entry.stopped = server.stopped;
+      void server.stopped?.then(() => {
+        if (!abort.signal.aborted) failRuntime(entry, 'process_exited');
+      });
       abort.signal.throwIfAborted();
       const client = createKiloClient({ baseUrl: server.url, directory: entry.directory });
-      const runtime: WorktreeKiloRuntime = {
+      const kiloClient = createWrapperKiloClient(client, server.url, entry.directory);
+      entry.kiloClient = {
+        ...kiloClient,
+        async createPty(options) {
+          if (entry.starting) {
+            throw new WorktreeKiloRuntimeError(
+              'session_busy',
+              'Worktree credentials are refreshing',
+              true
+            );
+          }
+          entry.pendingPtys += 1;
+          try {
+            return await kiloClient.createPty(options);
+          } finally {
+            entry.pendingPtys -= 1;
+          }
+        },
+      };
+      const runtime: WorktreeKiloRuntime = entry.runtime ?? {
         scopeId: entry.kilo.scopeId,
         directory: entry.directory,
-        env: entry.env,
-        kiloClient: createWrapperKiloClient(client, server.url, entry.directory),
-        signal: abort.signal,
+        get env() {
+          return entry.env;
+        },
+        get kiloClient() {
+          if (!entry.kiloClient) {
+            throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is not ready', true);
+          }
+          return entry.kiloClient;
+        },
+        signal: entry.abort.signal,
       };
+      const eventClient = createKiloEventClient({
+        baseUrl: server.url,
+        directory: entry.directory,
+      });
       entry.feed = await withTimeoutAndAbort(
         startSandboxControlEventFeed({
           signal: abort.signal,
-          open: signal => client.global.event({ signal, sseMaxRetryAttempts: 1 }),
+          open: signal =>
+            eventClient.global.event({
+              signal,
+              sseMaxRetryAttempts: 1,
+              onSseError: () => {
+                if (!signal.aborted) {
+                  throw new KiloEventFeedError('feed_failed', 'Kilo global event feed failed');
+                }
+              },
+            }),
           consume: async stream => {
             for await (const event of unfilteredKiloEvents(stream)) {
               if (abort.signal.aborted) return;
               options.onEvent?.(runtime, event);
             }
           },
-          onUnexpectedClose: () => {
-            abort.abort();
-            options.onUnexpectedClose();
+          onUnexpectedClose: error => {
+            if (abort.signal.aborted) return;
+            failRuntime(entry, error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
           },
         }),
         {
@@ -376,7 +451,8 @@ export function createWorktreeKiloRuntimes(options: {
       entry.runtime = runtime;
       return runtime;
     } catch {
-      abort.abort();
+      if (entry.runtime) failRuntime(entry, 'credential_refresh_failed');
+      else entry.abort.abort();
       closeServer();
       throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree failed to start', true);
     } finally {
@@ -384,8 +460,63 @@ export function createWorktreeKiloRuntimes(options: {
     }
   }
 
+  async function refreshCredentials(
+    entry: RuntimeEntry,
+    kilo: WorktreeKiloAuth,
+    env: Record<string, string>,
+    canRefreshCredentials: () => boolean
+  ): Promise<WorktreeKiloRuntime> {
+    const retry = () =>
+      new WorktreeKiloRuntimeError(
+        'session_busy',
+        'Worktree credentials require an idle runtime',
+        true
+      );
+    const client = entry.kiloClient;
+    if (!client || !entry.processAbort || !entry.stopped) {
+      throw new WorktreeKiloRuntimeError('not_ready', 'Worktree cannot refresh credentials', true);
+    }
+    if (entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
+    try {
+      const idle = await withKiloRequestDeadline(async signal => {
+        const statuses = await client.getSessionStatuses(entry.directory, signal);
+        if (Object.values(statuses).some(status => status.type !== 'idle')) return false;
+        const url = new URL('/pty', client.serverUrl);
+        url.searchParams.set('directory', entry.directory);
+        const response = await fetch(url, { signal });
+        if (!response.ok) throw new Error('Worktree PTY probe failed');
+        const ptys: unknown = await response.json();
+        if (!Array.isArray(ptys)) throw new Error('Worktree PTY probe failed');
+        return ptys.length === 0;
+      }, entry.abort.signal);
+      if (!idle || entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
+    } catch (error) {
+      if (error instanceof WorktreeKiloRuntimeError) throw error;
+      throw new WorktreeKiloRuntimeError('not_ready', 'Worktree idle probe failed', true);
+    }
+    entry.processAbort.abort();
+    try {
+      await withTimeoutAndAbort(entry.stopped, {
+        signal: entry.abort.signal,
+        timeoutMs: KILO_STARTUP_TIMEOUT_MS,
+        timeoutMessage: 'Kilo worktree credential refresh timed out',
+        abortMessage: 'Kilo worktree credential refresh cancelled',
+      });
+      entry.kilo = { ...kilo, targets: { ...kilo.targets } };
+      entry.env = env;
+      return await start(entry, undefined);
+    } catch {
+      failRuntime(entry, 'credential_refresh_failed');
+      throw new WorktreeKiloRuntimeError(
+        'runtime_unhealthy',
+        'Kilo worktree credential refresh failed',
+        true
+      );
+    }
+  }
+
   return {
-    attach(identity, kilo, environment) {
+    attach(identity, kilo, environment, canRefreshCredentials) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
       }
@@ -411,7 +542,48 @@ export function createWorktreeKiloRuntimes(options: {
         );
       }
       if (entry?.abort.signal.aborted) {
-        throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is closed', true);
+        throw new WorktreeKiloRuntimeError('runtime_unhealthy', 'Kilo worktree is closed', true);
+      }
+      if (entry?.runtime && entry.starting) {
+        throw new WorktreeKiloRuntimeError(
+          'session_busy',
+          'Worktree credentials are refreshing',
+          true
+        );
+      }
+      if (entry && kilo.containmentEnabled === false) {
+        const env = buildWorktreeKiloEnvironment(
+          directory,
+          entry.env.HOME,
+          kilo,
+          environment,
+          options.inheritedEnv
+        );
+        const currentEnv = entry.env;
+        const changed = Object.keys({ ...currentEnv, ...env }).some(
+          key => currentEnv[key] !== env[key]
+        );
+        if (changed) {
+          if (
+            !entry.runtime ||
+            entry.starting ||
+            !canRefreshCredentials ||
+            !canRefreshCredentials() ||
+            [...entry.roots].some(current => current.pending.size > 0)
+          ) {
+            throw new WorktreeKiloRuntimeError(
+              'session_busy',
+              'Worktree credentials require an idle runtime',
+              true
+            );
+          }
+          const refreshing = entry;
+          entry.starting = Promise.resolve()
+            .then(() => refreshCredentials(refreshing, kilo, env, canRefreshCredentials))
+            .finally(() => {
+              refreshing.starting = undefined;
+            });
+        }
       }
       if (!entry) {
         const homeId = createHash('sha256')
@@ -435,6 +607,7 @@ export function createWorktreeKiloRuntimes(options: {
           ),
           abort: new AbortController(),
           roots: new Set(),
+          pendingPtys: 0,
         };
         const homes = homesByDirectory.get(directory) ?? new Set<string>();
         homes.add(home);
@@ -458,9 +631,11 @@ export function createWorktreeKiloRuntimes(options: {
       const attempt = Symbol();
       attachedRoot.pending.add(attempt);
       const signal = AbortSignal.any([attachedRoot.abort.signal, entry.abort.signal]);
-      const ready = entry.runtime
-        ? Promise.resolve(entry.runtime)
-        : (entry.starting ??= start(entry, previous?.retiring));
+      const ready =
+        entry.starting ??
+        (entry.runtime
+          ? Promise.resolve(entry.runtime)
+          : (entry.starting = start(entry, previous?.retiring)));
       return {
         ready,
         signal,
@@ -500,8 +675,11 @@ export function createWorktreeKiloRuntimes(options: {
       homesByDirectory.delete(directory);
     },
     get(directory) {
-      const runtime = entries.get(directory)?.runtime;
-      return !closed && runtime && !runtime.signal.aborted ? runtime : undefined;
+      const entry = entries.get(directory);
+      const runtime = entry?.starting ? undefined : entry?.runtime;
+      return !closed && runtime && !runtime.signal.aborted && entry?.feed?.isFresh()
+        ? runtime
+        : undefined;
     },
     isHealthy() {
       return (
@@ -509,7 +687,8 @@ export function createWorktreeKiloRuntimes(options: {
         [...entries.values()].every(
           entry =>
             entry.retiring !== undefined ||
-            (!entry.abort.signal.aborted && (!entry.runtime || entry.feed?.isFresh() === true))
+            (!entry.abort.signal.aborted &&
+              (entry.starting !== undefined || !entry.runtime || entry.feed?.isFresh() === true))
         )
       );
     },

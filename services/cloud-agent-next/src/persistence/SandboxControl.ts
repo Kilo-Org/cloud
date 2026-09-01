@@ -20,7 +20,11 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { Env } from '../types.js';
-import { getSandboxProvider, type SessionMetadata } from './session-metadata.js';
+import {
+  getSandboxProvider,
+  requiresContainmentSandbox,
+  type SessionMetadata,
+} from './session-metadata.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { logger } from '../logger.js';
 import {
@@ -69,6 +73,7 @@ import {
   observe,
   recordStopAttempt,
   sameAllocation,
+  getWorktreeCredentialContainment,
   WORKTREE_CREDENTIAL_CONTAINMENT,
   type CredentialContainmentRequirements,
   type ObserveResult,
@@ -592,17 +597,20 @@ export class SandboxControl extends DurableObject<Env> {
     const provider = getSandboxProvider(metadata);
     await this.pinProvider(provider);
     const physical = await loadPhysicalRecord(this.ctx.storage);
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    const requiredContainment = getWorktreeCredentialContainment(
+      requiresContainmentSandbox(metadata)
+    );
+    if (!this.matchesContainment(physical, requiredContainment)) {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const outboundContainerId =
-      provider === 'cloudflare'
+      provider === 'cloudflare' && requiredContainment.kilocode
         ? getOutboundContainerId(
             this.env,
             decodeCloudflareProviderRef(physical.providerRef)?.sandboxId ??
               physical.createIntent?.allocationName ??
               this.sandboxId,
-            { managedScmContainment: true }
+            { managedScmContainment: requiredContainment.kilocode }
           )
         : undefined;
     const grants = await loadSessionCredentialGrants(this.ctx.storage);
@@ -641,7 +649,7 @@ export class SandboxControl extends DurableObject<Env> {
       if (
         (deadlineAt !== undefined && Date.now() >= deadlineAt) ||
         !sameAllocation(physical, currentPhysical) ||
-        !this.matchesContainment(currentPhysical, WORKTREE_CREDENTIAL_CONTAINMENT)
+        !this.matchesContainment(currentPhysical, requiredContainment)
       ) {
         throw new Error('Sandbox changed during credential preparation');
       }
@@ -651,6 +659,8 @@ export class SandboxControl extends DurableObject<Env> {
           !currentRuntime.allowed ||
           !this.sameTerminalRuntime(currentRuntime, terminal.runtime) ||
           prepared.grant.scopeId !== terminal.runtime.grant.scopeId ||
+          (prepared.grant.containmentEnabled !== false) !==
+            (terminal.runtime.grant.containmentEnabled !== false) ||
           prepared.grant.kilo.alias !== terminal.runtime.grant.kilo.alias
         ) {
           throw new Error('Terminal runtime changed during credential preparation');
@@ -658,9 +668,11 @@ export class SandboxControl extends DurableObject<Env> {
       }
       this.assertWorktreeAdmission(metadata.workspace?.worktreeId);
       const updated = [...grants.filter(grant => grant.scopeId !== scopeId), prepared.grant];
-      if (provider === 'vercel') await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      if (provider === 'vercel' && requiredContainment.kilocode) {
+        await this.ctx.storage.put(CREDENTIAL_POLICY_DIRTY_KEY, true);
+      }
       await saveSessionCredentialGrants(this.ctx.storage, updated);
-      if (provider === 'vercel') {
+      if (provider === 'vercel' && requiredContainment.kilocode) {
         const deadlines = await loadDeadlines(this.ctx.storage);
         const next = armDeadline(
           deadlines,
@@ -779,6 +791,9 @@ export class SandboxControl extends DurableObject<Env> {
       'Sandbox credential metadata timed out'
     );
     const worktreeId = metadata.workspace?.worktreeId;
+    const requiredContainment = getWorktreeCredentialContainment(
+      requiresContainmentSandbox(metadata)
+    );
     if (input.worktreeId !== undefined && input.worktreeId !== worktreeId) {
       throw new Error('Worktree identity conflict');
     }
@@ -795,15 +810,15 @@ export class SandboxControl extends DurableObject<Env> {
     let physical: PhysicalRecord;
     let creating = false;
     if (acquisition) {
-      let selected = await this.acquirePhysical(acquisition, worktreeId);
+      let selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
       if (selected.action === 'wait') {
         const step = nextEnsureReadyStep(selected.physical.state, true);
         if (step === 'release-failed') {
           await this.releaseIfAuthoritativelyDead(selected.physical);
-          selected = await this.acquirePhysical(acquisition, worktreeId);
+          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
         } else if (step === 'observe-unknown') {
           await this.observeCurrentProvider(selected.physical);
-          selected = await this.acquirePhysical(acquisition, worktreeId);
+          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
         }
       }
       if (selected.action === 'wait') return this.statusForPhysical(selected.physical);
@@ -829,7 +844,7 @@ export class SandboxControl extends DurableObject<Env> {
             intentId,
             this.provider.resumable,
             allocationName,
-            WORKTREE_CREDENTIAL_CONTAINMENT
+            requiredContainment
           );
           creating = true;
           return claimed;
@@ -842,7 +857,10 @@ export class SandboxControl extends DurableObject<Env> {
     if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
       return currentStatus();
     }
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    if (!this.matchesContainment(physical, requiredContainment)) {
+      if (this.matchesWorktreeContainment(physical)) {
+        throw new Error('Sandbox containment mode conflicts with the session');
+      }
       await this.beginStop('credential_containment_unavailable');
       await this.recordStopAttempt();
       return currentStatus();
@@ -901,7 +919,7 @@ export class SandboxControl extends DurableObject<Env> {
       const intent = physical.createIntent;
       if (!intent) throw new Error('Sandbox create intent is unavailable');
       const networkPolicy =
-        this.providerKind === 'vercel'
+        this.providerKind === 'vercel' && requiredContainment.kilocode
           ? await this.withCredentialUpdate(async () =>
               buildControlNetworkPolicy(
                 (await loadSessionCredentialGrants(this.ctx.storage)).filter(
@@ -991,6 +1009,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async acquirePhysical(
     acquisition: SandboxAcquisition,
+    requiredContainment: CredentialContainmentRequirements,
     worktreeId?: string
   ): Promise<{
     physical: PhysicalRecord;
@@ -1001,17 +1020,17 @@ export class SandboxControl extends DurableObject<Env> {
     return this.ctx.storage.transaction(async () => {
       const physical = await loadPhysicalRecord(this.ctx.storage, this.provider.resumable);
       this.assertWorktreeAdmission(worktreeId);
+      if (
+        this.matchesWorktreeContainment(physical) &&
+        !this.matchesContainment(physical, requiredContainment)
+      ) {
+        throw new Error('Sandbox containment mode conflicts with the session');
+      }
       if (await this.bindAcquisition(acquisition, physical)) return { physical, action: 'reuse' };
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
       }
-      const next = claimCreate(
-        physical,
-        intentId,
-        Date.now(),
-        allocationName,
-        WORKTREE_CREDENTIAL_CONTAINMENT
-      );
+      const next = claimCreate(physical, intentId, Date.now(), allocationName, requiredContainment);
       await this.persistPhysicalState(physical, next, 'demand');
       await this.bindAcquisition(acquisition, next);
       return { physical: next, action: 'create' };
@@ -1136,6 +1155,14 @@ export class SandboxControl extends DurableObject<Env> {
       const worktreeId = grant?.scopeId.startsWith('worktree_') ? grant.scopeId : undefined;
       if (!grant || worktreeId !== input.worktreeId) {
         throw new Error('Session has no matching worktree credential grant');
+      }
+      if (
+        !this.matchesContainment(
+          await loadPhysicalRecord(this.ctx.storage),
+          getWorktreeCredentialContainment(grant.containmentEnabled !== false)
+        )
+      ) {
+        throw new Error('Sandbox credential containment mismatch');
       }
       const result = await this.mutateRoutes(table => {
         this.assertWorktreeAdmission(worktreeId);
@@ -1503,10 +1530,11 @@ export class SandboxControl extends DurableObject<Env> {
 
     let billing: SandboxTerminalAccessResult;
     try {
-      const allocationId = decodeCloudflareProviderRef(runtime.physical.providerRef)?.sandboxId;
-      if (!allocationId) return { allowed: false, reason: 'runtime_not_running' };
+      const providerRef = decodeCloudflareProviderRef(runtime.physical.providerRef);
+      if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
+      const allocationId = providerRef.sandboxId;
       const namespace = getSandboxNamespace(this.env, allocationId, {
-        managedScmContainment: true,
+        managedScmContainment: providerRef.containment,
       });
       const sandbox = getSandbox(namespace, allocationId);
       billing = validateTerminalBillingRuntime({
@@ -1549,6 +1577,7 @@ export class SandboxControl extends DurableObject<Env> {
       left.route.kiloSessionId === right.route.kiloSessionId &&
       left.route.directory === right.route.directory &&
       left.grant.scopeId === right.grant.scopeId &&
+      (left.grant.containmentEnabled !== false) === (right.grant.containmentEnabled !== false) &&
       left.grant.kilo.alias === right.grant.kilo.alias
     );
   }
@@ -1557,6 +1586,11 @@ export class SandboxControl extends DurableObject<Env> {
     input: SandboxTerminalAccessInput,
     runtime: TerminalRuntimeSnapshot
   ): Promise<SandboxTerminalAccessResult> {
+    if (runtime.grant.containmentEnabled === false) {
+      return runtime.grant.expiresAt > Date.now()
+        ? { allowed: true }
+        : { allowed: false, reason: 'credential_reattach_required' };
+    }
     if (runtime.grant.expiresAt > Date.now() + TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS) {
       return { allowed: true };
     }
@@ -1923,6 +1957,14 @@ export class SandboxControl extends DurableObject<Env> {
         await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
         return;
       }
+      if (
+        this.matchesWorktreeContainment(physical) &&
+        !(physical.createIntent?.containment ?? physical.containment)?.kilocode
+      ) {
+        await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+        await this.cancelDeadlineAndAlarm('credentialExpiry');
+        return;
+      }
       if (physical.state !== 'running') {
         throw new Error('Sandbox credential policy is unavailable');
       }
@@ -2081,9 +2123,22 @@ export class SandboxControl extends DurableObject<Env> {
       return decodeVercelProviderRef(providerRef)?.sandboxName === allocationName;
     }
     const native = decodeCloudflareProviderRef(providerRef);
+    const containment = physical.createIntent?.containment ?? physical.containment;
     return (
       native?.sandboxId === allocationName &&
+      containment !== undefined &&
+      native.containment === (containment.kilocode || containment.github) &&
       (!physical.createIntent || native.instanceId === physical.createIntent.intentId)
+    );
+  }
+
+  private matchesWorktreeContainment(physical: PhysicalRecord): boolean {
+    const containment =
+      physical.state === 'creating' ? physical.createIntent?.containment : physical.containment;
+    return (
+      containment?.worktreeScoped === true &&
+      containment.kilocode === containment.github &&
+      this.matchesContainment(physical, containment)
     );
   }
 
@@ -2175,7 +2230,7 @@ export class SandboxControl extends DurableObject<Env> {
     return (
       (this.providerKind !== 'vercel' || physical.state === 'running') &&
       this.matchesProviderReference(physical, providerInstanceId) &&
-      this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      this.matchesWorktreeContainment(physical)
     );
   }
 
@@ -2189,7 +2244,7 @@ export class SandboxControl extends DurableObject<Env> {
       (physical.state !== 'running' && physical.state !== 'creating') ||
       (this.providerKind === 'vercel' && physical.state !== 'running') ||
       !this.matchesProviderReference(physical, identity.providerInstanceId) ||
-      !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      !this.matchesWorktreeContainment(physical)
     ) {
       this.socketHandler.closeAll('Sandbox runtime unavailable');
       return;
@@ -2271,6 +2326,14 @@ export class SandboxControl extends DurableObject<Env> {
   ): Promise<void> {
     if (!this.isCurrentConnection(identity)) return;
     if (!payload.kilo.ready) {
+      logger
+        .withFields({
+          sandboxId: this.sandboxId,
+          wrapperInstanceId: identity.wrapperInstanceId,
+          connectionId: identity.connectionId,
+          reason: payload.kilo.reason ?? 'unknown',
+        })
+        .warn('Sandbox control received unhealthy heartbeat');
       await this.quarantineConnection(identity, 'kilo_unhealthy');
       return;
     }
@@ -2620,7 +2683,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (physical.state !== 'running' || physical.stopTombstone || physical.providerRef === null) {
       return { allowed: false, reason: 'runtime_not_running' };
     }
-    if (!this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)) {
+    if (!this.matchesWorktreeContainment(physical)) {
       return { allowed: false, reason: 'credential_containment_unavailable' };
     }
     const grant = grants.find(
@@ -2637,7 +2700,15 @@ export class SandboxControl extends DurableObject<Env> {
             member.sessionId === input.sessionId && member.kiloSessionId === route.kiloSessionId
         )
     );
-    if (!grant) return { allowed: false, reason: 'credential_scope_unavailable' };
+    if (
+      !grant ||
+      !this.matchesContainment(
+        physical,
+        getWorktreeCredentialContainment(grant.containmentEnabled !== false)
+      )
+    ) {
+      return { allowed: false, reason: 'credential_scope_unavailable' };
+    }
 
     const connection = this.readyWrapperRuntime();
     if (!connection) return { allowed: false, reason: 'runtime_not_ready' };

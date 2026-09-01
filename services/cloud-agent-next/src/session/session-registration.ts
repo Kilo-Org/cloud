@@ -444,7 +444,11 @@ function computeCredentialContainment(
   input: SessionRegistrationInput,
   env: Env
 ): CredentialContainment {
-  const controlPlaneContainment = getControlPlaneCredentialContainment(sessionId, input.repository);
+  const controlPlaneContainment = getControlPlaneCredentialContainment(
+    sessionId,
+    input.repository,
+    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+  );
   if (controlPlaneContainment) return controlPlaneContainment;
   const containmentEnabled =
     env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false' && input.runtime?.devcontainer !== true;

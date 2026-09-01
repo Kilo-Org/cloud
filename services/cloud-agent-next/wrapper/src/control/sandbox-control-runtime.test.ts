@@ -683,7 +683,10 @@ describe('startSandboxControlEventFeed', () => {
 
     expect(received).toHaveLength(1);
     expect(failures).toHaveLength(1);
-    expect(failures[0]).toEqual(new Error('Kilo global event feed ended'));
+    expect(failures[0]).toMatchObject({
+      reason: 'feed_ended',
+      message: 'Kilo global event feed ended',
+    });
   });
 
   it('keeps silent work healthy on raw Kilo heartbeats and retires a frozen open feed', async () => {
@@ -739,7 +742,13 @@ describe('startSandboxControlEventFeed', () => {
       watchdog();
       watchdog();
       expect(streamSignal?.aborted).toBe(true);
-      expect(failures).toEqual([new Error('Kilo global event feed stopped responding')]);
+      expect(abort.signal.aborted).toBe(false);
+      expect(failures).toEqual([
+        expect.objectContaining({
+          reason: 'feed_stale',
+          message: 'Kilo global event feed stopped responding',
+        }),
+      ]);
     } finally {
       abort.abort();
       next.resolve();
@@ -764,11 +773,13 @@ describe('startSandboxControlEventFeed', () => {
       },
       onUnexpectedClose: failed.resolve,
     });
-    expect(await failed.promise).toEqual(
-      new Error('Kilo global event feed reconnected with a delivery gap')
-    );
+    expect(await failed.promise).toMatchObject({
+      reason: 'feed_reconnected',
+      message: 'Kilo global event feed reconnected with a delivery gap',
+    });
     expect(received).toHaveLength(1);
     expect(feed.isFresh()).toBe(false);
+    expect(abort.signal.aborted).toBe(false);
     abort.abort();
   });
 

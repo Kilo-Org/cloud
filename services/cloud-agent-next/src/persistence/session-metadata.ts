@@ -353,28 +353,29 @@ export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
 
 export function getControlPlaneCredentialContainment(
   sessionId: string,
-  repository: SessionMetadata['repository']
+  repository: SessionMetadata['repository'],
+  enabled = true
 ): CredentialContainment | undefined {
   if (sessionPlaneFromId(sessionId) !== 'control') return undefined;
   return {
-    github: repository?.type === 'github',
-    gitlab: repository?.type === 'gitlab',
-    bitbucket: repository?.type === 'bitbucket',
-    kilocode: true,
+    github: enabled && repository?.type === 'github',
+    gitlab: enabled && repository?.type === 'gitlab',
+    bitbucket: enabled && repository?.type === 'bitbucket',
+    kilocode: enabled,
   };
 }
 
 export function getEffectiveCredentialContainment(
   metadata: SessionMetadata
 ): CredentialContainment {
+  if (metadata.workspace?.credentialContainment) {
+    return metadata.workspace.credentialContainment;
+  }
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     metadata.identity.sessionId,
     metadata.repository
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  if (metadata.workspace?.credentialContainment) {
-    return metadata.workspace.credentialContainment;
-  }
   const legacyContainment = metadata.workspace?.managedScmContainment === true;
   return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
 }

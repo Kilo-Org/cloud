@@ -81,7 +81,10 @@ import {
   type PhysicalRecord,
 } from '../../src/sandbox-control/physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from '../../src/sandbox-control/provider.js';
-import { applyReportedSessionState } from '../../src/sandbox-control/session-routes.js';
+import {
+  applyReportedSessionState,
+  attachRoute,
+} from '../../src/sandbox-control/session-routes.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from '../../src/sandbox-session/control-dispatch.js';
 import {
   createVercelProviderAdapter,
@@ -5527,6 +5530,12 @@ describe('SandboxControl durable remainder', () => {
     const stub = env.SANDBOX_CONTROL.getByName('sbx__control_routes');
     await runInDurableObject(stub, async (instance, state) => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       const route = await attachGrantedSession(instance, state, {
         sessionId: GRANT_SESSION_ID,
         kiloSessionId: ROOT_ID,
@@ -6514,6 +6523,7 @@ describe('SandboxSession control-plane regressions', () => {
           {
             ...beforeDelivery.messages[1],
             state: 'accepted',
+            unresolvedDispatch: undefined,
             wrapperInstanceId: replacementFixture.wrapperInstanceId,
           },
         ]);
@@ -8638,12 +8648,16 @@ describe('SandboxControl terminal runtime coordination', () => {
 
     await runInDurableObject(control, async (instance, state) => {
       await instance.initializeOwner(input.ownerId);
-      await attachGrantedSession(instance, state, {
+      const attachment = {
         sessionId: input.sessionId,
         kiloSessionId: ROOT_ID,
         directory: '/workspace/terminal',
         ownerId: input.ownerId,
-      });
+      };
+      await seedGrant(instance, state, attachment);
+      const routes = await loadRouteTable(state.storage);
+      attachRoute(routes, attachment, input.ownerId);
+      await saveRouteTable(state.storage, routes);
       await expect(instance.validateTerminalAccess(input)).resolves.toEqual({
         allowed: false,
         reason: 'runtime_not_running',
@@ -8940,6 +8954,12 @@ describe('SandboxControl worktree routes', () => {
 
     const routes = await runInDurableObject(stub, async instance => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await Promise.all([
         attachGrantedSession(instance, instance['ctx'], groupedRoute(GRANT_SESSION_ID, ROOT_ID)),
         attachGrantedSession(
@@ -8965,6 +8985,12 @@ describe('SandboxControl worktree routes', () => {
 
     await runInDurableObject(stub, async instance => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await attachGrantedSession(
         instance,
         instance['ctx'],
@@ -9008,6 +9034,12 @@ describe('SandboxControl worktree routes', () => {
 
     await runInDurableObject(stub, async (instance, state) => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await state.storage.put('session_routes', [
         {
           sessionId: 'workspace_legacy',
@@ -9140,6 +9172,12 @@ describe('SandboxControl targeted detach', () => {
 
     await runInDurableObject(stub, async (instance, state) => {
       await instance.initializeOwner('owner_1');
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await attachGrantedSession(
         instance,
         instance['ctx'],
@@ -10075,7 +10113,12 @@ describe('SandboxSession root-owned terminal events', () => {
     const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
     await runInDurableObject(control, async instance => {
       await instance.initializeOwner(ownerId);
-      await instance.claimCreate('grouped-terminal-intent');
+      await instance.claimCreate(
+        'grouped-terminal-intent',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await attachGrantedSession(instance, instance['ctx'], groupedRoute(sessionId, root, ownerId));
       await attachGrantedSession(
         instance,
@@ -10909,6 +10952,12 @@ describe('SandboxSession targeted deletion', () => {
     const control = env.SANDBOX_CONTROL.getByName(targetSandboxId);
     await runInDurableObject(control, async instance => {
       await instance.initializeOwner(ownerId);
+      await instance.claimCreate(
+        'intent_routes',
+        false,
+        undefined,
+        WORKTREE_CREDENTIAL_CONTAINMENT
+      );
       await attachGrantedSession(
         instance,
         instance['ctx'],

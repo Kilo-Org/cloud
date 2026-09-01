@@ -61,6 +61,8 @@ export const controlErrorCodes = [
   'unknown_operation',
   'handshake_required',
   'not_ready',
+  'session_busy',
+  'runtime_unhealthy',
   'idempotency_conflict',
 ] as const;
 
@@ -161,6 +163,18 @@ export const sandboxHeartbeatPayloadSchema = z
     kilo: z
       .object({
         ready: z.boolean(),
+        reason: z
+          .enum([
+            'feed_stale',
+            'feed_reconnected',
+            'feed_ended',
+            'feed_failed',
+            'process_exited',
+            'credential_refresh_failed',
+            'control_disconnected',
+            'shutdown',
+          ])
+          .optional(),
       })
       .strict(),
     sessions: z.array(
@@ -233,6 +247,11 @@ export const sessionAttachPayloadSchema = z
       .object({
         scopeId: z.string().min(1).max(256),
         token: z.string().min(1).max(4096),
+        containmentEnabled: z.boolean().optional(),
+        organizationId: z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+          .optional(),
         targets: z
           .object({
             backendBaseUrl: z.string().url(),

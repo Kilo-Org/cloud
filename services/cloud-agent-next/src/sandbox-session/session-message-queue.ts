@@ -33,6 +33,8 @@ type SessionMessageLifecycle = {
   acceptedAt?: number;
   lastActivityAt?: number;
   deliveryDeadlineAt?: number;
+  deliveryRetryScope?: 'message' | 'runtime';
+  unresolvedDispatch?: true;
   wrapperInstanceId?: string;
   terminalAt?: number;
   failedReason?: string;
@@ -290,6 +292,7 @@ export function applyMessageOutcome(
       ? {
           ...item,
           state: outcome.status,
+          unresolvedDispatch: undefined,
           acceptedAt: item.acceptedAt ?? now,
           terminalAt: now,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
@@ -304,14 +307,15 @@ export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): b
 
 export function failQueuedMessage(
   messages: readonly SessionMessageRecord[],
-  messageId: string
+  messageId: string,
+  reason?: string
 ): SessionMessageRecord[] | undefined {
   if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
     return undefined;
   }
   return messages.map(message =>
     message.messageId === messageId && message.state === 'queued'
-      ? { ...message, state: 'failed' }
+      ? { ...message, state: 'failed', ...(reason ? { failedReason: reason } : {}) }
       : message
   );
 }
@@ -324,7 +328,13 @@ export function acceptQueuedMessage(
   if (nextQueuedMessageId(messages) !== messageId) return undefined;
   return messages.map(message =>
     message.messageId === messageId
-      ? { ...message, state: 'accepted', acceptedAt, lastActivityAt: acceptedAt }
+      ? {
+          ...message,
+          state: 'accepted',
+          acceptedAt,
+          lastActivityAt: acceptedAt,
+          unresolvedDispatch: undefined,
+        }
       : message
   );
 }

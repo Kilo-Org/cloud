@@ -95,6 +95,32 @@ describe('sandbox control durable state', () => {
     expect(await loadSessionCredentialGrants(storage)).toStrictEqual(grants);
   });
 
+  it('round-trips a direct credential grant without losing its scope or containment choice', async () => {
+    const storage = memoryStorage();
+    const contained = credentialGrant();
+    const grant = {
+      ...contained,
+      containmentEnabled: false,
+      kilo: {
+        token: contained.kilo.token,
+        targets: contained.kilo.targets,
+        capabilities: {},
+      },
+    } satisfies SessionCredentialGrant;
+    await saveSessionCredentialGrants(storage, [grant]);
+    expect(await loadSessionCredentialGrants(storage)).toStrictEqual([grant]);
+  });
+
+  it('rejects a persisted direct grant carrying a contained alias', async () => {
+    const storage = memoryStorage();
+    await storage.put('worktree_credential_grants', [
+      { ...credentialGrant(), containmentEnabled: false },
+    ]);
+    await expect(loadSessionCredentialGrants(storage)).rejects.toThrow(
+      'Invalid stored worktree credentials'
+    );
+  });
+
   it.each([
     { version: 2 },
     { scopeId: '' },

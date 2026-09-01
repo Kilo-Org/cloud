@@ -42,6 +42,7 @@ function billingInput(
     access?: SandboxTerminalAccessInput;
     sandboxId?: string;
     providerInstanceId?: string;
+    containment?: boolean;
     sandboxDurableObjectId?: string;
     sandboxClassName?: SandboxClassName;
     running?: boolean;
@@ -57,7 +58,7 @@ function billingInput(
       options.providerInstanceId ??
       encodeCloudflareProviderRef({
         sandboxId,
-        containment: true,
+        containment: options.containment ?? true,
         instanceId: PROVIDER_CREATION_ID,
       }),
     sandboxDurableObjectId: options.sandboxDurableObjectId ?? 'durable-object-small',
@@ -117,6 +118,59 @@ describe('validateTerminalBillingRuntime', () => {
       ).toEqual(input.expected);
     }
   );
+
+  it.each([
+    {
+      sandboxId: 'ses-abcdef',
+      sandboxClassName: 'SandboxSmall' as const,
+      service: 'cloud-agent-next-sandbox-small',
+    },
+    {
+      sandboxId: 'crv-abcdef',
+      sandboxClassName: 'SandboxCodeReview' as const,
+      service: 'cloud-agent-next-sandbox-code-review',
+    },
+    {
+      sandboxId: 'istd-abcdef',
+      sandboxClassName: 'Sandbox' as const,
+      service: 'cloud-agent-next-sandbox',
+    },
+    {
+      sandboxId: 'org-abcdef',
+      sandboxClassName: 'Sandbox' as const,
+      service: 'cloud-agent-next-sandbox',
+    },
+  ])('accepts uncontained $sandboxClassName only with its matching fenced reference', input => {
+    const uncontained = billingInput({
+      sandboxId: input.sandboxId,
+      sandboxClassName: input.sandboxClassName,
+      containment: false,
+      context: context({
+        service: input.service,
+        instanceId: input.sandboxId,
+        sku: SANDBOX_USAGE_SKUS[input.sandboxClassName],
+        ...(input.sandboxId.startsWith('org-') ? { sessionId: undefined } : {}),
+        metadata: {
+          container_class: input.sandboxClassName,
+          durable_object_id: 'durable-object-small',
+        },
+      }),
+    });
+    expect(validateTerminalBillingRuntime(uncontained)).toEqual({ allowed: true });
+    expect(
+      validateTerminalBillingRuntime({
+        ...uncontained,
+        providerInstanceId: encodeCloudflareProviderRef({
+          sandboxId: input.sandboxId,
+          containment: true,
+          instanceId: PROVIDER_CREATION_ID,
+        }),
+      })
+    ).toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+    expect(
+      validateTerminalBillingRuntime({ ...uncontained, sandboxDurableObjectId: 'other-namespace' })
+    ).toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+  });
 
   it('accepts an organization bot acting for the matching payer', () => {
     const organizationAccess = { ...access, organizationId: 'org_team', botId: 'bot_worker' };

@@ -16,6 +16,7 @@ import { DEADLINE_MS } from './deadlines.js';
 import {
   beginStop,
   confirmStopped,
+  getWorktreeCredentialContainment,
   recordStopAttempt,
   WORKTREE_CREDENTIAL_CONTAINMENT,
   type PhysicalRecord,
@@ -61,6 +62,76 @@ const billing = parseSandboxBillingInput({
 afterEach(() => vi.useRealTimers());
 
 describe('cloudflare provider adapter', () => {
+  it.each([true, false, undefined])(
+    'uses persisted containment %s for billing and launch regardless of launch environment',
+    async enabled => {
+      const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
+      const startProcess = vi.fn().mockResolvedValue({ id: 'proc_1' });
+      const ensureBillingAdmission = vi.fn().mockResolvedValue({ success: true });
+      const getSandbox = vi.fn(() =>
+        fakeSandbox({ setOutboundHandler, startProcess, ensureBillingAdmission })
+      );
+      const provider = createCloudflareProviderAdapter({
+        sandboxId: intent.allocationName,
+        getSandbox,
+        destroy: async () => undefined,
+      });
+      const created = await provider.create({
+        ...intent,
+        containment: enabled === undefined ? undefined : getWorktreeCredentialContainment(enabled),
+        billing,
+      });
+      if (!('providerRef' in created)) throw new Error('Missing allocation');
+      expect(decodeCloudflareProviderRef(created.providerRef)).toEqual({
+        sandboxId: intent.allocationName,
+        containment: enabled ?? true,
+        instanceId: intent.intentId,
+      });
+      await provider.launch(created.providerRef, {
+        CREDENTIAL_CONTAINMENT_ENABLED: enabled === false ? 'true' : 'false',
+      });
+      expect(getSandbox).toHaveBeenCalledTimes(2);
+      for (const call of getSandbox.mock.calls) {
+        expect(call).toEqual([intent.allocationName, { containment: enabled ?? true }]);
+      }
+      expect(ensureBillingAdmission).toHaveBeenCalledOnce();
+      expect(setOutboundHandler).toHaveBeenCalledTimes(enabled === false ? 0 : 1);
+      expect(startProcess).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          env: expect.objectContaining({ PROVIDER_INSTANCE_ID: created.providerRef }),
+        })
+      );
+    }
+  );
+
+  it.each([true, false])('reconstructs a fenced %s worktree ref for cleanup', async enabled => {
+    const getSandbox = vi.fn(() => fakeSandbox());
+    const destroy = vi.fn(async () => undefined);
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: intent.allocationName,
+      getSandbox,
+      destroy,
+    });
+    const retainedIntent = { ...intent, containment: getWorktreeCredentialContainment(enabled) };
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: intent.allocationName,
+      containment: enabled,
+      instanceId: intent.intentId,
+    });
+    await expect(provider.observe(null, retainedIntent)).resolves.toEqual({
+      status: 'active',
+      providerRef,
+    });
+    await expect(provider.stop(null, retainedIntent)).resolves.toBe('terminal');
+    expect(getSandbox).toHaveBeenCalledExactlyOnceWith(intent.allocationName, {
+      containment: enabled,
+    });
+    expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName, {
+      containment: enabled,
+    });
+  });
+
   it.each([true, false])(
     'cleans the exact physical allocation only after confirmed stop: %s',
     async confirmed => {
@@ -316,6 +387,14 @@ describe('cloudflare provider adapter', () => {
 
   it.each([
     { ref: PROVIDER_REF, containment: true },
+    {
+      ref: encodeCloudflareProviderRef({
+        sandboxId: 'sbx_1',
+        containment: false,
+        instanceId: 'op_1',
+      }),
+      containment: false,
+    },
     { ref: 'sbx_1', containment: false },
   ])(
     'observes, renews, and destroys only the encoded namespace without waking',
@@ -707,7 +786,7 @@ describe('cloudflare provider adapter', () => {
     'not-json',
     'sbx_other',
     JSON.stringify({ sandboxId: 'sbx_1', containment: true }),
-    JSON.stringify({ sandboxId: 'sbx_1', containment: false, instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: 'false', instanceId: 'op_1' }),
     encodeCloudflareProviderRef({
       sandboxId: 'sbx_other',
       containment: true,
@@ -761,12 +840,9 @@ describe('cloudflare provider adapter', () => {
 });
 
 describe('cloudflare provider references', () => {
-  it('round-trips the containment namespace and exact creation intent', () => {
-    expect(decodeCloudflareProviderRef(PROVIDER_REF)).toEqual({
-      sandboxId: 'sbx_1',
-      containment: true,
-      instanceId: 'op_1',
-    });
+  it.each([true, false])('round-trips namespace %s and exact creation intent', containment => {
+    const ref = { sandboxId: 'sbx_1', containment, instanceId: 'op_1' };
+    expect(decodeCloudflareProviderRef(encodeCloudflareProviderRef(ref))).toEqual(ref);
   });
 
   it.each([
@@ -781,7 +857,7 @@ describe('cloudflare provider references', () => {
     JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: '' }),
     JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: 1 }),
     JSON.stringify({ sandboxId: 'sbx_1', containment: 'true', instanceId: 'op_1' }),
-    JSON.stringify({ sandboxId: 'sbx_1', containment: false, instanceId: 'op_1' }),
+    JSON.stringify({ sandboxId: 'sbx_1', containment: 'false', instanceId: 'op_1' }),
     JSON.stringify({ sandboxId: '', containment: true, instanceId: 'op_1' }),
     JSON.stringify({ sandboxId: 'sbx_1', containment: true, instanceId: 'op_1', extra: true }),
     JSON.stringify({ sandboxId: 'a'.repeat(257), containment: true, instanceId: 'op_1' }),

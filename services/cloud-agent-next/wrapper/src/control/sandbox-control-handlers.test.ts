@@ -2010,7 +2010,10 @@ describe('owned control execution', () => {
         { ...payload, messageId: 'msg_2' },
         handlerDeps
       )
-    ).toMatchObject({ ok: false });
+    ).toMatchObject({ ok: false, error: { code: 'session_busy', retryable: true } });
+    expect(
+      await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
+    ).toMatchObject({ ok: false, error: { code: 'session_busy', retryable: true } });
     expect(submissions).toBe(1);
     expect(events).toEqual([]);
     finished.resolve(completion());
@@ -3957,6 +3960,43 @@ describe('control interactions and sync', () => {
         handlerDeps
       )
     ).toMatchObject({ ok: false });
+  });
+});
+
+describe('control wrapper heartbeat source policy', () => {
+  const source = fs
+    .readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
+    .replace(/\s+/g, ' ');
+
+  it('carries only the typed diagnostic code on final and in-flight negative heartbeats', () => {
+    expect(source).toContain(
+      "diagnosticReason: NonNullable<SandboxHeartbeatPayload['kilo']['reason']> = 'shutdown'"
+    );
+    expect(source).toContain(
+      'onUnexpectedClose: failure => shutdown( 1, `Kilo worktree failed reason=${failure.reason} directory=${failure.directory}`, failure.reason )'
+    );
+    expect(source).toContain(
+      "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"
+    );
+    expect(source).toContain(
+      'if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;'
+    );
+    expect(source).toContain(
+      'getHeartbeatPayload: async () => withHeartbeatReason(await refreshHeartbeatPayload(deps))'
+    );
+  });
+
+  it('sets the first diagnostic before sending the final heartbeat and cancelling tasks', () => {
+    const steps = [
+      'if (shuttingDown) return;',
+      'shuttingDown = true;',
+      'heartbeatReason = diagnosticReason;',
+      "control?.sendEvent?.('sandbox.heartbeat', withHeartbeatReason(buildHeartbeatPayload(deps)))",
+      'const stopped = cancelControlTasks(deps, reason,',
+      'abort.abort();',
+    ].map(step => source.indexOf(step));
+    expect(steps.every(index => index >= 0)).toBe(true);
+    expect(steps).toEqual([...steps].sort((a, b) => a - b));
   });
 });
 

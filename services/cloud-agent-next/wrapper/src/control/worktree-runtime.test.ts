@@ -130,6 +130,8 @@ function createKiloStub() {
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
+      if (request.method === 'GET' && url.pathname === '/session/status') return Response.json({});
+      if (request.method === 'GET' && url.pathname === '/pty') return Response.json([]);
       if (request.method === 'POST' && url.pathname.startsWith('/permission/')) {
         const id = decodeURIComponent(url.pathname.split('/')[2]);
         const index = permissions.findIndex(permission => permission.id === id);
@@ -281,6 +283,28 @@ afterEach(async () => {
 });
 
 describe('worktree Kilo environments', () => {
+  it.each([undefined, 'org-trusted'])(
+    'uses only trusted organization attribution: %s',
+    organizationId => {
+      const env = buildWorktreeKiloEnvironment(
+        '/workspace/a',
+        '/home/a',
+        { ...auth, token: 'real-kilo-token', organizationId },
+        { KILOCODE_ORGANIZATION_ID: 'profile-org' },
+        { KILOCODE_ORGANIZATION_ID: 'inherited-org' }
+      );
+      if (organizationId) expect(env.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(env).not.toHaveProperty('KILOCODE_ORGANIZATION_ID');
+      expect(JSON.parse(env.KILO_CONFIG_CONTENT).provider.kilo.options).toEqual({
+        apiKey: 'real-kilo-token',
+        kilocodeToken: 'real-kilo-token',
+        baseURL: auth.targets.providerBaseUrl,
+        ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
+      });
+      expect(env.KILO_CONFIG_CONTENT).toBe(env.OPENCODE_CONFIG_CONTENT);
+    }
+  );
+
   it('retains only the four trusted Bitbucket metadata keys from the attachment', () => {
     const env = buildWorktreeKiloEnvironment(
       '/workspace/a',
@@ -428,6 +452,130 @@ describe('worktree Kilo runtime registry', () => {
         expect.objectContaining({ messageID: 'message_root_two' }),
       ])
     );
+  });
+
+  it('uses the real SDK timeout-free fetch for global SSE with runtime-owned cancellation', async () => {
+    const fetchSpy = spyOn(globalThis, 'fetch');
+    const harness = createRegistry();
+    try {
+      const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+      const sseCalls = fetchSpy.mock.calls.filter(
+        ([request]) =>
+          request instanceof Request && new URL(request.url).pathname === '/global/event'
+      );
+      expect(sseCalls).toHaveLength(1);
+      const [request, init] = sseCalls[0];
+      if (!(request instanceof Request)) throw new Error('Expected SDK SSE request');
+      expect(init).toMatchObject({ duplex: 'half', timeout: false });
+      expect(new URL(request.url).searchParams.get('directory')).toBe(runtime.directory);
+      expect(request.signal.aborted).toBe(false);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(harness.registry.isHealthy()).toBe(true);
+      harness.registry.shutdown();
+      expect(request.signal.aborted).toBe(true);
+      expect(runtime.signal.aborted).toBe(true);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(harness.unexpectedCloses).toBe(0);
+    } finally {
+      harness.registry.shutdown();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
+    'classifies real SDK SSE %s without exposing private errors or reconnecting',
+    async failure => {
+      const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
+      const encoder = new TextEncoder();
+      const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+      const response = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(connected));
+            opened.resolve(controller);
+          },
+        }),
+        { headers: { 'Content-Type': 'text/event-stream' } }
+      );
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(response);
+      const failures: unknown[] = [];
+      const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
+      try {
+        const runtime = await harness.registry.ensure(path.join(tmpDir, 'worktree-sse'), auth);
+        const stream = await opened.promise;
+        if (failure === 'stream-error') stream.error(new Error('private-stream-credential'));
+        else if (failure === 'feed-end') stream.close();
+        else stream.enqueue(encoder.encode(connected));
+        await waitUntil(() => failures.length > 0);
+        expect(failures).toEqual([
+          {
+            directory: runtime.directory,
+            reason:
+              failure === 'stream-error'
+                ? 'feed_failed'
+                : failure === 'feed-end'
+                  ? 'feed_ended'
+                  : 'feed_reconnected',
+          },
+        ]);
+        expect(runtime.signal.aborted).toBe(true);
+        expect(harness.registry.isHealthy()).toBe(false);
+        expect(harness.registry.get(runtime.directory)).toBeUndefined();
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        harness.registry.shutdown();
+        fetchSpy.mockRestore();
+      }
+    }
+  );
+
+  it('keeps the refreshed SDK event feed healthy after intentional old-process shutdown', async () => {
+    const received: string[] = [];
+    const harness = createRegistry({
+      startServer: async () => {
+        const server = createKiloStub();
+        servers.push(server);
+        const stopped = Promise.withResolvers<void>();
+        return {
+          url: server.url,
+          stopped: stopped.promise,
+          close: () => {
+            server.endFeeds();
+            stopped.resolve();
+          },
+        };
+      },
+      onEvent: (_runtime, event) => received.push(event.type),
+    });
+    const directAuth = { ...auth, containmentEnabled: false };
+    const identity = rootIdentity(path.join(tmpDir, 'shared'));
+    const first = harness.registry.attach(identity, directAuth);
+    const runtime = await first.ready;
+    first.commit();
+    first.release();
+    const originalClient = runtime.kiloClient;
+    const refresh = harness.registry.attach(
+      identity,
+      { ...directAuth, token: 'rotated-token' },
+      undefined,
+      () => true
+    );
+    expect(await refresh.ready).toBe(runtime);
+    refresh.commit();
+    refresh.release();
+    expect(runtime.kiloClient).not.toBe(originalClient);
+    expect(servers).toHaveLength(2);
+    servers[1]?.emit({ payload: { type: 'server.heartbeat', properties: {} } });
+    servers[1]?.emit({ payload: { type: 'session.updated', properties: {} } });
+    await waitUntil(() => received.includes('session.updated'));
+    expect(runtime.signal.aborted).toBe(false);
+    expect(harness.registry.isHealthy()).toBe(true);
+    expect(harness.registry.get(identity.directory)).toBe(runtime);
+    expect(harness.unexpectedCloses).toBe(0);
+    servers[1]?.endFeeds();
+    await waitUntil(() => harness.unexpectedCloses === 1);
+    expect(runtime.signal.aborted).toBe(true);
+    expect(harness.registry.isHealthy()).toBe(false);
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -1033,6 +1181,7 @@ describe('worktree Kilo runtime registry', () => {
     const conflicts = [
       { ...auth, scopeId: 'different-scope' },
       { ...auth, token: 'different-token' },
+      { ...auth, organizationId: 'different-organization' },
       ...Object.keys(auth.targets).map(key => ({
         ...auth,
         targets: { ...auth.targets, [key]: 'https://different.example.test' },

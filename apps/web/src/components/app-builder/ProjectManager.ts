@@ -41,7 +41,7 @@ export type ProjectManager = {
   destroyed: boolean;
   subscribe: (listener: () => void) => () => void;
   getState: () => ProjectState;
-  sendMessage: (message: string, images?: Images, model?: string) => void;
+  sendMessage: (message: string, images?: Images, model?: string) => Promise<void>;
   interrupt: () => void;
   setCurrentIframeUrl: (url: string | null) => void;
   setGitRepoFullName: (repoFullName: string) => void;
@@ -64,7 +64,8 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   let pendingInitialStreamingStart = false;
   let pendingReconnect = false;
   let hasStartedInitialStreaming = false;
-  let sessionUnsubscribes: Array<() => void> = [];
+  const sessionUnsubscribes = new Map<AppBuilderSession, () => void>();
+  let sessionCreationOperation = 0;
 
   const initialState = createInitialState(
     project.deployment_id ?? null,
@@ -101,17 +102,24 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   }
 
   function getActiveSession(): AppBuilderSession | undefined {
-    const sessions = store.getState().sessions;
-    return sessions[sessions.length - 1];
+    if (!cloudAgentSessionId) return undefined;
+    return store
+      .getState()
+      .sessions.find(session => session.info.cloud_agent_session_id === cloudAgentSessionId);
   }
 
   function subscribeToSession(session: AppBuilderSession): void {
     const unsubscribe = session.subscribe(() => {
-      const active = getActiveSession();
-      const isStreaming = active?.getState().isStreaming ?? false;
-      store.setState({ isStreaming });
+      if (destroyed || getActiveSession() !== session) return;
+      const { isStreaming, isConnecting } = session.getState();
+      store.setState({ isStreaming, isConnecting });
     });
-    sessionUnsubscribes.push(unsubscribe);
+    sessionUnsubscribes.set(session, unsubscribe);
+  }
+
+  function unsubscribeFromSession(session: AppBuilderSession): void {
+    sessionUnsubscribes.get(session)?.();
+    sessionUnsubscribes.delete(session);
   }
 
   /**
@@ -123,12 +131,17 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     const sessionInfos = proj.sessions;
     if (sessionInfos.length === 0) return [];
 
-    const activeInfo =
-      sessionInfos.find(s => s.ended_at === null) ?? sessionInfos[sessionInfos.length - 1];
+    const activeInfo = project.session_id
+      ? sessionInfos.find(s => s.cloud_agent_session_id === project.session_id)
+      : undefined;
+
+    const orderedSessionInfos = activeInfo
+      ? [...sessionInfos.filter(info => info.id !== activeInfo.id), activeInfo]
+      : sessionInfos;
 
     const sessions: AppBuilderSession[] = [];
 
-    for (const info of sessionInfos) {
+    for (const info of orderedSessionInfos) {
       const isActive = info.id === activeInfo?.id;
 
       if (!isActive) {
@@ -173,6 +186,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     const currentActive = getActiveSession();
     if (currentActive) {
       currentActive.info.ended_at = new Date().toISOString();
+      unsubscribeFromSession(currentActive);
       currentActive.destroy();
     }
 
@@ -198,7 +212,9 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     const currentSessions = store.getState().sessions;
     store.setState({
       sessions: [...currentSessions, newSession],
-      isStreaming: true,
+      isStreaming: false,
+      isConnecting: true,
+      isRecoveringSession: false,
     });
     cloudAgentSessionId = newSessionId;
 
@@ -259,15 +275,25 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
 
   // Determine if the active session needs initial streaming from the backend session info.
   // `initiated` lives on ProjectSessionInfo (routing data), not on SessionDisplayInfo.
-  const activeProjectSessionInfo =
-    project.sessions.find(s => s.ended_at === null) ??
-    project.sessions[project.sessions.length - 1];
+  const activeProjectSessionInfo = project.session_id
+    ? project.sessions.find(s => s.cloud_agent_session_id === project.session_id)
+    : undefined;
 
-  if (activeProjectSessionInfo?.initiated === false) {
+  if (activeProjectSessionInfo?.prepared === true && activeProjectSessionInfo.initiated === false) {
     pendingInitialStreamingStart = true;
-  } else if (cloudAgentSessionId) {
+  } else if (
+    cloudAgentSessionId &&
+    activeProjectSessionInfo &&
+    activeProjectSessionInfo.prepared !== false
+  ) {
     pendingReconnect = true;
+    if (activeProjectSessionInfo.worker_version === 'v2') {
+      store.setState({ isConnecting: true });
+    }
   } else {
+    if (cloudAgentSessionId) {
+      store.setState({ pendingNewSession: true, isRecoveringSession: true });
+    }
     startPreviewPollingIfNeeded();
   }
 
@@ -303,16 +329,15 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     return store.getState();
   }
 
-  function sendMessage(message: string, images?: Images, model?: string): void {
+  async function sendMessage(message: string, images?: Images, model?: string): Promise<void> {
     if (store.getState().pendingNewSession) {
-      sendMessageAsNewSession(message, images, model);
-      return;
+      return sendMessageAsNewSession(message, images, model);
     }
 
     const activeSession = getActiveSession();
     if (!activeSession) {
       logger.logWarn('Cannot send message: no active session');
-      return;
+      throw new Error('Cannot send message: no active session');
     }
 
     if (model) {
@@ -320,7 +345,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     }
 
     const effectiveModel = model ?? store.getState().model;
-    void activeSession.sendMessage(message, images, effectiveModel);
+    return activeSession.sendMessage(message, images, effectiveModel);
   }
 
   /**
@@ -328,10 +353,14 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
    * Calls sendMessage tRPC mutation with forceNewSession:true, then delegates
    * to handleSessionChanged to create the new session object and begin streaming.
    */
-  function sendMessageAsNewSession(message: string, images?: Images, model?: string): void {
+  async function sendMessageAsNewSession(
+    message: string,
+    images?: Images,
+    model?: string
+  ): Promise<void> {
     if (destroyed) {
       logger.logWarn('Cannot start new session: ProjectManager is destroyed');
-      return;
+      throw new Error('Cannot start new session: ProjectManager is destroyed');
     }
 
     if (model) {
@@ -339,8 +368,10 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     }
 
     const effectiveModel = model ?? store.getState().model;
+    const isRecoveringSession = store.getState().isRecoveringSession;
 
-    store.setState({ pendingNewSession: false, isStreaming: true });
+    const operation = ++sessionCreationOperation;
+    store.setState({ pendingNewSession: false, isStreaming: false, isConnecting: true });
 
     const mutationPromise = organizationId
       ? trpcClient.organizations.appBuilder.sendMessage.mutate({
@@ -359,19 +390,25 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
           forceNewSession: true,
         });
 
-    void mutationPromise
-      .then(result => {
-        if (destroyed) return;
-        handleSessionChanged(result.cloudAgentSessionId, {
-          text: message,
-          images,
-        });
-      })
-      .catch((err: Error) => {
-        if (destroyed) return;
-        logger.logError('Failed to start new session', err);
-        store.setState({ isStreaming: false });
+    try {
+      const result = await mutationPromise;
+      if (destroyed || operation !== sessionCreationOperation) return;
+      handleSessionChanged(result.cloudAgentSessionId, {
+        text: message,
+        images,
       });
+    } catch (err) {
+      if (!destroyed && operation === sessionCreationOperation) {
+        logger.logError('Failed to start new session', err);
+        store.setState({
+          pendingNewSession: true,
+          isRecoveringSession,
+          isStreaming: false,
+          isConnecting: false,
+        });
+      }
+      throw err;
+    }
   }
 
   function interrupt(): void {
@@ -423,26 +460,29 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     if (currentActive) {
       currentActive.info.ended_at = new Date().toISOString();
     }
-    store.setState({ pendingNewSession: true });
+    store.setState({ pendingNewSession: true, isRecoveringSession: false });
   }
 
   function cancelNewSession(): void {
     if (destroyed) return;
+    if (store.getState().isRecoveringSession) return;
     const currentActive = getActiveSession();
     if (currentActive) {
       currentActive.info.ended_at = null;
     }
-    store.setState({ pendingNewSession: false });
+    store.setState({ pendingNewSession: false, isRecoveringSession: false });
   }
 
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
 
-    for (const unsub of sessionUnsubscribes) {
+    sessionCreationOperation++;
+
+    for (const unsub of sessionUnsubscribes.values()) {
       unsub();
     }
-    sessionUnsubscribes = [];
+    sessionUnsubscribes.clear();
 
     for (const session of store.getState().sessions) {
       session.destroy();

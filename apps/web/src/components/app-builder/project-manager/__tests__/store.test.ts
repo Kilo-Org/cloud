@@ -22,6 +22,7 @@ describe('createInitialState', () => {
     const state = createInitialState(null, null, null);
 
     expect(state.isStreaming).toBe(false);
+    expect(state.isConnecting).toBe(false);
     expect(state.previewUrl).toBeNull();
     expect(state.previewStatus).toBe('idle');
     expect(state.deploymentId).toBeNull();
@@ -52,6 +53,7 @@ describe('createInitialState', () => {
 describe('createProjectStore', () => {
   const initialState: ProjectState = {
     isStreaming: false,
+    isConnecting: false,
     isInterrupting: false,
     previewUrl: null,
     previewStatus: 'idle',
@@ -61,6 +63,7 @@ describe('createProjectStore', () => {
     gitRepoFullName: null,
     sessions: [],
     pendingNewSession: false,
+    isRecoveringSession: false,
   };
 
   describe('getState', () => {

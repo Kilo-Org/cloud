@@ -31,6 +31,7 @@ function createMockStore(): {
     getState: () => ({
       messages,
       isStreaming,
+      isConnecting: false,
       questionRequestIds: new Map<string, string>(),
       childSessionMessages,
     }),

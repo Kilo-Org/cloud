@@ -23,6 +23,7 @@ export function createInitialState(
 ): ProjectState {
   return {
     isStreaming: false,
+    isConnecting: false,
     isInterrupting: false,
     previewUrl: null,
     previewStatus: 'idle',
@@ -32,6 +33,7 @@ export function createInitialState(
     gitRepoFullName,
     sessions: [],
     pendingNewSession: false,
+    isRecoveringSession: false,
   };
 }
 

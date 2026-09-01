@@ -72,6 +72,19 @@ export type {
 
 const REQUIRED_WORKER_VERSION = 'v2' satisfies WorkerVersion;
 
+export function isDefinitiveSessionNotFoundError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  const trpcError = error as {
+    code?: unknown;
+    data?: { code?: unknown; httpStatus?: unknown };
+    shape?: { data?: { code?: unknown; httpStatus?: unknown } };
+  };
+  const data = trpcError.data ?? trpcError.shape?.data;
+
+  return trpcError.code === 'NOT_FOUND' || data?.code === 'NOT_FOUND' || data?.httpStatus === 404;
+}
+
 /**
  * Construct the git URL for an App Builder project.
  */
@@ -89,20 +102,35 @@ function parseWorkerVersion(value: string | null): WorkerVersion | null {
 }
 
 /**
- * Fetch all sessions for a project, ordered by created_at ascending.
+ * Fetch the project and all of its sessions in one statement so the canonical
+ * session pointer and session history come from the same PostgreSQL snapshot.
  */
-async function getProjectSessions(projectId: string): Promise<ProjectSessionInfo[]> {
+async function getProjectSnapshot(
+  projectId: string,
+  owner: Owner
+): Promise<{ project: AppBuilderProject; sessions: ProjectSessionInfo[] }> {
+  const ownerCondition =
+    owner.type === 'org'
+      ? eq(app_builder_projects.owned_by_organization_id, owner.id)
+      : eq(app_builder_projects.owned_by_user_id, owner.id);
+
   const rows = await db
     .select({
-      id: app_builder_project_sessions.id,
-      cloud_agent_session_id: app_builder_project_sessions.cloud_agent_session_id,
-      worker_version: app_builder_project_sessions.worker_version,
-      created_at: app_builder_project_sessions.created_at,
-      ended_at: app_builder_project_sessions.ended_at,
-      v1_title: cliSessions.title,
-      v2_title: cli_sessions_v2.title,
+      project: app_builder_projects,
+      session: {
+        id: app_builder_project_sessions.id,
+        cloud_agent_session_id: app_builder_project_sessions.cloud_agent_session_id,
+        worker_version: app_builder_project_sessions.worker_version,
+        ended_at: app_builder_project_sessions.ended_at,
+        v1_title: cliSessions.title,
+        v2_title: cli_sessions_v2.title,
+      },
     })
-    .from(app_builder_project_sessions)
+    .from(app_builder_projects)
+    .leftJoin(
+      app_builder_project_sessions,
+      eq(app_builder_projects.id, app_builder_project_sessions.project_id)
+    )
     .leftJoin(
       cliSessions,
       eq(app_builder_project_sessions.cloud_agent_session_id, cliSessions.cloud_agent_session_id)
@@ -114,18 +142,34 @@ async function getProjectSessions(projectId: string): Promise<ProjectSessionInfo
         cli_sessions_v2.cloud_agent_session_id
       )
     )
-    .where(eq(app_builder_project_sessions.project_id, projectId))
+    .where(and(eq(app_builder_projects.id, projectId), ownerCondition))
     .orderBy(asc(app_builder_project_sessions.created_at));
 
-  return rows.map(row => ({
-    id: row.id,
-    cloud_agent_session_id: row.cloud_agent_session_id,
-    worker_version: parseWorkerVersion(row.worker_version) ?? 'v1',
-    ended_at: row.ended_at,
-    title: row.v1_title ?? row.v2_title ?? null,
-    initiated: null,
-    prepared: null,
-  }));
+  const project = rows[0]?.project;
+  if (!project) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Project not found',
+    });
+  }
+
+  const sessions = rows.flatMap(({ session }) => {
+    if (!session.id || !session.cloud_agent_session_id || !session.worker_version) return [];
+
+    return [
+      {
+        id: session.id,
+        cloud_agent_session_id: session.cloud_agent_session_id,
+        worker_version: parseWorkerVersion(session.worker_version) ?? 'v1',
+        ended_at: session.ended_at,
+        title: session.v1_title ?? session.v2_title ?? null,
+        initiated: null,
+        prepared: null,
+      } satisfies ProjectSessionInfo,
+    ];
+  });
+
+  return { project, sessions };
 }
 
 /**
@@ -306,16 +350,29 @@ async function createCloudAgentNextSession(
     cloudAgentSessionId: newSessionId,
   });
 
-  await db.transaction(async tx => {
+  const claimedSession = await db.transaction(async tx => {
+    const [claimedProject] = await tx
+      .update(app_builder_projects)
+      .set({ session_id: newSessionId })
+      .where(
+        and(
+          eq(app_builder_projects.id, projectId),
+          eq(app_builder_projects.session_id, currentSessionId)
+        )
+      )
+      .returning({ id: app_builder_projects.id });
+
+    if (!claimedProject) return false;
+
     await tx
       .update(app_builder_project_sessions)
       .set({ ended_at: sql`now()` })
-      .where(eq(app_builder_project_sessions.cloud_agent_session_id, currentSessionId));
-
-    await tx
-      .update(app_builder_projects)
-      .set({ session_id: newSessionId })
-      .where(eq(app_builder_projects.id, projectId));
+      .where(
+        and(
+          eq(app_builder_project_sessions.project_id, projectId),
+          eq(app_builder_project_sessions.cloud_agent_session_id, currentSessionId)
+        )
+      );
 
     await tx.insert(app_builder_project_sessions).values({
       project_id: projectId,
@@ -323,7 +380,34 @@ async function createCloudAgentNextSession(
       reason: toSessionReason(reason),
       worker_version: REQUIRED_WORKER_VERSION,
     });
+
+    return true;
   });
+
+  if (!claimedSession) {
+    try {
+      await client.interruptSession(newSessionId);
+    } catch (error) {
+      errorExceptInTest(
+        'Failed to interrupt superseded App Builder session',
+        { cloudAgentSessionId: newSessionId, projectId },
+        error
+      );
+    }
+
+    const cleanupResult = await client.cleanupSession(newSessionId);
+    if (!cleanupResult.success) {
+      errorExceptInTest('Failed to clean up superseded App Builder session', {
+        cloudAgentSessionId: newSessionId,
+        projectId,
+      });
+    }
+
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Project session changed while creating a new session.',
+    });
+  }
 
   return {
     cloudAgentSessionId: newSessionId,
@@ -518,10 +602,7 @@ export async function getProject(
   owner: Owner,
   authToken: string
 ): Promise<ProjectWithMessages> {
-  const project = await getProjectWithOwnershipCheck(projectId, owner);
-
-  // Fetch all sessions for this project
-  const sessions = await getProjectSessions(projectId);
+  const { project, sessions } = await getProjectSnapshot(projectId, owner);
 
   // Session state for the active session (populated below).
   // Messages are only eagerly loaded for the active session; ended legacy v1
@@ -560,7 +641,7 @@ export async function getProject(
           err
         );
         sessionInitiated = null;
-        sessionPrepared = null;
+        sessionPrepared = isDefinitiveSessionNotFoundError(err) ? false : null;
       }
     } else if (activeSession) {
       // Active session is a legacy v1 session — fetch its messages from R2 so

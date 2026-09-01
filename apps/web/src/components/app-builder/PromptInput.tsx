@@ -117,6 +117,7 @@ const BottomBar = memo(function BottomBar({
           onValueChange={onModelChange}
           isLoading={isLoadingModels}
           error={modelsError}
+          disabled={disabled || isSubmitting}
           placeholder="Model"
           className="w-56 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
         />
@@ -162,6 +163,7 @@ const BottomBar = memo(function BottomBar({
           onClick={onInterrupt}
           disabled={isInterrupting}
           className="h-9 w-9"
+          aria-label="Stop building"
         >
           <Square className="h-4 w-4" />
         </Button>
@@ -173,6 +175,7 @@ const BottomBar = memo(function BottomBar({
           onClick={onSubmit}
           disabled={isSubmitDisabled}
           className="h-9 w-9"
+          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </Button>

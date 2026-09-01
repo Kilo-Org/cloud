@@ -4,17 +4,18 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { organization } from './agents-tab-badge.test-helpers';
 import TabsLayout from '@/app/(app)/(tabs)/_layout';
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
+import { makeTestQueryClient } from '@/lib/active-sessions-live-sync.test-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
-import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { AgentSessionListScreen } from './session-list-screen';
 
-const organization = vi.hoisted(() => ({ organizationId: null as string | null, isLoaded: true }));
 const fetchSessions = vi.hoisted(() => vi.fn<() => Promise<{ sessions: ActiveSession[] }>>());
 
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
+vi.mock('@/lib/trpc', () => {
+  const trpc = {
     activeSessions: {
       list: {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
@@ -25,12 +26,9 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
-  }),
-}));
-vi.mock('@/lib/organization-context', () => ({ useOrganization: () => organization }));
-vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
-  useUserWebConnectionState: () => false,
-}));
+  };
+  return { useTRPC: () => trpc };
+});
 vi.mock('@/lib/active-sessions-live-sync', () => ({
   refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
 }));
@@ -125,7 +123,7 @@ function CountSurfaces() {
   );
 }
 
-async function mount(queryClient = createTestQueryClient()) {
+async function mount(queryClient = makeTestQueryClient()) {
   const result = await renderWithProviders(createElement(CountSurfaces), { queryClient });
   mounts.push(result);
   return result;
@@ -191,7 +189,7 @@ describe('Agents live count surfaces', () => {
   ])(
     'shares the active cache and updates to $count while Home has focus',
     async ({ count, label }) => {
-      const queryClient = createTestQueryClient();
+      const queryClient = makeTestQueryClient();
       queryClient.setQueryData(key(), { sessions: [] });
       const { renderer } = await mount(queryClient);
       expectCounts(renderer);
@@ -226,7 +224,7 @@ describe('Agents live count surfaces', () => {
 
   it('hides cached counts and disables fetching until the organization loads', async () => {
     organization.isLoaded = false;
-    const queryClient = createTestQueryClient();
+    const queryClient = makeTestQueryClient();
     queryClient.setQueryData(key(), { sessions: sessions(3) }, { updatedAt: 0 });
     const result = await mount(queryClient);
     expectCounts(result.renderer);
@@ -253,7 +251,7 @@ describe('Agents live count surfaces', () => {
   });
 
   it('hides counts but retains cached rows after refetch failure, then recovers through refresh', async () => {
-    const queryClient = createTestQueryClient();
+    const queryClient = makeTestQueryClient();
     const cachedRows = sessions(3);
     queryClient.setQueryData(key(), { sessions: cachedRows });
     const { renderer } = await mount(queryClient);
@@ -279,7 +277,7 @@ describe('Agents live count surfaces', () => {
 
   it('never carries the previous organization count through loading or authorization failure', async () => {
     organization.organizationId = 'org-a';
-    const queryClient = createTestQueryClient();
+    const queryClient = makeTestQueryClient();
     queryClient.setQueryData(key('org-a'), { sessions: sessions(4, 'org-a') });
     const result = await mount(queryClient);
     expectCounts(result.renderer, 4, '4 LIVE');

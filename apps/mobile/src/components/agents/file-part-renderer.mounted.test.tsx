@@ -875,6 +875,8 @@ describe('FilePartRenderer mounted', () => {
     const headers = findByType(root, 'SheetHeader');
     expect(headers).toHaveLength(1);
     expect(headers[0]?.props.onShare).toBeTypeOf('function');
+    // Filenames truncate in the middle so the extension stays visible.
+    expect(headers[0]?.props.titleEllipsis).toBe('middle');
 
     await act(async () => {
       await Promise.resolve();

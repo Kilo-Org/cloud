@@ -176,6 +176,8 @@ describe('SheetHeader', () => {
 
     expect(row?.props.className).toContain('flex-row');
     expect(row?.props.className).not.toContain('flex-wrap');
+    expect(row?.props.className).toContain('items-center');
+    expect(title.props.ellipsizeMode).toBe('tail');
     expect(title.props.className).not.toContain('text-center');
     expect(titleRegion?.props.className).toContain('min-w-0');
     expect(titleRegion?.parent).toBe(row);
@@ -223,7 +225,7 @@ describe('SheetHeader', () => {
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
 
       // Native props bound the title; this renderer cannot prove visibility at large text sizes.
-      expect(title.props.numberOfLines).toBe(1);
+      expect(title.props.numberOfLines).toBe(2);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.props.accessibilityLabel).toBe(filename);
       expect(title.children).toEqual([filename]);

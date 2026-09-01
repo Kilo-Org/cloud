@@ -484,6 +484,7 @@ function AttachmentChip({
         >
           <SheetHeader
             title={attachment.filename}
+            titleEllipsis="middle"
             onDone={() => {
               setTextPreview(null);
             }}

@@ -7,6 +7,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function SheetHeader({
   title,
+  titleEllipsis = 'tail',
   onDone,
   onCancel,
   doneLabel,
@@ -16,6 +17,11 @@ export function SheetHeader({
   disabled = false,
 }: {
   title: string;
+  /**
+   * 'middle' keeps a filename's extension visible. Android ignores middle
+   * truncation past the first line and falls back to tail.
+   */
+  titleEllipsis?: 'tail' | 'middle';
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
@@ -72,8 +78,8 @@ export function SheetHeader({
         <View className="min-w-0 shrink grow">
           <Text
             className="text-lg font-semibold text-foreground"
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            numberOfLines={2}
+            ellipsizeMode={titleEllipsis}
             accessibilityRole="header"
             accessibilityLabel={title}
           >

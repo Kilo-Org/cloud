@@ -17,7 +17,8 @@ import {
   townIdMiddleware,
   type AuthVariables,
 } from './middleware/auth.middleware';
-import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { createKiloAuthMiddleware } from '@kilocode/worker-utils/kilo-auth-middleware';
+import { resolveSecret } from './util/secret.util';
 import { validateCfAccessRequest } from '@kilocode/worker-utils/cf-access';
 
 import { trpcServer } from '@hono/trpc-server';
@@ -171,6 +172,12 @@ export type GastownEnv = {
 };
 
 const app = new Hono<GastownEnv>();
+
+const kiloAuthMiddleware = createKiloAuthMiddleware<GastownEnv>({
+  resolveSecret,
+  onAuthenticated: payload => logger.setTags({ userId: payload.kiloUserId }),
+});
+
 const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promise<void>) {

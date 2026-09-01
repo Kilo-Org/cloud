@@ -12,6 +12,7 @@
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
+    "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",

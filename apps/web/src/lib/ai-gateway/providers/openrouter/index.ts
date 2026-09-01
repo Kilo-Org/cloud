@@ -155,8 +155,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .map(model => {
+        const publishedModel = { ...model };
+        delete publishedModel.enkrypt;
         const enkrypt = enkryptFor(enkryptBenchmarks, model.id);
-        return { ...model, ...(enkrypt && { enkrypt }) };
+        return { ...publishedModel, ...(enkrypt && { enkrypt }) };
       })
       .concat(autoModels)
       .map(applyCustomPricingToModel)
@@ -206,6 +208,26 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   return sortedModels;
 }
 
+function removeUpstreamEnkrypt(response: unknown): unknown {
+  if (
+    !response ||
+    typeof response !== 'object' ||
+    !('data' in response) ||
+    !Array.isArray(response.data)
+  ) {
+    return response;
+  }
+  return {
+    ...response,
+    data: response.data.map((model: unknown) => {
+      if (!model || typeof model !== 'object' || !('enkrypt' in model)) return model;
+      const sanitized: Record<string, unknown> = { ...model };
+      delete sanitized.enkrypt;
+      return sanitized;
+    }),
+  };
+}
+
 /**
  * Fetch raw, unfiltered models from OpenRouter API
  * Use this for syncing model stats where you need complete data including :free variants
@@ -232,7 +254,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     throw new Error('Failed to fetch models from OpenRouter API');
   }
 
-  const data = await response.json();
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
@@ -292,7 +314,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
     throw new Error('Failed to fetch transcription models from OpenRouter API');
   }
 
-  const data = await response.json();
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 

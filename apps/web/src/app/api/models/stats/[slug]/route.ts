@@ -4,8 +4,12 @@ import { db } from '@/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
 
-export const revalidate = 3600;
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+const headers = { 'Cache-Control': 'no-store' };
 
 /**
  * GET /api/models/stats/[slug]
@@ -21,16 +25,22 @@ export async function GET(
     const [stat] = await db.select().from(modelStats).where(eq(modelStats.slug, slug)).limit(1);
 
     if (!stat) {
-      return NextResponse.json({ error: `Model with slug "${slug}" not found` }, { status: 404 });
+      return NextResponse.json(
+        { error: `Model with slug "${slug}" not found` },
+        { status: 404, headers }
+      );
     }
 
-    return NextResponse.json(stat);
+    return NextResponse.json(publishEnkryptModelStats(stat), { headers });
   } catch (error) {
     console.error('Error fetching model stat by slug:', error);
     captureException(error, {
       tags: { endpoint: 'api/models/stats/[slug]' },
     });
 
-    return NextResponse.json({ error: 'Failed to fetch model statistics' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch model statistics' },
+      { status: 500, headers }
+    );
   }
 }

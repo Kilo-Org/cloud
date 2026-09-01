@@ -7,10 +7,31 @@ import {
   createScheduledJobRun,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
+import { EnkryptFailureCategorySchema, EnkryptSyncCountsSchema } from '@kilocode/db/schema-types';
+import type { EnkryptSyncCounts } from '@kilocode/db/schema-types';
+import * as z from 'zod';
 import { CRON_SECRET } from '@/lib/config.server';
+import { EnkryptSyncError } from '@/lib/model-stats/enkrypt-errors';
 import { syncEnkryptBenchmarks } from '@/lib/model-stats/sync-enkrypt';
 
 export const maxDuration = 120;
+
+const SuccessSchema = EnkryptSyncCountsSchema.extend({
+  status: z.literal('succeeded'),
+  ingestedAt: z.string().datetime(),
+});
+const HttpStatusSchema = z.number().int().min(100).max(599);
+
+function countMetadata(counts: EnkryptSyncCounts | undefined) {
+  return {
+    fetched_count: counts?.fetchedCount,
+    rejected_count: counts?.rejectedCount,
+    matched_count: counts?.matchedCount,
+    unmatched_count: counts?.unmatchedCount,
+    ambiguous_count: counts?.ambiguousCount,
+    updated_count: counts?.updatedCount,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -20,35 +41,51 @@ export async function GET(request: NextRequest) {
 
   const run = createScheduledJobRun({
     jobName: 'web.sync_enkrypt',
-    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+    environment: process.env.VERCEL_TARGET_ENV ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV,
   });
 
   try {
-    const { fetchedCount, matchedCount, unmatchedCount, ambiguousCount, updatedCount } =
-      await syncEnkryptBenchmarks();
+    const result = await syncEnkryptBenchmarks();
+    if (result.status === 'disabled') {
+      emitScheduledJobEvent(
+        buildScheduledJobSuccessEvent(run, { status: 'disabled', skipped: true })
+      );
+      return NextResponse.json({ status: 'disabled' });
+    }
 
+    const parsed = SuccessSchema.safeParse(result);
+    if (!parsed.success) throw new EnkryptSyncError('unexpected');
+    const summary = parsed.data;
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {
-        fetched_count: fetchedCount,
-        matched_count: matchedCount,
-        unmatched_count: unmatchedCount,
-        ambiguous_count: ambiguousCount,
-        updated_count: updatedCount,
+        status: summary.status,
+        ingested_at: summary.ingestedAt,
+        ...countMetadata(summary),
       })
     );
 
-    return NextResponse.json({
-      success: true,
-      fetchedCount,
-      matchedCount,
-      unmatchedCount,
-      ambiguousCount,
-      updatedCount,
+    return NextResponse.json(summary);
+  } catch (caught) {
+    const category = EnkryptFailureCategorySchema.safeParse(
+      caught instanceof EnkryptSyncError ? caught.category : undefined
+    );
+    const counts = EnkryptSyncCountsSchema.safeParse(
+      caught instanceof EnkryptSyncError ? caught.counts : undefined
+    );
+    const httpStatus = HttpStatusSchema.safeParse(
+      caught instanceof EnkryptSyncError ? caught.httpStatus : undefined
+    );
+    const error = new EnkryptSyncError(category.success ? category.data : 'unexpected', {
+      ...(counts.success ? { counts: counts.data } : {}),
+      ...(httpStatus.success ? { httpStatus: httpStatus.data } : {}),
     });
-  } catch {
-    const error = new Error('Failed to sync Enkrypt benchmarks');
+    const metadata = {
+      category: error.category,
+      ...countMetadata(error.counts),
+      ...(error.httpStatus === undefined ? {} : { http_status: error.httpStatus }),
+    };
     captureException(error, {
-      tags: { endpoint: 'cron/sync-enkrypt' },
+      tags: { endpoint: 'cron/sync-enkrypt', ...metadata },
     });
     emitScheduledJobEvent(
       buildScheduledJobFailureEvent({
@@ -56,12 +93,18 @@ export async function GET(request: NextRequest) {
         jobName: run.jobName,
         environment: run.environment,
         error,
-        metadata: { sync_failure_count: 1 },
+        metadata: { status: 'failed', sync_failure_count: 1, ...metadata },
       })
     );
 
     return NextResponse.json(
-      { success: false, error: 'Failed to sync Enkrypt benchmarks' },
+      {
+        status: 'failed',
+        error: 'Failed to sync Enkrypt benchmarks',
+        category: error.category,
+        ...(error.counts === undefined ? {} : { counts: error.counts }),
+        ...(error.httpStatus === undefined ? {} : { httpStatus: error.httpStatus }),
+      },
       { status: 500 }
     );
   }

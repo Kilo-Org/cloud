@@ -9,6 +9,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/check-enkrypt-health",
+      "schedule": "30 * * * *"
+    },
+    {
       "path": "/api/cron/sync-providers",
       "schedule": "*/5 * * * *"
     },

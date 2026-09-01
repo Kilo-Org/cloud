@@ -123,6 +123,8 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  EnkryptFailureCategory,
+  EnkryptSyncCounts,
   UserDeletionTaskProgress,
   UserDeletionManualEvidence,
   UserDeletionAuditDetails,
@@ -5219,6 +5221,42 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+export type EnkryptSyncOutcome = 'running' | 'succeeded' | 'failed';
+export type EnkryptSyncAlertReason =
+  | EnkryptFailureCategory
+  | 'stale'
+  | 'never_succeeded'
+  | 'monitor_error';
+
+export const enkrypt_sync_state = pgTable(
+  'enkrypt_sync_state',
+  {
+    job_name: text('job_name').$type<'enkrypt'>().primaryKey(),
+    attempt_id: uuid('attempt_id'),
+    last_attempt_at: timestamp('last_attempt_at', { withTimezone: true, mode: 'string' }),
+    last_completed_at: timestamp('last_completed_at', { withTimezone: true, mode: 'string' }),
+    last_success_at: timestamp('last_success_at', { withTimezone: true, mode: 'string' }),
+    last_outcome: text('last_outcome').$type<EnkryptSyncOutcome>(),
+    last_failure_category: text('last_failure_category').$type<EnkryptFailureCategory>(),
+    last_counts: jsonb('last_counts').$type<EnkryptSyncCounts>(),
+    last_success_counts: jsonb('last_success_counts').$type<EnkryptSyncCounts>(),
+    baseline_matched_count: integer('baseline_matched_count'),
+    last_alert_at: timestamp('last_alert_at', { withTimezone: true, mode: 'string' }),
+    last_alert_reason: text('last_alert_reason').$type<EnkryptSyncAlertReason>(),
+  },
+  table => [
+    check('enkrypt_sync_state_singleton', sql`${table.job_name} = 'enkrypt'`),
+    check(
+      'enkrypt_sync_state_outcome',
+      sql`${table.last_outcome} IN ('running', 'succeeded', 'failed')`
+    ),
+    check('enkrypt_sync_state_baseline', sql`${table.baseline_matched_count} >= 0`),
+  ]
+);
+
+export type EnkryptSyncState = typeof enkrypt_sync_state.$inferSelect;
+export type NewEnkryptSyncState = typeof enkrypt_sync_state.$inferInsert;
 
 export const model_eval_ingestions = pgTable(
   'model_eval_ingestions',

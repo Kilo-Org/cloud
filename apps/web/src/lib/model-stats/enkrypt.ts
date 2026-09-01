@@ -1,10 +1,14 @@
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { ENKRYPT_PUBLICATION_ENABLED } from '@/lib/config.server';
+import { isEnkryptPublicModel, publishEnkryptBenchmark } from './enkrypt-publication';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { readDb } from '@/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
-import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
+import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, eq, notLike } from 'drizzle-orm';
+
+export { ENKRYPT_STALE_AFTER_MS } from '@kilocode/db/schema-types';
 
 const EnkryptNamespaceSchema = ModelStatsBenchmarksSchema.unwrap()
   .pick({ enkrypt: true })
@@ -25,7 +29,7 @@ export function summarizeEnkrypt(rows: readonly Row[]): EnkryptBenchmarks {
   const benchmarks = new Map<string, EnkryptBenchmark>();
 
   for (const row of rows) {
-    if (!row.isActive || row.isStealth || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
+    if (!isEnkryptPublicModel(row)) continue;
     const result = EnkryptNamespaceSchema.safeParse(row.benchmarks);
     if (!result.success || !result.data?.enkrypt) continue;
     benchmarks.set(row.openrouterId, result.data.enkrypt);
@@ -37,11 +41,12 @@ export function summarizeEnkrypt(rows: readonly Row[]): EnkryptBenchmarks {
 export function enkryptFor(
   benchmarks: EnkryptBenchmarks,
   id: string
-): EnkryptBenchmark | undefined {
+): EnkryptPublishedBenchmark | undefined {
+  if (!ENKRYPT_PUBLICATION_ENABLED) return undefined;
   const exact = benchmarks.get(id);
-  if (exact) return exact;
+  if (exact) return publishEnkryptBenchmark(exact);
   const unprefixed = unprefixKiloGatewayModelId(id);
-  return unprefixed ? benchmarks.get(unprefixed) : undefined;
+  return unprefixed ? publishEnkryptBenchmark(benchmarks.get(unprefixed)) : undefined;
 }
 
 async function loadEnkrypt(): Promise<EnkryptBenchmarks> {
@@ -63,7 +68,7 @@ async function loadEnkrypt(): Promise<EnkryptBenchmarks> {
   return summarizeEnkrypt(rows);
 }
 
-export const getEnkryptBenchmarks = createCachedFetch(
+const getCachedEnkryptBenchmarks = createCachedFetch(
   () =>
     loadEnkrypt().catch(err => {
       console.error('[enkrypt] Failed to load model benchmarks');
@@ -72,3 +77,8 @@ export const getEnkryptBenchmarks = createCachedFetch(
   TTL,
   new Map<string, EnkryptBenchmark>()
 );
+
+export async function getEnkryptBenchmarks(): Promise<EnkryptBenchmarks> {
+  if (!ENKRYPT_PUBLICATION_ENABLED) return new Map();
+  return getCachedEnkryptBenchmarks();
+}

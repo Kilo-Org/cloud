@@ -22,7 +22,7 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
-import { EnkryptBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
+import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
@@ -348,7 +348,7 @@ const OpenRouterModelSchema = z.object({
       avgAttemptCostUsd: z.number(),
     })
     .optional(),
-  enkrypt: EnkryptBenchmarkSchema.optional(),
+  enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
 
   id: z.string(),

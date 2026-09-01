@@ -1983,7 +1983,7 @@ export const NormalizedOpenRouterResponse = z.object({
 export const EnkryptScoreSchema = z.object({
   model_name: z.string().min(1),
   provider: z.string().min(1),
-  source: z.string().min(1),
+  source: z.string().nullish(),
   risk_score: z.number().nullable().optional(),
   bias_score: z.number().nullable().optional(),
   cbrn_score: z.number().nullable().optional(),
@@ -2001,10 +2001,47 @@ export const EnkryptScoreSchema = z.object({
 export type EnkryptScore = z.infer<typeof EnkryptScoreSchema>;
 
 export const EnkryptBenchmarkSchema = EnkryptScoreSchema.extend({
-  lastUpdated: z.string().datetime(),
+  ingestedAt: z.string().datetime(),
+  evaluatedAt: z.null(),
 });
 
 export type EnkryptBenchmark = z.infer<typeof EnkryptBenchmarkSchema>;
+
+export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
+
+export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
+  staleAfter: z.string().datetime(),
+  freshness: z.enum(['fresh', 'stale']),
+});
+
+export type EnkryptPublishedBenchmark = z.infer<typeof EnkryptPublishedBenchmarkSchema>;
+
+export const EnkryptSyncCountsSchema = z.object({
+  fetchedCount: z.number().int().nonnegative(),
+  rejectedCount: z.number().int().nonnegative(),
+  matchedCount: z.number().int().nonnegative(),
+  unmatchedCount: z.number().int().nonnegative(),
+  ambiguousCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+});
+
+export type EnkryptSyncCounts = z.infer<typeof EnkryptSyncCountsSchema>;
+
+export const EnkryptFailureCategorySchema = z.enum([
+  'configuration',
+  'authentication',
+  'rate_limited',
+  'response_validation',
+  'timeout',
+  'network',
+  'upstream',
+  'database',
+  'coverage',
+  'superseded',
+  'unexpected',
+]);
+
+export type EnkryptFailureCategory = z.infer<typeof EnkryptFailureCategorySchema>;
 
 export const OpenCodePromptSchema = z.enum([
   'codex',

@@ -2,6 +2,8 @@ import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
 import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
 import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
+import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
+import { getRawOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { NextRequest } from 'next/server';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
 import { getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
@@ -13,6 +15,18 @@ import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
+
+import type * as Config from '@/lib/config.server';
+
+let mockPublicationEnabled = true;
+
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual<typeof Config>('@/lib/config.server'),
+  get ENKRYPT_PUBLICATION_ENABLED() {
+    return mockPublicationEnabled;
+  },
+  ENKRYPT_SYNC_ENABLED: false,
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -71,7 +85,13 @@ const enkryptBenchmark: EnkryptBenchmark = {
   risk_score: 0,
   bias_score: null,
   safety_score: 87.5,
-  lastUpdated: '2026-08-27T00:00:00.000Z',
+  ingestedAt: '2026-08-27T00:00:00.000Z',
+  evaluatedAt: null,
+};
+const publishedEnkryptBenchmark = {
+  ...enkryptBenchmark,
+  staleAfter: '2026-08-28T02:00:00.000Z',
+  freshness: 'fresh',
 };
 
 function createTestRequest(path: string) {
@@ -83,7 +103,10 @@ function createTestRequest(path: string) {
 const originalFetch = global.fetch;
 
 beforeEach(() => {
+  mockPublicationEnabled = true;
   jest.clearAllMocks();
+  jest.mocked(getEnkryptBenchmarks).mockResolvedValue(new Map());
+  jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
 });
 
 describe('GET /api/openrouter/models', () => {
@@ -188,7 +211,7 @@ describe('GET /api/openrouter/models', () => {
     const model = responseData.data.find(item => item.id === 'some-other-model');
 
     expect(response.status).toBe(200);
-    expect(model?.enkrypt).toEqual(enkryptBenchmark);
+    expect(model?.enkrypt).toEqual(publishedEnkryptBenchmark);
     expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
     expect(model?.enkrypt).not.toHaveProperty('toxicity_score');
   });
@@ -207,7 +230,7 @@ describe('GET /api/openrouter/models', () => {
     const model = responseData.data.find(item => item.id === 'some-other-model');
 
     expect(response.status).toBe(200);
-    expect(model?.enkrypt).toEqual(enkryptBenchmark);
+    expect(model?.enkrypt).toEqual(publishedEnkryptBenchmark);
     expect(model).not.toHaveProperty('terminalBench');
   });
 
@@ -235,7 +258,10 @@ describe('GET /api/openrouter/models', () => {
     const virtualModels = responseData.data.filter(item => item.id.startsWith('kilo-auto/'));
 
     expect(response.status).toBe(200);
-    expect(model?.enkrypt).toEqual(exclusiveBenchmark);
+    expect(model?.enkrypt).toEqual({
+      ...publishedEnkryptBenchmark,
+      model_name: exclusiveBenchmark.model_name,
+    });
     expect(virtualModels.length).toBeGreaterThan(0);
     for (const virtualModel of virtualModels) {
       expect(virtualModel).not.toHaveProperty('enkrypt');
@@ -279,12 +305,146 @@ describe('GET /api/gateway/v1/models', () => {
     expect(response.status).toBe(200);
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
     const model = responseData.data.find(item => item.id === 'some-other-model');
-    expect(model?.enkrypt).toEqual(enkryptBenchmark);
+    expect(model?.enkrypt).toEqual(publishedEnkryptBenchmark);
     expect(model?.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
 
+describe('Enkrypt catalog publication boundaries', () => {
+  test.each([
+    ['/api/openrouter/models', GET],
+    ['/api/gateway/v1/models', gatewayV1ModelsGET],
+  ])(
+    'withholds cached and raw upstream scores at %s when publication is disabled',
+    async (path, handler) => {
+      mockPublicationEnabled = false;
+      jest
+        .mocked(getEnkryptBenchmarks)
+        .mockResolvedValue(
+          new Map([
+            ['some-other-model', enkryptBenchmark],
+            ...kiloExclusiveModels.map(model => [model.public_id, enkryptBenchmark] as const),
+          ])
+        );
+      const upstream = {
+        data: mockOpenRouterModels.data.map(model => ({
+          ...model,
+          enkrypt: publishedEnkryptBenchmark,
+        })),
+      };
+      global.fetch = jest
+        .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+        .mockResolvedValue(createMockResponse({ jsonData: upstream }));
+
+      const response = await handler(createTestRequest(path));
+      const data = OpenRouterModelsResponseSchema.parse(await response.json());
+      expect(response.status).toBe(200);
+      expect(data.data.length).toBeGreaterThan(0);
+      for (const model of data.data) expect(model).not.toHaveProperty('enkrypt');
+      expect(data.data.find(model => model.id === 'some-other-model')?.terminalBench).toEqual({
+        overallScore: 0.551,
+        avgAttemptCostUsd: 53.37,
+      });
+      expect(upstream.data[0].enkrypt).toEqual(publishedEnkryptBenchmark);
+    }
+  );
+
+  test.each([true, false])(
+    'never trusts raw upstream scores with publication %s',
+    async enabled => {
+      mockPublicationEnabled = enabled;
+      const upstream = {
+        data: mockOpenRouterModels.data.map(model => ({ ...model, enkrypt: { untrusted: true } })),
+      };
+      global.fetch = jest
+        .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+        .mockResolvedValue(createMockResponse({ jsonData: upstream }));
+
+      const raw = await getRawOpenRouterModels();
+      const catalog = await GET(createTestRequest('/api/openrouter/models'));
+      const transcription = await transcriptionModelsGET();
+      expect(catalog.status).toBe(200);
+      expect(transcription.status).toBe(200);
+      for (const response of [raw, await catalog.json(), await transcription.json()]) {
+        const data = OpenRouterModelsResponseSchema.parse(response);
+        for (const model of data.data) expect(model).not.toHaveProperty('enkrypt');
+      }
+      expect(upstream.data[0].enkrypt).toEqual({ untrusted: true });
+    }
+  );
+
+  test('removes raw scores even when unrelated schema validation fails', async () => {
+    mockPublicationEnabled = false;
+    const upstream = {
+      data: [{ id: 'provider/invalid', enkrypt: publishedEnkryptBenchmark, unrelated: 'retained' }],
+    };
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: upstream }));
+    expect(await getRawOpenRouterModels()).toEqual({
+      data: [{ id: 'provider/invalid', unrelated: 'retained' }],
+    });
+    const transcription = await transcriptionModelsGET();
+    expect(transcription.status).toBe(200);
+    expect(await transcription.json()).toEqual({
+      data: [{ id: 'provider/invalid', unrelated: 'retained' }],
+    });
+    expect(upstream.data[0].enkrypt).toEqual(publishedEnkryptBenchmark);
+  });
+
+  test('recomputes freshness and the kill switch on each response from the same cached snapshot', async () => {
+    const cached = new Map([['some-other-model', enkryptBenchmark]]);
+    jest.mocked(getEnkryptBenchmarks).mockResolvedValue(cached);
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+    const staleAfter = Date.parse(publishedEnkryptBenchmark.staleAfter);
+    jest.mocked(Date.now).mockReturnValue(staleAfter - 1);
+    const freshResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const fresh = OpenRouterModelsResponseSchema.parse(await freshResponse.json());
+    expect(fresh.data.find(model => model.id === 'some-other-model')?.enkrypt).toEqual(
+      publishedEnkryptBenchmark
+    );
+
+    jest.mocked(Date.now).mockReturnValue(staleAfter);
+    const staleResponse = await gatewayV1ModelsGET(createTestRequest('/api/gateway/v1/models'));
+    const stale = OpenRouterModelsResponseSchema.parse(await staleResponse.json());
+    expect(stale.data.find(model => model.id === 'some-other-model')?.enkrypt).toEqual({
+      ...publishedEnkryptBenchmark,
+      freshness: 'stale',
+    });
+
+    mockPublicationEnabled = false;
+    const disabledResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const disabled = OpenRouterModelsResponseSchema.parse(await disabledResponse.json());
+    for (const model of disabled.data) expect(model).not.toHaveProperty('enkrypt');
+    expect(cached.get('some-other-model')).toEqual(enkryptBenchmark);
+  });
+
+  test('withholds future snapshots and preserves missing upstream source', async () => {
+    const withoutSource = { ...enkryptBenchmark };
+    delete withoutSource.source;
+    jest
+      .mocked(getEnkryptBenchmarks)
+      .mockResolvedValue(new Map([['some-other-model', withoutSource]]));
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const data = OpenRouterModelsResponseSchema.parse(await response.json());
+    const published = data.data.find(model => model.id === 'some-other-model')?.enkrypt;
+    expect(published).toBeDefined();
+    expect(published).not.toHaveProperty('source');
+
+    jest.mocked(Date.now).mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt) - 1);
+    const futureResponse = await GET(createTestRequest('/api/openrouter/models'));
+    const future = OpenRouterModelsResponseSchema.parse(await futureResponse.json());
+    for (const model of future.data) expect(model).not.toHaveProperty('enkrypt');
+  });
+});
+
 afterEach(() => {
   global.fetch = originalFetch;
+  jest.restoreAllMocks();
 });

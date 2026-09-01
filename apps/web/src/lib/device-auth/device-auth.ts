@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { eq, and, lt, gt, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
@@ -132,6 +132,27 @@ export function isDeviceAuthRequestExpired(request: {
  * Approve a device authorization request.
  */
 export async function approveDeviceAuthRequest(code: string, userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  const [approved] = await db
+    .update(device_auth_requests)
+    .set({
+      status: 'approved',
+      kilo_user_id: userId,
+      approved_at: now,
+    })
+    .where(
+      and(
+        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.status, 'pending'),
+        gt(device_auth_requests.expires_at, now)
+      )
+    )
+    .returning({ id: device_auth_requests.id });
+
+  if (approved) {
+    return;
+  }
+
   const request = await getDeviceAuthRequest(code);
 
   if (!request) {
@@ -142,22 +163,17 @@ export async function approveDeviceAuthRequest(code: string, userId: string): Pr
     throw new Error('Device authorization request is not pending');
   }
 
-  if (isDeviceAuthRequestExpired(request)) {
-    await db
-      .update(device_auth_requests)
-      .set({ status: 'expired' })
-      .where(eq(device_auth_requests.code, code));
-    throw new Error('Device authorization request has expired');
-  }
-
   await db
     .update(device_auth_requests)
-    .set({
-      status: 'approved',
-      kilo_user_id: userId,
-      approved_at: new Date().toISOString(),
-    })
-    .where(eq(device_auth_requests.code, code));
+    .set({ status: 'expired' })
+    .where(
+      and(
+        eq(device_auth_requests.code, code),
+        eq(device_auth_requests.status, 'pending'),
+        lte(device_auth_requests.expires_at, now)
+      )
+    );
+  throw new Error('Device authorization request has expired');
 }
 
 /**
@@ -174,10 +190,15 @@ export async function denyDeviceAuthRequest(code: string): Promise<void> {
     throw new Error('Device authorization request is not pending');
   }
 
-  await db
+  const [denied] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
-    .where(eq(device_auth_requests.code, code));
+    .where(and(eq(device_auth_requests.code, code), eq(device_auth_requests.status, 'pending')))
+    .returning({ id: device_auth_requests.id });
+
+  if (!denied) {
+    throw new Error('Device authorization request is not pending');
+  }
 }
 
 /**

@@ -234,6 +234,95 @@ describe('Device Auth', () => {
       );
     });
 
+    test('concurrent approvals preserve the single winning user', async () => {
+      const otherUserId = `${testUserId}-other`;
+      await db.insert(kilocode_users).values({
+        id: otherUserId,
+        google_user_email: `other-${testUserEmail}`,
+        google_user_name: 'Other User',
+        google_user_image_url: 'https://example.com/avatar.jpg',
+        stripe_customer_id: 'cus_other',
+      });
+
+      try {
+        for (let i = 0; i < 20; i++) {
+          const { code, deviceCode } = await createDeviceAuthRequest({});
+          const results = await Promise.allSettled(
+            [testUserId, otherUserId].map(async userId => {
+              await approveDeviceAuthRequest(code, userId);
+              return userId;
+            })
+          );
+          const approved = results.filter(result => result.status === 'fulfilled');
+          const rejected = results.filter(result => result.status === 'rejected');
+
+          expect(approved).toHaveLength(1);
+          expect(rejected).toHaveLength(1);
+          expect(rejected[0]?.reason).toEqual(
+            new Error('Device authorization request is not pending')
+          );
+          expect((await getDeviceAuthRequest(code))?.kilo_user_id).toBe(approved[0]?.value);
+          expect((await consumeDeviceAuthByDeviceCode(deviceCode)).userId).toBe(approved[0]?.value);
+        }
+      } finally {
+        await db
+          .delete(device_auth_requests)
+          .where(eq(device_auth_requests.kilo_user_id, otherUserId));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+      }
+    });
+
+    test.each(['denied', 'consumed', 'expired'] as const)(
+      'does not change a %s request',
+      async status => {
+        const { code } = await createDeviceAuthRequest({});
+        await db
+          .update(device_auth_requests)
+          .set({ status, kilo_user_id: testUserId })
+          .where(eq(device_auth_requests.code, code));
+        const before = await getDeviceAuthRequest(code);
+
+        await expect(approveDeviceAuthRequest(code, testUserId)).rejects.toThrow(
+          'Device authorization request is not pending'
+        );
+
+        expect(await getDeviceAuthRequest(code)).toEqual(before);
+      }
+    );
+
+    test('reports expiration when the atomic update reaches the expiry deadline', async () => {
+      const { code } = await createDeviceAuthRequest({});
+      const deadline = new Date();
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: deadline.toISOString(), kilo_user_id: testUserId })
+        .where(eq(device_auth_requests.code, code));
+      jest.useFakeTimers({
+        now: deadline,
+        doNotFake: [
+          'hrtime',
+          'nextTick',
+          'performance',
+          'queueMicrotask',
+          'setImmediate',
+          'clearImmediate',
+          'setInterval',
+          'clearInterval',
+          'setTimeout',
+          'clearTimeout',
+        ],
+      });
+
+      try {
+        await expect(approveDeviceAuthRequest(code, testUserId)).rejects.toThrow(
+          'Device authorization request has expired'
+        );
+        expect((await getDeviceAuthRequest(code))?.status).toBe('expired');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     test('throws error for expired request', async () => {
       const { code } = await createDeviceAuthRequest({});
 
@@ -250,6 +339,29 @@ describe('Device Auth', () => {
   });
 
   describe('denyDeviceAuthRequest', () => {
+    test('concurrent approval and denial preserve the single winning transition', async () => {
+      for (let i = 0; i < 20; i++) {
+        const { code } = await createDeviceAuthRequest({});
+        try {
+          const results = await Promise.allSettled([
+            approveDeviceAuthRequest(code, testUserId).then(() => 'approved' as const),
+            denyDeviceAuthRequest(code).then(() => 'denied' as const),
+          ]);
+          const succeeded = results.filter(result => result.status === 'fulfilled');
+          const rejected = results.filter(result => result.status === 'rejected');
+
+          expect(succeeded).toHaveLength(1);
+          expect(rejected).toHaveLength(1);
+          expect(rejected[0]?.reason).toEqual(
+            new Error('Device authorization request is not pending')
+          );
+          expect((await getDeviceAuthRequest(code))?.status).toBe(succeeded[0]?.value);
+        } finally {
+          await db.delete(device_auth_requests).where(eq(device_auth_requests.code, code));
+        }
+      }
+    });
+
     test('denies a pending request', async () => {
       const { code } = await createDeviceAuthRequest({});
 

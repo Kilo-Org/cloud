@@ -1,4 +1,5 @@
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { TimeToFullDisplay } from '@sentry/react-native';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Animated, {
@@ -191,26 +192,32 @@ export function AnimatedSplashOverlay() {
           is gone, for every outcome — error screens are the launch's full display too. */}
       <TimeToFullDisplay ready={dismissed} />
       {dismissed ? null : (
-        <Animated.View
-          pointerEvents="none"
-          className="absolute inset-0 items-center justify-center bg-[#FAF74F]"
-          style={overlayStyle}
-        >
+        <>
+          {/* The overlay is yellow, so the status bar needs dark icons whatever the
+              theme is. Mounted after the root `style="auto"` bar, it wins the merge
+              until the reveal ends and this unmounts. */}
+          <StatusBar style="dark" />
           <Animated.View
-            className="absolute h-[120px] w-[120px] rounded-full bg-background"
-            style={discStyle}
-          />
-          <Animated.View style={logoStyle}>
-            <Image
-              source={logo}
-              className="h-[100px] w-[100px]"
-              transition={0}
-              onLoad={() => {
-                setLogoLoaded(true);
-              }}
+            pointerEvents="none"
+            className="absolute inset-0 items-center justify-center bg-[#FAF74F]"
+            style={overlayStyle}
+          >
+            <Animated.View
+              className="absolute h-[120px] w-[120px] rounded-full bg-background"
+              style={discStyle}
             />
+            <Animated.View style={logoStyle}>
+              <Image
+                source={logo}
+                className="h-[100px] w-[100px]"
+                transition={0}
+                onLoad={() => {
+                  setLogoLoaded(true);
+                }}
+              />
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
+        </>
       )}
     </>
   );

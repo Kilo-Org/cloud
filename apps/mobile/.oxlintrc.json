@@ -257,7 +257,7 @@
       }
     },
     {
-      "files": ["src/app/_layout.tsx"],
+      "files": ["src/app/_layout.tsx", "src/components/animated-splash-overlay.tsx"],
       "rules": {
         "react/style-prop-object": "off"
       }

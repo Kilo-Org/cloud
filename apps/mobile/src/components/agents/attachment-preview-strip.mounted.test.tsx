@@ -757,6 +757,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     const renderer = await openMarkdownPreview();
 
     const header = nodesByType(renderer.root, 'SheetHeader')[0];
+    expect(header?.props.titleEllipsis).toBe('middle');
     if (!header) {
       throw new Error('SheetHeader not found');
     }

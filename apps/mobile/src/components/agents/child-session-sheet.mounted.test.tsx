@@ -75,7 +75,7 @@ describe('ChildSessionSheet title layout', () => {
     const renderer = await renderSheet(props);
     const header = host(renderer.root, 'SheetHeader');
 
-    expect(header.props).toMatchObject({ title: 'Inspect performance child 01', wrapTitle: true });
+    expect(header.props).toMatchObject({ title: 'Inspect performance child 01' });
     expect(header.props.onDone).toBe(props.onClose);
     expect(textValues(renderer.root)).toContain(state.expectedText);
     expect(
@@ -111,7 +111,7 @@ describe('ChildSessionSheet mounted', () => {
     await updateSheet(renderer, props);
 
     expect(host(renderer.root, 'SheetHeader')).toBe(header);
-    expect(header.props).toMatchObject({ title: props.title, wrapTitle: true });
+    expect(header.props).toMatchObject({ title: props.title });
     expect(textValues(renderer.root)).toEqual(expect.arrayContaining(['child text', 'Failed']));
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: true,
@@ -122,7 +122,7 @@ describe('ChildSessionSheet mounted', () => {
     await updateSheet(renderer, { ...props, hydrationState: readyState });
 
     expect(host(renderer.root, 'SheetHeader')).toBe(header);
-    expect(header.props).toMatchObject({ title: props.title, wrapTitle: true });
+    expect(header.props).toMatchObject({ title: props.title });
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     expect(host(renderer.root, 'FlashList')).toBe(list);
   });

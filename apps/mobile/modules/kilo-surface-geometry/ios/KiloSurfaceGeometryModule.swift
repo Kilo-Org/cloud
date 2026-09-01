@@ -77,7 +77,7 @@ public final class KiloSurfaceGeometryModule: Module {
   }
 }
 
-private final class SurfaceViewNotFoundException: Exception {
+private final class SurfaceViewNotFoundException: Exception, @unchecked Sendable {
   override var reason: String { "The native surface view is not mounted." }
 }
 
@@ -92,7 +92,7 @@ private final class WeakSurfaceGeometryProbe {
 private final class SurfaceGeometryProbe: UIView {
   let generation: Int
   private weak var root: UIView?
-  private let tag: Int
+  private let observedTag: Int
   private let emit: ([String: Any]) -> Void
   private let onStop: (SurfaceGeometryProbe) -> Void
   private let keyboardEdge = UIView()
@@ -108,7 +108,7 @@ private final class SurfaceGeometryProbe: UIView {
   init(root: UIView, tag: Int, generation: Int, emit: @escaping ([String: Any]) -> Void,
        onStop: @escaping (SurfaceGeometryProbe) -> Void) {
     self.root = root
-    self.tag = tag
+    self.observedTag = tag
     self.generation = generation
     self.emit = emit
     self.onStop = onStop
@@ -250,7 +250,7 @@ private final class SurfaceGeometryProbe: UIView {
   func snapshot() -> [String: Any] {
     guard !stopped, let root, superview === root else {
       stop()
-      return ["tag": tag, "visibleTop": 0.0, "visibleBottom": 0.0, "boundsHeight": 0.0,
+      return ["tag": observedTag, "visibleTop": 0.0, "visibleBottom": 0.0, "boundsHeight": 0.0,
               "safeAreaTop": 0.0, "safeAreaBottom": 0.0, "keyboardOverlap": 0.0]
     }
     if observingWindow {
@@ -262,7 +262,7 @@ private final class SurfaceGeometryProbe: UIView {
     }
     let geometry = measure(root)
     var event: [String: Any] = geometry
-    event["tag"] = tag
+    event["tag"] = observedTag
     if previous != geometry {
       previous = geometry
       emit(event)

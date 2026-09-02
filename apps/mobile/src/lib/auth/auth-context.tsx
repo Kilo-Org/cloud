@@ -44,6 +44,7 @@ import {
 } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearGlanceablePreference } from '@/lib/hooks/use-glanceable-preference';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
@@ -392,6 +393,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearKeepScreenOnPreference();
           clearSessionScopedState();
           clearPrReviewFooterPreference();
+          clearGlanceablePreference();
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

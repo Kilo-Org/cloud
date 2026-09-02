@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Mostra o pensamento do axente expandido cando remate.",
     "keepScreenOn": "Manter a pantalla acesa na páxina de sesión",
     "keepScreenOnSubtitle": "Mantén a pantalla esperta mentres a sesión traballa.",
+    "activeAgentsSubtitle": "Mostra o número de axentes nos trebellos e na pantalla de bloqueo.",
     "appearance": "Aparencia",
     "notifications": "Notificacións",
     "notificationsSubtitle": "Preferencias de notificacións push",

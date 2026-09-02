@@ -61,6 +61,9 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPrefere
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   clearKeepScreenOnPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-glanceable-preference', () => ({
+  clearGlanceablePreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
 }));

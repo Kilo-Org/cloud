@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "代理完成时展开显示其思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",
     "keepScreenOnSubtitle": "会话运行期间保持屏幕唤醒。",
+    "activeAgentsSubtitle": "在小组件和锁定屏幕上显示代理数量。",
     "appearance": "外观",
     "notifications": "通知",
     "notificationsSubtitle": "推送偏好设置",

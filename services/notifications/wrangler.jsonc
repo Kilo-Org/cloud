@@ -11,6 +11,11 @@
   "vars": {
     "WORKER_ENV": "production",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+    // Live Activity push topic: the iOS bundle id. The client appends
+    // `.push-type.liveactivity`. APNS_TEAM_ID and APNS_KEY_ID belong beside
+    // this once the APNs auth key exists; until all four values are present the
+    // worker logs "credentials missing" and skips Live Activity delivery.
+    "APNS_TOPIC": "com.kilocode.kiloapp",
   },
 
   "routes": [
@@ -62,6 +67,11 @@
     },
   ],
 
+  // Add once the .p8 auth key is stored (secret_name APNS_PRIVATE_KEY_PROD):
+  //   { "binding": "APNS_PRIVATE_KEY", "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+  //     "secret_name": "APNS_PRIVATE_KEY_PROD" }
+  // A binding for a secret that does not exist fails the deploy, so the secret
+  // must land first.
   "secrets_store_secrets": [
     {
       "binding": "EXPO_ACCESS_TOKEN",

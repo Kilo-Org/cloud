@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Wys die agent se denke uitgevou wanneer dit klaarmaak.",
     "keepScreenOn": "Hou skerm aan op sessiebladsy",
     "keepScreenOnSubtitle": "Hou die skerm wakker terwyl die sessie werk.",
+    "activeAgentsSubtitle": "Wys agent-tellings op jou legstukke en sluitskerm.",
     "appearance": "Voorkoms",
     "notifications": "Kennisgewings",
     "notificationsSubtitle": "Drukvoorkeure",

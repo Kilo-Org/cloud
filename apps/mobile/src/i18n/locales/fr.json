@@ -2186,6 +2186,7 @@
     "autoExpandThinkingSubtitle": "Afficher la réflexion de l'agent développée lorsqu'elle se termine.",
     "keepScreenOn": "Garder l'écran allumé sur la page de session",
     "keepScreenOnSubtitle": "Maintenir l'écran éveillé pendant que la session travaille.",
+    "activeAgentsSubtitle": "Affiche le nombre d'agents sur vos widgets et l'écran de verrouillage.",
     "appearance": "Apparence",
     "notifications": "Notifications",
     "notificationsSubtitle": "Préférences de push",

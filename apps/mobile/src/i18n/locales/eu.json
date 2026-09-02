@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
     "keepScreenOnSubtitle": "Mantendu pantaila esnatuta saioa lanean ari den bitartean.",
+    "activeAgentsSubtitle": "Erakutsi agenteen kopurua widgetetan eta blokeo-pantailan.",
     "appearance": "Itxura",
     "notifications": "Jakinarazpenak",
     "notificationsSubtitle": "Bultzadazko hobespenak",

@@ -20,7 +20,11 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  ACTIVE_USER_ID_KEY,
+  GLANCEABLE_ENABLED_KEY,
+  ORGANIZATION_STORAGE_KEY,
+} from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -536,6 +540,28 @@ describe('applyGlanceablePushData', () => {
 
     const result = await applyGlanceablePushData(
       activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-01T00:00:00.000Z' })
+    );
+
+    expect(result).toBe(false);
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+
+    unregisterGlanceableSink(sink);
+  });
+
+  it('drops a remote snapshot while the Active Agents switch is off', async () => {
+    mocks.getItemAsync.mockImplementation((key: string) => {
+      if (key === GLANCEABLE_ENABLED_KEY) {
+        return 'false';
+      }
+      return key === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9';
+    });
+    _setLastGlanceableSnapshotForTests(glanceableSnapshot({ scopeKey: SCOPE_KEY, revision: 1 }));
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-03T00:00:00.000Z' })
     );
 
     expect(result).toBe(false);

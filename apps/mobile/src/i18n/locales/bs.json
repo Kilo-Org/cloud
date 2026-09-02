@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Prikaži agentovo razmišljanje prošireno kada završi.",
     "keepScreenOn": "Zadrži ekran uključen na stranici sesije",
     "keepScreenOnSubtitle": "Održavaj ekran budnim dok sesija radi.",
+    "activeAgentsSubtitle": "Prikaži broj agenata na vidžetima i zaključanom ekranu.",
     "appearance": "Izgled",
     "notifications": "Obavijesti",
     "notificationsSubtitle": "Postavke push obavijesti",

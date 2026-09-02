@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Vis agentens tænkning udvidet, når den er færdig.",
     "keepScreenOn": "Hold skærmen tændt på sessionssiden",
     "keepScreenOnSubtitle": "Hold skærmen vågen, mens sessionen arbejder.",
+    "activeAgentsSubtitle": "Vis antal agenter på dine widgets og låseskærmen.",
     "appearance": "Udseende",
     "notifications": "Meddelelser",
     "notificationsSubtitle": "Push-indstillinger",

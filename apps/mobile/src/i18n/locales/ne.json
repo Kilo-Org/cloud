@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "समाप्त हुँदा एजेन्टको सोच विस्तार गरेर देखाउनुहोस्।",
     "keepScreenOn": "सत्र पृष्ठमा रहँदा स्क्रिन खुला राख्नुहोस्",
     "keepScreenOnSubtitle": "सत्र काम गर्दै गर्दा स्क्रिन जगाएर राख्नुहोस्।",
+    "activeAgentsSubtitle": "तपाईंका विजेट र लक स्क्रिनमा एजेन्ट संख्या देखाउनुहोस्।",
     "appearance": "रूप",
     "notifications": "सूचनाहरू",
     "notificationsSubtitle": "पुश प्राथमिकताहरू",

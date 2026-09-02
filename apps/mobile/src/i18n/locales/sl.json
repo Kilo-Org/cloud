@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Ko agent konča, prikaži njegovo razmišljanje razširjeno.",
     "keepScreenOn": "Pusti zaslon prižgan na strani seje",
     "keepScreenOnSubtitle": "Drži zaslon prižgan, medtem ko seja deluje.",
+    "activeAgentsSubtitle": "Prikaži število agentov na pripomočkih in zaklenjenem zaslonu.",
     "appearance": "Videz",
     "notifications": "Obvestila",
     "notificationsSubtitle": "Nastavitve potisnih obvestil",

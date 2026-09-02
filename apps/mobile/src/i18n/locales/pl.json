@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Pokaż myślenie agenta rozwinięte po zakończeniu.",
     "keepScreenOn": "Trzymaj ekran włączony na stronie sesji",
     "keepScreenOnSubtitle": "Utrzymuj ekran włączony, gdy sesja pracuje.",
+    "activeAgentsSubtitle": "Pokazuj liczbę agentów w widżetach i na ekranie blokady.",
     "appearance": "Wygląd",
     "notifications": "Powiadomienia",
     "notificationsSubtitle": "Preferencje powiadomień push",

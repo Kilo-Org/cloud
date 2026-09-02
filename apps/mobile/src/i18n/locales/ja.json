@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッションページで画面を常時オン",
     "keepScreenOnSubtitle": "セッションの動作中は画面を起動したままにします。",
+    "activeAgentsSubtitle": "ウィジェットとロック画面にエージェント数を表示します。",
     "appearance": "外観",
     "notifications": "通知",
     "notificationsSubtitle": "プッシュ設定",

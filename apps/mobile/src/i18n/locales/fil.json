@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Ipakita ang pag-iisip ng agent na naka-expand kapag ito ay natapos.",
     "keepScreenOn": "Panatilihing naka-on ang screen habang nasa session page",
     "keepScreenOnSubtitle": "Panatilihing gising ang screen habang gumagawa ang session.",
+    "activeAgentsSubtitle": "Ipakita ang bilang ng ahente sa iyong mga widget at Lock Screen.",
     "appearance": "Hitsura",
     "notifications": "Mga Notipikasyon",
     "notificationsSubtitle": "Mga kagustuhan sa push",

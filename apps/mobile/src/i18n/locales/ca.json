@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Mostra el raonament de l'agent ampliat quan acaba.",
     "keepScreenOn": "Mantén la pantalla encesa a la pàgina de sessió",
     "keepScreenOnSubtitle": "Mantén la pantalla activa mentre la sessió treballa.",
+    "activeAgentsSubtitle": "Mostra el nombre d'agents als ginys i a la pantalla de bloqueig.",
     "appearance": "Aparença",
     "notifications": "Notificacions",
     "notificationsSubtitle": "Preferències de notificacions push",

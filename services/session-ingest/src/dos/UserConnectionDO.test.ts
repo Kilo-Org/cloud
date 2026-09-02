@@ -700,7 +700,7 @@ describe('UserConnectionDO', () => {
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
         await flushAsync();
         messages.length = 0;
-        const reset = Promise.withResolvers<void>();
+        const reset = Promise.withResolvers<undefined>();
         sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(
           () => reset.promise
         );
@@ -708,7 +708,7 @@ describe('UserConnectionDO', () => {
         const disconnect = disconnectCli(doInstance, cliWs);
         await flushAsync();
         expect(messages).toEqual([]);
-        reset.resolve();
+        reset.resolve(undefined);
         await disconnect;
         await flushAsync();
         expect(messages.map(message => message.data)).toMatchObject([
@@ -753,7 +753,7 @@ describe('UserConnectionDO', () => {
           refreshGlanceableSessions: async () => {
             throw new Error('transport unavailable');
           },
-        } as Env['NOTIFICATIONS'],
+        } as unknown as Env['NOTIFICATIONS'],
       });
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'retry')]);

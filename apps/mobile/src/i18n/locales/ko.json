@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "에이전트가 완료되면 사고를 펼쳐서 표시합니다.",
     "keepScreenOn": "세션 페이지에서 화면 켜짐 유지",
     "keepScreenOnSubtitle": "세션이 작업하는 동안 화면을 깨어 있게 유지합니다.",
+    "activeAgentsSubtitle": "위젯과 잠금 화면에 에이전트 수를 표시합니다.",
     "appearance": "모양",
     "notifications": "알림",
     "notificationsSubtitle": "푸시 환경설정",

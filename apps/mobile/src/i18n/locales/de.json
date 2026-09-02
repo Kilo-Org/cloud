@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Das Denken des Agenten erweitert anzeigen, wenn es fertig ist.",
     "keepScreenOn": "Bildschirm auf der Sitzungsseite anlassen",
     "keepScreenOnSubtitle": "Den Bildschirm wach halten, während die Sitzung arbeitet.",
+    "activeAgentsSubtitle": "Agentenzahlen auf Widgets und dem Sperrbildschirm anzeigen.",
     "appearance": "Erscheinungsbild",
     "notifications": "Benachrichtigungen",
     "notificationsSubtitle": "Push-Einstellungen",

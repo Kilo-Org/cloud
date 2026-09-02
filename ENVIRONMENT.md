@@ -325,10 +325,12 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ### Notifications Worker
 
-- `APNS_TEAM_ID` - Apple Developer team ID for the token-based APNs key used to send Live Activity pushes. [SERVER]
-- `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. [SERVER]
-- `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. `[SECRET]`
-- `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. [SERVER]
+- `APNS_TEAM_ID` - Apple Developer team ID for the token-based APNs key used to send Live Activity pushes. Declare it in `services/notifications/wrangler.jsonc` under `vars`. [SERVER]
+- `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. Declare it beside `APNS_TEAM_ID`. [SERVER]
+- `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. Store the key in the Secrets Store first, then add its `secrets_store_secrets` binding; a binding for a missing secret fails the deploy. `[SECRET]`
+- `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. Already set in `vars`. [SERVER]
+
+Until all four values reach the worker it logs `APNs Live Activity credentials missing` and skips Live Activity pushes. Every other glanceable delivery, including the Expo aggregate push, keeps working.
 - `KILO_WEB_API_BASE_URL` - Base origin of the web app, used to reach the internal `glanceable-agents-snapshot` route; `https://app.kilo.ai` in production. [SERVER]
 
 ### KiloClaw Controller

@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Tampilkan pemikiran agen dalam keadaan diperluas saat selesai.",
     "keepScreenOn": "Biarkan layar menyala saat di halaman sesi",
     "keepScreenOnSubtitle": "Jaga layar tetap aktif saat sesi berjalan.",
+    "activeAgentsSubtitle": "Tampilkan jumlah agen di widget dan Layar Kunci Anda.",
     "appearance": "Tampilan",
     "notifications": "Notifikasi",
     "notificationsSubtitle": "Preferensi push",

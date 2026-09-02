@@ -7,6 +7,7 @@ import {
 } from '@/lib/active-sessions-live';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useGlanceablePreference } from '@/lib/hooks/use-glanceable-preference';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
@@ -15,7 +16,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from './persist';
-import { getTerminalBlankEpoch } from './cleanup';
+import { getTerminalBlankEpoch, writePrivacySnapshotAndEnd } from './cleanup';
 import { GlanceablePublisher } from './publisher';
 import { getGlanceableSinks, registerGlanceableSink } from './sink-registry';
 
@@ -35,12 +36,24 @@ export function GlanceablePublisherMount(): null {
   const { organizationId, isLoaded } = useOrganization();
   const { token } = useAuth();
   const { userId } = useCurrentUserId();
+  const { glanceableEnabled, hasLoaded: glanceableLoaded } = useGlanceablePreference();
 
   const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
   const targetHash = useMemo(() => hashKey(queryKey), [queryKey]);
 
   const signedIn = token != null;
+
+  // The one place the master switch is applied. Turning it off blanks every
+  // surface and unregisters its push tokens, so the server stops targeting this
+  // device; the publisher effect below then refuses to subscribe. Blanking also
+  // runs on a launch that is already off, which clears a surface left behind by
+  // a build that had no switch.
+  useEffect(() => {
+    if (glanceableLoaded && !glanceableEnabled) {
+      writePrivacySnapshotAndEnd();
+    }
+  }, [glanceableEnabled, glanceableLoaded]);
 
   // Populate the persisted last snapshot once so cleanup/org-fence can see it,
   // and so the publisher below seeds its revision from the persisted value.
@@ -60,7 +73,14 @@ export function GlanceablePublisherMount(): null {
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || !signedIn || userId === undefined || !restored) {
+    if (
+      !isLoaded ||
+      !signedIn ||
+      userId === undefined ||
+      !restored ||
+      !glanceableLoaded ||
+      !glanceableEnabled
+    ) {
       return undefined;
     }
 
@@ -101,7 +121,18 @@ export function GlanceablePublisherMount(): null {
       unsubscribe();
       publisher.dispose();
     };
-  }, [queryClient, queryKey, targetHash, isLoaded, signedIn, userId, organizationId, restored]);
+  }, [
+    queryClient,
+    queryKey,
+    targetHash,
+    isLoaded,
+    signedIn,
+    userId,
+    organizationId,
+    restored,
+    glanceableEnabled,
+    glanceableLoaded,
+  ]);
 
   return null;
 }

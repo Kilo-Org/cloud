@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "هنگام پایان کار عامل، تفکر او را باز شده نشان بده.",
     "keepScreenOn": "روشن نگه داشتن صفحه در صفحهٔ نشست",
     "keepScreenOnSubtitle": "در حالی که نشست کار می‌کند، صفحه را بیدار نگه دار.",
+    "activeAgentsSubtitle": "تعداد عامل‌ها را در ابزارک‌ها و صفحه قفل نشان بده.",
     "appearance": "ظاهر",
     "notifications": "اعلان‌ها",
     "notificationsSubtitle": "ترجیحات push",

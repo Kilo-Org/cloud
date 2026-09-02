@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "აჩვენე აგენტის ფიქრი გაფართოებულად, როცა დასრულდება.",
     "keepScreenOn": "ეკრანის ჩართული დატოვება სესიის გვერდზე",
     "keepScreenOnSubtitle": "შეინახე ეკრანი ჩართული, სანამ სესია მუშაობს.",
+    "activeAgentsSubtitle": "აჩვენე აგენტების რაოდენობა ვიჯეტებზე და ჩაკეტვის ეკრანზე.",
     "appearance": "გარეგნობა",
     "notifications": "შეტყობინებები",
     "notificationsSubtitle": "Push პარამეტრები",

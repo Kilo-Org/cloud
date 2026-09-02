@@ -43,6 +43,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
+  Gauge: 'Gauge',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Shield: 'Shield',
@@ -74,6 +75,13 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
     keepScreenOn: false,
     hasLoaded: true,
     setKeepScreenOn: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-glanceable-preference', () => ({
+  useGlanceablePreference: () => ({
+    glanceableEnabled: true,
+    hasLoaded: true,
+    setGlanceableEnabled: vi.fn(),
   }),
 }));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({

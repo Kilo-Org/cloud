@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Покажи го размислувањето на агентот проширено кога ќе заврши.",
     "keepScreenOn": "Држи го екранот вклучен на страницата на сесијата",
     "keepScreenOnSubtitle": "Држи го екранот буден додека сесијата работи.",
+    "activeAgentsSubtitle": "Прикажувај број на агенти на виџетите и заклучениот екран.",
     "appearance": "Изглед",
     "notifications": "Известувања",
     "notificationsSubtitle": "Преференции за притискање",

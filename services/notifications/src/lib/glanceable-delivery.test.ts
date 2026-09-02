@@ -553,7 +553,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       'sign',
       'verify',
     ])) as CryptoKeyPair;
-    const der = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+    // `exportKey` types the return as ArrayBuffer | JsonWebKey; 'pkcs8' always yields the buffer.
+    const der = new Uint8Array(
+      (await crypto.subtle.exportKey('pkcs8', pair.privateKey)) as ArrayBuffer
+    );
     return `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...der))}\n-----END PRIVATE KEY-----`;
   }
 

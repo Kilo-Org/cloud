@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "एजेंट की सोच समाप्त होने पर उसे विस्तारित दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
     "keepScreenOnSubtitle": "सत्र के काम करते समय स्क्रीन को जाग्रत रखें।",
+    "activeAgentsSubtitle": "अपने विजेट और लॉक स्क्रीन पर एजेंट की संख्या दिखाएं।",
     "appearance": "दिखावट",
     "notifications": "सूचनाएँ",
     "notificationsSubtitle": "पुश प्राथमिकताएँ",

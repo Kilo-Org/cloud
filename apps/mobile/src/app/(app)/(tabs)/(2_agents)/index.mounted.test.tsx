@@ -1,6 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree, and @testing-library/react-native cannot be transformed by the current vitest pipeline (react-native ships Flow). See src/test/render-with-providers.tsx. */
 /* eslint-disable max-lines -- mounted route outcomes and Settings recovery share the native boundary harness. */
-import * as SecureStore from 'expo-secure-store';
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,8 +63,21 @@ vi.mock('expo-router', async () => {
   };
 });
 
+// `failIdentityReadOnce` fails the identity read alone. The master-switch read
+// runs first, and its own failure keeps the surfaces on rather than skipping
+// recovery, so a first-call rejection would not exercise the identity path.
+const storage = vi.hoisted(() => ({ failIdentityReadOnce: false }));
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn((key: string) => (key === ACTIVE_USER_ID_KEY ? 'u1' : null)),
+  getItemAsync: vi.fn((key: string) => {
+    if (key !== ACTIVE_USER_ID_KEY) {
+      return null;
+    }
+    if (storage.failIdentityReadOnce) {
+      storage.failIdentityReadOnce = false;
+      throw new Error('storage unavailable');
+    }
+    return 'u1';
+  }),
 }));
 
 vi.mock('@/glanceable-ios/ios-sink', () => ({
@@ -392,6 +404,7 @@ describe('Agents ActivityKit Settings recovery', () => {
 
   afterEach(() => {
     unregisterGlanceableSink(sink);
+    storage.failIdentityReadOnce = false;
   });
 
   function changeAppState(state: string) {
@@ -447,7 +460,7 @@ describe('Agents ActivityKit Settings recovery', () => {
 
     changeAppState('background');
     activityKit.available = true;
-    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('storage unavailable'));
+    storage.failIdentityReadOnce = true;
     changeAppState('active');
     await flushMicrotasks();
     expect(surface.activity).toBeNull();

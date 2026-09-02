@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "Toon het denken van de agent uitgevouwen wanneer het klaar is.",
     "keepScreenOn": "Scherm aan houden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm wakker terwijl de sessie werkt.",
+    "activeAgentsSubtitle": "Toon het aantal agents op je widgets en het vergrendelscherm.",
     "appearance": "Weergave",
     "notifications": "Meldingen",
     "notificationsSubtitle": "Pushvoorkeuren",

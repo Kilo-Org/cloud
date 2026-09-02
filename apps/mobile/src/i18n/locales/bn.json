@@ -144,6 +144,7 @@
     "autoExpandThinkingSubtitle": "শেষ হলে এজেন্টের চিন্তাভাবনা প্রসারিত দেখান।",
     "keepScreenOn": "সেশন পেজে থাকাকালীন স্ক্রিন চালু রাখুন",
     "keepScreenOnSubtitle": "সেশন কাজ করার সময় স্ক্রিন জাগ্রত রাখুন।",
+    "activeAgentsSubtitle": "আপনার উইজেট এবং লক স্ক্রিনে এজেন্টের সংখ্যা দেখান।",
     "appearance": "চেহারা",
     "notifications": "বিজ্ঞপ্তি",
     "notificationsSubtitle": "পুশ পছন্দ",

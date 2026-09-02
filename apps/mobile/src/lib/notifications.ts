@@ -27,6 +27,7 @@ import {
 import { captureEvent } from '@/lib/analytics/posthog';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import { readGlanceableEnabled } from '@/lib/glanceable/enabled';
 import {
   getLastGlanceableSnapshot,
   getLocalScopeKey,
@@ -130,6 +131,12 @@ export async function applyGlanceablePushData(
   const scopeKey = getLocalScopeKey();
   const capturedSnapshot = getLastGlanceableSnapshot();
   if (data.scopeKey !== scopeKey) {
+    return false;
+  }
+
+  // The headless process starts with the in-memory default, so read the switch
+  // from disk. Dropping the push leaves the surfaces the in-app blank produced.
+  if (!(await readGlanceableEnabled())) {
     return false;
   }
 

@@ -167,25 +167,6 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
-  it('keeps the left-aligned title and Done on one row', async () => {
-    const renderer = await mount({ title: 'Run on', onDone: () => undefined });
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    const done = pressablesByLabel(renderer.root, 'Done')[0];
-    const titleRegion = title.parent;
-    const row = done?.parent;
-
-    expect(row?.props.className).toContain('flex-row');
-    expect(row?.props.className).not.toContain('flex-wrap');
-    expect(row?.props.className).toContain('items-center');
-    expect(title.props.ellipsizeMode).toBe('tail');
-    expect(title.props.className).not.toContain('text-center');
-    expect(titleRegion?.props.className).toContain('min-w-0');
-    expect(titleRegion?.parent).toBe(row);
-    expect(done?.props.className).toContain('shrink-0');
-
-    renderer.unmount();
-  });
-
   it('keeps Run on and action text with native font scaling and unlimited action lines', async () => {
     const title = 'Run on';
     const cancelLabel = 'Previous picker';

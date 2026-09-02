@@ -36,6 +36,8 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     });
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ status: 'pending' });
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   test('returns 200 with token for approved', async () => {
@@ -81,23 +83,6 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       params: Promise.resolve({ code: '' }),
     });
     expect(response.status).toBe(400);
-  });
-
-  test('legacy poll counts without user code in Sentry extras', async () => {
-    const sentrySpy = jest.spyOn(Sentry, 'captureMessage');
-    mockPoll.mockResolvedValue({ status: 'pending' });
-
-    await GET(new NextRequest('http://localhost:3000'), {
-      params: Promise.resolve({ code: 'ABCD-EFGH' }),
-    });
-
-    expect(sentrySpy).toHaveBeenCalledWith('legacy-poll-device-auth-count: 1', {
-      level: 'info',
-    });
-    // The user code must never appear in Sentry extras.
-    const call = sentrySpy.mock.calls[0]!;
-    expect(call[1] as Record<string, unknown>).not.toHaveProperty('extra');
-    sentrySpy.mockRestore();
   });
 });
 

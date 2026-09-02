@@ -21,8 +21,6 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
   }
 
-  process.stdout.write('legacy-poll-device-auth-count: 1\n');
-
   const result = await pollDeviceAuthRequest(code);
 
   // Return appropriate status codes based on the result

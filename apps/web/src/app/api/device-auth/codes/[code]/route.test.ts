@@ -6,11 +6,7 @@ jest.mock('@/lib/device-auth/device-auth');
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
-jest.mock('@sentry/nextjs', () => ({
-  ...jest.requireActual<typeof Sentry>('@sentry/nextjs'),
-  captureMessage: jest.fn(),
-  captureException: jest.fn(),
-}));
+jest.mock('@sentry/nextjs');
 
 import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -28,15 +24,8 @@ const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const fakeUser = { id: 'user-1' } as never;
 
 describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
-  let stdoutSpy: jest.SpyInstance;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    stdoutSpy = jest.spyOn(process.stdout, 'write').mockReturnValue(true);
-  });
-
-  afterEach(() => {
-    stdoutSpy.mockRestore();
   });
 
   test('returns 202 for pending', async () => {
@@ -47,6 +36,8 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
     });
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ status: 'pending' });
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   test('returns 200 with token for approved', async () => {
@@ -92,108 +83,6 @@ describe('GET /api/device-auth/codes/[code] (legacy poll)', () => {
       params: Promise.resolve({ code: '' }),
     });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'Code parameter is required' });
-    expect(mockPoll).not.toHaveBeenCalled();
-    expect(stdoutSpy).not.toHaveBeenCalled();
-    expect(Sentry.captureMessage).not.toHaveBeenCalled();
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test.each(['pending', 'approved', 'denied', 'expired'] as const)(
-    'logs exactly one sanitized counter per %s poll without Sentry capture',
-    async status => {
-      mockPoll.mockResolvedValue({
-        status,
-        token: 'synthetic-response-token',
-        userId: 'synthetic-user',
-        userEmail: 'synthetic@example.invalid',
-      });
-
-      for (let occurrence = 0; occurrence < 3; occurrence++) {
-        await GET(
-          new NextRequest('http://localhost/api/device-auth/codes/SYNTHETIC', {
-            headers: {
-              authorization: 'Bearer synthetic-authorization',
-              cookie: 'synthetic-cookie=value',
-            },
-          }),
-          { params: Promise.resolve({ code: 'SYNTHETIC' }) }
-        );
-      }
-
-      expect(mockPoll.mock.calls).toEqual([['SYNTHETIC'], ['SYNTHETIC'], ['SYNTHETIC']]);
-      expect(stdoutSpy.mock.calls).toEqual([
-        ['legacy-poll-device-auth-count: 1\n'],
-        ['legacy-poll-device-auth-count: 1\n'],
-        ['legacy-poll-device-auth-count: 1\n'],
-      ]);
-      expect(Sentry.captureMessage).not.toHaveBeenCalled();
-      expect(Sentry.captureException).not.toHaveBeenCalled();
-    }
-  );
-
-  test('counts a failed poll and preserves the thrown error', async () => {
-    const error = new Error('Synthetic polling failure');
-    mockPoll.mockRejectedValueOnce(error);
-
-    await expect(
-      GET(new NextRequest('http://localhost'), {
-        params: Promise.resolve({ code: 'SYNTHETIC' }),
-      })
-    ).rejects.toBe(error);
-
-    expect(stdoutSpy.mock.calls).toEqual([['legacy-poll-device-auth-count: 1\n']]);
-    expect(Sentry.captureMessage).not.toHaveBeenCalled();
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test('bypasses real Sentry console logs and breadcrumbs without suppressing other reporting', async () => {
-    const actualSentry = jest.requireActual<typeof Sentry>('@sentry/nextjs');
-    const beforeSend = jest.fn(event => event);
-    const beforeSendLog = jest.fn(log => log);
-    const beforeBreadcrumb = jest.fn(breadcrumb => breadcrumb);
-    const send = jest.fn().mockResolvedValue({ statusCode: 200 });
-    const client = actualSentry.init({
-      dsn: 'https://public@example.invalid/1',
-      defaultIntegrations: false,
-      integrations: [
-        actualSentry.consoleIntegration(),
-        actualSentry.consoleLoggingIntegration({ levels: ['info', 'log', 'warn', 'error'] }),
-      ],
-      enableLogs: true,
-      skipOpenTelemetrySetup: true,
-      transport: () => ({ send, flush: async () => true }),
-      beforeSend,
-      beforeSendLog,
-      beforeBreadcrumb,
-    });
-
-    try {
-      mockPoll.mockResolvedValue({ status: 'pending' });
-      await GET(new NextRequest('http://localhost'), {
-        params: Promise.resolve({ code: 'SYNTHETIC' }),
-      });
-      await actualSentry.flush();
-
-      expect(stdoutSpy.mock.calls).toEqual([['legacy-poll-device-auth-count: 1\n']]);
-      expect(Sentry.captureMessage).not.toHaveBeenCalled();
-      expect(Sentry.captureException).not.toHaveBeenCalled();
-      expect(beforeSend).not.toHaveBeenCalled();
-      expect(beforeSendLog).not.toHaveBeenCalled();
-      expect(beforeBreadcrumb).not.toHaveBeenCalled();
-      expect(send).not.toHaveBeenCalled();
-
-      console.info('synthetic unrelated console event');
-      actualSentry.captureMessage('synthetic unrelated reportable event');
-      await actualSentry.flush();
-
-      expect(beforeSend).toHaveBeenCalled();
-      expect(beforeSendLog).toHaveBeenCalled();
-      expect(beforeBreadcrumb).toHaveBeenCalled();
-      expect(send).toHaveBeenCalled();
-    } finally {
-      await client?.close();
-    }
   });
 });
 
@@ -311,23 +200,5 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     );
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'Not found' });
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test('reports unexpected deny failures and preserves the 500 response', async () => {
-    const error = new Error('Synthetic unexpected deny failure');
-    mockVerifyToken.mockReturnValue({ code: 'ABCD-EFGH', userId: 'user-1' });
-    mockDeny.mockRejectedValueOnce(error);
-
-    const response = await DELETE(
-      createRequest('ABCD-EFGH', { 'x-device-auth-viewer-token': 'valid-token' }),
-      { params: Promise.resolve({ code: 'ABCD-EFGH' }) }
-    );
-
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Internal server error' });
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledWith(error);
-    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 });

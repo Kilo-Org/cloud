@@ -26,6 +26,10 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { type QuickChatRow } from './quick-chat-messages';
 import { QuickChatScreen } from './quick-chat-screen';
 
+vi.mock('@/components/centered-state-surface', () => ({
+  StateSurfaceInsets: 'StateSurfaceInsets',
+}));
+
 const listMessagesQueryFn = vi.hoisted(() => vi.fn());
 const getOrCreateThreadMutate = vi.hoisted(() => vi.fn());
 const listMessagesQuery = vi.hoisted(() => vi.fn());

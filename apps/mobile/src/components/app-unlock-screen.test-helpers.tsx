@@ -91,6 +91,11 @@ vi.mock('react-native-reanimated', () => ({
   useAnimatedStyle: (build: () => unknown) => build(),
 }));
 vi.mock('expo-screen-capture', () => ({}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+  StateSurface: 'StateSurface',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Icon',
@@ -110,7 +115,7 @@ vi.mock('expo-router', () => ({
   // One mounted descriptor per navigator exercises its production callback.
   Stack: Object.assign(
     ({ screenLayout }: { screenLayout: typeof appUnlockScreenLayout }) =>
-      createElement('Scene', null, screenLayout({ children: <Draft /> })),
+      createElement('Scene', null, unlockScene(<Draft />, screenLayout)),
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
@@ -259,31 +264,7 @@ export async function flush(update?: () => void) {
   });
 }
 
-export function text(root: ReactTestInstance) {
-  const texts = root.findAllByType('Text' as ElementType);
-  return texts.map(node => node.props.children).join('\n');
-}
-
-export function expectHidden(root: ReactTestInstance, hidden: boolean) {
-  const scenes = root.findAllByType('Scene' as ElementType);
-  expect(scenes.length).toBeGreaterThan(0);
-  for (const scene of scenes) {
-    const wrapper = scene.find(
-      node => (node.type as string) === 'View' && node.props.pointerEvents !== undefined
-    );
-    expect(wrapper.props).toMatchObject({
-      pointerEvents: hidden ? 'none' : 'auto',
-      accessibilityElementsHidden: hidden,
-      importantForAccessibility: hidden ? 'no-hide-descendants' : 'auto',
-    });
-    expect((wrapper.props.className as string).includes('opacity-0')).toBe(hidden);
-    expect(wrapper.findAllByType('Draft' as ElementType)).toHaveLength(1);
-  }
-}
-
-export function nestedUnlockScenes(children: ReactElement) {
-  return appUnlockScreenLayout({ children: appUnlockScreenLayout({ children }) });
-}
+export { expectHidden, text } from './app-unlock-screen.test-assertions';
 
 function isHidden(node: ReactTestInstance): boolean {
   for (let parent = node.parent; parent; parent = parent.parent) {
@@ -307,4 +288,13 @@ export function expectFeedback(root: ReactTestInstance, message: string, copies:
   expect(visible[0]?.props.accessibilityLiveRegion).toBe(
     platform.OS === 'android' ? 'polite' : undefined
   );
+}
+
+export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
+  const props = { children };
+  return layout(props as Parameters<typeof appUnlockScreenLayout>[0]);
+}
+
+export function nestedUnlockScenes(children: ReactElement) {
+  return unlockScene(unlockScene(children));
 }

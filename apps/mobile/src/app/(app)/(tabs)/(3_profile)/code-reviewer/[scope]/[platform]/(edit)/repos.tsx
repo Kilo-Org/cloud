@@ -1,9 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
+import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
@@ -112,129 +114,139 @@ export default function ReposRoute() {
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
+  const fullBodyState = !capabilities.selectionModePicker && !reposLoading && repoRows.length === 0;
+  let repoState: ReactNode = null;
+  if (!reposLoading && reposError) {
+    repoState = (
+      <QueryError
+        variant="server"
+        placement={fullBodyState ? 'center' : 'top'}
+        title={t('codeReviewer.repos.couldNotLoad')}
+        onRetry={refetchRepos}
+        isRetrying={reposFetching}
+      />
+    );
+  } else if (!reposLoading && bitbucketNotReady) {
+    repoState = (
+      <CenteredState>
+        <View className="items-center gap-2 px-6">
+          <Text variant="muted" className="text-center text-xs">
+            {t('codeReviewer.repos.unavailable')}
+          </Text>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => {
+              void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
+                label: t('codeReviewer.repos.bitbucketSetup'),
+              });
+            }}
+          >
+            <Text>{t('codeReviewer.repos.finishSetup')}</Text>
+          </Button>
+        </View>
+      </CenteredState>
+    );
+  } else if (confirmedEmpty) {
+    repoState = (
+      <EmptyState
+        placement={fullBodyState ? 'center' : 'top'}
+        icon={FolderGit2}
+        title={emptyStateCopy.title}
+        description={emptyStateCopy.description}
+        action={
+          manageRepoAccessLabel ? (
+            <Button
+              variant="outline"
+              onPress={() => {
+                void (async () => {
+                  if (platform === 'github') {
+                    try {
+                      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+                        organizationId: orgScope ?? undefined,
+                        returnTo: '/cloud/sessions',
+                      });
+                      await openExternalUrl(
+                        getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
+                        { label: t('codeReviewer.repos.repositoryAccess') }
+                      );
+                    } catch {
+                      toast.error(t('codeReviewer.repos.couldNotOpenGithubSettings'));
+                    }
+                  } else if (platform === 'gitlab') {
+                    await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
+                      label: t('codeReviewer.repos.repositoryAccess'),
+                    });
+                  }
+                })();
+              }}
+            >
+              <Text>{t('codeReviewer.repos.manageAccess')}</Text>
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.repos.title')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        {capabilities.selectionModePicker && (
-          <RadioGroup label={t('codeReviewer.repos.title')}>
-            {(['all', 'selected'] as const).map(option => (
-              <ChoiceRow
-                key={option}
-                label={
-                  option === 'all'
-                    ? t('codeReviewer.repos.allRepositories')
-                    : t('codeReviewer.repos.selectedRepositories')
-                }
-                selected={mode === option}
-                disabled={configDisabled}
-                className="border-b-[0.5px] border-hair-soft"
-                onPress={() => {
-                  setMode(option);
-                }}
-              />
-            ))}
-          </RadioGroup>
-        )}
-
-        {(!capabilities.selectionModePicker || mode === 'selected') && (
-          <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
-            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.repos.title')}
-            </Text>
-            {reposLoading && (
-              <View className="gap-3 pt-2">
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-              </View>
-            )}
-
-            {!reposLoading && reposError && (
-              <QueryError
-                variant="server"
-                placement="top"
-                title={t('codeReviewer.repos.couldNotLoad')}
-                onRetry={refetchRepos}
-                isRetrying={reposFetching}
-              />
-            )}
-
-            {!reposLoading && !reposError && bitbucketNotReady && (
-              <View className="items-center gap-2 pt-2">
-                <Text variant="muted" className="text-center text-xs">
-                  {t('codeReviewer.repos.unavailable')}
-                </Text>
-                <Button
-                  variant="outline"
-                  size="sm"
+      {fullBodyState ? (
+        repoState
+      ) : (
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+          {capabilities.selectionModePicker && (
+            <RadioGroup label={t('codeReviewer.repos.title')}>
+              {(['all', 'selected'] as const).map(option => (
+                <ChoiceRow
+                  key={option}
+                  label={
+                    option === 'all'
+                      ? t('codeReviewer.repos.allRepositories')
+                      : t('codeReviewer.repos.selectedRepositories')
+                  }
+                  selected={mode === option}
+                  disabled={configDisabled}
+                  className="border-b-[0.5px] border-hair-soft"
                   onPress={() => {
-                    void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                      label: t('codeReviewer.repos.bitbucketSetup'),
-                    });
+                    setMode(option);
                   }}
-                >
-                  <Text>{t('codeReviewer.repos.finishSetup')}</Text>
-                </Button>
-              </View>
-            )}
+                />
+              ))}
+            </RadioGroup>
+          )}
 
-            {confirmedEmpty && (
-              <EmptyState
-                placement="top"
-                icon={FolderGit2}
-                title={emptyStateCopy.title}
-                description={emptyStateCopy.description}
-                action={
-                  manageRepoAccessLabel ? (
-                    <Button
-                      variant="outline"
-                      onPress={() => {
-                        void (async () => {
-                          if (platform === 'github') {
-                            try {
-                              const { token } = await trpcClient.githubApps.mintInstallState.mutate(
-                                {
-                                  organizationId: orgScope ?? undefined,
-                                  returnTo: '/cloud/sessions',
-                                }
-                              );
-                              await openExternalUrl(
-                                getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
-                                { label: t('codeReviewer.repos.repositoryAccess') }
-                              );
-                            } catch {
-                              toast.error(t('codeReviewer.repos.couldNotOpenGithubSettings'));
-                            }
-                          } else if (platform === 'gitlab') {
-                            await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
-                              label: t('codeReviewer.repos.repositoryAccess'),
-                            });
-                          }
-                        })();
-                      }}
-                    >
-                      <Text>{t('codeReviewer.repos.manageAccess')}</Text>
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )}
+          {(!capabilities.selectionModePicker || mode === 'selected') && (
+            <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
+              <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
+                {t('codeReviewer.repos.title')}
+              </Text>
+              {reposLoading && (
+                <View className="gap-3 pt-2">
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                </View>
+              )}
 
-            {repoRows.map(repo => (
-              <RepoToggleRow
-                key={repo.id}
-                repo={repo}
-                selected={selectedIds.includes(repo.id)}
-                disabled={configDisabled}
-                className="border-b-[0.5px] border-hair-soft"
-                onPress={() => {
-                  toggleRepo(repo.id);
-                }}
-              />
-            ))}
-          </View>
-        )}
-      </TabScreenScrollView>
+              {repoState}
+
+              {repoRows.map(repo => (
+                <RepoToggleRow
+                  key={repo.id}
+                  repo={repo}
+                  selected={selectedIds.includes(repo.id)}
+                  disabled={configDisabled}
+                  className="border-b-[0.5px] border-hair-soft"
+                  onPress={() => {
+                    toggleRepo(repo.id);
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

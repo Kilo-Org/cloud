@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -154,7 +155,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
-  if (findingQuery.isError) {
+  if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
@@ -167,7 +168,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     );
   }
 
-  if (capability.isError) {
+  if (capability.status === 'error') {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
@@ -232,6 +233,20 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
+        {findingQuery.isError ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.dismiss.couldNotLoad')}
+            isRetrying={findingQuery.isFetching}
+            onRetry={() => void findingQuery.refetch()}
+          />
+        ) : null}
+        {capability.isError ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.dismiss.couldNotCheckPermissions')}
+            isRetrying={capability.isFetching}
+            onRetry={() => void capability.refetch()}
+          />
+        ) : null}
         <PillGroup
           label={t('securityAgent.dismiss.reason')}
           options={DISMISS_REASONS.map(option => ({

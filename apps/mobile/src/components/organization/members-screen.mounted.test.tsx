@@ -6,7 +6,7 @@
 // error selector are unit-tested separately; this proves the loading → error →
 // empty precedence in the screen JSX itself.
 
-import { type ComponentType, createElement, type ReactElement } from 'react';
+import { type ComponentType, createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -25,6 +25,8 @@ const withMembersQuery = vi.hoisted(() => ({
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
+  isActiveOrgMember: (member: { status: string }) => member.status === 'active',
+  isInvitedOrgMember: (member: { status: string }) => member.status === 'invited',
   useOrgBoundary: () => ({
     organizationId: 'org-1',
     role: 'owner',
@@ -38,16 +40,22 @@ vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: unknown[];
     ListEmptyComponent?: ComponentType | ReactElement | null;
+    renderItem?: (info: { item: unknown; index: number }) => ReactElement;
   }) => {
     const data = props.data ?? [];
-    if (data.length === 0) {
-      const Empty = props.ListEmptyComponent;
-      if (typeof Empty === 'function') {
-        return createElement(Empty);
-      }
-      return Empty ?? null;
+    const Empty = props.ListEmptyComponent;
+    if (data.length > 0) {
+      return createElement(
+        'FlashList',
+        null,
+        data.map((item, index) => props.renderItem?.({ item, index }))
+      );
     }
-    return null;
+    return createElement(
+      'FlashList',
+      null,
+      typeof Empty === 'function' ? createElement(Empty) : Empty
+    );
   },
 }));
 
@@ -61,7 +69,8 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: ({ title }: { title: string }) => `EMPTY_STATE:${title}`,
+  EmptyState: (props: { title: string; placement?: string; action?: ReactNode }) =>
+    createElement('EmptyState', props, `EMPTY_STATE:${props.title}`, props.action),
 }));
 
 vi.mock('@/components/organization/invited-member-row', () => ({
@@ -161,10 +170,40 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     expect(texts).not.toContain('No members yet');
   });
 
-  it('renders "No members yet" when there is no error and both member arrays are empty', async () => {
-    const texts = await renderScreen();
+  it('renders "No members yet" outside the list when both member arrays are empty', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const texts = collectText(renderer.toJSON());
 
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).toContain('EMPTY_STATE:No members yet');
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the empty member notice inline above cached invitations after a refetch failure', async () => {
+    withMembersQuery.isError = true;
+    withMembersQuery.data = {
+      settings: {},
+      members: [{ status: 'invited', inviteId: 'invite-1', inviteDate: null }],
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const list = renderer.root.find(node => String(node.type) === 'FlashList');
+    expect(list.find(node => String(node.type) === 'EmptyState').props).toMatchObject({
+      placement: 'top',
+    });
+    expect(collectText(renderer.toJSON())).not.toContain('QUERY_ERROR');
+    unmount();
+  });
+
+  it('keeps the loading skeleton ahead of error and empty states', async () => {
+    withMembersQuery.isLoading = true;
+    withMembersQuery.isError = true;
+    const texts = await renderScreen();
+    expect(texts).not.toContain('QUERY_ERROR');
+    expect(texts).not.toContain('EMPTY_STATE:No members yet');
   });
 });

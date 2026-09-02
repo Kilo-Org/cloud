@@ -18,12 +18,8 @@ import {
   text,
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
-import { PickerSheet } from '@/components/picker-sheet';
 import { PreferencesScreen } from '@/components/preferences-screen';
-import { SheetHeader } from '@/components/sheet-header';
 import { type ElementType } from 'react';
-import { ScrollView } from 'react-native';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
@@ -124,25 +120,6 @@ it.each([false, true])(
     });
   }
 );
-
-it.each([true, false])('keeps native sheet siblings; scrollable=%s', async scrollable => {
-  const children = (
-    <PickerSheet title="Sheet" onDone={vi.fn<() => void>()} scrollable={scrollable}>
-      {scrollable ? null : <ScrollView />}
-    </PickerSheet>
-  );
-  await mount(appUnlockScreenLayout({ children }));
-  const sheet = root().findByType(PickerSheet);
-  expect(sheet.parent?.props).toEqual({
-    children,
-    className: 'flex-1',
-    pointerEvents: 'auto',
-    accessibilityElementsHidden: false,
-    importantForAccessibility: 'auto',
-  });
-  expect(sheet.parent?.parent?.type).not.toBe('View');
-  expect(sheet.children).toMatchObject([{ type: SheetHeader }, { type: 'ScrollView' }]);
-});
 
 it.each([null, 'disabled'])('shows the scene without a prompt for %s', async raw => {
   storage.getItemAsync.mockResolvedValue(raw);

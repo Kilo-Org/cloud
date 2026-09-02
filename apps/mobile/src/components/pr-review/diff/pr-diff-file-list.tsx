@@ -26,7 +26,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { RefreshControl, View, type ViewStyle } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import {
@@ -55,7 +55,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -101,9 +101,6 @@ export function PrReviewFileList({
   });
   const { viewMode, setViewMode } = useDiffViewMode();
   const isTablet = useIsTablet();
-  // Bottom clearance for the reconnect and retryable first-page chrome, which
-  // render without the floating bar (so no list reserve applies).
-  const bottomPadding = useDetailScreenBottomPadding();
   const { selection, selectionView, handleLineTap, clearSelection } = useDiffSelection({
     owner,
     repo,
@@ -281,31 +278,41 @@ export function PrReviewFileList({
     }
     if (firstPageErrorState?.kind === 'reconnect') {
       return (
-        <View
-          className="flex-1 items-center justify-center px-6 py-12"
-          style={{ paddingBottom: bottomPadding }}
-        >
+        <CenteredState className="px-6">
           <PrReviewReconnectNotice />
-        </View>
+        </CenteredState>
       );
     }
     if (firstPageErrorState?.kind === 'retryable') {
       return (
-        <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
-          <QueryError
-            variant="server"
-            onRetry={() => {
-              void query.refetch();
-            }}
-            isRetrying={query.isFetching}
-          />
-        </View>
+        <QueryError
+          variant="server"
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
       );
     }
   }
 
   if (!query.isLoading && files.length === 0) {
-    return <EmptyFilesView changedFiles={changedFiles} onRequestOverview={onRequestOverview} />;
+    return (
+      <EmptyFilesView
+        changedFiles={changedFiles}
+        onRequestOverview={onRequestOverview}
+        refreshControl={
+          changedFiles > 0 ? (
+            <RefreshControl
+              refreshing={query.isFetching}
+              onRefresh={() => {
+                void query.refetch();
+              }}
+            />
+          ) : undefined
+        }
+      />
+    );
   }
 
   const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);

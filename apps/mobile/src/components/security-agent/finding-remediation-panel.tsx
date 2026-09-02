@@ -6,6 +6,8 @@ import { type TFunction } from 'i18next';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { CenteredState } from '@/components/centered-state';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -226,7 +228,7 @@ export function FindingRemediationPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3">
+      <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
       </View>
@@ -234,18 +236,13 @@ export function FindingRemediationPanel({
   }
 
   if (isError && !analysis) {
-    return (
-      <View className="items-center justify-center py-8">
-        <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />
-      </View>
-    );
+    return <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />;
   }
 
   if (!analysis) {
     return (
       <EmptyState
         icon={Wrench}
-        placement="top"
         title={t('securityAgent.remediation.noAnalysisTitle')}
         description={t('securityAgent.remediation.noAnalysisDescription')}
       />
@@ -281,8 +278,12 @@ export function FindingRemediationPanel({
       ? getRemediationUnavailableKey(remediationCapability.retryReason)
       : null;
 
-  return (
-    <View className="gap-4">
+  const hasContent =
+    Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
+  const Body = hasContent ? TabScreenScrollView : CenteredState;
+
+  const content = (
+    <View className="gap-4 px-6 py-2">
       <View className="gap-1 rounded-lg bg-secondary p-3">
         <FindingStatusBadge
           icon={presentation.icon}
@@ -521,4 +522,6 @@ export function FindingRemediationPanel({
       ) : null}
     </View>
   );
+
+  return <Body className="flex-1">{content}</Body>;
 }

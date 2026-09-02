@@ -35,6 +35,7 @@ vi.mock('@/lib/pr-review/discussion/use-pr-review-discussion-threads', () => ({
 vi.mock('@/lib/a11y/motion', () => ({
   useMotionPolicy: () => ({ scrollAnimated: false }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -101,75 +102,70 @@ function resetState(): void {
   discussionState.laterPageError = false;
 }
 
-describe('PrReviewDiscussionTab chrome bottom inset (plan §6)', () => {
+describe('PrReviewDiscussionTab full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
     resetState();
   });
 
-  it('pads the permission chrome by the detail-screen padding at a zero inset', () => {
-    discussionState.firstPageErrorState = { kind: 'permission' };
+  it.each(['permission', 'not-found', 'retryable'])('lets QueryError own the %s body', kind => {
+    discussionState.firstPageErrorState = { kind };
     const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.placement).toBeUndefined();
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    if (kind === 'retryable') {
+      act(() => {
+        (error.props.onRetry as () => void)();
+      });
+      expect(discussionState.query.refetch).toHaveBeenCalled();
+    } else {
+      expect(error.props.onRetry).toBeUndefined();
+    }
   });
 
-  it('pads the not-found chrome by the detail-screen padding at a zero inset', () => {
-    discussionState.firstPageErrorState = { kind: 'not-found' };
-    const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
-  });
-
-  it('pads the reconnect chrome by the detail-screen padding at a zero inset', () => {
+  it('centers the reconnect notice', () => {
     discussionState.firstPageErrorState = { kind: 'reconnect' };
     const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
+    const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
+    expect(centered.find(node => String(node.type) === 'PrReviewReconnectNotice')).toBeDefined();
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
   });
 
-  it('pads the retryable chrome by the detail-screen padding at a zero inset', () => {
+  it('keeps the loading skeleton padding', () => {
+    discussionState.query.isPending = true;
+    expectSinglePadding(mountTab(), 32);
+  });
+
+  it('lets EmptyState own the empty body and keeps its Files action', () => {
+    const renderer = mountTab();
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.placement).toBeUndefined();
+    expect((empty.props.action as React.ReactElement<{ onPress: () => void }>).props.onPress).toBe(
+      BASE_PROPS.onRequestFiles
+    );
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+  });
+
+  it('keeps retained comments and a retry action after a transient first-page failure', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     discussionState.firstPageErrorState = { kind: 'retryable' };
     const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(list.props.laterPageError).toBe(true);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 
-  it('pads the loading chrome by the detail-screen padding at a zero inset', () => {
-    discussionState.query.isPending = true;
+  it('keeps permission denial ahead of retained comments', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    discussionState.firstPageErrorState = { kind: 'permission' };
     const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
-  });
-
-  it('pads the empty chrome by the detail-screen padding at a zero inset', () => {
-    const renderer = mountTab();
-
-    expectSinglePadding(renderer, 32);
-  });
-
-  it('grows every chrome padding with a nonzero system inset', () => {
-    insetsState.bottom = 34;
-    const states: { kind: string }[] = [
-      { kind: 'permission' },
-      { kind: 'not-found' },
-      { kind: 'reconnect' },
-      { kind: 'retryable' },
-    ];
-    for (const state of states) {
-      resetState();
-      discussionState.firstPageErrorState = state;
-      const renderer = mountTab();
-      // Math.max(34, 16) + 16
-      expectSinglePadding(renderer, 50);
-    }
-
-    resetState();
-    discussionState.query.isPending = true;
-    expectSinglePadding(mountTab(), 50);
-
-    resetState();
-    expectSinglePadding(mountTab(), 50);
+    expect(renderer.root.find(node => String(node.type) === 'QueryError').props.variant).toBe(
+      'permission'
+    );
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'PrReviewDiscussionList')
+    ).toHaveLength(0);
   });
 
   it('renders the happy list without a chrome wrapper', () => {

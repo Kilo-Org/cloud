@@ -42,6 +42,8 @@ const hoisted = vi.hoisted(() => {
 // Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
 // and `session-detail-content.tsx` pull in transitively before loading either
 // module.
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));

@@ -1,7 +1,9 @@
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Platform, type ScrollViewProps, View } from 'react-native';
+
+import { CenteredState } from '@/components/centered-state';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
@@ -12,6 +14,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -22,7 +25,6 @@ import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
-const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 // The trailing slash pins the index route.
 const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
 const MAX_ROWS = 3;
@@ -85,7 +87,13 @@ export function LiveSessionFeedback({
   context,
   sessions,
   failureLabel,
-}: LiveSessionProps & { failureLabel: string }) {
+  centered = false,
+  refreshControl,
+}: LiveSessionProps & {
+  failureLabel: string;
+  centered?: boolean;
+  refreshControl?: ScrollViewProps['refreshControl'];
+}) {
   const { t } = useTranslation();
   const router = useRouter();
   const internet = useCommittedConnectivityStatus();
@@ -93,9 +101,7 @@ export function LiveSessionFeedback({
   const connection = useUserWebConnection();
   const wasConnected = useRef(false);
   useEffect(() => {
-    if (isConnected) {
-      wasConnected.current = true;
-    }
+    wasConnected.current ||= isConnected;
   }, [isConnected]);
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
@@ -114,6 +120,9 @@ export function LiveSessionFeedback({
     })();
   };
   const content = liveSessionContent(context, sessions);
+  useStatusAnnouncement(
+    context.isReady && sessions.terminalError?.kind === 'retryable' ? failureLabel : null
+  );
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
   let failure: ReactNode = null;
@@ -121,6 +130,7 @@ export function LiveSessionFeedback({
     failure = (
       <QueryError
         placement="top"
+        className={centered ? 'pt-0' : undefined}
         title={t('organization.boundary.loadErrorTitle')}
         message={t('organization.boundary.loadErrorMessage')}
         onRetry={handleRetry}
@@ -144,7 +154,13 @@ export function LiveSessionFeedback({
     }
     failure = (
       <>
-        <QueryError placement="top" variant={variant} title={title} message={message} />
+        <QueryError
+          placement="top"
+          className={centered ? 'pt-0' : undefined}
+          variant={variant}
+          title={title}
+          message={message}
+        />
         <Button
           variant="outline"
           accessibilityLabel={t('organization.boundary.backToProfile')}
@@ -160,13 +176,16 @@ export function LiveSessionFeedback({
     const compact = content === 'rows';
     failure = (
       <View className="gap-1">
-        {/* QueryError supplies the cold heading; the persistent status owns its announcement. */}
-        {!compact && <QueryError placement="top" message="" />}
+        {!compact && (
+          <QueryError placement="top" className={centered ? 'pt-0' : undefined} message="" />
+        )}
         <View className={cn('items-center', compact ? 'flex-row gap-2' : 'gap-4')}>
-          <AccessibleStatus
-            message={failureLabel}
-            className={compact ? 'flex-1 text-xs' : 'text-center text-sm'}
-          />
+          <Text
+            accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+            className={cn('text-destructive', compact ? 'flex-1 text-xs' : 'text-center text-sm')}
+          >
+            {failureLabel}
+          </Text>
           <Button
             variant={compact ? 'ghost' : 'outline'}
             size={compact ? 'sm' : 'default'}
@@ -191,8 +210,8 @@ export function LiveSessionFeedback({
     }
   }
 
-  return (
-    <View className="gap-2">
+  const feedback = (
+    <View className={cn('gap-2', centered && 'px-6')}>
       <View className="flex-row items-center gap-2">
         {/* The app-wide OfflineBanner owns the offline announcement. */}
         {internet === 'offline' ? (
@@ -235,6 +254,11 @@ export function LiveSessionFeedback({
       {failure}
     </View>
   );
+  return centered ? (
+    <CenteredState refreshControl={refreshControl}>{feedback}</CenteredState>
+  ) : (
+    feedback
+  );
 }
 
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
@@ -260,18 +284,19 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           sessions={sessions}
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
-        {content === 'pending' && (
-          <Skeleton className={cn('w-full rounded-2xl', HOME_LIVE_SLOT_MIN_CLASS)} />
+        {content === 'pending' && <Skeleton className="min-h-[72px] w-full rounded-2xl" />}
+        {content === 'empty' && (
+          <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
+            <Text variant="muted" className="text-sm">
+              {t('home.noLiveSessions')}
+            </Text>
+          </View>
         )}
-        {content === 'empty' && <LiveNowEmpty />}
         {content === 'rows' &&
           sessions.activeSessions.slice(0, MAX_ROWS).map(session => (
             <View
               key={`active:${session.id}`}
-              className={cn(
-                'overflow-hidden rounded-2xl border border-border bg-card',
-                HOME_LIVE_SLOT_MIN_CLASS
-              )}
+              className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card"
             >
               <RemoteSessionRow
                 session={session}
@@ -284,22 +309,6 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
             </View>
           ))}
       </View>
-    </View>
-  );
-}
-
-function LiveNowEmpty() {
-  const { t } = useTranslation();
-  return (
-    <View
-      className={cn(
-        'items-center justify-center rounded-2xl border border-border bg-card px-4',
-        HOME_LIVE_SLOT_MIN_CLASS
-      )}
-    >
-      <Text variant="muted" className="text-sm">
-        {t('home.noLiveSessions')}
-      </Text>
     </View>
   );
 }

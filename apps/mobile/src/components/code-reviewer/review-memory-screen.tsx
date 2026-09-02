@@ -1,9 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -90,14 +91,83 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('codeReviewer.reviewMemory.title')}
-        eyebrow={t('codeReviewer.title')}
+  let body: ReactNode = null;
+  if (summaryLoading || proposalsLoading) {
+    body = (
+      <View
+        accessibilityLabel={t(
+          summaryLoading
+            ? 'codeReviewer.reviewMemory.loading'
+            : 'codeReviewer.reviewMemory.loadingProposals'
+        )}
+        className="gap-3 px-6 pt-4"
+      >
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+      </View>
+    );
+  } else if (summaryError) {
+    body = (
+      <QueryError
+        variant="server"
+        title={t('codeReviewer.reviewMemory.couldNotLoad')}
+        onRetry={() => void summaryQuery.refetch()}
+        isRetrying={summaryQuery.isFetching}
       />
+    );
+  } else if (disabled) {
+    body = (
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center text-sm font-medium">
+            {t('codeReviewer.reviewMemory.off')}
+          </Text>
+          <Text variant="muted" className="text-center text-xs">
+            {t('codeReviewer.reviewMemory.offDescription')}
+          </Text>
+          {readOnly ? (
+            <Text variant="muted" className="text-center text-xs">
+              {t('codeReviewer.reviewMemory.readOnlyDescription')}
+            </Text>
+          ) : (
+            <Button
+              onPress={() => {
+                setEnabled.mutate(true);
+              }}
+              loading={setEnabled.isPending}
+              accessibilityLabel={t('codeReviewer.reviewMemory.enable')}
+            >
+              <Text>{t('codeReviewer.reviewMemory.enable')}</Text>
+            </Button>
+          )}
+        </View>
+      </CenteredState>
+    );
+  } else if (firstPageError) {
+    body = (
+      <QueryError
+        variant="server"
+        title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
+        onRetry={() => void proposalsQuery.refetch()}
+        isRetrying={proposalsQuery.isFetching}
+      />
+    );
+  } else if (empty) {
+    body = (
+      <>
+        <EmptyState
+          icon={Brain}
+          title={t('codeReviewer.reviewMemory.noProposals')}
+          description={t('codeReviewer.reviewMemory.noProposalsDescription')}
+        />
+        {footer}
+      </>
+    );
+  } else if (happy) {
+    body = (
       <FlashList
-        data={happy ? proposals : []}
+        data={proposals}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
           <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
@@ -109,83 +179,6 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
             </Text>
           </View>
         )}
-        ListEmptyComponent={
-          <View className="px-6 pt-4">
-            {summaryLoading && (
-              <View accessibilityLabel={t('codeReviewer.reviewMemory.loading')} className="gap-3">
-                <Skeleton className="h-20 w-full rounded-lg" />
-                <Skeleton className="h-20 w-full rounded-lg" />
-                <Skeleton className="h-20 w-full rounded-lg" />
-              </View>
-            )}
-
-            {summaryError && (
-              <QueryError
-                variant="server"
-                title={t('codeReviewer.reviewMemory.couldNotLoad')}
-                placement="top"
-                onRetry={() => void summaryQuery.refetch()}
-                isRetrying={summaryQuery.isFetching}
-              />
-            )}
-
-            {disabled && (
-              <View className="items-center gap-3 pt-16">
-                <Text className="text-center text-sm font-medium">
-                  {t('codeReviewer.reviewMemory.off')}
-                </Text>
-                <Text variant="muted" className="text-center text-xs">
-                  {t('codeReviewer.reviewMemory.offDescription')}
-                </Text>
-                {readOnly ? (
-                  <Text variant="muted" className="text-center text-xs">
-                    {t('codeReviewer.reviewMemory.readOnlyDescription')}
-                  </Text>
-                ) : (
-                  <Button
-                    onPress={() => {
-                      setEnabled.mutate(true);
-                    }}
-                    loading={setEnabled.isPending}
-                    accessibilityLabel={t('codeReviewer.reviewMemory.enable')}
-                  >
-                    <Text>{t('codeReviewer.reviewMemory.enable')}</Text>
-                  </Button>
-                )}
-              </View>
-            )}
-
-            {proposalsLoading && (
-              <View
-                accessibilityLabel={t('codeReviewer.reviewMemory.loadingProposals')}
-                className="gap-3"
-              >
-                <Skeleton className="h-20 w-full rounded-lg" />
-                <Skeleton className="h-20 w-full rounded-lg" />
-                <Skeleton className="h-20 w-full rounded-lg" />
-              </View>
-            )}
-
-            {firstPageError && (
-              <QueryError
-                variant="server"
-                title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
-                placement="top"
-                onRetry={() => void proposalsQuery.refetch()}
-                isRetrying={proposalsQuery.isFetching}
-              />
-            )}
-
-            {empty && (
-              <EmptyState
-                icon={Brain}
-                placement="top"
-                title={t('codeReviewer.reviewMemory.noProposals')}
-                description={t('codeReviewer.reviewMemory.noProposalsDescription')}
-              />
-            )}
-          </View>
-        }
         ListFooterComponent={footer}
         onEndReached={() => {
           if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage) {
@@ -194,6 +187,16 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         }}
         onEndReachedThreshold={0.5}
       />
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        title={t('codeReviewer.reviewMemory.title')}
+        eyebrow={t('codeReviewer.title')}
+      />
+      {body}
     </View>
   );
 }

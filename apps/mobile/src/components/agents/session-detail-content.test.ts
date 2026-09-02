@@ -12,6 +12,7 @@ import {
   type KiloSessionId,
   type SessionManager,
   type SessionSnapshotPageOutcome,
+  type SessionStatusIndicator,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -49,6 +50,7 @@ vi.mock('@/components/agents/session-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -555,6 +557,31 @@ describe('SessionDetailContent display scope', () => {
   });
 });
 
+describe('session detail status placement', () => {
+  it.each(['progress', 'info'] as const)(
+    'centers a %s status without transcript rows',
+    async type => {
+      const view = await mountDetails([]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          {
+            type,
+            message: 'Session status',
+            timestamp: 0,
+          }
+        );
+      });
+      const centered = view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'));
+      expect(centered).toHaveLength(1);
+      expect(
+        centered[0]?.findAll(node => Object.is(node.type, 'SessionStatusIndicator'))
+      ).toHaveLength(1);
+      expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    }
+  );
+});
+
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
   beforeEach(() => {
     if (hasHistory) {
@@ -606,6 +633,10 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
         typeof QueryError
       >;
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))
+      ).toHaveLength(1);
+      expect(error.placement).toBe('top');
       expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
       expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
       expect(renderedText(view.renderer.root)).toContain('Back to sessions');

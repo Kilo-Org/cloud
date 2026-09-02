@@ -185,26 +185,24 @@ export default function InstancePickerScreen() {
         onDone={closePicker}
         scrollable={false}
       >
-        <View className="flex-1 items-center justify-center" style={{ paddingBottom: bottom }}>
-          <EmptyState
-            icon={Server}
-            placement="center"
-            title={t('agentChat.instancePicker.couldNotLoad')}
-            description={t('agentChat.instancePicker.couldNotLoadDescription')}
-            action={
-              <Button
-                variant="outline"
-                onPress={() => {
-                  void refetchInstances();
-                }}
-                loading={isRefetching}
-                accessibilityLabel={t('common.retry')}
-              >
-                <Text>{t('common.retry')}</Text>
-              </Button>
-            }
-          />
-        </View>
+        <EmptyState
+          icon={Server}
+          placement="center"
+          title={t('agentChat.instancePicker.couldNotLoad')}
+          description={t('agentChat.instancePicker.couldNotLoadDescription')}
+          action={
+            <Button
+              variant="outline"
+              onPress={() => {
+                void refetchInstances();
+              }}
+              loading={isRefetching}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          }
+        />
       </PickerSheet>
     );
   }

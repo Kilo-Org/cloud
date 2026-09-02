@@ -19,12 +19,8 @@ it('centers the unlock content and keeps a separate gap before Retry', async () 
   const copy = heading.parent;
   const content = copy?.parent;
   expect(content?.props.className).toContain('gap-8');
-  expect(content?.parent?.props.contentContainerStyle).toMatchObject({
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingTop: 48,
-    paddingBottom: 36,
-  });
+  expect(content?.parent?.type).toBe('CenteredState');
+  expect(content?.props.style).toEqual({ paddingLeft: 24, paddingRight: 24 });
   expect(content?.findAll(node => node === retry())).toHaveLength(1);
   expect(copy?.findAll(node => node === retry())).toHaveLength(0);
   expect(retry()?.props.accessibilityLabel).toBe('Retry');

@@ -237,6 +237,27 @@ describe('ToolCardImageAttachments mounted', () => {
     await unmount(renderer);
   });
 
+  it('clears a standalone decode failure when the cached URI changes', async () => {
+    seedImageCache();
+    const renderer = await mount(makeToolPart([makeAttachment('att-1', 'image/png', '')]));
+    const image = renderer.root.find(node => (node.type as string) === 'Image');
+    act(() => {
+      (image.props.onError as () => void)();
+    });
+    expect(texts(renderer.root)).toContain('Image unavailable');
+    act(() => {
+      __resetToolCardImageCacheForTests();
+      cacheToolAttachment('part-1', {
+        mime: 'image/png',
+        dataUrl: 'data:image/png;base64,QUJD',
+        filename: 'replacement.png',
+      });
+    });
+    expect(previewButtons(renderer.root)).toHaveLength(1);
+    expect(texts(renderer.root)).not.toContain('Image unavailable');
+    await unmount(renderer);
+  });
+
   it('flips the unavailable row to a preview when the cache write lands after mount', async () => {
     const renderer = await mount(makeToolPart([makeAttachment('att-1', 'image/png', '')]));
     const root = renderer.root;

@@ -12,6 +12,11 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ScrollView } from 'react-native';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { type SecurityFinding } from '@/lib/security-agent';
+import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { DismissFindingScreen } from './dismiss-finding-screen';
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
@@ -34,15 +39,18 @@ const dismiss = vi.hoisted(() => ({
 }));
 const capability = vi.hoisted(() => ({
   canManage: true,
+  status: 'allowed' as 'allowed' | 'denied' | 'error' | 'loading',
   isLoading: false,
+  isFetching: false,
   isError: false,
   refetch: vi.fn(),
 }));
 const finding = vi.hoisted(() => ({
   isLoading: false,
+  isFetching: false,
   isError: false,
   error: null as unknown,
-  data: { status: 'open' },
+  data: undefined as Pick<SecurityFinding, 'status'> | undefined,
   refetch: vi.fn(),
 }));
 const pillGroup = vi.hoisted(() => ({
@@ -97,8 +105,11 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   },
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: () => null }));
-vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  SettingsRecoveryStatus: 'SettingsRecoveryStatus',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
   PillGroup: (props: { onChange: (value: string) => void }) => {
@@ -175,15 +186,119 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     dismiss.isError = false;
     dismiss.error = null;
     capability.canManage = true;
+    capability.status = 'allowed';
     capability.isLoading = false;
+    capability.isFetching = false;
     capability.isError = false;
+    capability.refetch.mockReset();
     finding.isLoading = false;
+    finding.isFetching = false;
     finding.isError = false;
+    finding.error = null;
     finding.data = { status: 'open' };
+    finding.refetch.mockReset();
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
     dismissDraft.clear.mockClear();
+  });
+
+  it.each(['finding', 'permissions'] as const)(
+    'keeps the draft mounted and retries a cached %s failure without submitting',
+    source => {
+      const query = source === 'finding' ? finding : capability;
+      const otherQuery = source === 'finding' ? capability : finding;
+      const tree = renderScreen();
+      selectReason();
+      const input = findCommentInput(tree.root);
+      act(() => {
+        (input.props.onChangeText as (value: string) => void)('Keep this comment');
+      });
+      const update = () => {
+        tree.update(
+          createElement(DismissFindingScreen, { scope: 'personal', findingId: 'finding-1' })
+        );
+      };
+      query.isError = true;
+      finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+      act(update);
+      const scroll = tree.root.findByType(ScrollView);
+      const retry = scroll.findByType(SettingsRecoveryStatus);
+      expect(tree.root.findAllByType(ScrollView)).toHaveLength(1);
+      expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(0);
+      act(retry.props.onRetry as () => void);
+      expect(query.refetch).toHaveBeenCalledOnce();
+      expect(otherQuery.refetch).not.toHaveBeenCalled();
+      expect(dismiss.mutate).not.toHaveBeenCalled();
+      query.isFetching = true;
+      act(update);
+      expect(retry.props.isRetrying).toBe(true);
+      expect(findCommentInput(tree.root)).toBe(input);
+      query.isFetching = false;
+      query.isError = false;
+      act(update);
+      expect(tree.root.findByType(ScrollView)).toBe(scroll);
+      expect(findCommentInput(tree.root)).toBe(input);
+      expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
+      expect(buttonDisabled(tree.root)).toBe(false);
+      act(findDismissButton(tree.root).props.onPress as () => void);
+      expect(dismiss.mutate).toHaveBeenCalledWith(
+        { findingId: 'finding-1', reason: 'not_used', comment: 'Keep this comment' },
+        expect.any(Object)
+      );
+    }
+  );
+
+  it.each(['finding', 'permissions'] as const)(
+    'keeps an uncached %s failure outside the form',
+    source => {
+      const query = source === 'finding' ? finding : capability;
+      query.isError = true;
+      if (source === 'finding') {
+        finding.data = undefined;
+      } else {
+        capability.status = 'error';
+      }
+      const tree = renderScreen();
+      expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+      expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
+      const error = tree.root.findByType(QueryError);
+      expect(error.props.placement).not.toBe('top');
+      act(error.props.onRetry as () => void);
+      expect(query.refetch).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    ['denied', 'open'],
+    ['allowed', 'fixed'],
+    ['allowed', 'dismissed'],
+  ] as const)(
+    'keeps %s permissions and a %s finding blocked after refetch failures',
+    (status, findingStatus) => {
+      capability.status = status;
+      capability.canManage = status === 'allowed';
+      capability.isError = true;
+      finding.data = { status: findingStatus };
+      finding.isError = true;
+      finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+      const tree = renderScreen();
+      expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+      expect(tree.root.findAllByType(EmptyState)).toHaveLength(1);
+      expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
+      expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    }
+  );
+
+  it.each(['NOT_FOUND', 'FORBIDDEN'])('keeps the full-body %s state outside the form', code => {
+    finding.isError = true;
+    finding.error = { data: { code } };
+    const tree = renderScreen();
+    expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+    const empty = tree.root.findAllByType(EmptyState);
+    expect(empty).toHaveLength(1);
+    expect(empty[0]?.props.placement).not.toBe('top');
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {

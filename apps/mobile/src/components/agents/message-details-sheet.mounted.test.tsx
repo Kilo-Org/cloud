@@ -54,6 +54,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));

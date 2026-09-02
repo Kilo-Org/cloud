@@ -81,16 +81,14 @@ export default function VersionPinScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.versionPin.title')} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.versionPin.couldNotLoad')}
-            onRetry={() => {
-              void myPinQuery.refetch();
-              void latestVersionQuery.refetch();
-              void availableVersionsQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.versionPin.couldNotLoad')}
+          onRetry={() => {
+            void myPinQuery.refetch();
+            void latestVersionQuery.refetch();
+            void availableVersionsQuery.refetch();
+          }}
+        />
       </View>
     );
   }

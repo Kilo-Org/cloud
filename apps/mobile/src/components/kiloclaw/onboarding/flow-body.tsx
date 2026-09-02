@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { CompleteStep } from '@/components/kiloclaw/onboarding/complete-step';
 import { IdentityStep } from '@/components/kiloclaw/onboarding/identity-step';
 import { NotificationsStep } from '@/components/kiloclaw/onboarding/notifications-step';
@@ -45,79 +46,75 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
   if (errorCategory === 'access_conflict') {
     const warn = toneColor('warn');
     return (
-      <Animated.View
-        key="access-conflict"
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center gap-6 px-6"
-      >
-        <View
-          className={cn(
-            'h-24 w-24 items-center justify-center rounded-3xl border',
-            warn.tileBgClass,
-            warn.tileBorderClass
-          )}
-        >
-          <ShieldAlert size={40} color={colors.warn} />
-        </View>
-        <View className="items-center gap-2">
-          <Text variant="eyebrow" className="text-xs">
-            {t('kiloclaw.onboarding.flow.review')}
-          </Text>
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.onboarding.flow.manualReviewTitle')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.onboarding.flow.manualReviewBody')}
-          </Text>
-        </View>
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full"
-          onPress={() => {
-            void openExternalUrl(WEB_BASE_URL, { label: 'kilo.ai' });
-          }}
-          accessibilityRole="link"
-        >
-          <Text className="text-base">{t('kiloclaw.onboarding.flow.openKiloAi')}</Text>
-          <ExternalLink size={16} color={colors.foreground} />
-        </Button>
-      </Animated.View>
+      <CenteredState key="access-conflict">
+        <Animated.View entering={FadeIn.duration(200)} className="items-center gap-6 px-6">
+          <View
+            className={cn(
+              'h-24 w-24 items-center justify-center rounded-3xl border',
+              warn.tileBgClass,
+              warn.tileBorderClass
+            )}
+          >
+            <ShieldAlert size={40} color={colors.warn} />
+          </View>
+          <View className="items-center gap-2">
+            <Text variant="eyebrow" className="text-xs">
+              {t('kiloclaw.onboarding.flow.review')}
+            </Text>
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.onboarding.flow.manualReviewTitle')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.onboarding.flow.manualReviewBody')}
+            </Text>
+          </View>
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onPress={() => {
+              void openExternalUrl(WEB_BASE_URL, { label: 'kilo.ai' });
+            }}
+            accessibilityRole="link"
+          >
+            <Text className="text-base">{t('kiloclaw.onboarding.flow.openKiloAi')}</Text>
+            <ExternalLink size={16} color={colors.foreground} />
+          </Button>
+        </Animated.View>
+      </CenteredState>
     );
   }
 
   if (errorCategory === 'generic') {
     const danger = toneColor('danger');
     return (
-      <Animated.View
-        key="generic-error"
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center gap-6 px-6"
-      >
-        <View
-          className={cn(
-            'h-24 w-24 items-center justify-center rounded-3xl border',
-            danger.tileBgClass,
-            danger.tileBorderClass
-          )}
-        >
-          <AlertTriangle size={40} color={colors.destructive} />
-        </View>
-        <View className="items-center gap-2">
-          <Text variant="eyebrow" className="text-xs">
-            {t('kiloclaw.onboarding.flow.provisioning')}
-          </Text>
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.onboarding.flow.somethingWentWrong')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.onboarding.flow.genericErrorBody')}
-          </Text>
-        </View>
-        <Button size="lg" className="w-full" onPress={onRetry}>
-          <Text className="text-base">{t('common.tryAgain')}</Text>
-        </Button>
-      </Animated.View>
+      <CenteredState key="generic-error">
+        <Animated.View entering={FadeIn.duration(200)} className="items-center gap-6 px-6">
+          <View
+            className={cn(
+              'h-24 w-24 items-center justify-center rounded-3xl border',
+              danger.tileBgClass,
+              danger.tileBorderClass
+            )}
+          >
+            <AlertTriangle size={40} color={colors.destructive} />
+          </View>
+          <View className="items-center gap-2">
+            <Text variant="eyebrow" className="text-xs">
+              {t('kiloclaw.onboarding.flow.provisioning')}
+            </Text>
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.onboarding.flow.somethingWentWrong')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.onboarding.flow.genericErrorBody')}
+            </Text>
+          </View>
+          <Button size="lg" className="w-full" onPress={onRetry}>
+            <Text className="text-base">{t('common.tryAgain')}</Text>
+          </Button>
+        </Animated.View>
+      </CenteredState>
     );
   }
 

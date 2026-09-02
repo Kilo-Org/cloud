@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Lock } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
@@ -21,22 +20,21 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
   const { t } = useTranslation();
 
   return (
-    <View className="flex-1 bg-background">
-      <EmptyState
-        icon={Lock}
-        title={t('organization.permissionDenied.title')}
-        description={description}
-        action={
-          <Button
-            variant="outline"
-            onPress={() => {
-              router.back();
-            }}
-          >
-            <Text>{t('organization.permissionDenied.back')}</Text>
-          </Button>
-        }
-      />
-    </View>
+    <EmptyState
+      className="bg-background"
+      icon={Lock}
+      title={t('organization.permissionDenied.title')}
+      description={description}
+      action={
+        <Button
+          variant="outline"
+          onPress={() => {
+            router.back();
+          }}
+        >
+          <Text>{t('organization.permissionDenied.back')}</Text>
+        </Button>
+      }
+    />
   );
 }

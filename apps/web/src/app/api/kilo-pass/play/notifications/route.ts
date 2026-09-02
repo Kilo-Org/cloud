@@ -48,7 +48,16 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = GooglePlayNotificationBodySchema.safeParse(await request.json());
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      // A body that is not JSON can never become valid, so answer 400 and stop
+      // Pub/Sub from redelivering it.
+      return Response.json({ error: 'Missing Pub/Sub message data' }, { status: 400 });
+    }
+
+    const body = GooglePlayNotificationBodySchema.safeParse(rawBody);
     if (!body.success) {
       return Response.json({ error: 'Missing Pub/Sub message data' }, { status: 400 });
     }

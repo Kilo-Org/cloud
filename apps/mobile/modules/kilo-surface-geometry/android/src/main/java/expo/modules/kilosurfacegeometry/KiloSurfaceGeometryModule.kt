@@ -25,7 +25,6 @@ class KiloSurfaceGeometryModule : Module() {
 
   override fun definition() = ModuleDefinition {
     Name("KiloSurfaceGeometry")
-    Constant("isSupported") { true }
     Events("onSurfaceGeometryChange")
 
     AsyncFunction("observeSurface") { tag: Int ->
@@ -155,7 +154,7 @@ private class SurfaceGeometryObserver(
     val root = root.get()
     if (stopped || root == null) {
       stop()
-      return geometry(0f, 0f, 0f, 0f, 0f, 0f, 1.0)
+      return geometry(0f, 0f, 0f, 0f, 0f, 1.0)
     }
     val geometry = measure(root)
     if (geometry != previous) {
@@ -169,7 +168,7 @@ private class SurfaceGeometryObserver(
     val density = root.resources.displayMetrics.density.toDouble()
     val height = root.height.coerceAtLeast(0).toFloat()
     val toLocal = Matrix()
-    val empty = geometry(0f, 0f, height, 0f, 0f, 0f, density)
+    val empty = geometry(0f, 0f, height, 0f, 0f, density)
     if (!attached || !root.isAttachedToWindow) return empty
     if (!localToScreen(root).invert(toLocal)) return empty
     val windowRoot = root.rootView
@@ -194,7 +193,7 @@ private class SurfaceGeometryObserver(
     toLocal.mapRect(safeWindow)
     val safeTop = if (bars.top > 0) safeWindow.top.coerceIn(0f, height) else 0f
     val safeBottom = if (bars.bottom > 0) (height - safeWindow.bottom).coerceIn(0f, height) else 0f
-    val invisible = geometry(0f, 0f, height, safeTop, safeBottom, 0f, density)
+    val invisible = geometry(0f, 0f, height, safeTop, safeBottom, density)
     if (!root.isShown || root.windowVisibility != View.VISIBLE) return invisible
     val globalVisible = Rect()
     if (!root.getGlobalVisibleRect(globalVisible)) return invisible
@@ -214,7 +213,6 @@ private class SurfaceGeometryObserver(
       }
       ancestor = ancestor.parent as? View
     }
-    val beforeKeyboard = RectF(visible)
     if (dockedKeyboard) {
       val mode = (windowRoot.layoutParams as? WindowManager.LayoutParams)?.softInputMode
       val adjustsNothing = mode != null &&
@@ -223,11 +221,9 @@ private class SurfaceGeometryObserver(
       visible.bottom = keyboardTop.coerceIn(visible.top, visible.bottom)
     }
     toLocal.mapRect(visible)
-    toLocal.mapRect(beforeKeyboard)
     val top = visible.top.coerceIn(0f, height)
     val bottom = visible.bottom.coerceIn(top, height)
-    val overlap = (beforeKeyboard.bottom.coerceIn(top, height) - bottom).coerceAtLeast(0f)
-    return geometry(top, bottom, height, safeTop, safeBottom, overlap, density)
+    return geometry(top, bottom, height, safeTop, safeBottom, density)
   }
 
   private fun localToScreen(view: View): Matrix {
@@ -249,16 +245,14 @@ private class SurfaceGeometryObserver(
   }
 
   private fun geometry(
-    top: Float, bottom: Float, height: Float, safeTop: Float, safeBottom: Float,
-    overlap: Float, density: Double
+    top: Float, bottom: Float, height: Float, safeTop: Float, safeBottom: Float, density: Double
   ): Map<String, Any> = mapOf(
     "tag" to tag,
     "visibleTop" to top / density,
     "visibleBottom" to bottom / density,
     "boundsHeight" to height / density,
     "safeAreaTop" to safeTop / density,
-    "safeAreaBottom" to safeBottom / density,
-    "keyboardOverlap" to overlap / density
+    "safeAreaBottom" to safeBottom / density
   )
 
   fun stop() {

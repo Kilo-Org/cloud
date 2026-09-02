@@ -9,7 +9,6 @@ public final class KiloSurfaceGeometryModule: Module {
 
   public func definition() -> ModuleDefinition {
     Name("KiloSurfaceGeometry")
-    Constant("isSupported") { true }
     Events("onSurfaceGeometryChange")
 
     AsyncFunction("observeSurface") { (tag: Int) -> [String: Any] in
@@ -251,7 +250,7 @@ private final class SurfaceGeometryProbe: UIView {
     guard !stopped, let root, superview === root else {
       stop()
       return ["tag": observedTag, "visibleTop": 0.0, "visibleBottom": 0.0, "boundsHeight": 0.0,
-              "safeAreaTop": 0.0, "safeAreaBottom": 0.0, "keyboardOverlap": 0.0]
+              "safeAreaTop": 0.0, "safeAreaBottom": 0.0]
     }
     if observingWindow {
       observeAncestors()
@@ -275,8 +274,7 @@ private final class SurfaceGeometryProbe: UIView {
     let safeTop = min(height, max(0, root.safeAreaInsets.top))
     let safeBottom = min(height, max(0, root.safeAreaInsets.bottom))
     let empty = ["visibleTop": 0.0, "visibleBottom": 0.0, "boundsHeight": Double(height),
-                 "safeAreaTop": Double(safeTop), "safeAreaBottom": Double(safeBottom),
-                 "keyboardOverlap": 0.0]
+                 "safeAreaTop": Double(safeTop), "safeAreaBottom": Double(safeBottom)]
     guard observingWindow, let window = root.window, height > 0 else { return empty }
     var visible = root.bounds.intersection(root.convert(window.bounds, from: window))
     var ancestor: UIView? = root
@@ -308,8 +306,7 @@ private final class SurfaceGeometryProbe: UIView {
       "visibleBottom": Double(visibleBottom),
       "boundsHeight": Double(height),
       "safeAreaTop": Double(safeTop),
-      "safeAreaBottom": Double(safeBottom),
-      "keyboardOverlap": Double(bottom - visibleBottom)
+      "safeAreaBottom": Double(safeBottom)
     ]
   }
 

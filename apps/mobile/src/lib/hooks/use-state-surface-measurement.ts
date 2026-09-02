@@ -20,7 +20,6 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
   const [frame, setFrame] = useState<StateFrame | null>(null);
   const { width, height } = useWindowDimensions();
   const requestRef = useRef(0);
-  const mountedRef = useRef(true);
 
   const measure = useCallback(() => {
     const node = nodeRef.current;
@@ -32,7 +31,7 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
     }
     node.measureInWindow((...bounds) => {
       const [, y, , measuredHeight] = bounds;
-      if (!mountedRef.current || request !== requestRef.current) {
+      if (request !== requestRef.current) {
         return;
       }
       const top = y - (androidSheet ? node.scrollTop : 0);
@@ -62,10 +61,8 @@ export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive =
   );
 
   useLayoutEffect(() => {
-    mountedRef.current = true;
     measure();
     return () => {
-      mountedRef.current = false;
       requestRef.current += 1;
     };
   }, [measure, width, height]);

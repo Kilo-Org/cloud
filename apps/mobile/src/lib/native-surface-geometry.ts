@@ -7,7 +7,6 @@ export type NativeSurfaceGeometry = Readonly<{
   boundsHeight: number;
   safeAreaTop: number;
   safeAreaBottom: number;
-  keyboardOverlap: number;
 }>;
 
 type SurfaceGeometryEvents = {
@@ -15,26 +14,22 @@ type SurfaceGeometryEvents = {
 };
 
 type SurfaceGeometryModule = InstanceType<typeof NativeModule<SurfaceGeometryEvents>> & {
-  isSupported: boolean;
   observeSurface: (nativeViewTag: number) => Promise<NativeSurfaceGeometry>;
   unobserveSurface: (nativeViewTag: number) => Promise<void>;
 };
 
 const nativeModule = requireOptionalNativeModule<SurfaceGeometryModule>('KiloSurfaceGeometry');
 
-export const isNativeSurfaceGeometryAvailable = nativeModule?.isSupported === true;
+export const isNativeSurfaceGeometryAvailable = nativeModule !== null;
 
 export function addSurfaceGeometryListener(
   listener: (geometry: NativeSurfaceGeometry) => void
 ): { remove: () => void } | null {
-  if (!isNativeSurfaceGeometryAvailable) {
-    return null;
-  }
   return nativeModule?.addListener('onSurfaceGeometryChange', listener) ?? null;
 }
 
 export async function observeSurface(nativeViewTag: number): Promise<NativeSurfaceGeometry> {
-  if (!nativeModule || !isNativeSurfaceGeometryAvailable) {
+  if (!nativeModule) {
     throw new Error(
       'Native surface geometry requires a rebuilt iOS or Android development client.'
     );

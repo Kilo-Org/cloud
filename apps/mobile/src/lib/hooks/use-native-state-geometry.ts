@@ -23,7 +23,6 @@ function sameGeometry(left: NativeSurfaceGeometry | null, right: NativeSurfaceGe
     left.visibleTop === right.visibleTop &&
     left.visibleBottom === right.visibleBottom &&
     left.boundsHeight === right.boundsHeight &&
-    left.keyboardOverlap === right.keyboardOverlap &&
     left.safeAreaTop === right.safeAreaTop &&
     left.safeAreaBottom === right.safeAreaBottom
   );
@@ -51,10 +50,12 @@ export function useNativeStateGeometry(node: View | null) {
       return undefined;
     }
     let active = true;
+    let receivedGeometry = false;
     const publish = (geometry: NativeSurfaceGeometry) => {
       if (!active || geometry.tag !== tag) {
         return;
       }
+      receivedGeometry = true;
       const valid =
         Number.isFinite(geometry.visibleTop) &&
         Number.isFinite(geometry.visibleBottom) &&
@@ -82,7 +83,10 @@ export function useNativeStateGeometry(node: View | null) {
     const listener = addSurfaceGeometryListener(publish);
     const start = async () => {
       try {
-        publish(await observeSurface(tag));
+        const geometry = await observeSurface(tag);
+        if (!receivedGeometry) {
+          publish(geometry);
+        }
       } catch (error) {
         if (active) {
           setObservation({

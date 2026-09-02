@@ -57,7 +57,6 @@ const snapshot = (tag = 41): NativeSurfaceGeometry => ({
   boundsHeight: 800,
   safeAreaTop: 20,
   safeAreaBottom: 34,
-  keyboardOverlap: 0,
 });
 
 async function mount() {
@@ -155,6 +154,8 @@ describe('useNativeStateGeometry', () => {
   it('accepts its initial snapshot and ignores other native roots', async () => {
     const mounted = await mount();
     expect(mounted.read()?.status).toBe('pending');
+    mounted.emit(snapshot(42));
+    expect(mounted.read()?.status).toBe('pending');
     await mounted.resolve(41);
     expect(mounted.read()).toMatchObject({ status: 'ready', geometry: snapshot() });
     const previous = mounted.read();
@@ -163,6 +164,19 @@ describe('useNativeStateGeometry', () => {
     mounted.emit(snapshot());
     expect(mounted.read()).toBe(previous);
     mounted.unmount();
+  });
+
+  it('keeps a newer event when the startup snapshot resolves later', async () => {
+    const mounted = await mount();
+    try {
+      const geometry = { ...snapshot(), visibleBottom: 500 };
+      mounted.emit(geometry);
+      expect(mounted.read()).toMatchObject({ status: 'ready', geometry });
+      await mounted.resolve(41);
+      expect(mounted.read()).toMatchObject({ status: 'ready', geometry });
+    } finally {
+      mounted.unmount();
+    }
   });
 
   it('ignores an old snapshot after the root changes', async () => {
@@ -200,10 +214,14 @@ describe('useNativeStateGeometry', () => {
     await mounted.resolve(41);
     mounted.emit({ ...snapshot(), visibleBottom: 0 });
     expect(mounted.read()?.geometry?.visibleBottom).toBe(0);
-    mounted.emit({ ...snapshot(), visibleBottom: 500, keyboardOverlap: 300 });
+    mounted.emit({ ...snapshot(), visibleBottom: 500 });
     expect(mounted.read()?.geometry?.visibleBottom).toBe(500);
-    expect(native.observe).toHaveBeenCalledTimes(1);
+    expect(native.observe).toHaveBeenCalledExactlyOnceWith(41);
+    expect(native.listeners.size).toBe(1);
+    expect(native.unobserve).not.toHaveBeenCalled();
     mounted.unmount();
+    expect(native.listeners.size).toBe(0);
+    expect(native.unobserve).toHaveBeenCalledExactlyOnceWith(41);
   });
 
   it('rejects non-finite native bounds', async () => {

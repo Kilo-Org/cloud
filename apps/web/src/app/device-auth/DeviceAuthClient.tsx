@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signOut } from 'next-auth/react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,14 +54,10 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
   const shellClassName = getDeviceAuthShellClassName(isAppMode);
   const outcomeHeaderClassName = getDeviceAuthOutcomeHeaderClassName();
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setIsSigningOut(true);
-
-    try {
-      await fetch('/api/auth/revoke-web-session', { method: 'POST' });
-    } finally {
-      await signOut({ callbackUrl: getDeviceAuthSignInUrl(code, { app: isAppMode }) });
-    }
+    const callbackUrl = getDeviceAuthSignInUrl(code, { app: isAppMode });
+    window.location.assign(`/users/sign_out?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   };
 
   const redirectToSignIn = () => {

@@ -1078,6 +1078,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/users/sign_in',
     error: '/users/sign_in',
+    signOut: '/users/sign_out',
   },
   debug: !!getEnvVariable('DEBUG_AUTH'),
 };

@@ -102,6 +102,13 @@ import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@/lib/web-session-revocation';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+  type KiloCredentialExchangeEligibilityPolicy,
+} from '@kilocode/worker-utils/kilo-token-policy';
 
 export type TurnstileJwtPayload = {
   /**
@@ -1128,6 +1135,81 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   return result;
 }
 
+export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession({ adminOnly: false }, db);
+}
+
+export async function getUserFromSessionForCredentialIssuanceOrRedirect(
+  loggedOutRedirectUrl = '/users/sign_in'
+): Promise<User> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+
+  const { user } = await resolveUserFromSession(
+    { adminOnly: false, DANGEROUS_allowBlockedUsers: true },
+    db
+  );
+  if (!user) {
+    redirect(await appendCallbackPath(loggedOutRedirectUrl));
+  }
+  if (user.blocked_reason) {
+    redirect('/account-blocked');
+  }
+  return user;
+}
+
+export async function getUserFromBearerForCredentialExchange(
+  requestHeaders: Headers,
+  policy: KiloCredentialExchangeEligibilityPolicy
+): Promise<GetAuthResponse> {
+  const token = extractBearerToken(requestHeaders.get('authorization'));
+  if (!token) return authError(401, 'Unauthorized', '?');
+
+  let auth: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
+  try {
+    auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+  } catch {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  if (auth.claims.env !== process.env.NODE_ENV) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+
+  const user = await findUserById(auth.userId, db);
+  if (
+    auth.claims.apiTokenPepper === undefined ||
+    auth.claims.apiTokenPepper !== user?.api_token_pepper
+  ) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+
+  const result = await validateUserAuthorization(
+    auth.userId,
+    user,
+    { adminOnly: false },
+    false,
+    undefined,
+    undefined,
+    db
+  );
+  if (!result.user) return result;
+  if (!isKiloCredentialExchangeEligible(auth, policy)) {
+    return authError(401, 'Unauthorized', auth.userId);
+  }
+  return result;
+}
+
 async function resolveUserFromAuth(
   opts: RequiredPermissions,
   headersList: Awaited<ReturnType<typeof headers>>
@@ -1169,12 +1251,19 @@ async function resolveUserFromAuth(
     );
   }
 
+  return resolveUserFromSession(opts, readDb);
+}
+
+async function resolveUserFromSession(
+  opts: RequiredPermissions,
+  fromDb: typeof db
+): Promise<GetAuthResponse> {
   const session = await getServerSession(authOptions);
   const maybeKiloUserId = session?.kiloUserId;
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
 
-  const user = await findUserById(maybeKiloUserId, readDb);
+  const user = await findUserById(maybeKiloUserId, fromDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
   if (!isWebSessionCurrent(session.webSessionPepper, user))
@@ -1188,7 +1277,7 @@ async function resolveUserFromAuth(
     session.isNewUser,
     undefined,
     undefined,
-    readDb
+    fromDb
   );
 }
 

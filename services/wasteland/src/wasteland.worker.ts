@@ -12,7 +12,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { AuthVariables } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
-import { validateCfAccessRequest } from './middleware/cf-access.middleware';
+import { validateCfAccessRequest } from '@kilocode/worker-utils/cf-access';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';

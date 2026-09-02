@@ -523,6 +523,35 @@ export const createSessionResponseV1Schema = z
 export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Schema>;
 
 // ---------------------------------------------------------------------------
+// Remote CLI directory listing (list_directories)
+// ---------------------------------------------------------------------------
+
+const REMOTE_DIRECTORY_MAX_ENTRIES = 256;
+const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
+
+const remoteDirectoryEntrySchema = z
+  .object({
+    name: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+    path: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+  })
+  .strict();
+
+/**
+ * Strict `list_directories` success body (protocol v1). The CLI returns the
+ * resolved listing path and up to 256 contained directory entries. Anything
+ * outside this envelope — extra keys, an over-limit entry array, an empty or
+ * over-length entry string, or protocol drift — fails closed as `invalid`.
+ */
+export const listDirectoriesV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    path: z.string(),
+    directories: z.array(remoteDirectoryEntrySchema).max(REMOTE_DIRECTORY_MAX_ENTRIES),
+  })
+  .strict();
+export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
+
+// ---------------------------------------------------------------------------
 // V2 session system events
 // ---------------------------------------------------------------------------
 
@@ -539,6 +568,7 @@ export const sessionEventV2RowSchema = z.object({
   gitUrl: z.string().nullable(),
   gitBranch: z.string().nullable(),
   parentSessionId: z.string().nullable(),
+  worktreeId: z.string().nullable().optional(),
   status: sessionStatusValueSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
 });

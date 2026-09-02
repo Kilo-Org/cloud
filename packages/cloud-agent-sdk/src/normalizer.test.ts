@@ -1345,6 +1345,30 @@ describe('normalize', () => {
   });
 
   describe('connected', () => {
+    it.each(['active-message', null])(
+      'retains authoritative active identity %p',
+      activeMessageId => {
+        expect(normalize(createRaw('connected', { activeMessageId }))).toEqual({
+          type: 'connected',
+          activeMessageId,
+        });
+      }
+    );
+
+    it.each([42, false, { id: 'active-message' }])(
+      'ignores malformed active identity %p',
+      activeMessageId => {
+        expect(
+          normalize(
+            createRaw('connected', {
+              activeMessageId,
+              sessionStatus: { type: 'busy' },
+            })
+          )
+        ).toEqual({ type: 'connected', sessionStatus: { type: 'busy' } });
+      }
+    );
+
     it('normalizes with sessionStatus only', () => {
       const result = normalize(
         createRaw('connected', {
@@ -1625,6 +1649,22 @@ describe('normalize', () => {
   });
 
   describe('cloud.message.failed', () => {
+    it('retains explicit non-acceptance without requiring delivery', () => {
+      expect(
+        normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted: false }))
+      ).toMatchObject({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        accepted: false,
+      });
+    });
+
+    it.each(['false', 0, null])('does not coerce malformed acceptance %p', accepted => {
+      expect(
+        normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted }))
+      ).not.toHaveProperty('accepted');
+    });
+
     it('maps queued interrupted payload to reason=interrupted', () => {
       const result = normalize(
         createRaw('cloud.message.failed', {
@@ -1639,6 +1679,7 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: 'exe',
+        delivery: 'queued',
         error: 'Pending queued message interrupted by user',
         reason: 'interrupted',
         attempts: undefined,
@@ -1659,6 +1700,7 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: 'exe',
+        delivery: 'queued',
         error: 'flush failed',
         reason: 'exhausted',
         attempts: 5,
@@ -1680,6 +1722,8 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: 'exe',
+        delivery: 'sent',
+        accepted: true,
         error: 'boom',
         reason: 'execution',
         attempts: undefined,
@@ -1702,6 +1746,8 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: 'exe',
+        delivery: 'sent',
+        accepted: true,
         error: 'Execution was interrupted',
         reason: 'interrupted',
         attempts: undefined,
@@ -1716,6 +1762,7 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: undefined,
+        delivery: 'sent',
         error: 'Message delivery failed',
         reason: 'execution',
         attempts: undefined,
@@ -1735,6 +1782,7 @@ describe('normalize', () => {
         type: 'cloud.message.failed',
         messageId: 'msg',
         executionId: undefined,
+        delivery: 'queued',
         error: 'Underlying failure',
         reason: 'exhausted',
         attempts: 5,

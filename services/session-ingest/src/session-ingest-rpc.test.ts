@@ -50,12 +50,17 @@ vi.mock('./services/user-session-admission', () => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import {
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  cloudAgentWorktreeIdSchema,
   messageIdSchema,
   partIdSchema,
   validateKiloSdkMessagesCursor,
@@ -142,11 +147,38 @@ function makeRootWriteDb(params: {
     onConflictDoNothing: vi.fn(() => insert),
     returning: vi.fn(async () => (params.created ? [params.created] : [])),
   };
+  let worktree: Record<string, unknown> | undefined;
+  let selectedTable: unknown;
   const select = {
-    from: vi.fn(() => select),
+    from: vi.fn((table: unknown) => {
+      selectedTable = table;
+      return select;
+    }),
+    innerJoin: vi.fn(() => select),
     where: vi.fn(() => select),
     limit: vi.fn(() => select),
-    for: vi.fn(async () => (params.existing ? [params.existing] : [])),
+    for: vi.fn(async () =>
+      selectedTable === cloud_agent_worktrees
+        ? worktree
+          ? [worktree]
+          : []
+        : params.existing
+          ? [params.existing]
+          : []
+    ),
+    then: (resolve: (rows: unknown[]) => unknown) =>
+      resolve(selectedTable === organization_memberships ? [{ id: 'membership' }] : []),
+  };
+  const worktreeInsert = {
+    values: (values: Record<string, unknown>) => {
+      worktree = {
+        ...values,
+        deletion_started_at: null,
+        deletion_completed_at: null,
+        runtime_locations: [],
+      };
+      return { onConflictDoNothing: async () => undefined };
+    },
   };
   const updateSet = vi.fn((_values: unknown) => update);
   const update = {
@@ -155,7 +187,7 @@ function makeRootWriteDb(params: {
     returning: vi.fn(async () => (params.existing ? [params.existing] : [])),
   };
   const tx = {
-    insert: vi.fn(() => insert),
+    insert: vi.fn((table: unknown) => (table === cloud_agent_worktrees ? worktreeInsert : insert)),
     select: vi.fn(() => select),
     update: vi.fn(() => update),
   };
@@ -165,6 +197,23 @@ function makeRootWriteDb(params: {
     updateSet,
   };
 }
+
+describe('cloudAgentWorktreeIdSchema', () => {
+  it('accepts a canonical worktree UUID', () => {
+    expect(cloudAgentWorktreeIdSchema.parse('worktree_11111111-1111-4111-8111-111111111111')).toBe(
+      'worktree_11111111-1111-4111-8111-111111111111'
+    );
+  });
+
+  it.each([
+    'workspace_11111111-1111-4111-8111-111111111111',
+    'worktree_11111111-1111-4111-8111-111111111111/../other',
+    'worktree_11111111-1111-1111-1111-111111111111',
+    'worktree_11111111-1111-4111-8111-11111111111',
+  ])('rejects malformed worktree ID %s', value => {
+    expect(cloudAgentWorktreeIdSchema.safeParse(value).success).toBe(false);
+  });
+});
 
 describe('createSessionForCloudAgent', () => {
   const params = {
@@ -198,8 +247,44 @@ describe('createSessionForCloudAgent', () => {
       expect.objectContaining({
         cloud_agent_session_id: params.cloudAgentSessionId,
         cloud_agent_session_scope_id: params.cloudAgentSessionId,
+        cloud_agent_worktree_id: null,
       })
     );
+  });
+
+  it('persists the worktree ID when creating a grouped root', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      cloud_agent_worktree_id: cloudAgentWorktreeId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, cloudAgentWorktreeId });
+
+    expect(fake.values).toHaveBeenCalledWith(
+      expect.objectContaining({ cloud_agent_worktree_id: cloudAgentWorktreeId })
+    );
+  });
+
+  it('rejects a malformed worktree ID before any session write', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        ...params,
+        cloudAgentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111/../other',
+      })
+    ).rejects.toThrow();
+    expect(fake.values).not.toHaveBeenCalled();
   });
 
   it('refuses to claim an existing non-Cloud-Agent session as a root', async () => {
@@ -286,6 +371,70 @@ describe('createSessionForCloudAgent', () => {
     });
     expect(fake.values).toHaveBeenCalledTimes(1);
   });
+
+  it('accepts an idempotent retry with the same immutable worktree', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const existing = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      cloud_agent_worktree_id: cloudAgentWorktreeId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+    };
+    const fake = makeRootWriteDb({ existing });
+    const rpc = makeRpc(fake.db as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({ ...params, cloudAgentWorktreeId })
+    ).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    expect(fake.updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cloud_agent_worktree_id: expect.anything() })
+    );
+  });
+
+  it.each([
+    {
+      stored: null,
+      requested: 'worktree_11111111-1111-4111-8111-111111111111',
+    },
+    {
+      stored: 'worktree_11111111-1111-4111-8111-111111111111',
+      requested: undefined,
+    },
+    {
+      stored: 'worktree_11111111-1111-4111-8111-111111111111',
+      requested: 'worktree_22222222-2222-4222-8222-222222222222',
+    },
+  ] as const)(
+    'refuses to change an existing root worktree from $stored to $requested',
+    async values => {
+      const fake = makeRootWriteDb({
+        existing: {
+          session_id: params.sessionId,
+          kilo_user_id: params.kiloUserId,
+          cloud_agent_session_id: params.cloudAgentSessionId,
+          cloud_agent_session_scope_id: params.cloudAgentSessionId,
+          cloud_agent_worktree_id: values.stored,
+          organization_id: params.organizationId,
+          parent_session_id: null,
+        },
+      });
+      const rpc = makeRpc(fake.db as never);
+
+      await expect(
+        rpc.createSessionForCloudAgent({
+          ...params,
+          ...(values.requested === undefined ? {} : { cloudAgentWorktreeId: values.requested }),
+        })
+      ).rejects.toThrow('Cloud Agent root session identity conflict');
+      expect(fake.updateSet).not.toHaveBeenCalled();
+    }
+  );
 
   it('accepts an idempotent retry for a personal root', async () => {
     const { organizationId: _organizationId, ...personalParams } = params;
@@ -428,6 +577,7 @@ describe('createSessionForCloudAgent clone path', () => {
   const destinationSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
   const kiloUserId = 'usr_test';
   const organizationId = '11111111-1111-4111-8111-111111111111';
+  const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
 
   type CloneItem = {
     itemId: string;
@@ -1069,6 +1219,89 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(r2.put).not.toHaveBeenCalled();
     expect(values).not.toHaveBeenCalled();
   });
+
+  it('rejects a destination claimed by another worktree before cloning', async () => {
+    const sourceStub = makePagedSourceStub([], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      destinationRows: [
+        {
+          ...createdRow,
+          cloud_agent_worktree_id: 'worktree_22222222-2222-4222-8222-222222222222',
+        },
+      ],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(
+      rpc.createSessionForCloudAgent(cloneParams({ cloudAgentWorktreeId }))
+    ).resolves.toEqual({ status: 'rejected', code: 'destination_conflict' });
+    expect(dest.stub.inspectCloneStage).not.toHaveBeenCalled();
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it('reconciles an ambiguously committed clone only when its worktree matches', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, selectResult } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      destinationRows: [{ ...createdRow, cloud_agent_worktree_id: cloudAgentWorktreeId }],
+      insertError: new Error('postgres outcome unknown'),
+    });
+    selectResult.mockResolvedValueOnce([]);
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(
+      rpc.createSessionForCloudAgent(cloneParams({ cloudAgentWorktreeId }))
+    ).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 1 },
+    });
+    expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      identity: 'worktree',
+      overrides: { cloud_agent_worktree_id: 'worktree_22222222-2222-4222-8222-222222222222' },
+    },
+    {
+      identity: 'organization',
+      overrides: {
+        cloud_agent_worktree_id: cloudAgentWorktreeId,
+        organization_id: '22222222-2222-4222-8222-222222222222',
+      },
+    },
+    {
+      identity: 'session scope',
+      overrides: {
+        cloud_agent_worktree_id: cloudAgentWorktreeId,
+        cloud_agent_session_scope_id: 'another-session-scope',
+      },
+    },
+  ])(
+    'rejects an ambiguously committed clone with another $identity without clearing it',
+    async ({ overrides }) => {
+      const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);
+      const dest = makeDestinationStub();
+      const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+      const { db, selectResult } = makeCloneDb({
+        sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+        destinationRows: [{ ...createdRow, ...overrides }],
+        insertError: new Error('postgres outcome unknown'),
+      });
+      selectResult.mockResolvedValueOnce([]);
+      const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloudAgentWorktreeId }))
+      ).resolves.toEqual({ status: 'rejected', code: 'destination_conflict' });
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+    }
+  );
 
   it('resets the destination stage and rethrows when the insert fails without committing', async () => {
     const sourceStub = makePagedSourceStub([sourceSessionItem()], 100);

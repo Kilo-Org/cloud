@@ -158,6 +158,7 @@ type ApiSession = {
   git_url: string | null;
   git_branch: string | null;
   cloud_agent_session_id: string | null;
+  cloud_agent_worktree_id?: string | null;
   created_on_platform: string | null;
   created_at: string;
   updated_at: string;
@@ -180,6 +181,7 @@ export type DbSession = {
   git_url: string | null;
   git_branch: string | null;
   cloud_agent_session_id: string | null;
+  cloud_agent_worktree_id?: string | null;
   created_on_platform: string | null;
   created_at: Date;
   updated_at: Date;
@@ -200,6 +202,7 @@ export type DbSessionV2 = {
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;
+  cloud_agent_worktree_id?: string | null;
   created_on_platform: string | null;
   organization_id: string | null;
   git_url: string | null;

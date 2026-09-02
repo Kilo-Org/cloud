@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
 
 import {
   ActiveSessionsLiveSync,
@@ -37,14 +39,14 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     });
     sync.attach();
 
-    const pending = refreshActiveSessionsNow();
+    const pending = refreshActiveSessionsNow(QUERY_KEY);
     await sync.getFetchQueue();
     expect(qc.__hasPendingFetch()).toBe(true);
     expect(qc.fetchQueryCalls).toBe(1);
 
     qc.__triggerFetchResolve({ sessions: [makeCached({ createdOnPlatform: 'cli' })] });
     const result = await pending;
-    expect(result).toBe(true);
+    expect(result).toEqual({ accepted: true });
     expect(qc.__getCached()?.sessions[0]?.id).toBe('a1');
   });
 
@@ -61,7 +63,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     sync.attach();
 
     let settled = false;
-    const pending = refreshActiveSessionsNow();
+    const pending = refreshActiveSessionsNow(QUERY_KEY);
     // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return
     void pending.then(() => {
       settled = true;
@@ -76,43 +78,48 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     expect(settled).toBe(true);
   });
 
-  it('stays pending across a write that cancels the manual fetch', async () => {
+  it('waits for an accepted replacement when cancellation fulfills with cached data', async () => {
     const conn = makeConnection();
-    const qc = makeFakeQueryClient();
-    const queryFn = makeQueryFn();
+    const cached = { sessions: [makeCached({ createdOnPlatform: 'cli' })] };
+    const qc = makeFakeQueryClient(cached);
+    const query = qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    const before = getActiveSessionsQueryMetadata(query);
     sync = new ActiveSessionsLiveSync({
       connection: conn,
       queryClient: qc,
       queryKey: QUERY_KEY,
-      queryFn,
+      queryFn: makeQueryFn(),
     });
     sync.attach();
 
-    const settledFlag = { value: false };
-    const pending = refreshActiveSessionsNow();
-    // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return
-    void pending.then(() => {
-      settledFlag.value = true;
-    });
+    let settled = false;
+    const fetchSpy = vi.spyOn(qc, 'fetchQuery');
+    const pending = (async () => {
+      const result = await refreshActiveSessionsNow(QUERY_KEY);
+      settled = true;
+      return result;
+    })();
     await sync.getFetchQueue();
-    expect(qc.fetchQueryCalls).toBe(1);
-
-    const disconnected: SystemEvent = {
-      event: 'cli.disconnected',
-      data: { connectionId: 'c1' },
-    };
-    conn.__fireSystem(disconnected);
+    const canceledFetch = fetchSpy.mock.results[0]?.value;
+    conn.__fireSystem({ event: 'cli.disconnected', data: { connectionId: 'c1' } });
     await sync.getWriteQueue();
     await sync.getFetchQueue();
 
-    expect(qc.fetchQueryCalls).toBe(2);
+    expect(await canceledFetch).toEqual(cached);
+    expect(getActiveSessionsQueryMetadata(query)).toBe(before);
+    expect(qc.__getCached()?.sessions).toEqual([]);
+    expect(sync.getPendingReasons()).toContain('manual');
     expect(qc.__hasPendingFetch()).toBe(true);
-    expect(settledFlag.value).toBe(false);
+    expect(settled).toBe(false);
 
-    qc.__triggerFetchResolve({ sessions: [makeCached({ createdOnPlatform: 'cli' })] });
-    await pending;
-    expect(settledFlag.value).toBe(true);
-    expect(qc.__getCached()?.sessions[0]?.id).toBe('a1');
+    qc.__triggerFetchResolve(cached);
+    expect(await pending).toEqual({ accepted: true });
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(
+      before.acceptedRevision + 1
+    );
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(settled).toBe(true);
+    expect(qc.__getCached()).toEqual(cached);
   });
 
   it('refetches after a failed refresh left a reason pending', async () => {
@@ -144,14 +151,14 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
 
     // Manual refresh kicks a new fetch that clears the stuck reason.
     const previousCalls = qc.fetchQueryCalls;
-    const pending = refreshActiveSessionsNow();
+    const pending = refreshActiveSessionsNow(QUERY_KEY);
     await sync.getFetchQueue();
     expect(qc.fetchQueryCalls).toBe(previousCalls + 1);
     expect(qc.__hasPendingFetch()).toBe(true);
 
     qc.__triggerFetchResolve({ sessions: [makeCached({ createdOnPlatform: 'cli' })] });
     const result = await pending;
-    expect(result).toBe(true);
+    expect(result).toEqual({ accepted: true });
     expect(qc.__getCached()?.sessions[0]?.id).toBe('a1');
   });
 
@@ -169,7 +176,7 @@ describe('ActiveSessionsLiveSync — manual refresh', () => {
     sync.detach();
 
     const prevCalls = qc.fetchQueryCalls;
-    const result = await refreshActiveSessionsNow();
+    const result = await refreshActiveSessionsNow(QUERY_KEY);
     expect(result).toBe(false);
     expect(qc.fetchQueryCalls).toBe(prevCalls);
   });

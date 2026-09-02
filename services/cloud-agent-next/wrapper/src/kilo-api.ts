@@ -2,19 +2,18 @@
  * Adapter between the wrapper and the @kilocode/sdk client.
  *
  * Provides a stable `WrapperKiloClient` interface that all wrapper modules use.
- * Session methods use the v1 SDK client (passed in from main.ts, which uses
- * createKilo() from the root @kilocode/sdk). Global event subscription,
- * question reply/reject, and commit message use a v2 client created
- * internally from the same server URL. Permission reply POSTs
- * /permission/{id}/reply directly so it can carry `interactive` — the pinned
- * SDK client strips unknown body keys.
- *
  * The raw SDK client is not exposed on the returned interface — all access
  * goes through named methods.
  */
 
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
-import { createKiloClient as createV2Client } from '@kilocode/sdk/v2';
+import {
+  createKiloClient as createV2Client,
+  type PermissionRequest,
+  type QuestionRequest,
+  type SessionCommandResponse,
+  type SessionPromptResponse,
+} from '@kilocode/sdk/v2';
 import { logToFile } from './utils.js';
 import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
 
@@ -147,28 +146,21 @@ function exactDedupedModelKeys(data: unknown, providerID: string): string[] {
   );
 }
 
-function formatSdkError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-
-  if (isRecord(error) && typeof error.message === 'string') {
-    return error.message;
-  }
-
-  try {
-    return JSON.stringify(error) ?? String(error);
-  } catch {
-    return String(error);
-  }
+function formatSdkError(result: { response?: Response }): string {
+  return result.response ? `HTTP ${result.response.status}` : 'request error';
 }
 
-function requireSdkData<T>(result: { data?: T; error?: unknown }, operation: string): T {
+function requireSdkData<T>(
+  result: { data?: T; error?: unknown; response?: Response },
+  operation: string
+): T {
   if (result.error !== undefined) {
-    throw new Error(`${operation} failed: ${formatSdkError(result.error)}`, {
+    throw new Error(`${operation} failed: ${formatSdkError(result)}`, {
       cause: result.error,
     });
   }
 
-  if (result.data === undefined) {
+  if (result.data === undefined || result.data === null || result.response?.status === 204) {
     throw new Error(`${operation} returned no data`);
   }
 
@@ -221,6 +213,23 @@ export type KiloEvent = {
   properties?: Record<string, unknown>;
 };
 
+type PromptOptions = {
+  sessionId: string;
+  messageId: string;
+  parts?: Array<
+    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
+  >;
+  prompt?: string;
+  variant?: string;
+  agent?: string;
+  model?: { providerID?: string; modelID: string };
+  system?: string;
+  tools?: Record<string, boolean>;
+  snapshotInitialization?: 'wait';
+  directory?: string;
+  signal?: AbortSignal;
+};
+
 /**
  * The wrapper's unified kilo client interface.
  * All wrapper modules depend on this type rather than the raw SDK client.
@@ -228,71 +237,74 @@ export type KiloEvent = {
 export type WrapperKiloClient = {
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
-  ensureSession: (sessionId: string, directory: string) => Promise<void>;
-  sendPromptAsync: (opts: {
+  ensureSession: (sessionId: string, directory: string, signal?: AbortSignal) => Promise<void>;
+  sendPrompt: (opts: PromptOptions) => Promise<SessionPromptResponse>;
+  sendPromptAsync: (opts: PromptOptions) => Promise<void>;
+  abortSession: (opts: {
     sessionId: string;
-    messageId: string;
-    parts?: Array<
-      | { type: 'text'; text: string }
-      | { type: 'file'; mime: string; url: string; filename?: string }
-    >;
-    prompt?: string;
-    variant?: string;
-    agent?: string;
-    model?: { providerID?: string; modelID: string };
-    system?: string;
-    tools?: Record<string, boolean>;
-    snapshotInitialization?: 'wait';
-  }) => Promise<void>;
-  abortSession: (opts: { sessionId: string }) => Promise<boolean>;
+    directory?: string;
+    signal?: AbortSignal;
+  }) => Promise<boolean>;
   summarizeSession: (opts: {
     sessionId: string;
     model: { providerID?: string; modelID: string };
     auto?: boolean;
+    directory?: string;
+    signal?: AbortSignal;
   }) => Promise<boolean>;
   sendCommand: (opts: {
     sessionId: string;
     command: string;
     args?: string;
     messageId?: string;
+    agent?: string;
+    model?: { providerID?: string; modelID: string };
+    variant?: string;
     snapshotInitialization?: 'wait';
-  }) => Promise<unknown>;
+    directory?: string;
+    signal?: AbortSignal;
+  }) => Promise<SessionCommandResponse>;
   /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
   listCommands: () => Promise<SlashCommandInfo[]>;
   answerPermission: (
     permissionId: string,
     response: PermissionResponse,
     message?: string,
-    interactive?: boolean
+    interactive?: boolean,
+    directory?: string,
+    signal?: AbortSignal
   ) => Promise<boolean>;
-  answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
-  rejectQuestion: (questionId: string) => Promise<boolean>;
-  getSessionStatuses: () => Promise<Record<string, { type: string; [key: string]: unknown }>>;
-  getQuestions: () => Promise<
-    Array<{ id: string; sessionID: string; tool?: { messageID: string; callID: string } }>
-  >;
-  getPermissions: () => Promise<
-    Array<{
-      id: string;
-      sessionID: string;
-      permission: string;
-      patterns: string[];
-      metadata: Record<string, unknown>;
-      always: string[];
-      tool?: { messageID: string; callID: string };
-    }>
-  >;
+  answerQuestion: (
+    questionId: string,
+    answers: string[][],
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<boolean>;
+  rejectQuestion: (
+    questionId: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<boolean>;
+  getSessionStatuses: (
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
+  getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
+  getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   listEffectiveModels: (providerID: string) => Promise<string[]>;
-  generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
+  generateCommitMessage: (opts: {
+    path: string;
+    signal?: AbortSignal;
+  }) => Promise<{ message: string }>;
   createPty: (opts: {
     cwd: string;
     title: string;
     env: Record<string, string>;
   }) => Promise<WrapperPty>;
-  resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
-  deletePty: (ptyId: string) => Promise<boolean>;
+  resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
+  deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
 
   /**
    * Subscribe to kilo events. The stream yields typed events until the abort
@@ -309,18 +321,43 @@ export type WrapperKiloClient = {
 // Implementation
 // ---------------------------------------------------------------------------
 
-/**
- * Create a WrapperKiloClient. Session operations use the v1 sdkClient (from
- * createKilo()). Event, permission, question, and commitMessage operations use
- * a v2 client created from the same server URL.
- */
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
   serverUrl: string,
   workspacePath: string
 ): WrapperKiloClient {
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl });
+  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
+
+  function promptParameters(opts: PromptOptions) {
+    const rawParts =
+      opts.parts ?? (opts.prompt ? [{ type: 'text' as const, text: opts.prompt }] : []);
+    return {
+      sessionID: opts.sessionId,
+      directory: opts.directory ?? workspacePath,
+      messageID: opts.messageId,
+      parts: rawParts.map(part =>
+        part.type === 'file'
+          ? {
+              type: 'file' as const,
+              mime: part.mime,
+              url: part.url,
+              ...(part.filename ? { filename: part.filename } : {}),
+            }
+          : { type: 'text' as const, text: part.text }
+      ),
+      ...(opts.variant ? { variant: opts.variant } : {}),
+      ...(opts.model
+        ? { model: { providerID: opts.model.providerID ?? 'kilo', modelID: opts.model.modelID } }
+        : {}),
+      ...(opts.system ? { system: opts.system } : {}),
+      ...(opts.tools ? { tools: opts.tools } : {}),
+      ...(opts.agent ? { agent: opts.agent } : {}),
+      ...(opts.snapshotInitialization
+        ? { snapshotInitialization: opts.snapshotInitialization }
+        : {}),
+    };
+  }
 
   return {
     serverUrl,
@@ -335,143 +372,139 @@ export function createWrapperKiloClient(
     createSession: async opts => {
       const result = await sdkClient.session.create({
         body: { title: opts?.title },
+        query: { directory: workspacePath },
       });
-      if (!result.data) {
-        throw new Error('Session create returned no data');
-      }
-      return { id: result.data.id };
+      const data = requireSdkData(result, 'Session create');
+      return { id: data.id };
     },
 
     getSession: async sessionId => {
       const result = await sdkClient.session.get({
         path: { id: sessionId },
+        query: { directory: workspacePath },
       });
-      if (!result.data) {
-        throw new Error(`Session get returned no data for ${sessionId}`);
-      }
-      return { id: result.data.id };
+      const data = requireSdkData(result, `Session get for ${sessionId}`);
+      return { id: data.id };
     },
 
-    ensureSession: async (sessionId, directory) => {
-      const existing = await fetch(`${serverUrl}/session/${encodeURIComponent(sessionId)}`, {
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (existing.ok) return;
-      if (existing.status !== 404) {
-        throw new Error(`Session get failed for ${sessionId}: HTTP ${existing.status}`);
+    ensureSession: async (sessionId, directory, signal) => {
+      const lookupTimeout = AbortSignal.timeout(5_000);
+      const lookupSignal = signal ? AbortSignal.any([signal, lookupTimeout]) : lookupTimeout;
+      const existing = await v2Client.session.get(
+        { sessionID: sessionId, directory },
+        { signal: lookupSignal }
+      );
+      if (existing.response?.status !== 404) {
+        const data = requireSdkData(existing, `Session get for ${sessionId}`);
+        if (data.id !== sessionId) {
+          throw new Error(`Session get for ${sessionId} returned an invalid session`);
+        }
+        return;
+      }
+      const currentProject = await v2Client.project.current(
+        { directory },
+        { signal: lookupSignal }
+      );
+      const project = requireSdkData(currentProject, `Current project for session ${sessionId}`);
+      if (typeof project.id !== 'string' || project.id.length === 0) {
+        throw new Error(`Current project for session ${sessionId} returned an invalid project`);
       }
       const now = Date.now();
-      const imported = await fetch(
-        `${serverUrl}/kilocode/session-import/session?directory=${encodeURIComponent(directory)}`,
+      const importTimeout = AbortSignal.timeout(8_000);
+      const imported = await v2Client.kilocode.sessionImport.session(
         {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          signal: AbortSignal.timeout(8_000),
-          body: JSON.stringify({
-            id: sessionId,
-            projectID: 'global',
-            slug: sessionId.slice(0, 24),
-            directory,
-            title: 'Cloud Agent',
-            version: '7.4.20',
-            timeCreated: now,
-            timeUpdated: now,
-          }),
-        }
+          query_directory: directory,
+          body_directory: directory,
+          id: sessionId,
+          projectID: project.id,
+          slug: sessionId.slice(0, 24),
+          title: 'New session - ' + new Date(now).toISOString(),
+          version: '7.4.20',
+          timeCreated: now,
+          timeUpdated: now,
+        },
+        { signal: signal ? AbortSignal.any([signal, importTimeout]) : importTimeout }
       );
-      if (!imported.ok) {
-        const detail = await imported.text();
-        throw new Error(
-          `Session import failed for ${sessionId}: HTTP ${imported.status} ${detail}`
-        );
+      const data = requireSdkData(imported, `Session import for ${sessionId}`);
+      if (!data.ok || data.id !== sessionId) {
+        throw new Error(`Session import for ${sessionId} returned an invalid session`);
       }
+    },
+
+    sendPrompt: async opts => {
+      const result = await v2Client.session.prompt(promptParameters(opts), { signal: opts.signal });
+      return requireSdkData(result, `Prompt for session ${opts.sessionId}`);
     },
 
     sendPromptAsync: async opts => {
-      const rawParts =
-        opts.parts ?? (opts.prompt ? [{ type: 'text' as const, text: opts.prompt }] : []);
-      const parts = rawParts.map(p =>
-        p.type === 'file'
-          ? {
-              type: 'file' as const,
-              mime: p.mime,
-              url: p.url,
-              ...(p.filename ? { filename: p.filename } : {}),
-            }
-          : { type: 'text' as const, text: p.text }
-      );
-      // Use v2 client — it supports `variant` (thinking effort); v1 SDK omits it.
-      const result = await v2Client.session.promptAsync({
-        sessionID: opts.sessionId,
-        ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
-        parts,
-        ...(opts.variant ? { variant: opts.variant } : {}),
-        ...(opts.model
-          ? {
-              model: {
-                providerID: opts.model.providerID ?? 'kilo',
-                modelID: opts.model.modelID,
-              },
-            }
-          : {}),
-        ...(opts.system ? { system: opts.system } : {}),
-        ...(opts.tools ? { tools: opts.tools } : {}),
-        ...(opts.agent ? { agent: opts.agent } : {}),
-        ...(opts.snapshotInitialization
-          ? { snapshotInitialization: opts.snapshotInitialization }
-          : {}),
+      const result = await v2Client.session.promptAsync(promptParameters(opts), {
+        signal: opts.signal,
       });
       if (result.error !== undefined) {
         throw new Error(
-          `Async prompt for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
+          `Async prompt for session ${opts.sessionId} failed: ${formatSdkError(result)}`,
           { cause: result.error }
         );
       }
     },
 
     abortSession: async opts => {
-      await sdkClient.session.abort({ path: { id: opts.sessionId } });
-      return true;
+      const result = await v2Client.session.abort(
+        { sessionID: opts.sessionId, directory: opts.directory ?? workspacePath },
+        { signal: opts.signal }
+      );
+      const operation = `Session abort for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (typeof data !== 'boolean') {
+        throw new Error(`${operation} returned no boolean result`);
+      }
+      return data;
     },
 
     summarizeSession: async opts => {
-      const result = await v2Client.session.summarize({
-        sessionID: opts.sessionId,
-        providerID: opts.model.providerID ?? 'kilo',
-        modelID: opts.model.modelID,
-        ...(opts.auto !== undefined ? { auto: opts.auto } : {}),
-      });
-      if (result.error !== undefined) {
-        throw new Error(
-          `Session summarize for ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
-          { cause: result.error }
-        );
+      const result = await v2Client.session.summarize(
+        {
+          sessionID: opts.sessionId,
+          directory: opts.directory ?? workspacePath,
+          providerID: opts.model.providerID ?? 'kilo',
+          modelID: opts.model.modelID,
+          ...(opts.auto !== undefined ? { auto: opts.auto } : {}),
+        },
+        { signal: opts.signal }
+      );
+      const operation = `Session summarize for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (typeof data !== 'boolean') {
+        throw new Error(`${operation} returned no boolean result`);
       }
-      return result.data ?? true;
+      return data;
     },
 
     sendCommand: async opts => {
-      const result = await v2Client.session.command({
-        sessionID: opts.sessionId,
-        command: opts.command,
-        arguments: opts.args ?? '',
-        ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
-        ...(opts.snapshotInitialization
-          ? { snapshotInitialization: opts.snapshotInitialization }
-          : {}),
-      });
-      if (result.error !== undefined) {
-        throw new Error(
-          `Command for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
-          { cause: result.error }
-        );
-      }
-      return result.data;
+      const result = await v2Client.session.command(
+        {
+          sessionID: opts.sessionId,
+          directory: opts.directory ?? workspacePath,
+          command: opts.command,
+          arguments: opts.args ?? '',
+          ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
+          ...(opts.agent ? { agent: opts.agent } : {}),
+          ...(opts.model
+            ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
+            : {}),
+          ...(opts.variant ? { variant: opts.variant } : {}),
+          ...(opts.snapshotInitialization
+            ? { snapshotInitialization: opts.snapshotInitialization }
+            : {}),
+        },
+        { signal: opts.signal }
+      );
+      return requireSdkData(result, `Command for session ${opts.sessionId}`);
     },
 
     listCommands: async () => {
-      const result = await sdkClient.command.list();
-      const raw = (result.data ?? []) as unknown[];
+      const result = await sdkClient.command.list({ query: { directory: workspacePath } });
+      const raw = requireSdkData(result, 'Command list');
       const commands: SlashCommandInfo[] = [];
       for (const item of raw) {
         const trimmed = toSlashCommandInfo(item);
@@ -480,75 +513,59 @@ export function createWrapperKiloClient(
       return commands;
     },
 
-    answerPermission: async (permissionId, response, message, interactive) => {
-      // The pinned @kilocode/sdk 7.3.54 client whitelists body keys at runtime and
-      // would silently drop `interactive` (needs SDK >= 7.4.19). POST directly: old
-      // kilo servers ignore the unknown body key; >= 7.4.18 requires it to accept a
-      // human skill-shell approval.
-      const res = await fetch(
-        // `serverUrl` is passed through from the bootstrap; strip trailing slashes so
-        // both `http://host:port` and `http://host:port/` join to the same path.
-        `${serverUrl.replace(/\/+$/, '')}/permission/${encodeURIComponent(permissionId)}/reply`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            reply: response,
-            ...(message !== undefined ? { message } : {}),
-            ...(interactive === true ? { interactive: true } : {}),
-          }),
-        }
+    answerPermission: async (
+      permissionId,
+      response,
+      message,
+      interactive,
+      directory = workspacePath,
+      signal
+    ) => {
+      const result = await v2Client.permission.reply(
+        { requestID: permissionId, directory, reply: response, message, interactive },
+        { signal }
       );
-      if (!res.ok) {
-        throw new Error(`Permission reply ${permissionId} failed: HTTP ${res.status}`);
-      }
-      return true;
+      return requireSdkData(result, `Permission reply ${permissionId}`);
     },
 
-    answerQuestion: async (questionId, answers) => {
-      await v2Client.question.reply({ requestID: questionId, answers });
-      return true;
+    answerQuestion: async (questionId, answers, directory = workspacePath, signal) => {
+      const result = await v2Client.question.reply(
+        { requestID: questionId, answers, directory },
+        { signal }
+      );
+      return requireSdkData(result, `Question reply ${questionId}`);
     },
 
-    rejectQuestion: async questionId => {
-      await v2Client.question.reject({ requestID: questionId });
-      return true;
+    rejectQuestion: async (questionId, directory = workspacePath, signal) => {
+      const result = await v2Client.question.reject(
+        { requestID: questionId, directory },
+        { signal }
+      );
+      return requireSdkData(result, `Question reject ${questionId}`);
     },
 
-    getSessionStatuses: async () => {
-      const result = await v2Client.session.status();
-      return (result.data ?? {}) as Record<string, { type: string; [key: string]: unknown }>;
+    getSessionStatuses: async (directory = workspacePath, signal) => {
+      const result = await v2Client.session.status({ directory }, { signal });
+      return requireSdkData(result, 'Session status');
     },
 
-    getQuestions: async () => {
-      const result = await v2Client.question.list();
-      return (result.data ?? []) as Array<{
-        id: string;
-        sessionID: string;
-        tool?: { messageID: string; callID: string };
-      }>;
+    getQuestions: async (directory = workspacePath, signal) => {
+      const result = await v2Client.question.list({ directory }, { signal });
+      return requireSdkData(result, 'Question list');
     },
 
-    getPermissions: async () => {
-      const result = await v2Client.permission.list();
-      return (result.data ?? []) as Array<{
-        id: string;
-        sessionID: string;
-        permission: string;
-        patterns: string[];
-        metadata: Record<string, unknown>;
-        always: string[];
-        tool?: { messageID: string; callID: string };
-      }>;
+    getPermissions: async (directory = workspacePath, signal) => {
+      const result = await v2Client.permission.list({ directory }, { signal });
+      return requireSdkData(result, 'Permission list');
     },
 
     getNetworkWaits: async () => {
-      const result = await v2Client.network.list();
-      return (result.data ?? []) as NetworkWait[];
+      const result = await v2Client.network.list({ directory: workspacePath });
+      return requireSdkData(result, 'Network list');
     },
 
     resumeNetworkWait: async requestID => {
-      const result = await v2Client.network.reply({ requestID });
+      const result = await v2Client.network.reply({ requestID, directory: workspacePath });
       return requireSdkData(result, `Network reply ${requestID}`);
     },
 
@@ -562,8 +579,11 @@ export function createWrapperKiloClient(
     },
 
     generateCommitMessage: async opts => {
-      const result = await v2Client.commitMessage.generate({ path: opts.path });
-      return result.data ?? { message: '' };
+      const result = await v2Client.commitMessage.generate(
+        { path: opts.path, directory: workspacePath },
+        { signal: opts.signal }
+      );
+      return requireSdkData(result, 'Commit message generation');
     },
 
     createPty: async opts => {
@@ -573,30 +593,24 @@ export function createWrapperKiloClient(
         title: opts.title,
         env: opts.env,
       });
-      if (!result.data) {
-        throw new Error('PTY create returned no data');
-      }
-      return result.data as WrapperPty;
+      return requireSdkData(result, 'PTY create');
     },
 
-    resizePty: async (ptyId, size) => {
+    resizePty: async (ptyId, size, directory = workspacePath) => {
       const result = await v2Client.pty.update({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
         size,
       });
-      if (!result.data) {
-        throw new Error(`PTY update returned no data for ${ptyId}`);
-      }
-      return result.data as WrapperPty;
+      return requireSdkData(result, `PTY update for ${ptyId}`);
     },
 
-    deletePty: async ptyId => {
+    deletePty: async (ptyId, directory = workspacePath) => {
       const result = await v2Client.pty.remove({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
       });
-      return Boolean(result.data);
+      return requireSdkData(result, `PTY delete for ${ptyId}`);
     },
   };
 }

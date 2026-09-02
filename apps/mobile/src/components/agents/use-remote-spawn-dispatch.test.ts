@@ -2,7 +2,9 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
+import { CommandDeliveredError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
+import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
   __resetSharePayloadStoreForTests,
@@ -113,6 +115,9 @@ const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 /** Stub payload for the ready-path-with-payload case. */
@@ -162,6 +167,9 @@ function runHook(args: {
   getSubmitPayload?: () => SharePayload | null;
   onSpawnAdmitted?: () => void;
   onSpawnFailed?: () => void;
+  cloneFromKiloSessionId?: string | null;
+  onCloneImportFailure?: (key: string) => void;
+  onSpawnReady?: () => void;
   runOnInstance?: InstancePickerInstance | null;
   setRunOnInstance?: (next: InstancePickerInstance | null) => void;
   refetchInstances?: () => Promise<{ data: { instances: InstancePickerInstance[] } | undefined }>;
@@ -246,6 +254,9 @@ function runHook(args: {
         getSubmitPayload: args.getSubmitPayload,
         onSpawnAdmitted: args.onSpawnAdmitted,
         onSpawnFailed: args.onSpawnFailed,
+        cloneFromKiloSessionId: args.cloneFromKiloSessionId,
+        onCloneImportFailure: args.onCloneImportFailure,
+        onSpawnReady: args.onSpawnReady,
       });
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -487,6 +498,120 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
   });
+
+  it('a clone source with a capable instance reaches the spawn input', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      mode: 'code',
+      selection: { model: { providerID: 'anthropic', modelID: 'claude-x' } },
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: { ...INSTANCE, capabilities: { sessionClone: true } },
+    });
+
+    expect(await captureSpawnCall(onStart)).toEqual([
+      'conn-abc',
+      {
+        agent: 'code',
+        model: { providerID: 'anthropic', modelID: 'claude-x' },
+        orgId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+      },
+      { operationKey: expect.any(String) },
+    ]);
+  });
+
+  it('does not spawn when a clone source is set but the instance lacks sessionClone', () => {
+    const onCloneImportFailure = vi.fn();
+    const onSpawnAdmitted = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: INSTANCE,
+      onSpawnAdmitted: () => {
+        onSpawnAdmitted();
+      },
+      onCloneImportFailure: key => {
+        onCloneImportFailure(key);
+      },
+    });
+
+    onStart();
+    expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotContinue');
+    expect(onSpawnAdmitted).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it('a clone entry navigates with no shareId (payload is null)', async () => {
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: { ...INSTANCE, capabilities: { sessionClone: true } },
+      getSubmitPayload: () => null,
+    });
+
+    await runStartAndWaitForReplace(onStart);
+
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('ses_12345678901234567890123456');
+    expect(calledWith).not.toContain('shareId=');
+    expect(calledWith).not.toContain('autoSend=');
+  });
+
+  it('a delivered clone/import CommandDeliveredError calls onCloneImportFailure with the mapped key', async () => {
+    spawnMock.mockResolvedValueOnce({
+      status: 'nonRetryable',
+      reason: 'cloud session not found',
+      cause: new CommandDeliveredError('cloud session not found'),
+    });
+    const onCloneImportFailure = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: { ...INSTANCE, capabilities: { sessionClone: true } },
+      onCloneImportFailure: key => {
+        onCloneImportFailure(key);
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.session.notFound');
+    });
+    // The inline reason, never the generic spawn toast.
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('a retryable clone error toasts cloneFailedRetry and keeps the form enabled for a retry', async () => {
+    spawnMock.mockResolvedValueOnce({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+    const onCloneImportFailure = vi.fn();
+    const setRunOnInstance = vi.fn();
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      cloneFromKiloSessionId: 'ses_source',
+      runOnInstance: { ...INSTANCE, capabilities: { sessionClone: true } },
+      onCloneImportFailure: key => {
+        onCloneImportFailure(key);
+      },
+      setRunOnInstance: next => {
+        setRunOnInstance(next);
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('agentChat.session.cloneFailedRetry'));
+    });
+    // The clone retry surfaces no inline reason and never resets the selection
+    // to Cloud Agent, so Start stays enabled for the retry.
+    expect(onCloneImportFailure).not.toHaveBeenCalled();
+    expect(setRunOnInstance).not.toHaveBeenCalled();
+  });
 });
 
 describe('useRemoteSpawnDispatch live-instance remap', () => {
@@ -494,6 +619,9 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     connectionId: 'conn-live',
     name: 'laptop',
     projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
   };
 
   beforeEach(() => {

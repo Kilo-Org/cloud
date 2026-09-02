@@ -223,6 +223,44 @@ describe('auto models', () => {
   });
 });
 
+describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
+  'OpenRouter catalog inheritance for %s',
+  modelId => {
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('preserves the upstream metadata without duplicating or suppressing the free model', async () => {
+      const catalogModel = buildModel({
+        id: modelId,
+        name: 'OpenRouter catalog name',
+        pricing: { prompt: '0', completion: '0' },
+      });
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [catalogModel] } }))
+      ) as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels();
+      const matches = models.data.filter(entry => entry.id === modelId);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ ...catalogModel, isFree: true });
+      expect(findKiloExclusiveModel(modelId)).toBeNull();
+      expect(isDisabledKiloExclusiveModel(modelId)).toBe(false);
+    });
+
+    it('does not inject the model when OpenRouter omits it', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve(createMockResponse({ jsonData: { data: [] } }))
+      ) as typeof fetch;
+
+      const models = await getEnhancedOpenRouterModels();
+
+      expect(models.data.some(model => model.id === modelId)).toBe(false);
+    });
+  }
+);
+
 describe('reasoning variants', () => {
   afterEach(() => {
     global.fetch = originalFetch;

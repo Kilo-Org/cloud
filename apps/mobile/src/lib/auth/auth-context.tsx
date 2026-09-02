@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
 import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 import {
@@ -12,7 +13,13 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-import { discardPostHog } from '@/lib/analytics/posthog';
+import {
+  captureEvent,
+  discardPostHog,
+  flushLastPostHogEvent,
+  LOGOUT_EVENT,
+} from '@/lib/analytics/posthog';
+import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
@@ -56,6 +63,7 @@ import {
   ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
+  LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
@@ -68,6 +76,7 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
+import { beginAuthenticatedOwner } from '@/lib/context-scope';
 
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -203,8 +212,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // full teardown, and a sign-out queued behind a sign-in signs that new
       // session out (documented, correct FIFO semantics).
       await chainSave('auth-transition', async () => {
+        // Close admission before publishing the pending generation or writing credentials.
+        setSignOutTeardownActive(true);
+        setSignOutActive(true);
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
+        setToken(undefined);
+        clearActiveToken();
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -264,6 +279,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
+      beginAuthenticatedOwner();
       // Drop an account-bound pending deep-link destination synchronously,
       // before the first await, so a different account signed in later in this
       // process cannot navigate to the previous account's destination. A
@@ -277,12 +293,25 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // response cannot write the previous account's answer during
         // teardown.
         gateKiloClawOwned();
+        // Capture the logout event before any telemetry teardown step.
+        captureEvent(LOGOUT_EVENT);
+        // Remote cleanup (session revoke + push unregister + tombstone)
+        // runs BEFORE the epoch bump while the token owner still serves auth
+        // headers, and while optional telemetry is still allowed so the
+        // unregister emit in logout-cleanup can capture. Never throws by
+        // contract.
+        await runLogoutCleanup();
+        // Flush the logout and any cleanup-captured events, then tear the SDK
+        // down — drop queues, do not flush them. Must happen before any
+        // SecureStore or cache awaits so optional analytics cannot transmit
+        // during the teardown window. Each step is individually caught: a
+        // telemetry failure must never block sign-out.
+        await flushLastPostHogEvent();
         clearTelemetryDecision();
+        // A consent outcome queued before PostHog became ready must not
+        // survive sign-out and drain onto a later account's client.
+        clearPendingConsentOutcome();
         clearSentryUser();
-        // SDK teardown — drop queues, do not flush them. Must happen before
-        // any SecureStore or cache awaits so optional analytics cannot
-        // transmit during the teardown window. Each step is individually
-        // caught: a telemetry failure must never block sign-out.
         resetAppsFlyerState();
         try {
           await discardPostHog();
@@ -294,15 +323,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         } catch {
           // Optional telemetry storage purge is best effort.
         }
-        // Remote cleanup (session revoke + push unregister + tombstone)
-        // runs BEFORE the epoch bump while the token owner still serves auth
-        // headers. Never throws by contract.
-        await runLogoutCleanup();
       } finally {
         // The epoch bumps after remote cleanup (cleanup requests pass the
         // fence) and before any local deletion (no deferred save can land
         // after it).
         bumpAuthEpoch();
+        beginAuthenticatedOwner();
         setAuthEpoch(currentAuthEpoch());
         // The signed-out session owns no user id: a destination captured
         // during teardown is recorded as "captured while signed out".
@@ -326,6 +352,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             deleteAccountMetadata(SESSION_FILTERS_KEY),
+            deleteAccountMetadata(LIVE_SESSION_FILTERS_KEY),
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),

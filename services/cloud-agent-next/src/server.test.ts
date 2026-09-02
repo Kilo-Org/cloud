@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
+import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 
 const {
   getRunningTerminalClientMock,
@@ -212,6 +213,32 @@ function signWrapperDispatchTicket(overrides: Partial<WrapperDispatchTicketClaim
   );
 }
 
+function signTerminalTicket(
+  cloudAgentSessionId: string,
+  overrides: Record<string, unknown> = {}
+): string {
+  return jwt.sign(
+    {
+      type: 'stream_ticket',
+      purpose: 'terminal',
+      userId: 'user-1',
+      cloudAgentSessionId,
+      ptyId: 'pty_123',
+      nonce: 'nonce-1',
+      ...overrides,
+    },
+    secret,
+    { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
+  );
+}
+
+function installTerminalNonceConsumer(env: MockEnv) {
+  const consume = vi.fn().mockResolvedValue(true);
+  env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
+  env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({ consume });
+  return consume;
+}
+
 beforeEach(() => {
   getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
@@ -326,7 +353,7 @@ describe('server background reporting', () => {
 });
 
 describe('server /terminal', () => {
-  it('rejects control-plane sessions before consuming the ticket nonce', async () => {
+  it('validates control-plane terminal tickets before selecting the session Durable Object', async () => {
     const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
     const env = createEnv();
     const request = new Request(
@@ -336,12 +363,125 @@ describe('server /terminal', () => {
 
     const response = await fetchWorker(request, env);
 
-    expect(response.status).toBe(412);
-    await expect(response.text()).resolves.toBe('Terminal is not available for this session');
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Invalid ticket signature');
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
   });
+
+  it('forwards authorized control-plane browser upgrades without tickets or browser credentials', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const ticket = signTerminalTicket(sessionId, {
+      organizationId: 'org-1',
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+    const consume = installTerminalNonceConsumer(env);
+    const sessionResponse = new Response('bridged', { status: 200 });
+    const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    const request = new Request(
+      `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}&role=wrapper&ownerId=attacker`,
+      {
+        headers: {
+          Upgrade: 'websocket',
+          Connection: 'Upgrade',
+          'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+          'Sec-WebSocket-Version': '13',
+          'Sec-WebSocket-Protocol': 'private-browser-protocol',
+          'Sec-WebSocket-Extensions': 'permessage-deflate',
+          Origin: 'https://app.example.com',
+          Authorization: 'Bearer browser-secret',
+          Cookie: 'session=browser-secret',
+          'X-Terminal-Role': 'wrapper',
+          'X-Internal-Role': 'wrapper',
+          'X-Forwarded-User': 'attacker',
+        },
+      }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response).toBe(sessionResponse);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'user-1',
+      cloudAgentSessionId: sessionId,
+      expectedOrganizationId: 'org-1',
+      expectedKiloSessionId: 'ses_12345678901234567890123456',
+    });
+    expect(consume).toHaveBeenCalledOnce();
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`user-1:${sessionId}`);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(getRunningTerminalClientMock).not.toHaveBeenCalled();
+    expect(sessionFetch).toHaveBeenCalledOnce();
+
+    const forwarded = sessionFetch.mock.calls[0]?.[0] as Request;
+    const forwardedUrl = new URL(forwarded.url);
+    expect(forwarded).not.toBe(request);
+    expect(forwardedUrl.pathname).toBe('/terminal/browser');
+    expect(forwardedUrl.search).toBe('?ptyId=pty_123');
+    expect(forwarded.headers.get('upgrade')).toBe('websocket');
+    expect(forwarded.headers.get('connection')).toBe('Upgrade');
+    expect(forwarded.headers.get('sec-websocket-key')).toBe('dGhlIHNhbXBsZSBub25jZQ==');
+    expect(forwarded.headers.get('sec-websocket-version')).toBe('13');
+    expect(forwarded.headers.get('sec-websocket-protocol')).toBeNull();
+    expect(forwarded.headers.get('sec-websocket-extensions')).toBeNull();
+    expect(forwarded.headers.get('origin')).toBeNull();
+    expect(forwarded.headers.get('authorization')).toBeNull();
+    expect(forwarded.headers.get('cookie')).toBeNull();
+    expect(forwarded.headers.get('x-terminal-role')).toBeNull();
+    expect(forwarded.headers.get('x-internal-role')).toBeNull();
+    expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+
+  it('rejects revoked control-plane access before consuming the browser ticket nonce', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const ticket = signTerminalTicket(sessionId);
+    const env = createEnv();
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each(['pty.invalid', 'pty/invalid', 'a'.repeat(129)])(
+    'rejects invalid browser PTY identifiers before ticket validation: %s',
+    async ptyId => {
+      const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const env = createEnv();
+      const url = new URL('http://worker.test/terminal');
+      url.searchParams.set('cloudAgentSessionId', sessionId);
+      url.searchParams.set('ptyId', ptyId);
+      url.searchParams.set('ticket', 'unused');
+
+      const response = await fetchWorker(
+        new Request(url, { headers: { Upgrade: 'websocket' } }),
+        env
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toBe('Invalid ptyId parameter');
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+      expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
+      expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    }
+  );
 
   it('proxies valid terminal tickets directly to the wrapper container', async () => {
     const ticket = jwt.sign(
@@ -907,6 +1047,20 @@ describe('server wrapper ingest route', () => {
 });
 
 describe('server wrapper log upload route', () => {
+  it('does not accept legacy raw archives for control-plane sessions', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/workspace_test/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+        body: 'raw archive',
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
   function createLogEnv() {
     const env = createEnv();
     return Object.assign(env, {
@@ -1211,6 +1365,195 @@ describe('server /internal/sandbox-control/seed', () => {
     expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
     expect(setWrapperCredentialHash).toHaveBeenCalledOnce();
     expect(setWrapperCredentialHash.mock.calls[0]?.[0]).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('server /sandbox-terminal', () => {
+  const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  it('rejects non-WebSocket requests before resolving the session', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, {
+        headers: { Authorization: 'Bearer producer-capability' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(426);
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'workspace_invalid',
+    'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaax',
+  ])('rejects invalid control-plane session identifiers: %s', async invalidSessionId => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/sandbox-terminal/user-1/${invalidSessionId}/pty_123`, {
+        headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toBe('Invalid sessionId');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each(['pty.invalid', 'pty/invalid', 'a'.repeat(129)])(
+    'rejects invalid wrapper PTY identifiers: %s',
+    async ptyId => {
+      const env = createEnv();
+
+      const response = await fetchWorker(
+        new Request(
+          `http://worker.test/sandbox-terminal/user-1/${sessionId}/${encodeURIComponent(ptyId)}`,
+          {
+            headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
+          }
+        ),
+        env
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toBe('Invalid ptyId');
+      expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { name: 'missing', authorization: undefined },
+    { name: 'basic', authorization: 'Basic producer-capability' },
+    { name: 'empty bearer', authorization: 'Bearer' },
+    { name: 'multiple credentials', authorization: 'Bearer first second' },
+    { name: 'oversized bearer', authorization: `Bearer ${'a'.repeat(257)}` },
+  ])(
+    'rejects $name producer credentials before resolving the session',
+    async ({ authorization }) => {
+      const env = createEnv();
+      const headers = new Headers({ Upgrade: 'websocket' });
+      if (authorization !== undefined) headers.set('Authorization', authorization);
+
+      const response = await fetchWorker(
+        new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, { headers }),
+        env
+      );
+
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe('Invalid or missing Authorization header');
+      expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    }
+  );
+
+  it('routes OAuth owners without double decoding and forwards only wrapper handshake credentials', async () => {
+    const ownerId = 'oauth/github:user%2Fteam%25raw%invalid';
+    const env = createEnv();
+    const sessionResponse = new Response('wrapper bridged', { status: 200 });
+    const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    const request = new Request(
+      `http://worker.test/sandbox-terminal/${encodeURIComponent(ownerId)}/${sessionId}/pty_123?ticket=browser-secret&ptyId=attacker&role=browser`,
+      {
+        headers: {
+          Upgrade: 'websocket',
+          Connection: 'Upgrade',
+          'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+          'Sec-WebSocket-Version': '13',
+          'Sec-WebSocket-Protocol': 'private-wrapper-protocol',
+          'Sec-WebSocket-Extensions': 'permessage-deflate',
+          Authorization: 'Bearer producer-capability',
+          Cookie: 'session=browser-secret',
+          Origin: 'https://attacker.example.com',
+          'X-Terminal-Role': 'browser',
+          'X-Internal-Role': 'browser',
+          'X-Forwarded-User': 'attacker',
+        },
+      }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response).toBe(sessionResponse);
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`${ownerId}:${sessionId}`);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(sessionFetch).toHaveBeenCalledOnce();
+
+    const forwarded = sessionFetch.mock.calls[0]?.[0] as Request;
+    const forwardedUrl = new URL(forwarded.url);
+    expect(forwarded).not.toBe(request);
+    expect(forwardedUrl.pathname).toBe('/terminal/wrapper');
+    expect(forwardedUrl.search).toBe('?ptyId=pty_123');
+    expect(forwarded.headers.get('upgrade')).toBe('websocket');
+    expect(forwarded.headers.get('connection')).toBe('Upgrade');
+    expect(forwarded.headers.get('sec-websocket-key')).toBe('dGhlIHNhbXBsZSBub25jZQ==');
+    expect(forwarded.headers.get('sec-websocket-version')).toBe('13');
+    expect(forwarded.headers.get('authorization')).toBe('Bearer producer-capability');
+    expect(forwarded.headers.get('sec-websocket-protocol')).toBeNull();
+    expect(forwarded.headers.get('sec-websocket-extensions')).toBeNull();
+    expect(forwarded.headers.get('cookie')).toBeNull();
+    expect(forwarded.headers.get('origin')).toBeNull();
+    expect(forwarded.headers.get('x-terminal-role')).toBeNull();
+    expect(forwarded.headers.get('x-internal-role')).toBeNull();
+    expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+});
+
+describe('server control log routes', () => {
+  it('accepts a log-only grant without touching sandbox liveness', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn().mockResolvedValue(null) } });
+    const identity = {
+      sandboxId: 'sandbox_test',
+      allocationId: 'allocation_test',
+      wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+    };
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/sandbox-logs/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/5886f962-cc33-43f7-bd94-a31c0ed6c13b`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            version: 1,
+            sequence: 0,
+            droppedRecords: 0,
+            records: [
+              { timestamp: 100, event: 'wrapper.lifecycle', fields: { phase: 'starting' } },
+            ],
+          }),
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose log archives over HTTP', async () => {
+    const env = createEnv();
+    for (const path of [
+      '/internal/sandbox-logs/sandbox_test',
+      '/internal/sandbox-logs/sandbox_test/allocation_test/0fce125c-54a3-4143-b503-b7775c4d2135/5886f962-cc33-43f7-bd94-a31c0ed6c13b',
+    ]) {
+      const response = await fetchWorker(
+        new Request(`http://worker.test${path}`, {
+          headers: { 'x-internal-api-key': 'test-internal-secret' },
+        }),
+        env
+      );
+      expect(response.status).toBe(404);
+    }
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
   });
 });
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -21,7 +22,7 @@ import {
   type ProcessOptions,
   type ProcessOutputStream,
 } from './utils.js';
-import { redactSecrets } from './redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output.js';
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
@@ -82,37 +83,25 @@ function isPromptFileMime(mime: string): boolean {
 
 function createSetupOutputReporter(
   progress: BootstrapProgress | undefined,
-  stepId: string
+  stepId: string,
+  redact: (text: string) => string
 ): {
   onOutput: (stream: ProcessOutputStream, output: string) => void;
   flush: () => void;
 } {
-  const buffers: Record<ProcessOutputStream, string> = { stdout: '', stderr: '' };
-
-  const report = (text: string): void => {
-    const cleaned = cleanTerminalOutput(text).trim();
-    if (cleaned)
-      progress?.({
-        type: 'output',
-        step: 'setup_commands',
-        stepId,
-        output: `${redactSecrets(cleaned)}\n`,
-      });
-  };
-
-  return {
-    onOutput(stream, output) {
-      const lines = (buffers[stream] + output).split('\n');
-      buffers[stream] = lines.pop() ?? '';
-      report(lines.map(line => (line.endsWith('\r') ? line.slice(0, -1) : line)).join('\n'));
-    },
-    flush() {
-      report(buffers.stdout);
-      report(buffers.stderr);
-      buffers.stdout = '';
-      buffers.stderr = '';
-    },
-  };
+  return createOutputRedactor(
+    text => redact(cleanTerminalOutput(text)),
+    text => {
+      const cleaned = text.trim();
+      if (cleaned)
+        progress?.({
+          type: 'output',
+          step: 'setup_commands',
+          stepId,
+          output: `${cleaned}\n`,
+        });
+    }
+  );
 }
 
 export type BootstrapProgressStep =
@@ -165,6 +154,7 @@ export type WrapperBootstrapDeps = {
   git?: GitRunner;
   runProcess?: ProcessRunner;
   restoreSession?: typeof restoreSession;
+  beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
 
@@ -314,17 +304,25 @@ export function workspaceBootstrapErrorCode(
     : 'WORKSPACE_SETUP_FAILED';
 }
 
-function authenticatedUrl(
-  gitUrl: string,
-  token: string | undefined,
-  platform: 'github' | 'gitlab' | 'bitbucket' | undefined
-): string {
-  if (!token) return gitUrl;
-  const url = new URL(gitUrl);
-  url.username =
-    platform === 'gitlab' ? 'oauth2' : platform === 'bitbucket' ? 'x-token-auth' : 'x-access-token';
-  url.password = token;
-  return url.toString();
+function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
+  const raw = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function isHelperBackedRemote(
+  repo: NonNullable<WrapperSessionReadyRequest['repo']>,
+  env: WrapperSessionReadyRequest['materialized']['env']
+): boolean {
+  if (repo.kind === 'github') return true;
+  if (repo.platform === 'gitlab' || repo.platform === 'bitbucket') return true;
+  return Boolean(repo.token) || (repo.platform === 'github' && Boolean(env.GH_TOKEN));
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -342,6 +340,55 @@ function gitBootstrapMarkerPath(workspacePath: string): string {
 
 function sessionAuthFilePath(sessionHome: string): string {
   return path.join(sessionHome, '.local/share/kilo/auth.json');
+}
+
+async function materializeRepositoryCredentials(
+  request: WrapperSessionReadyRequest
+): Promise<void> {
+  const credentialsPath = path.join(
+    request.workspace.sessionHome,
+    '.local/share/kilo/cloud-agent/git-credentials'
+  );
+  const repo = request.repo;
+  if (!repo?.token) {
+    await fs.rm(credentialsPath, { force: true });
+    return;
+  }
+
+  const repositoryUrl = repo.kind === 'github' ? new URL('https://github.com') : new URL(repo.url);
+  if (repositoryUrl.protocol !== 'https:' || !repositoryUrl.host) {
+    throw new Error('Repository Git credentials require an HTTPS URL');
+  }
+
+  const username =
+    repo.kind === 'git' && repo.platform === 'gitlab'
+      ? 'oauth2'
+      : repo.kind === 'git' && repo.platform === 'bitbucket'
+        ? 'x-token-auth'
+        : 'x-access-token';
+  const values = ['https', repositoryUrl.host, username, repo.token];
+  if (values.some(value => value.includes('\r') || value.includes('\n') || value.includes('\0'))) {
+    throw new Error('Repository Git credentials contain invalid characters');
+  }
+
+  const credentials = `protocol=https\nhost=${repositoryUrl.host}\nusername=${username}\npassword=${repo.token}\n`;
+  const credentialsDirectory = path.dirname(credentialsPath);
+  await fs.mkdir(credentialsDirectory, { recursive: true, mode: 0o700 });
+  await fs.chmod(credentialsDirectory, 0o700);
+  const temporaryPath = path.join(credentialsDirectory, `git-credentials.${randomUUID()}.tmp`);
+
+  try {
+    const handle = await fs.open(temporaryPath, 'wx', 0o600);
+    try {
+      await handle.writeFile(credentials, 'utf8');
+    } finally {
+      await handle.close();
+    }
+    await fs.rename(temporaryPath, credentialsPath);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 // The marker is removed before re-bootstrapping and written only after restore
@@ -369,7 +416,15 @@ async function removePath(filePath: string, signal?: AbortSignal): Promise<void>
   }
 }
 
-async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<void> {
+async function cleanupWorkspace(
+  request: WrapperSessionReadyRequest,
+  beforeFailureCleanup: WrapperBootstrapDeps['beforeFailureCleanup']
+): Promise<void> {
+  try {
+    await beforeFailureCleanup?.();
+  } catch {
+    logToFile('Failed to finalize logs before workspace cleanup');
+  }
   await Promise.allSettled([
     removePath(request.workspace.workspacePath),
     removePath(request.workspace.sessionHome),
@@ -390,9 +445,9 @@ function isBitbucketReviewSession(
 }
 
 // Wire-format prefix of a Bitbucket outbound session capability (see the
-// git-token-service BitbucketSessionCapabilityCodec). A capability in the origin
-// stays authenticated through the outbound interceptor, unlike a raw token which
-// is stripped after bootstrap.
+// git-token-service BitbucketSessionCapabilityCodec). Presence of a capability
+// qualifies the session for blobless clone; the credential helper authenticates
+// later lazy fetches.
 const BITBUCKET_CAPABILITY_PREFIX = 'kbb1.';
 
 function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): boolean {
@@ -406,10 +461,6 @@ function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): bool
 function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
   if (!isCodeReviewSession(request)) return false;
   const repo = request.repo;
-  // GitHub/GitLab keep working credentials via outbound injection. Bitbucket
-  // keeps them only when the session uses an outbound capability (a raw-token
-  // origin is credential-stripped after bootstrap). Other/unknown git remotes
-  // have no such guarantee, so they keep a full clone.
   if (repo?.kind === 'github') return true;
   if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
   return hasBitbucketReviewCapability(request);
@@ -426,9 +477,8 @@ async function cloneRepository(
     throw new Error('Session metadata is missing a repository source');
   }
 
-  const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  const repoUrl = canonicalGitUrl(repo);
   const platform = repo.kind === 'git' ? repo.platform : 'github';
-  const repoUrl = authenticatedUrl(gitUrl, repo.token, platform);
   // Code review reads changed files from the working tree and gets the PR diff
   // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
   // commit graph but not every historical file blob, so a blobless partial clone
@@ -436,7 +486,7 @@ async function cloneRepository(
   // which on large repositories otherwise exceeds the clone timeout. Full history
   // is retained, so incremental diffs and merge-base still work. See
   // isBloblessReviewCloneEligible for which sessions qualify (GitHub, GitLab, and
-  // capability-backed Bitbucket, whose origin stays authenticated for lazy fetch).
+  // capability-backed Bitbucket). The credential helper authenticates lazy fetch.
   const useBlobless = isBloblessReviewCloneEligible(request);
 
   const runClone = async (blobless: boolean): Promise<ExecResult> => {
@@ -509,22 +559,39 @@ async function cloneRepository(
     `bootstrap clone complete kiloSessionId=${request.kiloSessionId} mode=${cloneTelemetry.mode} attempts=${attempts} durationMs=${cloneTelemetry.durationMs} totalObjects=${cloneTelemetry.totalObjects ?? '(unknown)'} receivedBytes=${cloneTelemetry.receivedBytes ?? '(unknown)'}`
   );
 
-  const authorName =
-    repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
-  const authorEmail =
-    repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
-  const authorNameResult = await runGit(['config', 'user.name', authorName], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
+  await configureWorkspaceGitAuthor(
+    request.workspace.workspacePath,
+    runGit,
+    repo.kind === 'github' ? repo.gitAuthor : undefined
+  );
+  return cloneTelemetry;
+}
+
+export async function configureWorkspaceGitAuthor(
+  workspacePath: string,
+  runGit: GitRunner = git,
+  author?: { name: string; email: string },
+  signal?: AbortSignal
+): Promise<void> {
+  const authorNameResult = await runGit(
+    ['config', 'user.name', author?.name ?? 'Kilo Code Cloud'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
+  const authorEmailResult = await runGit(
+    ['config', 'user.email', author?.email ?? 'agent@kilocode.ai'],
+    {
+      cwd: workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    }
+  );
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
     throw new Error('Failed to configure git author identity');
   }
-  return cloneTelemetry;
 }
 
 async function branchExists(
@@ -634,46 +701,12 @@ async function prepareBranch(
   }
 }
 
-async function sanitizeBitbucketCodeReviewRemote(
+async function sanitizeOriginRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
-): Promise<boolean> {
-  if (!isBitbucketReviewSession(request)) {
-    return false;
-  }
-  // A capability origin stays authenticated through the outbound interceptor and
-  // is safe to expose (scoped to one repo, useless outside this container), so it
-  // must stay in place for a blobless clone's later lazy blob fetches. Only a raw
-  // workspace token needs stripping. Either way this is a handled code-review
-  // remote (return true), so callers do not refresh a token over it.
-  if (hasBitbucketReviewCapability(request)) {
-    return true;
-  }
-  const canonicalUrl = new URL(request.repo.url);
-  canonicalUrl.username = '';
-  canonicalUrl.password = '';
-  const result = await runGit(['remote', 'set-url', 'origin', canonicalUrl.toString()], {
-    cwd: request.workspace.workspacePath,
-    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  return true;
-}
-
-function repositoryUrls(request: WrapperSessionReadyRequest): {
-  canonical: string;
-  authenticated: string;
-} | null {
-  const repo = request.repo;
-  if (!repo) return null;
-  const canonical = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  const platform = repo.kind === 'git' ? repo.platform : 'github';
-  return {
-    canonical,
-    authenticated: authenticatedUrl(canonical, repo.token, platform),
-  };
+): Promise<void> {
+  if (!request.repo || !isHelperBackedRemote(request.repo, request.materialized.env)) return;
+  await setOriginUrl(request, runGit, canonicalGitUrl(request.repo));
 }
 
 async function setOriginUrl(
@@ -690,33 +723,23 @@ async function setOriginUrl(
   }
 }
 
-async function refreshGitRemoteToken(
+async function refreshGitAuthor(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<void> {
   const repo = request.repo;
-  const urls = repositoryUrls(request);
-  if (!repo?.refreshRemote || !repo.token || !urls) return;
+  if (repo?.kind !== 'github' || !repo.gitAuthor) return;
 
-  const result = await runGit(['remote', 'set-url', 'origin', urls.authenticated], {
+  const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
     cwd: request.workspace.workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
-  if (result.exitCode !== 0) {
-    throw new Error('Failed to update git remote URL');
-  }
-  if (repo.kind === 'github' && repo.gitAuthor) {
-    const nameResult = await runGit(['config', 'user.name', repo.gitAuthor.name], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
-      cwd: request.workspace.workspacePath,
-      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
-    });
-    if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
-      throw new Error('Failed to configure git author identity');
-    }
+  const emailResult = await runGit(['config', 'user.email', repo.gitAuthor.email], {
+    cwd: request.workspace.workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (nameResult.exitCode !== 0 || emailResult.exitCode !== 0) {
+    throw new Error('Failed to configure git author identity');
   }
 }
 
@@ -917,14 +940,15 @@ async function runSetupCommands(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
+  const redact = createSecretRedactor({ ...process.env, ...request.materialized.env });
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );
   for (const [index, command] of setupCommands.entries()) {
     const startedAt = Date.now();
     const stepId = `setup_command:${index}`;
-    const safeCommand = redactSecrets(command);
-    const outputReporter = createSetupOutputReporter(progress, stepId);
+    const safeCommand = redact(command);
+    const outputReporter = createSetupOutputReporter(progress, stepId, redact);
     progress?.({
       type: 'started',
       step: 'setup_commands',
@@ -958,7 +982,7 @@ async function runSetupCommands(
       throw workspaceBootstrapError(
         timedOut ? 'setup_command_timeout' : 'setup_command_failed',
         safeError,
-        createSetupCommandDiagnostic(command, result),
+        createSetupCommandDiagnostic(command, result, redact),
         timedOut
       );
     }
@@ -969,14 +993,18 @@ async function runSetupCommands(
   );
 }
 
-function createSetupCommandDiagnostic(command: string, result: ExecResult): string {
+function createSetupCommandDiagnostic(
+  command: string,
+  result: ExecResult,
+  redact: (text: string) => string
+): string {
   const base = createSafeProcessDiagnostic(result);
   const safeCommand = boundedUtf8Tail(
-    redactSecrets(cleanTerminalOutput(command)).trim(),
+    redact(cleanTerminalOutput(command)).trim(),
     SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES
   );
   const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
-  const safeOutput = redactSecrets(cleanTerminalOutput(combinedOutput)).trim();
+  const safeOutput = redact(cleanTerminalOutput(combinedOutput)).trim();
   const outputTail = boundedUtf8Tail(safeOutput, SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES);
   const parts: string[] = [`command: ${safeCommand}`, base];
   if (outputTail) {
@@ -1003,20 +1031,32 @@ async function safeUnlink(filePath: string): Promise<void> {
  */
 async function downloadBounded(
   filePath: string,
-  response: Response
+  response: Response,
+  signal: AbortSignal
 ): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
   const body = response.body;
   if (!body) {
     throw new Error('Attachment download failed: empty body');
   }
 
-  const handle = await fs.open(filePath, 'w');
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  const reader = body.getReader();
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
   let bytesWritten = 0;
   let overflowed = false;
   try {
-    const reader = body.getReader();
+    signal.throwIfAborted();
     while (true) {
       const { value, done } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       if (!value) continue;
       const remaining = MAX_ATTACHMENT_DOWNLOAD_BYTES - bytesWritten;
@@ -1025,20 +1065,19 @@ async function downloadBounded(
         await handle.write(value.subarray(0, writable));
         bytesWritten += writable;
         overflowed = true;
-        try {
-          await reader.cancel();
-        } catch {
-          // Ignore: we're tearing the connection down anyway.
-        }
+        void reader.cancel().catch(() => {});
         break;
       }
       await handle.write(value);
+      signal.throwIfAborted();
       bytesWritten += value.byteLength;
     }
   } catch (error) {
     await safeUnlink(filePath);
     throw error;
   } finally {
+    signal.removeEventListener('abort', onAbort);
+    reader.releaseLock();
     await handle.close();
   }
 
@@ -1065,17 +1104,17 @@ export type DownloadResult =
 async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  abortController: AbortController
+  signal: AbortSignal
 ): Promise<DownloadResult> {
+  signal.throwIfAborted();
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
+  signal.throwIfAborted();
 
   let response: Response;
   try {
-    response = await fetchImpl(attachment.signedUrl, {
-      signal: abortController.signal,
-    });
+    response = await fetchImpl(attachment.signedUrl, { signal });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactSecrets(error instanceof Error ? error.message : String(error));
     return {
       kind: 'failed',
       part: {
@@ -1086,6 +1125,7 @@ async function downloadAndMaterializeAttachment(
   }
 
   if (!response.ok) {
+    void response.body?.cancel().catch(() => {});
     return {
       kind: 'failed',
       part: {
@@ -1097,9 +1137,10 @@ async function downloadAndMaterializeAttachment(
 
   let result: { bytesWritten: number };
   try {
-    result = await downloadBounded(attachment.localPath, response);
+    result = await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    void response.body?.cancel().catch(() => {});
+    const message = redactSecrets(error instanceof Error ? error.message : String(error));
     return {
       kind: 'failed',
       part: {
@@ -1137,25 +1178,32 @@ async function downloadAndMaterializeAttachment(
 
 export type MaterializeDeps = {
   fetch?: typeof fetch;
+  signal?: AbortSignal;
 };
 
-export async function materializePromptAttachments(
-  prompt: WrapperPromptRequest,
+export async function materializeMessageAttachments(
+  message: WrapperPromptRequest['message'],
   deps: MaterializeDeps = {}
-): Promise<WrapperPromptRequest> {
-  if (!prompt.message.attachments?.length) return prompt;
+): Promise<WrapperPromptRequest['message']> {
+  deps.signal?.throwIfAborted();
+  if (!message.attachments?.length) return message;
   const fetchImpl = deps.fetch ?? fetch;
 
   const parts: WrapperPromptPart[] = [];
-  for (const attachment of prompt.message.attachments) {
+  for (const attachment of message.attachments) {
+    deps.signal?.throwIfAborted();
     const abortController = new AbortController();
     const timeout = setTimeout(
       () => abortController.abort(new Error('attachment download timeout')),
       120_000
     );
+    const signal = deps.signal
+      ? AbortSignal.any([abortController.signal, deps.signal])
+      : abortController.signal;
     let result: DownloadResult;
     try {
-      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, abortController);
+      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, signal);
+      deps.signal?.throwIfAborted();
     } finally {
       clearTimeout(timeout);
     }
@@ -1163,24 +1211,30 @@ export async function materializePromptAttachments(
   }
 
   return {
-    ...prompt,
-    message: {
-      ...prompt.message,
-      parts: [
-        ...(prompt.message.parts ?? [{ type: 'text', text: prompt.message.prompt ?? '' }]),
-        ...parts,
-      ],
-      prompt: undefined,
-      attachments: undefined,
-    },
+    ...message,
+    parts: [
+      ...(message.parts ??
+        (message.prompt ? [{ type: 'text' as const, text: message.prompt }] : [])),
+      ...parts,
+    ],
+    prompt: undefined,
+    attachments: undefined,
   };
+}
+
+export async function materializePromptAttachments(
+  prompt: WrapperPromptRequest,
+  deps: MaterializeDeps = {}
+): Promise<WrapperPromptRequest> {
+  return { ...prompt, message: await materializeMessageAttachments(prompt.message, deps) };
 }
 
 async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   request: WrapperSessionReadyRequest,
   progress: BootstrapProgress | undefined,
   deps: WrapperBootstrapDeps,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timeoutError: WrapperBootstrapError
 ): Promise<WrapperBootstrapResult> {
   const runGit = deps.git ?? git;
   const run = deps.runProcess ?? runProcess;
@@ -1206,6 +1260,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await ensureWorkspaceDirectories(request);
+    await materializeRepositoryCredentials(request);
     signal.throwIfAborted();
 
     if (workspaceNeedsBootstrap) {
@@ -1218,9 +1273,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap warm workspace refreshing remote kiloSessionId=${request.kiloSessionId}`
       );
-      if (workspaceNeedsBootstrap || !(await sanitizeBitbucketCodeReviewRemote(request, runGit))) {
-        await refreshGitRemoteToken(request, runGit);
-      }
+      await sanitizeOriginRemote(request, runGit);
+      await refreshGitAuthor(request, runGit);
       logToFile(`bootstrap warm workspace remote ready kiloSessionId=${request.kiloSessionId}`);
     } else {
       progress?.('cloning', 'Cloning repository...');
@@ -1228,6 +1282,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
       );
       cloneTelemetry = await cloneRepository(request, runGit, progress, signal);
+      await sanitizeOriginRemote(request, runGit);
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
@@ -1240,8 +1295,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       if (restoredFromBackup) {
         try {
-          const urls = repositoryUrls(request);
-          if (urls) await setOriginUrl(request, runGit, urls.authenticated);
           await reconcileRestoredWorkspace(request, runGit, progress);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -1253,7 +1306,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
-      await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
       await writeRuntimeSkills(request);
 
@@ -1301,24 +1353,25 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
   } catch (error) {
-    if (error instanceof RestoredWorkspaceReconciliationError) {
-      if (workspaceNeedsBootstrap) {
-        await cleanupWorkspace(request);
-      }
-      throw error;
-    }
+    const failure = signal.reason === timeoutError ? timeoutError : error;
     const bootstrapError =
-      error instanceof WrapperBootstrapError
-        ? error
-        : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
+      failure instanceof WrapperBootstrapError
+        ? failure
+        : failure instanceof RestoredWorkspaceReconciliationError
+          ? new WrapperBootstrapError({
+              code: 'WORKSPACE_RECONCILIATION_FAILED',
+              message: redactSecrets(cleanTerminalOutput(failure.message)),
+              retryable: true,
+            })
+          : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
-      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'}`
+      `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
     );
     if (workspaceNeedsBootstrap) {
-      await cleanupWorkspace(request);
+      await cleanupWorkspace(request, deps.beforeFailureCleanup);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
-    throw bootstrapError;
+    throw failure instanceof RestoredWorkspaceReconciliationError ? failure : bootstrapError;
   }
 }
 
@@ -1370,11 +1423,9 @@ export async function prepareWrapperBootstrapWorkspace(
               : workspaceSignal,
           }),
       },
-      workspaceSignal
+      workspaceSignal,
+      timeoutError
     );
-  } catch (error) {
-    if (workspaceSignal.reason === timeoutError) throw timeoutError;
-    throw error;
   } finally {
     clearTimeout(timeout);
   }

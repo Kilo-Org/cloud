@@ -34,7 +34,7 @@ export type SessionId = `sess_${string}` | `agent_${string}` | `workspace_${stri
 export type LeaseId = `lease_${string}`;
 
 /** User identifier from the authentication system */
-export type UserId = `user_${string}`;
+export type UserId = string;
 
 /** Auto-incrementing event ID in SQLite storage */
 export type EventId = number;

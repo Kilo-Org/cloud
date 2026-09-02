@@ -152,7 +152,11 @@
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
     "prReviewAttribution": "Додати атрибуцію застосунку до перевірок PR",
-    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку."
+    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку.",
+    "returnSendsMessage": "Клавіша повернення надсилає повідомлення",
+    "returnSendsMessageSubtitle": "Коли вимкнено, клавіша повернення вставляє новий рядок у полях введення повідомлень агентам.",
+    "biometricUnlock": "Розблокування за допомогою біометрії",
+    "biometricUnlockSubtitle": "Розблоковуйте застосунок під час запуску та після п’яти хвилин перебування у фоновому режимі."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -211,7 +215,8 @@
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} з {{total}}"
+    "position": "{{name}}, вкладка, {{position}} з {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "Помилка мережі",
       "uploadFailed": "Не вдалося завантажити",
       "failedToUploadFile": "Не вдалося завантажити файл: {{reason}}",
-      "nothingToPaste": "Нема чого вставити"
+      "nothingToPaste": "Нема чого вставити",
+      "metadataStripFailed": "Не вдалося видалити метадані фото."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -724,7 +730,7 @@
       "destroying": "ЗНИЩЕННЯ",
       "provisioned": "ПІДГОТОВЛЕНО",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "Виконується",
+      "running": "ВИКОНУЄТЬСЯ",
       "shuttingDown": "ЗАВЕРШЕННЯ РОБОТИ",
       "starting": "ЗАПУСК",
       "stopped": "ЗУПИНЕНО",
@@ -902,7 +908,23 @@
       "title": "Перевірка",
       "tokens": "Токени",
       "tokensInOut": "{{input}} вхід / {{output}} вихід",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Очікування транскрипту перевірки.",
+      "transcriptEmpty": "Немає транскрипту для цієї перевірки.",
+      "transcriptRetry": "Не вдалося завантажити транскрипт перевірки.",
+      "transcriptLive": "Наживо",
+      "agentIdle": "Агент бездіє",
+      "agentWorking": "Агент працює…",
+      "anErrorOccurred": "Сталася помилка",
+      "errorWithMessage": "Помилка: {{message}}",
+      "executionStarted": "Виконання розпочато",
+      "reviewCompleted": "Перевірку завершено",
+      "reviewInterrupted": "Перевірку перервано",
+      "sessionError": "Помилка сеансу: {{error}}",
+      "statusWithValue": "Стан: {{status}}",
+      "toolName": "Інструмент: {{name}}",
+      "toolNameError": "Інструмент: {{name}} — помилка",
+      "unknownError": "Невідома помилка"
     },
     "reviewList": {
       "configureProvider": "Налаштувати провайдера",
@@ -1523,12 +1545,12 @@
       "overdue_other": "прострочено на {{count}} днів",
       "dueToday": "Термін сьогодні",
       "dueTomorrow": "Термін завтра",
-      "dueInDays_one": "термін через {{count}} день",
-      "dueInDays_few": "термін через {{count}} дні",
-      "dueInDays_many": "термін через {{count}} днів",
-      "dueInDays_other": "термін через {{count}} днів",
+      "dueInDays_one": "Термін через {{count}} день",
+      "dueInDays_few": "Термін через {{count}} дні",
+      "dueInDays_many": "Термін через {{count}} днів",
+      "dueInDays_other": "Термін через {{count}} днів",
       "overdue": "прострочено на {{count}} днів",
-      "dueInDays": "термін через {{count}} днів"
+      "dueInDays": "Термін через {{count}} днів"
     },
     "remediationStatus": {
       "cancellationRequested": "Запит на скасування",
@@ -1591,7 +1613,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активні зараз",
     "search": {
       "searching": "Пошук",
       "searchSessions": "Пошук сеансів",
@@ -1602,16 +1623,15 @@
     "sessionList": {
       "couldNotLoad": "Не вдалося завантажити сеанси",
       "couldNotLoadActive": "Не вдалося завантажити активні сеанси",
-      "noSessionsYet": "Сеансів поки немає",
       "noSessionsYetDescription": "Розпочніть завдання кодування з телефона. Ваші сеанси з'являться тут.",
       "noMatches": "Немає відповідних сеансів",
       "tryDifferentSearch": "Спробуйте інший пошуковий запит.",
       "tryAdjustFilters": "Спробуйте налаштувати або очистити фільтри.",
       "couldNotSearch": "Не вдалося виконати пошук сеансів",
-      "allActive": "Усі сеанси активні",
       "completedWillAppear": "Завершені сеанси з'являться тут.",
       "noPastSessions": "Немає минулих сеансів",
-      "live": "НАЖИВО"
+      "live": "НАЖИВО",
+      "updating": "Оновлення"
     },
     "sessionRow": {
       "deleteTitle": "Видалити сеанс?",
@@ -1659,7 +1679,11 @@
     "sessionExited": "Сесію завершено",
     "remoteSpawnRetryable": "Не вдалося з’єднатися з екземпляром — можливо, його відключено.",
     "remoteSpawnNonRetryable": "Не вдалося запустити сесію на екземплярі — перевірте машину або оновіть CLI.",
-    "remoteSpawnInstanceDisconnected": "Вибраний екземпляр відключився. Почніть сесію на Cloud Agent або виберіть інший екземпляр."
+    "remoteSpawnInstanceDisconnected": "Вибраний екземпляр відключився. Почніть сесію на Cloud Agent або виберіть інший екземпляр.",
+    "liveCount_one": "{{count}} НАЖИВО",
+    "liveCount_other": "{{count}} НАЖИВО",
+    "liveCount_few": "{{count}} НАЖИВО",
+    "liveCount_many": "{{count}} НАЖИВО"
   },
   "agentChat": {
     "session": {
@@ -1681,18 +1705,19 @@
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "renameAccessibility": "Перейменувати сесію: {{title}}",
-      "connectRepository": "Підключити репозиторій",
       "cloningSession": "Клонування сесії",
       "continue": "Продовжити",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс",
-      "cloneFailed": "Не вдалося клонувати цей сеанс.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
-      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити.",
       "notEnoughCredits": "Недостатньо кредитів для запуску Cloud Agent. Додайте кредити та спробуйте ще раз.",
       "previousTaskFinishing": "Попереднє завдання ще завершується. Зачекайте, будь ласка.",
       "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз, будь ласка.",
       "connectionTrouble": "Проблеми зі з'єднанням. Спробуйте ще раз за мить.",
-      "modelUnavailable": "Ця модель недоступна для Cloud Agent. Виберіть іншу модель і спробуйте ще раз."
+      "modelUnavailable": "Ця модель недоступна для Cloud Agent. Виберіть іншу модель і спробуйте ще раз.",
+      "cancelQueuedFailed": "Не вдалося скасувати повідомлення.",
+      "cancelQueuedRestoreAvailable": "Повідомлення скасовано. Торкніться «Відновити», щоб повернути його в поле введення повідомлення.",
+      "cancelQueuedRestored": "Повідомлення скасовано. Запит знову в полі введення повідомлення.",
+      "cancelQueuedUpgradeRequired": "Скасування повідомлень у черзі потребує новішої версії Kilo CLI. Оновіть Kilo CLI та підключіться знову."
     },
     "remoteSession": {
       "failedToCreate": "Не вдалося створити віддалений сеанс",
@@ -1760,7 +1785,12 @@
       "noRepositoriesVisibleGitlab": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв GitLab, а потім оновіть.",
       "openBitbucket": "Відкрити Bitbucket",
       "openGitlab": "Відкрити GitLab",
-      "recentlyUsed": "Нещодавно використані"
+      "recentlyUsed": "Нещодавно використані",
+      "cliCannotContinue": "Цей CLI не може продовжити сеанс. Виберіть Хмарний агент або інший CLI.",
+      "continueFrom": "Продовження {{title}}",
+      "importFailed": "Не вдалося імпортувати цей сеанс.",
+      "importingSession": "Імпортування сеансу",
+      "discardWithUploadsMessage": "Ваш запит і всі завантажені файли, не прикріплені до надісланих повідомлень, буде видалено."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -1820,7 +1850,9 @@
       "noCliInstancesDescription": "Виконайте `kilo remote` у проєкті на своєму комп'ютері або оновіть Kilo CLI, якщо вона вже запущена.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запустити на хмарному агенті"
+      "runOnCloudAgent": "Запустити на хмарному агенті",
+      "terminals": "Термінали",
+      "remotes": "Віддалені екземпляри"
     },
     "modePicker": {
       "title": "Вибрати режим",
@@ -2010,7 +2042,11 @@
       "queuedAccessibility": "Повідомлення в черзі",
       "userMessage": "Повідомлення користувача",
       "assistantMessage": "Повідомлення асистента",
-      "longPressHint": "Довге натискання для відомостей про повідомлення"
+      "longPressHint": "Довге натискання для відомостей про повідомлення",
+      "cancelQueued": "Скасувати повідомлення",
+      "cancelQueuedAccessibility": "Скасувати повідомлення в черзі",
+      "restoreQueued": "Відновити",
+      "restoreQueuedAccessibility": "Відновити скасоване повідомлення в полі введення повідомлення"
     },
     "olderMessages": {
       "arrived": "Раніші повідомлення завантажено",
@@ -2028,6 +2064,8 @@
       "viewTable": "Переглянути таблицю",
       "title": "Таблиця",
       "close": "Закрити таблицю",
+      "loading": "Завантаження таблиці",
+      "empty": "У цій таблиці немає рядків.",
       "columnCount_one": "стовпець",
       "columnCount": "стовпці",
       "columnCount_other": "стовпці",
@@ -2042,9 +2080,6 @@
     },
     "sessionFilter": {
       "title": "Фільтрувати сеанси",
-      "sortBy": "Сортувати за",
-      "sortLastUpdated": "Останнє оновлення",
-      "sortCreated": "Створено",
       "platform": "Платформа",
       "platformCloud": "Хмара",
       "platformExtension": "Розширення",
@@ -2053,9 +2088,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Інше",
-      "project": "Проєкт",
-      "removeProjectFilter": "Видалити фільтр проєкту {{label}}",
-      "removePlatformFilter": "Видалити фільтр платформи {{label}}"
+      "project": "Проєкт"
     },
     "suggestion": {
       "title": "Пропозиція",
@@ -2098,7 +2131,9 @@
       "uploading": "Завантаження…",
       "uploaded": "Завантажено",
       "uploadFailedRetry": "Завантаження не вдалося. Торкніться, щоб повторити.",
-      "uploadFailedTerminal": "Цей файл не можна завантажити."
+      "uploadFailedTerminal": "Цей файл не можна завантажити.",
+      "moveLeft": "Перемістити {{filename}} ліворуч",
+      "moveRight": "Перемістити {{filename}} праворуч"
     },
     "attachmentPasteHint": {
       "accessibility": "Вставити зображення з буфера обміну",
@@ -2128,7 +2163,11 @@
       "finalizingPlaceholder": "Завершення...",
       "messagePlaceholder": "Повідомлення...",
       "cannotReceiveFiles": "Ця сесія не може отримувати файли. Видаліть вкладення, щоб надіслати повідомлення.",
-      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз."
+      "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз.",
+      "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
+      "discardAttachmentsTitle": "Відкинути вкладення?",
+      "charactersRemaining": "Залишилося символів: {{count}}",
+      "insertNewline": "Вставити новий рядок"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",
@@ -2222,6 +2261,17 @@
       "hostConfirmMessage": "Це посилання відкриває {{host}} у вашому браузері.",
       "open": "Відкрити",
       "trustThisHost": "Довіряти цьому хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "«Готово» використовує цю папку.",
+      "emptyTitle": "Усередині немає папок",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Перевірте з'єднання та натисніть «Повторити». «Готово» все одно підтвердить цю папку.",
+      "retryableTitle": "Не вдалося перелічити папки",
+      "tapToListHint": "Торкніться папки, щоб переглянути її вміст",
+      "unsupportedDescription": "Цей CLI не може перелічувати папки. «Готово» зберігає папку запуску, а «Розпочати сеанс» розпочне там.",
+      "unsupportedTitle": "Неможливо перелічити папки"
     }
   },
   "bootstrap": {
@@ -2274,7 +2324,7 @@
     "newCodingTask": "Нове завдання кодування",
     "explore": "Дослідити",
     "seeAll": "Показати всі",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Зараз нічого не запущено"
   },
   "imageViewer": {
     "close": "Закрити {{filename}}",
@@ -2319,7 +2369,7 @@
     "optionsExpiredDescription": "Поверніться та знову відкрийте цей вибір з попереднього екрана."
   },
   "sessionRow": {
-    "needsInput": "потребує вводу"
+    "needsInput": "ПОТРЕБУЄ ВВОДУ"
   },
   "voiceInput": {
     "listening": "Слухаю...",
@@ -2338,7 +2388,8 @@
     "busy": "Голосове введення зайняте. Спробуйте ще раз.",
     "stopped": "Голосове введення зупинено. Торкніться мікрофона, щоб спробувати ще раз.",
     "unavailableDevice": "Голосове введення недоступне на цьому пристрої.",
-    "unavailableLanguage": "Голосове введення недоступне для мови цього пристрою."
+    "unavailableLanguage": "Голосове введення недоступне для мови цього пристрою.",
+    "listeningStopped": "Прослуховування зупинено."
   },
   "share": {
     "title": "Поділитися в Kilo",
@@ -3191,5 +3242,19 @@
     "emptyDescription": "Коли ви довіряєте хосту посилання, воно відкривається без повторного запиту.",
     "revoke": "Відкликати {{host}}",
     "backToPreferences": "Назад до налаштувань"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Повідомлення"
+    },
+    "empty": {
+      "title": "Розпочніть чат",
+      "description": "Надішліть повідомлення, щоб поговорити з моделлю."
+    },
+    "working": "Працює",
+    "historyRetry": "Не вдалося завантажити історію чату.",
+    "catalogRetry": "Не вдалося завантажити моделі",
+    "sendError": "Не вдалося надіслати повідомлення. Спробуйте ще раз."
   }
 }

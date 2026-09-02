@@ -1,4 +1,17 @@
+import { suggestionActionSchema } from '@kilocode/cloud-agent-sdk/schemas';
+import { z } from 'zod';
+
 import { i18n } from '@/i18n';
+
+export const suggestionToolInputSchema = z.object({
+  suggest: z.string(),
+  actions: z.array(suggestionActionSchema),
+});
+
+export const suggestionToolMetadataSchema = z.object({
+  accepted: suggestionActionSchema.optional(),
+  dismissed: z.boolean().optional(),
+});
 
 type ToolStatus = 'pending' | 'running' | 'completed' | 'error';
 type ActiveSuggestionIdentity = { requestId: string; callId?: string } | null;

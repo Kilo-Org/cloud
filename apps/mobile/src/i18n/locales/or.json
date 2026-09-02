@@ -152,7 +152,11 @@
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
     "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍ ଆଟ୍ରିବ୍ୟୁଶନ୍ ଯୋଡନ୍ତୁ",
-    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।"
+    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।",
+    "returnSendsMessage": "ରିଟର୍ନ କୀ ବାର୍ତ୍ତା ପଠାଏ",
+    "returnSendsMessageSubtitle": "ବନ୍ଦ ଥିଲେ, ରିଟର୍ନ କୀ ଏଜେଣ୍ଟର ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ନୂଆ ଧାଡ଼ି ଯୋଡ଼େ।",
+    "biometricUnlock": "ବାୟୋମେଟ୍ରିକ୍ସ ସହିତ ଅନଲକ୍ କରନ୍ତୁ",
+    "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -665,7 +669,8 @@
     "profile": "ପ୍ରୋଫାଇଲ୍",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}"
+    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}",
+    "chat": "ଚାଟ୍"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "ନେଟୱର୍କ ତ୍ରୁଟି",
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ",
       "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ବିଫଳ ହେଲା: {{reason}}",
-      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ"
+      "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ",
+      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ଅପସାରଣ ହୋଇପାରିଲା ନାହିଁ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "ଚେକ୍ ରନ୍",
       "status": "ସ୍ଥିତି",
       "threshold": "ସୀମା",
-      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
+      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+      "transcriptWaiting": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ପାଇଁ ଅପେକ୍ଷା କରୁଛି।",
+      "transcriptEmpty": "ଏହି ସମୀକ୍ଷା ପାଇଁ କୌଣସି ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ନାହିଁ।",
+      "transcriptRetry": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "transcriptLive": "ଲାଇଭ୍",
+      "agentIdle": "ଏଜେଣ୍ଟ ନିଷ୍କ୍ରିୟ",
+      "agentWorking": "ଏଜେଣ୍ଟ କାମ କରୁଛି...",
+      "anErrorOccurred": "ଏକ ତ୍ରୁଟି ଘଟିଲା",
+      "errorWithMessage": "ତ୍ରୁଟି: {{message}}",
+      "executionStarted": "ଏକ୍ସିକ୍ୟୁସନ ଆରମ୍ଭ ହୋଇଛି",
+      "reviewCompleted": "ସମୀକ୍ଷା ସମାପ୍ତ",
+      "reviewInterrupted": "ସମୀକ୍ଷା ବ୍ୟାହତ",
+      "sessionError": "ସେସନ୍ ତ୍ରୁଟି: {{error}}",
+      "statusWithValue": "ସ୍ଥିତି: {{status}}",
+      "toolName": "ଟୁଲ୍: {{name}}",
+      "toolNameError": "ଟୁଲ୍: {{name}} — ତ୍ରୁଟି",
+      "unknownError": "ଅଜଣା ତ୍ରୁଟି"
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "ବର୍ତ୍ତମାନ ସକ୍ରିୟ",
     "search": {
       "searching": "ଖୋଜୁଛି",
       "searchSessions": "ସେସନ୍ ଖୋଜନ୍ତୁ",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "noSessionsYet": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେସନ୍ ନାହିଁ",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଏକ ଭିନ୍ନ ଖୋଜ ଶବ୍ଦ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "tryAdjustFilters": "ଫିଲ୍ଟରଗୁଡ଼ିକୁ ସଜାଡ଼ିବା କିମ୍ବା ପରିଷ୍କାର କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "couldNotSearch": "ସେସନ୍ ଖୋଜାଯାଇପାରିଲା ନାହିଁ",
-      "allActive": "ସମସ୍ତ ସେସନ୍ ସକ୍ରିୟ",
       "completedWillAppear": "ସମାପ୍ତ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noPastSessions": "କୌଣସି ପୁରୁଣା ସେସନ୍ ନାହିଁ",
-      "live": "ଲାଇଭ୍"
+      "live": "ଲାଇଭ୍",
+      "updating": "ଅପଡେଟ୍ ହେଉଛି"
     },
     "sessionRow": {
       "deleteTitle": "ସେସନ୍ ବିଲୋପ କରିବେ?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "ସେସନ୍ ବାହାରିଛି",
     "remoteSpawnRetryable": "ଇନ୍‌ସ୍ଟାନ୍ସରେ ପହଞ୍ଚି ପାରିଲୁ ନାହିଁ — ଏହା ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଥାଇପାରେ।",
     "remoteSpawnNonRetryable": "ଇନ୍‌ସ୍ଟାନ୍ସ ସେସନ୍ ଆରମ୍ଭ କରିବାରେ ବିଫଳ ହେଲା — ମେସିନ୍ ଯାଞ୍ଚ କରନ୍ତୁ କିମ୍ବା CLI ଅପଡେଟ୍ କରନ୍ତୁ।",
-    "remoteSpawnInstanceDisconnected": "ଚୟନ କରାଯାଇଥିବା ଇନ୍‌ସ୍ଟାନ୍ସ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଛି। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଇନ୍‌ସ୍ଟାନ୍ସ ବାଛନ୍ତୁ।"
+    "remoteSpawnInstanceDisconnected": "ଚୟନ କରାଯାଇଥିବା ଇନ୍‌ସ୍ଟାନ୍ସ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଛି। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଇନ୍‌ସ୍ଟାନ୍ସ ବାଛନ୍ତୁ।",
+    "liveCount_one": "{{count}} ଲାଇଭ୍",
+    "liveCount_other": "{{count}} ଲାଇଭ୍"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "ତଳକୁ ସ୍କ୍ରୋଲ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "renameAccessibility": "ସେସନ୍ ପୁନଃନାମକରଣ କରନ୍ତୁ: {{title}}",
-      "connectRepository": "ରିପୋଜିଟୋରୀ ସଂଯୋଗ କରନ୍ତୁ",
       "cloningSession": "ସେସନ୍ କ୍ଲୋନ କରୁଛି",
       "continue": "ଜାରି ରଖନ୍ତୁ",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "cloneFailed": "ଏହି ସେସନ୍ କ୍ଲୋନ ହୋଇପାରିଲା ନାହିଁ।",
       "cloneFailedRetry": "ଏହି ସେସନ୍ କ୍ଲୋନ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
-      "connectRepositoryToContinue": "ଜାରି ରଖିବାକୁ ଏକ ରିପୋଜିଟୋରୀ ସଂଯୋଗ କରନ୍ତୁ।",
       "notEnoughCredits": "Cloud Agent ଚଲାଇବାକୁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ। କ୍ରେଡିଟ୍ ଯୋଡି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "previousTaskFinishing": "ପୂର୍ବ କାର୍ଯ୍ୟ ଏବେବି ସରୁଛି। ଦୟାକରି ଏକ ମୁହୂର୍ତ୍ତ ଅପେକ୍ଷା କରନ୍ତୁ।",
       "serviceUnavailable": "ସେବା ଏବେ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "connectionTrouble": "ସଂଯୋଗ ସମସ୍ୟା। ଦୟାକରି କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "modelUnavailable": "ଏହି ମଡେଲ୍ Cloud Agent ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ମଡେଲ୍ ବାଛି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "modelUnavailable": "ଏହି ମଡେଲ୍ Cloud Agent ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ମଡେଲ୍ ବାଛି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "cancelQueuedFailed": "ବାର୍ତ୍ତା ବାତିଲ ହୋଇପାରିଲା ନାହିଁ।",
+      "cancelQueuedRestoreAvailable": "ବାର୍ତ୍ତା ବାତିଲ ହେଲା। ଏହାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରାଇବାକୁ “ପୁନଃସ୍ଥାପନ କରନ୍ତୁ” ଟାପ୍ କରନ୍ତୁ।",
+      "cancelQueuedRestored": "ବାର୍ତ୍ତା ବାତିଲ ହେଲା। ପ୍ରମ୍ପ୍ଟ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନକୁ ଫେରିଛି।",
+      "cancelQueuedUpgradeRequired": "ଧାଡ଼ିରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରିବାକୁ Kilo CLI ର ଏକ ନୂତନ ସଂସ୍କରଣ ଆବଶ୍ୟକ। Kilo CLI ଅଦ୍ୟତନ କରନ୍ତୁ ଏବଂ ପୁନଃସଂଯୋଗ କରନ୍ତୁ।"
     },
     "remoteSession": {
       "failedToCreate": "ଦୂରସ୍ଥ ସେସନ୍ ସୃଷ୍ଟି କରିବାରେ ବିଫଳ ହେଲା",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। GitLab ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
       "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
-      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ"
+      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ",
+      "cliCannotContinue": "ଏହି CLI ଏକ ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ CLI ଚୟନ କରନ୍ତୁ।",
+      "continueFrom": "{{title}} ଜାରି ରହୁଛି",
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନୀ କରିପାରିଲା ନାହିଁ।",
+      "importingSession": "ସେସନ୍ ଆମଦାନୀ କରୁଛି",
+      "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରର ଏକ ପ୍ରୋଜେକ୍ଟରେ `kilo remote` ଚଲାନ୍ତୁ, କିମ୍ବା ଯଦି ଏକ ପୂର୍ବରୁ ଚାଲୁଅଛି ତେବେ Kilo CLI ଅଦ୍ୟତନ କରନ୍ତୁ।",
       "instanceOnProject": "{{name}} ଚାଲୁଥିବା {{project}}",
       "instanceOnProjectSuffix": "{{name}} ଚାଲୁଥିବା {{project}} ({{suffix}})",
-      "runOnCloudAgent": "କ୍ଲାଉଡ୍ ଏଜେଣ୍ଟରେ ଚଲାନ୍ତୁ"
+      "runOnCloudAgent": "କ୍ଲାଉଡ୍ ଏଜେଣ୍ଟରେ ଚଲାନ୍ତୁ",
+      "terminals": "ଟର୍ମିନାଲ୍‌ଗୁଡ଼ିକ",
+      "remotes": "ରିମୋଟ୍ ଇନଷ୍ଟାନ୍ସଗୁଡ଼ିକ"
     },
     "modePicker": {
       "title": "ମୋଡ୍ ଚୟନ କରନ୍ତୁ",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "ବାର୍ତ୍ତା ଧାଡିରେ ଅଛି",
       "userMessage": "ବ୍ୟବହାରକାରୀ ବାର୍ତ୍ତା",
       "assistantMessage": "ସହାୟକ ବାର୍ତ୍ତା",
-      "longPressHint": "ବାର୍ତ୍ତା ବିବରଣୀ ପାଇଁ ଦୀର୍ଘ ଦବାନ୍ତୁ"
+      "longPressHint": "ବାର୍ତ୍ତା ବିବରଣୀ ପାଇଁ ଦୀର୍ଘ ଦବାନ୍ତୁ",
+      "cancelQueued": "ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
+      "cancelQueuedAccessibility": "ଧାଡ଼ିରେ ଥିବା ବାର୍ତ୍ତା ବାତିଲ କରନ୍ତୁ",
+      "restoreQueued": "ପୁନଃସ୍ଥାପନ କରନ୍ତୁ",
+      "restoreQueuedAccessibility": "ବାତିଲ ହୋଇଥିବା ବାର୍ତ୍ତାକୁ ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ପୁନଃସ୍ଥାପନ କରନ୍ତୁ"
     },
     "olderMessages": {
       "arrived": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହେଲା",
@@ -2462,6 +2496,8 @@
       "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
       "title": "ଟେବୁଲ",
       "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
+      "loading": "ଟେବୁଲ ଲୋଡ ହେଉଛି",
+      "empty": "ଏହି ଟେବୁଲରେ କୌଣସି ଧାଡ଼ି ନାହିଁ।",
       "columnCount_one": "ସ୍ତମ୍ଭ",
       "columnCount": "ସ୍ତମ୍ଭ",
       "columnCount_other": "ସ୍ତମ୍ଭ",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "ସେସନ୍ ଫିଲ୍ଟର କରନ୍ତୁ",
-      "sortBy": "କ୍ରମବଦ୍ଧ କରନ୍ତୁ",
-      "sortLastUpdated": "ସର୍ବଶେଷ ଅପଡେଟ୍",
-      "sortCreated": "ସୃଷ୍ଟି",
       "platform": "ପ୍ଲାଟଫର୍ମ",
       "platformCloud": "କ୍ଲାଉଡ୍",
       "platformExtension": "ଏକ୍ସଟେନ୍ସନ୍",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ଅନ୍ୟ",
-      "project": "ପ୍ରୋଜେକ୍ଟ",
-      "removeProjectFilter": "{{label}} ପ୍ରୋଜେକ୍ଟ ଫିଲ୍ଟର ଅପସାରଣ କରନ୍ତୁ",
-      "removePlatformFilter": "{{label}} ପ୍ଲାଟଫର୍ମ ଫିଲ୍ଟର ଅପସାରଣ କରନ୍ତୁ"
+      "project": "ପ୍ରୋଜେକ୍ଟ"
     },
     "suggestion": {
       "title": "ପରାମର୍ଶ",
@@ -2528,7 +2559,9 @@
       "uploading": "ଅପଲୋଡ୍ ହେଉଛି…",
       "uploaded": "ଅପଲୋଡ୍ ହେଲା",
       "uploadFailedRetry": "ଅପଲୋଡ୍ ବିଫଳ। ପୁନଃଚେଷ୍ଟା ପାଇଁ ଟାପ୍ କରନ୍ତୁ।",
-      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।"
+      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।",
+      "moveLeft": "{{filename}} କୁ ବାମକୁ ଘୁଞ୍ଚାନ୍ତୁ",
+      "moveRight": "{{filename}} କୁ ଡାହାଣକୁ ଘୁଞ୍ଚାନ୍ତୁ"
     },
     "attachmentPasteHint": {
       "accessibility": "କ୍ଲିପବୋର୍ଡରୁ ଛବି ପେଷ୍ଟ କରନ୍ତୁ",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "ସମାପ୍ତ ହେଉଛି...",
       "messagePlaceholder": "ସନ୍ଦେଶ",
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ଆପଣଙ୍କ ବାର୍ତ୍ତା ପଠାଇବାକୁ ଆଟାଚମେଣ୍ଟ ଅପସାରଣ କରନ୍ତୁ।",
-      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।"
+      "couldNotAttachFiles": "ଫାଇଲ ଆଟାଚ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁନଃଚେଷ୍ଟା କରିବାକୁ ପଠାନ୍ତୁ ଟାପ୍ କରନ୍ତୁ।",
+      "discardAttachmentsMessage": "ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ସଂଲଗ୍ନ ହୋଇନଥିବା ଅପଲୋଡ୍ ହୋଇଥିବା ଫାଇଲ୍ ଗୁଡ଼ିକ ବିଲୋପ ହେବ।",
+      "discardAttachmentsTitle": "ସଂଲଗ୍ନକଗୁଡ଼ିକ ପରିତ୍ୟାଗ କରିବେ?",
+      "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "ଏହି ଲିଙ୍କ୍ ଆପଣଙ୍କ ବ୍ରାଉଜରରେ {{host}} ଖୋଲିବ।",
       "open": "ଖୋଲନ୍ତୁ",
       "trustThisHost": "ଏହି ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତୁ"
+    },
+    "folderPicker": {
+      "accessibility": "ଫୋଲ୍ଡର୍: {{label}}",
+      "emptyDescription": "ସମ୍ପନ୍ନ ଏହି ଫୋଲ୍ଡର୍ ବ୍ୟବହାର କରେ।",
+      "emptyTitle": "ଭିତରେ କୌଣସି ଫୋଲ୍ଡର୍ ନାହିଁ",
+      "fieldLabel": "ଫୋଲ୍ଡର୍",
+      "retryableDescription": "ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ। ସମ୍ପନ୍ନ ତଥାପି ଏହି ଫୋଲ୍ଡର୍ ନିଶ୍ଚିତ କରେ।",
+      "retryableTitle": "ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିଲା ନାହିଁ",
+      "tapToListHint": "ଏହାର ବିଷୟବସ୍ତୁ ତାଲିକା କରିବାକୁ ଏକ ଫୋଲ୍ଡର୍ ଟାପ୍ କରନ୍ତୁ",
+      "unsupportedDescription": "ଏହି CLI ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିବ ନାହିଁ। ସମ୍ପନ୍ନ ଲଞ୍ଚ ଫୋଲ୍ଡର୍ ରଖେ ଏବଂ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ ସେଠାରେ ଆରମ୍ଭ ହୁଏ।",
+      "unsupportedTitle": "ଫୋଲ୍ଡର୍ ତାଲିକା କରିପାରିବ ନାହିଁ"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "ନୂତନ କୋଡିଂ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",
     "seeAll": "ସବୁ ଦେଖନ୍ତୁ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ଏବେ କିଛି ଚାଲୁନାହିଁ"
   },
   "imageViewer": {
     "close": "{{filename}} ବନ୍ଦ କରନ୍ତୁ",
@@ -2766,7 +2814,8 @@
     "busy": "ଭଏସ୍ ଇନ୍ପୁଟ୍ ବ୍ୟସ୍ତ ଅଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "stopped": "ଭଏସ୍ ଇନ୍ପୁଟ୍ ବନ୍ଦ ହେଲା। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ମାଇକ୍ରୋଫୋନ୍ ଟାପ୍ କରନ୍ତୁ।",
     "unavailableDevice": "ଏହି ଡିଭାଇସ୍ ରେ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।",
-    "unavailableLanguage": "ଏହି ଡିଭାଇସ୍ ଭାଷା ପାଇଁ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।"
+    "unavailableLanguage": "ଏହି ଡିଭାଇସ୍ ଭାଷା ପାଇଁ ଭଏସ୍ ଇନ୍ପୁଟ୍ ଉପଲବ୍ଧ ନାହିଁ।",
+    "listeningStopped": "ଶୁଣିବା ବନ୍ଦ ହେଲା।"
   },
   "share": {
     "title": "Kilo କୁ ଅଂଶୀଦାର କରନ୍ତୁ",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "ଯେତେବେଳେ ଆପଣ ଏକ ଲିଙ୍କ୍‌ର ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତି, ଏହା ପୁଣି ପଚାରିବା ବିନା ଖୋଲିଥାଏ।",
     "revoke": "{{host}} ରଦ୍ଦ କରନ୍ତୁ",
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
+  },
+  "quickChat": {
+    "title": "ଚାଟ୍",
+    "composer": {
+      "placeholder": "ସନ୍ଦେଶ"
+    },
+    "empty": {
+      "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
+      "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
+    },
+    "working": "କାମ କରୁଛି",
+    "historyRetry": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "catalogRetry": "ମଡେଲ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
+    "sendError": "ସନ୍ଦେଶ ପଠାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   }
 }

@@ -16,7 +16,10 @@ function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   };
 }
 
-function completed(input: Record<string, unknown> = {}, output = ''): ToolPart['state'] {
+function completed(
+  input: Record<string, unknown> = {},
+  output = ''
+): Extract<ToolPart['state'], { status: 'completed' }> {
   return {
     status: 'completed',
     input,
@@ -245,6 +248,23 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('uses the suggest input text and recognizes completed dismissal metadata', () => {
+    expect(
+      getDisplay(makeToolPart('suggest', completed({ suggest: 'Review the changes?' })))
+    ).toEqual({
+      title: 'Suggestion',
+      subtitle: 'Review the changes?',
+    });
+    expect(
+      getDisplay(
+        makeToolPart('suggest', {
+          ...completed({ suggest: 'Review the changes?' }),
+          metadata: { dismissed: true, truncated: false },
+        })
+      )
+    ).toEqual({ title: 'Suggestion', subtitle: 'Suggestion dismissed' });
+  });
+
   it('maps an MCP tool to server/tool title', () => {
     expect(
       getDisplay(
@@ -409,8 +429,13 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
 });
 
 describe('toolPartHasDetails', () => {
-  it('returns false for suggest even with input', () => {
-    expect(toolPartHasDetails(makeToolPart('suggest', completed({ prompt: 'hi' })))).toBe(false);
+  it('opens suggestion details when input or output exists', () => {
+    expect(
+      toolPartHasDetails(makeToolPart('suggest', completed({ suggest: 'Review the changes?' })))
+    ).toBe(true);
+    expect(
+      toolPartHasDetails(makeToolPart('suggest', completed({}, 'User dismissed the suggestion.')))
+    ).toBe(true);
   });
 
   it('returns false for a running part with empty input and no output', () => {

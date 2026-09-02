@@ -152,7 +152,11 @@
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
     "prReviewAttribution": "Ychwanegu priodoli ap at adolygiadau PR",
-    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad"
+    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad",
+    "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
+    "returnSendsMessageSubtitle": "Pan fydd wedi'i ddiffodd, mae Dychwelyd yn mewnosod llinell newydd ym meysydd mewnbwn neges asiantau.",
+    "biometricUnlock": "Datgloi gyda biometreg",
+    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -197,7 +201,7 @@
       "diffTooLarge": "Diff yn rhy fawr i'w ddangos",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor diff y ffeil hon ar GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Clirio dewis",
@@ -693,7 +697,8 @@
     "profile": "Proffil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} o {{total}}"
+    "position": "{{name}}, tab, {{position}} o {{total}}",
+    "chat": "Sgwrs"
   },
   "chat": {
     "instancePicker": {
@@ -777,7 +782,8 @@
       "networkError": "Gwall rhwydwaith",
       "uploadFailed": "Methodd yr uwchlwythiad",
       "failedToUploadFile": "Methwyd uwchlwytho'r ffeil: {{reason}}",
-      "nothingToPaste": "Dim byd i'w ludo"
+      "nothingToPaste": "Dim byd i'w ludo",
+      "metadataStripFailed": "Ni ellid tynnu metadata'r llun."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1335,7 +1341,23 @@
       "checkRun": "Rhedeg gwiriad",
       "status": "Statws",
       "threshold": "Trothwy",
-      "pullRequest": "cais tynnu"
+      "pullRequest": "cais tynnu",
+      "transcriptWaiting": "Yn aros am drawsgrifiad yr adolygiad.",
+      "transcriptEmpty": "Dim trawsgrifiad ar gyfer yr adolygiad hwn.",
+      "transcriptRetry": "Ni ellid llwytho trawsgrifiad yr adolygiad.",
+      "transcriptLive": "Byw",
+      "agentIdle": "Asiant yn segur",
+      "agentWorking": "Asiant yn gweithio...",
+      "anErrorOccurred": "Digwyddodd gwall",
+      "errorWithMessage": "Gwall: {{message}}",
+      "executionStarted": "Dechreuodd y gweithrediad",
+      "reviewCompleted": "Adolygiad wedi'i gwblhau",
+      "reviewInterrupted": "Adolygiad wedi'i amharu",
+      "sessionError": "Gwall sesiwn: {{error}}",
+      "statusWithValue": "Statws: {{status}}",
+      "toolName": "Offeryn: {{name}}",
+      "toolNameError": "Offeryn: {{name}} — gwall",
+      "unknownError": "Gwall anhysbys"
     },
     "reviewMemory": {
       "title": "Cof adolygu",
@@ -2085,7 +2107,6 @@
     }
   },
   "agents": {
-    "activeNow": "Yn weithredol nawr",
     "search": {
       "searching": "Yn chwilio",
       "searchSessions": "Chwilio sesiynau",
@@ -2096,16 +2117,15 @@
     "sessionList": {
       "couldNotLoad": "Methwyd llwytho sesiynau",
       "couldNotLoadActive": "Methwyd llwytho sesiynau gweithredol",
-      "noSessionsYet": "Dim sesiynau eto",
       "noSessionsYetDescription": "Dechreuwch dasg codio o'ch ffôn. Bydd eich sesiynau'n ymddangos yma.",
       "noMatches": "Dim sesiynau'n cyfateb",
       "tryDifferentSearch": "Ceisiwch derm chwilio gwahanol.",
       "tryAdjustFilters": "Ceisiwch addasu neu glirio'ch hidlwyr.",
       "couldNotSearch": "Methwyd chwilio sesiynau",
-      "allActive": "Mae pob sesiwn yn weithredol",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau yn y gorffennol",
-      "live": "BYW"
+      "live": "BYW",
+      "updating": "Yn diweddaru"
     },
     "sessionRow": {
       "deleteTitle": "Dileu sesiwn?",
@@ -2157,7 +2177,13 @@
     "sessionExited": "Wedi gadael y sesiwn",
     "remoteSpawnRetryable": "Ni ellid cyrraedd yr enghraifft — efallai iddi ddatgysylltu.",
     "remoteSpawnNonRetryable": "Methodd yr enghraifft â chychwyn y sesiwn — gwiriwch y peiriant neu diweddarwch y CLI.",
-    "remoteSpawnInstanceDisconnected": "Datgysylltodd yr enghraifft a ddewiswyd. Cychwynnwch sesiwn ar Cloud Agent neu dewiswch enghraifft arall."
+    "remoteSpawnInstanceDisconnected": "Datgysylltodd yr enghraifft a ddewiswyd. Cychwynnwch sesiwn ar Cloud Agent neu dewiswch enghraifft arall.",
+    "liveCount_one": "{{count}} BYW",
+    "liveCount_other": "{{count}} BYW",
+    "liveCount_zero": "{{count}} BYW",
+    "liveCount_two": "{{count}} BYW",
+    "liveCount_few": "{{count}} BYW",
+    "liveCount_many": "{{count}} BYW"
   },
   "agentChat": {
     "session": {
@@ -2179,18 +2205,19 @@
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
-      "connectRepository": "Cysylltu ystorfa",
       "cloningSession": "Yn clonio sesiwn",
       "continue": "Parhau",
       "couldNotLoadThisSession": "Methwyd llwytho'r sesiwn hon",
-      "cloneFailed": "Methwyd clonio'r sesiwn hon.",
       "cloneFailedRetry": "Methwyd clonio'r sesiwn hon. Ceisiwch eto.",
-      "connectRepositoryToContinue": "Cysylltwch ystorfa i barhau.",
       "notEnoughCredits": "Dim digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Mae'r dasg flaenorol yn dal i orffen. Arhoswch funud.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Problem cysylltiad. Ceisiwch eto ymhen munud.",
-      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto."
+      "modelUnavailable": "Nid yw'r model hwn ar gael ar gyfer Cloud Agent. Dewiswch fodel arall a cheisiwch eto.",
+      "cancelQueuedFailed": "Ni ellid canslo'r neges.",
+      "cancelQueuedRestoreAvailable": "Neges wedi'i chanslo. Tapiwch Adfer i'w dychwelyd i'r maes mewnbwn neges.",
+      "cancelQueuedRestored": "Neges wedi'i chanslo. Mae'r anogiad yn ôl yn y maes mewnbwn neges.",
+      "cancelQueuedUpgradeRequired": "Mae angen Kilo CLI mwy newydd i ganslo negeseuon yn y ciw. Diweddarwch Kilo CLI ac ailgysylltwch."
     },
     "remoteSession": {
       "failedToCreate": "Methodd creu sesiwn o bell",
@@ -2258,7 +2285,12 @@
       "noRepositoriesVisibleGitlab": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer GitLab, yna adnewyddwch.",
       "openBitbucket": "Agor Bitbucket",
       "openGitlab": "Agor GitLab",
-      "recentlyUsed": "Defnyddiwyd yn ddiweddar"
+      "recentlyUsed": "Defnyddiwyd yn ddiweddar",
+      "continueFrom": "Parhau gyda {{title}}",
+      "importingSession": "Mewnforio sesiwn",
+      "cliCannotContinue": "Ni all y CLI hwn barhau sesiwn. Dewiswch Cloud Agent neu CLI arall.",
+      "importFailed": "Ni ellid mewnforio'r sesiwn hon.",
+      "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2320,7 +2352,9 @@
       "noCliInstancesDescription": "Rhedwch `kilo remote` mewn prosiect ar eich cyfrifiadur, neu diweddarwch Kilo CLI os yw un eisoes yn rhedeg.",
       "instanceOnProject": "{{name}} ar {{project}}",
       "instanceOnProjectSuffix": "{{name}} ar {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rhedeg ar Cloud Agent"
+      "runOnCloudAgent": "Rhedeg ar Cloud Agent",
+      "terminals": "Terfynellau",
+      "remotes": "Achosion o bell"
     },
     "modePicker": {
       "title": "Dewis modd",
@@ -2510,7 +2544,11 @@
       "queuedAccessibility": "Neges mewn ciw",
       "userMessage": "Neges defnyddiwr",
       "assistantMessage": "Neges cynorthwyydd",
-      "longPressHint": "Pwyswch yn hir i weld manylion y neges"
+      "longPressHint": "Pwyswch yn hir i weld manylion y neges",
+      "cancelQueued": "Canslo neges",
+      "cancelQueuedAccessibility": "Canslo neges yn y ciw",
+      "restoreQueued": "Adfer",
+      "restoreQueuedAccessibility": "Adfer neges wedi'i chanslo i'r maes mewnbwn neges"
     },
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",
@@ -2530,6 +2568,8 @@
       "viewTable": "Gweld y tabl",
       "title": "Tabl",
       "close": "Cau'r tabl",
+      "loading": "Yn llwytho'r tabl",
+      "empty": "Nid oes rhesi yn y tabl hwn.",
       "columnCount_one": "colofn",
       "columnCount": "colofnau",
       "columnCount_other": "colofnau",
@@ -2548,9 +2588,6 @@
     },
     "sessionFilter": {
       "title": "Hidlo sesiynau",
-      "sortBy": "Trefnu yn ôl",
-      "sortLastUpdated": "Diweddarwyd ddiwethaf",
-      "sortCreated": "Crëwyd",
       "platform": "Platfform",
       "platformCloud": "Cwmwl",
       "platformExtension": "Estyniad",
@@ -2559,9 +2596,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Arall",
-      "project": "Prosiect",
-      "removeProjectFilter": "Dileu hidlydd prosiect {{label}}",
-      "removePlatformFilter": "Dileu hidlydd llwyfan {{label}}"
+      "project": "Prosiect"
     },
     "suggestion": {
       "title": "Awgrym",
@@ -2604,7 +2639,9 @@
       "uploading": "Llwytho i fyny…",
       "uploaded": "Llwythwyd i fyny",
       "uploadFailedRetry": "Methodd llwytho i fyny. Tapiwch i ailgynnig.",
-      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon."
+      "uploadFailedTerminal": "Ni ellir uwchlwytho'r ffeil hon.",
+      "moveLeft": "Symud {{filename}} i'r chwith",
+      "moveRight": "Symud {{filename}} i'r dde"
     },
     "attachmentPasteHint": {
       "accessibility": "Gludo delwedd o'r clipfwrdd",
@@ -2634,7 +2671,11 @@
       "finalizingPlaceholder": "Dirwyn i ben...",
       "messagePlaceholder": "Neges...",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Dileuwch yr atodiadau i anfon eich neges.",
-      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto."
+      "couldNotAttachFiles": "Methwyd atodi ffeiliau. Tapiwch anfon i geisio eto.",
+      "discardAttachmentsMessage": "Bydd ffeiliau wedi'u huwchlwytho nad ydynt wedi'u hatodi i negeseuon a anfonwyd yn cael eu dileu.",
+      "discardAttachmentsTitle": "Taflu atodiadau?",
+      "charactersRemaining": "{{count}} nod yn weddill",
+      "insertNewline": "Mewnosod llinell newydd"
     },
     "chatLink": {
       "linkCopied": "Copïwyd y ddolen",
@@ -2699,7 +2740,7 @@
       "olderActivity": "Gweithgaredd cynharach",
       "olderActivityDescription": "Cost heb ei phriodoli i'r hanes a lwythwyd",
       "ofWindowTokens": "o {{window}} token",
-      "tokens": "Tocynnau",
+      "tokens": "tocynnau",
       "tokensWithPercentage": "tokenau ({{percentage}})",
       "stepsCount_one": "{{steps}} cam",
       "stepsCount": "{{steps}} cam",
@@ -2730,6 +2771,17 @@
       "hostConfirmMessage": "Mae'r ddolen hon yn agor {{host}} yn eich porwr.",
       "open": "Agor",
       "trustThisHost": "Ymddiried yn y gwesteiwr hwn"
+    },
+    "folderPicker": {
+      "accessibility": "Ffolder: {{label}}",
+      "emptyDescription": "Mae Wedi'i wneud yn defnyddio'r ffolder hwn.",
+      "emptyTitle": "Dim ffolderi y tu mewn",
+      "fieldLabel": "Ffolder",
+      "retryableDescription": "Gwiriwch eich cysylltiad a rhoi cynnig eto. Mae Wedi'i wneud yn cadarnhau'r ffolder hwn o hyd.",
+      "retryableTitle": "Methodd rhestru ffolderi",
+      "tapToListHint": "Tapiwch ffolder i restru ei gynnwys",
+      "unsupportedDescription": "Ni all y CLI hwn restru ffolderi. Mae Wedi'i wneud yn cadw'r ffolder lansio ac mae Dechrau sesiwn yn dechrau yno.",
+      "unsupportedTitle": "Ni ellir rhestru ffolderi"
     }
   },
   "bootstrap": {
@@ -2782,7 +2834,7 @@
     "newCodingTask": "Tasg codio newydd",
     "explore": "Archwilio",
     "seeAll": "Gweld y cyfan",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Does dim byd yn rhedeg ar hyn o bryd"
   },
   "imageViewer": {
     "close": "Cau {{filename}}",
@@ -2846,7 +2898,8 @@
     "busy": "Mae mewnbwn llais yn brysur. Rhowch gynnig arall arni.",
     "stopped": "Stopiodd mewnbwn llais. Tapiwch y meic i roi cynnig arall arni.",
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
-    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon."
+    "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
+    "listeningStopped": "Stopiodd y gwrando."
   },
   "share": {
     "title": "Rhannu i Kilo",
@@ -3020,7 +3073,7 @@
   "feedback": {
     "noEmailApp": "Dim app e-bost ar gael. Gallwch gysylltu â ni yn {{email}}",
     "couldNotOpenStore": "Methwyd agor y siop.",
-    "emailSubject": "Adborth ap symudol",
+    "emailSubject": "adborth ap symudol",
     "neutralTitle": "Graduwch ap Kilo",
     "rateTheApp": "Graduwch yr ap",
     "sendFeedback": "Anfonwch adborth"
@@ -3233,5 +3286,19 @@
     "emptyDescription": "Pan fyddwch yn ymddiried yn nhost y ddolen, bydd yn agor heb ofyn eto.",
     "revoke": "Diddymu {{host}}",
     "backToPreferences": "Yn ôl i'r dewisiadau"
+  },
+  "quickChat": {
+    "title": "Sgwrs",
+    "composer": {
+      "placeholder": "Neges"
+    },
+    "empty": {
+      "title": "Dechrau sgwrs",
+      "description": "Anfonwch neges i siarad â model."
+    },
+    "working": "Yn gweithio",
+    "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
+    "catalogRetry": "Methodd llwytho modelau",
+    "sendError": "Methodd anfon neges. Ceisiwch eto."
   }
 }

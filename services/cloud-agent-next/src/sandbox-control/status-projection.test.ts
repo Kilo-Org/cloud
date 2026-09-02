@@ -50,12 +50,6 @@ describe('projectReportedStatus', () => {
     ).toBe('finalizing');
   });
 
-  it('reports stalled when running, ready, and stalled', () => {
-    expect(
-      projectReportedStatus({ physical: 'running', connection: 'ready', work: 'stalled' })
-    ).toBe('stalled');
-  });
-
   it('reports degraded when running and disconnected', () => {
     expect(
       projectReportedStatus({

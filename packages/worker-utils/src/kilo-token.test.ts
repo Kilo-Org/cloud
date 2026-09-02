@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { SignJWT } from 'jose';
+import { SignJWT, decodeProtectedHeader } from 'jose';
 import {
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
@@ -102,6 +102,31 @@ describe('signKiloToken', () => {
     expect(payloadWithoutEnv.env).toBeUndefined();
   });
 
+  it('omits the apiTokenPepper claim entirely when pepper is not provided', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-internal',
+      secret: SECRET,
+      expiresInSeconds: 60,
+    });
+
+    const payload = await verifyKiloToken(token, SECRET);
+
+    expect('apiTokenPepper' in payload).toBe(false);
+  });
+
+  it('sets typ: JWT on the protected header', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-header',
+      pepper: 'pepper-header',
+      secret: SECRET,
+      expiresInSeconds: 60,
+    });
+
+    const header = decodeProtectedHeader(token);
+
+    expect(header).toEqual({ alg: 'HS256', typ: 'JWT' });
+  });
+
   it('produces payloads accepted by the closed schema', async () => {
     const { token } = await signKiloToken({
       userId: 'user-schema',
@@ -173,6 +198,24 @@ describe('verifyKiloToken', () => {
     ).resolves.toMatchObject({ kiloUserId: 'user-123' });
     await expect(verifyKiloToken(token, SECRET, { audience: 'another-service' })).rejects.toThrow();
     await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+  });
+
+  it('retains jose audience-array handling for the strict reader', async () => {
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-123',
+      aud: ['git-token-service:bitbucket-repositories', 'another-service'],
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(encode(SECRET));
+
+    await expect(
+      verifyKiloToken(token, SECRET, { audience: 'git-token-service:bitbucket-repositories' })
+    ).resolves.toMatchObject({ kiloUserId: 'user-123' });
+    await expect(verifyKiloToken(token, SECRET, { audience: 'other-service' })).rejects.toThrow();
+    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow('Unexpected token audience');
   });
 
   it('rejects wrong secret', async () => {

@@ -29,13 +29,17 @@ import {
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import {
   disconnectGitHubUserAuthorization,
   getGitHubUserAuthorizationStatus,
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
+import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -58,7 +62,10 @@ export const githubAppsRouter = createTRPCRouter({
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
 
       return {
-        canAdd: integrations.length === 0 || ctx.user.is_admin,
+        canAdd:
+          canManageOrganization(role) &&
+          (integrations.length === 0 ||
+            canOrganizationUseMultipleGitHubInstallations(input.organizationId)),
         installations: integrations.map(integration => {
           const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
           const status: 'connected' | 'pending' | 'suspended' | 'needs_attention' =
@@ -145,20 +152,17 @@ export const githubAppsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Any org member can start an install, matching the pre-C1 callback,
-      // which called ensureOrganizationAccess with no role filter.
-      const owner = await resolveAuthorizedOwner(ctx, input.organizationId, [
-        'owner',
-        'admin',
-        'billing_manager',
-        'member',
-      ]);
-      if (owner.type === 'org') {
+      const owner = await resolveAuthorizedOwner(
+        ctx,
+        input.organizationId,
+        input.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
+      );
+      if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
         const integrations = await githubAppsService.listIntegrations(owner);
-        if (integrations.length > 0 && !ctx.user.is_admin) {
+        if (integrations.length > 0) {
           throw new TRPCError({
             code: 'FORBIDDEN',
-            message: 'Only Kilo administrators can add another GitHub organization',
+            message: 'This organization already has a GitHub installation',
           });
         }
       }
@@ -494,6 +498,10 @@ export const githubAppsRouter = createTRPCRouter({
           code: 'FORBIDDEN',
           message: 'This endpoint is only available in development mode',
         });
+      }
+
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
 
       const appType = input.appType;

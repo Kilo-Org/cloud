@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contracts';
 
 const sdk = vi.hoisted(() => {
   class StockSandbox {}
@@ -11,6 +12,7 @@ const logging = vi.hoisted(() => {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
     withFields: vi.fn(),
   };
   logger.withFields.mockReturnValue(logger);
@@ -36,6 +38,10 @@ import {
   MANAGED_SCM_OUTBOUND_HANDLER,
   handleManagedScmOutbound,
 } from './sandbox-outbound.js';
+import {
+  createControlPlaneCredential,
+  type ControlCredentialPurpose,
+} from './sandbox-control/managed-credential.js';
 
 const CAPABILITY = 'kgh2.opaque';
 const LEGACY_CAPABILITY = 'kgh1.opaque';
@@ -80,6 +86,7 @@ function serializedLogCalls(): string {
     debug: logging.logger.debug.mock.calls,
     info: logging.logger.info.mock.calls,
     warn: logging.logger.warn.mock.calls,
+    error: logging.logger.error.mock.calls,
   });
 }
 
@@ -1069,6 +1076,44 @@ describe('handleManagedScmOutbound Kilo authorization', () => {
     });
   });
 
+  it('strips forged trusted lineage from proxied child bootstrap while preserving the body', async () => {
+    const root = 'ses_12345678901234567890123456';
+    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const body = { sessionId: child, parentSessionId: root };
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+      sessionIngestScope: { cloudAgentSessionId: 'cloud-agent-session-1', rootKiloSessionId: root },
+    });
+    const scopedFetch = vi.fn(async (_request: Request) => new Response(null, { status: 200 }));
+    const publicFetch = vi.fn();
+    vi.stubGlobal('fetch', publicFetch);
+
+    const response = await handleOutbound(
+      new Request('https://ingest.kilosessions.ai/api/session', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KILO_CAPABILITY}`,
+          'Content-Type': 'application/json',
+          [cloudAgentSessionScopeHeaders.trustedLineage]: '1',
+        },
+        body: JSON.stringify(body),
+      }),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability, undefined, scopedFetch)
+    );
+
+    expect(response.status).toBe(200);
+    expect(publicFetch).not.toHaveBeenCalled();
+    expect(scopedFetch).toHaveBeenCalledOnce();
+    const forwarded = scopedFetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(forwarded.url).pathname).toBe('/internal/cloud-agent/v1/session');
+    expect(forwarded.headers.get('X-Internal-Secret')).toBe('trusted-internal-secret');
+    expect(forwarded.headers.get(cloudAgentSessionScopeHeaders.rootKiloSessionId)).toBe(root);
+    expect(forwarded.headers.get(cloudAgentSessionScopeHeaders.trustedLineage)).toBeNull();
+    await expect(forwarded.json()).resolves.toEqual(body);
+  });
+
   it('routes session-scoped ingest through the internal binding and treats 404 as terminal', async () => {
     const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
       success: true,
@@ -1362,5 +1407,431 @@ describe('handleManagedScmOutbound Bitbucket', () => {
     );
     expect(redeem).not.toHaveBeenCalled();
     expect(response.status).toBe(502);
+  });
+});
+
+describe('handleManagedScmOutbound control-plane aliases', () => {
+  const capabilities = {
+    kilo: KILO_CAPABILITY,
+    github: CAPABILITY,
+    gitlab: GITLAB_CAPABILITY,
+    bitbucket: 'kbb1.opaque',
+  } satisfies Record<ControlCredentialPurpose, string>;
+
+  function fixture() {
+    const resolveCredential = vi.fn().mockResolvedValue(null);
+    const getByName = vi.fn(() => ({ resolveCredential }));
+    const redemptions = {
+      kilo: vi.fn().mockResolvedValue({
+        success: true,
+        authorization: REDEEMED_KILO_AUTHORIZATION,
+        routeClass: 'backend_api',
+      }),
+      github: vi.fn().mockResolvedValue({
+        success: true,
+        authorization: REDEEMED_GIT_AUTHORIZATION,
+      }),
+      gitlab: vi.fn().mockResolvedValue({
+        success: true,
+        headers: { authorization: REDEEMED_GITLAB_AUTHORIZATION },
+      }),
+      bitbucket: vi.fn().mockResolvedValue({
+        success: true,
+        headers: { authorization: basicCredential('upstream-token', 'Basic', 'x-token-auth') },
+      }),
+    };
+    const scopedFetch = vi.fn(async (_request: Request) => new Response('scoped'));
+    const env: Cloudflare.Env = {
+      ...createEnv(
+        redemptions.github,
+        redemptions.gitlab,
+        redemptions.kilo,
+        undefined,
+        scopedFetch
+      ),
+      GIT_TOKEN_SERVICE: {
+        redeemGitHubSessionCapability: redemptions.github,
+        redeemGitLabSessionCapability: redemptions.gitlab,
+        redeemKiloSessionCapability: redemptions.kilo,
+        redeemBitbucketSessionCapability: redemptions.bitbucket,
+      } as never,
+      SANDBOX_CONTROL: { getByName } as never,
+    };
+    const forward = vi.fn(async (_request: Request) => new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+    return { env, resolveCredential, getByName, redemptions, forward, scopedFetch };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { purpose: 'kilo', scheme: 'Bearer', username: undefined },
+    { purpose: 'kilo', scheme: 'token', username: undefined },
+    { purpose: 'github', scheme: 'bEaReR', username: undefined },
+    { purpose: 'github', scheme: 'ToKeN', username: undefined },
+    { purpose: 'github', scheme: 'bAsIc', username: 'x-access-token' },
+    { purpose: 'gitlab', scheme: 'Bearer', username: undefined },
+    { purpose: 'gitlab', scheme: 'Basic', username: 'oauth2' },
+    { purpose: 'bitbucket', scheme: 'Bearer', username: undefined },
+    { purpose: 'bitbucket', scheme: 'token', username: undefined },
+    { purpose: 'bitbucket', scheme: 'Basic', username: 'x-token-auth' },
+  ] as const)(
+    'resolves $purpose aliases carried by $scheme and redeems exactly once',
+    async ({ purpose, scheme, username }) => {
+      const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', purpose);
+      resolveCredential.mockResolvedValue({ credential: capabilities[purpose] });
+      const authorization = username
+        ? basicCredential(credential, `${scheme}\t `, username)
+        : `${scheme}\t ${credential}`;
+      const request = new Request('https://example.test:8443/managed/resource?key=query-secret', {
+        method: 'POST',
+        headers: { Authorization: authorization, Host: 'guest-supplied.invalid' },
+        body: 'request-body',
+      });
+
+      const response = await handleOutbound(request, env);
+
+      expect(response.status).toBe(200);
+      expect(getByName).toHaveBeenCalledExactlyOnceWith('sbx_1');
+      expect(resolveCredential).toHaveBeenCalledExactlyOnceWith({
+        credential,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        url: request.url,
+        method: request.method,
+      });
+      expect(redemptions[purpose]).toHaveBeenCalledExactlyOnceWith({
+        capability: capabilities[purpose],
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+        requestUrl: request.url,
+        requestMethod: request.method,
+        ...(purpose === 'kilo'
+          ? { bootstrapKiloSessionId: undefined, sessionIngestProxyVersion: 1 }
+          : {}),
+      });
+      for (const [provider, redeem] of Object.entries(redemptions)) {
+        if (provider !== purpose) expect(redeem).not.toHaveBeenCalled();
+      }
+      expect(forward).toHaveBeenCalledOnce();
+      const forwarded = forward.mock.calls[0]?.[0];
+      expect(forwarded?.headers.get('Authorization')).not.toContain(credential);
+      expect(forwarded?.headers.get('Authorization')).not.toContain(capabilities[purpose]);
+      expect(forwarded?.headers.get('Host')).toBe('example.test:8443');
+      expect(forwarded?.redirect).toBe('manual');
+      expect(await forwarded?.text()).toBe('request-body');
+      expect(request.headers.get('Authorization')).toBe(authorization);
+      const logs = serializedLogCalls();
+      expect(logs).not.toContain(credential);
+      expect(logs).not.toContain(capabilities[purpose]);
+      expect(logs).not.toContain('query-secret');
+      expect(logs).not.toContain('upstream-token');
+    }
+  );
+
+  it.each([false, true])(
+    'resolves GitLab PRIVATE-TOKEN aliases once with duplicate bearer=%s',
+    async duplicate => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'gitlab');
+      resolveCredential.mockResolvedValue({ credential: GITLAB_CAPABILITY });
+      const headers = new Headers({ 'PRIVATE-TOKEN': credential });
+      if (duplicate) headers.set('Authorization', `Bearer ${credential}`);
+
+      const response = await handleOutbound(
+        new Request('https://gitlab.com/api/v4/projects/1/merge_requests', { headers }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(resolveCredential).toHaveBeenCalledOnce();
+      expect(redemptions.gitlab).toHaveBeenCalledOnce();
+      expect(forward.mock.calls[0]?.[0].headers.get('PRIVATE-TOKEN')).toBeNull();
+      expect(forward.mock.calls[0]?.[0].headers.get('Authorization')).toBe(
+        REDEEMED_GITLAB_AUTHORIZATION
+      );
+    }
+  );
+
+  it.each(['trusted-organization', '', undefined])(
+    'overrides guest organization and Host headers using trusted Kilo scope',
+    async organizationId => {
+      const { env, resolveCredential, forward } = fixture();
+      resolveCredential.mockResolvedValue({ credential: KILO_CAPABILITY, organizationId });
+      const credential = createControlPlaneCredential('sbx_1', 'kilo');
+
+      await handleOutbound(
+        new Request('https://api.kilo.ai/api/openrouter/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${credential}`,
+            'x-kilocode-organizationid': 'forged-organization',
+            Host: 'guest-supplied.invalid',
+          },
+          body: '{}',
+        }),
+        env
+      );
+
+      const forwarded = forward.mock.calls[0]?.[0];
+      expect(forwarded?.headers.get('x-kilocode-organizationid')).toBe(organizationId ?? '');
+      expect(forwarded?.headers.get('Host')).toBe('api.kilo.ai');
+    }
+  );
+
+  it('uses the request-specific capability for multiple Kilo roots in one sandbox', async () => {
+    const { env, resolveCredential, redemptions, forward, scopedFetch, getByName } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'kilo');
+    const roots = ['ses_12345678901234567890123456', 'ses_abcdefghijklmnopqrstuvwxyz'];
+    for (const [index, root] of roots.entries()) {
+      resolveCredential.mockResolvedValueOnce({
+        credential: `kka1.root-${index}`,
+        organizationId: 'trusted-organization',
+      });
+      redemptions.kilo.mockResolvedValueOnce({
+        success: true,
+        authorization: REDEEMED_KILO_AUTHORIZATION,
+        routeClass: 'session_ingest',
+        sessionIngestScope: { cloudAgentSessionId: 'workspace_1', rootKiloSessionId: root },
+      });
+      await handleOutbound(
+        new Request(`https://ingest.kilosessions.ai/api/session/${root}/ingest`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${credential}`,
+            'X-Kilo-Root-Session': 'forged-root',
+            'x-kilocode-organizationid': 'forged-organization',
+            Host: 'guest-supplied.invalid',
+          },
+          body: '{}',
+        }),
+        env
+      );
+    }
+
+    expect(resolveCredential).toHaveBeenCalledTimes(2);
+    expect(resolveCredential.mock.calls.map(([input]) => input.credential)).toEqual([
+      credential,
+      credential,
+    ]);
+    expect(getByName.mock.calls).toEqual([['sbx_1'], ['sbx_1']]);
+    expect(redemptions.kilo.mock.calls.map(([input]) => input.capability)).toEqual([
+      'kka1.root-0',
+      'kka1.root-1',
+    ]);
+    expect(
+      scopedFetch.mock.calls.map(([request]) => request.headers.get('X-Kilo-Root-Session'))
+    ).toEqual(roots);
+    for (const [request] of scopedFetch.mock.calls) {
+      expect(request.headers.get('Host')).toBe('ingest.kilosessions.ai');
+      expect(request.headers.get('x-kilocode-organizationid')).toBe('trusted-organization');
+    }
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'kcp1',
+    'kcp1.',
+    'kcp1-invalid',
+    'kcp1.invalid',
+    `kcp1.YR.github.${'a'.repeat(64)}`,
+    `kcp1.${Buffer.from('../other').toString('base64url')}.github.${'a'.repeat(64)}`,
+    `kcp1.${'x'.repeat(10_000)}`,
+  ])('never forwards malformed aliases in supported carriers', async credential => {
+    const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+    const carriers: HeadersInit[] = [
+      { Authorization: `Bearer ${credential}` },
+      { Authorization: `token ${credential}` },
+      { Authorization: basicCredential(credential) },
+      { 'PRIVATE-TOKEN': credential },
+    ];
+    for (const headers of carriers) {
+      const response = await handleOutbound(new Request('https://example.test/', { headers }), env);
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+    }
+    expect(getByName).not.toHaveBeenCalled();
+    expect(resolveCredential).not.toHaveBeenCalled();
+    for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects noncanonical Basic aliases and aliases in the Basic username', async () => {
+    const { env, resolveCredential, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_12', 'github');
+    const authorization = basicCredential(credential);
+    for (const value of [
+      `${authorization}!`,
+      authorization.replace(/=+$/, ''),
+      basicCredential('unused', 'Basic', credential),
+      `Basic ${Buffer.from(credential).toString('base64')}`,
+    ]) {
+      const response = await handleOutbound(
+        new Request('https://example.test/', { headers: { Authorization: value } }),
+        env
+      );
+      expect(response.status).toBe(502);
+    }
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported or conflicting alias carriers before resolution', async () => {
+    const { env, resolveCredential, forward } = fixture();
+    const github = createControlPlaneCredential('sbx_1', 'github');
+    const gitlab = createControlPlaneCredential('sbx_1', 'gitlab');
+    const carriers: HeadersInit[] = [
+      { Authorization: basicCredential(github, 'Basic', 'oauth2') },
+      { Authorization: `token ${gitlab}` },
+      { 'PRIVATE-TOKEN': github },
+      { Authorization: `Bearer ${github}`, 'PRIVATE-TOKEN': gitlab },
+      {
+        Authorization: `Bearer ${gitlab}`,
+        'PRIVATE-TOKEN': createControlPlaneCredential('sbx_1', 'gitlab'),
+      },
+      { Authorization: `Bearer ${gitlab}`, 'PRIVATE-TOKEN': GITLAB_CAPABILITY },
+    ];
+    for (const headers of carriers) {
+      const response = await handleOutbound(new Request('https://example.test/', { headers }), env);
+      expect(response.status).toBe(502);
+    }
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each(['kilo', 'github', 'gitlab', 'bitbucket'] as const)(
+    'rejects raw, recursive, legacy, malformed, and cross-purpose %s resolution results',
+    async purpose => {
+      const { env, resolveCredential, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', purpose);
+      const otherCapabilities = Object.entries(capabilities)
+        .filter(([provider]) => provider !== purpose)
+        .map(([, capability]) => ({ credential: capability }));
+      for (const resolved of [
+        null,
+        undefined,
+        'raw-upstream-token',
+        {},
+        { credential: null },
+        { credential: 'raw-upstream-token' },
+        { credential: 'Bearer raw-upstream-token' },
+        { credential },
+        { credential: 'kgh1.legacy' },
+        { credential: 'kgl1.legacy' },
+        { credential: 'kka2.future' },
+        { credential: capabilities[purpose], organizationId: 42 },
+        { credential: capabilities[purpose].slice(0, 5) },
+        { credential: `${capabilities[purpose]} secret` },
+        ...otherCapabilities,
+      ]) {
+        resolveCredential.mockResolvedValue(resolved);
+        const response = await handleOutbound(
+          new Request('https://example.test/', {
+            headers: { Authorization: `Bearer ${credential}` },
+          }),
+          env
+        );
+        expect(response.status).toBe(502);
+        expect(await response.text()).toBe('SCM authorization unavailable');
+      }
+      for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+      expect(forward).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fails closed when the control namespace or resolution RPC is unavailable', async () => {
+    const { env, resolveCredential, getByName, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'kilo');
+    for (const control of [undefined, {}, { getByName: () => ({}) }]) {
+      const response = await handleOutbound(
+        new Request('https://api.kilo.ai/api/users/me', {
+          headers: { Authorization: `Bearer ${credential}` },
+        }),
+        { ...env, SANDBOX_CONTROL: control } as never
+      );
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+    }
+    expect(getByName).not.toHaveBeenCalled();
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it.each(['lookup', 'resolution', 'retry-exhausted'] as const)(
+    'fails closed and sanitizes %s errors before retry diagnostics',
+    async failure => {
+      const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+      const credential = createControlPlaneCredential('sbx_1', 'kilo');
+      const error = Object.assign(new Error(`sensitive-error ${credential} upstream-secret`), {
+        retryable: failure === 'retry-exhausted',
+      });
+      vi.stubGlobal('scheduler', { wait: vi.fn().mockResolvedValue(undefined) });
+      if (failure === 'lookup')
+        getByName.mockImplementation(() => {
+          throw error;
+        });
+      else resolveCredential.mockRejectedValue(error);
+
+      const response = await handleOutbound(
+        new Request('https://api.kilo.ai/api/users/me', {
+          headers: { Authorization: `Bearer ${credential}` },
+        }),
+        env
+      );
+
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe('SCM authorization unavailable');
+      expect(getByName).toHaveBeenCalledTimes(failure === 'retry-exhausted' ? 3 : 1);
+      for (const redeem of Object.values(redemptions)) expect(redeem).not.toHaveBeenCalled();
+      expect(forward).not.toHaveBeenCalled();
+      const logs = serializedLogCalls();
+      expect(logs).not.toContain(credential);
+      expect(logs).not.toContain('upstream-secret');
+      expect(logs).not.toContain('sensitive-error');
+    }
+  );
+
+  it('retries resolution using a fresh stub without duplicating broker redemption', async () => {
+    const { env, resolveCredential, getByName, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'kilo');
+    vi.stubGlobal('scheduler', { wait: vi.fn().mockResolvedValue(undefined) });
+    resolveCredential
+      .mockRejectedValueOnce(Object.assign(new Error(credential), { retryable: true }))
+      .mockResolvedValueOnce({ credential: KILO_CAPABILITY });
+
+    const response = await handleOutbound(
+      new Request('https://api.kilo.ai/api/users/me', {
+        headers: { Authorization: `Bearer ${credential}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(getByName).toHaveBeenCalledTimes(2);
+    expect(resolveCredential).toHaveBeenCalledTimes(2);
+    expect(redemptions.kilo).toHaveBeenCalledOnce();
+    expect(forward).toHaveBeenCalledOnce();
+    expect(serializedLogCalls()).not.toContain(credential);
+  });
+
+  it('does not bypass the existing broker when a resolved capability is rejected', async () => {
+    const { env, resolveCredential, redemptions, forward } = fixture();
+    const credential = createControlPlaneCredential('sbx_1', 'kilo');
+    resolveCredential.mockResolvedValue({ credential: KILO_CAPABILITY });
+    redemptions.kilo.mockResolvedValue({ success: false, reason: 'upstream_not_allowed' });
+
+    const response = await handleOutbound(
+      new Request('https://untrusted.test/', {
+        headers: { Authorization: `Bearer ${credential}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    expect(resolveCredential).toHaveBeenCalledOnce();
+    expect(redemptions.kilo).toHaveBeenCalledOnce();
+    expect(forward).not.toHaveBeenCalled();
   });
 });

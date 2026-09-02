@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
@@ -24,8 +24,6 @@ import {
   getEligibleSlaNotificationKind,
   meetsSecurityNotificationSeverityMinimum,
 } from '@kilocode/worker-utils/security-notification-policy';
-
-const SECRET_COMPARE_HMAC_KEY = Buffer.from('security-agent-notification-secret-compare');
 
 // The sweep posts the strict `{ notificationId }` shape with no discriminator,
 // so a discriminated union on `kind` would break it. A plain union keeps the
@@ -57,9 +55,7 @@ const notificationKindToTemplate = {
 
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
-  const left = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
-  const right = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
-  return timingSafeEqual(left, right);
+  return timingSafeEqual(provided, expected);
 }
 
 function formatDeadline(iso: string | null): string {

@@ -94,6 +94,47 @@ describe('formatSpokenTimeAgo', () => {
 });
 
 describe('sessionRowAccessibilityLabel', () => {
+  it.each([undefined, false])('preserves nonlive speech for live=%s', live => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: false,
+        live,
+        badge: 'CLI',
+        meta: '5 minutes ago',
+      })
+    ).toBe('Fix login bug, CLI, and 5 minutes ago');
+  });
+
+  it('speaks live status without dropping provenance, metadata, or platform', () => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: false,
+        live: true,
+        badge: 'CLOUD',
+        subtitle: 'feature/x',
+        prNumber: 7,
+        meta: '5 minutes ago',
+        platform: 'cloud-agent',
+      })
+    ).toBe(
+      'Fix login bug, LIVE, feature/x, pull request 7, CLOUD, 5 minutes ago, and from CLOUD AGENT'
+    );
+  });
+
+  it('speaks needs input instead of live when attention takes priority', () => {
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Fix login bug',
+        needsInput: true,
+        live: true,
+        badge: 'CLI',
+        meta: null,
+      })
+    ).toBe('Fix login bug, needs input, and CLI');
+  });
+
   describe('needs-input variant — StoredSessionRow (meta omitted)', () => {
     it('produces "title, needs input, badge" with meta=null', () => {
       // Stored row, needs-input eyebrow wins: meta is NOT rendered.

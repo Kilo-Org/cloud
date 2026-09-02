@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 // -- CLI → DO (CLIOutbound) ---------------------------------------------------
 
-// Identity of the CLI process (kilo remote spawner) attached to this WebSocket.
+// Identity of the CLI process (terminal or kilo remote) attached to this WebSocket.
 // Newer CLIs include this on every heartbeat; legacy CLIs that predate the
 // `kilo remote` spawner omit it entirely. The DO persists the latest value
 // in the WebSocket attachment and uses it for `getConnectedInstances()`.
@@ -14,6 +14,11 @@ const instanceSchema = z.object({
   name: z.string().min(1).max(64),
   projectName: z.string().min(1).max(64),
   version: z.string().max(32).optional(),
+  // Old producers and hibernated attachments omit this metadata. Keep it optional
+  // until all supported metadata-free producers and attachments have retired.
+  kind: z.enum(['cli', 'remote']).optional(),
+  startedAt: z.string().datetime({ precision: 3 }).length(24).optional(),
+  gitBranch: z.string().max(24).optional(),
 });
 
 export type Instance = z.infer<typeof instanceSchema>;
@@ -27,7 +32,14 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
     // Per-connection capabilities advertised by the CLI. Absent on CLIs that
     // predate the field — treated as a legacy CLI with no opt-in features
     // (e.g. attachment uploads from the mobile viewer).
-    capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
+    capabilities: z
+      .object({
+        attachments: z.boolean().optional(),
+        // Old form is absent sessionClone; treat missing as incapable until
+        // every shipped CLI advertises it.
+        sessionClone: z.boolean().optional(),
+      })
+      .optional(),
     // Optional identity of the spawning CLI process. Absent on legacy CLIs
     // (which are not spawned by `kilo remote`). When present, the DO
     // persists it in the WebSocket attachment and exposes it via
@@ -152,6 +164,7 @@ export const SessionEventV2RowSchema = z.object({
   gitUrl: z.string().nullable(),
   gitBranch: z.string().nullable(),
   parentSessionId: z.string().nullable(),
+  worktreeId: z.string().nullable().optional(),
   status: SessionStatusSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
 });

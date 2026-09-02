@@ -1,4 +1,4 @@
-import { count, max, eq, and, gt, gte, lte, lt, inArray, asc } from 'drizzle-orm';
+import { count, max, eq, and, gt, gte, lte, lt, inArray, asc, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
@@ -95,6 +95,7 @@ export type EventQueryFilters = {
   endTime?: number;
   /** Maximum number of events to return */
   limit?: number;
+  materialized?: 'updates' | 'removals';
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,17 @@ function buildConditions(filters: Omit<EventQueryFilters, 'limit'>): SQL[] {
   }
   if (filters.endTime !== undefined) {
     conditions.push(lte(events.timestamp, filters.endTime));
+  }
+  if (filters.materialized) {
+    conditions.push(
+      eq(events.stream_event_type, 'kilocode'),
+      inArray(
+        sql<string>`json_extract(${events.payload}, '$.event')`,
+        filters.materialized === 'updates'
+          ? ['message.updated', 'message.part.updated', 'autocommit_completed']
+          : ['message.removed', 'message.part.removed']
+      )
+    );
   }
 
   return conditions;

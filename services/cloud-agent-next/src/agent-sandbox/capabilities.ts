@@ -19,5 +19,5 @@ export function sessionHasTerminal(
   sessionId: string,
   provider: AgentSandboxProvider = 'cloudflare'
 ): boolean {
-  return sessionPlaneFromId(sessionId) !== 'control' && PROVIDER_CAPABILITIES[provider].terminal;
+  return sessionPlaneFromId(sessionId) === 'control' || PROVIDER_CAPABILITIES[provider].terminal;
 }

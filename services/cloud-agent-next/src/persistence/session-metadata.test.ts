@@ -81,6 +81,163 @@ describe('session metadata boundary', () => {
     expect(requiresContainmentSandbox(metadata)).toBe(false);
   });
 
+  describe.each(['cloudflare', 'vercel'] as const)(
+    '%s control-plane containment',
+    sandboxProvider => {
+      it.each([
+        {
+          name: 'GitHub',
+          repository: { type: 'github', repo: 'acme/repo' },
+          expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'GitLab',
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          expected: { github: false, gitlab: true, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'Bitbucket',
+          repository: {
+            type: 'bitbucket',
+            url: 'https://bitbucket.org/acme/repo.git',
+            workspaceUuid: '123e4567-e89b-12d3-a456-426614174000',
+            repositoryUuid: '123e4567-e89b-12d3-a456-426614174001',
+          },
+          expected: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitHub platform alias',
+          repository: { type: 'git', url: 'https://github.com/acme/repo.git', platform: 'github' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'generic Git with a GitLab platform alias',
+          repository: { type: 'git', url: 'https://gitlab.com/acme/repo.git', platform: 'gitlab' },
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+        {
+          name: 'no repository',
+          repository: undefined,
+          expected: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+        },
+      ])(
+        'defaults missing policy to Kilo and the typed $name repository',
+        ({ repository, expected }) => {
+          const workspace = {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            managedScmContainment: true,
+          };
+          const metadata = parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+            auth: {},
+            repository,
+            workspace,
+            lifecycle: { version: 1, timestamp: 1 },
+          });
+
+          expect(getEffectiveCredentialContainment(metadata)).toEqual(expected);
+          expect(requiresContainmentSandbox(metadata)).toBe(true);
+          expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+        }
+      );
+
+      it.each([
+        { github: false, gitlab: false, bitbucket: false, kilocode: false },
+        { github: true, gitlab: true, bitbucket: true, kilocode: true },
+        { github: false, gitlab: true, bitbucket: true, kilocode: false },
+      ])('honors historical explicit flags without rewriting them: %j', credentialContainment => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'github', repo: 'acme/repo' },
+          workspace: {
+            sandboxId: 'ses-abcdef',
+            sandboxProvider,
+            credentialContainment,
+            managedScmContainment: true,
+          },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual(credentialContainment);
+        expect(requiresContainmentSandbox(metadata)).toBe(
+          Object.values(credentialContainment).some(Boolean)
+        );
+        expect(serializeSessionMetadata(metadata).workspace?.credentialContainment).toEqual(
+          credentialContainment
+        );
+      });
+
+      it.each([
+        { name: 'missing policy', fields: {} },
+        { name: 'disabled legacy alias', fields: { managedScmContainment: false } },
+        { name: 'enabled legacy alias', fields: { managedScmContainment: true } },
+      ])('defaults $name without rewriting stored fields', ({ fields }) => {
+        const workspace = { sandboxId: 'ses-abcdef', sandboxProvider, ...fields };
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'workspace_containment', userId: 'user_containment' },
+          auth: {},
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          workspace,
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+
+        expect(getEffectiveCredentialContainment(metadata)).toEqual({
+          github: false,
+          gitlab: true,
+          bitbucket: false,
+          kilocode: true,
+        });
+        expect(requiresContainmentSandbox(metadata)).toBe(true);
+        expect(serializeSessionMetadata(metadata).workspace).toEqual(workspace);
+      });
+    }
+  );
+
+  it('requires Kilo containment for a control-plane session without workspace metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'workspace_no_workspace', userId: 'user_containment' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: false,
+      bitbucket: false,
+      kilocode: true,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+    expect(metadata.workspace).toBeUndefined();
+  });
+
+  it('preserves legacy policy even when its SCM flags do not match the repository', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_mixed_containment', userId: 'user_containment' },
+      auth: {},
+      repository: { type: 'github', repo: 'acme/repo' },
+      workspace: {
+        credentialContainment: { github: false, gitlab: true, bitbucket: true, kilocode: false },
+        managedScmContainment: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: true,
+      bitbucket: true,
+      kilocode: false,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+  });
+
   it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
@@ -166,21 +323,76 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
-  it('parses and serializes clone source metadata', () => {
+  it('preserves a validated worktree ID and its canonical workspace path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
     const current = {
       metadataSchemaVersion: 2 as const,
-      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+      identity: {
+        sessionId: 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+        userId: 'oauth/google:1234',
+      },
       auth: {},
-      clone: {
-        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+      workspace: {
+        worktreeId,
+        workspacePath: `/workspace/oauth-google-1234/worktrees/${worktreeId}`,
       },
       lifecycle: { version: 1, timestamp: 1 },
     };
 
     expect(parseSessionMetadata(current)).toEqual(current);
-    expect(serializeSessionMetadata(current)).toEqual(current);
-    expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
   });
+
+  it.each([
+    'worktree_invalid',
+    'worktree_../outside',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects malformed persisted worktree ID %s', worktreeId => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user_test' },
+        auth: {},
+        workspace: { worktreeId },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it.each([undefined, '2026-08-29T10:00:00.000Z'])(
+    'round-trips clone metadata without inventing a reporting creation time (%s)',
+    reportingCreatedAt => {
+      const current = {
+        metadataSchemaVersion: 2 as const,
+        identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+        auth: {},
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      };
+
+      expect(parseSessionMetadata(current)).toEqual(current);
+      expect(serializeSessionMetadata(current)).toEqual(current);
+      expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    }
+  );
+
+  it.each(['invalid', '2026-08-29', '2026-02-30T10:00:00.000Z', 1_700_000_000_000, null])(
+    'rejects an invalid clone reporting creation time (%s)',
+    reportingCreatedAt => {
+      expect(() =>
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+          auth: {},
+          clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', reportingCreatedAt },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toThrow('Invalid current session metadata');
+    }
+  );
 
   it('keeps metadata without clone as an empty-session bootstrap', () => {
     const current = {

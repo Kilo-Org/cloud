@@ -65,6 +65,7 @@ export type BitbucketAuthorizationResult =
       status: 'available';
       token: string;
       integrationId: string;
+      credentialId: string;
       workspace: BitbucketWorkspaceIdentity;
     }
   | { status: 'not_connected' }
@@ -258,6 +259,7 @@ export class BitbucketAuthorizationService {
       status: 'available',
       token,
       integrationId: authorization.integrationId,
+      credentialId: authorization.credential.id,
       workspace: authorization.workspace,
     };
   }

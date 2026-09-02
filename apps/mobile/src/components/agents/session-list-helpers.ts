@@ -14,6 +14,23 @@ export type SessionSection = {
   data: StoredSession[];
 };
 
+/** Platform buckets offered by the session filters, in display order. */
+export const PLATFORM_FILTERS = [
+  'cloud-agent',
+  'extension',
+  'cli',
+  'slack',
+  'github',
+  'linear',
+  'other',
+] as const;
+
+/** One repository the session filters can select. */
+export type ProjectFilterOption = {
+  gitUrl: string;
+  displayName: string;
+};
+
 const platformExpansion: ReadonlyMap<string, string[]> = new Map([
   ['cloud-agent', ['cloud-agent', 'cloud-agent-web']],
   ['extension', ['vscode', 'agent-manager']],

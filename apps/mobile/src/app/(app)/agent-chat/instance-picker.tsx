@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, Cloud, Server } from '@/components/ui/icons';
+import { Check, Cloud, Server, Terminal } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
@@ -25,12 +26,20 @@ import { useTRPC } from '@/lib/trpc';
 
 const POLL_INTERVAL_MS = 10_000;
 const SKELETON_ROW_COUNT = 4;
+const INSTANCE_GROUP_LABEL_KEYS = {
+  remote: 'agentChat.instancePicker.remotes',
+  cli: 'agentChat.instancePicker.terminals',
+};
+
+type PickerListItem =
+  | { key: string; type: 'header'; kind: InstancePickerInstance['kind'] }
+  | { key: string; type: 'instance'; instance: LabeledInstance };
 
 export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -90,7 +99,20 @@ export default function InstancePickerScreen() {
     [instancesData]
   );
 
-  const labeled = useMemo(() => dedupeInstanceLabels(instances), [instances]);
+  const listItems = useMemo<PickerListItem[]>(() => {
+    const labeled = dedupeInstanceLabels(instances, i18n.language);
+    const items: PickerListItem[] = [];
+    for (const kind of ['remote', 'cli'] as const) {
+      const group = labeled.filter(instance => instance.kind === kind);
+      if (group.length > 0) {
+        items.push({ key: `header:${kind}`, type: 'header', kind });
+        for (const instance of group) {
+          items.push({ key: instance.connectionId, type: 'instance', instance });
+        }
+      }
+    }
+    return items;
+  }, [instances, i18n.language]);
 
   const viewState = resolveInstancePickerViewState({
     isLoading: isLoadingInstances,
@@ -187,9 +209,21 @@ export default function InstancePickerScreen() {
     );
   }
 
-  const renderItem = ({ item }: { item: LabeledInstance }) => {
+  const renderItem = ({ item: row }: { item: PickerListItem }) => {
+    if (row.type === 'header') {
+      return (
+        <Text
+          accessibilityRole="header"
+          className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          {t(INSTANCE_GROUP_LABEL_KEYS[row.kind])}
+        </Text>
+      );
+    }
+    const item = row.instance;
     const selected = item.connectionId === currentConnectionId;
-    const label = item.dedupSuffix
+    const InstanceIcon = item.kind === 'remote' ? Server : Terminal;
+    const identity = item.dedupSuffix
       ? t('agentChat.instancePicker.instanceOnProjectSuffix', {
           name: item.name,
           project: item.projectName,
@@ -199,28 +233,35 @@ export default function InstancePickerScreen() {
           name: item.name,
           project: item.projectName,
         });
+    const label = formatList(
+      [t(INSTANCE_GROUP_LABEL_KEYS[item.kind]), identity, item.displayFacts].filter(Boolean),
+      i18n.language
+    );
     return (
       <Pressable
+        testID={item.testID}
         className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
         onPress={() => {
           handleSelectInstance(item);
         }}
         {...radioItemA11y({ label, checked: selected })}
       >
+        <InstanceIcon size={18} color={colors.foreground} />
         <View className="flex-1">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base text-foreground" numberOfLines={1}>
-              {item.name}
-            </Text>
-            {item.dedupSuffix ? (
-              <Text variant="mono" className="text-xs text-muted-foreground">
-                #{item.dedupSuffix}
-              </Text>
-            ) : null}
-          </View>
-          <Text variant="muted" className="text-sm" numberOfLines={1}>
+          <Text className="text-base text-foreground">{item.name}</Text>
+          <Text variant="muted" className="text-sm">
             {item.projectName}
           </Text>
+          {item.displayFacts ? (
+            <Text variant="muted" className="text-sm">
+              {item.displayFacts}
+            </Text>
+          ) : null}
+          {item.dedupSuffix ? (
+            <Text variant="mono" className="text-xs text-muted-foreground">
+              #{item.dedupSuffix}
+            </Text>
+          ) : null}
         </View>
         {selected ? <Check size={18} color={colors.primary} /> : null}
       </Pressable>
@@ -245,8 +286,8 @@ export default function InstancePickerScreen() {
         className="flex-1 bg-background"
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
-        data={labeled}
-        keyExtractor={item => item.connectionId}
+        data={listItems}
+        keyExtractor={item => item.key}
         contentContainerStyle={{ paddingBottom: bottom }}
         ListHeaderComponent={
           <Pressable

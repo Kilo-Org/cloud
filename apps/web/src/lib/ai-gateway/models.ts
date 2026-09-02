@@ -18,11 +18,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  minimax_m27_free_model,
-  minimax_m3_free_model,
-} from '@/lib/ai-gateway/providers/minimax';
+import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
@@ -51,7 +47,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 7,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -79,6 +75,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
+  {
+    model: 'minimax/minimax-m3:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(
@@ -144,8 +145,6 @@ export function isKiloExclusiveRateLimitedModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  minimax_m3_free_model,
-  minimax_m27_free_model,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_discounted_model,
   claude_opus_4_8_stealth_model,

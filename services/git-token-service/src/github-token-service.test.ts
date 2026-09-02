@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
-import { GitHubTokenService } from './github-token-service.js';
+import { GitHubTokenGenerationError, GitHubTokenService } from './github-token-service.js';
 
 vi.mock('@octokit/auth-app', () => ({
   createAppAuth: vi.fn(),
@@ -123,29 +123,101 @@ describe('GitHubTokenService', () => {
     expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('sensitive-metadata-response');
   });
 
-  it('does not log authenticated upstream response data when scoped token minting fails', async () => {
-    const upstreamError = Object.assign(new Error('repository unavailable'), {
-      response: { data: { token: 'sensitive-upstream-data' } },
-    });
-    vi.mocked(createAppAuth).mockReturnValue(
-      vi.fn().mockRejectedValue(upstreamError) as unknown as ReturnType<typeof createAppAuth>
-    );
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const service = new GitHubTokenService({
-      GITHUB_APP_ID: 'app-id',
-      GITHUB_APP_PRIVATE_KEY: 'private-key',
-    } as CloudflareEnv);
+  it.each([
+    [404, 'Not Found', 'no_installation_found'],
+    [403, 'Resource not accessible by integration', 'repository_not_installed'],
+    [
+      422,
+      'There is at least one repository that does not exist or is not accessible to the parent installation.',
+      'repository_not_installed',
+    ],
+  ] as const)(
+    'preserves the expected GitHub %s token failure as %s without exposing credentials',
+    async (status, message, reason) => {
+      const secret = 'sensitive-upstream-credential';
+      const upstreamError = Object.assign(new Error(`provider detail: ${secret}`), {
+        status,
+        request: { headers: { authorization: `Bearer ${secret}` } },
+        response: { data: { message, token: secret } },
+      });
+      const auth = vi.fn().mockRejectedValue(upstreamError);
+      vi.mocked(createAppAuth).mockReturnValue(Object.assign(auth, { hook: vi.fn() }));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const tokenCache = createTokenCache();
+      const service = new GitHubTokenService({
+        GITHUB_APP_ID: 'app-id',
+        GITHUB_APP_PRIVATE_KEY: 'private-key',
+        TOKEN_CACHE: tokenCache,
+      } as unknown as CloudflareEnv);
 
-    await expect(service.getTokenForRepo('123', 'repository')).rejects.toThrow(
-      'Failed to generate GitHub installation token: repository unavailable'
-    );
+      const error = await service
+        .getTokenForRepo('123', 'repository')
+        .catch((error: unknown) => error);
 
-    expect(consoleError).toHaveBeenCalledWith(
-      JSON.stringify({
+      expect(error).toBeInstanceOf(GitHubTokenGenerationError);
+      expect(error).toMatchObject({
+        status,
+        reason,
         message: 'Failed to generate GitHub installation token',
-        errorType: 'Error',
-      })
-    );
-    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('sensitive-upstream-data');
+      });
+      expect(error).not.toHaveProperty('cause');
+      expect(JSON.stringify({ error, logs: consoleError.mock.calls })).not.toContain(secret);
+      expect(consoleError).toHaveBeenCalledWith(
+        JSON.stringify({ message: 'Failed to generate GitHub installation token', status, reason })
+      );
+      expect(auth).toHaveBeenCalledOnce();
+      expect(tokenCache.put).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [403, 'API rate limit exceeded'],
+    [403, 'You have exceeded a secondary rate limit.'],
+    [403, 'Forbidden'],
+    [429, 'Too Many Requests'],
+    [401, 'Bad credentials'],
+    [422, 'The permissions requested are not granted to this installation.'],
+    [500, 'Resource not accessible by integration'],
+    [undefined, 'Not Found'],
+    [undefined, 'Resource not accessible by integration'],
+  ])(
+    'does not infer repository access from unrecognized %s token errors',
+    async (status, message) => {
+      const upstreamError = Object.assign(new Error('secret-provider-detail'), {
+        status,
+        response: { data: { message, token: 'secret-token' } },
+      });
+      vi.mocked(createAppAuth).mockReturnValue(
+        Object.assign(vi.fn().mockRejectedValue(upstreamError), { hook: vi.fn() })
+      );
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const service = new GitHubTokenService({
+        GITHUB_APP_ID: 'app-id',
+        GITHUB_APP_PRIVATE_KEY: 'private-key',
+      } as CloudflareEnv);
+
+      const error = await service
+        .getTokenForRepo('123', 'repository')
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(GitHubTokenGenerationError);
+      expect(error).toMatchObject({
+        status,
+        reason: undefined,
+        message: 'Failed to generate GitHub installation token',
+      });
+      expect(error).not.toHaveProperty('cause');
+      expect(JSON.stringify({ error, logs: consoleError.mock.calls })).not.toContain('secret-');
+    }
+  );
+
+  it('does not classify token-cache failures as GitHub access failures', async () => {
+    const cacheError = Object.assign(new Error('cache unavailable'), { status: 404 });
+    const tokenCache = createTokenCache();
+    tokenCache.get.mockRejectedValueOnce(cacheError);
+    const service = new GitHubTokenService({ TOKEN_CACHE: tokenCache } as unknown as CloudflareEnv);
+
+    await expect(service.getTokenForRepo('123', 'repository')).rejects.toBe(cacheError);
+    expect(createAppAuth).not.toHaveBeenCalled();
   });
 });

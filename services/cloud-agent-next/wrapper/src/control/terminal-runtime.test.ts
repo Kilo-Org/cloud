@@ -6,12 +6,9 @@ import type {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-environment.js';
 import type { WrapperKiloClient, WrapperPty } from '../kilo-api.js';
+import type { WorktreeKiloRuntime } from './worktree-runtime.js';
 import { createControlTerminalRuntime, type ControlTerminalRuntime } from './terminal-runtime.js';
-import {
-  rememberAttachedRoot,
-  resetSessionDirectoryState,
-  rootForSession,
-} from './session-directories.js';
+import { rememberAttachedRoot, resetSessionDirectoryState } from './session-directories.js';
 
 const firstSession: SessionRequestIdentity = {
   sessionId: 'workspace_first',
@@ -65,10 +62,24 @@ function createRuntime(
   kiloClient: WrapperKiloClient,
   controlUrl = 'ws://127.0.0.1:1/sandbox-control/sandbox'
 ): ControlTerminalRuntime {
+  const worktrees = new Map<string, WorktreeKiloRuntime>();
   const runtime = createControlTerminalRuntime({
     controlUrl,
     wrapperInstanceId,
-    kiloClient,
+    getKiloRuntime: directory => {
+      let worktree = worktrees.get(directory);
+      if (!worktree) {
+        worktree = {
+          scopeId: directory,
+          directory,
+          env: { WORKTREE_VALUE: directory },
+          kiloClient,
+          signal: new AbortController().signal,
+        };
+        worktrees.set(directory, worktree);
+      }
+      return worktree;
+    },
   });
   activeRuntimes.add(runtime);
   return runtime;
@@ -243,7 +254,7 @@ describe('control terminal PTY ownership', () => {
     );
   });
 
-  it('creates an idempotent directory-scoped PTY with the safe legacy terminal environment', async () => {
+  it('creates an idempotent directory-scoped PTY with its worktree environment', async () => {
     const createCalls: Array<{ cwd: string; title: string; env: Record<string, string> }> = [];
     const resizeCalls: Array<{ ptyId: string; cols: number; rows: number; directory?: string }> =
       [];
@@ -284,7 +295,7 @@ describe('control terminal PTY ownership', () => {
           PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
           PS1: '\\n\\W\\n\\$ ',
           [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
-          SANDBOX_CONTROL_CREDENTIAL: '',
+          WORKTREE_VALUE: firstSession.directory,
         },
       },
     ]);
@@ -366,64 +377,240 @@ describe('control terminal PTY ownership', () => {
     expect(deleted).toEqual([{ ptyId: 'pty_first', directory: firstSession.directory }]);
   });
 
-  it('fences every PTY operation to its owning session and preserves unrelated sessions on detach', async () => {
-    const resized: Array<{ ptyId: string; directory?: string }> = [];
-    const deleted: Array<{ ptyId: string; directory?: string }> = [];
-    let createdCount = 0;
-    const kiloClient = fakeKilo({
-      createPty: async input => makePty(input.cwd, `pty_${++createdCount}`),
-      resizePty: async (ptyId, _size, directory) => {
-        resized.push({ ptyId, directory });
-        return makePty(directory ?? '', ptyId);
-      },
-      deletePty: async (ptyId, directory) => {
-        deleted.push({ ptyId, directory });
-        return true;
-      },
-    });
-    const runtime = createRuntime(kiloClient);
-    attach(runtime, firstSession);
-    attach(runtime, secondSession);
-    await runtime.create(firstSession, creationPayload(firstOperationId));
-    await runtime.create(secondSession, creationPayload(secondOperationId));
+  it.each([secondSession, { ...secondSession, directory: firstSession.directory }])(
+    'fences every PTY operation from a sibling in $directory',
+    async secondSession => {
+      const resized: Array<{ ptyId: string; directory?: string }> = [];
+      const deleted: Array<{ ptyId: string; directory?: string }> = [];
+      let createdCount = 0;
+      const kiloClient = fakeKilo({
+        createPty: async input => makePty(input.cwd, `pty_${++createdCount}`),
+        resizePty: async (ptyId, _size, directory) => {
+          resized.push({ ptyId, directory });
+          return makePty(directory ?? '', ptyId);
+        },
+        deletePty: async (ptyId, directory) => {
+          deleted.push({ ptyId, directory });
+          return true;
+        },
+      });
+      const runtime = createRuntime(kiloClient);
+      attach(runtime, firstSession);
+      attach(runtime, secondSession);
+      await runtime.create(firstSession, creationPayload(firstOperationId));
+      await runtime.create(secondSession, creationPayload(secondOperationId));
 
-    expect(
-      await terminalFailure(runtime.resize(secondSession, { ptyId: 'pty_1', cols: 100, rows: 30 }))
-    ).toMatchObject({ code: 'unauthorized', retryable: false });
-    expect(await terminalFailure(runtime.close(secondSession, { ptyId: 'pty_1' }))).toMatchObject({
-      code: 'unauthorized',
-      retryable: false,
-    });
-    expect(
-      await terminalFailure(
-        runtime.resize(
-          { ...firstSession, directory: secondSession.directory },
-          { ptyId: 'pty_1', cols: 100, rows: 30 }
+      expect(
+        await terminalFailure(
+          runtime.resize(secondSession, { ptyId: 'pty_1', cols: 100, rows: 30 })
         )
-      )
-    ).toMatchObject({ code: 'unauthorized', retryable: false });
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
+      expect(await terminalFailure(runtime.close(secondSession, { ptyId: 'pty_1' }))).toMatchObject(
+        {
+          code: 'unauthorized',
+          retryable: false,
+        }
+      );
+      expect(
+        await terminalFailure(runtime.connect(secondSession, connectionPayload({ ptyId: 'pty_1' })))
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
+      expect(
+        await terminalFailure(runtime.create(secondSession, creationPayload(firstOperationId)))
+      ).toMatchObject({ code: 'idempotency_conflict', retryable: false });
+      expect(
+        await terminalFailure(
+          runtime.resize(
+            { ...firstSession, directory: '/workspace/unowned' },
+            { ptyId: 'pty_1', cols: 100, rows: 30 }
+          )
+        )
+      ).toMatchObject({ code: 'unauthorized', retryable: false });
 
-    await runtime.detachSession(firstSession);
-    expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
-    expect(rootForSession(firstSession.kiloSessionId)).toBeUndefined();
-    expect(rootForSession(secondSession.kiloSessionId)).toBe(secondSession.kiloSessionId);
+      await runtime.detachSession(firstSession);
+      expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
+      expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+        code: 'not_ready',
+        message: 'Terminal session is not attached',
+      });
 
-    expect(await runtime.resize(secondSession, { ptyId: 'pty_2', cols: 110, rows: 40 })).toEqual({
-      pty: makePty(secondSession.directory, 'pty_2'),
+      expect(await runtime.resize(secondSession, { ptyId: 'pty_2', cols: 110, rows: 40 })).toEqual({
+        pty: makePty(secondSession.directory, 'pty_2'),
+      });
+      expect(resized).toEqual([{ ptyId: 'pty_2', directory: secondSession.directory }]);
+      attach(runtime, firstSession);
+      expect(await runtime.create(firstSession, creationPayload(firstOperationId))).toEqual({
+        pty: makePty(firstSession.directory, 'pty_3'),
+      });
+    }
+  );
+
+  it('fences all same-directory PTYs before waiting for pending creation and preserves another worktree', async () => {
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    const unrelated = {
+      ...secondSession,
+      sessionId: 'workspace_other',
+      kiloSessionId: 'kilo_other',
+    };
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const deleted: Array<{ ptyId: string; directory?: string }> = [];
+    let created = 0;
+    const runtime = createRuntime(
+      fakeKilo({
+        createPty: async input => {
+          const id = `pty_${++created}`;
+          if (id === 'pty_3') {
+            started.resolve();
+            await release.promise;
+          }
+          return makePty(input.cwd, id);
+        },
+        deletePty: async (ptyId, directory) => {
+          deleted.push({ ptyId, directory });
+          return true;
+        },
+      })
+    );
+    for (const identity of [firstSession, sibling, unrelated]) attach(runtime, identity);
+    await runtime.create(sibling, creationPayload(secondOperationId));
+    await runtime.create(unrelated, creationPayload(crypto.randomUUID()));
+    const creation = terminalFailure(
+      runtime.create(firstSession, creationPayload(firstOperationId))
+    );
+    await started.promise;
+    let settled = false;
+    const detaching = runtime.detachDirectory(firstSession.directory).then(() => {
+      settled = true;
     });
-    expect(resized).toEqual([{ ptyId: 'pty_2', directory: secondSession.directory }]);
+    try {
+      expect(
+        await terminalFailure(runtime.resize(sibling, { ptyId: 'pty_1', cols: 90, rows: 30 }))
+      ).toMatchObject({ code: 'not_ready' });
+      expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+        code: 'not_ready',
+      });
+      expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
+      expect(settled).toBe(false);
+      expect(await runtime.resize(unrelated, { ptyId: 'pty_2', cols: 90, rows: 30 })).toEqual({
+        pty: makePty(unrelated.directory, 'pty_2'),
+      });
+      release.resolve();
+      expect(await creation).toMatchObject({
+        code: 'not_ready',
+        message: 'Terminal session is no longer attached',
+      });
+      await detaching;
+      expect(deleted).toEqual([
+        { ptyId: 'pty_1', directory: firstSession.directory },
+        { ptyId: 'pty_3', directory: firstSession.directory },
+      ]);
+      attach(runtime, sibling);
+      expect(await runtime.create(sibling, creationPayload(secondOperationId))).toEqual({
+        pty: makePty(sibling.directory, 'pty_4'),
+      });
+    } finally {
+      release.resolve();
+      await Promise.allSettled([creation, detaching]);
+    }
   });
 
-  it('compensates PTY creation that finishes after its session detaches', async () => {
-    let releaseCreation: (() => void) | undefined;
-    const creationGate = new Promise<void>(resolve => {
-      releaseCreation = resolve;
+  it('keeps independent same-worktree roots eligible when a sibling detaches', async () => {
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    let count = 0;
+    const deleted: string[] = [];
+    const runtime = createRuntime(
+      fakeKilo({
+        createPty: async input => makePty(input.cwd, `pty_${++count}`),
+        deletePty: async id => {
+          deleted.push(id);
+          return true;
+        },
+      })
+    );
+    attach(runtime, firstSession);
+    attach(runtime, sibling);
+    await runtime.create(firstSession, creationPayload(firstOperationId));
+    await runtime.create(sibling, creationPayload(secondOperationId));
+
+    expect(await terminalFailure(runtime.close(sibling, { ptyId: 'pty_1' }))).toMatchObject({
+      code: 'unauthorized',
     });
+    await runtime.detachSession(sibling);
+    expect(deleted).toEqual(['pty_2']);
+    expect(await runtime.resize(firstSession, { ptyId: 'pty_1', cols: 100, rows: 30 })).toEqual({
+      pty: makePty(firstSession.directory, 'pty_1'),
+    });
+    expect(await runtime.create(firstSession, creationPayload(firstOperationId))).toEqual({
+      pty: makePty(firstSession.directory, 'pty_1'),
+    });
+  });
+
+  it('uses the owning worktree client and credentials for every PTY operation', async () => {
+    const calls: Array<{ operation: string; directory: string; env?: Record<string, string> }> = [];
+    const worktrees = new Map<string, WorktreeKiloRuntime>();
+    for (const identity of [firstSession, secondSession]) {
+      const directory = identity.directory;
+      worktrees.set(directory, {
+        directory,
+        scopeId: directory,
+        env: { HOME: `/home/${identity.sessionId}`, KILOCODE_TOKEN: `guest-${identity.sessionId}` },
+        signal: new AbortController().signal,
+        kiloClient: fakeKilo({
+          createPty: async input => {
+            calls.push({ operation: 'create', directory, env: input.env });
+            return makePty(input.cwd, `pty_${identity.sessionId}`);
+          },
+          resizePty: async (id, _size, cwd) => {
+            calls.push({ operation: 'resize', directory });
+            return makePty(cwd ?? '', id);
+          },
+          deletePty: async () => {
+            calls.push({ operation: 'delete', directory });
+            return true;
+          },
+        }),
+      });
+    }
+    const runtime = createControlTerminalRuntime({
+      controlUrl: 'ws://127.0.0.1:1/sandbox-control/sandbox',
+      wrapperInstanceId,
+      getKiloRuntime: directory => worktrees.get(directory),
+    });
+    activeRuntimes.add(runtime);
+    attach(runtime, firstSession);
+    attach(runtime, secondSession);
+
+    for (const identity of [firstSession, secondSession]) {
+      const created = await runtime.create(identity, creationPayload(crypto.randomUUID()));
+      await runtime.resize(identity, { ptyId: created.pty.id, cols: 90, rows: 30 });
+      await runtime.close(identity, { ptyId: created.pty.id });
+      expect(calls.at(-3)).toMatchObject({
+        operation: 'create',
+        directory: identity.directory,
+        env: worktrees.get(identity.directory)?.env,
+      });
+      expect(calls.at(-3)?.env).not.toHaveProperty('SANDBOX_CONTROL_CREDENTIAL');
+      expect(calls.slice(-2)).toEqual([
+        { operation: 'resize', directory: identity.directory },
+        { operation: 'delete', directory: identity.directory },
+      ]);
+    }
+
+    worktrees.delete(firstSession.directory);
+    expect(
+      await terminalFailure(runtime.create(firstSession, creationPayload(crypto.randomUUID())))
+    ).toMatchObject({ code: 'not_ready', message: 'Kilo worktree is not available' });
+  });
+
+  it('compensates late PTY creation without disturbing a reattached session', async () => {
+    const releaseCreation = Promise.withResolvers<void>();
     const deleted: Array<{ ptyId: string; directory?: string }> = [];
+    let creations = 0;
     const kiloClient = fakeKilo({
       createPty: async input => {
-        await creationGate;
-        return makePty(input.cwd);
+        const id = ++creations;
+        if (id === 1) await releaseCreation.promise;
+        return makePty(input.cwd, `pty_${id}`);
       },
       deletePty: async (ptyId, directory) => {
         deleted.push({ ptyId, directory });
@@ -434,17 +621,30 @@ describe('control terminal PTY ownership', () => {
     attach(runtime, firstSession);
 
     const creation = runtime.create(firstSession, creationPayload());
+    const failure = terminalFailure(creation);
     await Promise.resolve();
     const detached = runtime.detachSession(firstSession);
-    releaseCreation?.();
-
-    expect(await terminalFailure(creation)).toMatchObject({
-      code: 'not_ready',
-      message: 'Terminal session is no longer attached',
-      retryable: false,
-    });
-    await detached;
-    expect(deleted).toEqual([{ ptyId: 'pty_first', directory: firstSession.directory }]);
+    try {
+      attach(runtime, firstSession);
+      const replacement = await runtime.create(firstSession, creationPayload());
+      expect(replacement.pty.id).toBe('pty_2');
+      releaseCreation.resolve();
+      expect(await failure).toMatchObject({
+        code: 'not_ready',
+        message: 'Terminal session is no longer attached',
+        retryable: false,
+      });
+      await detached;
+      expect(deleted).toEqual([{ ptyId: 'pty_1', directory: firstSession.directory }]);
+      expect(await runtime.create(firstSession, creationPayload())).toEqual(replacement);
+      expect(await runtime.resize(firstSession, { ptyId: 'pty_2', cols: 100, rows: 30 })).toEqual({
+        pty: makePty(firstSession.directory, 'pty_2'),
+      });
+    } finally {
+      releaseCreation.resolve();
+      await detached;
+      await failure;
+    }
   });
 
   it('removes completed creation-operation state when its PTY is closed', async () => {
@@ -467,6 +667,50 @@ describe('control terminal PTY ownership', () => {
 });
 
 describe('control terminal reverse WebSocket bridge', () => {
+  it('closes every bridge in a deleted directory without closing an unrelated worktree', async () => {
+    const servers = createBridgeServers();
+    const sibling = { ...secondSession, directory: firstSession.directory };
+    const unrelated = {
+      ...secondSession,
+      sessionId: 'workspace_other',
+      kiloSessionId: 'kilo_other',
+    };
+    let count = 0;
+    const deleted: string[] = [];
+    const runtime = createRuntime(
+      fakeKilo({
+        serverUrl: servers.localUrl,
+        createPty: async input => makePty(input.cwd, `pty_${++count}`),
+        deletePty: async id => {
+          deleted.push(id);
+          return true;
+        },
+      }),
+      servers.controlUrl
+    );
+    try {
+      for (const identity of [firstSession, sibling, unrelated]) {
+        attach(runtime, identity);
+        const { pty } = await runtime.create(identity, creationPayload(crypto.randomUUID()));
+        await runtime.connect(identity, connectionPayload({ ptyId: pty.id }));
+      }
+      await runtime.detachDirectory(firstSession.directory);
+      expect(deleted).toEqual(['pty_1', 'pty_2']);
+      for (let index = 0; index < 2; index++) {
+        expect((await servers.reverseCloses.next()).code).toBe(1000);
+        expect((await servers.localCloses.next()).code).toBe(1000);
+      }
+      const unrelatedSocket = servers.reverseSockets[2];
+      if (!unrelatedSocket) throw new Error('Expected unrelated bridge');
+      unrelatedSocket.send('still connected');
+      expect(await servers.localFrames.next()).toBe('still connected');
+      expect(await servers.reverseFrames.next()).toBe('still connected');
+    } finally {
+      runtime.shutdown();
+      servers.stop();
+    }
+  });
+
   it('authenticates the trusted reverse origin and relays initial, text, control, and binary frames unchanged', async () => {
     const servers = createBridgeServers('initial output');
     const kiloClient = fakeKilo({ serverUrl: servers.localUrl });
@@ -507,6 +751,55 @@ describe('control terminal reverse WebSocket bridge', () => {
     } finally {
       runtime.shutdown();
       servers.stop();
+    }
+  });
+
+  it('connects each terminal bridge to its owning worktree server', async () => {
+    const firstServers = createBridgeServers('first worktree');
+    const secondServers = createBridgeServers('second worktree');
+    const worktrees = new Map<string, WorktreeKiloRuntime>();
+    for (const [identity, servers, id] of [
+      [firstSession, firstServers, 'pty_first'],
+      [secondSession, secondServers, 'pty_second'],
+    ] as const) {
+      worktrees.set(identity.directory, {
+        scopeId: identity.directory,
+        directory: identity.directory,
+        env: {},
+        signal: new AbortController().signal,
+        kiloClient: fakeKilo({
+          serverUrl: servers.localUrl,
+          createPty: async input => makePty(input.cwd, id),
+        }),
+      });
+    }
+    const runtime = createControlTerminalRuntime({
+      controlUrl: firstServers.controlUrl,
+      wrapperInstanceId,
+      getKiloRuntime: directory => worktrees.get(directory),
+    });
+    activeRuntimes.add(runtime);
+    attach(runtime, firstSession);
+    attach(runtime, secondSession);
+
+    try {
+      await runtime.create(firstSession, creationPayload(firstOperationId));
+      await runtime.create(secondSession, creationPayload(secondOperationId));
+      await runtime.connect(secondSession, connectionPayload({ ptyId: 'pty_second' }));
+      expect(await firstServers.reverseFrames.next()).toBe('second worktree');
+      expect(firstServers.localRequests).toEqual([]);
+      expect(secondServers.localRequests[0]?.searchParams.get('directory')).toBe(
+        secondSession.directory
+      );
+      await runtime.connect(firstSession, connectionPayload());
+      expect(await firstServers.reverseFrames.next()).toBe('first worktree');
+      expect(firstServers.localRequests[0]?.searchParams.get('directory')).toBe(
+        firstSession.directory
+      );
+    } finally {
+      runtime.shutdown();
+      firstServers.stop();
+      secondServers.stop();
     }
   });
 

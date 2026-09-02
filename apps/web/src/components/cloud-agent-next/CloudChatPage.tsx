@@ -1,15 +1,17 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ArrowDown, GitBranch } from 'lucide-react';
+import { ArrowDown, GitBranch, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
+import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
@@ -27,12 +29,10 @@ import {
   getSessionTotalCostUsd,
   isRenderableSessionCost,
 } from './session-cost-breakdown';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
-import { MessageBubble } from './MessageBubble';
+import { ConversationMessages } from './ConversationMessages';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
-import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
+import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
-import { PreparationRow } from './PreparationRow';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
 import { WorkingIndicator } from './WorkingIndicator';
@@ -57,11 +57,11 @@ import {
   addTerminalTab,
   closeTerminalTab,
   createWorkspaceTabsState,
+  getWorkspaceTabScope,
   resetWorkspaceTabs,
   selectWorkspaceTab,
   terminalTabId,
 } from './terminal-tabs';
-import { isMessageStreaming } from './types';
 import {
   createRemoteModelOverride,
   useSessionModels,
@@ -75,125 +75,11 @@ import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
-import { Button } from '@/components/ui/button';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
-import type {
-  MessageDeliveryState,
-  PreparationAttempt,
-  StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
-
-// ---------------------------------------------------------------------------
-// Static messages — memoized, never re-renders during streaming
-// ---------------------------------------------------------------------------
-const StaticMessages = memo(
-  ({
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: {
-    messages: StoredMessage[];
-    pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-    preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-    getChildMessages?: (sessionId: string) => StoredMessage[];
-    onOpenChildSession?: OpenChildSession;
-    onOpenPreparationDetails: (attemptId: string) => void;
-  }) => (
-    <>
-      {messages.map(msg => (
-        <MessageErrorBoundary key={msg.info.id}>
-          <MessageBubble
-            message={msg}
-            deliveryState={pendingMessages.get(msg.info.id)}
-            getChildMessages={getChildMessages}
-            onOpenChildSession={onOpenChildSession}
-          />
-          {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-            <PreparationRow
-              key={attempt.id}
-              attempt={attempt}
-              onOpenDetails={onOpenPreparationDetails}
-            />
-          ))}
-        </MessageErrorBoundary>
-      ))}
-    </>
-  )
-);
-StaticMessages.displayName = 'StaticMessages';
-
-// ---------------------------------------------------------------------------
-// Dynamic messages — re-renders as streaming progresses while chat is visible
-// ---------------------------------------------------------------------------
-type DynamicMessagesProps = {
-  active: boolean;
-  isStreaming: boolean;
-  messages: StoredMessage[];
-  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
-  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-  onOpenPreparationDetails: (attemptId: string) => void;
-};
-
-const DynamicMessages = memo(
-  function DynamicMessages({
-    isStreaming,
-    messages,
-    pendingMessages,
-    preparationByMessageId,
-    getChildMessages,
-    onOpenChildSession,
-    onOpenPreparationDetails,
-  }: DynamicMessagesProps) {
-    return (
-      <>
-        {messages.map(msg => {
-          const streaming = isStreaming && isMessageStreaming(msg);
-          return (
-            <MessageErrorBoundary key={msg.info.id}>
-              <MessageBubble
-                message={msg}
-                isStreaming={streaming}
-                deliveryState={pendingMessages.get(msg.info.id)}
-                getChildMessages={getChildMessages}
-                onOpenChildSession={onOpenChildSession}
-              />
-              {preparationByMessageId.get(msg.info.id)?.map(attempt => (
-                <PreparationRow
-                  key={attempt.id}
-                  attempt={attempt}
-                  onOpenDetails={onOpenPreparationDetails}
-                />
-              ))}
-            </MessageErrorBoundary>
-          );
-        })}
-      </>
-    );
-  },
-  (previous, next) => {
-    if (!previous.active && !next.active) return true;
-
-    return (
-      previous.active === next.active &&
-      previous.isStreaming === next.isStreaming &&
-      previous.messages === next.messages &&
-      previous.pendingMessages === next.pendingMessages &&
-      previous.preparationByMessageId === next.preparationByMessageId &&
-      previous.getChildMessages === next.getChildMessages &&
-      previous.onOpenChildSession === next.onOpenChildSession &&
-      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
-    );
-  }
-);
-DynamicMessages.displayName = 'DynamicMessages';
 
 // ---------------------------------------------------------------------------
 // CloudChatPage
@@ -248,6 +134,17 @@ export default function CloudChatPage({
   organizationRole,
 }: CloudChatPageProps) {
   const manager = useManager();
+  const { createWorktreeChat, creatingWorktreeSourceSessionId } = useWorktreeChatCreation();
+  const {
+    selectedWorktreeId,
+    worktreeChats,
+    openWorktreeChats,
+    closedWorktreeChats,
+    openSession,
+    closeSession,
+    renameSession,
+    deletingSessionIds,
+  } = useWorktreeChatTabs();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -269,12 +166,14 @@ export default function CloudChatPage({
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
   useEffect(() => {
+    childSessionDrawerFocusTargetRef.current = null;
+    setChildSessionStack([]);
+    preparationDrawerFocusTargetRef.current = null;
+    setPreparationDrawerAttemptId(null);
     if (sessionIdFromParams) {
-      childSessionDrawerFocusTargetRef.current = null;
-      setChildSessionStack([]);
-      preparationDrawerFocusTargetRef.current = null;
-      setPreparationDrawerAttemptId(null);
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
+    } else {
+      manager.destroy();
     }
   }, [sessionIdFromParams, manager]);
 
@@ -340,12 +239,45 @@ export default function CloudChatPage({
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
-  const chatTabActive = workspaceTabs.activeTabId === CHAT_TAB_ID;
+  const preserveTerminalSelectionRef = useRef(false);
+  const chatTabActive =
+    workspaceTabs.activeTabId === CHAT_TAB_ID &&
+    (sessionIdFromParams !== null || selectedWorktreeId === null);
+  const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
+  const workspaceIdentityResolved =
+    !sessionIdFromParams ||
+    selectedWorktreeId !== null ||
+    (fetchedSessionData?.kiloSessionId === sessionIdFromParams &&
+      fetchedSessionData.organizationId === (organizationId ?? null));
+  const [resolvedWorkspaceScope, setResolvedWorkspaceScope] = useState({
+    currentUserId,
+    organizationId,
+    scope: workspaceTabScope,
+  });
 
-  useEffect(() => {
+  if (
+    resolvedWorkspaceScope.currentUserId !== currentUserId ||
+    resolvedWorkspaceScope.organizationId !== organizationId ||
+    (workspaceIdentityResolved && resolvedWorkspaceScope.scope !== workspaceTabScope)
+  ) {
+    setResolvedWorkspaceScope({
+      currentUserId,
+      organizationId,
+      scope: workspaceIdentityResolved ? workspaceTabScope : null,
+    });
     setWorkspaceTabs(resetWorkspaceTabs);
     setTerminalStatuses({});
-  }, [sessionId]);
+  }
+
+  useEffect(() => {
+    if (preserveTerminalSelectionRef.current) {
+      preserveTerminalSelectionRef.current = false;
+      return;
+    }
+    if (sessionIdFromParams) {
+      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+    }
+  }, [sessionIdFromParams]);
 
   // -- Session models -------------------------------------------------------
   const sessionModels = useSessionModels({
@@ -575,6 +507,23 @@ export default function CloudChatPage({
   }, [scheduleScrollToBottom, setChatUI]);
 
   // -- Handlers -------------------------------------------------------------
+  const worktreeChatSourceSessionId = sessionIdFromParams
+    ? activeSessionType === 'cloud-agent' &&
+      fetchedSessionData?.worktreeId &&
+      fetchedSessionData.kiloSessionId === sessionIdFromParams
+      ? sessionIdFromParams
+      : null
+    : (worktreeChats[0]?.sessionId ?? null);
+  const canCreateWorktreeChat = worktreeChatSourceSessionId !== null;
+  const handleCreateWorktreeChat = useCallback(async () => {
+    if (!worktreeChatSourceSessionId) return false;
+    return createWorktreeChat(worktreeChatSourceSessionId);
+  }, [createWorktreeChat, worktreeChatSourceSessionId]);
+  const handleReplaceWorktreeChat = useCallback(async () => {
+    if (!canCreateWorktreeChat || !sessionIdFromParams) return false;
+    return createWorktreeChat(sessionIdFromParams, 'replace');
+  }, [canCreateWorktreeChat, createWorktreeChat, sessionIdFromParams]);
+
   const handleSendMessage = useCallback(
     async (prompt: string, attachments?: CloudAgentAttachments) => {
       setChatUI({ shouldAutoScroll: true });
@@ -638,13 +587,50 @@ export default function CloudChatPage({
   }, [setSoundEnabled]);
 
   const handleCreateTerminalTab = useCallback(() => {
+    const preparedSiblingSessionId =
+      selectedWorktreeId && fetchedSessionData?.isInitiated === false
+        ? worktreeChats.find(
+            chat => chat.sessionId !== sessionIdFromParams && chat.cloudAgentSessionId
+          )?.cloudAgentSessionId
+        : null;
+    const terminalSessionId = sessionIdFromParams
+      ? (preparedSiblingSessionId ?? sessionId)
+      : worktreeChats.find(chat => chat.cloudAgentSessionId)?.cloudAgentSessionId;
+    if (!terminalSessionId) return;
+
     const terminalId = uuidv4();
-    setWorkspaceTabs(state => addTerminalTab(state, terminalId));
-  }, []);
+    setWorkspaceTabs(state => addTerminalTab(state, terminalId, terminalSessionId));
+  }, [
+    fetchedSessionData?.isInitiated,
+    selectedWorktreeId,
+    sessionId,
+    sessionIdFromParams,
+    worktreeChats,
+  ]);
 
   const handleSelectWorkspaceTab = useCallback((tabId: WorkspaceTabId) => {
     setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
   }, []);
+
+  const handleCloseChat = useCallback(
+    (closingSessionId: string) => {
+      if (closingSessionId === sessionIdFromParams) {
+        preserveTerminalSelectionRef.current = !chatTabActive;
+        const fallbackTerminal = workspaceTabs.terminals.at(-1);
+        if (chatTabActive && openWorktreeChats.length === 1 && fallbackTerminal) {
+          setWorkspaceTabs(state => selectWorkspaceTab(state, terminalTabId(fallbackTerminal.id)));
+        }
+      }
+      closeSession(closingSessionId);
+    },
+    [
+      chatTabActive,
+      closeSession,
+      openWorktreeChats.length,
+      sessionIdFromParams,
+      workspaceTabs.terminals,
+    ]
+  );
 
   const handleCloseTerminalTab = useCallback((terminalId: string) => {
     setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
@@ -669,7 +655,7 @@ export default function CloudChatPage({
         key={tab.id}
         terminalId={tab.id}
         active={active}
-        sessionId={sessionId}
+        sessionId={tab.cloudAgentSessionId}
         organizationId={organizationId}
         onStatusChange={handleTerminalStatusChange}
       />
@@ -897,7 +883,8 @@ export default function CloudChatPage({
   }, [isLoading]);
 
   // -- Derived state --------------------------------------------------------
-  const showChatInterface = Boolean(sessionConfig) || Boolean(sessionIdFromParams);
+  const showChatInterface =
+    Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
   const currentModelOption = modelOptions.find(model =>
     activeSessionType === 'remote'
       ? model.id === sessionModels.selectedValue
@@ -941,7 +928,10 @@ export default function CloudChatPage({
         ? 'Wrapping up…'
         : 'Ask anything…';
 
-  const canOpenTerminal = Boolean(sessionId) && !isReadOnly;
+  const canOpenTerminal =
+    !sessionIdFromParams && selectedWorktreeId
+      ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
+      : Boolean(sessionId) && !isReadOnly;
 
   const sessionActions = (
     <ChatHeader
@@ -981,11 +971,15 @@ export default function CloudChatPage({
           acceptSuggestion={handleAcceptSuggestion}
           dismissSuggestion={handleDismissSuggestion}
         >
-          <div className="flex h-full w-full flex-col overflow-hidden">
+          <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
             <SetPageTitle
-              title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
+              title={
+                !sessionIdFromParams && selectedWorktreeId
+                  ? 'Worktree'
+                  : fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'
+              }
             >
-              {isRenderableSessionCost(totalCostUsd) && (
+              {sessionIdFromParams && isRenderableSessionCost(totalCostUsd) && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -1007,12 +1001,29 @@ export default function CloudChatPage({
               <>
                 {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-                <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-                  <MobileSidebarToggle variant="inline" label="Sessions" />
-                  <div className="min-w-0 flex-1">
-                    {canOpenTerminal && (
+                <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
+                  <MobileSidebarToggle variant="inline" label="Worktrees" />
+                  <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto">
+                    {(canOpenTerminal || selectedWorktreeId) && (
                       <CloudAgentWorkspaceTabs
                         activeTabId={workspaceTabs.activeTabId}
+                        chatSessions={worktreeChats}
+                        openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
+                        closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
+                        currentSessionId={sessionIdFromParams}
+                        worktreeId={selectedWorktreeId}
+                        onSelectChat={openSession}
+                        onCloseChat={handleCloseChat}
+                        onCreateChat={
+                          canCreateWorktreeChat
+                            ? () => {
+                                void handleCreateWorktreeChat();
+                              }
+                            : undefined
+                        }
+                        isCreatingChat={creatingWorktreeSourceSessionId !== null}
+                        onRenameChat={renameSession}
+                        deletingSessionIds={deletingSessionIds}
                         terminals={workspaceTabs.terminals}
                         terminalStatuses={terminalStatuses}
                         canCreateTerminal={canOpenTerminal}
@@ -1022,7 +1033,7 @@ export default function CloudChatPage({
                       />
                     )}
                   </div>
-                  <div className="shrink-0">{sessionActions}</div>
+                  {sessionIdFromParams && <div className="ml-auto shrink-0">{sessionActions}</div>}
                 </div>
 
                 <div
@@ -1034,11 +1045,40 @@ export default function CloudChatPage({
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="relative min-h-0 flex-1">
+                      {!sessionIdFromParams &&
+                        selectedWorktreeId &&
+                        workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                            <MessageSquare
+                              className="text-muted-foreground h-6 w-6"
+                              aria-hidden="true"
+                            />
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">
+                                {openWorktreeChats.length > 0 ? 'Select a chat' : 'No open chats'}
+                              </p>
+                              <p className="text-muted-foreground text-sm">
+                                Reopen a saved session from Sessions in the tab options menu
+                                {canCreateWorktreeChat ? ' or start a new chat.' : '.'}
+                              </p>
+                            </div>
+                            {canCreateWorktreeChat && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={creatingWorktreeSourceSessionId !== null}
+                                onClick={() => void handleCreateWorktreeChat()}
+                              >
+                                New chat
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       <>
                         <div
                           ref={scrollContainerRef}
                           hidden={!chatTabActive}
-                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                          className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                           onScroll={handleScroll}
                         >
                           <div ref={messagesContentRef}>
@@ -1051,18 +1091,11 @@ export default function CloudChatPage({
                               olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
                               onRetry={requestOlderMessages}
                             />
-                            <StaticMessages
-                              messages={staticMessages}
-                              pendingMessages={pendingMessages}
-                              preparationByMessageId={preparationByMessageId}
-                              getChildMessages={getChildMessages}
-                              onOpenChildSession={handleOpenTopLevelChildSession}
-                              onOpenPreparationDetails={handleOpenPreparationDetails}
-                            />
-                            <DynamicMessages
+                            <ConversationMessages
                               active={chatTabActive}
                               isStreaming={isStreaming}
-                              messages={dynamicMessages}
+                              staticMessages={staticMessages}
+                              dynamicMessages={dynamicMessages}
                               pendingMessages={pendingMessages}
                               preparationByMessageId={preparationByMessageId}
                               getChildMessages={getChildMessages}
@@ -1099,7 +1132,7 @@ export default function CloudChatPage({
 
                       <div
                         className={
-                          chatTabActive
+                          workspaceTabs.activeTabId === CHAT_TAB_ID
                             ? 'hidden'
                             : 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
                         }
@@ -1160,6 +1193,9 @@ export default function CloudChatPage({
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
+                                onNewChat={
+                                  canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
+                                }
                                 onStop={handleStopExecution}
                                 disabled={!canSend}
                                 isStreaming={isStreaming && !activeSuggestion}

@@ -391,8 +391,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   // required so react-native-screens finds it as the formSheet header.
   const header = (
     <View collapsable={false} className="border-b border-border bg-background pt-4">
-      <View className="h-11 flex-row items-center justify-center px-4">
-        <Text className="text-lg font-semibold text-foreground" accessibilityRole="header">
+      <View className="min-h-11 flex-row items-center justify-center px-4">
+        <Text
+          className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
+          accessibilityRole="header"
+        >
           {t('share.title')}
         </Text>
         <Button

@@ -57,7 +57,16 @@ export function ChildSessionSection({
   const agent = subtaskPart?.agent || getTaskAgent(taskToolPart);
   const taskStatus = taskToolPart?.state?.status;
   const isRunning = taskStatus === 'running' || taskStatus === 'pending';
-  const currentTool = isRunning ? getCurrentRunningTool(childMessages) : undefined;
+  const latestTool = isRunning ? getLatestToolActivity(childMessages) : undefined;
+  const agentLabel = agent ? agent.charAt(0).toUpperCase() + agent.slice(1) : undefined;
+  const activity = latestTool ? `Latest: ${latestTool}` : undefined;
+  const progress = activity ?? (taskStatus === 'pending' ? 'Delegating...' : 'Working...');
+  const statusLabel =
+    taskStatus === 'completed' ? 'Completed' : taskStatus === 'error' ? 'Failed' : undefined;
+  const toolCount = childMessages.reduce(
+    (total, message) => total + message.parts.filter(isToolPart).length,
+    0
+  );
   const canOpenDrawer = Boolean(sessionId && onOpenChildSession);
   const inlineRenderPart = sessionId && !canOpenDrawer ? renderPart : undefined;
   const canExpandInline = Boolean(inlineRenderPart);
@@ -74,80 +83,74 @@ export function ChildSessionSection({
     }
   };
 
-  const borderColor =
-    taskStatus === 'error'
-      ? 'border-red-500/40'
-      : taskStatus === 'completed'
-        ? 'border-green-500/40'
-        : 'border-blue-500/40';
-
   const rowContent = (
     <>
-      {canOpenDrawer ? (
-        <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-      ) : canExpandInline ? (
-        isExpanded ? (
-          <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
-        ) : (
-          <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-        )
-      ) : (
-        <span className="h-4 w-4 shrink-0" aria-hidden />
-      )}
-
       {isRunning ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
+        <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
       ) : (
-        <Bot className="h-4 w-4 shrink-0 text-blue-500" />
+        <Bot className="size-3.5 shrink-0" />
       )}
-
-      <span className="flex-1 truncate text-left text-sm font-medium">
-        {description || 'Subtask'}
-        {currentTool && (
-          <span className="text-muted-foreground ml-2 font-normal">
-            <span className="text-blue-500">{currentTool.tool}</span>
-            {currentTool.context && <span className="ml-1 opacity-70">{currentTool.context}</span>}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate" title={description}>
+            {description || 'Subagent task'}
+          </span>
+          {agentLabel && (
+            <Badge
+              variant="outline"
+              className="max-w-[35%] shrink-0 px-1.5 py-0 text-xs font-normal"
+            >
+              <span className="truncate" title={agentLabel}>
+                {agentLabel}
+              </span>
+            </Badge>
+          )}
+        </span>
+        {isRunning && (
+          <span className="truncate font-normal" title={progress}>
+            {progress}
           </span>
         )}
       </span>
-
-      {taskStatus && (
-        <Badge
-          variant={
-            taskStatus === 'completed'
-              ? 'default'
-              : taskStatus === 'error'
-                ? 'destructive'
-                : 'outline'
-          }
-          className="shrink-0 text-xs"
-        >
-          {taskStatus}
-        </Badge>
+      {(statusLabel || toolCount > 0) && (
+        <span className="flex shrink-0 items-center gap-2 font-normal">
+          {statusLabel && (
+            <span className={taskStatus === 'error' ? 'text-destructive' : undefined}>
+              {statusLabel}
+            </span>
+          )}
+          {statusLabel && toolCount > 0 && <span aria-hidden="true">·</span>}
+          {toolCount > 0 && (
+            <span className="tabular-nums">
+              {toolCount} {toolCount === 1 ? 'tool call' : 'tool calls'}
+            </span>
+          )}
+        </span>
       )}
-
-      {agent && (
-        <Badge variant="outline" className="shrink-0 text-xs">
-          {agent}
-        </Badge>
-      )}
+      {isInteractive &&
+        (canExpandInline && isExpanded ? (
+          <ChevronDown className="size-3.5 shrink-0" />
+        ) : (
+          <ChevronRight className="size-3.5 shrink-0" />
+        ))}
     </>
   );
 
   return (
-    <div className={`bg-muted/20 my-2 rounded-r-md border-l-2 ${borderColor}`}>
+    <div className="text-muted-foreground min-w-0 text-xs">
       {isInteractive ? (
         <Button
           variant="ghost"
           onClick={handleOpen}
-          className="hover:bg-muted/50 h-auto w-full justify-start gap-2 px-3 py-2 text-left"
+          aria-busy={isRunning || undefined}
+          aria-haspopup={canOpenDrawer ? 'dialog' : undefined}
+          aria-expanded={canExpandInline ? isExpanded : undefined}
+          className="hover:bg-muted/40 h-auto min-h-6 w-full items-center justify-start gap-2 px-2 py-1 text-left text-xs pointer-coarse:min-h-11"
         >
           {rowContent}
         </Button>
       ) : (
-        <div className="flex h-auto w-full items-center justify-start gap-2 px-3 py-2 text-left">
-          {rowContent}
-        </div>
+        <div className="flex min-h-6 w-full items-center gap-2 px-2 py-1">{rowContent}</div>
       )}
 
       {isExpanded && inlineRenderPart && (
@@ -274,14 +277,7 @@ export function getTaskToolSessionId(toolPart: ToolPart): KiloSessionId | undefi
   return undefined;
 }
 
-/**
- * Find the currently running tool from child session messages.
- * Looks through all assistant messages to find a tool part with status 'running' or 'pending'.
- * Returns the tool name and optional context (e.g., filename for read/edit tools).
- */
-export function getCurrentRunningTool(
-  childMessages: StoredMessage[]
-): { tool: string; context?: string } | undefined {
+function getLatestToolActivity(childMessages: StoredMessage[]): string | undefined {
   for (let i = childMessages.length - 1; i >= 0; i--) {
     const msg = childMessages[i];
     if (msg.info.role !== 'assistant') continue;
@@ -290,38 +286,31 @@ export function getCurrentRunningTool(
       const part = msg.parts[j];
       if (!isToolPart(part)) continue;
 
-      const status = part.state.status;
-      if (status === 'running' || status === 'pending') {
-        const tool = part.tool;
-        let context: string | undefined;
-
-        const input = part.state.input;
-        if (tool === 'read' || tool === 'edit' || tool === 'write') {
-          const filePath = getStringProperty(input, 'filePath');
-          if (filePath) {
-            context = filePath.split('/').pop();
-          }
-        } else if (tool === 'bash') {
-          const command = getStringProperty(input, 'command');
-          if (command) {
-            const firstWord = command.split(/\s+/)[0];
-            context = firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord;
-          }
-        } else if (tool === 'glob' || tool === 'grep') {
-          const pattern = getStringProperty(input, 'pattern');
-          if (pattern) {
-            context = pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern;
-          }
-        } else if (tool === 'task') {
-          const taskDescription = getStringProperty(input, 'description');
-          if (taskDescription) {
-            context =
-              taskDescription.length > 30 ? taskDescription.slice(0, 30) + '...' : taskDescription;
-          }
+      const tool = part.tool;
+      let context: string | undefined;
+      const input = part.state.input;
+      if (tool === 'read' || tool === 'edit' || tool === 'write') {
+        const filePath = getStringProperty(input, 'filePath');
+        if (filePath) context = filePath.split('/').pop();
+      } else if (tool === 'bash') {
+        const command = getStringProperty(input, 'command');
+        if (command) {
+          const firstWord = command.split(/\s+/)[0];
+          context = firstWord.length > 20 ? firstWord.slice(0, 20) + '...' : firstWord;
         }
-
-        return { tool, context };
+      } else if (tool === 'glob' || tool === 'grep') {
+        const pattern = getStringProperty(input, 'pattern');
+        if (pattern) context = pattern.length > 25 ? pattern.slice(0, 25) + '...' : pattern;
+      } else if (tool === 'task') {
+        const taskDescription = getStringProperty(input, 'description');
+        if (taskDescription) {
+          context =
+            taskDescription.length > 30 ? taskDescription.slice(0, 30) + '...' : taskDescription;
+        }
       }
+
+      const label = tool === 'bash' ? 'Shell' : tool.charAt(0).toUpperCase() + tool.slice(1);
+      return `${label}${context ? ` ${context}` : ''}${part.state.status === 'error' ? ' (failed)' : ''}`;
     }
   }
   return undefined;

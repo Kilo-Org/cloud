@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
+
 import {
   ActiveSessionsLiveSync,
   makeConnection,
@@ -37,6 +39,12 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
     conn.__fireConnection(true);
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(2);
+    const query = qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(0);
+    qc.__triggerFetchResolve({ sessions: [] });
+    await sync.getFetchCompletion();
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(1);
   });
 
   it('release-then-retain still produces exactly one refresh per rising edge', async () => {

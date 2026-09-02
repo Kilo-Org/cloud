@@ -111,6 +111,107 @@ describe('sandbox control socket handler', () => {
     );
   });
 
+  it('rejects an invalid provisional handshake without replacing the current valid socket', async () => {
+    const current = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_current',
+    });
+    const incoming = createFakeWebSocket({ handshakeComplete: false, acceptedAt: Date.now() });
+    const validateHandshake = vi.fn(async () => false);
+    const onHandshakeComplete = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([current, incoming]),
+      'sbx_test',
+      undefined,
+      { validateHandshake, onHandshakeComplete }
+    );
+    const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const request = JSON.parse(current.send.mock.calls[0]?.[0] as string) as {
+      requestId: string;
+    };
+
+    await handler.handleMessage(
+      asWs(incoming),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_rejected',
+        operation: 'sandbox.hello',
+        payload: { protocolVersion: 1, providerInstanceId: 'inst_stale' },
+      })
+    );
+
+    expect(validateHandshake).toHaveBeenCalledWith('inst_stale');
+    expect(incoming.serializeAttachment).not.toHaveBeenCalled();
+    expect(incoming.close).toHaveBeenCalledWith(1008, 'invalid_provider_instance');
+    expect(incoming.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'response',
+        requestId: 'req_rejected',
+        ok: false,
+        error: {
+          code: 'unauthorized',
+          message: 'Invalid sandbox provider instance',
+          retryable: false,
+        },
+      })
+    );
+    expect(current.close).not.toHaveBeenCalled();
+    expect(onHandshakeComplete).not.toHaveBeenCalled();
+
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: request.requestId, ok: true })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: true, requestId: request.requestId });
+  });
+
+  it.each([true, false])(
+    'preserves the replacement connection when superseded provider validation resolves to %s',
+    async valid => {
+      const first = createFakeWebSocket();
+      const sockets = [first];
+      let finishValidation: ((valid: boolean) => void) | undefined;
+      const validation = new Promise<boolean>(resolve => {
+        finishValidation = resolve;
+      });
+      const onHandshakeComplete = vi.fn();
+      const handler = createSandboxControlSocketHandler(
+        createFakeState(sockets),
+        'sbx_test',
+        undefined,
+        {
+          validateHandshake: providerInstanceId =>
+            providerInstanceId === 'inst_pending' ? validation : true,
+          onHandshakeComplete,
+        }
+      );
+      const pending = handler.handleMessage(
+        asWs(first),
+        helloFrame('inst_pending', WRAPPER_INSTANCE_ID, 'req_first')
+      );
+      const second = createFakeWebSocket();
+      sockets.push(second);
+
+      await handler.handleMessage(
+        asWs(second),
+        helloFrame('inst_current', REPLACEMENT_WRAPPER_INSTANCE_ID, 'req_second')
+      );
+      first.readyState = 1;
+      finishValidation?.(valid);
+      await pending;
+
+      expect(first.send).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+      expect(handler.getConnectionIdentity()).toMatchObject({
+        providerInstanceId: 'inst_current',
+        wrapperInstanceId: REPLACEMENT_WRAPPER_INSTANCE_ID,
+      });
+      expect(onHandshakeComplete).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('replaces the previous handshaken socket after sandbox.hello and probes status', async () => {
     const current = createFakeWebSocket({
       handshakeComplete: true,
@@ -503,20 +604,26 @@ describe('sandbox control socket handler', () => {
     );
   });
 
-  it('sends an outbound request and settles the waiter from the wrapper response', async () => {
+  it('keeps the expected runtime fence off the wire and settles the outbound request', async () => {
     const ws = createFakeWebSocket({
       handshakeComplete: true,
       acceptedAt: Date.now(),
       protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
       providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const pending = handler.sendRequest({
+      operation: 'sandbox.status',
+      payload: {},
+      expectedWrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
     const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as {
       requestId: string;
       operation: string;
     };
     expect(sent.operation).toBe('sandbox.status');
+    expect(sent).not.toHaveProperty('expectedWrapperInstanceId');
     await handler.handleMessage(
       asWs(ws),
       JSON.stringify({

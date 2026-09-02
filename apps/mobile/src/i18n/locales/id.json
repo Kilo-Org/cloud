@@ -152,7 +152,11 @@
     "appearanceDark": "Gelap",
     "account": "Akun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi ke ulasan PR",
-    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan."
+    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan.",
+    "returnSendsMessage": "Tombol Enter mengirim pesan",
+    "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen.",
+    "biometricUnlock": "Buka kunci dengan biometrik",
+    "biometricUnlockSubtitle": "Buka kunci saat aplikasi diluncurkan dan setelah berada di latar belakang selama lima menit."
   },
   "notifications": {
     "title": "Notifikasi",
@@ -296,7 +300,8 @@
       "networkError": "Kesalahan jaringan",
       "uploadFailed": "Unggahan gagal",
       "failedToUploadFile": "Gagal mengunggah file: {{reason}}",
-      "nothingToPaste": "Tidak ada yang bisa ditempel"
+      "nothingToPaste": "Tidak ada yang bisa ditempel",
+      "metadataStripFailed": "Metadata foto tidak dapat dihapus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1613,7 +1618,8 @@
       "couldNotSearch": "Tidak dapat mencari sesi",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tidak ada sesi sebelumnya",
-      "live": "LANGSUNG"
+      "live": "LANGSUNG",
+      "updating": "Memperbarui"
     },
     "sessionRow": {
       "deleteTitle": "Hapus sesi?",
@@ -1657,7 +1663,9 @@
     "sessionExited": "Sesi berakhir",
     "remoteSpawnRetryable": "Tidak dapat menjangkau instance — mungkin telah terputus.",
     "remoteSpawnNonRetryable": "Instance gagal memulai sesi — periksa mesin atau perbarui CLI.",
-    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instance lain."
+    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instance lain.",
+    "liveCount_one": "{{count}} LANGSUNG",
+    "liveCount_other": "{{count}} LANGSUNG"
   },
   "agentChat": {
     "session": {
@@ -1687,7 +1695,11 @@
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Tunggu sebentar.",
       "serviceUnavailable": "Layanan tidak tersedia saat ini. Coba lagi.",
       "connectionTrouble": "Gangguan koneksi. Coba lagi sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan coba lagi.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan pesan.",
+      "cancelQueuedRestoreAvailable": "Pesan dibatalkan. Ketuk Pulihkan untuk mengembalikannya ke kolom pesan.",
+      "cancelQueuedRestored": "Pesan dibatalkan. Prompt kembali ke kolom pesan.",
+      "cancelQueuedUpgradeRequired": "Pembatalan pesan dalam antrean memerlukan Kilo CLI yang lebih baru. Perbarui Kilo CLI dan sambungkan kembali."
     },
     "remoteSession": {
       "failedToCreate": "Gagal membuat sesi jarak jauh",
@@ -1759,7 +1771,8 @@
       "continueFrom": "Melanjutkan {{title}}",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini."
+      "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "discardWithUploadsMessage": "Prompt Anda dan unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus."
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",
@@ -1817,7 +1830,9 @@
       "noCliInstancesDescription": "Jalankan `kilo remote` di proyek pada komputer Anda, atau perbarui Kilo CLI jika sudah berjalan.",
       "instanceOnProject": "{{name}} di {{project}}",
       "instanceOnProjectSuffix": "{{name}} di {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Jalankan di Agen Cloud"
+      "runOnCloudAgent": "Jalankan di Agen Cloud",
+      "terminals": "Terminal",
+      "remotes": "Instans jarak jauh"
     },
     "modePicker": {
       "title": "Pilih mode",
@@ -2007,7 +2022,11 @@
       "queuedAccessibility": "Pesan dalam antrean",
       "userMessage": "Pesan pengguna",
       "assistantMessage": "Pesan asisten",
-      "longPressHint": "Tekan lama untuk detail pesan"
+      "longPressHint": "Tekan lama untuk detail pesan",
+      "cancelQueued": "Batalkan pesan",
+      "cancelQueuedAccessibility": "Batalkan pesan dalam antrean",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan pesan yang dibatalkan ke kolom pesan"
     },
     "olderMessages": {
       "arrived": "Pesan sebelumnya dimuat",
@@ -2035,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "Filter sesi",
-      "sortBy": "Urutkan menurut",
-      "sortLastUpdated": "Terakhir diperbarui",
-      "sortCreated": "Dibuat",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstensi",
@@ -2046,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lainnya",
-      "project": "Proyek",
-      "removeProjectFilter": "Hapus filter proyek {{label}}",
-      "removePlatformFilter": "Hapus filter platform {{label}}"
+      "project": "Proyek"
     },
     "suggestion": {
       "title": "Saran",
@@ -2091,7 +2105,9 @@
       "uploading": "Mengunggah…",
       "uploaded": "Terunggah",
       "uploadFailedRetry": "Unggahan gagal. Ketuk untuk mencoba lagi.",
-      "uploadFailedTerminal": "File ini tidak dapat diunggah."
+      "uploadFailedTerminal": "File ini tidak dapat diunggah.",
+      "moveLeft": "Pindahkan {{filename}} ke kiri",
+      "moveRight": "Pindahkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tempel gambar dari papan klip",
@@ -2121,7 +2137,11 @@
       "finalizingPlaceholder": "Menyelesaikan...",
       "messagePlaceholder": "Pesan...",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima file. Hapus lampiran untuk mengirim pesan Anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi."
+      "couldNotAttachFiles": "Tidak dapat melampirkan file. Ketuk Kirim untuk mencoba lagi.",
+      "discardAttachmentsMessage": "Unggahan yang tidak dilampirkan ke pesan terkirim akan dihapus.",
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} karakter tersisa",
+      "insertNewline": "Sisipkan baris baru"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",
@@ -2197,7 +2217,7 @@
       "open": "pull request terbuka",
       "closed": "pull request tertutup",
       "merged": "pull request tergabung",
-      "draft": "Draf pull request",
+      "draft": "draf pull request",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2276,7 +2296,7 @@
     "newCodingTask": "Tugas coding baru",
     "explore": "Jelajahi",
     "seeAll": "Lihat semua",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Tidak ada yang berjalan saat ini"
   },
   "imageViewer": {
     "close": "Tutup {{filename}}",
@@ -2321,7 +2341,7 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "memerlukan input"
+    "needsInput": "MEMERLUKAN INPUT"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",
@@ -2340,7 +2360,8 @@
     "busy": "Masukan suara sedang sibuk. Coba lagi.",
     "stopped": "Masukan suara berhenti. Ketuk mikrofon untuk mencoba lagi.",
     "unavailableDevice": "Masukan suara tidak tersedia di perangkat ini.",
-    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini."
+    "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini.",
+    "listeningStopped": "Mendengarkan berhenti."
   },
   "share": {
     "title": "Bagikan ke Kilo",

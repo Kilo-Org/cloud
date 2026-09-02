@@ -1,5 +1,11 @@
+/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted query fixtures */
+import { createElement, type ReactNode } from 'react';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, vi } from 'vitest';
-import { type QueryFunction, type QueryKey } from '@tanstack/react-query';
+import { createKiloAppQueryClient } from '@/lib/query-client';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
 
 import {
   ActiveSessionsLiveSync,
@@ -7,6 +13,7 @@ import {
   type LiveSyncQueryClient,
 } from '@/lib/active-sessions-live-sync';
 import {
+  buildActiveSessionsTrayInput,
   type CachedActiveSession,
   type CachedActiveSessionsData,
 } from '@/lib/active-sessions-live';
@@ -106,96 +113,75 @@ type FakeQueryClient = LiveSyncQueryClient & {
 
 const emptySessionsData = (): CachedActiveSessionsData => ({ sessions: [] });
 
+/** Real QueryClient cancellation/provenance with a controlled network result. */
 export function makeFakeQueryClient(
   initial: CachedActiveSessionsData = emptySessionsData()
 ): FakeQueryClient {
-  let cache: CachedActiveSessionsData | undefined = initial;
+  const qc = makeTestQueryClient();
+  const seed = qc.setQueryData.bind(qc);
+  seed(QUERY_KEY, initial);
   let pendingFetch: Deferred<CachedActiveSessionsData> | null = null;
-  let fetchQueryCalls = 0;
-  let cancelQueriesCalls = 0;
-  const qc = {
-    cancelQueries: vi.fn(async () => {
-      cancelQueriesCalls += 1;
-      if (pendingFetch) {
-        const d = pendingFetch;
-        pendingFetch = null;
-        d.reject(new Error('canceled'));
-      }
-      await Promise.resolve();
-    }),
-    setQueryData: vi.fn((_key: QueryKey, updater: unknown): unknown => {
-      const next =
-        typeof updater === 'function'
-          ? (updater as (old: CachedActiveSessionsData | undefined) => unknown)(cache)
-          : updater;
-      cache = next as CachedActiveSessionsData;
-      return next;
-    }),
-    getQueryData: vi.fn((_key: QueryKey) => cache as unknown),
-    fetchQuery: vi.fn(
-      async (opts: {
-        queryKey: QueryKey;
-        queryFn: QueryFunction<CachedActiveSessionsData>;
-        staleTime?: number;
-      }): Promise<CachedActiveSessionsData> => {
-        fetchQueryCalls += 1;
-        // Drive the supplied queryFn so tests can assert it was invoked,
-        // but let the test control the resolved value via __triggerFetchResolve.
-        // QueryFunction requires a context arg; the fake only needs to observe the call.
-        await (opts.queryFn as unknown as () => Promise<unknown>)();
-        const d = deferred<CachedActiveSessionsData>();
-        pendingFetch = d;
+  const fetch = qc.fetchQuery.bind(qc);
+  const cancel = qc.cancelQueries.bind(qc);
+  const fetchSpy = vi.spyOn(qc, 'fetchQuery').mockImplementation(async options => {
+    const queryFn = options.queryFn;
+    if (typeof queryFn !== 'function') {
+      throw new TypeError('Expected a query function');
+    }
+    const result = await fetch({
+      ...options,
+      queryFn: async context => {
+        const pending = deferred<CachedActiveSessionsData>();
+        pendingFetch = pending;
         try {
-          const result = await d.promise;
-          return result;
+          await queryFn(context);
+          return await pending.promise;
         } finally {
-          if (pendingFetch === d) {
+          if (pendingFetch === pending) {
             pendingFetch = null;
           }
         }
-      }
-    ),
-    fetchQueryCalls: 0,
-    cancelQueriesCalls: 0,
+      },
+    });
+    return result;
+  });
+  const cancelSpy = vi.spyOn(qc, 'cancelQueries').mockImplementation(async (...args) => {
+    pendingFetch = null;
+    await cancel(...args);
+  });
+  vi.spyOn(qc, 'setQueryData');
+  Object.assign(qc, {
     __setCached(data: CachedActiveSessionsData | undefined) {
-      cache = data;
+      if (data === undefined) {
+        qc.removeQueries({ queryKey: QUERY_KEY, exact: true });
+      } else {
+        seed(QUERY_KEY, data);
+      }
     },
     __triggerFetchResolve(data: CachedActiveSessionsData) {
-      if (pendingFetch) {
-        const d = pendingFetch;
-        pendingFetch = null;
-        cache = data;
-        d.resolve(data);
-      }
+      pendingFetch?.resolve(data);
     },
     __triggerFetchReject(error: Error) {
-      if (pendingFetch) {
-        const d = pendingFetch;
-        pendingFetch = null;
-        d.reject(error);
-      }
+      pendingFetch?.reject(error);
     },
     __hasPendingFetch() {
       return pendingFetch !== null;
     },
     __getCached() {
-      return cache;
-    },
-  };
-  Object.defineProperty(qc, 'fetchQueryCalls', {
-    get() {
-      return fetchQueryCalls;
+      return qc.getQueryData<CachedActiveSessionsData>(QUERY_KEY);
     },
   });
-  Object.defineProperty(qc, 'cancelQueriesCalls', {
-    get() {
-      return cancelQueriesCalls;
-    },
+  Object.defineProperties(qc, {
+    fetchQueryCalls: { get: () => fetchSpy.mock.calls.length },
+    cancelQueriesCalls: { get: () => cancelSpy.mock.calls.length },
   });
-  return qc as unknown as FakeQueryClient;
+  return qc as FakeQueryClient;
 }
 
-export const QUERY_KEY = ['activeSessions', 'list'] as const;
+export const QUERY_KEY = [
+  ['activeSessions', 'list'],
+  { input: buildActiveSessionsTrayInput(null), type: 'query' },
+] as const;
 
 export function makeQueryFn(response: CachedActiveSessionsData = emptySessionsData()) {
   return vi.fn(async () => {
@@ -231,6 +217,88 @@ export function setupTimers(): void {
   afterEach(() => {
     vi.useRealTimers();
   });
+}
+
+export function makeActiveSessionsQueryKey(organizationId: string | null = null) {
+  return [
+    ['activeSessions', 'list'],
+    { input: buildActiveSessionsTrayInput(organizationId), type: 'query' },
+  ] as const;
+}
+
+export async function flushQueryUpdates(): Promise<void> {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/** Reuse the DOM-free query-provider lifecycle without sharing query clients. */
+export function createQueryProbe(Probe: () => ReactNode, getClient: () => QueryClient) {
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  return {
+    render: async () => {
+      await act(async () => {
+        const tree = createElement(
+          QueryClientProvider,
+          { client: getClient() },
+          createElement(Probe)
+        );
+        if (renderer) {
+          renderer.update(tree);
+        } else {
+          renderer = TestRenderer.create(tree);
+        }
+        await flushQueryUpdates();
+      });
+    },
+    unmount: () => {
+      renderer?.unmount();
+      renderer = undefined;
+    },
+  };
+}
+
+export function makeTestQueryClient(): QueryClient {
+  const client = createKiloAppQueryClient();
+  client.setDefaultOptions({
+    queries: { retry: false, gcTime: Infinity },
+    mutations: { retry: false, gcTime: Infinity },
+  });
+  return client;
+}
+
+export function seedMutationSessions(
+  client: QueryClient,
+  listKey: readonly unknown[],
+  title = 'Old'
+) {
+  const cliSessions = [
+    { session_id: 's1', title },
+    { session_id: 's2', title: 'Other' },
+  ];
+  client.setQueryData(listKey, { pages: [{ cliSessions }], pageParams: [null] });
+  client.setQueryData(QUERY_KEY, { sessions: [makeCached({ id: 's1', title })] });
+}
+
+export function mutationStoredTitles(client: QueryClient, listKey: readonly unknown[]) {
+  return client
+    .getQueryData<{ pages: { cliSessions: { title: string }[] }[] }>(listKey)
+    ?.pages.flatMap(page => page.cliSessions.map(session => session.title));
+}
+
+export function mutationActiveTitle(client: QueryClient) {
+  return client.getQueryData<CachedActiveSessionsData>(QUERY_KEY)?.sessions[0]?.title;
+}
+
+export function replaceMutationAccount(client: QueryClient, listKey: readonly unknown[]) {
+  setSignOutActive(true);
+  bumpAuthEpoch();
+  client.clear();
+  setSignOutActive(false);
+  seedMutationSessions(client, listKey, 'Account B');
 }
 
 export { ActiveSessionsLiveSync };

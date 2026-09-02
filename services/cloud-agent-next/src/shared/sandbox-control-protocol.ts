@@ -16,7 +16,15 @@ export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
-export const SANDBOX_OPERATIONS = ['sandbox.hello', 'sandbox.status', 'sandbox.shutdown'] as const;
+export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
+
+export const SANDBOX_OPERATIONS = [
+  'sandbox.hello',
+  'sandbox.status',
+  'sandbox.shutdown',
+  'worktree.prepareDeletion',
+  'worktree.delete',
+] as const;
 
 export const SESSION_OPERATIONS = [
   'session.attach',
@@ -53,6 +61,8 @@ export const controlErrorCodes = [
   'unknown_operation',
   'handshake_required',
   'not_ready',
+  'session_busy',
+  'runtime_unhealthy',
   'idempotency_conflict',
 ] as const;
 
@@ -153,6 +163,18 @@ export const sandboxHeartbeatPayloadSchema = z
     kilo: z
       .object({
         ready: z.boolean(),
+        reason: z
+          .enum([
+            'feed_stale',
+            'feed_reconnected',
+            'feed_ended',
+            'feed_failed',
+            'process_exited',
+            'credential_refresh_failed',
+            'control_disconnected',
+            'shutdown',
+          ])
+          .optional(),
       })
       .strict(),
     sessions: z.array(
@@ -161,7 +183,7 @@ export const sandboxHeartbeatPayloadSchema = z
           kiloSessionId: z.string().min(1),
           state: z.enum(['idle', 'active', 'finalizing']),
           idleForMs: z.number().int().nonnegative(),
-          waitingOn: z.enum(['model', 'tool', 'finalizing']).optional(),
+          waitingOn: z.enum(['model', 'tool', 'finalizing', 'preparation', 'input']).optional(),
         })
         .strict()
     ),
@@ -191,11 +213,55 @@ export const sandboxShutdownResultSchema = z
   })
   .strict();
 
+export const worktreeDeletePayloadSchema = z
+  .object({
+    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    directory: z.string().min(1).max(1024),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreePrepareDeletionResultSchema = z
+  .object({
+    prepared: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreeDeleteResultSchema = z
+  .object({
+    deleted: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
+export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
+
 export const sessionAttachPayloadSchema = z
   .object({
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
+    kilo: z
+      .object({
+        scopeId: z.string().min(1).max(256),
+        token: z.string().min(1).max(4096),
+        containmentEnabled: z.boolean().optional(),
+        organizationId: z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+          .optional(),
+        targets: z
+          .object({
+            backendBaseUrl: z.string().url(),
+            providerBaseUrl: z.string().url(),
+            sessionIngestBaseUrl: z.string().url(),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
     git: z
       .object({
         url: z.string().min(1).max(2048),
@@ -270,6 +336,18 @@ const sessionPromptAgentSchema = z
 const sessionPromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
+    attachments: z
+      .array(
+        z
+          .object({
+            filename: z.string().min(1),
+            mime: z.string().min(1),
+            signedUrl: z.string().min(1),
+            localPath: z.string().min(1),
+          })
+          .strict()
+      )
+      .optional(),
     finalization: z
       .object({
         autoCommit: z.boolean().optional(),
@@ -336,6 +414,7 @@ export const sessionQuestionResolveResultSchema = z
 
 export const sessionAbortPayloadSchema = z
   .object({
+    messageId: z.string().min(1).max(128).optional(),
     reason: z.string().min(1).max(256).optional(),
   })
   .strict();
@@ -442,6 +521,16 @@ export const sessionEventPayloadSchema = z
     timestamp: z.string().min(1).optional(),
   })
   .strict();
+
+export const sessionMessageOutcomeSchema = z
+  .object({
+    messageId: z.string().min(1).max(128),
+    status: z.enum(['completed', 'failed', 'cancelled']),
+    reason: z.string().max(4096).optional(),
+  })
+  .strict();
+
+export type SessionMessageOutcome = z.infer<typeof sessionMessageOutcomeSchema>;
 
 export const sessionPreparingPayloadSchema = z
   .object({

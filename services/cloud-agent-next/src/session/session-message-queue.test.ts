@@ -132,6 +132,7 @@ function createQueueHarness(options?: {
   getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
   recoverExhaustedDeliveryBlock?: () => Promise<void>;
   checkBillingAdmission?: SessionMessageQueueDependencies['checkBillingAdmission'];
+  persistCloneQueuedMessage?: SessionMessageQueueDependencies['persistCloneQueuedMessage'];
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -182,6 +183,19 @@ function createQueueHarness(options?: {
         events.push(event);
         if (messageId) admittedEventMessageIds.add(messageId);
       },
+      persistCloneQueuedMessage:
+        options?.persistCloneQueuedMessage ??
+        (async (intent, callbackSnapshot) => {
+          const now = Date.now();
+          await storePendingSessionMessage(
+            storage,
+            createPendingSessionMessageFromIntent(intent, now, callbackSnapshot)
+          );
+          await putSessionMessageState(
+            storage,
+            createQueuedSessionMessageState(intent, callbackSnapshot, now)
+          );
+        }),
       ensureAcceptedMessageEffects:
         options?.ensureAcceptedMessageEffects ?? (async () => undefined),
       persistTerminalTransition: async (messageId, params, options) => {
@@ -1136,35 +1150,76 @@ describe('SessionMessageQueue', () => {
     await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
-  it('admits a durable queued message once and replays the original acknowledgement', async () => {
-    const harness = createQueueHarness();
-    const request = {
-      userId: 'user_test' as UserId,
-      turn: { type: 'prompt' as const, id: FIRST_MESSAGE_ID, prompt: 'queue this prompt' },
-    };
+  it.each([false, true])(
+    'admits a durable queued message once and replays its acknowledgement (marked clone: %s)',
+    async markedClone => {
+      const harness = createQueueHarness({
+        metadata: createMetadata({
+          clone: markedClone
+            ? {
+                cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+                reportingCreatedAt: '2026-08-01T10:00:00.000Z',
+              }
+            : undefined,
+        }),
+      });
+      const request = {
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt' as const, id: FIRST_MESSAGE_ID, prompt: 'queue this prompt' },
+      };
 
-    const admitted = await harness.queue.admitSubmittedMessage(request);
-    const replay = await harness.queue.admitSubmittedMessage(request);
-    const pending = await listPendingSessionMessages(harness.storage);
-    const messageState = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
+      const admitted = await harness.queue.admitSubmittedMessage(request);
+      const replay = await harness.queue.admitSubmittedMessage(request);
+      const pending = await listPendingSessionMessages(harness.storage);
+      const messageState = await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID);
 
-    expect(admitted).toEqual({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'queued',
-      messageId: FIRST_MESSAGE_ID,
-    });
-    expect(replay).toEqual(admitted);
-    expect(pending.map(message => message.messageId)).toEqual([FIRST_MESSAGE_ID]);
-    expect(messageState?.status).toBe('queued');
-    expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.queued']);
-    expect(JSON.parse(harness.events[0]?.payload ?? '{}')).toMatchObject({
-      messageId: FIRST_MESSAGE_ID,
-      content: 'queue this prompt',
-      delivery: 'queued',
-    });
-    expect(harness.alarmDeadlines).toHaveLength(2);
-  });
+      expect(admitted).toEqual({
+        success: true,
+        outcome: 'queued',
+        compatibilityDelivery: 'queued',
+        messageId: FIRST_MESSAGE_ID,
+      });
+      expect(replay).toEqual(admitted);
+      expect(pending.map(message => message.messageId)).toEqual([FIRST_MESSAGE_ID]);
+      expect(messageState?.status).toBe('queued');
+      expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.queued']);
+      expect(JSON.parse(harness.events[0]?.payload ?? '{}')).toMatchObject({
+        messageId: FIRST_MESSAGE_ID,
+        content: 'queue this prompt',
+        delivery: 'queued',
+      });
+      expect(harness.alarmDeadlines).toHaveLength(2);
+    }
+  );
+
+  it.each([false, true])(
+    'uses DO-owned queued persistence only for marked clones (%s)',
+    async markedClone => {
+      const persistCloneQueuedMessage = vi.fn().mockRejectedValue(new Error('transaction failed'));
+      const harness = createQueueHarness({
+        metadata: createMetadata({
+          clone: {
+            cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+            ...(markedClone ? { reportingCreatedAt: '2026-08-01T10:00:00.000Z' } : {}),
+          },
+        }),
+        persistCloneQueuedMessage,
+      });
+
+      const result = await harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'clone first message' },
+      });
+
+      expect(result.success).toBe(!markedClone);
+      expect(await listPendingSessionMessages(harness.storage)).toHaveLength(markedClone ? 0 : 1);
+      expect(await getSessionMessageState(harness.storage, FIRST_MESSAGE_ID)).toEqual(
+        markedClone ? undefined : expect.objectContaining({ status: 'queued' })
+      );
+      expect(harness.events).toHaveLength(markedClone ? 0 : 1);
+      expect(harness.alarmDeadlines).toHaveLength(markedClone ? 0 : 1);
+    }
+  );
 
   it('repairs submitted admission event/drain effects after an event persistence failure', async () => {
     const harness = createQueueHarness({ failQueuedEventOnce: true });
@@ -2397,4 +2452,110 @@ describe('SessionMessageQueue', () => {
       },
     ]);
   });
+
+  it('drops a queued pending message and terminalizes its state as canceled', async () => {
+    const harness = createQueueHarness();
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'cancel me before delivery' },
+    });
+
+    const result = await harness.queue.cancelQueuedMessage(FIRST_MESSAGE_ID);
+
+    expect(result).toEqual({ dropped: true });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    await expect(getSessionMessageState(harness.storage, FIRST_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'interrupted',
+      completionSource: 'canceled',
+      failureStage: 'interruption',
+      failureCode: 'user_interrupt',
+    });
+  });
+
+  it('reports dropped for a retried cancel of an already-canceled message', async () => {
+    const harness = createQueueHarness();
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already canceled' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'interrupted',
+      terminalAt: 12,
+      completionSource: 'canceled',
+      failureStage: 'interruption',
+      failureCode: 'user_interrupt',
+    });
+
+    const result = await harness.queue.cancelQueuedMessage(FIRST_MESSAGE_ID);
+
+    expect(result).toEqual({ dropped: true });
+  });
+
+  it('does not drop an accepted message with leftover pending residue', async () => {
+    const harness = createQueueHarness();
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'already accepted',
+        createdAt: 1,
+      })
+    );
+    await putSessionMessageState(harness.storage, {
+      ...createQueuedSessionMessageState({
+        turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already accepted' },
+        agent: { mode: 'code', model: 'default-model' },
+      }),
+      status: 'accepted',
+      acceptedAt: 3,
+      wrapperRunId: 'wr_existing',
+    });
+
+    const result = await harness.queue.cancelQueuedMessage(FIRST_MESSAGE_ID);
+
+    expect(result).toEqual({ dropped: false });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(1);
+    await expect(getSessionMessageState(harness.storage, FIRST_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+      wrapperRunId: 'wr_existing',
+    });
+  });
+
+  it.each([
+    ['completed', 'assistant_message_event'],
+    ['failed', 'wrapper_failure'],
+    ['interrupted', 'interrupt'],
+  ] as const)(
+    'does not drop a %s message with leftover pending residue',
+    async (status, completionSource) => {
+      const harness = createQueueHarness();
+      await storePendingSessionMessage(
+        harness.storage,
+        createPendingSessionMessage({
+          messageId: FIRST_MESSAGE_ID,
+          role: 'user',
+          content: 'already terminal',
+          createdAt: 1,
+        })
+      );
+      await putSessionMessageState(harness.storage, {
+        ...createQueuedSessionMessageState({
+          turn: { type: 'prompt', messageId: FIRST_MESSAGE_ID, prompt: 'already terminal' },
+          agent: { mode: 'code', model: 'default-model' },
+        }),
+        status,
+        terminalAt: 12,
+        completionSource,
+      });
+
+      const result = await harness.queue.cancelQueuedMessage(FIRST_MESSAGE_ID);
+
+      expect(result).toEqual({ dropped: false });
+      expect(await listPendingSessionMessages(harness.storage)).toHaveLength(1);
+      await expect(
+        getSessionMessageState(harness.storage, FIRST_MESSAGE_ID)
+      ).resolves.toMatchObject({ status });
+    }
+  );
 });

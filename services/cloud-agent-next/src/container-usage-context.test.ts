@@ -5,6 +5,7 @@ import {
   assertSandboxBillingAllocation,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
   SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
@@ -41,6 +42,62 @@ describe('container usage context', () => {
     await expect(
       getSandboxBillingRuntimeStatus({ getBillingRuntimeStatus } as unknown as SandboxInstance)
     ).resolves.toEqual(status);
+  });
+
+  it('invokes native control-plane destruction as a binding method without SDK fallback', async () => {
+    const forceDestroyForControlPlane = new Proxy(
+      vi.fn(async function (this: { running: boolean }) {
+        this.running = false;
+      }),
+      {
+        get: (target, property, receiver) => {
+          if (property === 'call' || property === 'apply') {
+            throw new Error('RPC method proxies do not support Function.call or Function.apply');
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      }
+    );
+    const sandbox = {
+      running: true,
+      forceDestroyForControlPlane,
+      destroy: vi.fn(),
+    };
+
+    await expect(forceDestroyControlPlaneSandbox(sandbox)).resolves.toBeUndefined();
+
+    expect(sandbox.running).toBe(false);
+    expect(forceDestroyForControlPlane).toHaveBeenCalledOnce();
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, 42, {}, { forceDestroyForControlPlane: true }])(
+    'fails closed when native control-plane destruction is unavailable: %j',
+    async sandbox => {
+      await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
+        'Cloudflare control-plane native destruction is unavailable'
+      );
+    }
+  );
+
+  it('does not substitute SDK destruction for a missing native capability', async () => {
+    const sandbox = { destroy: vi.fn(async () => undefined) };
+
+    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toThrow(
+      'Cloudflare control-plane native destruction is unavailable'
+    );
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
+  it('propagates native control-plane destruction failures', async () => {
+    const error = new Error('Native destroy acknowledgement lost');
+    const sandbox = {
+      forceDestroyForControlPlane: vi.fn().mockRejectedValue(error),
+      destroy: vi.fn(),
+    };
+
+    await expect(forceDestroyControlPlaneSandbox(sandbox)).rejects.toBe(error);
+    expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
   it('maps every concrete sandbox class to its immutable SKU', () => {

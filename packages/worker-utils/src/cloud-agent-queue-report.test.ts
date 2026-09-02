@@ -42,6 +42,24 @@ describe('CloudAgentQueueReportSchema', () => {
     ).toBe(true);
   });
 
+  it('rejects unknown diagnostic content at the strict producer boundary', () => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({
+          status: 'failed',
+          terminalAt,
+          failureStage: 'unknown',
+          failureCode: 'unclassified',
+          diagnostic: {
+            errorMessageRedacted: 'The agent failed',
+            errorExpiresAt: '2026-06-25T08:04:00.000Z',
+            responseBody: 'private fixture output',
+          },
+        })
+      ).success
+    ).toBe(false);
+  });
+
   it('supports retained statuses and typed failure classifications', () => {
     const reportsByStatus = {
       queued: reportWithRun({ status: 'queued' }),
@@ -77,6 +95,46 @@ describe('CloudAgentQueueReportSchema', () => {
         ).success
       ).toBe(true);
     }
+  });
+
+  it.each(['wrapper_ping_timeout', 'wrapper_no_output', 'wrapper_disconnected'] as const)(
+    'accepts %s before and after observed agent activity',
+    failureCode => {
+      for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
+        const report = CloudAgentQueueReportSchema.parse(
+          reportWithRun({
+            status: 'failed',
+            dispatchAcceptedAt: '2026-05-26T08:02:00.000Z',
+            ...(failureStage === 'agent_activity'
+              ? { agentActivityObservedAt: '2026-05-26T08:03:00.000Z' }
+              : {}),
+            terminalAt,
+            failureStage,
+            failureCode,
+          })
+        );
+
+        expect(report.run).toMatchObject({ failureStage, failureCode });
+      }
+    }
+  );
+
+  it('accepts payment_required before dispatch without acceptance or activity timestamps', () => {
+    const report = CloudAgentQueueReportSchema.parse(
+      reportWithRun({
+        status: 'failed',
+        terminalAt,
+        failureStage: 'pre_dispatch',
+        failureCode: 'payment_required',
+      })
+    );
+
+    expect(report.run).toMatchObject({
+      failureStage: 'pre_dispatch',
+      failureCode: 'payment_required',
+    });
+    expect(report.run).not.toHaveProperty('dispatchAcceptedAt');
+    expect(report.run).not.toHaveProperty('agentActivityObservedAt');
   });
 
   it('rejects removed lifecycle fields and unsafe transport content', () => {

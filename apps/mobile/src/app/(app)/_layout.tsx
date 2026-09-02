@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
@@ -123,6 +124,7 @@ export default function AppLayout() {
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <Stack
+            screenLayout={appUnlockScreenLayout}
             screenOptions={{
               contentStyle: { backgroundColor: colors.background },
               headerShown: false,

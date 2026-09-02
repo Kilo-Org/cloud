@@ -257,6 +257,36 @@ describe('sandbox control frames', () => {
     ).toBe(true);
   });
 
+  it.each([
+    'feed_stale',
+    'feed_reconnected',
+    'feed_ended',
+    'feed_failed',
+    'process_exited',
+    'credential_refresh_failed',
+    'control_disconnected',
+    'shutdown',
+  ])('preserves the allowlisted unhealthy heartbeat reason %s', reason => {
+    const payload = { state: 'idle', kilo: { ready: false, reason }, sessions: [] };
+    expect(parseEventPayload('sandbox.heartbeat', payload)).toEqual({ ok: true, payload });
+  });
+
+  it.each(['', 'unknown', 'Error: request failed', { message: 'request failed' }, null])(
+    'rejects a non-allowlisted heartbeat reason %j without echoing it',
+    reason => {
+      expect(
+        parseEventPayload('sandbox.heartbeat', {
+          state: 'idle',
+          kilo: { ready: false, reason },
+          sessions: [],
+        })
+      ).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid sandbox.heartbeat payload' },
+      });
+    }
+  );
+
   it('accepts sandbox.heartbeat waitingOn values', () => {
     for (const waitingOn of ['model', 'tool', 'finalizing'] as const) {
       expect(

@@ -152,7 +152,11 @@
     "appearanceDark": "Tumšs",
     "account": "Konts",
     "prReviewAttribution": "Pievienot lietotnes attiecinājumu PR pārskatiem",
-    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu."
+    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu.",
+    "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
+    "returnSendsMessageSubtitle": "Ja izslēgts, ievades taustiņš ievieto jaunu rindu aģenta ziņojuma ievades laukā.",
+    "biometricUnlock": "Atbloķēt ar biometriju",
+    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -757,7 +761,8 @@
       "networkError": "Tīkla kļūda",
       "uploadFailed": "Augšupielāde neizdevās",
       "failedToUploadFile": "Neizdevās augšupielādēt failu: {{reason}}",
-      "nothingToPaste": "Nav ko ielīmēt"
+      "nothingToPaste": "Nav ko ielīmēt",
+      "metadataStripFailed": "Neizdevās noņemt foto metadatus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1140,7 +1145,7 @@
       "restarting": "RESTARTĒ",
       "running": "DARBOJAS",
       "shuttingDown": "IZSLĒDZAS",
-      "starting": "Sākas",
+      "starting": "SĀKAS",
       "stopped": "APTURĒTS",
       "stopping": "APTUR",
       "unknown": "NEZINĀMS",
@@ -1298,7 +1303,7 @@
       "started": "Sākts",
       "completed": "Pabeigts",
       "cost": "Izmaksas",
-      "tokens": "tokeni",
+      "tokens": "Tokeni",
       "tokensInOut": "{{input}} iekšā / {{output}} ārā",
       "openPullRequest": "Atvērt pull request",
       "council": "Padome",
@@ -1313,7 +1318,7 @@
       "transcriptWaiting": "Gaida pārskata stenogrammu.",
       "transcriptEmpty": "Šim pārskatam nav stenogrammas.",
       "transcriptRetry": "Neizdevās ielādēt pārskata stenogrammu.",
-      "transcriptLive": "TIŠRAIDĒ",
+      "transcriptLive": "Tišraidē",
       "agentIdle": "Aģents dīkstāvē",
       "agentWorking": "Aģents strādā...",
       "anErrorOccurred": "Radās kļūda",
@@ -2080,7 +2085,8 @@
       "couldNotSearch": "Neizdevās meklēt sesijas",
       "completedWillAppear": "Pabeigtās sesijas parādīsies šeit.",
       "noPastSessions": "Nav pagājušo sesiju",
-      "live": "TIŠRAIDĒ"
+      "live": "TIŠRAIDĒ",
+      "updating": "Atjaunina"
     },
     "sessionRow": {
       "deleteTitle": "Dzēst sesiju?",
@@ -2126,7 +2132,10 @@
     "sessionExited": "Sesija beidzās",
     "remoteSpawnRetryable": "Nevarēja sasniegt instanci — tā, iespējams, ir atvienojusies.",
     "remoteSpawnNonRetryable": "Instancei neizdevās sākt sesiju — pārbaudiet iekārtu vai atjauniniet CLI.",
-    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci."
+    "remoteSpawnInstanceDisconnected": "Atlasītā instance atvienojās. Sāciet sesiju Cloud Agent vai izvēlieties citu instanci.",
+    "liveCount_one": "{{count}} TIŠRAIDĒ",
+    "liveCount_other": "{{count}} TIŠRAIDĒ",
+    "liveCount_zero": "{{count}} TIŠRAIDĒ"
   },
   "agentChat": {
     "session": {
@@ -2156,7 +2165,11 @@
       "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
       "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa.",
-      "modelUnavailable": "Šis modelis nav pieejams Cloud Agent. Izvēlieties citu modeli un mēģiniet vēlreiz."
+      "modelUnavailable": "Šis modelis nav pieejams Cloud Agent. Izvēlieties citu modeli un mēģiniet vēlreiz.",
+      "cancelQueuedFailed": "Neizdevās atcelt ziņojumu.",
+      "cancelQueuedRestoreAvailable": "Ziņojums atcelts. Pieskarieties “Atjaunot”, lai to atgrieztu ziņojuma ievades laukā.",
+      "cancelQueuedRestored": "Ziņojums atcelts. Jautājums atkal ir ziņojuma ievades laukā.",
+      "cancelQueuedUpgradeRequired": "Lai atceltu rindā esošus ziņojumus, nepieciešama jaunāka Kilo CLI versija. Atjauniniet Kilo CLI un savienojieties vēlreiz."
     },
     "remoteSession": {
       "failedToCreate": "Neizdevās izveidot attālo sesiju",
@@ -2228,7 +2241,8 @@
       "continueFrom": "Turpina {{title}}",
       "importingSession": "Importē sesiju",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlieties Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju."
+      "importFailed": "Neizdevās importēt šo sesiju.",
+      "discardWithUploadsMessage": "Jūsu jautājums un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2287,7 +2301,9 @@
       "noCliInstancesDescription": "Palaid `kilo remote` projektā savā datorā vai atjaunini Kilo CLI, ja tā jau darbojas.",
       "instanceOnProject": "{{name}} uz {{project}}",
       "instanceOnProjectSuffix": "{{name}} uz {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Palaist uz Cloud Agent"
+      "runOnCloudAgent": "Palaist uz Cloud Agent",
+      "terminals": "Termināļi",
+      "remotes": "Attālinātās instances"
     },
     "modePicker": {
       "title": "Izvēlēties režīmu",
@@ -2477,7 +2493,11 @@
       "queuedAccessibility": "Ziņojums rindā",
       "userMessage": "Lietotāja ziņojums",
       "assistantMessage": "Asistenta ziņojums",
-      "longPressHint": "Turiet piespiestu ziņojuma detaļām"
+      "longPressHint": "Turiet piespiestu ziņojuma detaļām",
+      "cancelQueued": "Atcelt ziņojumu",
+      "cancelQueuedAccessibility": "Atcelt rindā esošu ziņojumu",
+      "restoreQueued": "Atjaunot",
+      "restoreQueuedAccessibility": "Atjaunot atcelto ziņojumu ziņojuma ievades laukā"
     },
     "olderMessages": {
       "arrived": "Ielādēti agrāki ziņojumi",
@@ -2508,9 +2528,6 @@
     },
     "sessionFilter": {
       "title": "Filtrēt sesijas",
-      "sortBy": "Kārtot pēc",
-      "sortLastUpdated": "Pēdējo reizi atjaunināts",
-      "sortCreated": "Izveidots",
       "platform": "Platforma",
       "platformCloud": "Mākonis",
       "platformExtension": "Paplašinājums",
@@ -2519,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Cits",
-      "project": "Projekts",
-      "removeProjectFilter": "Noņemt {{label}} projekta filtru",
-      "removePlatformFilter": "Noņemt {{label}} platformas filtru"
+      "project": "Projekts"
     },
     "suggestion": {
       "title": "Ieteikums",
@@ -2564,7 +2579,9 @@
       "uploading": "Augšupielādē…",
       "uploaded": "Augšupielādēts",
       "uploadFailedRetry": "Augšupielāde neizdevās. Pieskarieties, lai mēģinātu vēlreiz.",
-      "uploadFailedTerminal": "Šo failu nevar augšupielādēt."
+      "uploadFailedTerminal": "Šo failu nevar augšupielādēt.",
+      "moveLeft": "Pārvietot {{filename}} pa kreisi",
+      "moveRight": "Pārvietot {{filename}} pa labi"
     },
     "attachmentPasteHint": {
       "accessibility": "Ielīmēt attēlu no starpliktuves",
@@ -2594,7 +2611,11 @@
       "finalizingPlaceholder": "Pabeidz...",
       "messagePlaceholder": "Ziņojums...",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
-      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz."
+      "couldNotAttachFiles": "Neizdevās pievienot failus. Pieskarieties Sūtīt, lai mēģinātu vēlreiz.",
+      "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
+      "discardAttachmentsTitle": "Atmest pielikumus?",
+      "charactersRemaining": "Atlikušās rakstzīmes: {{count}}",
+      "insertNewline": "Ievietot jaunu rindu"
     },
     "chatLink": {
       "linkCopied": "Saite kopēta",
@@ -2671,7 +2692,7 @@
       "open": "atvērts pull request",
       "closed": "aizvērts pull request",
       "merged": "apvienots pull request",
-      "draft": "Melnraksta pull request",
+      "draft": "melnraksta pull request",
       "updating": "Atjaunina, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2750,7 +2771,7 @@
     "newCodingTask": "Jauns kodēšanas uzdevums",
     "explore": "Izpētīt",
     "seeAll": "Skatīt visus",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Pašlaik nekas nedarbojas"
   },
   "imageViewer": {
     "close": "Aizvērt {{filename}}",
@@ -2814,7 +2835,8 @@
     "busy": "Balss ievade ir aizņemta. Mēģiniet vēlreiz.",
     "stopped": "Balss ievade tika apturēta. Pieskarieties mikrofonam, lai mēģinātu vēlreiz.",
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
-    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai."
+    "unavailableLanguage": "Balss ievade nav pieejama šai ierīces valodai.",
+    "listeningStopped": "Klausīšanās apturēta."
   },
   "share": {
     "title": "Kopīgot Kilo",

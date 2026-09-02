@@ -152,7 +152,11 @@
     "appearanceDark": "Dunkel",
     "account": "Konto",
     "prReviewAttribution": "App-Zuordnung zu PR-Reviews hinzufügen",
-    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an."
+    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an.",
+    "returnSendsMessage": "Eingabetaste sendet Nachricht",
+    "returnSendsMessageSubtitle": "Wenn deaktiviert, fügt die Eingabetaste einen Zeilenumbruch in die Nachrichteneingabe für Agenten ein.",
+    "biometricUnlock": "Mit Biometrie entsperren",
+    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -296,7 +300,8 @@
       "networkError": "Netzwerkfehler",
       "uploadFailed": "Hochladen fehlgeschlagen",
       "failedToUploadFile": "Datei konnte nicht hochgeladen werden: {{reason}}",
-      "nothingToPaste": "Nichts einzufügen"
+      "nothingToPaste": "Nichts einzufügen",
+      "metadataStripFailed": "Die Metadaten des Fotos konnten nicht entfernt werden."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -903,7 +908,7 @@
       "transcriptWaiting": "Warten auf das Review-Sitzungsprotokoll.",
       "transcriptEmpty": "Kein Sitzungsprotokoll für dieses Review.",
       "transcriptRetry": "Das Review-Sitzungsprotokoll konnte nicht geladen werden.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent inaktiv",
       "agentWorking": "Agent arbeitet...",
       "anErrorOccurred": "Ein Fehler ist aufgetreten",
@@ -1613,7 +1618,8 @@
       "couldNotSearch": "Sitzungen konnten nicht durchsucht werden",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Keine vergangenen Sitzungen",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Wird aktualisiert"
     },
     "sessionRow": {
       "deleteTitle": "Sitzung löschen?",
@@ -1657,7 +1663,9 @@
     "sessionExited": "Sitzung beendet",
     "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden – sie wurde möglicherweise getrennt.",
     "remoteSpawnNonRetryable": "Die Instanz konnte die Sitzung nicht starten – überprüfe die Maschine oder aktualisiere die CLI.",
-    "remoteSpawnInstanceDisconnected": "Die ausgewählte Instanz wurde getrennt. Starte eine Sitzung auf Cloud Agent oder wähle eine andere Instanz."
+    "remoteSpawnInstanceDisconnected": "Die ausgewählte Instanz wurde getrennt. Starte eine Sitzung auf Cloud Agent oder wähle eine andere Instanz.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1687,7 +1695,11 @@
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
       "connectionTrouble": "Verbindungsproblem. Bitte versuche es in einem Moment erneut.",
-      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut."
+      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut.",
+      "cancelQueuedFailed": "Die Nachricht konnte nicht abgebrochen werden.",
+      "cancelQueuedRestoreAvailable": "Nachricht abgebrochen. Tippe auf „Wiederherstellen“, um sie zurück in die Nachrichteneingabe zu holen.",
+      "cancelQueuedRestored": "Nachricht abgebrochen. Der Prompt ist wieder in der Nachrichteneingabe.",
+      "cancelQueuedUpgradeRequired": "Das Abbrechen von Nachrichten in der Warteschlange erfordert eine neuere Kilo CLI. Aktualisiere die Kilo CLI und verbinde dich erneut."
     },
     "remoteSession": {
       "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",
@@ -1759,7 +1771,8 @@
       "continueFrom": "{{title}} wird fortgesetzt",
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
-      "importFailed": "Diese Sitzung konnte nicht importiert werden."
+      "importFailed": "Diese Sitzung konnte nicht importiert werden.",
+      "discardWithUploadsMessage": "Dein Prompt und alle hochgeladenen Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",
@@ -1817,7 +1830,9 @@
       "noCliInstancesDescription": "Führe `kilo remote` in einem Projekt auf deinem Computer aus, oder aktualisiere die Kilo CLI, falls bereits eine läuft.",
       "instanceOnProject": "{{name}} auf {{project}}",
       "instanceOnProjectSuffix": "{{name}} auf {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Auf Cloud-Agent ausführen"
+      "runOnCloudAgent": "Auf Cloud-Agent ausführen",
+      "terminals": "Terminals",
+      "remotes": "Remote-Instanzen"
     },
     "modePicker": {
       "title": "Modus wählen",
@@ -2007,7 +2022,11 @@
       "queuedAccessibility": "Nachricht in Warteschlange",
       "userMessage": "Nutzer-Nachricht",
       "assistantMessage": "Assistenten-Nachricht",
-      "longPressHint": "Lange drücken für Nachrichtendetails"
+      "longPressHint": "Lange drücken für Nachrichtendetails",
+      "cancelQueued": "Nachricht abbrechen",
+      "cancelQueuedAccessibility": "Nachricht in der Warteschlange abbrechen",
+      "restoreQueued": "Wiederherstellen",
+      "restoreQueuedAccessibility": "Abgebrochene Nachricht in der Nachrichteneingabe wiederherstellen"
     },
     "olderMessages": {
       "arrived": "Frühere Nachrichten geladen",
@@ -2035,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "Sitzungen filtern",
-      "sortBy": "Sortieren nach",
-      "sortLastUpdated": "Zuletzt aktualisiert",
-      "sortCreated": "Erstellt",
       "platform": "Plattform",
       "platformCloud": "Cloud",
       "platformExtension": "Erweiterung",
@@ -2046,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Sonstige",
-      "project": "Projekt",
-      "removeProjectFilter": "{{label}}-Projektfilter entfernen",
-      "removePlatformFilter": "{{label}}-Plattformfilter entfernen"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Vorschlag",
@@ -2091,7 +2105,9 @@
       "uploading": "Wird hochgeladen…",
       "uploaded": "Hochgeladen",
       "uploadFailedRetry": "Hochladen fehlgeschlagen. Zum erneuten Versuch tippen.",
-      "uploadFailedTerminal": "Diese Datei kann nicht hochgeladen werden."
+      "uploadFailedTerminal": "Diese Datei kann nicht hochgeladen werden.",
+      "moveLeft": "{{filename}} nach links verschieben",
+      "moveRight": "{{filename}} nach rechts verschieben"
     },
     "attachmentPasteHint": {
       "accessibility": "Bild aus der Zwischenablage einfügen",
@@ -2121,7 +2137,11 @@
       "finalizingPlaceholder": "Wird abgeschlossen...",
       "messagePlaceholder": "Nachricht...",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
-      "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen."
+      "couldNotAttachFiles": "Dateien konnten nicht angehängt werden. Tippe auf Senden, um es erneut zu versuchen.",
+      "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
+      "discardAttachmentsTitle": "Anhänge verwerfen?",
+      "charactersRemaining": "Noch {{count}} Zeichen",
+      "insertNewline": "Zeilenumbruch einfügen"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",
@@ -2276,7 +2296,7 @@
     "newCodingTask": "Neue Codieraufgabe",
     "explore": "Entdecken",
     "seeAll": "Alle ansehen",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Zurzeit läuft nichts"
   },
   "imageViewer": {
     "close": "{{filename}} schließen",
@@ -2340,7 +2360,8 @@
     "busy": "Spracheingabe ist beschäftigt. Versuche es erneut.",
     "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
     "unavailableDevice": "Spracheingabe ist auf diesem Gerät nicht verfügbar.",
-    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar."
+    "unavailableLanguage": "Spracheingabe ist für diese Gerätesprache nicht verfügbar.",
+    "listeningStopped": "Zuhören beendet."
   },
   "share": {
     "title": "An Kilo teilen",

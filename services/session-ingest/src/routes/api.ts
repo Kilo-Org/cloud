@@ -22,6 +22,7 @@ import { isDefaultSessionTitle } from '../ingest/default-session-title';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
+import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
 
 export type ApiContext = {
   Bindings: Env;
@@ -296,6 +297,9 @@ api.delete('/session/:sessionId', async c => {
   const kiloUserId = c.get('user_id');
   if (c.get('deletionAudience')) {
     return deleteOwnedLeafSession(c, kiloUserId, parsed.data);
+  }
+  if (await isWorktreeSessionDeleting(db, kiloUserId, parsed.data)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
   }
 
   const accessibleSession = await resolveAccessibleKiloSession(c.env, {

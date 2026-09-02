@@ -423,6 +423,14 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     this.ctx.waitUntil(promise);
   }
 
+  async forceDestroyForControlPlane(): Promise<void> {
+    const container = this.ctx.container;
+    if (!container || typeof container.destroy !== 'function') {
+      throw new Error('Native container destruction is unavailable');
+    }
+    await container.destroy();
+  }
+
   override async destroy(): Promise<void> {
     const context = await getBillingContext(this.ctx.storage);
     const block = await this.getBillingBlock();

@@ -45,6 +45,7 @@ import {
   createQueuedSessionMessageState,
   getSessionMessageState,
   listReconnectVisibleTerminalQueuedMessages,
+  markMessageInterrupted,
   putSessionMessageState,
   type SessionMessageFailureCode,
   type SessionMessageStorage,
@@ -125,6 +126,15 @@ export type SessionMessageQueue = {
   interruptPendingQueuedMessages(
     afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
   ): Promise<PendingSessionMessage[]>;
+  /**
+   * Delete one pending (not yet accepted) queued message by id without
+   * interrupting the accepted/current run. A successful drop also terminalizes
+   * the message's queued `SessionMessageState` so a later re-admit treats the
+   * id as terminal instead of ACKing it as still queued. Returns whether a
+   * pending row was removed; a missing id or the accepted current message
+   * returns false.
+   */
+  cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }>;
   recoverPendingInterruption(
     afterTransition?: (messages: PendingSessionMessage[]) => Promise<void>
   ): Promise<boolean>;
@@ -154,6 +164,10 @@ export type SessionMessageQueueDependencies = {
   > | null>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
   reportQueuedState?: (state: SessionMessageState) => void;
+  persistCloneQueuedMessage: (
+    intent: SessionMessageIntent,
+    callbackSnapshot?: PendingSessionMessage['callbackSnapshot']
+  ) => Promise<void>;
   ensureAcceptedMessageEffects: (messageId: string) => Promise<void>;
   persistTerminalTransition: (
     messageId: string,
@@ -851,9 +865,13 @@ export function createSessionMessageQueue(
       ? { required: true, target: callbackTarget }
       : undefined;
 
-    await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
-    const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
-    await putSessionMessageState(storage, messageState);
+    if (metadata?.clone?.reportingCreatedAt) {
+      await dependencies.persistCloneQueuedMessage(intent, callbackSnapshot);
+    } else {
+      await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
+      const messageState = createQueuedSessionMessageState(intent, callbackSnapshot);
+      await putSessionMessageState(storage, messageState);
+    }
     await completeQueuedAdmissionEffects(intent);
     return buildAdmissionAck(turn.messageId);
   }
@@ -1211,6 +1229,51 @@ export function createSessionMessageQueue(
     return capturedMessages;
   }
 
+  async function cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    const pendingMessage = await findPendingSessionMessageByMessageId(storage, messageId);
+
+    // A retry after a successful cancel finds no pending row, but the durable
+    // state is already terminalized as interrupted/canceled. Report dropped so
+    // the caller still persists the `cloud.message.canceled` replay event.
+    if (!pendingMessage) {
+      const existing = await getSessionMessageState(storage, messageId);
+      return existing?.status === 'interrupted' && existing.completionSource === 'canceled'
+        ? { dropped: true }
+        : { dropped: false };
+    }
+
+    // `admitIntent` wrote a queued `SessionMessageState` alongside the pending
+    // row. Terminalize it so `getExistingAdmissionAckForMessageId` rejects a
+    // later re-admit instead of ACKing the id as still queued. Terminalize
+    // without the outbox `cloud.message.failed` effect: the caller persists the
+    // `cloud.message.canceled` replay event instead, and the `canceled`
+    // completion source keeps the dropped id out of the reconnect catch-up
+    // snapshot so a reconnecting client nets empty after queued then canceled.
+    let existing = await getSessionMessageState(storage, messageId);
+    if (!existing) {
+      await repairMissingQueuedStateFromPendingMessage(pendingMessage);
+      existing = await getSessionMessageState(storage, messageId);
+    }
+
+    // Only a still-queued turn may be dropped. `recordRuntimeAcceptedMessage`
+    // and `ensureAcceptedMessageBeforeTerminal` can write accepted or terminal
+    // state while the pending row still exists; never drop a running or
+    // finished turn.
+    if (existing?.status !== 'queued') {
+      return { dropped: false };
+    }
+
+    await markMessageInterrupted(storage, messageId, {
+      error: 'Queued message canceled by user',
+      completionSource: 'canceled',
+      failureStage: 'interruption',
+      failureCode: 'user_interrupt',
+    });
+
+    await deletePendingSessionMessageByMessageId(storage, messageId);
+    return { dropped: true };
+  }
+
   return {
     hasMessageAdmission,
     admitSubmittedMessage,
@@ -1218,6 +1281,7 @@ export function createSessionMessageQueue(
     drainNextPendingMessage,
     snapshotForStreamConnect,
     interruptPendingQueuedMessages,
+    cancelQueuedMessage,
     recoverPendingInterruption,
     requestPendingDrain,
     requestPendingDrainIfNeeded,

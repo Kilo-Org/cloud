@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
-import {
-  parseSessionMetadata,
-  requiresContainmentSandbox,
-  type SessionMetadata,
-} from '../persistence/session-metadata.js';
+import { parseSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import type { OperationResult } from '../persistence/types.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -69,7 +65,10 @@ const completedCreationSchema = z
   })
   .strict();
 
-type TerminalControl = ReturnType<typeof sandboxControlRpc>;
+type TerminalControl = Pick<
+  ReturnType<typeof sandboxControlRpc>,
+  'getStatus' | 'request' | 'detachSession' | 'validateTerminalAccess' | 'recordTerminalActivity'
+>;
 type LifecycleFence = z.infer<typeof lifecycleFenceSchema>;
 type AttachedSession = z.infer<typeof attachedSessionSchema>;
 type CompletedCreation = z.infer<typeof completedCreationSchema>;
@@ -196,7 +195,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     return parsed.success && parsed.data.ptyId === ptyId ? parsed.data : null;
   }
 
-  function matchesMetadata(record: SandboxTerminalRecord, metadata: SessionMetadata): boolean {
+  function matchesMetadata(record: AttachedSession, metadata: SessionMetadata): boolean {
     return (
       record.ownerId === metadata.identity.userId &&
       record.sessionId === metadata.identity.sessionId &&
@@ -205,6 +204,14 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
       record.sandboxId === metadata.workspace?.sandboxId &&
       record.organizationId === metadata.identity.orgId
     );
+  }
+
+  function getAttachedWrapperInstanceId(): string | undefined {
+    const current = snapshot();
+    const attached = readAttachedSession();
+    return current && attached && matchesMetadata(attached, current.metadata)
+      ? attached.wrapperInstanceId
+      : undefined;
   }
 
   function clearCompletedCreations(ptyId: string): void {
@@ -484,9 +491,6 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     if (!current) return unavailableSession();
     if (!isTerminalSessionPlatform(current.metadata.identity.createdOnPlatform)) {
       return denied('terminals are only available for interactive Cloud Agent sessions');
-    }
-    if (requiresContainmentSandbox(current.metadata)) {
-      return denied('this session requires unsupported credential containment');
     }
 
     const ready = await readyContext(current, { validateAccess: true });
@@ -768,21 +772,6 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
           record.ptyId
         );
       }
-      if (metadata?.auth.kiloSessionId) {
-        try {
-          await control.request({
-            operation: 'session.detach',
-            session: {
-              sessionId,
-              kiloSessionId: metadata.auth.kiloSessionId,
-              directory: deps.getDirectory(metadata),
-            },
-            payload: {},
-          });
-        } catch {
-          return;
-        }
-      }
     } finally {
       await control.detachSession(sessionId);
     }
@@ -835,6 +824,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     cleanupSession,
     closeTerminal,
     createTerminal,
+    getAttachedWrapperInstanceId,
     getStoredMetadata,
     getTerminal,
     invalidateRuntime,

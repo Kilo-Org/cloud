@@ -68,7 +68,12 @@ import {
   findAllGitPlatformUrls,
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
-import type { AgentMode } from './types';
+import {
+  getCloudSessionCreationOperation,
+  isAmbiguousCloudSessionCreationError,
+  type AgentMode,
+  type CloudSessionCreationOperation,
+} from './types';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
@@ -148,6 +153,9 @@ export function NewSessionPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
+  const firstChatCreationOperationRef = useRef<
+    (CloudSessionCreationOperation & { initialMessageId: string }) | null
+  >(null);
   const [devcontainer, setDevcontainer] = useState(false);
   const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
     boolean | null
@@ -1028,7 +1036,6 @@ export function NewSessionPanel({
     setIsPreparing(true);
 
     try {
-      const initialMessageId = generateMessageId();
       const trimmed = prompt.trim();
 
       // Parse slash command: if the input matches a known command, send a
@@ -1048,7 +1055,7 @@ export function NewSessionPanel({
         return;
       }
 
-      const baseInput = {
+      const creationInput = {
         prompt: trimmed,
         mode,
         model: displayModel,
@@ -1056,7 +1063,6 @@ export function NewSessionPanel({
         profileId: selectedProfileId ?? undefined,
         autoCommit: true,
         autoInitiate: true,
-        initialMessageId,
         attachments: await attachmentUpload.finalizeAttachments(),
         ...(slashCommand
           ? {
@@ -1068,6 +1074,25 @@ export function NewSessionPanel({
             }
           : {}),
         ...(effectiveDevcontainer ? { devcontainer: true } : {}),
+      };
+      const intent = JSON.stringify({
+        ...creationInput,
+        organizationId: organizationId ?? null,
+        repository: selectedRepo,
+        platform: selectedPlatform,
+        bitbucketRepo,
+      });
+      const previousOperation = firstChatCreationOperationRef.current;
+      const pendingOperation = getCloudSessionCreationOperation(previousOperation, intent, uuidv4);
+      const operation =
+        previousOperation?.operationKey === pendingOperation.operationKey
+          ? previousOperation
+          : { ...pendingOperation, initialMessageId: generateMessageId() };
+      firstChatCreationOperationRef.current = operation;
+      const baseInput = {
+        ...creationInput,
+        initialMessageId: operation.initialMessageId,
+        operationKey: operation.operationKey,
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -1104,6 +1129,10 @@ export function NewSessionPanel({
         });
       }
 
+      if (firstChatCreationOperationRef.current?.operationKey === operation.operationKey) {
+        firstChatCreationOperationRef.current = null;
+      }
+
       if (!hasAgentModelOverride) {
         setLastUsedModel(model, organizationId);
       }
@@ -1127,6 +1156,9 @@ export function NewSessionPanel({
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
       setBillingFailure(null);
     } catch (error) {
+      if (!isAmbiguousCloudSessionCreationError(error)) {
+        firstChatCreationOperationRef.current = null;
+      }
       const failure = parseCustomerBillingFailure(error);
       setBillingFailure(failure);
       console.error('Failed to prepare session:', error);

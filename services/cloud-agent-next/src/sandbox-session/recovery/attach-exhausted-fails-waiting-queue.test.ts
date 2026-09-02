@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTACH_FAILURE_LIMIT,
   failWaitingMessages,
-  incrementAttachFailure,
-  isAttachExhausted,
+  incrementDeliveryFailure,
   nextQueuedMessageId,
   type SessionMessageRecord,
 } from '../session-message-queue.js';
@@ -11,15 +10,15 @@ import {
 describe('attach exhausted', () => {
   it('fails the waiting queue after two attach failures', () => {
     expect(ATTACH_FAILURE_LIMIT).toBe(2);
-    let current: SessionMessageRecord[] = [
-      { messageId: 'a', state: 'queued' },
+    const current: SessionMessageRecord[] = [
+      { messageId: 'a', state: 'queued', promptFailures: 2 },
       { messageId: 'b', state: 'queued' },
     ];
-    const first = incrementAttachFailure(current, 'a');
-    expect(isAttachExhausted(first.failures)).toBe(false);
-    current = first.messages;
-    const second = incrementAttachFailure(current, 'a');
-    expect(isAttachExhausted(second.failures)).toBe(true);
+    const first = incrementDeliveryFailure(current, 'a', 'attach');
+    expect(first.exhausted).toBe(false);
+    const second = incrementDeliveryFailure(first.messages, 'a', 'attach');
+    expect(second.exhausted).toBe(true);
+    expect(second.messages[0]).toMatchObject({ attachFailures: 2, promptFailures: 2 });
 
     const { messages, failedIds } = failWaitingMessages(second.messages, 'attach_exhausted');
     expect(failedIds).toEqual(['a', 'b']);

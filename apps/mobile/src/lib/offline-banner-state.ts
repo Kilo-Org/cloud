@@ -1,12 +1,7 @@
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
-/**
- * How long the connection must stay down before the banner appears. NetInfo
- * reports a false `offline` for a moment after a long background, so a short
- * window flashed the banner on every foreground. Hiding stays immediate: a
- * banner that is up when the connection works is the worse error.
- */
-export const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
+/** Wait out transient NetInfo reports before confirming offline with a probe. */
+const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
 
 export type OfflineBannerTimer = {
   set(callback: () => void, delayMs: number): { cancel(): void };
@@ -29,15 +24,15 @@ export type BannerState = 'online' | 'offline' | 'unknown';
 export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
   timer: OfflineBannerTimer;
-  showDelayMs?: number;
+  probe: () => Promise<boolean>;
 }): OfflineBannerStore {
-  const { source, timer } = options;
-  const showDelayMs = options.showDelayMs ?? OFFLINE_BANNER_SHOW_DELAY_MS;
+  const { source, timer, probe } = options;
 
-  // Start unknown, not online: until NetInfo settles we cannot claim the
-  // connection works, but we also must not show the offline banner.
+  // Start unknown: neither NetInfo nor a probe has confirmed connectivity yet.
   let state: BannerState = 'unknown';
   let pending: { cancel(): void } | null = null;
+  let generation = 0;
+  let destroyed = false;
   const listeners = new Set<() => void>();
 
   function cancelPending(): void {
@@ -58,12 +53,28 @@ export function createOfflineBannerStore(options: {
     }
   }
 
+  async function confirmConnectivity(attempt: number): Promise<void> {
+    let reachable = false;
+    try {
+      reachable = await probe();
+    } catch {
+      // Synchronous throws and rejected probes both permit offline confirmation.
+    }
+    if (!destroyed && attempt === generation) {
+      commit(reachable ? 'online' : 'offline');
+    }
+  }
+
   function handleSourceState(sourceState: ConnectivityState): void {
-    const status = connectivityStatus(sourceState);
+    generation += 1;
+    const attempt = generation;
     cancelPending();
+    if (destroyed) {
+      return;
+    }
+    const status = connectivityStatus(sourceState);
     if (status === 'unknown') {
-      // Do not reveal the banner while connectivity is unknown, and do not
-      // advance the committed state from its boot default.
+      // Unknown cancels confirmation but preserves the last committed state.
       return;
     }
     if (status === 'online') {
@@ -71,9 +82,12 @@ export function createOfflineBannerStore(options: {
       return;
     }
     pending = timer.set(() => {
+      if (destroyed || attempt !== generation) {
+        return;
+      }
       pending = null;
-      commit('offline');
-    }, showDelayMs);
+      void confirmConnectivity(attempt);
+    }, OFFLINE_BANNER_SHOW_DELAY_MS);
   }
 
   const unsubscribeSource = source.subscribe(handleSourceState);
@@ -92,6 +106,8 @@ export function createOfflineBannerStore(options: {
   const getState = (): BannerState => state;
 
   const destroy = (): void => {
+    destroyed = true;
+    generation += 1;
     cancelPending();
     unsubscribeSource();
     listeners.clear();

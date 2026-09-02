@@ -86,6 +86,8 @@ type SessionRowAccessibilityLabelInputs = {
   title: string;
   /** True when the row's right eyebrow renders the `NEEDS INPUT` state. */
   needsInput: boolean;
+  /** Opt-in live status for stored list rows; needs-input speech takes priority. */
+  live?: boolean;
   /**
    * Left-eyebrow badge text, always visible (e.g. "CLI", "VSCODE", "LIVE",
    * "CLOUD AGENT"). Pass an empty string only as a defensive fallback —
@@ -123,13 +125,13 @@ type SessionRowAccessibilityLabelInputs = {
 /**
  * Compose the screen-reader label for a `SessionRow`, mirroring its visible
  * content in the order the row renders parts: title, then `needs input`
- * (only when the needs-input eyebrow is shown), then the branch subtitle
+ * (or localized live status when opted in), then the branch subtitle
  * (when present), then the `pull request <number>` phrase (when `prNumber`
  * is set), then the always-visible left-eyebrow badge, then the meta text
  * (only when the row visibly renders meta), then an optional platform origin
  * (`from <LABEL>`). Empty parts are skipped; the order is fixed.
  *
- * Three exclusive variants, aligned with `selectSessionRowEyebrowRight`:
+ * Examples without the opt-in live status, aligned with `selectSessionRowEyebrowRight`:
  *   - **needs-input variant**  (`needs-input` eyebrow):
  *       `"<title>, needs input, <badge>"` — meta is NOT rendered, so it is
  *       omitted. The left-eyebrow badge is always included.
@@ -144,6 +146,7 @@ type SessionRowAccessibilityLabelInputs = {
 export function sessionRowAccessibilityLabel({
   title,
   needsInput,
+  live = false,
   badge,
   meta,
   subtitle,
@@ -153,6 +156,8 @@ export function sessionRowAccessibilityLabel({
   const parts: string[] = [title];
   if (needsInput) {
     parts.push(i18n.t('agents.sessionRow.needsInput'));
+  } else if (live) {
+    parts.push(i18n.t('agents.sessionList.live'));
   }
   if (subtitle) {
     parts.push(subtitle);

@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow, format } from 'date-fns';
 import { TRPCClientError } from '@trpc/client';
 import { toast } from 'sonner';
+import { useCallback } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -33,6 +34,11 @@ type CodeReviewDetailClientProps = {
 export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const handleComplete = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
+    });
+  }, [queryClient, reviewId, trpc]);
 
   const { data, isLoading, error } = useQuery({
     ...trpc.codeReviews.get.queryOptions({ reviewId }),
@@ -327,11 +333,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
         <CodeReviewStreamView
           reviewId={reviewId}
           attempts={data.attempts}
-          onComplete={() => {
-            void queryClient.invalidateQueries({
-              queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
-            });
-          }}
+          onComplete={handleComplete}
         />
       )}
     </PageContainer>

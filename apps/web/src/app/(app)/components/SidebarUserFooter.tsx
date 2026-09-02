@@ -10,7 +10,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
-import { BookOpen, ChevronsUpDown, Download, FileDown, LogOut, UserCog } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronsUpDown,
+  Download,
+  FileDown,
+  LogOut,
+  Trash2,
+  UserCog,
+} from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -111,12 +119,19 @@ export function SidebarUserFooterView({
               <UserCog className="h-4 w-4" />
               Connected Accounts
             </DropdownMenuItem>
-            {dataExportEnabled === true && (
-              <DropdownMenuItem onClick={() => router.push('/data-exports')}>
-                <FileDown className="h-4 w-4" />
-                Request data export
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onClick={() => router.push('/data-exports')}>
+              {dataExportEnabled === true ? (
+                <>
+                  <FileDown className="h-4 w-4" />
+                  Request data export
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Request data deletion
+                </>
+              )}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/install')}>
               <Download className="h-4 w-4" />
               Install

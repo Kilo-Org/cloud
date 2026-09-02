@@ -51,7 +51,9 @@ describe('SidebarUserFooter export entry shared by personal and organization sid
       isSuccess: true,
     });
 
-    expect(await renderFooter()).toContain('Request data export');
+    const html = await renderFooter();
+    expect(html).toContain('Request data export');
+    expect(html).not.toContain('Request data deletion');
     expect(mockQueryOptions).toHaveBeenCalledWith(
       undefined,
       expect.objectContaining({ enabled: true })
@@ -64,12 +66,13 @@ describe('SidebarUserFooter export entry shared by personal and organization sid
     { data: { enabled: undefined, email: user.google_user_email }, isSuccess: true },
     { data: { enabled: true, email: user.google_user_email }, isSuccess: false },
     { data: { enabled: true, email: 'previous-user@example.com' }, isSuccess: true },
-  ])('hides export but preserves other menu entries for %j', async result => {
+  ])('keeps deletion reachable while hiding export for %j', async result => {
     mockUseQuery.mockReturnValue(result);
 
     const html = await renderFooter();
 
     expect(html).not.toContain('Request data export');
+    expect(html).toContain('Request data deletion');
     expect(html).toContain('Connected Accounts');
     expect(html).toContain('Install');
     expect(html).toContain('Learn');
@@ -84,6 +87,7 @@ describe('SidebarUserFooter export entry shared by personal and organization sid
 
     expect(html).toContain('Connected Accounts');
     expect(html).not.toContain('Request data export');
+    expect(html).toContain('Request data deletion');
     expect(mockUseQuery).not.toHaveBeenCalled();
   });
 

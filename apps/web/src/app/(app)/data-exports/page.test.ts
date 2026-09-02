@@ -12,13 +12,23 @@ jest.mock('@/lib/user/server', () => ({
 jest.mock('@/lib/user-data-export-ui', () => ({
   isCloudDataExportUIEnabled: mockIsCloudDataExportUIEnabled,
 }));
-jest.mock('next/navigation', () => ({
-  notFound: () => {
-    throw new Error('NEXT_NOT_FOUND');
-  },
-}));
 jest.mock('@/components/PageLayout', () => ({
-  PageLayout: ({ children }: { children: React.ReactNode }) => children,
+  PageLayout: ({
+    children,
+    title,
+    subtitle,
+  }: {
+    children: React.ReactNode;
+    title: string;
+    subtitle: string;
+  }) =>
+    React.createElement(
+      'main',
+      null,
+      React.createElement('h1', null, title),
+      React.createElement('p', null, subtitle),
+      children
+    ),
 }));
 jest.mock('./DataExportsClient', () => ({ DataExportsClient: () => 'Export controls' }));
 jest.mock('./RequestDataDeletionCard', () => ({
@@ -52,23 +62,35 @@ describe('DataExportsPage', () => {
 
     const html = renderToStaticMarkup(await DataExportsPage());
 
+    expect(html).toContain('<h1>Data exports</h1>');
+    expect(html).toContain(
+      'Request and download a copy of the data stored with your Kilo account.'
+    );
     expect(html).toContain('Export controls');
     expect(html).toContain('Deletion support');
     expect(mockIsCloudDataExportUIEnabled).toHaveBeenCalledWith('export-user@example.com');
   });
 
-  it.each([false, undefined])('rejects direct access when the flag is %s', async enabled => {
-    mockIsCloudDataExportUIEnabled.mockResolvedValue(enabled);
-    const { default: DataExportsPage } = await import('./page');
+  it.each([false, undefined])(
+    'preserves deletion without export controls when the flag is %s',
+    async enabled => {
+      mockIsCloudDataExportUIEnabled.mockResolvedValue(enabled);
+      const { default: DataExportsPage } = await import('./page');
 
-    await expect(DataExportsPage()).rejects.toThrow('NEXT_NOT_FOUND');
-  });
+      const html = renderToStaticMarkup(await DataExportsPage());
+
+      expect(html).toContain('<h1>Data deletion</h1>');
+      expect(html).toContain('Deletion support');
+      expect(html).not.toContain('Export controls');
+      expect(html).not.toContain('Request and download a copy');
+    }
+  );
 
   it('does not render while the flag evaluation is pending', async () => {
     const flag = Promise.withResolvers<boolean>();
     mockIsCloudDataExportUIEnabled.mockReturnValue(flag.promise);
     const { default: DataExportsPage } = await import('./page');
-    const rendered = jest.fn();
+    const rendered = jest.fn(renderToStaticMarkup);
     const result = DataExportsPage().then(rendered);
 
     await Promise.resolve();
@@ -76,8 +98,9 @@ describe('DataExportsPage', () => {
     expect(rendered).not.toHaveBeenCalled();
 
     flag.resolve(false);
-    await expect(result).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(rendered).not.toHaveBeenCalled();
+    const html = await result;
+    expect(html).toContain('Deletion support');
+    expect(html).not.toContain('Export controls');
   });
 
   it('does not bypass the flag for staff', async () => {
@@ -89,6 +112,8 @@ describe('DataExportsPage', () => {
     mockIsCloudDataExportUIEnabled.mockResolvedValue(false);
     const { default: DataExportsPage } = await import('./page');
 
-    await expect(DataExportsPage()).rejects.toThrow('NEXT_NOT_FOUND');
+    const html = renderToStaticMarkup(await DataExportsPage());
+    expect(html).toContain('Deletion support');
+    expect(html).not.toContain('Export controls');
   });
 });

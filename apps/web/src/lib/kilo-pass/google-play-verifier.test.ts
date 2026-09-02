@@ -4,7 +4,8 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
 import type * as GooglePlayVerifier from './google-play-verifier';
 
-const mockGetGooglePlaySubscriptionPurchase = jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
+const mockGetGooglePlaySubscriptionPurchase =
+  jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
@@ -101,6 +102,34 @@ describe('mapGooglePlayKiloPassPurchase', () => {
       mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: Date.now() - 1_000 }))
     ).toThrow('Google Play subscription purchase has expired');
   });
+
+  it.each([
+    'SUBSCRIPTION_STATE_ON_HOLD',
+    'SUBSCRIPTION_STATE_PAUSED',
+    'SUBSCRIPTION_STATE_PENDING',
+    'SUBSCRIPTION_STATE_EXPIRED',
+    'SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED',
+    'SUBSCRIPTION_STATE_UNSPECIFIED',
+    '',
+  ])('rejects the non-entitled state %s even with a future expiry', state => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }))).toThrow(
+      'Google Play subscription purchase is not entitled'
+    );
+  });
+
+  it.each(['SUBSCRIPTION_STATE_CANCELED', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'])(
+    'accepts the entitled state %s while the period is unexpired',
+    state => {
+      const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+      expect(mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }))).toMatchObject({
+        productId: 'kilopass_tier19',
+        tier: KiloPassTier.Tier19,
+      });
+    }
+  );
 
   it('rejects unknown products', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();

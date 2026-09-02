@@ -19,6 +19,18 @@ export type GooglePlayDecodedPurchase = {
   rawPayload: Record<string, unknown>;
 };
 
+/**
+ * Google Play states that entitle the buyer. `CANCELED` keeps access until the
+ * paid period ends, and `IN_GRACE_PERIOD` keeps access while a payment retries.
+ * Every other state (pending, paused, on hold, expired) grants no entitlement,
+ * so a purchase in one of those states must never complete as `active`.
+ */
+const ENTITLED_GOOGLE_PLAY_SUBSCRIPTION_STATES = new Set([
+  'SUBSCRIPTION_STATE_ACTIVE',
+  'SUBSCRIPTION_STATE_CANCELED',
+  'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+]);
+
 export function mapGooglePlayKiloPassPurchase(
   decoded: GooglePlayDecodedPurchase
 ): ValidatedStoreKiloPassPurchase {
@@ -30,6 +42,11 @@ export function mapGooglePlayKiloPassPurchase(
   }
   // Called only from the tRPC purchase-completion path; renewals and refunds enter via
   // the Play notifications handler, which intentionally allows expired purchases.
+  if (!ENTITLED_GOOGLE_PLAY_SUBSCRIPTION_STATES.has(decoded.subscriptionState)) {
+    throw new Error(
+      `Google Play subscription purchase is not entitled: ${decoded.subscriptionState || 'unknown'}`
+    );
+  }
   if (decoded.expiryTimeMs <= Date.now()) {
     throw new Error('Google Play subscription purchase has expired');
   }

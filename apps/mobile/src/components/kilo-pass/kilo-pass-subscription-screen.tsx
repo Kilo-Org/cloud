@@ -431,7 +431,9 @@ function KiloPassNativeIapContent() {
             }}
           />
 
-          <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
+          {/* Do not set a leading class here. Android applies the parent line height
+              to each nested link Text and the block grows to many times its size. */}
+          <Text className="px-1 pt-1 text-xs text-muted-foreground">
             {kiloPassLegalDisclosure(Platform.OS)}
             {t('kiloPass.legalConnectorTerms')}
             <Text

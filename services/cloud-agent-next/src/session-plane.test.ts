@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateSessionId,
   isControlPlaneOwner,
+  isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   sessionSupportsTerminal,
@@ -45,6 +46,35 @@ describe('session plane identity', () => {
     );
     expect(sessionPlaneForNewOwner({}, { userId: 'user-1', orgId: 'org-1' })).toBe('legacy');
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
+  });
+
+  it.each([
+    [undefined, { userId: 'user-1' }, false],
+    ['', { userId: 'user-1' }, false],
+    [' , ', { userId: 'user-1' }, false],
+    ['user-1', { userId: 'user-1' }, true],
+    ['user-1', { userId: 'user-2' }, false],
+    ['org-1', { userId: 'user-2', orgId: 'org-1' }, true],
+    ['org-1', { userId: 'user-2' }, false],
+    [' other, org-1, ', { userId: 'user-2', orgId: 'org-1' }, true],
+    ['*', { userId: 'user-3' }, true],
+    [' oauth/google:1234 ', { userId: 'oauth/google:1234' }, true],
+  ] as const)(
+    'matches WORKTREE_CREATION_ENABLED_IDS=%s against %j as %s',
+    (ids, owner, expected) => {
+      expect(isWorktreeOwner({ WORKTREE_CREATION_ENABLED_IDS: ids }, owner)).toBe(expected);
+    }
+  );
+
+  it('keeps worktree enrollment independent of control-plane routing', () => {
+    const owner = { userId: 'user-1' };
+    const controlOnly = { CONTROL_PLANE_IDS: '*', WORKTREE_CREATION_ENABLED_IDS: '' };
+    const worktreeOnly = { CONTROL_PLANE_IDS: '', WORKTREE_CREATION_ENABLED_IDS: '*' };
+
+    expect(sessionPlaneForNewOwner(controlOnly, owner)).toBe('control');
+    expect(isWorktreeOwner(controlOnly, owner)).toBe(false);
+    expect(sessionPlaneForNewOwner(worktreeOnly, owner)).toBe('legacy');
+    expect(isWorktreeOwner(worktreeOnly, owner)).toBe(true);
   });
 
   it('supports control-plane terminals independently of legacy provider capabilities', () => {

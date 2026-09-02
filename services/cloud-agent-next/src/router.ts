@@ -12,8 +12,11 @@ import { createSessionQuestionHandlers } from './router/handlers/session-questio
 import { createSessionTerminalHandlers } from './router/handlers/session-terminal.js';
 import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
+import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
+import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 
 export const appRouter = router({
+  deleteWorktree,
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),
@@ -21,6 +24,7 @@ export const appRouter = router({
   ...createSessionTerminalHandlers(),
   ...createSessionStartHandlers(),
   ...createSessionSendHandlers(),
+  ...createSessionWorktreeHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

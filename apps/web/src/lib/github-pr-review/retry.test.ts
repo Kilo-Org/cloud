@@ -104,16 +104,72 @@ describe('withGitHubUserTokenRetry', () => {
     expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(1);
   });
 
-  it('throws PRECONDITION_FAILED when the user is disconnected', async () => {
-    getGitHubUserAccessToken.mockResolvedValueOnce({
-      status: 'disconnected',
-      reason: 'not_connected',
-    });
+  it('throws BAD_GATEWAY when the initial token fetch is temporarily unavailable', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce({ status: 'temporarily_unavailable' });
     const call = jest.fn();
 
     await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
+      code: 'BAD_GATEWAY',
+      message: 'GitHub authorization is temporarily unavailable. Try again.',
     });
     expect(call).not.toHaveBeenCalled();
+    expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(1);
+    expect(getGitHubUserAccessToken).toHaveBeenCalledWith('u1', { op: 'fetch' });
   });
+
+  it('throws BAD_GATEWAY when token rotation is temporarily unavailable', async () => {
+    getGitHubUserAccessToken
+      .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+      .mockResolvedValueOnce({ status: 'temporarily_unavailable' });
+    const call = jest.fn().mockRejectedValueOnce(http401());
+
+    await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).rejects.toMatchObject({
+      code: 'BAD_GATEWAY',
+      message: 'GitHub authorization is temporarily unavailable. Try again.',
+    });
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(2);
+    expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'u1', {
+      op: 'rotate',
+      staleAuthorizationId: 'auth_1',
+      staleCredentialVersion: 1,
+    });
+  });
+
+  it.each(['not_connected', 'revoked'])(
+    'throws PRECONDITION_FAILED when the initial token fetch returns %s',
+    async reason => {
+      getGitHubUserAccessToken.mockResolvedValueOnce({ status: 'disconnected', reason });
+      const call = jest.fn();
+
+      await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: 'GitHub connection is no longer valid — reconnect',
+      });
+      expect(call).not.toHaveBeenCalled();
+      expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['not_connected', 'revoked'])(
+    'throws PRECONDITION_FAILED when token rotation returns %s',
+    async reason => {
+      getGitHubUserAccessToken
+        .mockResolvedValueOnce(connected('t1', 'auth_1', 1))
+        .mockResolvedValueOnce({ status: 'disconnected', reason });
+      const call = jest.fn().mockRejectedValueOnce(http401());
+
+      await expect(withGitHubUserTokenRetry({ kiloUserId: 'u1', call })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: 'GitHub connection is no longer valid — reconnect',
+      });
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(getGitHubUserAccessToken).toHaveBeenCalledTimes(2);
+      expect(getGitHubUserAccessToken).toHaveBeenNthCalledWith(2, 'u1', {
+        op: 'rotate',
+        staleAuthorizationId: 'auth_1',
+        staleCredentialVersion: 1,
+      });
+    }
+  );
 });

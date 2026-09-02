@@ -1,20 +1,22 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Balance across owners: the card keeps the raw 2-element tRPC query key
 // (`[path, { input, type }]`), never a userId-suffixed key. Owner switches are
 // safe because sign-out clears the React Query cache (`queryClient.clear()`), so
 // a new owner refetches and never reuses the previous owner's cached balance.
 
-import { createElement, type ReactElement } from 'react';
-import { Pressable } from 'react-native';
-import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ElementType } from 'react';
+import { Platform, Pressable } from 'react-native';
+import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { CreditsCard } from './profile-credits-card';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
+import { OrganizationProvider } from '@/lib/organization-context';
+import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -64,17 +66,23 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   }),
 }));
 
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, setOrganizationId: vi.fn() }),
+const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: storage.read,
+  setItemAsync: storage.write,
+  deleteItemAsync: storage.remove,
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => false,
 }));
 
+const showPicker = vi.hoisted(() => vi.fn());
 vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+  useActionSheet: () => ({ showActionSheetWithOptions: showPicker }),
 }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
@@ -120,67 +128,64 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
 
-vi.mock('@/lib/utils', () => ({
-  parseTimestamp: () => new Date(0),
-}));
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = ['user', 'getContextBalance'] as const;
+const organizationName = 'A very long organization name that must leave the credits label visible';
+const savedMetadata = new Map<string, string>();
+let saveCompletion: Promise<undefined> | undefined = undefined;
 
-function collectText(node: unknown): string[] {
-  if (node == null) {
-    return [];
-  }
-  if (typeof node === 'string') {
-    return [node];
-  }
-  if (Array.isArray(node)) {
-    return node.flatMap(item => collectText(item));
-  }
-  if (typeof node === 'object' && 'children' in node) {
-    return collectText((node as { children?: unknown }).children);
-  }
-  return [];
-}
-
-function cardElement(orgs?: OrgListEntry[]): ReactElement {
-  return createElement(CreditsCard, { enabled: true, orgs });
-}
-
-type CardHandle = {
-  renderer: ReactTestRenderer;
-  texts: () => string[];
-  unmount: () => void;
-};
-
-async function mountCard(queryClient: QueryClient = createTestQueryClient()): Promise<CardHandle> {
-  const wrapper = (orgs: OrgListEntry[] | undefined) =>
-    createElement(QueryClientProvider, { client: queryClient }, cardElement(orgs));
-
-  const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    ref.current = TestRenderer.create(wrapper(undefined));
-    await Promise.resolve();
+async function mountCard(
+  queryClient: QueryClient = createTestQueryClient(),
+  orgs?: OrgListEntry[]
+) {
+  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
+    queryClient,
+    wrapper: OrganizationProvider,
   });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-
   return {
-    renderer,
-    texts: () => collectText(renderer.toJSON()),
-    unmount: () => {
-      act(() => {
-        renderer.unmount();
-      });
-      queryClient.clear();
-    },
+    ...ui,
+    texts: () =>
+      ui.renderer.root
+        .findAll(() => true)
+        .flatMap(node => node.children.filter(child => typeof child === 'string')),
   };
 }
 
+function openNativePicker(renderer: ReactTestRenderer) {
+  const control = renderer.root.find(
+    node => node.type === Pressable && node.props.accessibilityHint === 'Select account'
+  );
+  const open = control.props.onPress as () => void;
+  act(() => {
+    open();
+  });
+  const call = showPicker.mock.lastCall as
+    | [{ options: string[]; cancelButtonIndex: number }, (index: number) => void]
+    | undefined;
+  if (!call) {
+    throw new Error('native picker did not open');
+  }
+  return call;
+}
+
 beforeEach(() => {
+  Platform.OS = 'ios';
+  savedMetadata.clear();
+  saveCompletion = undefined;
+  storage.read.mockReset().mockImplementation(async (key: string) => {
+    await Promise.resolve();
+    return savedMetadata.get(key) ?? null;
+  });
+  storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
+    await saveCompletion;
+    savedMetadata.set(key, value);
+  });
+  storage.remove.mockReset().mockImplementation(async (key: string) => {
+    await saveCompletion;
+    savedMetadata.delete(key);
+  });
+  showPicker.mockReset();
   getContextBalanceQueryFn.mockReset();
   personalCreditBlocksQueryFn.mockReset();
   orgCreditBlocksQueryFn.mockReset();
@@ -191,6 +196,100 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it.each([
+    { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
+    {
+      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
+      options: ['Personal', organizationName, 'Cancel'],
+      choice: 1,
+      expected: 'org-a',
+      label: organizationName,
+    },
+  ])('uses supplied memberships for native selection: $expected', async state => {
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'missing-org');
+    const { renderer, texts, unmount } = await mountCard(
+      createTestQueryClient(),
+      state.orgs as OrgListEntry[]
+    );
+    const call = openNativePicker(renderer);
+    expect(call[0].options).toEqual(state.options);
+    await act(() => {
+      call[1](call[0].cancelButtonIndex);
+    });
+    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('missing-org');
+    expect(texts()).toContain('Organization');
+    await act(() => {
+      call[1](state.choice);
+    });
+    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
+    const label = renderer.root.findByProps({ children: state.label });
+    expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
+    unmount();
+  });
+
+  it.each(['org-b', null])(
+    'retries the latest Profile selection %s after save failures',
+    async id => {
+      Platform.OS = 'android';
+      savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'previous-org');
+      const orgs = [
+        { organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' },
+        { organizationId: 'org-b', organizationName: 'Latest organization', role: 'owner' },
+      ] as OrgListEntry[];
+      storage.write.mockRejectedValueOnce(new Error('write failed'));
+      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      const firstPicker = openNativePicker(renderer);
+      await act(() => {
+        firstPicker[1](1);
+      });
+      expect(texts()).toContain('Could not save setting');
+      expect(texts()).toContain('Supplied organization');
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
+      const retryButton = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
+      expect(retryButton.props.accessibilityRole).toBe('button');
+      expect(retryButton.props.accessibilityHint).toBe('Could not save setting');
+      // Keep the rendered handler to catch a retry that captures the earlier failed choice.
+      const retry = retryButton.props.onPress as () => void;
+      (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
+        new Error('latest save failed')
+      );
+      const latestPicker = openNativePicker(renderer);
+      await act(() => {
+        latestPicker[1](id === null ? 0 : 2);
+      });
+      const label = id === null ? 'Personal' : 'Latest organization';
+      expect(texts()).toContain(label);
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
+      const status = renderer.root.find(
+        node => (node.type as string) === 'Text' && node.props.accessibilityLiveRegion === 'polite'
+      );
+      expect(status.children).toContain('Could not save setting');
+      const save = Promise.withResolvers<undefined>();
+      saveCompletion = save.promise;
+      await act(() => {
+        retry();
+      });
+      expect(texts()).toContain(label);
+      expect(texts()).toContain('Could not save setting');
+      const busyRetry = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
+      expect(busyRetry.props.accessibilityState).toEqual({ busy: true, disabled: true });
+      expect(busyRetry.props.disabled).toBe(true);
+      expect(busyRetry.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
+      await act(() => {
+        save.resolve(undefined);
+      });
+      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? undefined);
+      expect(texts()).toContain(label);
+      expect(texts()).not.toContain('Could not save setting');
+      expect(texts()).not.toContain('Retry');
+      unmount();
+      const reopened = await mountCard(createTestQueryClient(), orgs);
+      expect(reopened.texts()).toContain(label);
+      reopened.unmount();
+    }
+  );
+
   it('shows a skeleton (not $0) when no signed-in user is resolved yet', async () => {
     const { texts, unmount } = await mountCard();
 
@@ -201,21 +300,7 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
-  it('shows the balance when data is cached for the signed-in user', async () => {
-    currentUser.userId = 'user-A';
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData([...BALANCE_KEY], { balance: 1 });
-
-    const { texts, unmount } = await mountCard(queryClient);
-
-    await waitFor(() => texts().includes('$1.00') && !texts().includes('SKELETON'));
-    expect(texts()).not.toContain('SKELETON');
-    expect(texts()).toContain('$1.00');
-
-    unmount();
-  });
-
-  it('never renders user A balance as current after switching to user B', async () => {
+  it('shows a cached balance without reusing it after an account change', async () => {
     const queryClient = createTestQueryClient();
 
     // Owner A signs in and has a cached balance.
@@ -224,18 +309,15 @@ describe('CreditsCard balance state', () => {
 
     // Hold the next owner's balance fetch until the test resolves it, so the
     // skeleton state between the switch and the resolved fetch is observable.
-    let resolveB: ((value: { balance: number }) => void) | undefined = undefined;
-    getContextBalanceQueryFn.mockReturnValue(
-      new Promise<{ balance: number }>(resolve => {
-        resolveB = resolve;
-      })
-    );
+    const balanceB = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(balanceB.promise);
 
     const a = await mountCard(queryClient);
 
     // User A renders from cache.
     await waitFor(() => a.texts().includes('$10.00'));
     expect(a.texts()).toContain('$10.00');
+    expect(a.texts()).not.toContain('SKELETON');
 
     // Sign-out unmounts the profile and clears the React Query cache.
     a.unmount();
@@ -250,9 +332,8 @@ describe('CreditsCard balance state', () => {
     expect(b.texts()).not.toContain('$10.00');
 
     // Resolve user B's balance.
-    await act(async () => {
-      resolveB?.({ balance: 25 });
-      await Promise.resolve();
+    await act(() => {
+      balanceB.resolve({ balance: 25 });
     });
     await waitFor(() => b.texts().includes('$25.00'));
 

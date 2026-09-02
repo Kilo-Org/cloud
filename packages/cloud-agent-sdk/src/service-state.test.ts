@@ -1776,21 +1776,22 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'interrupted' });
     });
 
-    it('cloud.message.failed with reason=interrupted settles the session', () => {
+    it('cloud.message.failed with reason=interrupted settles the accepted turn', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({
         type: 'cloud.message.failed',
         messageId: 'm1',
-        error: 'Pending queued message interrupted by user',
+        error: 'Execution was interrupted',
         reason: 'interrupted',
       });
 
       expect(state.getPendingMessages().get('m1')).toEqual({
         status: 'failed',
-        error: 'Pending queued message interrupted by user',
+        error: 'Execution was interrupted',
         reason: 'interrupted',
       });
       expect(state.getActivity()).toEqual({ type: 'idle' });

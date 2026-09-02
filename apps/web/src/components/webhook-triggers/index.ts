@@ -1,5 +1,5 @@
 // Hooks
-export { useWebhookTriggers } from './hooks/useWebhookTriggers';
+export { useInvokeWebhookTrigger, useWebhookTriggers } from './hooks/useWebhookTriggers';
 export { useGitHubIntegration } from './hooks/useGitHubIntegration';
 
 // Components
@@ -11,6 +11,7 @@ export { TriggersLoadingState } from './TriggersLoadingState';
 export { TriggersErrorState } from './TriggersErrorState';
 export { GitHubIntegrationRequired } from './GitHubIntegrationRequired';
 export { DeleteTriggerDialog, type DeleteTarget } from './DeleteTriggerDialog';
+export { InvokeTriggerDialog } from './InvokeTriggerDialog';
 
 // Form (existing)
 export { TriggerForm, type TriggerFormData, type TriggerFormProps } from './TriggerForm';

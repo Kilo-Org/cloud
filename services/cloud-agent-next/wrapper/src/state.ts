@@ -137,8 +137,9 @@ export class WrapperState {
   }
 
   setLogUploader(uploader: LogUploader | null): void {
-    this._logUploader?.stop();
+    const previousUploader = this._logUploader;
     this._logUploader = uploader;
+    if (previousUploader) void previousUploader.finalize().catch(() => {});
   }
 
   updateActivity(): void {
@@ -210,6 +211,7 @@ export class WrapperState {
       return { changed: true };
     }
     const changed =
+      this.session.kiloSessionId !== context.kiloSessionId ||
       this.session.ingestUrl !== context.ingestUrl ||
       this.session.ingestToken !== context.ingestToken ||
       this.session.workerAuthToken !== context.workerAuthToken ||

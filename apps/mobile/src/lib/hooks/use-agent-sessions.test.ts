@@ -17,6 +17,11 @@ import {
 vi.mock('@/lib/trpc', () => ({
   useTRPC: vi.fn(),
 }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
+vi.mock('@/lib/organization-context', () => ({ useOrganization: vi.fn() }));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionState: () => false,

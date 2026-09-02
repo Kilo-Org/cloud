@@ -152,7 +152,11 @@
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
     "prReviewAttribution": "Pridėti programėlės atribuciją prie PR peržiūrų",
-    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“."
+    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“.",
+    "returnSendsMessage": "Grįžimo klavišas siunčia žinutę",
+    "returnSendsMessageSubtitle": "Kai išjungta, grįžimo klavišas įterpia naują eilutę agentų žinučių įvesties laukuose.",
+    "biometricUnlock": "Atrakinti naudojant biometrinius duomenis",
+    "biometricUnlockSubtitle": "Paleidus programėlę ir jai penkias minutes išbuvus fone, reikia ją atrakinti."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -764,7 +768,8 @@
       "networkError": "Tinklo klaida",
       "uploadFailed": "Įkelti nepavyko",
       "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}",
-      "nothingToPaste": "Nėra ko įklijuoti"
+      "nothingToPaste": "Nėra ko įklijuoti",
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1146,12 +1151,12 @@
       "destroying": "NAKINAMA",
       "provisioned": "PARUOŠTA",
       "restarting": "PALEIDŽIAMA IŠ NAUJO",
-      "running": "Vykdoma",
+      "running": "VYKDOMA",
       "shuttingDown": "IŠJUNGINAMA",
       "starting": "PRADEDAMA",
       "stopped": "SUSTABDYTA",
       "stopping": "STABDOMA",
-      "unknown": "Nežinomas",
+      "unknown": "NEŽINOMAS",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1716,11 +1721,11 @@
       "statusFixed": "Ištaisyta",
       "statusOpen": "Atidaryta",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Taisymas jau pradėtas",
-      "reasonNoBandwidth": "Nėra laisvos talpos",
-      "reasonTolerableRisk": "Rizika yra priimtina",
-      "reasonInaccurate": "Radinys yra netikslus",
-      "reasonNotUsed": "Pažeidžiamas kodas nenaudojamas",
+      "reasonFixStarted": "taisymas jau pradėtas",
+      "reasonNoBandwidth": "nėra laisvos talpos",
+      "reasonTolerableRisk": "rizika yra priimtina",
+      "reasonInaccurate": "radinys yra netikslus",
+      "reasonNotUsed": "pažeidžiamas kodas nenaudojamas",
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {
@@ -2093,7 +2098,8 @@
       "couldNotSearch": "Nepavyko ieškoti sesijų",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
-      "live": "TIESIOGIAI"
+      "live": "TIESIOGIAI",
+      "updating": "Atnaujinama"
     },
     "sessionRow": {
       "deleteTitle": "Ištrinti sesiją?",
@@ -2141,7 +2147,11 @@
     "sessionExited": "Sesija baigta",
     "remoteSpawnRetryable": "Nepavyko pasiekti egzemplioriaus — jis galėjo atsijungti.",
     "remoteSpawnNonRetryable": "Egzemplioriui nepavyko pradėti sesijos — patikrinkite įrenginį arba atnaujinkite CLI.",
-    "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėkite sesiją „Cloud Agent“ arba pasirinkite kitą egzempliorių."
+    "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėkite sesiją „Cloud Agent“ arba pasirinkite kitą egzempliorių.",
+    "liveCount_one": "{{count}} TIESIOGIAI",
+    "liveCount_other": "{{count}} TIESIOGIAI",
+    "liveCount_few": "{{count}} TIESIOGIAI",
+    "liveCount_many": "{{count}} TIESIOGIAI"
   },
   "agentChat": {
     "session": {
@@ -2171,7 +2181,11 @@
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Ryšio problema. Bandykite dar kartą po akimirkos.",
-      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą."
+      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą.",
+      "cancelQueuedFailed": "Nepavyko atšaukti žinutės.",
+      "cancelQueuedRestoreAvailable": "Žinutė atšaukta. Bakstelėkite „Atkurti“, kad grąžintumėte ją į žinutės įvesties lauką.",
+      "cancelQueuedRestored": "Žinutė atšaukta. Užklausa grąžinta į žinutės įvesties lauką.",
+      "cancelQueuedUpgradeRequired": "Norint atšaukti eilėje esančias žinutes, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "remoteSession": {
       "failedToCreate": "Nepavyko sukurti nuotolinės sesijos",
@@ -2243,7 +2257,8 @@
       "continueFrom": "Tęsiama {{title}}",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šis CLI negali tęsti sesijos. Pasirinkite Cloud Agent arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos."
+      "importFailed": "Nepavyko importuoti šios sesijos.",
+      "discardWithUploadsMessage": "Jūsų užklausa ir visos prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2303,7 +2318,9 @@
       "noCliInstancesDescription": "Vykdykite `kilo remote` projekte savo kompiuteryje arba atnaujinkite Kilo CLI, jei jis jau veikia.",
       "instanceOnProject": "{{name}} projekte {{project}}",
       "instanceOnProjectSuffix": "{{name}} projekte {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Vykdyti „Cloud Agent\""
+      "runOnCloudAgent": "Vykdyti „Cloud Agent\"",
+      "terminals": "Terminalai",
+      "remotes": "Nuotoliniai egzemplioriai"
     },
     "modePicker": {
       "title": "Pasirinkti režimą",
@@ -2493,7 +2510,11 @@
       "queuedAccessibility": "Žinutė įdėta į eilę",
       "userMessage": "Vartotojo žinutė",
       "assistantMessage": "Asistento žinutė",
-      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales"
+      "longPressHint": "Paspauskite ir palaikykite, kad pamatytumėte žinutės detales",
+      "cancelQueued": "Atšaukti žinutę",
+      "cancelQueuedAccessibility": "Atšaukti eilėje esančią žinutę",
+      "restoreQueued": "Atkurti",
+      "restoreQueuedAccessibility": "Atkurti atšauktą žinutę žinutės įvesties lauke"
     },
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",
@@ -2527,9 +2548,6 @@
     },
     "sessionFilter": {
       "title": "Filtruoti sesijas",
-      "sortBy": "Rūšiuoti pagal",
-      "sortLastUpdated": "Paskutinį kartą atnaujinta",
-      "sortCreated": "Sukurta",
       "platform": "Platforma",
       "platformCloud": "Debesija",
       "platformExtension": "Plėtinys",
@@ -2538,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kita",
-      "project": "Projektas",
-      "removeProjectFilter": "Pašalinti {{label}} projekto filtrą",
-      "removePlatformFilter": "Pašalinti {{label}} platformos filtrą"
+      "project": "Projektas"
     },
     "suggestion": {
       "title": "Pasiūlymas",
@@ -2583,7 +2599,9 @@
       "uploading": "Įkeliama…",
       "uploaded": "Įkelta",
       "uploadFailedRetry": "Įkelti nepavyko. Bakstelėkite, kad bandytumėte dar kartą.",
-      "uploadFailedTerminal": "Šis failas negali būti įkeltas."
+      "uploadFailedTerminal": "Šis failas negali būti įkeltas.",
+      "moveLeft": "Perkelti {{filename}} į kairę",
+      "moveRight": "Perkelti {{filename}} į dešinę"
     },
     "attachmentPasteHint": {
       "accessibility": "Įklijuoti paveikslėlį iš iškarpinės",
@@ -2613,7 +2631,11 @@
       "finalizingPlaceholder": "Baigiama...",
       "messagePlaceholder": "Žinutė...",
       "cannotReceiveFiles": "Ši sesija negali gauti failų. Pašalinkite priedus, kad išsiųstumėte žinutę.",
-      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą."
+      "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siųsti, kad bandytumėte dar kartą.",
+      "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėtos įkeltos rinkmenos bus ištrintos.",
+      "discardAttachmentsTitle": "Atmesti priedus?",
+      "charactersRemaining": "Liko simbolių: {{count}}",
+      "insertNewline": "Įterpti naują eilutę"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",
@@ -2770,7 +2792,7 @@
     "newCodingTask": "Nauja kodavimo užduotis",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Šiuo metu niekas nevykdoma"
   },
   "imageViewer": {
     "close": "Uždaryti {{filename}}",
@@ -2834,7 +2856,8 @@
     "busy": "Balso įvestis užimta. Bandykite dar kartą.",
     "stopped": "Balso įvestis sustabdyta. Bakstelėkite mikrofoną, kad bandytumėte dar kartą.",
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
-    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos."
+    "unavailableLanguage": "Balso įvestis nepasiekiama šios įrenginio kalbos.",
+    "listeningStopped": "Klausymasis sustabdytas."
   },
   "share": {
     "title": "Dalintis į Kilo",

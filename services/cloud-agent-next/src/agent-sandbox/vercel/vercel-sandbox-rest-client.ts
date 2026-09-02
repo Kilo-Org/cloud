@@ -91,6 +91,24 @@ export type VercelSandboxSession = z.infer<typeof sessionSchema>;
 export type VercelSandboxRoute = z.infer<typeof routeSchema>;
 export type VercelSandboxCommand = z.infer<typeof commandSchema>;
 
+export type VercelSandboxMatcher = { exact: string } | { startsWith: string };
+
+export type VercelSandboxInjectionRule = {
+  domain: string;
+  headers: Record<string, string>;
+  match: {
+    headers: Array<{ key: { exact: string }; value: { exact: string } }>;
+    path?: VercelSandboxMatcher;
+    method?: string[];
+  };
+};
+
+export type VercelSandboxNetworkPolicy = {
+  mode: 'custom';
+  allowedDomains: string[];
+  injectionRules: VercelSandboxInjectionRule[];
+};
+
 export type VercelSandboxRestClientConfig = {
   accessToken: string;
   projectId?: string;
@@ -105,6 +123,7 @@ export type CreateSandboxInput = {
   snapshotId: string;
   runtime: VercelSandboxRuntime;
   timeoutMs: number;
+  networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
 export type VercelSandboxCreateEnvelope = {
@@ -145,6 +164,7 @@ type VercelSandboxOperation =
   | 'write-files'
   | 'read-file'
   | 'extend-timeout'
+  | 'update-network-policy'
   | 'stop-session';
 export type VercelSandboxErrorKind =
   | 'invalid_configuration'
@@ -291,6 +311,7 @@ export class VercelSandboxRestClient {
           [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: input.operationId,
           [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: input.runtimeBuildId,
         },
+        ...(input.networkPolicy === undefined ? {} : { networkPolicy: input.networkPolicy }),
       }),
     });
     await this.requireSuccessfulResponse(response, operation);
@@ -461,6 +482,28 @@ export class VercelSandboxRestClient {
     });
     await this.requireSuccessfulResponse(response, operation);
     return this.readBoundedBytes(response, maxBytes, operation);
+  }
+
+  async updateNetworkPolicy(
+    sessionId: string,
+    expectedSandboxName: string,
+    networkPolicy: VercelSandboxNetworkPolicy
+  ): Promise<VercelSandboxSession> {
+    const operation = 'update-network-policy';
+    this.validateSessionTarget(sessionId, expectedSandboxName, operation);
+    const response = await this.fetchProvider(
+      operation,
+      this.sessionActionUrl(sessionId, 'network-policy'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(networkPolicy),
+      }
+    );
+    await this.requireSuccessfulResponse(response, operation);
+    const envelope = await this.parseJson(response, sessionEnvelopeSchema, operation);
+    correlateSession(envelope.session, sessionId, expectedSandboxName, operation);
+    return envelope.session;
   }
 
   async extendSessionTimeout(
@@ -645,7 +688,12 @@ export class VercelSandboxRestClient {
     const signal = init.signal ? AbortSignal.any([init.signal, deadlineSignal]) : deadlineSignal;
     try {
       const fetchImpl = this.config.fetch;
-      const response = await fetchImpl(url.toString(), { ...init, headers, signal });
+      const response = await fetchImpl(url.toString(), {
+        ...init,
+        headers,
+        signal,
+        redirect: 'manual',
+      });
       this.responseSignals.set(response, signal);
       return response;
     } catch {

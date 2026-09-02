@@ -152,7 +152,11 @@
     "appearanceDark": "Tamno",
     "account": "Nalog",
     "prReviewAttribution": "Dodaj atribuciju aplikacije u PR preglede",
-    "prReviewAttributionSubtitle": "Dodaj 'Reviewed via Kilo' podnožje kada pošalješ pregled."
+    "prReviewAttributionSubtitle": "Dodaj 'Reviewed via Kilo' podnožje kada pošalješ pregled.",
+    "returnSendsMessage": "Taster za novi red šalje poruku",
+    "returnSendsMessageSubtitle": "Kada je isključeno, taster za novi red unosi novi red u kompozitore agenata.",
+    "biometricUnlock": "Otključavanje biometrijom",
+    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nije dostupan",
@@ -757,7 +761,8 @@
       "networkError": "Mrežna greška",
       "uploadFailed": "Otpremanje nije uspelo",
       "failedToUploadFile": "Otpremanje datoteke nije uspelo: {{reason}}",
-      "nothingToPaste": "Nema šta da se nalepi"
+      "nothingToPaste": "Nema šta da se nalepi",
+      "metadataStripFailed": "Metapodaci fotografije nisu mogli biti uklonjeni."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -842,7 +847,7 @@
       "managedByAdmin": "Naplatom upravlja administrator tvoje organizacije.",
       "couldNotLoad": "Nije moguće učitati informacije o naplati",
       "manageOnWeb": "Upravljaj naplatom na webu",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Rana ptica",
       "finalCommitTermEndsOn": "Tvoj konačni rok obaveze završava se {{date}}. Nastavi kao Standard po ceni {{price}}, ili se hosting završava.",
       "freeTrial": "Besplatno probno razdoblje",
@@ -859,7 +864,7 @@
       "trialDaysRemaining": "Probno razdoblje: preostalo {{remaining}} dana",
       "trialEndingSoon": "Probno razdoblje se uskoro završava: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1138,9 +1143,9 @@
       "destroying": "UNIŠTAVANJE",
       "provisioned": "DODEĐENO",
       "restarting": "PONOVNO POKRETANJE",
-      "running": "U toku",
+      "running": "U TOKU",
       "shuttingDown": "GAŠENJE",
-      "starting": "Započinje",
+      "starting": "ZAPOČINJE",
       "stopped": "ZAUSTAVLJENO",
       "stopping": "ZAUSTAVLJANJE",
       "unknown": "NEPOZNATO",
@@ -1313,7 +1318,7 @@
       "transcriptWaiting": "Čekanje na transkript pregleda.",
       "transcriptEmpty": "Nema transkripta za ovaj pregled.",
       "transcriptRetry": "Učitavanje transkripta pregleda nije uspelo.",
-      "transcriptLive": "UŽIVO",
+      "transcriptLive": "Uživo",
       "agentIdle": "Agent je neaktivan",
       "agentWorking": "Agent radi...",
       "anErrorOccurred": "Došlo je do greške",
@@ -1710,7 +1715,7 @@
       "reasonNoBandwidth": "nema dostupnog kapaciteta",
       "reasonTolerableRisk": "rizik je prihvatljiv",
       "reasonInaccurate": "nalaz nije tačan",
-      "reasonNotUsed": "Ranljivi kod se ne koristi",
+      "reasonNotUsed": "ranljivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
@@ -2080,7 +2085,8 @@
       "couldNotSearch": "Sesije se ne mogu pretražiti",
       "completedWillAppear": "Završene sesije će se pojaviti ovde.",
       "noPastSessions": "Nema prošlih sesija",
-      "live": "UŽIVO"
+      "live": "UŽIVO",
+      "updating": "Ažuriranje"
     },
     "sessionRow": {
       "deleteTitle": "Obrisati sesiju?",
@@ -2126,7 +2132,10 @@
     "sessionExited": "Sesija je završena",
     "remoteSpawnRetryable": "Nije bilo moguće doći do instance — možda se isključila.",
     "remoteSpawnNonRetryable": "Instance nije uspela da pokrene sesiju — proverite mašinu ili ažurirajte CLI.",
-    "remoteSpawnInstanceDisconnected": "Izabrana instanca se isključila. Pokrenite sesiju na Cloud Agent-u ili izaberite drugu instancu."
+    "remoteSpawnInstanceDisconnected": "Izabrana instanca se isključila. Pokrenite sesiju na Cloud Agent-u ili izaberite drugu instancu.",
+    "liveCount_one": "{{count}} UŽIVO",
+    "liveCount_other": "{{count}} UŽIVO",
+    "liveCount_few": "{{count}} UŽIVO"
   },
   "agentChat": {
     "session": {
@@ -2156,7 +2165,11 @@
       "previousTaskFinishing": "Prethodni zadatak se još završava. Sačekaj malo.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušaj ponovo.",
       "connectionTrouble": "Problem s vezom. Pokušaj ponovo za trenutak.",
-      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Izaberi drugi model i pokušaj ponovo."
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Izaberi drugi model i pokušaj ponovo.",
+      "cancelQueuedFailed": "Otkazivanje poruke nije uspelo.",
+      "cancelQueuedRestoreAvailable": "Poruka je otkazana. Dodirnite „Vratite“ da je vratite u kompozitor.",
+      "cancelQueuedRestored": "Poruka je otkazana. Upit je ponovo u kompozitoru.",
+      "cancelQueuedUpgradeRequired": "Otkazivanje poruka u redu čekanja zahteva noviji Kilo CLI. Ažurirajte Kilo CLI i ponovo se povežite."
     },
     "remoteSession": {
       "failedToCreate": "Daljinska sesija se ne može kreirati",
@@ -2228,7 +2241,8 @@
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Izaberite Cloud Agent ili drugi CLI.",
       "continueFrom": "Nastavljanje {{title}}",
       "importFailed": "Uvoz ove sesije nije uspeo.",
-      "importingSession": "Uvoz sesije"
+      "importingSession": "Uvoz sesije",
+      "discardWithUploadsMessage": "Vaš upit i svi otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran {{displayCount}} fajl",
@@ -2287,7 +2301,9 @@
       "noCliInstancesDescription": "Pokreni `kilo remote` u projektu na svom računaru, ili ažuriraj Kilo CLI ako već radi.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Pokreni na Cloud Agent"
+      "runOnCloudAgent": "Pokreni na Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Udaljene instance"
     },
     "modePicker": {
       "title": "Izaberi režim",
@@ -2477,7 +2493,11 @@
       "queuedAccessibility": "Poruka u redu čekanja",
       "userMessage": "Korisnička poruka",
       "assistantMessage": "Asistentska poruka",
-      "longPressHint": "Dugi pritisak za detalje poruke"
+      "longPressHint": "Dugi pritisak za detalje poruke",
+      "cancelQueued": "Otkažite poruku",
+      "cancelQueuedAccessibility": "Otkažite poruku u redu čekanja",
+      "restoreQueued": "Vratite",
+      "restoreQueuedAccessibility": "Vratite otkazanu poruku u kompozitor"
     },
     "olderMessages": {
       "arrived": "Ranije poruke učitane",
@@ -2508,9 +2528,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj sesije",
-      "sortBy": "Sortiraj po",
-      "sortLastUpdated": "Poslednje ažurirano",
-      "sortCreated": "Kreirano",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Ekstenzija",
@@ -2519,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ostalo",
-      "project": "Projekat",
-      "removeProjectFilter": "Ukloni {{label}} filter projekta",
-      "removePlatformFilter": "Ukloni {{label}} filter platforme"
+      "project": "Projekat"
     },
     "suggestion": {
       "title": "Predlog",
@@ -2564,7 +2579,9 @@
       "uploading": "Otpremanje…",
       "uploaded": "Otpremljeno",
       "uploadFailedRetry": "Otpremanje nije uspelo. Dodirnite za ponovni pokušaj.",
-      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti."
+      "uploadFailedTerminal": "Ova datoteka se ne može otpremiti.",
+      "moveLeft": "Pomerite {{filename}} ulevo",
+      "moveRight": "Pomerite {{filename}} udesno"
     },
     "attachmentPasteHint": {
       "accessibility": "Nalepi sliku iz klipborda",
@@ -2594,7 +2611,11 @@
       "finalizingPlaceholder": "Završavanje...",
       "messagePlaceholder": "Poruka...",
       "cannotReceiveFiles": "Ova sesija ne može da prima datoteke. Uklonite priloge da biste poslali poruku.",
-      "couldNotAttachFiles": "Dodavanje datoteka nije uspelo. Dodirnite pošalji za ponovni pokušaj."
+      "couldNotAttachFiles": "Dodavanje datoteka nije uspelo. Dodirnite pošalji za ponovni pokušaj.",
+      "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
+      "discardAttachmentsTitle": "Odbaciti priloge?",
+      "charactersRemaining": "Preostalo znakova: {{count}}",
+      "insertNewline": "Unesite novi red"
     },
     "chatLink": {
       "linkCopied": "Link kopiran",
@@ -2750,7 +2771,7 @@
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Vidi sve",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Trenutno ništa nije pokrenuto"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",
@@ -2795,7 +2816,7 @@
     "optionsExpiredDescription": "Vratite se i ponovo otvorite ovaj birač sa prethodnog ekrana."
   },
   "sessionRow": {
-    "needsInput": "zahteva unos"
+    "needsInput": "ZAHTEVA UNOS"
   },
   "voiceInput": {
     "listening": "Slušanje...",
@@ -2814,7 +2835,8 @@
     "busy": "Glasovni unos je zauzet. Pokušajte ponovo.",
     "stopped": "Glasovni unos je zaustavljen. Dodirnite mikrofon da pokušate ponovo.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
-    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja."
+    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {
     "title": "Podeli u Kilo",

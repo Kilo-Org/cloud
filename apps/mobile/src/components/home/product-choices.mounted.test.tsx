@@ -59,7 +59,9 @@ async function mountProductChoices(
   };
   await act(async () => {
     await Promise.resolve();
-    rendererRef.current = TestRenderer.create(createElement(ProductChoices, { organizationId }));
+    rendererRef.current = TestRenderer.create(
+      createElement(ProductChoices, { organizationId, contextReady: true })
+    );
   });
   const renderer = rendererRef.current;
   if (!renderer) {

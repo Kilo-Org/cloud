@@ -372,7 +372,7 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
 
       const body: Record<string, unknown> = {
         body_html: USER_DELETION_PYLON_REPLY_HTML,
-        message_id: replyTarget.threadId ?? replyTarget.id,
+        message_id: replyTarget.id,
         email_info: { to_emails: [emailOrOutcome] },
       };
 

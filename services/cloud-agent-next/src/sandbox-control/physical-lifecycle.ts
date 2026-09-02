@@ -1,14 +1,43 @@
+import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+
 export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
+
+export type CredentialContainmentRequirements = {
+  kilocode: boolean;
+  github: boolean;
+  worktreeScoped?: true;
+};
+
+export const WORKTREE_CREDENTIAL_CONTAINMENT = {
+  kilocode: true,
+  github: true,
+  worktreeScoped: true,
+} satisfies CredentialContainmentRequirements;
+
+export function getWorktreeCredentialContainment(
+  enabled: boolean
+): CredentialContainmentRequirements {
+  return enabled
+    ? WORKTREE_CREDENTIAL_CONTAINMENT
+    : { kilocode: false, github: false, worktreeScoped: true };
+}
 
 export type CreateIntent = {
   intentId: string;
   createdAt: number;
+  allocationName?: string;
+  vercel?: Pick<
+    VercelSandboxRuntimeConfig,
+    'projectId' | 'snapshotId' | 'runtimeBuildId' | 'runtime'
+  >;
+  containment?: CredentialContainmentRequirements;
 };
 
 export type StopTombstone = {
   reason: string;
   attempts: number;
   createdAt: number;
+  wrapperInstanceId?: string;
 };
 
 export type PhysicalRecord = {
@@ -17,6 +46,7 @@ export type PhysicalRecord = {
   createIntent: CreateIntent | null;
   stopTombstone: StopTombstone | null;
   resumable: boolean;
+  containment?: CredentialContainmentRequirements & { providerRef: string };
 };
 
 export type ObserveResult = 'active' | 'terminal' | 'unknown';
@@ -31,14 +61,33 @@ export function initialPhysicalRecord(resumable: boolean): PhysicalRecord {
   };
 }
 
-export function claimCreate(record: PhysicalRecord, intentId: string, now: number): PhysicalRecord {
+export function claimCreate(
+  record: PhysicalRecord,
+  intentId: string,
+  now: number,
+  allocationName?: string,
+  containment?: CredentialContainmentRequirements
+): PhysicalRecord {
   if (record.state !== 'stopped') {
     throw illegal('claimCreate', record.state);
   }
   return {
     ...record,
     state: 'creating',
-    createIntent: { intentId, createdAt: now },
+    createIntent: {
+      intentId,
+      createdAt: now,
+      ...(allocationName ? { allocationName } : {}),
+      ...(containment
+        ? {
+            containment: {
+              kilocode: containment.kilocode,
+              github: containment.github,
+              ...(containment.worktreeScoped ? { worktreeScoped: true } : {}),
+            },
+          }
+        : {}),
+    },
   };
 }
 
@@ -57,17 +106,24 @@ export function confirmRunning(
   return toRunning(record, providerRef);
 }
 
-export function beginStop(record: PhysicalRecord, reason: string, now: number): PhysicalRecord {
-  if (record.state !== 'running' && record.state !== 'creating' && record.state !== 'failed') {
-    throw illegal('beginStop', record.state);
-  }
-  if (record.providerRef === null && record.createIntent === null) {
+export function beginStop(
+  record: PhysicalRecord,
+  reason: string,
+  now: number,
+  wrapperInstanceId?: string
+): PhysicalRecord {
+  if (record.state === 'stopped' || (record.providerRef === null && record.createIntent === null)) {
     throw illegal('beginStop', record.state);
   }
   return {
     ...record,
     state: 'stopping',
-    stopTombstone: { reason, attempts: 0, createdAt: now },
+    stopTombstone: record.stopTombstone ?? {
+      reason,
+      attempts: 0,
+      createdAt: now,
+      ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
+    },
   };
 }
 
@@ -113,14 +169,13 @@ export function observe(record: PhysicalRecord, result: ObserveResult): Physical
       return toUnknown(record);
     case 'stopping':
       if (result === 'terminal') return toStopped(record);
-      if (result === 'unknown') return toUnknown(record);
       return record;
     case 'failed':
       if (result === 'terminal') return toStopped(record);
       return toUnknown(record);
     case 'unknown':
       if (result === 'terminal') return toStopped(record);
-      if (result === 'active') {
+      if (result === 'active' && record.stopTombstone === null) {
         if (record.providerRef === null) return record;
         return toRunning(record, record.providerRef);
       }
@@ -128,11 +183,25 @@ export function observe(record: PhysicalRecord, result: ObserveResult): Physical
   }
 }
 
-export function fail(record: PhysicalRecord, _now: number): PhysicalRecord {
+export function fail(record: PhysicalRecord, now: number): PhysicalRecord {
   if (record.state !== 'creating' && record.state !== 'running') {
     throw illegal('fail', record.state);
   }
-  return toFailed(record);
+  return {
+    ...toFailed(record),
+    stopTombstone: record.stopTombstone ?? {
+      reason: 'environment_failed',
+      attempts: 0,
+      createdAt: now,
+    },
+  };
+}
+
+export function sameAllocation(left: PhysicalRecord, right: PhysicalRecord): boolean {
+  if (left.createIntent || right.createIntent) {
+    return left.createIntent?.intentId === right.createIntent?.intentId;
+  }
+  return left.providerRef !== null && left.providerRef === right.providerRef;
 }
 
 export function exhaustStopRetries(record: PhysicalRecord): PhysicalRecord {
@@ -143,11 +212,21 @@ export function exhaustStopRetries(record: PhysicalRecord): PhysicalRecord {
 }
 
 function toRunning(record: PhysicalRecord, providerRef: string): PhysicalRecord {
+  const containment = record.createIntent?.containment;
   return {
     ...record,
     state: 'running',
     providerRef,
-    createIntent: null,
+    ...(containment
+      ? {
+          containment: {
+            kilocode: containment.kilocode,
+            github: containment.github,
+            ...(containment.worktreeScoped ? { worktreeScoped: true } : {}),
+            providerRef,
+          },
+        }
+      : {}),
   };
 }
 

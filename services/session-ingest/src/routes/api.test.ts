@@ -121,13 +121,24 @@ function ingestRequest(body: string, contentLength = new TextEncoder().encode(bo
   });
 }
 
+function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
+  return {
+    stageR2Object: async (params: { key: string }, body: ReadableStream<Uint8Array>) => {
+      await env.SESSION_INGEST_R2.put(params.key, body);
+      return true;
+    },
+  };
+}
+
 function prepareIngestRoute(
   ingest: ReturnType<typeof vi.fn> = vi.fn(async () => ({ accepted: true, changes: [] }))
 ) {
   const { db } = makeDbFakes();
   vi.mocked(getWorkerDb).mockReturnValue(db);
   vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
-  vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+  vi.mocked(getSessionIngestDO).mockImplementation(
+    env => ({ ...r2StagingStub(env), ingest }) as never
+  );
   vi.mocked(getUserConnectionDO).mockReturnValue({
     hasActiveCliSession: vi.fn(async () => true),
   } as never);
@@ -230,6 +241,7 @@ function makeDbFakes() {
 describe('api routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(getSessionIngestDO).mockImplementation(env => r2StagingStub(env) as never);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
@@ -1002,8 +1014,9 @@ describe('api routes', () => {
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         expect.stringMatching(/\/ses_12345678901234567890123456\//),
-        new TextEncoder().encode(body)
+        expect.any(ReadableStream)
       );
+      expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(info).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'oversized_item' })
       );
@@ -1056,8 +1069,9 @@ describe('api routes', () => {
       expect(ingest).toHaveBeenCalledTimes(1);
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         'ingest/usr_test/ses_12345678901234567890123456/11111111-1111-4111-8111-111111111111',
-        new TextEncoder().encode(body)
+        expect.any(ReadableStream)
       );
+      expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(env.INGEST_QUEUE.send).toHaveBeenCalledWith(
         expect.objectContaining({ ingestedAt: 4567 })
       );
@@ -1436,6 +1450,9 @@ describe('api routes', () => {
         { session_id: parentSessionId, has_access: true },
       ],
     });
+    fns.selectResult
+      .mockResolvedValueOnce([{ worktreeId: null, scopeId: 'cloud-agent-session-scope-1' }])
+      .mockResolvedValueOnce([{ worktreeId: null }]);
     // Rows selected for session.deleted events
     fns.selectResult.mockResolvedValueOnce([
       {
@@ -1483,7 +1500,13 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
 
-    const deletedRowsPredicate = fns.selectWhere.mock.calls[0]?.[0];
+    const deletedRowsPredicate = fns.selectWhere.mock.calls
+      .map(([predicate]) => predicate)
+      .find(
+        predicate =>
+          predicate instanceof SQL &&
+          new PgDialect().sqlToQuery(predicate).sql.includes('"session_id" in')
+      );
     if (!(deletedRowsPredicate instanceof SQL)) {
       throw new Error('Expected pre-delete predicate');
     }
@@ -1565,7 +1588,6 @@ describe('api routes', () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ success: false, error: 'session_not_found' });
-    expect(fns.select).not.toHaveBeenCalled();
     expect(fns.delete).not.toHaveBeenCalled();
     expect(fns.transaction).not.toHaveBeenCalled();
   });
@@ -2262,6 +2284,16 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       }));
       vi.mocked(getUserConnectionDO).mockReturnValue({
@@ -2280,8 +2312,32 @@ describe('api routes', () => {
         instances: [
           { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
           { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-remote',
+            name: 'remote-host',
+            projectName: 'kilo',
+            version: '1.0.0',
+            kind: 'remote',
+            startedAt: '2026-08-28T12:34:56.789Z',
+            gitBranch: 'feature/identity',
+            capabilities: { attachments: true, sessionClone: true },
+          },
         ],
       });
+    });
+
+    it('keeps a failed instance lookup distinct from an empty list', async () => {
+      vi.mocked(getUserConnectionDO).mockReturnValue({
+        getConnectedInstances: vi.fn(async () => {
+          throw new Error('instance lookup failed');
+        }),
+      } as never);
+      const res = await makeApiApp().fetch(
+        new Request('http://local/instances/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(500);
+      expect(await res.text()).toBe('Internal Server Error');
     });
 
     it('returns 200 with an empty `instances` array when no CLIs are connected', async () => {

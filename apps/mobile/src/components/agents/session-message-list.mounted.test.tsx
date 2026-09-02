@@ -15,6 +15,8 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -33,6 +35,7 @@ vi.mock('@/components/agents/use-session-list-auto-scroll', () => ({
     listRef: { current: null },
     scrollToLatestAnimated: vi.fn(),
     handleContentSizeChange: vi.fn(),
+    handleKeyboardShow: vi.fn(),
     handleListLayout: vi.fn(),
     handleScroll: vi.fn(),
     handleScrollBeginDrag: vi.fn(),

@@ -1,10 +1,13 @@
+/// <reference lib="es2024.promise" />
 /* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
+import type * as ContextScopeModule from '../context-scope';
+import type * as TokenOwnerModule from './token-owner';
 
 // ---- hoisted mocks ----
 
@@ -106,6 +109,38 @@ const logoutCleanupMock = vi.hoisted(() => ({
 const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
 }));
+
+const ownerProducer = vi.hoisted(() => ({
+  getMe: vi.fn<() => Promise<{ id: string }>>().mockResolvedValue({ id: 'user-a' }),
+  ticket: vi.fn().mockResolvedValue({ token: 'ingest-ticket' }),
+  getAuthToken: undefined as (() => Promise<string>) | undefined,
+}));
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    user: { getMe: { query: ownerProducer.getMe } },
+    activeSessions: { createWebTicket: { mutate: ownerProducer.ticket } },
+  },
+}));
+vi.mock('@/lib/user-web-connection-lifecycle', () => ({
+  createNativeUserWebConnectionLifecycleHooks: () => ({}),
+}));
+// Capture the real provider's credential callback. The mounted connection suite uses the real SDK.
+vi.mock('@kilocode/cloud-agent-sdk/user-web-connection', () => ({
+  createUserWebConnection: (config: { getAuthToken: () => Promise<string> }) => {
+    ownerProducer.getAuthToken = config.getAuthToken;
+    return { retain: () => vi.fn(), destroy: vi.fn() };
+  },
+}));
+
+async function requestOwnerTicket() {
+  const request = ownerProducer.getAuthToken;
+  if (!request) {
+    throw new Error('committed connection producer did not mount');
+  }
+  const token = await request();
+  return token;
+}
 
 // ---- all vi.mock calls ----
 
@@ -241,12 +276,14 @@ vi.mock('@/lib/storage-keys', () => ({
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   REFRESH_TOKEN_KEY: 'refresh-token',
+  LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
+  SESSION_INGEST_WS_URL: 'wss://ingest.example.com',
 }));
 
 vi.mock('react-native', () => ({
@@ -455,6 +492,7 @@ describe('sign-out teardown ordering', () => {
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
     expect(hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink).toHaveBeenCalled();
@@ -1090,12 +1128,18 @@ describe('reactive auth epoch', () => {
   /** Mount the provider with a consumer that re-captures the context on every
    *  render, so the test can read the epoch after sign-in or sign-out moved it. */
   // oxlint-disable-next-line require-await -- dynamic import is awaited
-  async function mountEpochTest(): Promise<{
+  async function mountEpochTest(withConnection = false): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
   }> {
     vi.resetModules();
+    ownerProducer.getAuthToken = undefined;
+    ownerProducer.getMe.mockReset().mockResolvedValue({ id: 'user-a' });
     const mod = await import('./auth-context');
+    const connectionModule = withConnection
+      ? await import('../../components/agents/user-web-connection-provider')
+      : null;
+    const ConnectionProvider = connectionModule?.UserWebConnectionProvider;
 
     let capturedCtx: AuthContextValue | undefined = undefined;
     function Consumer(): null {
@@ -1105,8 +1149,14 @@ describe('reactive auth epoch', () => {
 
     let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
     await act(async () => {
+      const consumer = createElement(Consumer);
       renderer = TestRenderer.create(
-        createElement(mod.AuthProvider, null, createElement(Consumer))
+        createElement(
+          mod.AuthProvider,
+          null,
+          consumer,
+          ConnectionProvider ? createElement(ConnectionProvider, null, null) : null
+        )
       );
       await Promise.resolve();
     });
@@ -1129,6 +1179,184 @@ describe('reactive auth epoch', () => {
       },
     };
   }
+
+  it('publishes pending ownership before credential writes and confirms only the committed successor', async () => {
+    const { getCtx, unmount } = await mountEpochTest(true);
+    onTestFinished(() => act(unmount));
+    const scope: typeof ContextScopeModule = await import('../context-scope');
+    const tokens: typeof TokenOwnerModule = await import('./token-owner');
+    await act(async () => {
+      await getCtx().signIn('account-a-token');
+    });
+    await act(async () => {
+      await requestOwnerTicket();
+    });
+    const previous = scope.getAuthenticatedOwner();
+    expect(previous.userId).toBe('user-a');
+    // The old credentials remain readable on disk while the replacement write is held.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('account-a-token');
+
+    const published: { userId: string | null; token: string | null }[] = [];
+    const unsubscribe = scope.subscribeAuthenticatedOwner(() => {
+      published.push({
+        userId: scope.getAuthenticatedOwner().userId,
+        token: tokens.getActiveToken()?.token ?? null,
+      });
+    });
+    onTestFinished(unsubscribe);
+    const write = Promise.withResolvers<undefined>();
+    onTestFinished(() => {
+      write.resolve(undefined);
+    });
+    hoisted.secureStore.setItemAsync.mockImplementationOnce(async () => {
+      await write.promise;
+    });
+    const transition: { promise?: Promise<void> } = {};
+    await act(async () => {
+      transition.promise = getCtx().signIn('account-b-token');
+      await Promise.resolve();
+    });
+
+    expect(published).toEqual([{ userId: null, token: null }]);
+    expect(scope.isAuthenticatedOwner(previous)).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().isSigningOut).toBe(true);
+    await expect(tokens.getAuthTokenForRequest()).resolves.toBeNull();
+    await expect(requestOwnerTicket()).rejects.toThrow('Authenticated owner changed');
+
+    await act(async () => {
+      write.resolve(undefined);
+      await transition.promise;
+    });
+    expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    const requestedTokens: (string | undefined)[] = [];
+    ownerProducer.getMe.mockImplementationOnce(async () => {
+      requestedTokens.push(tokens.getActiveToken()?.token);
+      await Promise.resolve();
+      return { id: 'user-b' };
+    });
+    await act(async () => {
+      await requestOwnerTicket();
+    });
+
+    expect(requestedTokens).toEqual(['account-b-token']);
+    expect(scope.getAuthenticatedOwner().userId).toBe('user-b');
+    expect(scope.getAuthenticatedOwner().generation).toBeGreaterThan(previous.generation);
+    expect(getCtx().token).toBe('account-b-token');
+    expect(getCtx().isSigningOut).toBe(false);
+  });
+
+  it('confirms a restored account from getMe rather than the decoded token hint', async () => {
+    const token = makeToken({ kiloUserId: 'unconfirmed-hint' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(token)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(token);
+    const { unmount } = await mountEpochTest(true);
+    onTestFinished(() => act(unmount));
+    const scope: typeof ContextScopeModule = await import('../context-scope');
+    expect(scope.getAuthenticatedOwner().userId).toBeNull();
+
+    await act(async () => {
+      await requestOwnerTicket();
+    });
+
+    expect(scope.getAuthenticatedOwner().userId).toBe('user-a');
+    expect(scope.isAuthenticatedOwner(scope.getAuthenticatedOwner())).toBe(true);
+  });
+
+  it('rejects a prior account getMe completion after the current account confirms', async () => {
+    const { getCtx, unmount } = await mountEpochTest(true);
+    onTestFinished(() => act(unmount));
+    await act(async () => {
+      await getCtx().signIn('account-a-token');
+    });
+    const identity = Promise.withResolvers<{ id: string }>();
+    ownerProducer.getMe.mockReturnValueOnce(identity.promise);
+    const stale = requestOwnerTicket();
+    const rejection = expect(stale).rejects.toThrow('Authenticated owner changed');
+
+    await act(async () => {
+      await getCtx().signIn('account-b-token');
+    });
+    ownerProducer.getMe.mockResolvedValueOnce({ id: 'user-b' });
+    await act(async () => {
+      await requestOwnerTicket();
+      identity.resolve({ id: 'user-a' });
+      await rejection;
+    });
+
+    const scope: typeof ContextScopeModule = await import('../context-scope');
+    expect(scope.getAuthenticatedOwner().userId).toBe('user-b');
+    expect(getCtx().token).toBe('account-b-token');
+  });
+
+  it('revokes the confirmed owner before remote logout cleanup or the epoch bump', async () => {
+    const { getCtx, unmount } = await mountEpochTest(true);
+    onTestFinished(() => act(unmount));
+    await act(async () => {
+      await getCtx().signIn('account-a-token');
+    });
+    await act(async () => {
+      await requestOwnerTicket();
+    });
+    const scope: typeof ContextScopeModule = await import('../context-scope');
+    const previous = scope.getAuthenticatedOwner();
+    const cleanup = Promise.withResolvers<undefined>();
+    onTestFinished(() => {
+      cleanup.resolve(undefined);
+    });
+    logoutCleanupMock.runLogoutCleanup.mockReturnValueOnce(cleanup.promise);
+    const transition: { promise?: Promise<void> } = {};
+    await act(async () => {
+      transition.promise = getCtx().signOut();
+      await Promise.resolve();
+    });
+
+    expect(getCtx().authEpoch).toBe(previous.authEpoch);
+    expect(getCtx().isSigningOut).toBe(true);
+    expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    expect(scope.isAuthenticatedOwner(previous)).toBe(false);
+    await expect(requestOwnerTicket()).rejects.toThrow('Authenticated owner changed');
+
+    await act(async () => {
+      cleanup.resolve(undefined);
+      await transition.promise;
+    });
+    expect(getCtx().token).toBeUndefined();
+  });
+
+  it('keeps confirmed ownership stable during real request-time credential refresh', async () => {
+    const { getCtx, unmount } = await mountEpochTest(true);
+    onTestFinished(() => act(unmount));
+    await act(async () => {
+      await getCtx().signIn('account-a-token');
+    });
+    await act(async () => {
+      await requestOwnerTicket();
+    });
+    const scope: typeof ContextScopeModule = await import('../context-scope');
+    const owner = scope.getAuthenticatedOwner();
+    const { performRefresh } = await import('@/lib/auth/credentials');
+    const tokens: typeof TokenOwnerModule = await import('./token-owner');
+    hoisted.secureStore.getItemAsync.mockResolvedValueOnce('refresh-a');
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        Response.json({ token: 'refreshed-token', refreshToken: 'refreshed-pair', expiresIn: 3600 })
+      );
+    onTestFinished(() => {
+      fetch.mockRestore();
+    });
+
+    const outcome = await performRefresh();
+
+    expect(outcome.ok).toBe(true);
+    expect(tokens.getActiveToken()?.token).toBe('refreshed-token');
+    expect(scope.getAuthenticatedOwner()).toBe(owner);
+    expect(scope.isAuthenticatedOwner(owner)).toBe(true);
+  });
 
   it('exposes the current auth epoch in the context value', async () => {
     const { getCtx, unmount } = await mountEpochTest();
@@ -1364,6 +1592,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('live-session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
     expect(clearAgentModelPreference).toHaveBeenCalled();

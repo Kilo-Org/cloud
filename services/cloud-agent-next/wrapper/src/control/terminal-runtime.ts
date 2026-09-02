@@ -13,11 +13,13 @@ import {
   type SessionTerminalResizeResult,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-environment.js';
-import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
+import { isKiloServerUnreachableError } from '../kilo-api.js';
 import { directoryForSession, forgetAttachedRoot, rootForSession } from './session-directories.js';
+import type { WorktreeKiloRuntime } from './worktree-runtime.js';
 
 type AttachedTerminalSession = SessionRequestIdentity & {
   wrapperInstanceId: string;
+  kiloRuntime: WorktreeKiloRuntime;
 };
 
 type OwnedTerminal = AttachedTerminalSession & {
@@ -53,7 +55,6 @@ const WORKSPACE_TERMINAL_ENV = {
   PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
   PS1: '\\n\\W\\n\\$ ',
   [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
-  SANDBOX_CONTROL_CREDENTIAL: '',
 } satisfies Record<string, string>;
 
 export class ControlTerminalRuntimeError extends Error {
@@ -70,6 +71,7 @@ export class ControlTerminalRuntimeError extends Error {
 export type ControlTerminalRuntime = {
   rememberAttachedSession(identity: SessionRequestIdentity): void;
   detachSession(identity: SessionRequestIdentity): Promise<void>;
+  detachDirectory(directory: string): Promise<void>;
   create(
     identity: SessionRequestIdentity,
     payload: SessionTerminalCreatePayload
@@ -148,9 +150,9 @@ function waitForSocketOpen(socket: WebSocket): Promise<void> {
 export function createControlTerminalRuntime(options: {
   controlUrl: string;
   wrapperInstanceId: string;
-  kiloClient: WrapperKiloClient;
+  getKiloRuntime: (directory: string) => WorktreeKiloRuntime | undefined;
 }): ControlTerminalRuntime {
-  const { wrapperInstanceId, kiloClient } = options;
+  const { wrapperInstanceId } = options;
   const controlOrigin = new URL(options.controlUrl).origin;
   const attachedSessions = new Map<string, AttachedTerminalSession>();
   const terminals = new Map<string, OwnedTerminal>();
@@ -167,14 +169,16 @@ export function createControlTerminalRuntime(options: {
       attached.wrapperInstanceId !== wrapperInstanceId ||
       !sameSession(attached, identity) ||
       directoryForSession(identity.kiloSessionId) !== identity.directory ||
-      rootForSession(identity.kiloSessionId) !== identity.kiloSessionId ||
-      rootForSession(undefined, identity.directory) !== identity.kiloSessionId
+      rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
     ) {
       throw new ControlTerminalRuntimeError(
         'unauthorized',
         'Terminal session ownership mismatch',
         false
       );
+    }
+    if (options.getKiloRuntime(identity.directory) !== attached.kiloRuntime) {
+      throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
     }
     return attached;
   }
@@ -255,11 +259,12 @@ export function createControlTerminalRuntime(options: {
     payload: SessionTerminalCreatePayload
   ): Promise<SessionTerminalCreateResult> {
     let createdPtyId: string | undefined;
+    const { kiloClient, env } = attached.kiloRuntime;
     try {
       const created = await kiloClient.createPty({
         cwd: attached.directory,
         title: 'Workspace terminal',
-        env: WORKSPACE_TERMINAL_ENV,
+        env: { ...env, ...WORKSPACE_TERMINAL_ENV },
       });
       createdPtyId = created.id;
       if (attachedSessions.get(attached.sessionId) !== attached) {
@@ -326,7 +331,7 @@ export function createControlTerminalRuntime(options: {
 
       const localUrl = new URL(
         `/pty/${encodeURIComponent(bridge.terminal.ptyId)}/connect`,
-        kiloClient.serverUrl
+        bridge.terminal.kiloRuntime.kiloClient.serverUrl
       );
       localUrl.protocol = localUrl.protocol === 'https:' ? 'wss:' : 'ws:';
       localUrl.search = '';
@@ -366,13 +371,45 @@ export function createControlTerminalRuntime(options: {
     }
   }
 
+  async function detachSession(identity: SessionRequestIdentity): Promise<void> {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached) return;
+    if (!sameSession(attached, identity)) {
+      throw new ControlTerminalRuntimeError(
+        'unauthorized',
+        'Terminal session ownership mismatch',
+        false
+      );
+    }
+
+    attachedSessions.delete(identity.sessionId);
+
+    const pending: Promise<unknown>[] = [];
+    for (const [operationId, operation] of operations) {
+      if (!sameSession(operation, attached)) continue;
+      operations.delete(operationId);
+      pending.push(operation.promise);
+    }
+
+    for (const [ptyId, terminal] of terminals) {
+      if (!sameSession(terminal, attached)) continue;
+      const bridge = bridges.get(ptyId);
+      if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
+      terminals.delete(ptyId);
+      pending.push(terminal.kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
+    }
+
+    await Promise.allSettled(pending);
+  }
+
   return {
     rememberAttachedSession(identity) {
+      const kiloRuntime = options.getKiloRuntime(identity.directory);
       if (
         shutDown ||
+        !kiloRuntime ||
         directoryForSession(identity.kiloSessionId) !== identity.directory ||
-        rootForSession(identity.kiloSessionId) !== identity.kiloSessionId ||
-        rootForSession(undefined, identity.directory) !== identity.kiloSessionId
+        rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
       ) {
         throw new ControlTerminalRuntimeError(
           'unauthorized',
@@ -383,7 +420,7 @@ export function createControlTerminalRuntime(options: {
 
       const existing = attachedSessions.get(identity.sessionId);
       if (existing) {
-        if (!sameSession(existing, identity)) {
+        if (!sameSession(existing, identity) || existing.kiloRuntime !== kiloRuntime) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
             'Terminal session ownership mismatch',
@@ -394,10 +431,7 @@ export function createControlTerminalRuntime(options: {
       }
 
       for (const attached of attachedSessions.values()) {
-        if (
-          attached.kiloSessionId === identity.kiloSessionId ||
-          attached.directory === identity.directory
-        ) {
+        if (attached.kiloSessionId === identity.kiloSessionId) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
             'Terminal session ownership mismatch',
@@ -406,39 +440,16 @@ export function createControlTerminalRuntime(options: {
         }
       }
 
-      attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId });
+      attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId, kiloRuntime });
     },
 
-    async detachSession(identity) {
-      const attached = attachedSessions.get(identity.sessionId);
-      if (!attached) return;
-      if (!sameSession(attached, identity)) {
-        throw new ControlTerminalRuntimeError(
-          'unauthorized',
-          'Terminal session ownership mismatch',
-          false
-        );
-      }
+    detachSession,
 
-      attachedSessions.delete(identity.sessionId);
-      forgetAttachedRoot(identity.kiloSessionId, identity.directory);
-
-      const pending: Promise<unknown>[] = [];
-      for (const [operationId, operation] of operations) {
-        if (!sameSession(operation, attached)) continue;
-        operations.delete(operationId);
-        pending.push(operation.promise);
-      }
-
-      for (const [ptyId, terminal] of terminals) {
-        if (!sameSession(terminal, attached)) continue;
-        const bridge = bridges.get(ptyId);
-        if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
-        terminals.delete(ptyId);
-        pending.push(kiloClient.deletePty(ptyId, terminal.directory));
-      }
-
-      await Promise.allSettled(pending);
+    async detachDirectory(directory) {
+      const sessions = [...attachedSessions.values()].filter(
+        session => session.directory === directory
+      );
+      await Promise.all(sessions.map(detachSession));
     },
 
     async create(identity, payload) {
@@ -480,7 +491,7 @@ export function createControlTerminalRuntime(options: {
     async resize(identity, payload) {
       const terminal = requireTerminal(identity, payload.ptyId);
       try {
-        const pty = await kiloClient.resizePty(
+        const pty = await terminal.kiloRuntime.kiloClient.resizePty(
           payload.ptyId,
           { cols: payload.cols, rows: payload.rows },
           terminal.directory
@@ -513,7 +524,10 @@ export function createControlTerminalRuntime(options: {
     async close(identity, payload) {
       const terminal = requireTerminal(identity, payload.ptyId, true);
       try {
-        const success = await kiloClient.deletePty(payload.ptyId, terminal.directory);
+        const success = await terminal.kiloRuntime.kiloClient.deletePty(
+          payload.ptyId,
+          terminal.directory
+        );
         if (success && terminals.get(payload.ptyId) === terminal) {
           const bridge = bridges.get(payload.ptyId);
           if (bridge) closeBridge(bridge, 1000, 'PTY session ended');

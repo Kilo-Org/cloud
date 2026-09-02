@@ -78,9 +78,8 @@ export type EnsureRunningOptions = {
    */
   devcontainer?: DevContainerHandle;
   /**
-   * `TOOL_CGROUP_*` knobs for the wrapper's memory cgroup partition, already
-   * gated per-org by the caller (`TOOL_CGROUP_ORG_IDS`). Only defined keys are
-   * included — see MEMORY_CGROUPS_PLAN.md (W4).
+   * `TOOL_CGROUP_*` knobs for the wrapper's memory cgroup partition. Only
+   * defined keys are included — see MEMORY_CGROUPS_PLAN.md (W4).
    */
   toolCgroupEnv?: ToolCgroupEnv;
   /**

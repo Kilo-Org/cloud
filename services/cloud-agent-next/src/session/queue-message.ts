@@ -14,7 +14,7 @@ import type {
   SubmittedSessionMessageRequest,
   RetryableResultCode,
 } from '../execution/types.js';
-import type { SessionId, UserId } from '../types/ids.js';
+import type { SessionId } from '../types/ids.js';
 import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
@@ -23,6 +23,7 @@ import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from '../session-plane.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
+import { createMessageId } from './message-id.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -159,11 +160,11 @@ export async function queueMessage(
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: SubmittedSessionMessageRequest = {
-    userId: ctx.userId as UserId,
+    userId: ctx.userId,
     botId: ctx.botId,
     turn: {
       ...input.turn,
-      id: input.turn.id ?? undefined,
+      id: input.turn.id ?? createMessageId(),
     },
     agent: input.agent,
     finalization: input.finalization,

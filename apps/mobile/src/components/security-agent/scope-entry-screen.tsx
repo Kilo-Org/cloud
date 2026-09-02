@@ -16,11 +16,13 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { trpcClient } from '@/lib/trpc';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 function ScopeEntrySkeleton() {
   const { t } = useTranslation();
@@ -46,11 +48,22 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
-  const repositories = useSecurityAgentRepositories(scope);
+  useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
+  const recovery = useRetrySecurityAgentSettings(scope);
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
-  const isLoading = permission.isLoading || config.isLoading || capability.isLoading;
-  const isError = permission.isError || config.isError || capability.isError;
+  // Pending includes uncached queries paused by NetInfo. Cached query errors
+  // must not replace usable settings or a resolved capability with an error screen.
+  const isLoading = permission.isPending || config.isPending || capability.status === 'loading';
+  const isError =
+    (!permission.data && permission.isError) ||
+    (!config.data && config.isError) ||
+    capability.status === 'error';
+  const isPaused =
+    permission.fetchStatus === 'paused' ||
+    config.fetchStatus === 'paused' ||
+    capability.fetchStatus === 'paused';
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
@@ -114,32 +127,24 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // pre-minted token or the connect action must fail closed.
   const connectUrl = mintUrl;
 
-  const refetchAll = async () => {
-    await Promise.all([
-      permission.refetch(),
-      config.refetch(),
-      repositories.refetch(),
-      capability.refetch(),
-    ]);
-  };
+  const refetchAll = recovery.retry;
 
-  if (view === 'loading') {
-    return <ScopeEntrySkeleton />;
-  }
-
-  if (view === 'error') {
+  if (
+    view === 'error' ||
+    (isLoading && (isError || recovery.isRetrying || (isPaused && isConnectivityKnown)))
+  ) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.title')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
-        onRetry={() => {
-          void permission.refetch();
-          void config.refetch();
-          void capability.refetch();
-        }}
-        isRetrying={permission.isFetching || config.isFetching || capability.isFetching}
+        onRetry={() => void recovery.retry()}
+        isRetrying={recovery.isRetrying}
       />
     );
+  }
+
+  if (view === 'loading') {
+    return <ScopeEntrySkeleton />;
   }
 
   // Audit-report access shouldn't depend on the agent being connected or
@@ -230,7 +235,13 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'disabled-settings': {
-      return <SettingsOverviewScreen scope={scope} presentation="inline" />;
+      return (
+        <SettingsOverviewScreen
+          scope={scope}
+          presentation="inline"
+          permissionError={permission.isError}
+        />
+      );
     }
     case 'dashboard': {
       // Fade the Dashboard in when the agent is enabled: the

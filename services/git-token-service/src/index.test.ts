@@ -2,6 +2,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
+import type * as GitHubTokenServiceModule from './github-token-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
   findInstallationId: vi.fn(),
@@ -32,7 +33,8 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('./github-token-service.js', () => ({
+vi.mock('./github-token-service.js', async importOriginal => ({
+  ...(await importOriginal<typeof GitHubTokenServiceModule>()),
   GitHubTokenService: class GitHubTokenService {
     getToken = serviceMocks.getToken;
     getTokenForRepo = serviceMocks.getTokenForRepo;
@@ -98,6 +100,7 @@ vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
+import { GitHubTokenGenerationError } from './github-token-service.js';
 
 beforeEach(() => {
   serviceMocks.hasGitLabProjectCredentialCandidates.mockReset().mockResolvedValue(false);
@@ -346,6 +349,11 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     repositoryFullName: 'acme/widgets',
     token: 'ATCT-runtime-token',
   };
+  const oauthSubject = {
+    ...subject,
+    token: 'oauth-runtime-token',
+    oauthCredentialId: '123e4567-e89b-12d3-a456-426614174023',
+  };
   const issueParams = {
     userId: 'user-1',
     orgId: '123e4567-e89b-12d3-a456-426614174030',
@@ -406,7 +414,100 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     });
   });
 
-  it('rejects redemption from a different container', async () => {
+  it('redeems the same OAuth capability after the access token refreshes', async () => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...oauthSubject, token: 'oauth-refreshed-token' },
+    });
+
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from('x-token-auth:oauth-refreshed-token').toString('base64')}`,
+      },
+    });
+    expect(serviceMocks.resolveBitbucketCapabilitySubject).toHaveBeenLastCalledWith(
+      expect.anything(),
+      {
+        userId: issueParams.userId,
+        orgId: issueParams.orgId,
+        expectedIntegrationId: oauthSubject.integrationId,
+        workspaceUuid: oauthSubject.workspaceUuid,
+        repositoryUuid: oauthSubject.repositoryUuid,
+        repositoryUrl: issueParams.repositoryUrl,
+      }
+    );
+  });
+
+  it.each([
+    [
+      'a replaced OAuth credential',
+      { ...oauthSubject, oauthCredentialId: '123e4567-e89b-12d3-a456-426614174024' },
+    ],
+    ['a missing OAuth credential identity', { ...oauthSubject, oauthCredentialId: undefined }],
+    ['a workspace access token source', { ...subject, token: oauthSubject.token }],
+  ])('rejects %s even when token bytes are unchanged', async (_description, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+    const capability = await issueCapability();
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
+
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+  });
+
+  it.each(['not_connected', 'reconnect_required', 'integration_mismatch'])(
+    'rejects OAuth redemption when the current source is %s',
+    async reason => {
+      serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+        success: true,
+        subject: oauthSubject,
+      });
+      const capability = await issueCapability();
+      serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({ success: false, reason });
+
+      await expect(
+        createService().redeemBitbucketSessionCapability({
+          capability,
+          outboundContainerId: 'outbound-container-1',
+          requestMethod: 'POST',
+          requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+        })
+      ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    }
+  );
+
+  it.each([
+    ['workspace access token', subject],
+    ['OAuth', oauthSubject],
+  ])('rejects %s redemption from a different container', async (_source, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
     const capability = await issueCapability();
     await expect(
       createService().redeemBitbucketSessionCapability({
@@ -418,7 +519,14 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
   });
 
-  it('rejects redemption for a different repository', async () => {
+  it.each([
+    ['workspace access token', subject],
+    ['OAuth', oauthSubject],
+  ])('rejects %s redemption for a different repository', async (_source, currentSubject) => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: currentSubject,
+    });
     const capability = await issueCapability();
     await expect(
       createService().redeemBitbucketSessionCapability({
@@ -430,7 +538,40 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
     ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
   });
 
-  it('rejects redemption when the token was rotated after issue', async () => {
+  it('keeps legacy OAuth capabilities digest-bound after refresh', async () => {
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...subject, token: oauthSubject.token },
+    });
+    const capability = await issueCapability();
+    const redeemParams = {
+      capability,
+      outboundContainerId: 'outbound-container-1',
+      requestMethod: 'POST',
+      requestUrl: 'https://bitbucket.org/acme/widgets.git/git-upload-pack',
+    };
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: oauthSubject,
+    });
+
+    await expect(createService().redeemBitbucketSessionCapability(redeemParams)).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from(`x-token-auth:${oauthSubject.token}`).toString('base64')}`,
+      },
+    });
+    serviceMocks.resolveBitbucketCapabilitySubject.mockResolvedValue({
+      success: true,
+      subject: { ...oauthSubject, token: 'oauth-refreshed-token' },
+    });
+    await expect(createService().redeemBitbucketSessionCapability(redeemParams)).resolves.toEqual({
+      success: false,
+      reason: 'source_unavailable',
+    });
+  });
+
+  it('rejects workspace access token rotation after issue', async () => {
     const capability = await issueCapability();
     serviceMocks.resolveBitbucketCapabilitySubject
       .mockReset()
@@ -748,6 +889,90 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       'acme'
     );
   });
+});
+
+describe.each([
+  'getTokenForRepo',
+  'getCloudAgentAuthForRepo',
+  'issueGitHubSessionCapability',
+] as const)('GitHub credential failures through %s', method => {
+  const params = { githubRepo: 'acme/repo', userId: 'user_1' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const installation = {
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'write', pull_requests: 'write' },
+    };
+    serviceMocks.findInstallationId.mockReset().mockResolvedValue(installation);
+    serviceMocks.findManagedInstallationForRepo.mockReset().mockResolvedValue(installation);
+    serviceMocks.findRefreshCandidates
+      .mockReset()
+      .mockResolvedValue({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockReset().mockResolvedValue('installation-token');
+  });
+
+  it.each([
+    [404, 'no_installation_found'],
+    [403, 'repository_not_installed'],
+    [422, 'repository_not_installed'],
+  ] as const)(
+    'returns the structured %s token failure without a token or capability',
+    async (status, reason) => {
+      serviceMocks.getTokenForRepo.mockRejectedValueOnce(
+        new GitHubTokenGenerationError(status, reason)
+      );
+
+      await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    'no_installation_found',
+    'invalid_repo_format',
+    'invalid_org_id',
+    'integration_mismatch',
+  ] as const)('preserves the %s lookup gate before token issuance', async reason => {
+    serviceMocks.findInstallationId.mockResolvedValue({ success: false, reason });
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({ success: false, reason });
+
+    await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('does not turn a database lookup exception into a missing installation', async () => {
+    const databaseError = new Error('query failed with private SQL parameters', {
+      cause: new Error('database connection closed'),
+    });
+    serviceMocks.findInstallationId.mockRejectedValueOnce(databaseError);
+    serviceMocks.findManagedInstallationForRepo.mockRejectedValueOnce(databaseError);
+
+    await expect(createService()[method](params)).rejects.toBe(databaseError);
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it.each([403, 429, 500, undefined])(
+    'leaves unclassified %s token failures as exceptions',
+    async status => {
+      const error = new GitHubTokenGenerationError(status);
+      serviceMocks.getTokenForRepo.mockRejectedValueOnce(error);
+
+      await expect(createService()[method](params)).rejects.toBe(error);
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+    }
+  );
 });
 
 const outboundContainerId = 'outbound-container-1';

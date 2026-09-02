@@ -162,7 +162,13 @@ preloadThemePreference();
 preloadLanguagePreference();
 preloadStartupFonts();
 
-function RootLayoutNav() {
+function RootLayoutNav({
+  languageReady,
+  setLanguageReady,
+}: Readonly<{
+  languageReady: boolean;
+  setLanguageReady: (ready: boolean) => void;
+}>) {
   const { token, isLoading: authLoading, isSigningOut, signOut } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
@@ -176,9 +182,6 @@ function RootLayoutNav() {
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
-  // True once the active catalog is loaded (or English after a catalog
-  // failure), so the splash never hides on an unlocalized tree.
-  const [languageReady, setLanguageReady] = useState(false);
   // True when the cold-start RTL reload failed after syncRtl forced the native
   // direction; the app then shows a Retry/Continue screen instead of painting LTR.
   const [languageReloadFailed, setLanguageReloadFailed] = useState(false);
@@ -375,7 +378,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [languageHasLoaded, router]);
+  }, [languageHasLoaded, router, setLanguageReady]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
@@ -934,6 +937,9 @@ function AppContentReveal({ children }: Readonly<{ children: React.ReactNode }>)
 
 function RootLayout() {
   const navigationTheme = useNavigationTheme();
+  // Share catalog readiness with native unlock without delaying the mounted tree.
+  // A catalog failure still resolves readiness with the existing English fallback.
+  const [languageReady, setLanguageReady] = useState(false);
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();
@@ -965,10 +971,10 @@ function RootLayout() {
   return (
     <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
       <ThemeProvider value={navigationTheme}>
-        <AppRootProviders>
+        <AppRootProviders languageReady={languageReady}>
           <StatusBar style="auto" />
           <AppContentReveal>
-            <RootLayoutNav />
+            <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
           </AppContentReveal>
           <AnimatedSplashOverlay />
         </AppRootProviders>

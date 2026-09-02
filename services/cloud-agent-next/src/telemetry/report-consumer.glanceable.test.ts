@@ -387,25 +387,27 @@ describe('committed cloud eligibility refresh', () => {
     expect(await activeIds()).toEqual([]);
   });
 
-  it.each(['expired', 'missing_parent'])(
-    'does not publish an unapplied %s report',
-    async outcome => {
-      fixture = setup();
-      await fixture.seed();
-      const parent = eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId);
-      if (outcome === 'expired') {
-        await fixture.db
-          .update(cloud_agent_sessions)
-          .set({ created_at: '2026-05-01T00:00:00.000Z' })
-          .where(parent);
-      } else {
-        await fixture.db.delete(cloud_agent_sessions).where(parent);
-      }
-      expect(await fixture.consume()).toBe('ack');
-      expect(await fixture.db.select().from(cloud_agent_session_runs)).toEqual([]);
-      expect(fixture.messages).toEqual([]);
+  // An expired anchor is final, so its report is acknowledged. A missing anchor
+  // is retried: the session row can still arrive.
+  it.each([
+    ['expired', 'ack'],
+    ['missing_parent', 'retry'],
+  ] as const)('does not publish an unapplied %s report', async (outcome, expected) => {
+    fixture = setup();
+    await fixture.seed();
+    const parent = eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId);
+    if (outcome === 'expired') {
+      await fixture.db
+        .update(cloud_agent_sessions)
+        .set({ created_at: '2026-05-01T00:00:00.000Z' })
+        .where(parent);
+    } else {
+      await fixture.db.delete(cloud_agent_sessions).where(parent);
     }
-  );
+    expect(await fixture.consume()).toBe(expected);
+    expect(await fixture.db.select().from(cloud_agent_session_runs)).toEqual([]);
+    expect(fixture.messages).toEqual([]);
+  });
 
   it('does not invent a recipient when CLI session metadata has not arrived', async () => {
     fixture = setup();

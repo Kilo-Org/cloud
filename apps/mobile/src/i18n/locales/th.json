@@ -152,7 +152,11 @@
     "appearanceDark": "มืด",
     "account": "บัญชี",
     "prReviewAttribution": "เพิ่มการระบุแหล่งที่มาของแอปในรีวิว PR",
-    "prReviewAttributionSubtitle": "ผนวกส่วนท้าย \"Reviewed via Kilo\" เมื่อคุณส่งรีวิว"
+    "prReviewAttributionSubtitle": "ผนวกส่วนท้าย \"Reviewed via Kilo\" เมื่อคุณส่งรีวิว",
+    "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
+    "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
+    "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
+    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที"
   },
   "prReview": {
     "pullRequestUnavailable": "ไม่สามารถใช้ pull request ได้",
@@ -750,7 +754,8 @@
       "networkError": "ข้อผิดพลาดของเครือข่าย",
       "uploadFailed": "อัปโหลดล้มเหลว",
       "failedToUploadFile": "อัปโหลดไฟล์ไม่สำเร็จ: {{reason}}",
-      "nothingToPaste": "ไม่มีอะไรให้วาง"
+      "nothingToPaste": "ไม่มีอะไรให้วาง",
+      "metadataStripFailed": "ไม่สามารถลบข้อมูลเมตาของรูปภาพได้"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "กำลังรอใบถอดความการตรวจสอบ",
       "transcriptEmpty": "ไม่มีใบถอดความสำหรับการตรวจสอบนี้",
       "transcriptRetry": "ไม่สามารถโหลดใบถอดความการตรวจสอบได้",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "เอเจนต์ว่าง",
       "agentWorking": "เอเจนต์กำลังทำงาน...",
       "anErrorOccurred": "เกิดข้อผิดพลาด",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "ไม่สามารถค้นหา sessions ได้",
       "completedWillAppear": "sessions ที่เสร็จแล้วจะปรากฏที่นี่",
       "noPastSessions": "ไม่มี sessions ในอดีต",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "กำลังอัปเดต"
     },
     "sessionRow": {
       "deleteTitle": "ลบ session?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "ออกจากเซสชันแล้ว",
     "remoteSpawnRetryable": "ไม่สามารถเข้าถึงอินสแตนซ์ได้ — อาจตัดการเชื่อมต่อแล้ว",
     "remoteSpawnNonRetryable": "อินสแตนซ์ไม่สามารถเริ่มเซสชันได้ — ตรวจสอบเครื่องหรืออัปเดต CLI",
-    "remoteSpawnInstanceDisconnected": "อินสแตนซ์ที่เลือกตัดการเชื่อมต่อแล้ว เริ่มเซสชันบน Cloud Agent หรือเลือกอินสแตนซ์อื่น"
+    "remoteSpawnInstanceDisconnected": "อินสแตนซ์ที่เลือกตัดการเชื่อมต่อแล้ว เริ่มเซสชันบน Cloud Agent หรือเลือกอินสแตนซ์อื่น",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
       "connectionTrouble": "เกิดปัญหาการเชื่อมต่อ โปรดลองอีกครั้งในอีกสักครู่",
-      "modelUnavailable": "โมเดลนี้ไม่พร้อมใช้งานสำหรับ Cloud Agent โปรดเลือกโมเดลอื่นแล้วลองอีกครั้ง"
+      "modelUnavailable": "โมเดลนี้ไม่พร้อมใช้งานสำหรับ Cloud Agent โปรดเลือกโมเดลอื่นแล้วลองอีกครั้ง",
+      "cancelQueuedFailed": "ไม่สามารถยกเลิกข้อความได้",
+      "cancelQueuedRestoreAvailable": "ยกเลิกข้อความแล้ว แตะ กู้คืน เพื่อส่งข้อความกลับไปยังช่องป้อนข้อความ",
+      "cancelQueuedRestored": "ยกเลิกข้อความแล้ว พรอมต์กลับมาอยู่ในช่องป้อนข้อความแล้ว",
+      "cancelQueuedUpgradeRequired": "การยกเลิกข้อความที่อยู่ในคิวต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "remoteSession": {
       "failedToCreate": "ไม่สามารถสร้าง remote session ได้",
@@ -2213,7 +2225,8 @@
       "continueFrom": "กำลังดำเนินการต่อ {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถดำเนินการต่อเซสชันได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
+      "discardWithUploadsMessage": "พรอมต์ของคุณและไฟล์ที่อัปโหลดแต่ยังไม่ได้แนบกับข้อความที่ส่งแล้วจะถูกลบ"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "รัน `kilo remote` ในโปรเจกต์บนคอมพิวเตอร์ของคุณ หรืออัปเดต Kilo CLI หากมีอยู่แล้วกำลังทำงาน",
       "instanceOnProject": "{{name}} บน {{project}}",
       "instanceOnProjectSuffix": "{{name}} บน {{project}} ({{suffix}})",
-      "runOnCloudAgent": "รันบน Cloud Agent"
+      "runOnCloudAgent": "รันบน Cloud Agent",
+      "terminals": "เทอร์มินัล",
+      "remotes": "อินสแตนซ์ระยะไกล"
     },
     "modePicker": {
       "title": "เลือกโหมด",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "ข้อความอยู่ในคิว",
       "userMessage": "ข้อความผู้ใช้",
       "assistantMessage": "ข้อความผู้ช่วย",
-      "longPressHint": "กดค้างเพื่อดูรายละเอียดข้อความ"
+      "longPressHint": "กดค้างเพื่อดูรายละเอียดข้อความ",
+      "cancelQueued": "ยกเลิกข้อความ",
+      "cancelQueuedAccessibility": "ยกเลิกข้อความที่อยู่ในคิว",
+      "restoreQueued": "กู้คืน",
+      "restoreQueuedAccessibility": "กู้คืนข้อความที่ยกเลิกไปยังช่องป้อนข้อความ"
     },
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "กรองเซสชัน",
-      "sortBy": "เรียงตาม",
-      "sortLastUpdated": "อัปเดตล่าสุด",
-      "sortCreated": "สร้างเมื่อ",
       "platform": "แพลตฟอร์ม",
       "platformCloud": "คลาวด์",
       "platformExtension": "ส่วนขยาย",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "อื่น ๆ",
-      "project": "โปรเจกต์",
-      "removeProjectFilter": "ลบตัวกรองโปรเจกต์ {{label}} ออก",
-      "removePlatformFilter": "ลบตัวกรองแพลตฟอร์ม {{label}} ออก"
+      "project": "โปรเจกต์"
     },
     "suggestion": {
       "title": "คำแนะนำ",
@@ -2545,7 +2559,9 @@
       "uploading": "กำลังอัปโหลด…",
       "uploaded": "อัปโหลดแล้ว",
       "uploadFailedRetry": "อัปโหลดล้มเหลว แตะเพื่อลองอีกครั้ง",
-      "uploadFailedTerminal": "ไม่สามารถอัปโหลดไฟล์นี้ได้"
+      "uploadFailedTerminal": "ไม่สามารถอัปโหลดไฟล์นี้ได้",
+      "moveLeft": "ย้าย {{filename}} ไปทางซ้าย",
+      "moveRight": "ย้าย {{filename}} ไปทางขวา"
     },
     "attachmentPasteHint": {
       "accessibility": "วางรูปภาพจากคลิปบอร์ด",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "กำลังสรุป...",
       "messagePlaceholder": "ข้อความ...",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
-      "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง"
+      "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
+      "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดแต่ยังไม่ได้แนบกับข้อความที่ส่งแล้วจะถูกลบ",
+      "discardAttachmentsTitle": "ทิ้งไฟล์แนบหรือไม่?",
+      "charactersRemaining": "เหลือ {{count}} อักขระ",
+      "insertNewline": "แทรกบรรทัดใหม่"
     },
     "chatLink": {
       "linkCopied": "คัดลอกลิงก์แล้ว",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "งานการเขียนโค้ดใหม่",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ตอนนี้ไม่มีอะไรทำงานอยู่"
   },
   "imageViewer": {
     "close": "ปิด {{filename}}",
@@ -2794,7 +2814,8 @@
     "busy": "การป้อนเสียงไม่ว่าง ลองอีกครั้ง",
     "stopped": "การป้อนเสียงหยุดแล้ว แตะไมโครโฟนเพื่อลองอีกครั้ง",
     "unavailableDevice": "การป้อนเสียงไม่พร้อมใช้งานบนอุปกรณ์นี้",
-    "unavailableLanguage": "การป้อนเสียงไม่พร้อมใช้งานสำหรับภาษาของอุปกรณ์นี้"
+    "unavailableLanguage": "การป้อนเสียงไม่พร้อมใช้งานสำหรับภาษาของอุปกรณ์นี้",
+    "listeningStopped": "หยุดฟังแล้ว"
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",

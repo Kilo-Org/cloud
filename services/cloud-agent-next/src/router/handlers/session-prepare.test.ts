@@ -167,6 +167,7 @@ describe('prepareSession operation-ledger admission gate', () => {
       autoInitiate: true,
       operationKey: OPERATION_KEY,
       createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
     });
 
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(1);
@@ -175,6 +176,7 @@ describe('prepareSession operation-ledger admission gate', () => {
         options: expect.objectContaining({
           operationKey: OPERATION_KEY,
           createdOnPlatform: 'cloud-agent-web',
+          clientProvenance: 'browser',
         }),
       }),
       expect.objectContaining({ userId: 'test-user-123', authToken: 'test-auth-token' }),
@@ -207,6 +209,29 @@ describe('prepareSession operation-ledger admission gate', () => {
       }),
       expect.any(Object),
       expect.any(Object)
+    );
+  });
+
+  it('preserves trusted mobile provenance on internally authenticated preparation', async () => {
+    const caller = router.createCaller(createContext());
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'mobile',
+    });
+
+    expect(createSessionWithLedgerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({ clientProvenance: 'mobile' }),
+      }),
+      expect.anything(),
+      expect.anything()
     );
   });
 

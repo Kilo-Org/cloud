@@ -152,7 +152,11 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Engadir atribución da app ás revisións de PR",
-    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión."
+    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión.",
+    "returnSendsMessage": "A tecla Intro envía a mensaxe",
+    "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
+    "biometricUnlock": "Desbloquear con biometría",
+    "biometricUnlockSubtitle": "Require desbloquear ao iniciar a app e despois de cinco minutos en segundo plano."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -197,7 +201,7 @@
       "diffTooLarge": "Diff demasiado grande para mostrar",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir o diff deste arquivo en GitHub",
-      "githubDiff": "diff de GitHub"
+      "githubDiff": "Diff de GitHub"
     },
     "floatingActions": {
       "clearSelection": "Limpar selección",
@@ -750,7 +754,8 @@
       "networkError": "Erro de rede",
       "uploadFailed": "Non se puido subir",
       "failedToUploadFile": "Non se puido subir o arquivo: {{reason}}",
-      "nothingToPaste": "Non hai nada que pegar"
+      "nothingToPaste": "Non hai nada que pegar",
+      "metadataStripFailed": "Non se puideron eliminar os metadatos da foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -833,7 +838,7 @@
       "managedByAdmin": "A facturación xestiónaa o administrador da túa organización.",
       "couldNotLoad": "Non se puido cargar a información de facturación",
       "manageOnWeb": "Xestionar a facturación na web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Madrugador",
       "finalCommitTermEndsOn": "O teu prazo final de Commit remata o {{date}}. Continúa como Standard por {{price}}, ou a hospedaxe remata.",
       "freeTrial": "Probas gratuítas",
@@ -1130,7 +1135,7 @@
       "destroying": "DESTRUÍNDO",
       "provisioned": "APROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "Executando",
+      "running": "EXECUTANDO",
       "shuttingDown": "APAGANDO",
       "starting": "INICIANDO",
       "stopped": "DETIDO",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "Agardando pola transcrición da revisión.",
       "transcriptEmpty": "Non hai transcrición para esta revisión.",
       "transcriptRetry": "Non se puido cargar a transcrición da revisión.",
-      "transcriptLive": "EN DIRECTO",
+      "transcriptLive": "En directo",
       "agentIdle": "Axente inactivo",
       "agentWorking": "Axente traballando...",
       "anErrorOccurred": "Ocorreu un erro",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "Non se puido buscar nas sesións",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Sen sesións pasadas",
-      "live": "EN DIRECTO"
+      "live": "EN DIRECTO",
+      "updating": "Actualizando"
     },
     "sessionRow": {
       "deleteTitle": "Eliminar sesión?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "A sesión saíu",
     "remoteSpawnRetryable": "Non se puido alcanzar a instancia; é posible que se desconectase.",
     "remoteSpawnNonRetryable": "A instancia non puido iniciar a sesión; comprobe a máquina ou actualice a CLI.",
-    "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicie unha sesión en Cloud Agent ou elixa outra instancia."
+    "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicie unha sesión en Cloud Agent ou elixa outra instancia.",
+    "liveCount_one": "{{count}} EN DIRECTO",
+    "liveCount_other": "{{count}} EN DIRECTO"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
       "serviceUnavailable": "O servizo non está dispoñible agora mesmo. Téntao de novo.",
       "connectionTrouble": "Problema de conexión. Téntao de novo nun momento.",
-      "modelUnavailable": "Este modelo non está dispoñible para Cloud Agent. Escolle outro modelo e téntao de novo."
+      "modelUnavailable": "Este modelo non está dispoñible para Cloud Agent. Escolle outro modelo e téntao de novo.",
+      "cancelQueuedFailed": "Non se puido cancelar a mensaxe.",
+      "cancelQueuedRestoreAvailable": "Mensaxe cancelada. Toca Restaurar para devolvela ao campo de mensaxe.",
+      "cancelQueuedRestored": "Mensaxe cancelada. A indicación volveu ao campo de mensaxe.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensaxes na cola require un Kilo CLI máis novo. Actualiza o Kilo CLI e reconéctate."
     },
     "remoteSession": {
       "failedToCreate": "Non se puido crear a sesión remota",
@@ -2213,7 +2225,8 @@
       "continueFrom": "Continuando {{title}}",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
-      "importFailed": "Non se puido importar esta sesión."
+      "importFailed": "Non se puido importar esta sesión.",
+      "discardWithUploadsMessage": "Eliminaranse a túa indicación e os arquivos subidos que non estean anexados a mensaxes enviadas."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Executa `kilo remote` nun proxecto do teu ordenador ou actualiza Kilo CLI se xa hai unha en execución.",
       "instanceOnProject": "{{name}} en {{project}}",
       "instanceOnProjectSuffix": "{{name}} en {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Executar en Cloud Agent"
+      "runOnCloudAgent": "Executar en Cloud Agent",
+      "terminals": "Terminais",
+      "remotes": "Instancias remotas"
     },
     "modePicker": {
       "title": "Seleccionar modo",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Mensaxe en cola",
       "userMessage": "Mensaxe de usuario",
       "assistantMessage": "Mensaxe de asistente",
-      "longPressHint": "Mantén premido para ver os detalles da mensaxe"
+      "longPressHint": "Mantén premido para ver os detalles da mensaxe",
+      "cancelQueued": "Cancelar mensaxe",
+      "cancelQueuedAccessibility": "Cancelar a mensaxe na cola",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar a mensaxe cancelada no campo de mensaxe"
     },
     "olderMessages": {
       "arrived": "Cargáronse as mensaxes anteriores",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sesións",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Actualizado por última vez",
-      "sortCreated": "Creado",
       "platform": "Plataforma",
       "platformCloud": "Cloud",
       "platformExtension": "Extensión",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Outro",
-      "project": "Proxecto",
-      "removeProjectFilter": "Eliminar o filtro de proxecto {{label}}",
-      "removePlatformFilter": "Eliminar o filtro de plataforma {{label}}"
+      "project": "Proxecto"
     },
     "suggestion": {
       "title": "Suxestión",
@@ -2545,7 +2559,9 @@
       "uploading": "Enviando…",
       "uploaded": "Enviado",
       "uploadFailedRetry": "Fallou o envío. Toca para reintentar.",
-      "uploadFailedTerminal": "Este arquivo non se pode subir."
+      "uploadFailedTerminal": "Este arquivo non se pode subir.",
+      "moveLeft": "Mover {{filename}} á esquerda",
+      "moveRight": "Mover {{filename}} á dereita"
     },
     "attachmentPasteHint": {
       "accessibility": "Pegar imaxe do portapapeis",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Rematando...",
       "messagePlaceholder": "Mensaxe...",
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
-      "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca enviar para reintentar."
+      "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca enviar para reintentar.",
+      "discardAttachmentsMessage": "Eliminaranse os arquivos subidos que non estean anexados a mensaxes enviadas.",
+      "discardAttachmentsTitle": "Descartar os anexos?",
+      "charactersRemaining": "Quedan {{count}} caracteres",
+      "insertNewline": "Inserir un salto de liña"
     },
     "chatLink": {
       "linkCopied": "Ligazón copiada",
@@ -2648,10 +2668,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Pull request aberta",
+      "open": "pull request aberta",
       "closed": "solicitude de pull pechada",
       "merged": "solicitude de pull fusionada",
-      "draft": "Pull request en borrador",
+      "draft": "pull request en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Nova tarefa de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Non hai nada en execución agora mesmo"
   },
   "imageViewer": {
     "close": "Pechar {{filename}}",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Volve e reabre este selector desde a pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "precisa entrada"
+    "needsInput": "PRECISA ENTRADA"
   },
   "voiceInput": {
     "listening": "Escoitando...",
@@ -2794,7 +2814,8 @@
     "busy": "A entrada de voz está ocupada. Proba de novo.",
     "stopped": "A entrada de voz detívose. Toca o micrófono para volver tentalo.",
     "unavailableDevice": "A entrada de voz non está dispoñible neste dispositivo.",
-    "unavailableLanguage": "A entrada de voz non está dispoñible para o idioma deste dispositivo."
+    "unavailableLanguage": "A entrada de voz non está dispoñible para o idioma deste dispositivo.",
+    "listeningStopped": "Detívose a escoita."
   },
   "share": {
     "title": "Compartir en Kilo",

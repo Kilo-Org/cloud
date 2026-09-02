@@ -1,4 +1,5 @@
-import { test, describe, expect, jest } from '@jest/globals';
+import { test, describe, expect, beforeEach, afterEach } from '@jest/globals';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
   extractPromptInfo,
@@ -39,6 +40,12 @@ import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 
 // Note: Legacy banned_ja4/whitelist_ja4 tests removed - abuse classification
 // is now handled by the external abuse detection service (src/lib/abuse-service.ts)
@@ -291,6 +298,118 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.hasError).toBe(true);
     expect(result.status_code).toBe(502);
+  });
+
+  describe('upstream error reporting', () => {
+    const overloadMessage = 'Upstream error from Nvidia: Service temporarily overloaded';
+
+    beforeEach(() => {
+      jest.mocked(captureException).mockClear();
+      jest.mocked(captureMessage).mockClear();
+      jest.spyOn(console, 'info').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    const parseChunks = (chunks: object[]) =>
+      parseMicrodollarUsageFromStream(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const chunk of chunks) {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\n\n`));
+            }
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        }),
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200
+      );
+
+    test.each([502, '502', undefined])(
+      'logs Nvidia overload without reporting to Sentry when code is %s',
+      async code => {
+        const result = await parseChunks([
+          {
+            id: 'gen-nvidia-overload',
+            model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+            provider: 'Nvidia',
+            choices: [],
+            error: { code, message: overloadMessage },
+          },
+        ]);
+
+        expect(console.info).toHaveBeenCalledWith(`OpenRouter error: ${overloadMessage}`, {
+          source: 'sse_processing',
+          provider: 'openrouter',
+          code,
+          messageId: 'gen-nvidia-overload',
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        });
+        expect(captureException).not.toHaveBeenCalled();
+        expect(captureMessage).not.toHaveBeenCalled();
+        expect(result).toMatchObject({
+          hasError: true,
+          status_code: typeof code === 'number' ? code : 200,
+          messageId: 'gen-nvidia-overload',
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          inference_provider: 'Nvidia',
+        });
+      }
+    );
+
+    test.each([
+      'Upstream error from Nvidia: Internal server error',
+      'Upstream error from Nvidia: ResourceExhausted: Worker local total request limit reached (16/16)',
+      'Upstream error from Tencent: Service temporarily overloaded',
+      'Upstream idle timeout exceeded',
+    ])('still reports %s to Sentry', async message => {
+      const chunk = { error: { code: 502, message } };
+      const result = await parseChunks([chunk]);
+
+      expect(console.info).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(new Error(`OpenRouter error: ${message}`), {
+        tags: { source: 'sse_processing' },
+        extra: { json: chunk, event: expect.objectContaining({ data: JSON.stringify(chunk) }) },
+      });
+      expect(result).toMatchObject({ hasError: true, status_code: 502 });
+    });
+
+    test('preserves partial content and usage and reports later errors after Nvidia overload', async () => {
+      const result = await parseChunks([
+        { id: 'gen-partial', model: 'test-model', choices: [{ delta: { content: 'Hello' } }] },
+        { error: { code: 502, message: overloadMessage } },
+        {
+          choices: [{ delta: { content: ' world' } }],
+          usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001, is_byok: false },
+        },
+        { error: { code: 504, message: 'Upstream idle timeout exceeded' } },
+      ]);
+
+      expect(console.info).toHaveBeenCalledWith(
+        `OpenRouter error: ${overloadMessage}`,
+        expect.objectContaining({ messageId: 'gen-partial', model: 'test-model' })
+      );
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('OpenRouter error: Upstream idle timeout exceeded'),
+        expect.any(Object)
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        hasError: true,
+        status_code: 504,
+        responseContent: 'Hello world',
+        inputTokens: 10,
+        outputTokens: 2,
+        cost_mUsd: 1000,
+      });
+    });
   });
 
   test('records the Vercel upstream provider request id as upstream_id', async () => {

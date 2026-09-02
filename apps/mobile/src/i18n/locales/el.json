@@ -152,7 +152,11 @@
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
     "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στις ανασκοπήσεις PR",
-    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση."
+    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση.",
+    "returnSendsMessage": "Το πλήκτρο επιστροφής στέλνει το μήνυμα",
+    "returnSendsMessageSubtitle": "Όταν είναι απενεργοποιημένο, το πλήκτρο επιστροφής εισάγει νέα γραμμή στα πεδία εισαγωγής μηνύματος των πρακτόρων.",
+    "biometricUnlock": "Ξεκλείδωμα με βιομετρικά στοιχεία",
+    "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -750,7 +754,8 @@
       "networkError": "Σφάλμα δικτύου",
       "uploadFailed": "Η μεταφόρτωση απέτυχε",
       "failedToUploadFile": "Δεν ήταν δυνατή η μεταφόρτωση του αρχείου: {{reason}}",
-      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση"
+      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση",
+      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1130,12 +1135,12 @@
       "destroying": "ΚΑΤΑΣΤΡΟΦΗ",
       "provisioned": "ΠΑΡΕΧΕΤΑΙ",
       "restarting": "ΕΠΑΝΕΚΚΙΝΗΣΗ",
-      "running": "Σε εξέλιξη",
+      "running": "ΣΕ ΕΞΕΛΙΞΗ",
       "shuttingDown": "ΤΕΡΜΑΤΙΣΜΟΣ",
-      "starting": "Έναρξη",
+      "starting": "ΕΝΑΡΞΗ",
       "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
       "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "Άγνωστο",
+      "unknown": "ΑΓΝΩΣΤΟ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1289,7 +1294,7 @@
       "started": "Ξεκίνησε",
       "completed": "Ολοκληρώθηκε",
       "cost": "Κόστος",
-      "tokens": "διακριτικά",
+      "tokens": "Διακριτικά",
       "tokensInOut": "{{input}} εισερχόμενα / {{output}} εξερχόμενα",
       "openPullRequest": "Άνοιγμα αιτήματος έλξης",
       "council": "Συμβούλιο",
@@ -1302,7 +1307,7 @@
       "threshold": "Κατώφλι",
       "pullRequest": "αίτημα έλξης",
       "transcriptEmpty": "Δεν υπάρχει απομαγνητοφώνηση για αυτή την αναθεώρηση.",
-      "transcriptLive": "ΖΩΝΤΑΝΑ",
+      "transcriptLive": "Ζωντανά",
       "transcriptRetry": "Δεν ήταν δυνατή η φόρτωση της απομαγνητοφώνησης της αναθεώρησης.",
       "transcriptWaiting": "Αναμονή για την απομαγνητοφώνηση της αναθεώρησης.",
       "agentIdle": "Πράκτορας σε αναμονή",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "Δεν ήταν δυνατή η αναζήτηση συνεδριών",
       "completedWillAppear": "Οι ολοκληρωμένες συνεδρίες θα εμφανιστούν εδώ.",
       "noPastSessions": "Καμία προηγούμενη συνεδρία",
-      "live": "ΖΩΝΤΑΝΑ"
+      "live": "ΖΩΝΤΑΝΑ",
+      "updating": "Ενημέρωση"
     },
     "sessionRow": {
       "deleteTitle": "Διαγραφή συνεδρίας;",
@@ -2111,7 +2117,9 @@
     "sessionExited": "Η συνεδρία τερματίστηκε",
     "remoteSpawnRetryable": "Δεν ήταν δυνατή η πρόσβαση στην παρουσία — μπορεί να αποσυνδέθηκε.",
     "remoteSpawnNonRetryable": "Η παρουσία απέτυχε να ξεκινήσει τη συνεδρία — ελέγξτε τη μηχανή ή ενημερώστε το CLI.",
-    "remoteSpawnInstanceDisconnected": "Η επιλεγμένη παρουσία αποσυνδέθηκε. Ξεκινήστε μια συνεδρία στο Cloud Agent ή επιλέξτε άλλη παρουσία."
+    "remoteSpawnInstanceDisconnected": "Η επιλεγμένη παρουσία αποσυνδέθηκε. Ξεκινήστε μια συνεδρία στο Cloud Agent ή επιλέξτε άλλη παρουσία.",
+    "liveCount_one": "{{count}} ΖΩΝΤΑΝΑ",
+    "liveCount_other": "{{count}} ΖΩΝΤΑΝΑ"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "Η προηγούμενη εργασία ολοκληρώνεται ακόμα. Περιμένετε μια στιγμή.",
       "serviceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκιμάστε ξανά.",
       "connectionTrouble": "Πρόβλημα σύνδεσης. Δοκιμάστε ξανά σε λίγο.",
-      "modelUnavailable": "Αυτό το μοντέλο δεν είναι διαθέσιμο για το Cloud Agent. Επιλέξτε άλλο μοντέλο και δοκιμάστε ξανά."
+      "modelUnavailable": "Αυτό το μοντέλο δεν είναι διαθέσιμο για το Cloud Agent. Επιλέξτε άλλο μοντέλο και δοκιμάστε ξανά.",
+      "cancelQueuedFailed": "Δεν ήταν δυνατή η ακύρωση του μηνύματος.",
+      "cancelQueuedRestoreAvailable": "Το μήνυμα ακυρώθηκε. Πατήστε Επαναφορά για να το επαναφέρετε στο πεδίο εισαγωγής μηνύματος.",
+      "cancelQueuedRestored": "Το μήνυμα ακυρώθηκε. Το μήνυμα βρίσκεται ξανά στο πεδίο εισαγωγής μηνύματος.",
+      "cancelQueuedUpgradeRequired": "Η ακύρωση μηνυμάτων σε αναμονή απαιτεί νεότερη έκδοση του Kilo CLI. Ενημερώστε το Kilo CLI και συνδεθείτε ξανά."
     },
     "remoteSession": {
       "failedToCreate": "Αποτυχία δημιουργίας απομακρυσμένης συνεδρίας",
@@ -2213,7 +2225,8 @@
       "continueFrom": "Συνέχιση του {{title}}",
       "importingSession": "Εισαγωγή συνεδρίας",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επιλέξτε Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
+      "discardWithUploadsMessage": "Το μήνυμά σας και τυχόν μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Εκτελέστε το `kilo remote` σε ένα έργο στον υπολογιστή σας ή ενημερώστε το Kilo CLI εάν εκτελείται ήδη.",
       "instanceOnProject": "{{name}} στο {{project}}",
       "instanceOnProjectSuffix": "{{name}} στο {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent"
+      "runOnCloudAgent": "Εκτέλεση σε Cloud Agent",
+      "terminals": "Τερματικά",
+      "remotes": "Απομακρυσμένες περιπτώσεις"
     },
     "modePicker": {
       "title": "Επιλογή λειτουργίας",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Το μήνυμα είναι σε αναμονή",
       "userMessage": "Μήνυμα χρήστη",
       "assistantMessage": "Μήνυμα βοηθού",
-      "longPressHint": "Παρατεταμένο πάτημα για λεπτομέρειες μηνύματος"
+      "longPressHint": "Παρατεταμένο πάτημα για λεπτομέρειες μηνύματος",
+      "cancelQueued": "Ακύρωση μηνύματος",
+      "cancelQueuedAccessibility": "Ακύρωση μηνύματος σε αναμονή",
+      "restoreQueued": "Επαναφορά",
+      "restoreQueuedAccessibility": "Επαναφορά ακυρωμένου μηνύματος στο πεδίο εισαγωγής μηνύματος"
     },
     "olderMessages": {
       "arrived": "Φορτώθηκαν προηγούμενα μηνύματα",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Φιλτράρισμα συνεδριών",
-      "sortBy": "Ταξινόμηση κατά",
-      "sortLastUpdated": "Τελευταία ενημέρωση",
-      "sortCreated": "Δημιουργήθηκε",
       "platform": "Πλατφόρμα",
       "platformCloud": "Cloud",
       "platformExtension": "Επέκταση",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Άλλο",
-      "project": "Έργο",
-      "removeProjectFilter": "Αφαίρεση φίλτρου έργου {{label}}",
-      "removePlatformFilter": "Αφαίρεση φίλτρου πλατφόρμας {{label}}"
+      "project": "Έργο"
     },
     "suggestion": {
       "title": "Πρόταση",
@@ -2545,7 +2559,9 @@
       "uploading": "Μεταφόρτωση…",
       "uploaded": "Μεταφορτώθηκε",
       "uploadFailedRetry": "Η μεταφόρτωση απέτυχε. Πατήστε για επανάληψη.",
-      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί."
+      "uploadFailedTerminal": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί.",
+      "moveLeft": "Μετακίνηση του {{filename}} αριστερά",
+      "moveRight": "Μετακίνηση του {{filename}} δεξιά"
     },
     "attachmentPasteHint": {
       "accessibility": "Επικόλληση εικόνας από το πρόχειρο",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Ολοκλήρωση...",
       "messagePlaceholder": "Μήνυμα...",
       "cannotReceiveFiles": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία. Αφαιρέστε τα συνημμένα για να στείλετε το μήνυμά σας.",
-      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά."
+      "couldNotAttachFiles": "Δεν ήταν δυνατή η προσάρτηση αρχείων. Πατήστε αποστολή για να δοκιμάσετε ξανά.",
+      "discardAttachmentsMessage": "Τα μεταφορτωμένα αρχεία που δεν έχουν προσαρτηθεί σε απεσταλμένα μηνύματα θα διαγραφούν.",
+      "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
+      "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
+      "insertNewline": "Εισαγωγή νέας γραμμής"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",
@@ -2651,7 +2671,7 @@
       "open": "ανοιχτό αίτημα έλξης",
       "closed": "κλειστό αίτημα έλξης",
       "merged": "συγχωνευμένο αίτημα έλξης",
-      "draft": "Πρόχειρο pull request",
+      "draft": "πρόχειρο pull request",
       "updating": "Ενημέρωση, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "αίτημα έλξης"
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Δεν εκτελείται τίποτα αυτή τη στιγμή"
   },
   "imageViewer": {
     "close": "Κλείσιμο {{filename}}",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Επιστρέψτε και ανοίξτε ξανά αυτόν τον επιλογέα από την προηγούμενη οθόνη."
   },
   "sessionRow": {
-    "needsInput": "χρειάζεται είσοδο"
+    "needsInput": "ΧΡΕΙΑΖΕΤΑΙ ΕΙΣΟΔΟ"
   },
   "voiceInput": {
     "listening": "Ακρόαση...",
@@ -2794,7 +2814,8 @@
     "busy": "Η φωνητική είσοδος είναι απασχολημένη. Δοκιμάστε ξανά.",
     "stopped": "Η φωνητική είσοδος σταμάτησε. Πατήστε το μικρόφωνο για να δοκιμάσετε ξανά.",
     "unavailableDevice": "Η φωνητική είσοδος δεν είναι διαθέσιμη σε αυτή τη συσκευή.",
-    "unavailableLanguage": "Η φωνητική είσοδος δεν είναι διαθέσιμη για τη γλώσσα αυτής της συσκευής."
+    "unavailableLanguage": "Η φωνητική είσοδος δεν είναι διαθέσιμη για τη γλώσσα αυτής της συσκευής.",
+    "listeningStopped": "Η ακρόαση σταμάτησε."
   },
   "share": {
     "title": "Κοινή χρήση στο Kilo",

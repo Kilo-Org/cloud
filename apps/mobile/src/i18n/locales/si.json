@@ -152,7 +152,11 @@
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
     "prReviewAttribution": "PR සමාලෝචන සඳහා යෙදුම් ආරෝපණය එක් කරන්න",
-    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න"
+    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න",
+    "returnSendsMessage": "ආපසු යතුර පණිවිඩය යවයි",
+    "returnSendsMessageSubtitle": "ක්‍රියා විරහිත විට, ආපසු යතුර නියෝජිත පණිවිඩ ආදාන කොටුවල නව පේළියක් ඇතුළත් කරයි.",
+    "biometricUnlock": "ජෛවමිතික දත්ත භාවිතයෙන් අගුළු හරින්න",
+    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -750,7 +754,8 @@
       "networkError": "ජාල දෝෂය",
       "uploadFailed": "උඩුගත කිරීම අසාර්ථකයි",
       "failedToUploadFile": "ගොනුව උඩුගත කිරීමට අසමත් විය: {{reason}}",
-      "nothingToPaste": "ඇලවීමට කිසිවක් නැත"
+      "nothingToPaste": "ඇලවීමට කිසිවක් නැත",
+      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "සැසි සෙවීමට නොහැකි විය",
       "completedWillAppear": "සම්පූර්ණ කළ සැසි මෙහි දිස්වනු ඇත.",
       "noPastSessions": "පසුගිය සැසි නැත",
-      "live": "සජීවී"
+      "live": "සජීවී",
+      "updating": "යාවත්කාලීන වෙමින්"
     },
     "sessionRow": {
       "deleteTitle": "සැසිය මකන්නද?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "සැසියෙන් ඉවත් විය",
     "remoteSpawnRetryable": "අවස්ථාවට ළඟා විය නොහැකි විය — එය විසන්ධි වන්නට පුළුවන.",
     "remoteSpawnNonRetryable": "සැසිය ආරම්භ කිරීමට අවස්ථාව අසමත් විය — යන්ත්රය පරීක්ෂා කරන්න හෝ CLI යාවත්කාලීන කරන්න.",
-    "remoteSpawnInstanceDisconnected": "තෝරාගත් අවස්ථාව විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් අවස්ථාවක් තෝරන්න."
+    "remoteSpawnInstanceDisconnected": "තෝරාගත් අවස්ථාව විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් අවස්ථාවක් තෝරන්න.",
+    "liveCount_one": "{{count}} සජීවී",
+    "liveCount_other": "{{count}} සජීවී"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
       "serviceUnavailable": "සේවාව දැනට ලබා ගත නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
       "connectionTrouble": "සම්බන්ධතා ගැටලුවකි. කරුණාකර මොහොතකට පසු නැවත උත්සාහ කරන්න.",
-      "modelUnavailable": "මෙම මාදිලිය Cloud Agent සඳහා ලබා ගත නොහැක. වෙනත් මාදිලියක් තෝරා නැවත උත්සාහ කරන්න."
+      "modelUnavailable": "මෙම මාදිලිය Cloud Agent සඳහා ලබා ගත නොහැක. වෙනත් මාදිලියක් තෝරා නැවත උත්සාහ කරන්න.",
+      "cancelQueuedFailed": "පණිවිඩය අවලංගු කළ නොහැකි විය.",
+      "cancelQueuedRestoreAvailable": "පණිවිඩය අවලංගු විය. එය පණිවිඩ ආදාන කොටුවට ආපසු ගෙන ඒමට ප්‍රතිස්ථාපනය කරන්න තට්ටු කරන්න.",
+      "cancelQueuedRestored": "පණිවිඩය අවලංගු විය. ඉල්ලීම නැවත පණිවිඩ ආදාන කොටුවේ ඇත.",
+      "cancelQueuedUpgradeRequired": "පෝලිමේ ඇති පණිවිඩ අවලංගු කිරීමට වඩා නව Kilo CLI අනුවාදයක් අවශ්‍ය වේ. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ කරන්න."
     },
     "remoteSession": {
       "failedToCreate": "දුරස්ථ සැසියක් සෑදීමට අසාර්ථක විය",
@@ -2213,7 +2225,8 @@
       "cliCannotContinue": "මෙම CLI සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
       "continueFrom": "{{title}} දිගටම කරගෙන යමින්",
       "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
-      "importingSession": "සැසිය ආයාත කරමින්"
+      "importingSession": "සැසිය ආයාත කරමින්",
+      "discardWithUploadsMessage": "ඔබේ ඉල්ලීම සහ යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "ඔබේ පරිගණකයේ ව්යාපෘතියක `kilo remote` ධාවනය කරන්න, නැතහොත් එකක් දැනටමත් ධාවනය වන්නේ නම් Kilo CLI යාවත්කාලීන කරන්න.",
       "instanceOnProject": "{{project}} මත {{name}}",
       "instanceOnProjectSuffix": "{{project}} මත {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent මත ධාවනය කරන්න"
+      "runOnCloudAgent": "Cloud Agent මත ධාවනය කරන්න",
+      "terminals": "පර්යන්ත",
+      "remotes": "දුරස්ථ අවස්ථා"
     },
     "modePicker": {
       "title": "ප්රකාරය තෝරන්න",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "පණිවිඩය පෝලිමේ ඇත",
       "userMessage": "පරිශීලක පණිවිඩය",
       "assistantMessage": "සහායක පණිවිඩය",
-      "longPressHint": "පණිවිඩ විස්තර සඳහා දිගු ඔබන්න"
+      "longPressHint": "පණිවිඩ විස්තර සඳහා දිගු ඔබන්න",
+      "cancelQueued": "පණිවිඩය අවලංගු කරන්න",
+      "cancelQueuedAccessibility": "පෝලිමේ ඇති පණිවිඩය අවලංගු කරන්න",
+      "restoreQueued": "ප්‍රතිස්ථාපනය කරන්න",
+      "restoreQueuedAccessibility": "අවලංගු කළ පණිවිඩය පණිවිඩ ආදාන කොටුවට ප්‍රතිස්ථාපනය කරන්න"
     },
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "සැසි පෙරහන් කරන්න",
-      "sortBy": "අනුව වර්ග කරන්න",
-      "sortLastUpdated": "අවසන් යාවත්කාලීනය",
-      "sortCreated": "සාදන ලදී",
       "platform": "වේදිකාව",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "වෙනත්",
-      "project": "ව්‍යාපෘතිය",
-      "removeProjectFilter": "{{label}} ව්‍යාපෘති පෙරහන ඉවත් කරන්න",
-      "removePlatformFilter": "{{label}} වේදිකා පෙරහන ඉවත් කරන්න"
+      "project": "ව්‍යාපෘතිය"
     },
     "suggestion": {
       "title": "යෝජනාව",
@@ -2545,7 +2559,9 @@
       "uploading": "උඩුගත වෙමින්…",
       "uploaded": "උඩුගත කරන ලදී",
       "uploadFailedRetry": "උඩුගත කිරීම අසාර්ථකයි. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
-      "uploadFailedTerminal": "මෙම ගොනුව උඩුගත කළ නොහැක."
+      "uploadFailedTerminal": "මෙම ගොනුව උඩුගත කළ නොහැක.",
+      "moveLeft": "{{filename}} වමට ගෙන යන්න",
+      "moveRight": "{{filename}} දකුණට ගෙන යන්න"
     },
     "attachmentPasteHint": {
       "accessibility": "පසුරු පුවරුවෙන් රූපය අලවන්න",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "අවසන් කරමින්...",
       "messagePlaceholder": "පණිවිඩය...",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලබා ගත නොහැක. ඔබගේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
-      "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීම තට්ටු කරන්න."
+      "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීම තට්ටු කරන්න.",
+      "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
+      "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?",
+      "charactersRemaining": "අක්ෂර {{count}} ක් ඉතිරිව ඇත",
+      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න"
     },
     "chatLink": {
       "linkCopied": "සබැඳිය පිටපත් කරන ලදී",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "මේ මොහොතේ කිසිවක් ක්‍රියාත්මක නොවේ"
   },
   "imageViewer": {
     "close": "{{filename}} වසන්න",
@@ -2794,7 +2814,8 @@
     "busy": "හඬ ආදානය කාර්යබහුලයි. නැවත උත්සාහ කරන්න.",
     "stopped": "හඬ ආදානය නතර විය. නැවත උත්සාහ කිරීමට මයික්‍රෆෝනය තට්ටු කරන්න.",
     "unavailableDevice": "මෙම උපාංගයේ හඬ ආදානය ලබා ගත නොහැක.",
-    "unavailableLanguage": "මෙම උපාංග භාෂාව සඳහා හඬ ආදානය ලබා ගත නොහැක."
+    "unavailableLanguage": "මෙම උපාංග භාෂාව සඳහා හඬ ආදානය ලබා ගත නොහැක.",
+    "listeningStopped": "සවන් දීම නතර විය."
   },
   "share": {
     "title": "Kilo වෙත බෙදාගන්න",

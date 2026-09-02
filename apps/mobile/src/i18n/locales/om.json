@@ -152,7 +152,11 @@
     "appearanceDark": "Dukkana",
     "account": "Herrega",
     "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
-    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu."
+    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu.",
+    "returnSendsMessage": "Furtuun deebi'uu ergaa ergiti",
+    "returnSendsMessageSubtitle": "Yeroo cufamu, furtuun deebi'uu iddoo ergaa ejentii galchuu keessatti sarara haaraa galchiti.",
+    "biometricUnlock": "Baayoometirikisiin qulfii bani",
+    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii banuun barbaachisa."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -750,7 +754,8 @@
       "networkError": "Dogoggorri network",
       "uploadFailed": "Ol fe'uun hin milkoofne",
       "failedToUploadFile": "Faayilii ol fe'uu dadhabe: {{reason}}",
-      "nothingToPaste": "Maxxansuuf wanti hin jiru"
+      "nothingToPaste": "Maxxansuuf wanti hin jiru",
+      "metadataStripFailed": "Odeeffannoon suuraa baafamuu hin danda'ame."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -781,7 +786,7 @@
       "retrySend": "Ergachuu deebi'i",
       "moreReactions": "Falxiiwwan dabalataa",
       "reply": "Deebisii",
-      "edit": "gulaali",
+      "edit": "Gulaali",
       "sendFailed": "Ergicha erguun hin milkaa'ine",
       "retrySendFailed": "Deebi'ee erguun hin milkaa'ine",
       "editFailed": "Ergicha jijjiruu hin dandeenye",
@@ -1122,7 +1127,7 @@
       "memory": "Qabiyyee",
       "model": "Modeelii",
       "region": "Naannoo",
-      "resources": "Qabeenya",
+      "resources": "QABEENYA",
       "restarts": "Irra deebi'ii jalqaba",
       "state": "Haala",
       "uptime": "Yeroo hojii",
@@ -1130,12 +1135,12 @@
       "destroying": "BARBADEESSAA",
       "provisioned": "MADAALAMEE",
       "restarting": "IRRA DEEBI'AA",
-      "running": "Hojii irra jira",
+      "running": "HOJII IRRA JIRA",
       "shuttingDown": "DUUFAA",
-      "starting": "Jalqabaa jira",
+      "starting": "JALQABAA JIRA",
       "stopped": "DHAABAME",
       "stopping": "DHAABAA",
-      "unknown": "Hin beekamu",
+      "unknown": "HIN BEEKAMU",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "Galmee xalayyii sakatta'aa eeggachaa jira.",
       "transcriptEmpty": "Sakatta'a kanaaf galmee xalayyii hin jiru.",
       "transcriptRetry": "Galmee xalayyii sakatta'aa fudhachuu hin danda'ine.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Eejentii hojii irraa boqachaa",
       "agentWorking": "Eejentii hojachaa jira...",
       "anErrorOccurred": "Dogoggorri uumame",
@@ -1696,7 +1701,7 @@
       "statusFixed": "Qulqullaa'e",
       "statusOpen": "Banaa",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Furmaanni duraan jalqabeera",
+      "reasonFixStarted": "furmaanni duraan jalqabeera",
       "reasonNoBandwidth": "dandeettiin hin jiru",
       "reasonTolerableRisk": "balaan obsa danda'ama",
       "reasonInaccurate": "raawwiin dogoggoraadha",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "Xalayyii barbaaduu hin dandeenye",
       "completedWillAppear": "Xalayyiin xumuraman as ni mul'atu.",
       "noPastSessions": "Xalayyiin darbe hin jiru",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Fooyyachaa jira"
     },
     "sessionRow": {
       "deleteTitle": "Xalayyii haqaa?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "Xalayyiin bahe",
     "remoteSpawnRetryable": "Instance bira ga'uu hin dandeenye — addaan citee ta'a.",
     "remoteSpawnNonRetryable": "Instance sessi jalqabuun hin milkaa'in — meeshaa sakatta'i ykn CLI haaromsi.",
-    "remoteSpawnInstanceDisconnected": "Instance filatame addaan citeera. Sessa Cloud Agent irratti jalqabi ykn instance biraa filadhu."
+    "remoteSpawnInstanceDisconnected": "Instance filatame addaan citeera. Sessa Cloud Agent irratti jalqabi ykn instance biraa filadhu.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "Hojii duraan ture amma iyyuu xumurameera. Mee yeroo xinnoo eegi.",
       "serviceUnavailable": "Tajaajilli amma hin jiraatu. Mee deebi'ii yaali.",
       "connectionTrouble": "Hidhannaan rakkoo qaba. Mee yeroo xinnoo booda deebi'ii yaali.",
-      "modelUnavailable": "Moodelii kun Cloud Agentf hin jiraatu. Mee moodelii biraa filadhuu deebi'ii yaali."
+      "modelUnavailable": "Moodelii kun Cloud Agentf hin jiraatu. Mee moodelii biraa filadhuu deebi'ii yaali.",
+      "cancelQueuedFailed": "Ergaa dhaabuu hin danda'ame.",
+      "cancelQueuedRestoreAvailable": "Ergaan dhaabbateera. Gara iddoo ergaa galchuutti deebisuuf Deebisaa tuqaa.",
+      "cancelQueuedRestored": "Ergaan dhaabbateera. Gaaffiin gara iddoo ergaa galchuutti deebi'eera.",
+      "cancelQueuedUpgradeRequired": "Ergaawwan tarree keessa jiran dhaabuun Kilo CLI haaraa barbaada. Kilo CLI haaromsaa, deebi'aatii walqabaa."
     },
     "remoteSession": {
       "failedToCreate": "Xalayyii fagoo uumuu hin danda'ame",
@@ -2213,7 +2225,8 @@
       "cliCannotContinue": "CLI kuni shumarra itti fufuu hin danda'u. Cloud Agent ykn CLI biraa filadhu.",
       "continueFrom": "{{title}} itti fufaa jira",
       "importFailed": "Shumarra kana galchuu hin danda'ine.",
-      "importingSession": "Shumarra galchaa jira"
+      "importingSession": "Shumarra galchaa jira",
+      "discardWithUploadsMessage": "Gaaffiin keessanii fi faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Kompiutara kee irratti project tokko keessatti `kilo remote` hojjedhu, ykn yoo tokko hojjechaa jiraate Kilo CLI haaromsi.",
       "instanceOnProject": "{{name}} kan {{project}} irratti",
       "instanceOnProjectSuffix": "{{name}} kan {{project}} irratti ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent irratti hojjedhu"
+      "runOnCloudAgent": "Cloud Agent irratti hojjedhu",
+      "terminals": "Terminaloota",
+      "remotes": "Fagootti hojjetan"
     },
     "modePicker": {
       "title": "Haala filadhu",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Ergaan terraa keessa jira",
       "userMessage": "Ergaa fayyadamaa",
       "assistantMessage": "Ergaa gargaaraa",
-      "longPressHint": "Odeeffannoo ergaaf yeroo dheeraa cuqaasa"
+      "longPressHint": "Odeeffannoo ergaaf yeroo dheeraa cuqaasa",
+      "cancelQueued": "Ergaa dhaabaa",
+      "cancelQueuedAccessibility": "Ergaa tarree keessa jiru dhaabaa",
+      "restoreQueued": "Deebisaa",
+      "restoreQueuedAccessibility": "Ergaa dhaabbate gara iddoo ergaa galchuutti deebisaa"
     },
     "olderMessages": {
       "arrived": "Ergaawwan duraanii baay'amanii jiru",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Shumarra waraabi",
-      "sortBy": "Kan ittiin gargar baasan",
-      "sortLastUpdated": "Yeroo dhumaa bifa godhame",
-      "sortCreated": "Uumame",
       "platform": "Pilaatfoormii",
       "platformCloud": "Duumessa",
       "platformExtension": "Extension",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kan biroo",
-      "project": "Pirojekti",
-      "removeProjectFilter": "Waraabtoo pirojektii {{label}} baasi",
-      "removePlatformFilter": "Waraabtoo falaasamaa {{label}} baasi"
+      "project": "Pirojekti"
     },
     "suggestion": {
       "title": "Yaada",
@@ -2545,7 +2559,9 @@
       "uploading": "Ol fe'aa jira…",
       "uploaded": "Ol fe'ameera",
       "uploadFailedRetry": "Ol fe'uun hin milkoofne. Deebi'i yaaluuf cuqaasa.",
-      "uploadFailedTerminal": "Faayiliin kun ol fe'uun hin danda'amu."
+      "uploadFailedTerminal": "Faayiliin kun ol fe'uun hin danda'amu.",
+      "moveLeft": "{{filename}} gara bitaatti siqsaa",
+      "moveRight": "{{filename}} gara mirgaatti siqsaa"
     },
     "attachmentPasteHint": {
       "accessibility": "Suuraa kilaapbootaa irraa maxxan",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Xumuraa jira...",
       "messagePlaceholder": "Ergaa...",
       "cannotReceiveFiles": "Shumarri kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota baasi.",
-      "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'ine. Erguuf ergi cuqaasa."
+      "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'ine. Erguuf ergi cuqaasa.",
+      "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaawwan ergamanitti hin qabachiifamne ni haqamu.",
+      "discardAttachmentsTitle": "Faayiloota qabachiifaman haqnaa?",
+      "charactersRemaining": "Qubeelaa {{count}} hafe",
+      "insertNewline": "Sarara haaraa galchaa"
     },
     "chatLink": {
       "linkCopied": "Geessituun maxxanameera",
@@ -2640,7 +2660,7 @@
       "olderActivity": "Sochii duraanii",
       "olderActivityDescription": "Gatii seenaa fe'amee irratti kaa'amaa hin turre",
       "ofWindowTokens": "tokkanoota {{window}} keessaa",
-      "tokens": "Tokenwwan",
+      "tokens": "tokenwwan",
       "tokensWithPercentage": "tokkanoota ({{percentage}})",
       "stepsCount_one": "tarkaanfii {{steps}}",
       "stepsCount": "tarkaanfiiwwan {{steps}}",
@@ -2648,7 +2668,7 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Pull request bani",
+      "open": "pull request bani",
       "closed": "pull request cufame",
       "merged": "pull request makame",
       "draft": "pull request daaftaraa",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Hojii code haaraa",
     "explore": "Qoradhu",
     "seeAll": "Hunda ilaali",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Amma wanti hojjechaa jiru hin jiru"
   },
   "imageViewer": {
     "close": "{{filename}} cufi",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Deebi'ii filattoo kana fuulla duraanii irraa deebi'ii bani."
   },
   "sessionRow": {
-    "needsInput": "seensa barbaada"
+    "needsInput": "SEENSA BARBAADA"
   },
   "voiceInput": {
     "listening": "Dhaggeeffachaa jira...",
@@ -2794,7 +2814,8 @@
     "busy": "Galchuun sagalee qabanaa jira. Irra deebi'ii yaali.",
     "stopped": "Galchuun sagalee dhaabbateera. Irra deebi'uuf maayikirofoonii tuqi.",
     "unavailableDevice": "Galchuun sagalee meeshaa kana irratti hin jiru.",
-    "unavailableLanguage": "Galchuun sagalee afaan meeshaa kanaaf hin jiru."
+    "unavailableLanguage": "Galchuun sagalee afaan meeshaa kanaaf hin jiru.",
+    "listeningStopped": "Dhaggeeffachuun dhaabbateera."
   },
   "share": {
     "title": "Kilo wajjin qoodi",

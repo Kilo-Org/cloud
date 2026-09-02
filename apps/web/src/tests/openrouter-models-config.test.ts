@@ -16,7 +16,6 @@ describe('OpenRouter Models Config', () => {
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
       'z-ai/glm-5.3',
-      tencent_hy3_free_model.public_id,
     ];
 
     expectedModels.forEach(model => {
@@ -29,6 +28,7 @@ describe('OpenRouter Models Config', () => {
       'stealth/qwen3.6-plus',
       QWEN37_PLUS_MODEL_ID,
       'deepseek/deepseek-v4-pro',
+      tencent_hy3_free_model.public_id,
     ];
 
     supersededModels.forEach(model => {

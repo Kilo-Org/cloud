@@ -2,25 +2,30 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Brain, ChevronDown, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Brain, Loader2 } from 'lucide-react';
+import { ToolCardShell } from './ToolCardShell';
 import { ReadToolCard } from './ReadToolCard';
 import { EditToolCard } from './EditToolCard';
 import { WriteToolCard } from './WriteToolCard';
 import { BashToolCard } from './BashToolCard';
+import { BackgroundProcessToolCard } from './BackgroundProcessToolCard';
+import { ApplyPatchToolCard } from './ApplyPatchToolCard';
+import { WebFetchToolCard } from './WebFetchToolCard';
+import { ToolErrorCard } from './ToolErrorCard';
+import { ToolMarkdown } from './ToolOutput';
+import { shouldRenderToolPart } from './message-presentation';
+import { getReasoningHeader, getReasoningPresentation } from './reasoning-presentation';
 import { GlobToolCard } from './GlobToolCard';
 import { GrepToolCard } from './GrepToolCard';
 import { WebSearchToolCard } from './WebSearchToolCard';
 import { ListToolCard } from './ListToolCard';
 import { GenericToolCard } from './GenericToolCard';
-import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
-import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
@@ -79,7 +84,7 @@ const markdownComponents = { a: LinkRenderer };
  */
 function TextPartRenderer({ part }: { part: Extract<Part, { type: 'text' }> }) {
   return (
-    <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
+    <div className="prose prose-sm prose-invert prose-p:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:text-xs max-w-none overflow-hidden px-2 leading-relaxed">
       {part.text ? (
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {part.text}
@@ -110,7 +115,10 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
     case 'grep':
       return typeof input.pattern === 'string' && input.pattern.length > 0;
     case 'websearch':
+    case 'codesearch':
       return typeof input.query === 'string' && input.query.length > 0;
+    case 'webfetch':
+      return typeof input.url === 'string' && input.url.length > 0;
     case 'list':
       return typeof input.path === 'string' && input.path.length > 0;
     case 'mcp':
@@ -121,7 +129,6 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
         input.tool_name.length > 0
       );
     case 'task':
-    case 'todoread':
     case 'todowrite':
     case 'question':
     case 'suggest':
@@ -139,9 +146,9 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
  */
 function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   return (
-    <div className="border-muted bg-muted/30 flex items-center gap-2 rounded-md border px-3 py-2">
-      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />
-      <span className="text-muted-foreground text-sm">
+    <div className="text-muted-foreground flex min-h-6 items-center gap-2 px-2 py-1 text-xs">
+      <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+      <span>
         {toolName}
         <span className="animate-pulse">...</span>
       </span>
@@ -151,11 +158,6 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
 
 const renderPartFn: RenderPartFn = props => <PartRenderer {...props} />;
 
-/**
- * Renders a ToolPart using ToolExecutionCard
- * Converts V2 ToolPart format to V1 ToolExecution format for compatibility
- * Special handling for task tools to render as ChildSessionSection
- */
 function ToolPartRenderer({
   part,
   childSessionMessages,
@@ -167,102 +169,73 @@ function ToolPartRenderer({
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 }) {
-  // plan_enter / plan_exit are internal mode-switching tools with no user-visible output
-  if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
-    return null;
+  if (!shouldRenderToolPart(part)) return null;
+
+  if (
+    part.state.status === 'error' &&
+    !['question', 'suggest', 'chart', 'permission'].includes(part.tool)
+  ) {
+    return <ToolErrorCard toolName={part.tool} error={part.state.error} />;
   }
 
-  // Check if tool input is still streaming (incomplete data)
-  if (!hasRequiredInput(part)) {
+  if (
+    (part.state.status === 'pending' || part.state.status === 'running') &&
+    !hasRequiredInput(part)
+  ) {
     return <StreamingToolPlaceholder toolName={part.tool} />;
   }
 
-  // Special handling for task tools - render as child session
-  if (part.tool === 'task') {
-    const sessionId = getTaskToolSessionId(part);
-    const childMessages = sessionId
-      ? childSessionMessages?.get(sessionId) || getChildMessages?.(sessionId) || []
-      : [];
-
-    return (
-      <ChildSessionSection
-        taskToolPart={part}
-        sessionId={sessionId}
-        childMessages={childMessages}
-        getChildMessages={getChildMessages}
-        renderPart={renderPartFn}
-        onOpenChildSession={onOpenChildSession}
-      />
-    );
+  switch (part.tool) {
+    case 'task': {
+      const sessionId = getTaskToolSessionId(part);
+      const childMessages = sessionId
+        ? childSessionMessages?.get(sessionId) || getChildMessages?.(sessionId) || []
+        : [];
+      return (
+        <ChildSessionSection
+          taskToolPart={part}
+          sessionId={sessionId}
+          childMessages={childMessages}
+          getChildMessages={getChildMessages}
+          renderPart={renderPartFn}
+          onOpenChildSession={onOpenChildSession}
+        />
+      );
+    }
+    case 'read':
+      return <ReadToolCard toolPart={part} />;
+    case 'edit':
+      return <EditToolCard toolPart={part} />;
+    case 'write':
+      return <WriteToolCard toolPart={part} />;
+    case 'apply_patch':
+      return <ApplyPatchToolCard toolPart={part} />;
+    case 'bash':
+      return <BashToolCard toolPart={part} />;
+    case 'background_process':
+      return <BackgroundProcessToolCard toolPart={part} />;
+    case 'glob':
+      return <GlobToolCard toolPart={part} />;
+    case 'grep':
+      return <GrepToolCard toolPart={part} />;
+    case 'webfetch':
+      return <WebFetchToolCard toolPart={part} />;
+    case 'websearch':
+    case 'codesearch':
+      return <WebSearchToolCard toolPart={part} />;
+    case 'list':
+      return <ListToolCard toolPart={part} />;
+    case 'todowrite':
+      return <TodoWriteToolCard toolPart={part} />;
+    case 'question':
+      return <QuestionToolStatus toolPart={part} />;
+    case 'suggest':
+      return <SuggestToolCard toolPart={part} />;
+    case 'skill':
+      return <SkillToolCard toolPart={part} />;
+    default:
+      return <GenericToolCard toolPart={part} />;
   }
-
-  // Special handling for read tool - compact display
-  if (part.tool === 'read') {
-    return <ReadToolCard toolPart={part} />;
-  }
-
-  // Special handling for edit tool - compact display
-  if (part.tool === 'edit') {
-    return <EditToolCard toolPart={part} />;
-  }
-
-  // Special handling for write tool - compact display
-  if (part.tool === 'write') {
-    return <WriteToolCard toolPart={part} />;
-  }
-
-  // Special handling for bash tool - compact display
-  if (part.tool === 'bash') {
-    return <BashToolCard toolPart={part} />;
-  }
-
-  // Special handling for glob tool - compact display
-  if (part.tool === 'glob') {
-    return <GlobToolCard toolPart={part} />;
-  }
-
-  // Special handling for grep tool - compact display
-  if (part.tool === 'grep') {
-    return <GrepToolCard toolPart={part} />;
-  }
-
-  // Special handling for websearch tool - compact display
-  if (part.tool === 'websearch') {
-    return <WebSearchToolCard toolPart={part} />;
-  }
-
-  // Special handling for list tool - compact display
-  if (part.tool === 'list') {
-    return <ListToolCard toolPart={part} />;
-  }
-
-  // Special handling for todoread tool - compact display
-  if (part.tool === 'todoread') {
-    return <TodoReadToolCard toolPart={part} />;
-  }
-
-  // Special handling for todowrite tool - compact display
-  if (part.tool === 'todowrite') {
-    return <TodoWriteToolCard toolPart={part} />;
-  }
-
-  // Question tool — read-only status in message stream (interactive UI is in the dock)
-  if (part.tool === 'question') {
-    return <QuestionToolStatus toolPart={part} />;
-  }
-
-  // Suggest tool — interactive card rendered inline (no dock), so the text
-  // input stays available for the user to send messages in parallel.
-  if (part.tool === 'suggest') {
-    return <SuggestToolCard toolPart={part} />;
-  }
-
-  // Skill tool — show the skill name being loaded
-  if (part.tool === 'skill') {
-    return <SkillToolCard toolPart={part} />;
-  }
-
-  return <GenericToolCard toolPart={part} />;
 }
 
 /**
@@ -330,45 +303,35 @@ function ReasoningPartRenderer({
   part: Extract<Part, { type: 'reasoning' }>;
   isStreaming?: boolean;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const streaming = isStreaming ?? isPartStreaming(part);
+  const streaming = (isStreaming ?? true) && isPartStreaming(part);
 
   if (!shouldRenderReasoningPart(part)) {
     return null;
   }
 
-  return (
-    <div className="border-muted bg-muted/30 rounded-md border">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <Brain className="text-muted-foreground h-4 w-4 shrink-0" />
-        <span className="text-muted-foreground min-w-0 flex-1 text-sm">
-          Reasoning
-          {streaming && <span className="ml-2 animate-pulse text-xs">(thinking...)</span>}
-        </span>
-        <ChevronDown
-          className={cn(
-            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+  const { title, body } = getReasoningPresentation(part.text);
+  if (!title && !body) return null;
+  const header = getReasoningHeader(title, part.time, streaming);
 
-      {isExpanded && (
-        <div className="border-muted space-y-2 border-t px-3 py-2">
-          <div className="prose prose-sm prose-invert text-muted-foreground max-w-none overflow-hidden">
-            {part.text ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {part.text}
-              </ReactMarkdown>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </div>
+  if (!body) {
+    return (
+      <div className="text-muted-foreground flex min-h-6 items-center gap-2 px-2 py-1 text-xs">
+        {streaming ? (
+          <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+        ) : (
+          <Brain className="size-3.5 shrink-0" />
+        )}
+        <span className="min-w-0 truncate" title={header}>
+          {header}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <ToolCardShell icon={Brain} title={header} status={streaming ? 'running' : 'completed'}>
+      <ToolMarkdown content={body} className="text-muted-foreground max-h-64" />
+    </ToolCardShell>
   );
 }
 
@@ -431,22 +394,6 @@ function PartErrorFallback({ partType }: { partType: string }) {
   );
 }
 
-/**
- * PartRenderer - Routes V2 message parts to appropriate renderers
- *
- * Handles different part types from V2 messages:
- * - text: Markdown text rendered with ReactMarkdown
- * - tool: Tool executions rendered with ToolExecutionCard (task tools render as ChildSessionSection)
- * - file: File/image attachments
- * - reasoning: Collapsible reasoning display
- * - step-start/step-finish: Return null (no visible rendering)
- * - subtask: Child session indicator
- * - patch: Shows files modified in a patch/commit
- * - unknown: Graceful fallback
- *
- * Wrapped with error boundary to prevent individual part rendering errors
- * from crashing the entire message list.
- */
 export function PartRenderer({
   part,
   isStreaming,
@@ -463,7 +410,6 @@ export function PartRenderer({
     );
   }
 
-  // Tool parts -> render using ToolExecutionCard (or ChildSessionSection for task tools)
   if (isToolPart(part)) {
     return (
       <MessageErrorBoundary fallback={<PartErrorFallback partType="tool" />}>

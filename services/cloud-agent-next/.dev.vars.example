@@ -41,11 +41,10 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Credential containment org IDs (optional)
-# Each value is a comma-separated list of org IDs, or `*` for all orgs.
-GITHUB_TOKEN_CONTAINMENT_ORG_IDS=
-GITLAB_TOKEN_CONTAINMENT_ORG_IDS=
-KILOCODE_TOKEN_CONTAINMENT_ORG_IDS=
+CONTROL_PLANE_IDS=*
+WORKTREE_CREATION_ENABLED_IDS=*
+
+CREDENTIAL_CONTAINMENT_ENABLED=false
 
 # Repo snapshot org IDs (optional)
 # Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users

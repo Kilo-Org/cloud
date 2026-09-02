@@ -1,12 +1,11 @@
-/**
- * App-level owner for active-sessions live-sync: retains UserWebConnection,
- * applies onSystemEvent payloads to trpc.activeSessions.list via a serialized
- * cancelQueries+setQueryData pipeline, and coalesces refreshes (cli.connected /
- * disconnected, reconnect, enrichment) with fetchQuery staleTime:0.
- * Framework-agnostic; React glue is active-sessions-live-sync-mount.tsx.
- */
-
-import { type QueryClient, type QueryFunction, type QueryKey } from '@tanstack/react-query';
+/** Serialized socket writes and accepted server refreshes for one tray scope. */
+import {
+  hashKey,
+  type QueryClient,
+  type QueryFunction,
+  type QueryKey,
+} from '@tanstack/react-query';
+import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
 
 import {
   type CachedActiveSession,
@@ -14,28 +13,18 @@ import {
   hasUnenrichedLiveId,
   planLiveSystemEventActions,
 } from './active-sessions-live';
-
-import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
+import { currentAuthEpoch, isCurrentAuthEpoch } from './auth/auth-epoch';
+import { isSignOutActive } from './auth/sign-out-state';
+import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from './query-client';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
-
 type RefreshReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect' | 'manual';
-
-type SystemEvent = UserWebSystemEvent;
-
 type WriteUpdater = (current: CachedActiveSession[]) => CachedActiveSession[];
-
-/** Minimal UserWebConnection surface used by this owner. */
 export type LiveSyncConnection = Pick<
   UserWebConnection,
   'retain' | 'isConnected' | 'onConnectionChange' | 'onSystemEvent'
 >;
-
-export type LiveSyncQueryClient = Pick<
-  QueryClient,
-  'cancelQueries' | 'setQueryData' | 'getQueryData' | 'fetchQuery'
->;
-
+export type LiveSyncQueryClient = QueryClient;
 type CreateLiveSyncOptions = {
   connection: LiveSyncConnection;
   queryClient: LiveSyncQueryClient;
@@ -44,24 +33,16 @@ type CreateLiveSyncOptions = {
   now?: () => number;
 };
 
-/** Testable owner: serialized pipeline, pending reasons, reconnect edge. */
 export class ActiveSessionsLiveSync {
-  private readonly connection: LiveSyncConnection;
-  private readonly queryClient: LiveSyncQueryClient;
-  private readonly queryKey: QueryKey;
-  private readonly queryFn: QueryFunction<CachedActiveSessionsData>;
   private readonly now: () => number;
-
   // eslint-disable-next-line promise/prefer-await-to-then
   private writeQueue: Promise<void> = Promise.resolve();
   // eslint-disable-next-line promise/prefer-await-to-then
   private fetchQueue: Promise<void> = Promise.resolve();
-
   private fetchStartCount = 0;
-  private fetchStartWaiters: (() => void)[] = [];
+  private readonly fetchStartWaiters: (() => void)[] = [];
   private lastGetFetchQueueCount = 0;
-  private fetchCompletionWaiters: (() => void)[] = [];
-
+  private readonly fetchCompletionWaiters: (() => void)[] = [];
   private readonly pendingReasons = new Set<RefreshReason>();
   private inFlightReasons: Set<RefreshReason> | null = null;
   private isFetchInFlight = false;
@@ -69,35 +50,36 @@ export class ActiveSessionsLiveSync {
   private lastEnrichmentAttemptAt: number | null = null;
   private lastConnectedState: boolean;
   private attachmentEpoch = 0;
-
+  private authEpoch = currentAuthEpoch();
   private releaseRetain: (() => void) | null = null;
   private systemListenerUnsubscribe: (() => void) | null = null;
   private connectionListenerUnsubscribe: (() => void) | null = null;
 
+  private readonly options: CreateLiveSyncOptions;
+
   constructor(options: CreateLiveSyncOptions) {
-    this.connection = options.connection;
-    this.queryClient = options.queryClient;
-    this.queryKey = options.queryKey;
-    this.queryFn = options.queryFn;
+    // Copy the inputs so a caller cannot retarget this owner by changing them.
+    this.options = { ...options };
     this.now = options.now ?? (() => Date.now());
-    this.lastConnectedState = this.connection.isConnected();
+    this.lastConnectedState = options.connection.isConnected();
   }
 
-  /** Subscribe, retain; detach releases listeners + retain. */
   attach(): () => void {
     if (this.releaseRetain) {
       throw new Error('ActiveSessionsLiveSync already attached');
     }
-    // Re-attach while connected must not look like a rising edge.
     this.attachmentEpoch += 1;
-    this.lastConnectedState = this.connection.isConnected();
-    this.releaseRetain = this.connection.retain();
+    this.authEpoch = currentAuthEpoch();
+    const { connection } = this.options;
+    // Re-attachment while connected must not look like a rising edge.
+    this.lastConnectedState = connection.isConnected();
+    this.releaseRetain = connection.retain();
     // eslint-disable-next-line typescript-eslint/no-this-alias, unicorn/no-this-assignment
     attachedSync = this;
-    this.systemListenerUnsubscribe = this.connection.onSystemEvent(event => {
+    this.systemListenerUnsubscribe = connection.onSystemEvent(event => {
       this.handleSystemEvent(event);
     });
-    this.connectionListenerUnsubscribe = this.connection.onConnectionChange(connected => {
+    this.connectionListenerUnsubscribe = connection.onConnectionChange(connected => {
       this.handleConnectionChange(connected);
     });
     return () => {
@@ -117,37 +99,33 @@ export class ActiveSessionsLiveSync {
     if (attachedSync === this) {
       attachedSync = null;
     }
-    void this.queryClient.cancelQueries({ queryKey: this.queryKey });
+    void this.options.queryClient.cancelQueries({ queryKey: this.options.queryKey, exact: true });
+  }
+
+  private isCurrentAttachment(epoch: number): boolean {
+    const isAttached = this.releaseRetain !== null && epoch === this.attachmentEpoch;
+    return isAttached && isCurrentAuthEpoch(this.authEpoch) && !isSignOutActive();
   }
 
   scheduleRefresh(reason: RefreshReason): void {
-    if (this.releaseRetain === null) {
+    if (!this.isCurrentAttachment(this.attachmentEpoch)) {
       return;
     }
     this.pendingReasons.add(reason);
     this.kickFetch();
   }
 
-  /**
-   * Manual (pull-to-refresh) resync. Runs through the same serialized fetch
-   * queue as WS-driven refreshes, so it can neither be cancelled by nor race
-   * with this owner's own writes, and it retries a refresh that an earlier
-   * failure left pending. Resolves when the forced fetch settles — it never
-   * rejects (`processFetchQueue` swallows fetch failures), so a caller's
-   * pull-to-refresh spinner always stops. Returns false when detached, so the
-   * caller can fall back to a plain query refetch.
-   */
-  async refreshNow(): Promise<boolean> {
-    if (this.releaseRetain === null) {
+  /** False selects a caller fallback; handled failures must not start another fetch. */
+  async refreshNow(queryKey: QueryKey): Promise<false | { accepted: boolean }> {
+    const epoch = this.attachmentEpoch;
+    if (!this.isCurrentAttachment(epoch) || hashKey(queryKey) !== hashKey(this.options.queryKey)) {
       return false;
     }
+    const refresh = captureActiveSessionsQueryRefresh(this.options.queryClient, queryKey);
     this.scheduleRefresh('manual');
-    // A write landing mid-fetch cancels that fetch and re-kicks the queue, so
-    // awaiting a single hop can return while the replacement fetch is still in
-    // flight. Follow the chain until the manual refresh is done (a successful
-    // fetch clears the reason) or nothing new was scheduled.
+    // Cached-data cancellation can fulfill. Follow the replacement fetches.
     /* eslint-disable no-await-in-loop */
-    while (this.pendingReasons.has('manual')) {
+    while (this.pendingReasons.has('manual') && this.isCurrentAttachment(epoch)) {
       const queue = this.fetchQueue;
       await queue;
       if (this.fetchQueue === queue) {
@@ -155,7 +133,12 @@ export class ActiveSessionsLiveSync {
       }
     }
     /* eslint-enable no-await-in-loop */
-    return true;
+    return {
+      accepted:
+        this.isCurrentAttachment(epoch) &&
+        !this.pendingReasons.has('manual') &&
+        refresh.hasAcceptedResult(),
+    };
   }
 
   async getWriteQueue(): Promise<void> {
@@ -166,33 +149,30 @@ export class ActiveSessionsLiveSync {
     if (this.pendingReasons.size === 0) {
       return;
     }
-    if (this.fetchStartCount > this.lastGetFetchQueueCount) {
-      this.lastGetFetchQueueCount = this.fetchStartCount;
-      return;
+    if (this.fetchStartCount <= this.lastGetFetchQueueCount) {
+      await new Promise<void>(resolve => {
+        this.fetchStartWaiters.push(resolve);
+      });
     }
-    await new Promise<void>(resolve => {
-      this.fetchStartWaiters.push(resolve);
-    });
     this.lastGetFetchQueueCount = this.fetchStartCount;
   }
 
   async getFetchCompletion(): Promise<void> {
-    if (!this.isFetchInFlight) {
-      return;
+    if (this.isFetchInFlight) {
+      await new Promise<void>(resolve => {
+        this.fetchCompletionWaiters.push(resolve);
+      });
     }
-    await new Promise<void>(resolve => {
-      this.fetchCompletionWaiters.push(resolve);
-    });
   }
 
   getPendingReasons(): Set<RefreshReason> {
     return new Set(this.pendingReasons);
   }
 
-  private handleSystemEvent(event: SystemEvent): void {
+  private handleSystemEvent(event: UserWebSystemEvent): void {
     for (const action of planLiveSystemEventActions(event)) {
       if (action.type === 'write') {
-        this.enqueueWrite(current => action.updater(current));
+        this.enqueueWrite(action.updater);
       } else {
         this.scheduleRefresh(action.reason);
       }
@@ -208,28 +188,27 @@ export class ActiveSessionsLiveSync {
   }
 
   private enqueueWrite(updater: WriteUpdater): void {
-    if (this.releaseRetain === null) {
+    if (!this.isCurrentAttachment(this.attachmentEpoch)) {
       return;
     }
     const attachmentEpoch = this.attachmentEpoch;
+    const { queryClient, queryKey } = this.options;
     // Serialized cancel+setQueryData; never awaits network.
     this.writeQueue = (async () => {
       await this.writeQueue;
-      if (attachmentEpoch !== this.attachmentEpoch) {
+      if (!this.isCurrentAttachment(attachmentEpoch)) {
         return;
       }
-      // Cancel in-flight fetch so stale results cannot overwrite.
       if (this.isFetchInFlight) {
         this.inFlightFetchCanceled = true;
       }
-      await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (attachmentEpoch !== this.attachmentEpoch) {
+      await queryClient.cancelQueries({ queryKey, exact: true });
+      if (!this.isCurrentAttachment(attachmentEpoch)) {
         return;
       }
-      this.queryClient.setQueryData<CachedActiveSessionsData>(this.queryKey, current => {
-        const existing = current?.sessions ?? [];
-        return { sessions: updater(existing) };
-      });
+      queryClient.setQueryData<CachedActiveSessionsData>(queryKey, current => ({
+        sessions: updater(current?.sessions ?? []),
+      }));
       this.maybeScheduleEnrichmentRefresh();
     })();
   }
@@ -242,8 +221,9 @@ export class ActiveSessionsLiveSync {
   }
 
   private updateEnrichmentReason(): void {
+    const { queryClient, queryKey } = this.options;
     const cachedSessions =
-      this.queryClient.getQueryData<CachedActiveSessionsData>(this.queryKey)?.sessions ?? [];
+      queryClient.getQueryData<CachedActiveSessionsData>(queryKey)?.sessions ?? [];
     if (!hasUnenrichedLiveId(cachedSessions)) {
       this.pendingReasons.delete('enrichment');
       return;
@@ -263,30 +243,25 @@ export class ActiveSessionsLiveSync {
 
   private notifyFetchStart(): void {
     this.fetchStartCount += 1;
-    const waiters = this.fetchStartWaiters;
-    this.fetchStartWaiters = [];
-    for (const resolve of waiters) {
+    for (const resolve of this.fetchStartWaiters.splice(0)) {
       resolve();
     }
   }
 
   private notifyFetchCompletion(): void {
-    const waiters = this.fetchCompletionWaiters;
-    this.fetchCompletionWaiters = [];
-    for (const resolve of waiters) {
+    for (const resolve of this.fetchCompletionWaiters.splice(0)) {
       resolve();
     }
   }
 
   private kickFetch(): void {
-    if (this.releaseRetain === null) {
+    if (!this.isCurrentAttachment(this.attachmentEpoch)) {
       return;
     }
     const attachmentEpoch = this.attachmentEpoch;
-    // Cancel in-flight fetch so a new refresh starts immediately.
     if (this.isFetchInFlight) {
       this.inFlightFetchCanceled = true;
-      void this.queryClient.cancelQueries({ queryKey: this.queryKey });
+      void this.options.queryClient.cancelQueries({ queryKey: this.options.queryKey, exact: true });
     }
     this.fetchQueue = (async () => {
       await this.fetchQueue;
@@ -295,36 +270,39 @@ export class ActiveSessionsLiveSync {
   }
 
   private async processFetchQueue(attachmentEpoch: number): Promise<void> {
-    if (attachmentEpoch !== this.attachmentEpoch || this.pendingReasons.size === 0) {
-      return;
-    }
-    if (this.isFetchInFlight) {
+    // Start a replacement after the write that canceled its predecessor.
+    await this.writeQueue;
+    const canFetch = this.pendingReasons.size > 0 && !this.isFetchInFlight;
+    if (!canFetch || !this.isCurrentAttachment(attachmentEpoch)) {
       return;
     }
     this.isFetchInFlight = true;
     this.inFlightFetchCanceled = false;
     const inFlightReasons = new Set(this.pendingReasons);
     this.inFlightReasons = inFlightReasons;
+    const { queryClient, queryKey, queryFn } = this.options;
+    const refresh = captureActiveSessionsQueryRefresh(queryClient, queryKey);
     let success = false;
     try {
-      await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (attachmentEpoch === this.attachmentEpoch) {
-        // staleTime:0 forces a network call after setQueryData.
-        const fetchPromise = this.queryClient.fetchQuery({
-          queryKey: this.queryKey,
-          queryFn: this.queryFn,
+      await queryClient.cancelQueries({ queryKey, exact: true });
+      if (this.isCurrentAttachment(attachmentEpoch) && refresh.isCurrent()) {
+        const fetchPromise = queryClient.fetchQuery({
+          queryKey,
+          queryFn: fenceActiveSessionsQuery(queryFn, () =>
+            this.isCurrentAttachment(attachmentEpoch)
+          ),
           staleTime: 0,
         });
         this.notifyFetchStart();
         await fetchPromise;
-        success = true;
+        success = !this.readInFlightFetchCanceled() && refresh.hasAcceptedResult();
       }
     } catch {
-      // Canceled or network failure: keep reasons pending for retry.
+      // Cancellation and network failure keep reasons pending for Retry.
     } finally {
       this.isFetchInFlight = false;
     }
-    if (attachmentEpoch !== this.attachmentEpoch) {
+    if (!this.isCurrentAttachment(attachmentEpoch)) {
       this.inFlightReasons = null;
       this.notifyFetchCompletion();
       return;
@@ -333,17 +311,15 @@ export class ActiveSessionsLiveSync {
       this.lastEnrichmentAttemptAt = this.now();
     }
     if (success) {
-      for (const r of inFlightReasons) {
-        this.pendingReasons.delete(r);
+      for (const reason of inFlightReasons) {
+        this.pendingReasons.delete(reason);
       }
       this.updateEnrichmentReason();
     }
     const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
-    // Helper so CFA does not treat the field as stuck at false after await.
     const wasCanceled = this.readInFlightFetchCanceled();
     this.inFlightReasons = null;
     this.notifyFetchCompletion();
-    // Re-kick only after intentional cancel or new reasons mid-flight.
     if (this.pendingReasons.size > 0 && (wasCanceled || hasNewReasons)) {
       this.kickFetch();
     }
@@ -354,17 +330,12 @@ export class ActiveSessionsLiveSync {
   }
 }
 
-/**
- * The currently attached owner. One `<ActiveSessionsLiveSyncMount />` in
- * `app/(app)/_layout.tsx` owns the live tray app-wide, so a module-scoped
- * reference is the whole registry this needs.
- */
+/** One app-level mount owns the registry and socket lease. */
 let attachedSync: ActiveSessionsLiveSync | null = null;
 
-/**
- * Pull-to-refresh entry point for the live tray. Returns false when no owner
- * is attached, so the caller falls back to a plain query refetch.
- */
-export async function refreshActiveSessionsNow(): Promise<boolean> {
-  return (await attachedSync?.refreshNow()) ?? false;
+/** Returns false if no current owner handles this exact key. */
+export async function refreshActiveSessionsNow(
+  queryKey: QueryKey
+): Promise<false | { accepted: boolean }> {
+  return (await attachedSync?.refreshNow(queryKey)) ?? false;
 }

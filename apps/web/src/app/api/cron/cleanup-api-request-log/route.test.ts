@@ -21,7 +21,7 @@ import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
-const BATCH_SIZE = 1_000;
+const BATCH_SIZE = 10_000;
 
 function daysAgo(days: number): string {
   const date = new Date();

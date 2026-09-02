@@ -10,6 +10,7 @@ import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../sandbox-id.js';
 import type { SandboxInstance } from '../types.js';
 import { DEADLINE_MS } from './deadlines.js';
+import { logControlDiagnostic } from './diagnostics.js';
 import type { CreateIntent } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 
@@ -142,16 +143,42 @@ export function createCloudflareProviderAdapter(deps: {
     },
     async stop(ref, intent) {
       const parsed = decodeOwnedProviderRef(resolveProviderRef(ref, intent));
-      if (!parsed) return 'retryable';
+      const diagnostic = { provider: 'cloudflare', allocationName: deps.sandboxId };
+      if (!parsed) {
+        logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
+        return 'retryable';
+      }
+      const startedAt = Date.now();
+      logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
         await deps.destroy(parsed.sandboxId, { containment: parsed.containment });
+        logControlDiagnostic('native_stop', {
+          ...diagnostic,
+          result: 'terminal',
+          durationMs: Date.now() - startedAt,
+        });
         return 'terminal';
       } catch {
+        logControlDiagnostic(
+          'native_stop',
+          {
+            ...diagnostic,
+            result: 'retryable',
+            durationMs: Date.now() - startedAt,
+          },
+          'warn'
+        );
         return 'retryable';
       }
     },
-    async ensureLeaseAtLeast(ref, _ms) {
+    async ensureLeaseAtLeast(ref, ms) {
       const parsed = decodeOwnedProviderRef(ref);
+      logControlDiagnostic('native_lease', {
+        provider: 'cloudflare',
+        allocationName: deps.sandboxId,
+        requestedLeaseMs: ms,
+        action: parsed === null ? 'invalid_reference' : 'activity_timeout_renewal',
+      });
       if (parsed === null) return;
       return deps
         .getSandbox(parsed.sandboxId, { containment: parsed.containment })

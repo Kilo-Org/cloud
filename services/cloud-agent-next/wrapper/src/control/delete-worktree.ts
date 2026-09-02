@@ -7,6 +7,11 @@ import {
   type WorktreeDeletePayload,
   type WorktreeDeleteResult,
 } from '../../../src/shared/sandbox-control-protocol';
+import {
+  emitControlDiagnostic,
+  type ControlDiagnosticRecord,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import { fenceDirectoryOperations } from './worktree-operations';
 import { directoryForSession, forgetAttachedRoot } from './session-directories';
 
@@ -149,6 +154,7 @@ async function assertNoSymlinks(directory: string): Promise<void> {
 }
 
 export type WorktreeCleanupDeps = {
+  onDiagnostic?: ControlDiagnosticReporter;
   client?: WorktreeKiloCleanupClient;
   assertDirectory?: (directory: string) => Promise<void>;
   retireDirectory?: (directory: string) => Promise<void>;
@@ -161,68 +167,130 @@ export async function prepareWorktreeDeletion(
   raw: unknown,
   deps: WorktreeCleanupDeps
 ): Promise<string[]> {
+  const startedAt = Date.now();
   const input = worktreeDeletePayloadSchema.parse(raw);
-  validateWorktreeDirectory(input);
-  await fenceDirectoryOperations(input.directory);
-  await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
-  const { client } = deps;
-  const sessionIds = new Set([
-    ...input.sessionIds,
-    ...(client ? await client.listSessionIds(input.directory) : []),
-  ]);
-  for (const sessionId of sessionIds) {
-    const rememberedDirectory = directoryForSession(sessionId);
-    if (rememberedDirectory && rememberedDirectory !== input.directory)
-      throw new Error('Worktree session directory conflict');
-    if (!client) continue;
-    const session = await client.getSession(input.directory, sessionId);
-    if (session && session.directory !== input.directory)
-      throw new Error('Worktree session directory conflict');
-    await client.abortSession(input.directory, sessionId);
-    if (!session) continue;
-    for (const child of await client.children(input.directory, sessionId)) {
-      if (child.directory !== input.directory) throw new Error('Worktree child directory conflict');
-      sessionIds.add(child.id);
+  let stage: ControlDiagnosticRecord['fields']['stage'] = 'directory_validation';
+  let sessionCount = input.sessionIds.length;
+  const diagnostic = (phase: 'completed' | 'failed'): void =>
+    emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+      operation: 'worktree.prepareDeletion',
+      phase,
+      stage,
+      worktreeId: input.worktreeId,
+      sessionCount,
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      ok: phase === 'completed',
+    });
+  try {
+    validateWorktreeDirectory(input);
+    stage = 'deletion_fence';
+    await fenceDirectoryOperations(input.directory);
+    stage = 'directory_validation';
+    await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
+    const { client } = deps;
+    stage = 'manifest_discovery';
+    const sessionIds = new Set([
+      ...input.sessionIds,
+      ...(client ? await client.listSessionIds(input.directory) : []),
+    ]);
+    sessionCount = sessionIds.size;
+    for (const sessionId of sessionIds) {
+      stage = 'manifest_discovery';
+      const rememberedDirectory = directoryForSession(sessionId);
+      if (rememberedDirectory && rememberedDirectory !== input.directory)
+        throw new Error('Worktree session directory conflict');
+      if (!client) continue;
+      const session = await client.getSession(input.directory, sessionId);
+      if (session && session.directory !== input.directory)
+        throw new Error('Worktree session directory conflict');
+      stage = 'session_abort';
+      await client.abortSession(input.directory, sessionId);
+      if (!session) continue;
+      stage = 'manifest_discovery';
+      for (const child of await client.children(input.directory, sessionId)) {
+        if (child.directory !== input.directory)
+          throw new Error('Worktree child directory conflict');
+        sessionIds.add(child.id);
+        sessionCount = sessionIds.size;
+      }
     }
+    stage = 'manifest_discovery';
+    diagnostic('completed');
+    return [...sessionIds];
+  } catch (error) {
+    diagnostic('failed');
+    throw error;
   }
-  return [...sessionIds];
 }
 
 export async function deleteWorktree(
   raw: unknown,
   deps: WorktreeCleanupDeps
 ): Promise<WorktreeDeleteResult> {
+  const startedAt = Date.now();
   const input = worktreeDeletePayloadSchema.parse(raw);
-  const sessionIds = await prepareWorktreeDeletion(input, deps);
-  const journaled = new Set(input.sessionIds);
-  if (sessionIds.some(id => !journaled.has(id)))
-    throw new Error('Worktree cleanup manifest changed');
-  const { client } = deps;
-  if (client) {
+  let stage: ControlDiagnosticRecord['fields']['stage'] = 'manifest_discovery';
+  let sessionCount = input.sessionIds.length;
+  const diagnostic = (phase: 'completed' | 'failed'): void =>
+    emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+      operation: 'worktree.delete',
+      phase,
+      stage,
+      worktreeId: input.worktreeId,
+      sessionCount,
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      ok: phase === 'completed',
+    });
+  try {
+    const sessionIds = await prepareWorktreeDeletion(input, deps);
+    sessionCount = sessionIds.length;
+    const journaled = new Set(input.sessionIds);
+    if (sessionIds.some(id => !journaled.has(id))) {
+      stage = 'manifest_growth';
+      throw new Error('Worktree cleanup manifest changed');
+    }
+    const { client } = deps;
+    stage = 'process_cleanup';
+    if (client) {
+      for (const sessionId of sessionIds) {
+        await client.stopSessionProcesses(input.directory, sessionId);
+      }
+    }
+    stage = 'terminal_cleanup';
+    await deps.detachTerminals?.(input.directory);
+    if (client) {
+      await client.closeTerminals(input.directory);
+      stage = 'session_delete';
+      for (const sessionId of [...sessionIds].reverse()) {
+        await client.deleteSession(input.directory, sessionId);
+      }
+      stage = 'session_delete_confirmation';
+      for (const sessionId of sessionIds) {
+        if (await client.getSession(input.directory, sessionId)) {
+          stage = 'session_delete_unconfirmed';
+          throw new Error('Kilo session deletion was not confirmed');
+        }
+      }
+      stage = 'directory_dispose';
+      await client.disposeDirectory(input.directory);
+    }
+    stage = 'runtime_retirement';
+    await deps.retireDirectory?.(input.directory);
+    stage = 'directory_validation';
+    await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
+    stage = 'directory_removal';
+    await (
+      deps.removeDirectory ?? (directory => fs.rm(directory, { recursive: true, force: true }))
+    )(input.directory);
+    stage = 'root_detach';
     for (const sessionId of sessionIds) {
-      await client.stopSessionProcesses(input.directory, sessionId);
+      forgetAttachedRoot(sessionId, input.directory);
+      deps.detachRoot?.(sessionId);
     }
+    diagnostic('completed');
+    return { deleted: true, sessionIds };
+  } catch (error) {
+    diagnostic('failed');
+    throw error;
   }
-  await deps.detachTerminals?.(input.directory);
-  if (client) {
-    await client.closeTerminals(input.directory);
-    for (const sessionId of [...sessionIds].reverse()) {
-      await client.deleteSession(input.directory, sessionId);
-    }
-    for (const sessionId of sessionIds) {
-      if (await client.getSession(input.directory, sessionId))
-        throw new Error('Kilo session deletion was not confirmed');
-    }
-    await client.disposeDirectory(input.directory);
-  }
-  await deps.retireDirectory?.(input.directory);
-  await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
-  await (deps.removeDirectory ?? (directory => fs.rm(directory, { recursive: true, force: true })))(
-    input.directory
-  );
-  for (const sessionId of sessionIds) {
-    forgetAttachedRoot(sessionId, input.directory);
-    deps.detachRoot?.(sessionId);
-  }
-  return { deleted: true, sessionIds };
 }

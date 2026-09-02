@@ -1,4 +1,9 @@
-import { logger } from '../logger.js';
+import {
+  diagnosticConnection,
+  diagnosticEventType,
+  logControlDiagnostic,
+  type ControlDiagnosticFields,
+} from './diagnostics.js';
 import {
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   SANDBOX_CONTROL_WS_TAG,
@@ -213,6 +218,8 @@ export function createSandboxControlSocketHandler(
   hooks: SandboxControlSocketHooks = {}
 ): SandboxControlSocketHandler {
   const activatingConnections = new Set<string>();
+  const log = (event: string, fields: ControlDiagnosticFields) =>
+    logControlDiagnostic(event, { sandboxId, ...fields });
 
   return {
     hasHandshakenSocket(): boolean {
@@ -253,25 +260,35 @@ export function createSandboxControlSocketHandler(
       };
       state.acceptWebSocket(server, [SANDBOX_CONTROL_WS_TAG]);
       server.serializeAttachment(attachment);
-      logger.withFields({ sandboxId }).info('Sandbox control socket accepted');
+      log('socket_accepted', { connectionId: attachment.connectionId });
       return new Response(null, { status: 101, webSocket: client });
     },
 
     async handleMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-      if (ws.readyState !== 1) return;
+      if (ws.readyState !== 1) {
+        log('socket_frame_rejected', { reason: 'socket_not_open' });
+        return;
+      }
 
       const attachment = readAttachment(ws);
+      const diagnostic = {
+        connectionId: attachment?.connectionId,
+        wrapperInstanceId: attachment?.wrapperInstanceId,
+        handshakeComplete: attachment?.handshakeComplete ?? false,
+      };
       if (
         attachment &&
         !attachment.handshakeComplete &&
         Date.now() - attachment.acceptedAt > SANDBOX_HELLO_DEADLINE_MS
       ) {
+        log('socket_frame_rejected', { ...diagnostic, reason: 'handshake_expired' });
         closeSocket(ws, 1008, 'handshake_required');
         return;
       }
 
       const parsed = parseControlFrame(message);
       if (!parsed.ok) {
+        log('socket_frame_rejected', { ...diagnostic, reason: parsed.error.code });
         if (parsed.error.code === 'payload_too_large') {
           closeSocket(ws, 1009, 'payload_too_large');
           return;
@@ -281,8 +298,32 @@ export function createSandboxControlSocketHandler(
       }
 
       const frame = parsed.frame;
+      let eventType = frame.type === 'event' ? diagnosticEventType(frame.event) : undefined;
+      if (
+        frame.type === 'event' &&
+        frame.event === 'session.event' &&
+        typeof frame.payload === 'object' &&
+        frame.payload !== null &&
+        'type' in frame.payload &&
+        typeof frame.payload.type === 'string'
+      ) {
+        eventType = diagnosticEventType(frame.payload.type);
+      }
+      const frameDiagnostic = {
+        ...diagnostic,
+        frameType: frame.type,
+        frameBytes: parsed.bytes,
+        eventType,
+        operation:
+          frame.type === 'request' && isControlOperation(frame.operation)
+            ? frame.operation
+            : undefined,
+        requestId: frame.type !== 'event' ? frame.requestId : undefined,
+      };
+      log('socket_frame_received', frameDiagnostic);
       if (frame.type === 'request' && frame.operation === 'sandbox.hello') {
         if (!isProvisionalSocket(state, ws, attachment)) {
+          log('socket_frame_rejected', { ...frameDiagnostic, reason: 'invalid_provisional' });
           sendJson(
             ws,
             errorResponse(
@@ -299,6 +340,7 @@ export function createSandboxControlSocketHandler(
 
         const payload = parseSandboxHelloPayload(frame.payload);
         if (!payload) {
+          log('socket_frame_rejected', { ...frameDiagnostic, reason: 'invalid_hello' });
           sendJson(
             ws,
             errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox.hello payload')
@@ -316,6 +358,10 @@ export function createSandboxControlSocketHandler(
             return;
           }
           if (!valid) {
+            log('socket_frame_rejected', {
+              ...frameDiagnostic,
+              reason: 'invalid_provider_instance',
+            });
             sendJson(
               ws,
               errorResponse(frame.requestId, 'unauthorized', 'Invalid sandbox provider instance')
@@ -384,11 +430,12 @@ export function createSandboxControlSocketHandler(
           operation: 'sandbox.status',
           payload: {},
         });
-        logger.withFields({ sandboxId }).info('Sandbox control handshake complete');
+        log('socket_handshake_complete', { ...diagnosticConnection(identity), replaced });
         return;
       }
 
       if (!attachment?.handshakeComplete) {
+        log('socket_frame_rejected', { ...frameDiagnostic, reason: 'handshake_required' });
         if (frame.type === 'request') {
           sendJson(
             ws,
@@ -408,27 +455,29 @@ export function createSandboxControlSocketHandler(
         !identity ||
         current.identity.connectionId !== identity.connectionId
       ) {
+        log('socket_frame_rejected', { ...frameDiagnostic, reason: 'stale_connection' });
         closeSocket(ws, 1008, 'stale_connection');
         return;
       }
-      if (activatingConnections.has(identity.connectionId)) return;
+      if (activatingConnections.has(identity.connectionId)) {
+        log('socket_frame_rejected', { ...frameDiagnostic, reason: 'activation_pending' });
+        return;
+      }
 
       if (frame.type === 'response') {
+        log('socket_response', { ...frameDiagnostic, ok: frame.ok });
         waiters.settle(frame);
         return;
       }
 
       if (frame.type === 'event') {
-        if (!isControlEvent(frame.event)) return;
+        if (!isControlEvent(frame.event)) {
+          log('socket_frame_rejected', { ...frameDiagnostic, reason: 'unknown_event' });
+          return;
+        }
         const eventPayload = parseEventPayload(frame.event, frame.payload);
         if (!eventPayload.ok) {
-          logger
-            .withFields({
-              sandboxId,
-              event: frame.event,
-              error: eventPayload.error.message,
-            })
-            .warn('Control event payload rejected');
+          log('socket_frame_rejected', { ...frameDiagnostic, reason: 'invalid_event_payload' });
           return;
         }
         if (frame.event === 'sandbox.ready') {
@@ -479,12 +528,11 @@ export function createSandboxControlSocketHandler(
     async handleClose(ws: WebSocket): Promise<void> {
       const attachment = readAttachment(ws);
       const handshakeComplete = attachment?.handshakeComplete === true;
-      logger
-        .withFields({
-          sandboxId,
-          handshakeComplete,
-        })
-        .info('Sandbox control socket closed');
+      log('socket_closed', {
+        connectionId: attachment?.connectionId,
+        wrapperInstanceId: attachment?.wrapperInstanceId,
+        handshakeComplete,
+      });
       if (!handshakeComplete) return;
 
       const current = currentHandshakenSocket(state);
@@ -538,6 +586,13 @@ export function createSandboxControlSocketHandler(
         ...(input.session ? { session: input.session } : {}),
       };
       const pending = waiters.wait(requestId, input.timeoutMs);
+      log('socket_request_sent', {
+        ...diagnosticConnection(current.identity),
+        requestId,
+        operation: input.operation,
+        sessionId: input.session?.sessionId,
+        timeoutMs: input.timeoutMs,
+      });
       sendJson(current.socket, frame);
       return pending;
     },

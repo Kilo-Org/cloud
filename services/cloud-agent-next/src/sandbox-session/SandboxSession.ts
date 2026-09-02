@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -16,7 +17,13 @@ import {
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
-import { withDORetry } from '../utils/do-retry.js';
+import {
+  diagnosticCause,
+  diagnosticEventType,
+  logControlDiagnostic,
+  withControlDORetry as withDORetry,
+  type ControlDiagnosticFields,
+} from '../sandbox-control/diagnostics.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -76,6 +83,7 @@ import {
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  controlErrorCodes,
   sessionAttachResultSchema,
   sessionMessageOutcomeSchema,
   sessionPromptResultSchema,
@@ -273,19 +281,30 @@ export class SandboxSession extends DurableObject<Env> {
   private async applySandboxControlEvent(
     input: SandboxControlEventInput & { wrapperInstanceId?: string }
   ): Promise<{ applied: boolean }> {
+    const startedAt = Date.now();
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (!metadata || epoch === null) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          eventType: input.payload.type,
-        })
-        .warn('receiveSandboxControlEvent rejected; session metadata missing');
-      return { applied: false };
-    }
+    const result = (
+      applied: boolean,
+      disposition: string,
+      fields: ControlDiagnosticFields = {}
+    ) => {
+      logControlDiagnostic('session_event_result', {
+        sessionId: this.sessionId,
+        sandboxId: metadata?.workspace?.sandboxId,
+        wrapperInstanceId: input.wrapperInstanceId,
+        eventType: diagnosticEventType(input.payload.type),
+        applied,
+        disposition,
+        durationMs: Date.now() - startedAt,
+        ...fields,
+      });
+      return { applied };
+    };
+    if (!metadata || epoch === null) return result(false, 'session_unavailable');
     const root = metadata.auth.kiloSessionId;
-    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
+    if (input.identity.directory !== this.directory(metadata))
+      return result(false, 'directory_mismatch');
     const payloadKiloSessionId = ingestKiloSessionId(input.payload.type, input.payload.properties);
     const identityKiloSessionId = input.identity.kiloSessionId;
     const eventKiloSessionId = identityKiloSessionId ?? payloadKiloSessionId;
@@ -302,15 +321,7 @@ export class SandboxSession extends DurableObject<Env> {
         identityKiloSessionId !== root &&
         payloadKiloSessionId !== root)
     ) {
-      logger
-        .withFields({
-          sessionId: this.sessionId,
-          eventType: input.payload.type,
-          rootKiloSessionId: input.identity.rootKiloSessionId,
-          expectedRootKiloSessionId: root,
-        })
-        .warn('receiveSandboxControlEvent rejected; kilo session mismatch');
-      return { applied: false };
+      return result(false, 'root_mismatch');
     }
     if (input.payload.type === 'session.created' || input.payload.type === 'session.updated') {
       const info = input.payload.properties.info;
@@ -331,48 +342,66 @@ export class SandboxSession extends DurableObject<Env> {
     const sessionId = this.requireSessionId();
     if (input.payload.type === 'session.message.outcome') {
       const outcome = sessionMessageOutcomeSchema.safeParse(input.payload.properties);
-      if (
-        !outcome.success ||
-        !input.wrapperInstanceId ||
-        (eventKiloSessionId !== undefined && root !== undefined && eventKiloSessionId !== root)
-      ) {
-        return { applied: false };
+      if (!outcome.success) return result(false, 'invalid_outcome');
+      if (!input.wrapperInstanceId) return result(false, 'missing_wrapper_identity');
+      if (eventKiloSessionId !== undefined && root !== undefined && eventKiloSessionId !== root) {
+        return result(false, 'root_mismatch');
       }
       const messages = this.loadMessages();
       const existing = messages.find(message => message.messageId === outcome.data.messageId);
+      const diagnostic = {
+        messageId: existing?.messageId,
+        fromState: existing?.state,
+        outcome: outcome.data.status,
+      };
       if (
         existing?.wrapperInstanceId === input.wrapperInstanceId &&
         existing.state === outcome.data.status
       )
-        return { applied: true };
+        return result(true, 'duplicate', diagnostic);
       const settled = applyMessageOutcome(
         messages,
         outcome.data,
         input.wrapperInstanceId,
         Date.now()
       );
-      if (!settled || !this.saveMessages(settled, epoch)) return { applied: false };
+      if (!settled) {
+        return result(
+          false,
+          !existing
+            ? 'message_missing'
+            : existing.state !== 'queued' && existing.state !== 'accepted'
+              ? 'already_terminal'
+              : existing.wrapperInstanceId !== input.wrapperInstanceId
+                ? 'runtime_mismatch'
+                : 'not_queue_head',
+          diagnostic
+        );
+      }
+      if (!this.saveMessages(settled, epoch, 'wrapper_outcome'))
+        return result(false, 'epoch_changed', diagnostic);
       await this.armQueueRetry();
       const nextId = nextQueuedMessageId(this.loadMessages());
       if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
         this.ctx.waitUntil(this.dispatchQueued(nextId));
       }
-      return { applied: true };
+      return result(true, 'outcome_applied', diagnostic);
     }
-    if (!this.isCurrentEventRuntime(input.wrapperInstanceId)) return { applied: false };
+    if (!this.isCurrentEventRuntime(input.wrapperInstanceId))
+      return result(false, 'runtime_mismatch');
     if (
       eventKiloSessionId !== undefined &&
       eventKiloSessionId !== root &&
       (root === undefined || input.identity.rootKiloSessionId !== root)
     )
-      return { applied: false };
+      return result(false, 'root_mismatch');
     if (
       (input.payload.type === 'question.asked' || input.payload.type === 'permission.asked') &&
       !this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'
       )
     )
-      return { applied: false };
+      return result(false, 'no_pending_work');
     this.recordPendingInteraction(input.payload);
     persistSandboxControlSessionEvent({
       sessionId,
@@ -394,7 +423,7 @@ export class SandboxSession extends DurableObject<Env> {
         } catch {
           internalSecret = undefined;
         }
-        if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
+        if (!this.terminalLifecycle.isCurrent(epoch)) return result(false, 'epoch_changed');
         if (!internalSecret) {
           logger
             .withFields({
@@ -428,7 +457,8 @@ export class SandboxSession extends DurableObject<Env> {
         this.ctx.waitUntil(publication);
       }
     }
-    return { applied: this.terminalLifecycle.isCurrent(epoch) };
+    const applied = this.terminalLifecycle.isCurrent(epoch);
+    return result(applied, applied ? 'applied' : 'epoch_changed');
   }
 
   async receiveSandboxControlPreparing(input: {
@@ -438,15 +468,26 @@ export class SandboxSession extends DurableObject<Env> {
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (!metadata || epoch === null) return { applied: false };
+    const result = (applied: boolean, disposition: string) => {
+      logControlDiagnostic('session_preparing_result', {
+        sessionId: this.sessionId,
+        sandboxId: metadata?.workspace?.sandboxId,
+        wrapperInstanceId: input.wrapperInstanceId,
+        applied,
+        disposition,
+      });
+      return { applied };
+    };
+    if (!metadata || epoch === null) return result(false, 'session_unavailable');
     const root = metadata.auth.kiloSessionId;
-    if (input.identity.directory !== this.directory(metadata)) return { applied: false };
+    if (input.identity.directory !== this.directory(metadata))
+      return result(false, 'directory_mismatch');
     if (
       input.identity.rootKiloSessionId !== undefined &&
       root !== undefined &&
       input.identity.rootKiloSessionId !== root
     ) {
-      return { applied: false };
+      return result(false, 'root_mismatch');
     }
     const message = this.loadMessages().find(
       item => item.messageId === input.payload.triggerMessageId
@@ -458,9 +499,18 @@ export class SandboxSession extends DurableObject<Env> {
       (input.wrapperInstanceId !== undefined &&
         message.wrapperInstanceId !== input.wrapperInstanceId)
     ) {
-      return { applied: false };
+      return result(
+        false,
+        !this.terminalLifecycle.isCurrent(epoch)
+          ? 'epoch_changed'
+          : !message
+            ? 'message_missing'
+            : message.preparationAttemptId !== input.payload.attemptId
+              ? 'attempt_mismatch'
+              : 'runtime_mismatch'
+      );
     }
-    if (message.state !== 'queued') return { applied: true };
+    if (message.state !== 'queued') return result(true, 'already_settled');
     const sessionId = this.requireSessionId();
     applyControlPlanePreparingEvent({
       sessionId,
@@ -468,7 +518,7 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       broadcast: event => this.broadcastStoredEvent(event),
     });
-    return { applied: true };
+    return result(true, 'processed');
   }
 
   async closeOrgStreams(organizationId: string): Promise<number> {
@@ -604,6 +654,21 @@ export class SandboxSession extends DurableObject<Env> {
       return { success: true };
     } catch {
       if (!this.isCurrentAcceptedMessage(accepted, epoch)) return { success: true };
+      logControlDiagnostic(
+        'session_interrupt_failed',
+        {
+          sessionId: this.sessionId,
+          messageId: accepted.messageId,
+          expectedWrapperInstanceId: accepted.wrapperInstanceId,
+          sandboxId,
+          kiloSessionId,
+          worktreeId: metadata?.workspace?.worktreeId,
+          epoch,
+          operation: 'session.abort',
+          cause: 'runtime_unhealthy',
+        },
+        'warn'
+      );
       await this.failDelivery(accepted.messageId, 'runtime_unhealthy', accepted.wrapperInstanceId);
       return { success: false, message: 'The session runtime could not be interrupted' };
     }
@@ -1059,24 +1124,61 @@ export class SandboxSession extends DurableObject<Env> {
         decision.action === 'rearm' ? decision.at : now + DEADLINE_MS.acceptedAlarmCap
       );
       if (decision.action === 'check') {
+        const startedAt = Date.now();
+        const diagnostic: ControlDiagnosticFields = {
+          sessionId: this.sessionId,
+          messageId: accepted.messageId,
+          expectedWrapperInstanceId: accepted.wrapperInstanceId,
+          epoch,
+          acceptedAt: accepted.acceptedAt,
+          lastActivityAt: accepted.lastActivityAt,
+          stage: 'sync',
+        };
+        const report = (result: 'healthy' | 'superseded' | 'runtime_unhealthy') =>
+          logControlDiagnostic(
+            'accepted_reconciliation',
+            { ...diagnostic, phase: 'finished', result, durationMs: Date.now() - startedAt },
+            result === 'runtime_unhealthy' ? 'warn' : 'info'
+          );
+        logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
         try {
-          const snapshot = await this.syncAcceptedMessage(accepted, epoch);
-          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) return;
+          const snapshot = await this.syncAcceptedMessage(accepted, epoch, 'accepted_alarm');
+          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) {
+            diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
+            report('superseded');
+            return;
+          }
+          diagnostic.stage = 'activity_check';
+          diagnostic.syncStatus = diagnosticSyncStatus(snapshot.status.type);
+          diagnostic.questionCount = snapshot.questions.length;
+          diagnostic.permissionCount = snapshot.permissions.length;
           const healthy =
             snapshot.status.type === 'busy' ||
             snapshot.status.type === 'retry' ||
             snapshot.questions.length > 0 ||
             snapshot.permissions.length > 0;
-          if (!healthy) throw new Error('Accepted execution is no longer active');
+          diagnostic.healthy = healthy;
+          if (!healthy) {
+            diagnostic.reason = 'inactive_snapshot';
+            throw new Error('Accepted execution is no longer active');
+          }
+          diagnostic.stage = 'record_activity';
           const active = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
-          if (active) this.saveMessages(active, epoch);
+          diagnostic.activityRecorded = active ? this.saveMessages(active, epoch) : false;
+          report('healthy');
         } catch {
           if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+            diagnostic.reason ??=
+              diagnostic.stage === 'record_activity' ? 'activity_record_failed' : 'sync_failed';
+            report('runtime_unhealthy');
             await this.failDelivery(
               accepted.messageId,
               'runtime_unhealthy',
               accepted.wrapperInstanceId
             );
+          } else {
+            diagnostic.reason = 'accepted_message_changed';
+            report('superseded');
           }
         }
       }
@@ -1802,92 +1904,220 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async syncAcceptedMessage(
     message: MessageRecord,
-    epoch: number
+    epoch: number,
+    trigger: 'accepted_alarm' | 'pending_interactions'
   ): Promise<SessionSyncResult | undefined> {
-    const metadata = this.terminalLifecycle.getStoredMetadata();
-    const sandboxId = metadata?.workspace?.sandboxId;
-    const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (
-      !metadata ||
-      !sandboxId ||
-      !kiloSessionId ||
-      !message.wrapperInstanceId ||
-      this.pendingRuntimeCleanup()
-    ) {
-      throw new Error('Accepted runtime is unavailable');
-    }
-    const control = sandboxControlRpc(this.env, sandboxId);
-    const status = await withTimeout(
-      control.getStatus(),
-      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-      'Runtime status timed out'
-    );
-    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
-    if (
-      status.connection !== 'ready' ||
-      status.physical !== 'running' ||
-      status.wrapperInstanceId !== message.wrapperInstanceId
-    ) {
-      throw new Error('Accepted runtime is not ready');
-    }
-    const revision = this.readPendingInteractions()?.revision;
-    const response = await withTimeout(
-      control.request({
-        operation: 'session.sync',
-        expectedWrapperInstanceId: message.wrapperInstanceId,
-        session: {
-          sessionId: metadata.identity.sessionId,
-          kiloSessionId,
-          directory: this.directory(metadata),
-        },
-        payload: {},
-      }),
-      SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-      'Session sync timed out'
-    );
-    if (!this.isCurrentAcceptedMessage(message, epoch)) return undefined;
-    if (!response.ok) throw new Error('Session sync failed');
-    const parsed = sessionSyncResultSchema.parse(response.result);
-    const belongsToRoot = (request: unknown): boolean => {
-      if (
-        typeof request !== 'object' ||
-        request === null ||
-        Array.isArray(request) ||
-        !('id' in request) ||
-        typeof request.id !== 'string' ||
-        request.id.length === 0 ||
-        !('sessionID' in request) ||
-        typeof request.sessionID !== 'string' ||
-        request.sessionID.length === 0
-      )
-        return false;
-      const root = 'rootKiloSessionId' in request ? request.rootKiloSessionId : undefined;
-      return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
+    const startedAt = Date.now();
+    const diagnostic: ControlDiagnosticFields = {
+      sessionId: this.sessionId,
+      messageId: message.messageId,
+      expectedWrapperInstanceId: message.wrapperInstanceId,
+      epoch,
+      trigger,
+      stage: 'runtime_context',
+      timeoutMs: SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+      timedOut: false,
     };
-    const result = metadata.workspace?.worktreeId
-      ? {
-          ...parsed,
-          questions: parsed.questions.filter(belongsToRoot),
-          permissions: parsed.permissions.filter(belongsToRoot),
+    let outcome: 'synced' | 'superseded' | 'failed' = 'failed';
+    logControlDiagnostic('session_sync', { ...diagnostic, phase: 'started' });
+    try {
+      const metadata = this.terminalLifecycle.getStoredMetadata();
+      const sandboxId = metadata?.workspace?.sandboxId;
+      const kiloSessionId = metadata?.auth.kiloSessionId;
+      diagnostic.sandboxId = sandboxId;
+      diagnostic.kiloSessionId = kiloSessionId;
+      diagnostic.worktreeId = metadata?.workspace?.worktreeId;
+      if (
+        !metadata ||
+        !sandboxId ||
+        !kiloSessionId ||
+        !message.wrapperInstanceId ||
+        this.pendingRuntimeCleanup()
+      ) {
+        diagnostic.reason = !metadata
+          ? 'missing_metadata'
+          : !sandboxId
+            ? 'missing_sandbox'
+            : !kiloSessionId
+              ? 'missing_kilo_session'
+              : !message.wrapperInstanceId
+                ? 'missing_wrapper_identity'
+                : 'cleanup_pending';
+        throw new Error('Accepted runtime is unavailable');
+      }
+      const control = sandboxControlRpc(this.env, sandboxId);
+      diagnostic.stage = 'runtime_status';
+      const status = await withTimeout(
+        control.getStatus(),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Runtime status timed out',
+        () => {
+          diagnostic.timedOut = true;
         }
-      : parsed;
-    if (this.readPendingInteractions()?.revision === revision) {
-      this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
-        revision: (revision ?? 0) + 1,
-        questions: result.questions,
-        permissions: result.permissions,
+      );
+      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+        outcome = 'superseded';
+        diagnostic.reason = 'accepted_message_changed';
+        return undefined;
+      }
+      diagnostic.stage = 'runtime_identity';
+      const connection = status?.connection;
+      const physical = status?.physical;
+      const observedWrapperId = status?.wrapperInstanceId;
+      const observedWrapper = wrapperInstanceIdSchema.safeParse(observedWrapperId);
+      diagnostic.connection =
+        connection === undefined
+          ? 'missing'
+          : ['disconnected', 'connected', 'ready'].includes(connection)
+            ? connection
+            : 'other';
+      diagnostic.physical =
+        physical === undefined
+          ? 'missing'
+          : ['stopped', 'creating', 'running', 'stopping', 'failed', 'unknown'].includes(physical)
+            ? physical
+            : 'other';
+      diagnostic.observedWrapperInstanceId =
+        observedWrapperId === undefined
+          ? undefined
+          : observedWrapper.success
+            ? observedWrapper.data
+            : 'invalid';
+      diagnostic.wrapperMatches = observedWrapperId === message.wrapperInstanceId;
+      if (
+        status.connection !== 'ready' ||
+        status.physical !== 'running' ||
+        status.wrapperInstanceId !== message.wrapperInstanceId
+      ) {
+        diagnostic.reason =
+          status.connection !== 'ready'
+            ? 'connection_not_ready'
+            : status.physical !== 'running'
+              ? 'physical_not_running'
+              : 'wrapper_mismatch';
+        throw new Error('Accepted runtime is not ready');
+      }
+      diagnostic.stage = 'read_interactions';
+      const revision = this.readPendingInteractions()?.revision;
+      diagnostic.interactionRevision = revision;
+      diagnostic.stage = 'sync_request';
+      const response = await withTimeout(
+        control.request({
+          operation: 'session.sync',
+          expectedWrapperInstanceId: message.wrapperInstanceId,
+          session: {
+            sessionId: metadata.identity.sessionId,
+            kiloSessionId,
+            directory: this.directory(metadata),
+          },
+          payload: {},
+        }),
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+        'Session sync timed out',
+        () => {
+          diagnostic.timedOut = true;
+        }
+      );
+      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+        outcome = 'superseded';
+        diagnostic.reason = 'accepted_message_changed';
+        return undefined;
+      }
+      diagnostic.requestId = response?.requestId;
+      diagnostic.responseOk = typeof response?.ok === 'boolean' ? response.ok : undefined;
+      if (!response.ok) {
+        diagnostic.reason = 'sync_rejected';
+        const errorCode = response.error?.code;
+        diagnostic.errorCode = controlErrorCodes.some(code => code === errorCode)
+          ? errorCode
+          : 'other';
+        diagnostic.retryable =
+          typeof response.error?.retryable === 'boolean' ? response.error.retryable : undefined;
+        throw new Error('Session sync failed');
+      }
+      diagnostic.stage = 'validate_sync_result';
+      const parsed = sessionSyncResultSchema.parse(response.result);
+      diagnostic.syncStatus = diagnosticSyncStatus(parsed.status.type);
+      diagnostic.receivedQuestionCount = parsed.questions.length;
+      diagnostic.receivedPermissionCount = parsed.permissions.length;
+      const belongsToRoot = (request: unknown): boolean => {
+        if (
+          typeof request !== 'object' ||
+          request === null ||
+          Array.isArray(request) ||
+          !('id' in request) ||
+          typeof request.id !== 'string' ||
+          request.id.length === 0 ||
+          !('sessionID' in request) ||
+          typeof request.sessionID !== 'string' ||
+          request.sessionID.length === 0
+        )
+          return false;
+        const root = 'rootKiloSessionId' in request ? request.rootKiloSessionId : undefined;
+        return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
+      };
+      diagnostic.stage = 'scope_interactions';
+      const result = metadata.workspace?.worktreeId
+        ? {
+            ...parsed,
+            questions: parsed.questions.filter(belongsToRoot),
+            permissions: parsed.permissions.filter(belongsToRoot),
+          }
+        : parsed;
+      diagnostic.questionCount = result.questions.length;
+      diagnostic.permissionCount = result.permissions.length;
+      diagnostic.stage = 'interaction_revision';
+      const applyInteractions = this.readPendingInteractions()?.revision === revision;
+      diagnostic.interactionSnapshotApplied = false;
+      if (applyInteractions) {
+        diagnostic.stage = 'persist_interactions';
+        this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+          revision: (revision ?? 0) + 1,
+          questions: result.questions,
+          permissions: result.permissions,
+        });
+        diagnostic.interactionSnapshotApplied = true;
+      }
+      diagnostic.stage = 'persist_status';
+      persistSandboxControlSessionEvent({
+        sessionId: metadata.identity.sessionId,
+        payload: {
+          type: 'session.status',
+          properties: { sessionID: kiloSessionId, status: result.status },
+        },
+        eventQueries: this.eventQueries,
+        broadcast: event => this.broadcastStoredEvent(event),
       });
+      outcome = 'synced';
+      return result;
+    } catch (error) {
+      diagnostic.reason ??= diagnostic.timedOut
+        ? 'timeout'
+        : error instanceof z.ZodError
+          ? 'invalid_response'
+          : 'operation_failed';
+      diagnostic.errorClass =
+        error instanceof z.ZodError
+          ? 'validation_error'
+          : error instanceof TypeError
+            ? 'type_error'
+            : error instanceof Error
+              ? 'error'
+              : 'non_error';
+      if (error instanceof z.ZodError) {
+        diagnostic.validationIssueCount = error.issues.length;
+        diagnostic.invalidStatus = error.issues.some(issue => issue.path[0] === 'status');
+        diagnostic.invalidQuestions = error.issues.some(issue => issue.path[0] === 'questions');
+        diagnostic.invalidPermissions = error.issues.some(issue => issue.path[0] === 'permissions');
+      }
+      throw error;
+    } finally {
+      logControlDiagnostic(
+        'session_sync',
+        { ...diagnostic, phase: 'finished', result: outcome, durationMs: Date.now() - startedAt },
+        outcome === 'failed' ? 'warn' : 'info'
+      );
     }
-    persistSandboxControlSessionEvent({
-      sessionId: metadata.identity.sessionId,
-      payload: {
-        type: 'session.status',
-        properties: { sessionID: kiloSessionId, status: result.status },
-      },
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcastStoredEvent(event),
-    });
-    return result;
   }
 
   private async derivePendingInteractions(): Promise<
@@ -1898,7 +2128,7 @@ export class SandboxSession extends DurableObject<Env> {
     const accepted = this.loadMessages().find(message => message.state === 'accepted');
     if (accepted) {
       try {
-        await this.syncAcceptedMessage(accepted, epoch);
+        await this.syncAcceptedMessage(accepted, epoch, 'pending_interactions');
       } catch {
         logger
           .withFields({ sessionId: this.sessionId })
@@ -2047,7 +2277,11 @@ export class SandboxSession extends DurableObject<Env> {
     return this.ctx.storage.kv.get<MessageRecord[]>(MESSAGES_KEY) ?? [];
   }
 
-  private saveMessages(messages: MessageRecord[], epoch?: number): boolean {
+  private saveMessages(
+    messages: MessageRecord[],
+    epoch?: number,
+    source: 'coordinator' | 'wrapper_outcome' = 'coordinator'
+  ): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
     if (
       this.deletedWorktreeId ||
@@ -2056,6 +2290,7 @@ export class SandboxSession extends DurableObject<Env> {
     )
       return false;
     const events: StoredEvent[] = [];
+    const committed: ControlDiagnosticFields[] = [];
     this.ctx.storage.transactionSync(() => {
       const before = this.loadMessages();
       const previousById = new Map(before.map(message => [message.messageId, message]));
@@ -2070,6 +2305,13 @@ export class SandboxSession extends DurableObject<Env> {
           if (previous?.state !== 'accepted') {
             const event = this.persistMessageLifecycleEvent(message);
             if (event) events.push(event);
+            committed.push({
+              messageId: message.messageId,
+              wrapperInstanceId: message.wrapperInstanceId,
+              fromState: previous?.state,
+              toState: message.state,
+              lifecycleEventInserted: event !== undefined,
+            });
           }
           return message;
         }
@@ -2084,6 +2326,15 @@ export class SandboxSession extends DurableObject<Env> {
         }
         const event = this.persistMessageLifecycleEvent(terminal);
         if (event) events.push(event);
+        committed.push({
+          messageId: terminal.messageId,
+          wrapperInstanceId: terminal.wrapperInstanceId,
+          fromState: previous?.state,
+          toState: terminal.state,
+          terminalAt: terminal.terminalAt,
+          lifecycleEventInserted: event !== undefined,
+          cause: terminal.failedReason ? diagnosticCause(terminal.failedReason) : undefined,
+        });
         if (terminal.preparationAttemptId) {
           events.push(
             ...finalizePreparationAttempt(
@@ -2106,6 +2357,13 @@ export class SandboxSession extends DurableObject<Env> {
       });
       this.ctx.storage.kv.put(MESSAGES_KEY, next);
     });
+    for (const fields of committed) {
+      logControlDiagnostic('session_message_committed', {
+        sessionId: this.sessionId,
+        source,
+        ...fields,
+      });
+    }
     for (const event of events) this.broadcastStoredEvent(event);
     return true;
   }

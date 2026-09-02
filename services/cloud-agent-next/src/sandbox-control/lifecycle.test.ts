@@ -23,6 +23,7 @@ import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
+import { validateControlLogUploadGrant } from './log-upload-grant.js';
 
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
@@ -687,6 +688,76 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.sendRequest).not.toHaveBeenCalled();
     }
   );
+
+  it('launches the wrapper with an upload-only grant scoped to its physical allocation', async () => {
+    const secret = 'test-log-upload-signing-secret';
+    let launchEnv: Record<string, string> | undefined;
+    const h = await harness({
+      env: { NEXTAUTH_SECRET: { get: async () => secret } },
+      configureAllocation: runtime => {
+        runtime.startProcess.mockImplementation(
+          async (_command: string, options: { env: Record<string, string> }) => {
+            launchEnv = options.env;
+            return { id: 'proc_1' };
+          }
+        );
+      },
+    });
+    await h.create();
+    const physical = await h.control.getPhysicalRecord();
+    expect(launchEnv).toBeDefined();
+    if (!launchEnv) throw new Error('Wrapper was not launched');
+    expect(
+      validateControlLogUploadGrant(`Bearer ${launchEnv.CONTROL_LOG_UPLOAD_GRANT}`, secret)
+    ).toMatchObject({
+      sandboxId: SANDBOX_ID,
+      allocationId: physical.createIntent?.intentId,
+      wrapperInstanceId: launchEnv.CONTROL_WRAPPER_INSTANCE_ID,
+    });
+    expect(launchEnv.CONTROL_LOG_UPLOAD_URL).toBe(
+      `https://example.test/sandbox-logs/${SANDBOX_ID}/${physical.createIntent?.intentId}/${launchEnv.CONTROL_WRAPPER_INSTANCE_ID}`
+    );
+    expect(Object.values(launchEnv)).not.toContain(secret);
+  });
+
+  it('launches without diagnostic credentials when the signing secret lookup stalls', async () => {
+    const lookup = deferred<string>();
+    const entered = deferred<void>();
+    const launches: Record<string, string>[] = [];
+    const h = await harness({
+      env: {
+        NEXTAUTH_SECRET: {
+          get: () => {
+            entered.resolve();
+            return lookup.promise;
+          },
+        },
+      },
+      configureAllocation: runtime => {
+        runtime.startProcess.mockImplementation(
+          async (_command: string, options: { env: Record<string, string> }) => {
+            launches.push(options.env);
+            return { id: 'proc_1' };
+          }
+        );
+      },
+    });
+    const creating = h.create();
+    await entered.promise;
+    try {
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(launches).toHaveLength(1);
+      expect(launches[0]).toMatchObject({ SANDBOX_CONTROL_CREDENTIAL: expect.any(String) });
+      expect(launches[0]).not.toHaveProperty('CONTROL_LOG_UPLOAD_GRANT');
+      expect(launches[0]).not.toHaveProperty('CONTROL_LOG_UPLOAD_URL');
+      await expect(creating).resolves.toMatchObject({ physical: 'running' });
+    } finally {
+      lookup.resolve('late-test-signing-secret');
+      await creating;
+    }
+    expect(launches).toHaveLength(1);
+    expect(launches[0]).not.toHaveProperty('CONTROL_LOG_UPLOAD_GRANT');
+  });
 
   it('binds concurrent acquisition replays to one allocation before provider I/O', async () => {
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
@@ -1805,15 +1876,18 @@ describe('SandboxControl lifecycle boundaries', () => {
         });
         expect(warn).not.toHaveBeenCalled();
         await h.hooks.onHeartbeat?.(payload, identity);
-        expect(fields).toHaveBeenCalledExactlyOnceWith({
-          sandboxId: SANDBOX_ID,
-          wrapperInstanceId: identity.wrapperInstanceId,
-          connectionId: identity.connectionId,
-          reason: reason ?? 'unknown',
-        });
-        expect(warn).toHaveBeenCalledExactlyOnceWith(
-          'Sandbox control received unhealthy heartbeat'
+        expect(fields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sandboxId: SANDBOX_ID,
+            wrapperInstanceId: identity.wrapperInstanceId,
+            connectionId: identity.connectionId,
+            reason: reason ?? 'unknown',
+            logTag: 'sandbox_control',
+            diagnosticEvent: 'heartbeat',
+            decision: 'kilo_unhealthy',
+          })
         );
+        expect(warn).toHaveBeenCalledExactlyOnceWith('Sandbox control diagnostic');
         await h.flush();
         expect(runtime?.state.running).toBe(false);
         expect(h.session.failWaitingMessages).toHaveBeenCalledWith(

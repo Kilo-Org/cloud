@@ -493,11 +493,15 @@ describe('applyMetadataChanges', () => {
 
   describe('glanceable aggregate refresh', () => {
     it.each([
-      ['idle', 'busy', { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 }],
-      ['busy', 'retry', { status: 'happy', running: 0, needsInput: 0, reconnecting: 1 }],
-      ['question', 'busy', { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 }],
-      ['permission', 'idle', { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 }],
-      ['busy', 'idle', { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 }],
+      ['idle', 'busy', { status: 'happy', running: 1, needsInput: 0, idle: 0 }],
+      // Reconnecting is not its own count: the surfaces draw one orange state
+      // for "the agent is waiting on you", and a retry is a wait.
+      ['busy', 'retry', { status: 'happy', running: 0, needsInput: 1, idle: 0 }],
+      ['question', 'busy', { status: 'happy', running: 1, needsInput: 0, idle: 0 }],
+      // An idle agent is connected, so it is work to show, not an empty
+      // aggregate: the surfaces draw it as the third, white row.
+      ['permission', 'idle', { status: 'happy', running: 0, needsInput: 0, idle: 1 }],
+      ['busy', 'idle', { status: 'happy', running: 0, needsInput: 0, idle: 1 }],
     ] as const)(
       'delivers persisted cloud status %s → %s without attention or stream clients',
       async (initialStatus, status, expected) => {

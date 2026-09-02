@@ -601,11 +601,15 @@ describe('UserConnectionDO', () => {
         await flushAsync();
       }
       expect(messages.map(message => message.data)).toMatchObject([
-        { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 },
-        { status: 'happy', running: 0, needsInput: 0, reconnecting: 1 },
-        { status: 'happy', running: 0, needsInput: 1, reconnecting: 0 },
-        { status: 'happy', running: 1, needsInput: 0, reconnecting: 0 },
-        { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+        { status: 'happy', running: 1, needsInput: 0, idle: 0 },
+        // The retry and the question deliver the same counts, because one
+        // orange state covers both, but each still delivers: the coordinator
+        // resends on a root status change, not on a count change.
+        { status: 'happy', running: 0, needsInput: 1, idle: 0 },
+        { status: 'happy', running: 0, needsInput: 1, idle: 0 },
+        { status: 'happy', running: 1, needsInput: 0, idle: 0 },
+        // Idle is a count, not an empty aggregate.
+        { status: 'happy', running: 0, needsInput: 0, idle: 1 },
       ]);
       expect(messages.every(message => message._contentAvailable && !message.body)).toBe(true);
       expect(
@@ -649,9 +653,9 @@ describe('UserConnectionDO', () => {
       ]);
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
-        { running: 1, needsInput: 0, reconnecting: 1 },
-        { running: 0, needsInput: 1, reconnecting: 1 },
-        { running: 1, needsInput: 0, reconnecting: 1 },
+        { running: 1, needsInput: 1, idle: 0 },
+        { running: 0, needsInput: 2, idle: 0 },
+        { running: 1, needsInput: 1, idle: 0 },
       ]);
     });
 
@@ -674,9 +678,7 @@ describe('UserConnectionDO', () => {
       expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'retry' }]);
       sendHeartbeat(restored, cliWs, [makeSession('s1', 'retry')]);
       await flushAsync();
-      expect(messages.map(message => message.data)).toMatchObject([
-        { running: 0, reconnecting: 1 },
-      ]);
+      expect(messages.map(message => message.data)).toMatchObject([{ running: 0, needsInput: 1 }]);
     });
 
     it('delivers an empty aggregate when a root disappears from the heartbeat', async () => {
@@ -688,7 +690,7 @@ describe('UserConnectionDO', () => {
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
         { running: 1 },
-        { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+        { status: 'empty', running: 0, needsInput: 0, idle: 0 },
       ]);
     });
 
@@ -712,7 +714,7 @@ describe('UserConnectionDO', () => {
         await disconnect;
         await flushAsync();
         expect(messages.map(message => message.data)).toMatchObject([
-          { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+          { status: 'empty', running: 0, needsInput: 0, idle: 0 },
         ]);
       }
     );

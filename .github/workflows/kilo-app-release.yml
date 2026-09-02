@@ -1,10 +1,17 @@
 name: kilo-app Release
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+# cancel-in-progress: false lets a running release finish. GitHub keeps one run
+# pending per group and cancels the previously pending run, so a burst of merges
+# releases the newest commit, not every one of them.
 concurrency:
   group: kilo-app-release
   cancel-in-progress: false

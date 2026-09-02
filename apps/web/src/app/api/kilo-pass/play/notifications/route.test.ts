@@ -147,6 +147,20 @@ describe('POST /api/kilo-pass/play/notifications', () => {
     expect(await response.json()).toEqual({ error: 'Missing Pub/Sub message data' });
   });
 
+  it('returns 400 when the request body is not JSON', async () => {
+    const response = await POST(
+      new Request('https://app.example.com/api/kilo-pass/play/notifications', {
+        method: 'POST',
+        body: 'not-json',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Missing Pub/Sub message data' });
+    expect(mockProcess).not.toHaveBeenCalled();
+  });
+
   it('processes Play notification payloads', async () => {
     const response = await POST(
       request({ message: { data: 'cGF5bG9hZA==', messageId: 'msg-1' } }, 'valid-token')

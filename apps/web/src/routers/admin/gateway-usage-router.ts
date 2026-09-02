@@ -1,10 +1,12 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
+import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { executeSnowflakeStatement, resolveSnowflakeConfig } from '@/lib/snowflake';
+import { readDb, usesSeparateReplica } from '@/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { timedUsageQuery } from '@/lib/usage-query';
 
 const NonnegativeIntegerStringSchema = z.string().regex(/^\d+$/);
 const DecimalStringSchema = z.string().regex(/^-?\d+(?:\.\d+)?$/);
@@ -27,78 +29,13 @@ const MonthlyUsageSchema = z.object({
   market_cost: NullableCostSumSchema,
 });
 
-const SnowflakeMonthlyUsageRowSchema = z
-  .tuple([
-    z.string().nullable(),
-    z
-      .enum(['true', 'false', 'TRUE', 'FALSE'])
-      .nullable()
-      .transform(value => (value === null ? null : value.toLowerCase() === 'true')),
-    NonnegativeIntegerStringSchema,
-    NonnegativeIntegerStringSchema,
-    NullableTokenSumSchema,
-    NullableTokenSumSchema,
-    NullableTokenSumSchema,
-    NullableTokenSumSchema,
-    NullableCostSumSchema,
-    NullableCostSumSchema,
-  ])
-  .transform(
-    ([
-      provider,
-      is_byok,
-      users,
-      logged_in_users,
-      input_tokens,
-      output_tokens,
-      cache_read_tokens,
-      cache_write_tokens,
-      cost,
-      market_cost,
-    ]) => ({
-      provider,
-      is_byok,
-      users,
-      logged_in_users,
-      input_tokens,
-      output_tokens,
-      cache_read_tokens,
-      cache_write_tokens,
-      cost,
-      market_cost,
-    })
-  );
-
-const MONTHLY_USAGE_SQL = `
-  SELECT
-    provider,
-    is_byok,
-    COUNT(DISTINCT kilo_user_id) AS users,
-    COUNT(DISTINCT CASE WHEN kilo_user_id NOT ILIKE 'anon:%' THEN kilo_user_id END) AS logged_in_users,
-    SUM(input_tokens) AS input_tokens,
-    SUM(output_tokens) AS output_tokens,
-    SUM(cache_read_tokens) AS cache_read_tokens,
-    SUM(cache_write_tokens) AS cache_write_tokens,
-    SUM(cost) AS cost,
-    SUM(market_cost) AS market_cost
-  FROM microdollar_usage
-  WHERE requested_model = ?
-    AND is_user_byok = false
-    AND usage_date >= TO_DATE(?)
-    AND usage_date < TO_DATE(?)
-  GROUP BY provider, is_byok
-  ORDER BY provider, is_byok
-`;
-
-const QUERY_GRACE_MS = 30_000;
-
 function monthlyUsageTimeoutMs(): number {
   const configured = Number(getEnvVariable('USAGE_QUERY_TIMEOUT_ADMIN_MS'));
   const adminTimeoutMs =
-    Number.isFinite(configured) && configured > 0 && configured <= 2_147_483_647 - QUERY_GRACE_MS
+    Number.isInteger(configured) && configured >= 0 && configured <= 2_147_483_647
       ? configured
       : 20_000;
-  return Math.max(10 * 60_000, adminTimeoutMs);
+  return Math.max(600_000, adminTimeoutMs);
 }
 
 export const adminGatewayUsageRouter = createTRPCRouter({
@@ -112,47 +49,57 @@ export const adminGatewayUsageRouter = createTRPCRouter({
     )
     .output(z.array(MonthlyUsageSchema))
     .query(async ({ input, signal }) => {
-      const timeoutMs = monthlyUsageTimeoutMs();
-      const budgetMs = timeoutMs + QUERY_GRACE_MS;
-      const controller = new AbortController();
-      const querySignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-      const timer = setTimeout(
-        () => controller.abort(new DOMException('Gateway usage query timed out', 'TimeoutError')),
-        budgetMs
-      );
-
       try {
-        querySignal.throwIfAborted();
-        const config = resolveSnowflakeConfig();
-        if (!config) {
-          throw new Error('Snowflake configuration unavailable');
+        signal?.throwIfAborted();
+        if (process.env.NODE_ENV === 'production' && !usesSeparateReplica) {
+          throw new Error('Gateway usage requires a read replica');
         }
 
-        const startDate = `${input.year}-${String(input.month).padStart(2, '0')}-01`;
+        const period = `${input.year}-${String(input.month).padStart(2, '0')}`;
+        const startDate = `${period}-01 00:00:00+00`;
         const endYear = input.month === 12 ? input.year + 1 : input.year;
         const endMonth = input.month === 12 ? 1 : input.month + 1;
-        const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
-        const rows = await executeSnowflakeStatement({
-          config,
-          statement: MONTHLY_USAGE_SQL,
-          bindings: [
-            { type: 'TEXT', value: input.model },
-            { type: 'TEXT', value: startDate },
-            { type: 'TEXT', value: endDate },
-          ],
-          timeoutSeconds: Math.ceil(timeoutMs / 1000),
-          pollTimeoutMs: budgetMs,
-          signal: querySignal,
-        });
-        querySignal.throwIfAborted();
-        return z.array(SnowflakeMonthlyUsageRowSchema).parse(rows);
+        const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00+00`;
+        const rows = await timedUsageQuery(
+          {
+            db: readDb,
+            route: 'admin.gatewayUsage.getMonthlyUsage',
+            queryLabel: 'monthly_model_usage',
+            scope: 'admin',
+            period,
+            timeoutMs: monthlyUsageTimeoutMs(),
+          },
+          async tx => {
+            const result = await tx.execute(sql`
+              SELECT
+                mu.provider,
+                meta.is_byok,
+                COUNT(DISTINCT mu.kilo_user_id)::text AS users,
+                COUNT(DISTINCT CASE WHEN mu.kilo_user_id NOT ILIKE 'anon:%' THEN mu.kilo_user_id END)::text AS logged_in_users,
+                SUM(mu.input_tokens)::text AS input_tokens,
+                SUM(mu.output_tokens)::text AS output_tokens,
+                SUM(mu.cache_hit_tokens)::text AS cache_read_tokens,
+                SUM(mu.cache_write_tokens)::text AS cache_write_tokens,
+                SUM(mu.cost)::text AS cost,
+                SUM(meta.market_cost)::text AS market_cost
+              FROM microdollar_usage mu
+              INNER JOIN microdollar_usage_metadata meta ON mu.id = meta.id
+              WHERE mu.requested_model = ${input.model}
+                AND meta.is_user_byok = false
+                AND mu.created_at >= ${startDate}::timestamptz
+                AND mu.created_at < ${endDate}::timestamptz
+              GROUP BY mu.provider, meta.is_byok
+              ORDER BY mu.provider, meta.is_byok
+            `);
+            return result.rows;
+          }
+        );
+        return z.array(MonthlyUsageSchema).parse(rows);
       } catch {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Gateway usage data temporarily unavailable',
         });
-      } finally {
-        clearTimeout(timer);
       }
     }),
 });

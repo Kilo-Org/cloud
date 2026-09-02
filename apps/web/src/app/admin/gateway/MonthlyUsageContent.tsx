@@ -91,9 +91,9 @@ export function MonthlyUsageContent() {
       <div>
         <h3 className="text-lg font-semibold">Monthly model usage</h3>
         <p className="text-muted-foreground text-sm">
-          Snowflake usage grouped by provider and gateway BYOK. Excludes user BYOK and counts
-          logged-in users separately from anonymous users. Queries can take up to 10 minutes, or
-          longer if the configured timeout is higher.
+          PostgreSQL read-replica usage grouped by provider and gateway BYOK. Excludes user BYOK and
+          counts logged-in users separately from anonymous users. Queries can take up to 10 minutes,
+          or longer if the configured timeout is higher.
         </p>
       </div>
       <form onSubmit={runReport} className="flex flex-wrap items-end gap-4">
@@ -139,7 +139,7 @@ export function MonthlyUsageContent() {
       </p>
       {report.isFetching && (
         <p role="status" className="text-muted-foreground text-sm">
-          Querying Snowflake. Keep this tab open while the report runs.
+          Querying the PostgreSQL read replica. Keep this tab open while the report runs.
         </p>
       )}
       {report.error && (
@@ -155,7 +155,7 @@ export function MonthlyUsageContent() {
                 {submitted.year}-{String(submitted.month).padStart(2, '0')} · {submitted.model}
               </p>
               <p className="text-muted-foreground text-xs">
-                Costs use raw Snowflake units, without currency conversion. Null values are shown as
+                Costs are in microdollars (1 USD = 1,000,000 microdollars). Null values are shown as
                 NULL and copied as empty cells. User counts are distinct within each row, not
                 additive.
               </p>

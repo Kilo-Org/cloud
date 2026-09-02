@@ -1,39 +1,44 @@
-jest.mock('@/lib/snowflake', () => ({
-  resolveSnowflakeConfig: jest.fn(),
-  executeSnowflakeStatement: jest.fn(),
-}));
+jest.mock('@/lib/drizzle', () => {
+  const actual = jest.requireActual<typeof import('@/lib/drizzle')>('@/lib/drizzle');
+  return {
+    ...actual,
+    readDb: { ...actual.readDb, transaction: jest.fn(), execute: jest.fn() },
+    get usesSeparateReplica() {
+      return mockUsesSeparateReplica;
+    },
+  };
+});
 jest.mock('@/lib/admin/admin-access-log', () => ({ emitAdminAccessEvent: jest.fn() }));
 jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
-import {
-  executeSnowflakeStatement,
-  resolveSnowflakeConfig,
-  type SnowflakeConfig,
-  type SnowflakeRow,
-} from '@/lib/snowflake';
+import { sql, type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
+import { db, readDb } from '@/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { adminGatewayUsageRouter } from './gateway-usage-router';
 
-const mockResolveConfig = jest.mocked(resolveSnowflakeConfig);
-const mockExecute = jest.mocked(executeSnowflakeStatement);
-const CONFIG = {
-  accountHost: 'account.snowflakecomputing.com',
-  jwtAccountIdentifier: 'ACCOUNT',
-  username: 'user',
-  role: 'role',
-  warehouse: 'warehouse',
-  database: 'database',
-  schema: 'schema',
-  privateKeyPem: 'key',
-  publicKeyFingerprint: 'SHA256:fingerprint',
-} satisfies SnowflakeConfig;
+let mockUsesSeparateReplica = true;
+const mockTransaction = jest.mocked(readDb.transaction);
+const mockReadExecute = jest.mocked(readDb.execute);
+const mockExecute = jest.fn<Promise<{ rows: unknown[] }>, [SQL]>();
 const INPUT = { year: 2026, month: 9, model: 'anthropic/claude-opus-5' };
-const ROW = ['provider-a', 'false', '10', '8', '100', '200', '30', '40', '50.25', '60.50'];
+const ROW = {
+  provider: 'provider-a',
+  is_byok: false,
+  users: '10',
+  logged_in_users: '8',
+  input_tokens: '100',
+  output_tokens: '200',
+  cache_read_tokens: '30',
+  cache_write_tokens: '40',
+  cost: '50.25',
+  market_cost: '60.50',
+};
 const SANITIZED_ERROR = {
   code: 'INTERNAL_SERVER_ERROR',
   message: 'Gateway usage data temporarily unavailable',
 };
-const originalTimeout = process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS;
 
 function caller(isAdmin = true, signal?: AbortSignal) {
   return adminGatewayUsageRouter.createCaller(
@@ -42,52 +47,81 @@ function caller(isAdmin = true, signal?: AbortSignal) {
   );
 }
 
+function executedQuery(index = 1) {
+  return new PgDialect().sqlToQuery(mockExecute.mock.calls[index][0]);
+}
+
 beforeEach(() => {
-  jest.useFakeTimers();
-  jest.clearAllMocks();
-  delete process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS;
-  mockResolveConfig.mockReturnValue(CONFIG);
-  mockExecute.mockResolvedValue([]);
+  jest.replaceProperty(process, 'env', {
+    ...process.env,
+    NODE_ENV: 'test',
+    USAGE_QUERY_TIMEOUT_ADMIN_MS: '',
+  });
+  mockUsesSeparateReplica = true;
+  mockTransaction.mockReset();
+  mockReadExecute.mockReset();
+  mockExecute.mockReset().mockResolvedValue({ rows: [] });
+  mockTransaction.mockImplementation(async callback => callback({ execute: mockExecute } as never));
 });
 
 afterEach(() => {
-  if (originalTimeout === undefined) {
-    delete process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS;
-  } else {
-    process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS = originalTimeout;
-  }
-  jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('admin.gatewayUsage.getMonthlyUsage', () => {
-  it('uses the exact warehouse filters, aggregate columns and grouping without joins or rollups', async () => {
+  beforeEach(() => {
+    jest.spyOn(db, 'transaction').mockRejectedValue(new Error('Unexpected primary transaction'));
+    jest.spyOn(db, 'execute').mockRejectedValue(new Error('Unexpected primary query'));
+  });
+
+  afterEach(() => {
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(mockReadExecute).not.toHaveBeenCalled();
+  });
+
+  it('runs text aggregates and parameterized filters in a replica-only timed transaction', async () => {
     await caller().getMonthlyUsage(INPUT);
 
-    expect(mockExecute).toHaveBeenCalledTimes(1);
-    const request = mockExecute.mock.calls[0][0];
-    expect(request.statement.replace(/\s+/g, ' ').trim()).toBe(
-      'SELECT provider, is_byok, ' +
-        'COUNT(DISTINCT kilo_user_id) AS users, ' +
-        "COUNT(DISTINCT CASE WHEN kilo_user_id NOT ILIKE 'anon:%' THEN kilo_user_id END) AS logged_in_users, " +
-        'SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, ' +
-        'SUM(cache_read_tokens) AS cache_read_tokens, SUM(cache_write_tokens) AS cache_write_tokens, ' +
-        'SUM(cost) AS cost, SUM(market_cost) AS market_cost ' +
-        'FROM microdollar_usage WHERE requested_model = ? AND is_user_byok = false ' +
-        'AND usage_date >= TO_DATE(?) AND usage_date < TO_DATE(?) ' +
-        'GROUP BY provider, is_byok ORDER BY provider, is_byok'
-    );
-    expect(request).toMatchObject({
-      config: CONFIG,
-      bindings: [
-        { type: 'TEXT', value: INPUT.model },
-        { type: 'TEXT', value: '2026-09-01' },
-        { type: 'TEXT', value: '2026-10-01' },
-      ],
-      timeoutSeconds: 600,
-      pollTimeoutMs: 630_000,
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+    expect(executedQuery(0)).toMatchObject({
+      sql: "SET LOCAL statement_timeout = '600000'",
+      params: [],
     });
-    expect(request.signal?.aborted).toBe(false);
-    expect(jest.getTimerCount()).toBe(0);
+    expect(executedQuery().sql.replace(/\s+/g, ' ').trim()).toBe(
+      'SELECT mu.provider, meta.is_byok, ' +
+        'COUNT(DISTINCT mu.kilo_user_id)::text AS users, ' +
+        "COUNT(DISTINCT CASE WHEN mu.kilo_user_id NOT ILIKE 'anon:%' THEN mu.kilo_user_id END)::text AS logged_in_users, " +
+        'SUM(mu.input_tokens)::text AS input_tokens, SUM(mu.output_tokens)::text AS output_tokens, ' +
+        'SUM(mu.cache_hit_tokens)::text AS cache_read_tokens, SUM(mu.cache_write_tokens)::text AS cache_write_tokens, ' +
+        'SUM(mu.cost)::text AS cost, SUM(meta.market_cost)::text AS market_cost ' +
+        'FROM microdollar_usage mu INNER JOIN microdollar_usage_metadata meta ON mu.id = meta.id ' +
+        'WHERE mu.requested_model = $1 AND meta.is_user_byok = false ' +
+        'AND mu.created_at >= $2::timestamptz AND mu.created_at < $3::timestamptz ' +
+        'GROUP BY mu.provider, meta.is_byok ORDER BY mu.provider, meta.is_byok'
+    );
+    expect(executedQuery().params).toEqual([
+      INPUT.model,
+      '2026-09-01 00:00:00+00',
+      '2026-10-01 00:00:00+00',
+    ]);
+  });
+
+  it('waits for SET LOCAL to complete before issuing the aggregation', async () => {
+    const started = Promise.withResolvers<void>();
+    const timeout = Promise.withResolvers<{ rows: unknown[] }>();
+    mockExecute.mockImplementationOnce(() => {
+      started.resolve();
+      return timeout.promise;
+    });
+    const result = caller().getMonthlyUsage(INPUT);
+    await started.promise;
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
+    timeout.resolve({ rows: [] });
+    await expect(result).resolves.toEqual([]);
+    expect(mockExecute).toHaveBeenCalledTimes(2);
   });
 
   it.each<[number, number, string, string]>([
@@ -95,21 +129,20 @@ describe('admin.gatewayUsage.getMonthlyUsage', () => {
     [2026, 12, '2026-12-01', '2027-01-01'],
     [2000, 1, '2000-01-01', '2000-02-01'],
     [9999, 12, '9999-12-01', '10000-01-01'],
-  ])('uses calendar month bounds for %s-%s', async (year, month, start, end) => {
+  ])('uses explicit UTC calendar month bounds for %s-%s', async (year, month, start, end) => {
     await caller().getMonthlyUsage({ ...INPUT, year, month });
-    expect(mockExecute.mock.calls[0][0].bindings?.map(binding => binding.value)).toEqual([
+    expect(executedQuery().params).toEqual([
       INPUT.model,
-      start,
-      end,
+      `${start} 00:00:00+00`,
+      `${end} 00:00:00+00`,
     ]);
   });
 
   it('trims model input and binds it rather than interpolating SQL', async () => {
     const model = "model' OR 1=1 --";
     await caller().getMonthlyUsage({ ...INPUT, model: `  ${model}  ` });
-    const request = mockExecute.mock.calls[0][0];
-    expect(request.bindings?.[0]).toEqual({ type: 'TEXT', value: model });
-    expect(request.statement).not.toContain(model);
+    expect(executedQuery().params[0]).toBe(model);
+    expect(executedQuery().sql).not.toContain(model);
   });
 
   it('accepts a model with exactly 256 characters', async () => {
@@ -131,238 +164,339 @@ describe('admin.gatewayUsage.getMonthlyUsage', () => {
     { model: ' \t\n ' },
     { model: 'a'.repeat(257) },
     { model: null },
-  ])('rejects invalid input %p before querying Snowflake', async invalid => {
+  ])('rejects invalid input %p before opening a transaction', async invalid => {
     await expect(
       caller().getMonthlyUsage({ ...INPUT, ...invalid } as typeof INPUT)
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
-    expect(mockResolveConfig).not.toHaveBeenCalled();
   });
 
-  it('preserves numeric strings, decimal precision and negative costs in raw warehouse units', async () => {
-    mockExecute.mockResolvedValue([
-      [
-        'provider-a',
-        'true',
-        '900719925474099312345',
-        '900719925474099300001',
-        '123456789012345678901234567890',
-        '234567890123456789012345678901',
-        '345678901234567890123456789012',
-        '456789012345678901234567890123',
-        '-12345678901234567890.123456789',
-        '23456789012345678901.987654321',
-      ],
-    ]);
-
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([
-      {
-        provider: 'provider-a',
-        is_byok: true,
-        users: '900719925474099312345',
-        logged_in_users: '900719925474099300001',
-        input_tokens: '123456789012345678901234567890',
-        output_tokens: '234567890123456789012345678901',
-        cache_read_tokens: '345678901234567890123456789012',
-        cache_write_tokens: '456789012345678901234567890123',
-        cost: '-12345678901234567890.123456789',
-        market_cost: '23456789012345678901.987654321',
-      },
-    ]);
+  it('preserves large numeric strings and decimal precision in microdollar costs', async () => {
+    const row = {
+      provider: 'provider-a',
+      is_byok: true,
+      users: '900719925474099312345',
+      logged_in_users: '900719925474099300001',
+      input_tokens: '123456789012345678901234567890',
+      output_tokens: '234567890123456789012345678901',
+      cache_read_tokens: '345678901234567890123456789012',
+      cache_write_tokens: '456789012345678901234567890123',
+      cost: '-12345678901234567890.123456789',
+      market_cost: '23456789012345678901.987654321',
+    };
+    mockExecute.mockResolvedValue({ rows: [row] });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([row]);
   });
 
-  it('preserves nonnegative decimal token sums from scaled NUMBER columns', async () => {
-    mockExecute.mockResolvedValue([
-      [
-        ...ROW.slice(0, 4),
-        '9007199254740993.000000000',
-        '1.500000000',
-        '0.000000000',
-        '12345678901234567890.123456789',
-        ...ROW.slice(8),
-      ],
-    ]);
-
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([
-      expect.objectContaining({
-        input_tokens: '9007199254740993.000000000',
-        output_tokens: '1.500000000',
-        cache_read_tokens: '0.000000000',
-        cache_write_tokens: '12345678901234567890.123456789',
-      }),
-    ]);
+  it('keeps the existing nonnegative decimal token sum contract', async () => {
+    const row = {
+      ...ROW,
+      input_tokens: '9007199254740993.000000000',
+      output_tokens: '1.500000000',
+      cache_read_tokens: '0.000000000',
+      cache_write_tokens: '12345678901234567890.123456789',
+    };
+    mockExecute.mockResolvedValue({ rows: [row] });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([row]);
   });
 
-  it('preserves null provider, BYOK and aggregate values while keeping zero counts as strings', async () => {
-    mockExecute.mockResolvedValue([
-      [null, null, '0', '0', null, null, null, null, null, null],
-    ] as SnowflakeRow[]);
-
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([
-      {
-        provider: null,
-        is_byok: null,
-        users: '0',
-        logged_in_users: '0',
-        input_tokens: null,
-        output_tokens: null,
-        cache_read_tokens: null,
-        cache_write_tokens: null,
-        cost: null,
-        market_cost: null,
-      },
-    ]);
+  it('preserves null provider, BYOK and aggregates while keeping zero counts as strings', async () => {
+    const row = {
+      provider: null,
+      is_byok: null,
+      users: '0',
+      logged_in_users: '0',
+      input_tokens: null,
+      output_tokens: null,
+      cache_read_tokens: null,
+      cache_write_tokens: null,
+      cost: null,
+      market_cost: null,
+    };
+    mockExecute.mockResolvedValue({ rows: [row] });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([row]);
   });
 
-  it.each<[string, boolean]>([
-    ['false', false],
-    ['true', true],
-    ['FALSE', false],
-    ['TRUE', true],
-  ])('validates and maps Snowflake boolean %s', async (raw, expected) => {
-    mockExecute.mockResolvedValue([[ROW[0], raw, ...ROW.slice(2)]]);
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([
-      expect.objectContaining({ is_byok: expected }),
-    ]);
+  it.each([false, true])('preserves the PostgreSQL boolean %s', async is_byok => {
+    mockExecute.mockResolvedValue({ rows: [{ ...ROW, is_byok }] });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([{ ...ROW, is_byok }]);
   });
 
-  it.each<[number, unknown]>([
-    [0, 123],
-    [1, 'not-a-boolean'],
-    [1, '1'],
-    [2, null],
-    [2, '1.5'],
-    [2, '-1'],
-    [3, null],
-    [3, 'NaN'],
-    [4, '-1'],
-    [5, '-1.5'],
-    [6, '-0.01'],
-    [7, '1.2.3'],
-    [6, '1e3'],
-    [7, ''],
-    [4, 100],
-    [8, 'Infinity'],
-    [8, '1e5'],
-    [9, 'not-a-decimal'],
-    [9, ' 1.25 '],
+  it.each<[keyof typeof ROW, unknown]>([
+    ['provider', 123],
+    ['is_byok', 'false'],
+    ['is_byok', 'true'],
+    ['is_byok', '1'],
+    ['users', null],
+    ['users', '1.5'],
+    ['users', '-1'],
+    ['users', 10],
+    ['logged_in_users', null],
+    ['logged_in_users', 'NaN'],
+    ['input_tokens', '-1'],
+    ['output_tokens', '-1.5'],
+    ['cache_read_tokens', '-0.01'],
+    ['cache_write_tokens', '1.2.3'],
+    ['cache_read_tokens', '1e3'],
+    ['cache_write_tokens', ''],
+    ['input_tokens', 100],
+    ['cost', 'Infinity'],
+    ['cost', '1e5'],
+    ['market_cost', 'not-a-decimal'],
+    ['market_cost', ' 1.25 '],
+    ['market_cost', undefined],
   ])(
-    'rejects malformed warehouse column %s value %p with a sanitized error',
+    'rejects malformed database column %s value %p with a generic error',
     async (column, value) => {
-      const row: unknown[] = [...ROW];
-      row[column] = value;
-      mockExecute.mockResolvedValue([row] as SnowflakeRow[]);
-
-      await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
-      expect(jest.getTimerCount()).toBe(0);
-    }
-  );
-
-  it.each([{ row: ROW.slice(0, -1) }, { row: [...ROW, 'extra'] }])(
-    'rejects incorrect row widths: %p',
-    async ({ row }) => {
-      mockExecute.mockResolvedValue([row]);
+      mockExecute.mockResolvedValue({ rows: [{ ...ROW, [column]: value }] });
       await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
     }
   );
 
   it('accepts negative market costs and integer costs without conversion', async () => {
-    mockExecute.mockResolvedValue([[...ROW.slice(0, 8), '0', '-10.500000000']]);
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([
-      expect.objectContaining({ cost: '0', market_cost: '-10.500000000' }),
-    ]);
+    const row = { ...ROW, cost: '0', market_cost: '-10.500000000' };
+    mockExecute.mockResolvedValue({ rows: [row] });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([row]);
   });
 
-  it('returns an empty array when Snowflake returns no rows', async () => {
+  it('returns an empty array when PostgreSQL returns no rows', async () => {
     await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([]);
   });
 
-  it('requires admin access before resolving config or querying Snowflake', async () => {
+  it('requires admin access before opening a transaction', async () => {
     await expect(caller(false).getMonthlyUsage(INPUT)).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(mockResolveConfig).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it('sanitizes missing Snowflake configuration', async () => {
-    mockResolveConfig.mockReturnValue(null);
-    await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
-    expect(mockExecute).not.toHaveBeenCalled();
-    expect(jest.getTimerCount()).toBe(0);
-  });
+  it.each(['transaction', 'timeout', 'aggregation'])(
+    'does not retry a failed %s on primary',
+    async stage => {
+      const error = new Error('database query failed');
+      if (stage === 'transaction') {
+        mockTransaction.mockRejectedValue(error);
+      } else if (stage === 'timeout') {
+        mockExecute.mockRejectedValueOnce(error);
+      } else {
+        mockExecute.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(error);
+      }
+      await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject({
+        ...SANITIZED_ERROR,
+        cause: undefined,
+      });
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledTimes(
+        stage === 'transaction' ? 0 : stage === 'timeout' ? 1 : 2
+      );
+    }
+  );
 
-  it('does not expose upstream errors or their causes', async () => {
-    mockExecute.mockRejectedValue(new Error('secret upstream statement and credentials'));
-    await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject({
-      ...SANITIZED_ERROR,
-      cause: undefined,
-    });
-    expect(jest.getTimerCount()).toBe(0);
-  });
-
-  it.each(['20000', '0', '-1', 'NaN', 'Infinity', '2147483648', ''])(
+  it.each(['20000', '0', '-1', 'NaN', 'Infinity', '2147483648', '720000.5', 'invalid', ''])(
     'enforces a ten-minute minimum for timeout configuration %p',
     async timeout => {
       process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS = timeout;
       await caller().getMonthlyUsage(INPUT);
-      expect(mockExecute.mock.calls[0][0]).toMatchObject({
-        timeoutSeconds: 600,
-        pollTimeoutMs: 630_000,
-      });
+      expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
     }
   );
 
-  it('honors larger valid admin timeouts and rounds the SQL timeout up to seconds', async () => {
-    process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS = '720001';
-    await caller().getMonthlyUsage(INPUT);
-    expect(mockExecute.mock.calls[0][0]).toMatchObject({
-      timeoutSeconds: 721,
-      pollTimeoutMs: 750_001,
-    });
+  it.each(['600000', '720001', '2147483647'])(
+    'honors valid PostgreSQL millisecond timeouts without rounding: %s',
+    async timeout => {
+      process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS = timeout;
+      await caller().getMonthlyUsage(INPUT);
+      expect(executedQuery(0).sql).toBe(`SET LOCAL statement_timeout = '${timeout}'`);
+    }
+  );
+
+  it('fails closed in production when readDb would fall back to primary', async () => {
+    jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: 'production' });
+    mockUsesSeparateReplica = false;
+    await expect(caller().getMonthlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it('aborts at the query timeout plus 30 seconds and clears its timer', async () => {
-    mockExecute.mockImplementation(({ signal }) => {
-      if (!signal) throw new Error('Expected query signal');
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-      });
-    });
-    const result = caller().getMonthlyUsage(INPUT);
-    const rejected = expect(result).rejects.toMatchObject(SANITIZED_ERROR);
-
-    await jest.advanceTimersByTimeAsync(629_999);
-    expect(mockExecute.mock.calls[0][0].signal?.aborted).toBe(false);
-    await jest.advanceTimersByTimeAsync(1);
-    await rejected;
-
-    expect(mockExecute.mock.calls[0][0].signal?.aborted).toBe(true);
-    expect(jest.getTimerCount()).toBe(0);
+  it('allows a separately configured replica in production', async () => {
+    jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: 'production' });
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([]);
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
-  it('combines the procedure request signal with its timeout controller', async () => {
-    const controller = new AbortController();
-    mockExecute.mockImplementation(({ signal }) => {
-      if (!signal) throw new Error('Expected query signal');
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-      });
-    });
-    const result = caller(true, controller.signal).getMonthlyUsage(INPUT);
-    const rejected = expect(result).rejects.toMatchObject(SANITIZED_ERROR);
-
-    await jest.advanceTimersByTimeAsync(0);
-    controller.abort(new Error('request canceled'));
-    await rejected;
-
-    expect(mockExecute.mock.calls[0][0].signal?.aborted).toBe(true);
-    expect(jest.getTimerCount()).toBe(0);
+  it.each(['development', 'test'])('allows the local readDb fallback in %s', async nodeEnv => {
+    jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
+    mockUsesSeparateReplica = false;
+    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([]);
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
-  it('does not submit a query for an already-aborted procedure request', async () => {
+  it('does not open a transaction for an already-aborted request', async () => {
     await expect(caller(true, AbortSignal.abort()).getMonthlyUsage(INPUT)).rejects.toMatchObject(
       SANITIZED_ERROR
     );
+    expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
-    expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
+describe('admin.gatewayUsage.getMonthlyUsage PostgreSQL semantics', () => {
+  let input: typeof INPUT;
+  const singleUsage = {
+    provider: 'provider-a',
+    is_byok: false,
+    users: '1',
+    logged_in_users: '1',
+    input_tokens: '10',
+    output_tokens: '20',
+    cache_read_tokens: '3',
+    cache_write_tokens: '4',
+    cost: '100',
+    market_cost: '200',
+  };
+
+  beforeEach(() => {
+    input = { ...INPUT, model: `gateway-usage-test-${crypto.randomUUID()}` };
+    mockUsesSeparateReplica = false;
+    mockTransaction.mockImplementation(callback =>
+      db.transaction(async tx => {
+        await tx.execute(sql`SET LOCAL TIME ZONE 'America/Los_Angeles'`);
+        return callback(tx);
+      })
+    );
+  });
+
+  async function insertUsage(
+    core: Partial<typeof microdollar_usage.$inferInsert> = {},
+    metadata: Partial<typeof microdollar_usage_metadata.$inferInsert> | null = {}
+  ) {
+    const id = crypto.randomUUID();
+    await db.insert(microdollar_usage).values({
+      id,
+      kilo_user_id: 'oauth/google/test-user',
+      provider: 'provider-a',
+      model: 'different-resolved-model',
+      requested_model: input.model,
+      created_at: '2026-09-15 12:00:00+00',
+      input_tokens: 10,
+      output_tokens: 20,
+      cache_hit_tokens: 3,
+      cache_write_tokens: 4,
+      cost: 100,
+      ...core,
+    });
+    if (metadata !== null) {
+      await db.insert(microdollar_usage_metadata).values({
+        id,
+        message_id: id,
+        created_at: '2026-08-01 00:00:00+00',
+        is_byok: false,
+        is_user_byok: false,
+        market_cost: 200,
+        ...metadata,
+      });
+    }
+  }
+
+  it('filters exact model and false user BYOK with an inner join and a half-open UTC month', async () => {
+    await insertUsage({ created_at: '2026-09-01 00:00:00+00' });
+    await insertUsage({ created_at: '2026-09-30 23:59:59.999999+00' });
+    await insertUsage({ kilo_user_id: 'anon:lowercase' });
+    await insertUsage({ kilo_user_id: 'AnOn:mixed-case' });
+    await insertUsage({ kilo_user_id: 'ANON-without-colon' });
+    await insertUsage({ created_at: '2026-08-31 23:59:59.999999+00' });
+    await insertUsage({ created_at: '2026-10-01 00:00:00+00' });
+    await insertUsage({ requested_model: 'different-requested-model', model: input.model });
+    await insertUsage({ requested_model: null });
+    await insertUsage({}, { is_user_byok: true });
+    await insertUsage({}, { is_user_byok: null });
+    await insertUsage({}, null);
+    await db.insert(microdollar_usage_metadata).values({
+      id: crypto.randomUUID(),
+      message_id: 'orphan-metadata',
+      is_user_byok: false,
+      is_byok: false,
+      market_cost: 1000,
+    });
+
+    await expect(caller().getMonthlyUsage(input)).resolves.toEqual([
+      {
+        ...singleUsage,
+        users: '4',
+        logged_in_users: '2',
+        input_tokens: '50',
+        output_tokens: '100',
+        cache_read_tokens: '15',
+        cache_write_tokens: '20',
+        cost: '500',
+        market_cost: '1000',
+      },
+    ]);
+  });
+
+  it('groups provider and nullable real BYOK booleans without coalescing all-null market costs', async () => {
+    await insertUsage({}, { market_cost: null });
+    await insertUsage({}, { market_cost: null });
+    await insertUsage({}, { is_byok: true, market_cost: 0 });
+    await insertUsage({}, { is_byok: null, market_cost: -20 });
+    await insertUsage({ provider: 'provider-b' });
+    await insertUsage({ provider: null }, { is_byok: null });
+
+    await expect(caller().getMonthlyUsage(input)).resolves.toEqual([
+      {
+        ...singleUsage,
+        input_tokens: '20',
+        output_tokens: '40',
+        cache_read_tokens: '6',
+        cache_write_tokens: '8',
+        cost: '200',
+        market_cost: null,
+      },
+      { ...singleUsage, is_byok: true, market_cost: '0' },
+      { ...singleUsage, is_byok: null, market_cost: '-20' },
+      { ...singleUsage, provider: 'provider-b' },
+      { ...singleUsage, provider: null, is_byok: null },
+    ]);
+  });
+
+  it('returns exact text sums beyond bigint and JavaScript integer ranges in microdollars', async () => {
+    const ids = [crypto.randomUUID(), crypto.randomUUID()];
+    const large = '9223372036854775807';
+    await db.insert(microdollar_usage).values(
+      ids.map(id => ({
+        id,
+        kilo_user_id: 'oauth/google/test-user',
+        provider: 'provider-a',
+        requested_model: input.model,
+        created_at: '2026-09-15 12:00:00+00',
+        input_tokens: sql`${large}::bigint`,
+        output_tokens: sql`${large}::bigint`,
+        cache_hit_tokens: sql`${large}::bigint`,
+        cache_write_tokens: sql`${large}::bigint`,
+        cost: sql`${`-${large}`}::bigint`,
+      }))
+    );
+    await db.insert(microdollar_usage_metadata).values(
+      ids.map(id => ({
+        id,
+        message_id: id,
+        is_byok: true,
+        is_user_byok: false,
+        market_cost: sql`${large}::bigint`,
+      }))
+    );
+
+    await expect(caller().getMonthlyUsage(input)).resolves.toEqual([
+      {
+        ...singleUsage,
+        is_byok: true,
+        input_tokens: '18446744073709551614',
+        output_tokens: '18446744073709551614',
+        cache_read_tokens: '18446744073709551614',
+        cache_write_tokens: '18446744073709551614',
+        cost: '-18446744073709551614',
+        market_cost: '18446744073709551614',
+      },
+    ]);
   });
 });

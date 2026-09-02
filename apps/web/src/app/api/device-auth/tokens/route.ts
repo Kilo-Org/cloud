@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
+import { APP_URL } from '@/lib/constants';
 import * as z from 'zod';
 
 const TokensSchema = z.object({
@@ -8,14 +9,18 @@ const TokensSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  // Authenticate the user
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const origin = request.headers.get('origin');
+  if (origin !== new URL(APP_URL).origin) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
+  }
+
+  const { user, authFailedResponse } = await getUserFromSessionForCredentialIssuance();
 
   if (authFailedResponse) {
     return authFailedResponse;
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => undefined);
   const validation = TokensSchema.safeParse(body);
   if (!validation.success) {
     return NextResponse.json(

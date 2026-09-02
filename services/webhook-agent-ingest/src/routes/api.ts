@@ -16,6 +16,7 @@ import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
+import type { ScheduledInvocationResult } from '../dos/TriggerDO';
 
 const api = new Hono<HonoContext>();
 
@@ -36,6 +37,12 @@ api.post('/triggers/user/:userId/:triggerId', async c => {
   const doKey = buildDOKey(namespace, triggerId);
 
   return handleCreateTrigger(c, namespace, triggerId, doKey);
+});
+
+api.post('/triggers/user/:userId/:triggerId/invoke', async c => {
+  const { triggerId } = c.req.param();
+  const userId = decodeUserIdFromPath(c.req.param('userId'));
+  return handleInvokeScheduled(c, `user/${userId}`, triggerId);
 });
 
 /**
@@ -108,6 +115,11 @@ api.post('/triggers/org/:orgId/:triggerId', async c => {
   return handleCreateTrigger(c, namespace, triggerId, doKey);
 });
 
+api.post('/triggers/org/:orgId/:triggerId/invoke', async c => {
+  const { orgId, triggerId } = c.req.param();
+  return handleInvokeScheduled(c, `org/${orgId}`, triggerId);
+});
+
 /**
  * List captured requests for an organization trigger
  */
@@ -164,13 +176,19 @@ api.delete('/triggers/org/:orgId/:triggerId', async c => {
 
 type RouteContext = Context<HonoContext>;
 
-const TriggerConfigInput = z
+export const TriggerConfigInput = z
   .object({
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .optional(),
+    sandboxAllocation: z.literal('isolated-standard').optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
     profileId: z.string().uuid().optional(),
     autoCommit: z.boolean().optional(),
@@ -257,6 +275,13 @@ const TriggerConfigInput = z
           message: 'kiloclawInstanceId is required for kiloclaw_chat triggers',
           path: ['kiloclawInstanceId'],
         });
+      if (data.sandboxAllocation !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'sandboxAllocation is not applicable for kiloclaw_chat triggers',
+          path: ['sandboxAllocation'],
+        });
+      }
     }
   });
 
@@ -264,10 +289,17 @@ const TriggerConfigInput = z
 // null = explicitly clear the field, undefined = leave unchanged
 // Note: targetType and kiloclawInstanceId are intentionally excluded — they are
 // immutable after creation. To change target type or instance, delete and recreate.
-const TriggerConfigUpdateInput = z
+export const TriggerConfigUpdateInput = z
   .object({
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
+    variant: z
+      .string()
+      .max(50)
+      .regex(/^[a-zA-Z]+$/)
+      .nullable()
+      .optional(),
+    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
     profileId: z.string().uuid().optional(),
@@ -403,6 +435,38 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
   }
 }
 
+async function handleInvokeScheduled(c: RouteContext, namespace: string, triggerId: string) {
+  const doKey = buildDOKey(namespace, triggerId);
+  try {
+    const result: ScheduledInvocationResult = await withDORetry(
+      () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
+      async stub => {
+        const result = await stub.invokeScheduled();
+        return result as ScheduledInvocationResult;
+      },
+      'invokeScheduled',
+      { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }
+    );
+
+    if (result.success) {
+      return c.json(resSuccess({ requestId: result.requestId }), 202);
+    }
+
+    const statusByError = {
+      NOT_FOUND: 404,
+      NOT_SCHEDULED: 400,
+      INACTIVE: 409,
+      INFLIGHT_LIMIT: 429,
+      QUEUE_FAILED: 500,
+    } as const;
+    const status = statusByError[result.error];
+    return c.json(resError(result.error), status);
+  } catch {
+    logger.error('Failed to invoke scheduled trigger', { namespace, triggerId });
+    return c.json(resError('Internal server error'), 500);
+  }
+}
+
 async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId: string) {
   const doKey = buildDOKey(namespace, triggerId);
 
@@ -436,6 +500,13 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
 
     if (!existingConfig) {
       return c.json(resError('Trigger not found'), 404);
+    }
+
+    if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {
+      return c.json(
+        resError('sandboxAllocation is not applicable for kiloclaw_chat triggers'),
+        400
+      );
     }
 
     const result = await withDORetry(

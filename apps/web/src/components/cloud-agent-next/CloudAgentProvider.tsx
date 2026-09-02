@@ -311,6 +311,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           organizationId: sessionResult.organization_id,
           gitUrl: sessionResult.git_url,
           gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
+          worktreeId: sessionResult.cloud_agent_worktree_id ?? null,
           mode: normalizeAlias(rs?.mode),
           model: rs?.model ?? null,
           variant: rs?.variant ?? null,
@@ -322,6 +323,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           initialMessageId: rs?.initialMessageId ?? null,
           runtimeAgents: rs?.runtimeAgents,
           associatedPr: sessionResult.associatedPr,
+          totalCostMicrodollars: sessionResult.total_cost_microdollars,
         };
       },
 

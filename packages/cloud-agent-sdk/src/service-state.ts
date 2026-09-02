@@ -54,6 +54,8 @@ type ServiceStateConfig = {
   onPreparationFailed?: ((message: string) => void) | undefined;
   /** Fired when the server acknowledges a user message was queued. */
   onMessageQueued?: ((messageId: string) => void) | undefined;
+  /** Fired when a queued user message is canceled before delivery. */
+  onMessageCanceled?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message's execution terminates in 'completed'. */
   onMessageCompleted?: ((messageId: string) => void) | undefined;
   /** Fired when a queued user message fails delivery or its execution fails. */
@@ -120,6 +122,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let permissions: readonly PermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
+  let activeMessageId: string | null = null;
   let disconnectedSource: 'transport' | 'wrapper' | null = null;
   let completed = false;
 
@@ -568,7 +571,26 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function processMessageCanceled(
+    event: Extract<ServiceEvent, { type: 'cloud.message.canceled' }>
+  ): void {
+    pendingMessages.delete(event.messageId);
+    config.onMessageCanceled?.(event.messageId);
+    notify();
+  }
+
   function processMessageSent(event: Extract<ServiceEvent, { type: 'cloud.message.sent' }>): void {
+    activeMessageId = event.messageId;
+    if (
+      status.type === 'error' ||
+      status.type === 'interrupted' ||
+      status.type === 'disconnected'
+    ) {
+      status = IDLE_STATUS;
+    }
+    terminated = false;
+    disconnectedSource = null;
+    completed = false;
     pendingMessages.delete(event.messageId);
     notify();
   }
@@ -576,6 +598,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processMessageCompleted(
     event: Extract<ServiceEvent, { type: 'cloud.message.completed' }>
   ): void {
+    if (activeMessageId === event.messageId) activeMessageId = null;
     pendingMessages.delete(event.messageId);
     config.onMessageCompleted?.(event.messageId);
     notify();
@@ -591,20 +614,37 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
     pendingMessages.set(event.messageId, deliveryState);
+    const isActiveMessage =
+      activeMessageId === event.messageId &&
+      event.delivery !== 'queued' &&
+      event.accepted !== false;
+    const preparingWithoutActiveTurn =
+      cloudStatus?.type === 'preparing' &&
+      activeMessageId === null &&
+      activity.type !== 'busy' &&
+      activity.type !== 'retrying';
     // A preparation failure can arrive as a terminal message-delivery event
     // without a separate preparing event. Do not leave the composer showing
     // "Setting up environment" forever in that case. An interrupt is the user
     // cancelling, not a failure, so it clears the stale status instead of
     // raising an error banner.
-    if (cloudStatus?.type === 'preparing') {
+    if (preparingWithoutActiveTurn) {
       cloudStatus = event.reason === 'interrupted' ? null : { type: 'error', message: event.error };
     }
-    if (event.reason === 'interrupted') {
+    if (isActiveMessage || (preparingWithoutActiveTurn && event.reason === 'interrupted')) {
+      activeMessageId = null;
       activity = { type: 'idle' };
-      status = { type: 'interrupted' };
+      cloudStatus = null;
+      setupLog = [];
+      status =
+        event.reason === 'interrupted'
+          ? { type: 'interrupted' }
+          : { type: 'error', message: event.error };
       terminated = true;
       disconnectedSource = null;
       completed = false;
+      clearPendingInteractions();
+      if (event.reason !== 'interrupted') config.onError?.(event.error);
     }
     config.onMessageFailed?.(event.messageId, deliveryState);
     notify();
@@ -660,11 +700,33 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function clearPendingInteractions(): void {
+    const clearedQuestions = questions;
+    const clearedPermissions = permissions;
+    const clearedSuggestion = suggestion;
+    questions = [];
+    permissions = [];
+    suggestion = null;
+    for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
+    for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+    if (clearedSuggestion) config.onSuggestionResolved?.(clearedSuggestion.requestId);
+  }
+
   function processConnected(event: Extract<ServiceEvent, { type: 'connected' }>): void {
     // Set activity from sessionStatus. When sessionStatus is absent (server
     // has no execution-derived state yet), default to idle — we know the
     // transport connected, so we're at least no longer in the 'connecting' phase.
     const sessionStatus = event.sessionStatus;
+    if (event.activeMessageId !== undefined) {
+      activeMessageId = event.activeMessageId;
+    } else if (sessionStatus?.type === 'idle') {
+      activeMessageId = null;
+    }
+    if (sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry') {
+      status = IDLE_STATUS;
+      disconnectedSource = null;
+      completed = false;
+    }
     if (sessionStatus === undefined) {
       // Only default to idle on initial connect (activity === 'connecting').
       // On reconnect, preserve existing activity — the server will send a
@@ -691,21 +753,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // replays them as separate question.asked / permission.asked events
     // immediately after the snapshot, so they will be re-added. Fire resolve
     // callbacks first so consumers (e.g. dock atoms) also clear.
-    const clearedQuestions = questions;
-    questions = [];
-    for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
-    const clearedPermissions = permissions;
-    permissions = [];
-    for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
-
-    // Clear suggestion
-    if (suggestion) {
-      const { requestId } = suggestion;
-      suggestion = null;
-      config.onSuggestionResolved?.(requestId);
-    } else {
-      suggestion = null;
-    }
+    clearPendingInteractions();
 
     // Clear terminated on connected
     terminated = false;
@@ -794,6 +842,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'cloud.message.queued':
         processMessageQueued(event);
         break;
+      case 'cloud.message.canceled':
+        processMessageCanceled(event);
+        break;
       case 'cloud.message.sent':
         processMessageSent(event);
         break;
@@ -879,6 +930,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       permissions = [];
       suggestion = null;
       pendingMessages.clear();
+      activeMessageId = null;
       terminated = false;
       disconnectedSource = null;
       completed = false;

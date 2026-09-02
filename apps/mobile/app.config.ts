@@ -180,6 +180,10 @@ const config: ExpoConfig = {
     'expo-image',
     'expo-font',
     'expo-secure-store',
+    [
+      'expo-local-authentication',
+      { faceIDPermission: 'Allow Kilo to use Face ID to unlock the app.' },
+    ],
     'expo-sharing',
     // Encrypts the local persistence database (kilo-persist.db) with SQLCipher.
     // The key is generated from expo-crypto and held in SecureStore; see

@@ -28,6 +28,10 @@ export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string
   return `time:${item.messageId}`;
 }
 
+export function getSessionTranscriptItemType(item: SessionTranscriptItem): string {
+  return item.type;
+}
+
 export function mergeSessionTranscript(
   messages: readonly StoredMessage[],
   preparationAttempts: readonly PreparationAttempt[]

@@ -7,6 +7,7 @@ export const DEADLINE_IDS = [
   'idleStop',
   'stopAttempt',
   'reconciliation',
+  'credentialExpiry',
 ] as const;
 export type DeadlineId = (typeof DEADLINE_IDS)[number];
 
@@ -22,6 +23,8 @@ export const DEADLINE_MS = {
   stopAttempt: 30_000,
   stopAttemptLadder: [5_000, 10_000, 10_000, 10_000, 10_000] as const,
   reconciliation: 5 * 60_000,
+  reconciliationWindow: 60 * 60_000,
+  createSettle: 5 * 60_000,
   acceptedOverdue: 90_000,
   idleStopLeaseMargin: 60_000,
 } as const;

@@ -2,12 +2,17 @@ import type { DeadlineTable } from './deadlines.js';
 import { emptyDeadlines } from './deadlines.js';
 import { initialPhysicalRecord, type PhysicalRecord } from './physical-lifecycle.js';
 import type { SessionRoute } from './session-routes.js';
+import {
+  sessionCredentialGrantSchema,
+  type SessionCredentialGrant,
+} from './session-credentials.js';
 import { emptyTransitionLog, type TransitionRow } from './transition-log.js';
 
-const PHYSICAL_KEY = 'physical_record';
+export const PHYSICAL_KEY = 'physical_record';
 const ROUTES_KEY = 'session_routes';
 const DEADLINES_KEY = 'deadlines';
 const LOG_KEY = 'transition_log';
+const CREDENTIAL_GRANTS_KEY = 'worktree_credential_grants';
 
 type ControlStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -61,6 +66,22 @@ export async function saveTransitionLog(
   await storage.put(LOG_KEY, log);
 }
 
+export async function loadSessionCredentialGrants(
+  storage: ControlStorage
+): Promise<SessionCredentialGrant[]> {
+  const stored = await storage.get(CREDENTIAL_GRANTS_KEY);
+  const parsed = sessionCredentialGrantSchema.array().safeParse(stored ?? []);
+  if (!parsed.success) throw new Error('Invalid stored worktree credentials');
+  return parsed.data;
+}
+
+export async function saveSessionCredentialGrants(
+  storage: ControlStorage,
+  grants: SessionCredentialGrant[]
+): Promise<void> {
+  await storage.put(CREDENTIAL_GRANTS_KEY, grants);
+}
+
 export async function eraseSandboxRecord(storage: ControlStorage): Promise<void> {
-  await storage.delete([PHYSICAL_KEY, ROUTES_KEY, DEADLINES_KEY, LOG_KEY]);
+  await storage.delete([PHYSICAL_KEY, ROUTES_KEY, DEADLINES_KEY, LOG_KEY, CREDENTIAL_GRANTS_KEY]);
 }

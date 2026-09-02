@@ -7,6 +7,7 @@ import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
 import { sessionHasTerminal } from '../../agent-sandbox/capabilities.js';
+import { sessionPlaneFromId } from '../../session-plane.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import {
@@ -23,7 +24,7 @@ function throwTerminalError(result: OperationResult<unknown>): never {
   const code =
     message === 'Session not found'
       ? 'NOT_FOUND'
-      : message.includes('interactive Cloud Agent')
+      : message.startsWith('Terminal access denied:') || message.includes('interactive Cloud Agent')
         ? 'FORBIDDEN'
         : message.includes('workspace is prepared') ||
             message.includes('session wrapper is not running')
@@ -33,7 +34,7 @@ function throwTerminalError(result: OperationResult<unknown>): never {
   throw new TRPCError({ code, message });
 }
 
-function rejectControlPlaneTerminal(sessionId: string): void {
+function rejectUnsupportedTerminal(sessionId: string): void {
   if (!sessionHasTerminal(sessionId)) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -50,7 +51,6 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'createTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId });
           logger.withFields({ cols: input.cols, rows: input.rows }).info('Creating terminal');
           await requireCurrentSessionAccess({
@@ -58,17 +58,18 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
+          rejectUnsupportedTerminal(sessionId);
 
+          const terminalInput =
+            sessionPlaneFromId(sessionId) === 'control'
+              ? { cols: input.cols, rows: input.rows, operationId: crypto.randomUUID() }
+              : { cols: input.cols, rows: input.rows };
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
           >(
             () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
-            stub =>
-              stub.createTerminal({
-                cols: input.cols,
-                rows: input.rows,
-              }),
+            stub => stub.createTerminal(terminalInput),
             'createTerminal'
           );
 
@@ -87,13 +88,13 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'resizeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
           await requireCurrentSessionAccess({
             env: ctx.env,
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
+          rejectUnsupportedTerminal(sessionId);
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
@@ -122,7 +123,6 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'closeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
-          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
           logger.info('Closing terminal');
           await requireCurrentSessionAccess({
@@ -130,6 +130,7 @@ export function createSessionTerminalHandlers() {
             kiloUserId: ctx.userId,
             cloudAgentSessionId: sessionId,
           });
+          rejectUnsupportedTerminal(sessionId);
 
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,

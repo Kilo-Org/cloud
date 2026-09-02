@@ -6,21 +6,24 @@ import { i18n } from '@/i18n';
 import { setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import {
   type AgentSessionFilters,
+  countActiveSessionFilters,
   createDefaultAgentSessionFilters,
   parseStoredAgentSessionFilters,
 } from '@/lib/agent-session-filters';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
-import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
 
-type FiltersUpdater = AgentSessionFilters | ((prev: AgentSessionFilters) => AgentSessionFilters);
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
 
-async function loadStoredFilters(): Promise<AgentSessionFilters> {
-  const raw = await SecureStore.getItemAsync(SESSION_FILTERS_KEY);
+async function loadStoredFilters(storageKey: string): Promise<AgentSessionFilters> {
+  const raw = await SecureStore.getItemAsync(storageKey);
   return parseStoredAgentSessionFilters(raw) ?? createDefaultAgentSessionFilters();
 }
 
-export function usePersistedAgentSessionFilters() {
+/**
+ * Persisted narrowing filters for one session-list page. The storage key is a
+ * parameter because the live and history pages filter separate lists and must
+ * not share a record.
+ */
+export function usePersistedAgentSessionFilters(storageKey: string) {
   const [filters, setFiltersState] = useState<AgentSessionFilters>(() =>
     createDefaultAgentSessionFilters()
   );
@@ -31,7 +34,7 @@ export function usePersistedAgentSessionFilters() {
 
     const loadFilters = async () => {
       try {
-        const loadedFilters = await loadStoredFilters();
+        const loadedFilters = await loadStoredFilters(storageKey);
         if (isActive) {
           setFiltersState(loadedFilters);
         }
@@ -51,7 +54,7 @@ export function usePersistedAgentSessionFilters() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (!hasLoaded) {
@@ -60,7 +63,7 @@ export function usePersistedAgentSessionFilters() {
 
     const saveFilters = async () => {
       try {
-        await setAccountMetadata(SESSION_FILTERS_KEY, JSON.stringify(filters));
+        await setAccountMetadata(storageKey, JSON.stringify(filters));
       } catch {
         // Keep the in-memory filters so the session still works, but the
         // change won't survive relaunch — tell the user so it's not a silent
@@ -70,47 +73,38 @@ export function usePersistedAgentSessionFilters() {
     };
 
     void saveFilters();
-  }, [filters, hasLoaded]);
+  }, [filters, hasLoaded, storageKey]);
 
-  const setFilters = useCallback((updater: FiltersUpdater) => {
-    setFiltersState(prev => ('sortBy' in updater ? updater : updater(prev)));
+  const setFilters = useCallback((next: AgentSessionFilters) => {
+    setFiltersState(next);
   }, []);
 
-  const setPlatformFilter = useCallback(
-    (updater: StringArrayUpdater) => {
-      setFilters(prev => ({
-        ...prev,
-        platformFilter: Array.isArray(updater) ? updater : updater(prev.platformFilter),
-      }));
-    },
-    [setFilters]
-  );
+  const clearFilters = useCallback(() => {
+    setFiltersState(createDefaultAgentSessionFilters());
+  }, []);
 
-  const setProjectFilter = useCallback(
-    (updater: StringArrayUpdater) => {
-      setFilters(prev => ({
-        ...prev,
-        projectFilter: Array.isArray(updater) ? updater : updater(prev.projectFilter),
-      }));
-    },
-    [setFilters]
-  );
+  const setPlatformFilter = useCallback((updater: StringArrayUpdater) => {
+    setFiltersState(prev => ({
+      ...prev,
+      platformFilter: Array.isArray(updater) ? updater : updater(prev.platformFilter),
+    }));
+  }, []);
 
-  const setSortBy = useCallback(
-    (sortBy: AgentSessionSortBy) => {
-      setFilters(prev => ({ ...prev, sortBy }));
-    },
-    [setFilters]
-  );
+  const setProjectFilter = useCallback((updater: StringArrayUpdater) => {
+    setFiltersState(prev => ({
+      ...prev,
+      projectFilter: Array.isArray(updater) ? updater : updater(prev.projectFilter),
+    }));
+  }, []);
 
   return {
     platformFilter: filters.platformFilter,
     projectFilter: filters.projectFilter,
-    sortBy: filters.sortBy,
+    activeFilterCount: countActiveSessionFilters(filters),
     hasLoaded,
     setFilters,
+    clearFilters,
     setPlatformFilter,
     setProjectFilter,
-    setSortBy,
   };
 }

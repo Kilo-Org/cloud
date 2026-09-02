@@ -1,6 +1,7 @@
 import { UserDeletionStepKey } from '@kilocode/db/schema-types';
 import {
   USER_DELETION_CATALOG_VERSION,
+  USER_DELETION_ID_ONLY_CATALOG_VERSION,
   USER_DELETION_MAX_ORDINARY_ATTEMPTS,
 } from '@/lib/user/deletion-queue/deletion-constants';
 
@@ -32,6 +33,14 @@ const V2_TEARDOWN_KEYS = [
   ...V1_TEARDOWN_KEYS,
   UserDeletionStepKey.Posthog,
   UserDeletionStepKey.Substack,
+] as const;
+
+const V3_TEARDOWN_KEYS = [
+  UserDeletionStepKey.KiloclawDestroy,
+  UserDeletionStepKey.CliV1Blobs,
+  UserDeletionStepKey.CliV2Sessions,
+  UserDeletionStepKey.UsagePromptPrefixes,
+  UserDeletionStepKey.Posthog,
 ] as const;
 
 export const USER_DELETION_CATALOG_V1 = [
@@ -173,9 +182,55 @@ export const USER_DELETION_CATALOG_V2 = [
   },
 ] as const satisfies readonly UserDeletionCatalogEntry[];
 
+export const USER_DELETION_CATALOG_V3 = [
+  {
+    stepKey: UserDeletionStepKey.KiloclawDestroy,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.CliV1Blobs,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.CliV2Sessions,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.UsagePromptPrefixes,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: false,
+  },
+  {
+    stepKey: UserDeletionStepKey.Posthog,
+    phase: UserDeletionPhase.Teardown,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [],
+    allowsManualVerification: true,
+  },
+  {
+    stepKey: UserDeletionStepKey.Anonymize,
+    phase: UserDeletionPhase.Anonymize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: V3_TEARDOWN_KEYS,
+    allowsManualVerification: false,
+  },
+] as const satisfies readonly UserDeletionCatalogEntry[];
+
 export function catalogForVersion(version: number): readonly UserDeletionCatalogEntry[] {
   if (version === 1) return USER_DELETION_CATALOG_V1;
   if (version === 2) return USER_DELETION_CATALOG_V2;
+  if (version === USER_DELETION_ID_ONLY_CATALOG_VERSION) return USER_DELETION_CATALOG_V3;
   throw new Error(`Unsupported user deletion catalog version ${version}`);
 }
 

@@ -15,7 +15,14 @@ const SESSION_ID: KiloSessionId = 'ses_12345678901234567890123456' as KiloSessio
 const CONNECTION_ID = 'conn-abc123';
 
 function instance(connectionId: string): InstancePickerInstance {
-  return { connectionId, name: 'laptop', projectName: 'kilo' };
+  return {
+    connectionId,
+    name: 'laptop',
+    projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
+  };
 }
 
 describe('resolveRemoteSubmitOutcome', () => {

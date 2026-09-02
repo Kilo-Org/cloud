@@ -55,8 +55,12 @@ describe('getChildSessionSheetState', () => {
     expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 0)).toBe('error');
   });
 
-  it('keeps rendering messages if a refresh fails', () => {
+  it('keeps live messages visible after first-page hydration fails', () => {
     expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 1)).toBe('content');
+  });
+
+  it('keeps live messages visible while first-page hydration retries', () => {
+    expect(getChildSessionSheetState({ status: 'loading' }, 2)).toBe('content');
   });
 
   it('shows an error for a runtime error with no messages and hydration ready', () => {

@@ -12,10 +12,12 @@ import {
   fetchSessionMetadata,
 } from '../../session-service.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { getSandboxSessionStub, resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { sessionPlaneFromId } from '../../session-plane.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
   sessionIdSchema,
+  MessageIdSchema,
   GetSessionInput,
   GetSessionOutput,
   GetSessionHealthInput,
@@ -77,7 +79,15 @@ async function deleteSessionResources(
 
   try {
     const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    if (!metadata) {
+    const retainedRuntime =
+      !metadata && sessionPlaneFromId(sessionId) === 'control'
+        ? await withDORetry(
+            () => getSandboxSessionStub(env, userId, sessionId),
+            stub => stub.getRuntimeLocation(),
+            'getRuntimeLocation'
+          )
+        : null;
+    if (!metadata && !retainedRuntime) {
       logger.info('Session not found or already deleted');
       return { success: true, message: 'Session not found or already deleted' };
     }
@@ -237,12 +247,54 @@ export function createSessionManagementHandlers() {
       }),
 
     /**
+     * Drop one pending (not yet accepted) queued message by id. Never interrupts
+     * the accepted/current run; a missing id or the accepted current message
+     * returns `{ dropped: false }`.
+     */
+    cancelQueuedMessage: protectedProcedure
+      .input(
+        z.object({
+          sessionId: sessionIdSchema.describe('Session ID owning the queued message'),
+          messageId: MessageIdSchema.describe('Message ID to drop from the queue'),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return withLogTags({ source: 'cancelQueuedMessage' }, async () => {
+          const sessionId = input.sessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Canceling queued message');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
+
+          try {
+            const getStub = () => resolveSessionStub(env, userId, sessionId);
+            return await withDORetry(
+              getStub,
+              stub => stub.cancelQueuedMessage(input.messageId),
+              'cancelQueuedMessage'
+            );
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            logger.withFields({ error: errorMsg }).error('Failed to cancel queued message');
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to cancel queued message: ${errorMsg}`,
+            });
+          }
+        });
+      }),
+
+    /**
      * Get session metadata.
      *
      * Returns sanitized session metadata (no secrets) including lifecycle timestamps.
      * Useful for frontend idempotency - checking if a session was already initiated
      * before a page refresh.
-     *
      * Security:
      * - Excludes: githubToken, gitToken, envVars values, setupCommands, mcpServers configs
      * - Includes: counts of envVars, setupCommands, mcpServers for debugging

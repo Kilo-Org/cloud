@@ -7,7 +7,8 @@ import { getCustomerInfo } from '@/lib/customerInfo';
 import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
 import { DevAddCreditsButton } from '@/components/dev/DevAddCreditsButton';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromSessionForCredentialIssuanceOrRedirect } from '@/lib/user/server';
+import { generateApiToken } from '@/lib/tokens';
 import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { cookies } from 'next/headers';
@@ -34,7 +35,8 @@ import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
 export const metadata = { itunes: smartAppBannerItunes('/profile') };
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
-  const user = await getUserFromAuthOrRedirect('/users/sign_in');
+  const user = await getUserFromSessionForCredentialIssuanceOrRedirect('/users/sign_in');
+  const kiloToken = generateApiToken(user);
   const params = await searchParams;
   const customerInfo = await getCustomerInfo(user, params);
 
@@ -114,7 +116,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       {params.source && (
         <IntegrationsCard
-          customerInfo={customerInfo}
+          kiloToken={kiloToken}
           ideName={ideName}
           logoSrc={logoSrc}
           isProminent={true}
@@ -127,7 +129,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       {!params.source && (
         <IntegrationsCard
-          customerInfo={customerInfo}
+          kiloToken={kiloToken}
           ideName={ideName}
           logoSrc={logoSrc}
           isProminent={false}

@@ -12,6 +12,7 @@ import {
 } from '@expo/fingerprint';
 
 import { hashRootNativeInputs, withNativeBuildSemaphore } from './mobile-native-build';
+import { fetchIosApp } from './mobile-remote-native';
 
 // Compatibility dimensions hashed into the cache key. Any change must
 // invalidate the key so cached artifacts are not reused for an
@@ -149,12 +150,17 @@ export type CliArgs =
 export function buildFingerprintOptions(): {
   platforms: ['ios'];
   sourceSkips: number;
+  ignorePaths: string[];
   extraSources: HashSourceContents[];
   silent: boolean;
 } {
   return {
     platforms: ['ios'],
     sourceSkips: DEFAULT_SOURCE_SKIPS | SourceSkips.ExpoConfigExtraSection,
+    // The generated ios/ tree is output, not an input: its bytes differ per
+    // worktree (pbxproj UUIDs, absolute paths in Podfile.lock). Pin it out of
+    // the hash so no fingerprint version can key builds on it.
+    ignorePaths: ['ios/**'],
     extraSources: [
       {
         type: 'contents',
@@ -893,6 +899,16 @@ export type BuildDeps = {
   withNativeBuildSlot: <T>(run: () => Promise<T>) => Promise<T>;
   validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) => void;
   sleep?: (ms: number) => Promise<void>;
+  // Fetch a prebuilt Kilo.app for this nativeHash into productsDir (the
+  // directory locateProducedApp reads). Returns false on a miss. When set,
+  // a cache miss tries this before compiling locally. `toolchain` is the
+  // host's own Xcode and simulator SDK: the artifact is keyed on nativeHash
+  // alone, so the fetcher must reject one built by a different toolchain.
+  fetchRemote?: (args: {
+    nativeHash: string;
+    productsDir: string;
+    toolchain: { xcodeBuildVersion: string; simulatorSdkVersion: string };
+  }) => Promise<boolean>;
 };
 
 export type RunFingerprintDeps = {
@@ -1039,6 +1055,57 @@ function validateKey(key: string): void {
   }
 }
 
+// Publish a cache entry from a remote-built artifact instead of a local
+// compile. Reuses publishCacheEntry unchanged — only the build step is
+// swapped for a fetch into the products directory it already reads — so the
+// bundle-id check, checksum, manifest, and atomic publish all still apply.
+// Any failure returns undefined and the caller compiles locally.
+async function tryRemotePublish(args: {
+  key: string;
+  compatibility: CompatibilityDimensions;
+  udid: string;
+  deps: BuildDeps;
+}): Promise<LookupCacheResult | undefined> {
+  const { deps } = args;
+  const fetchRemote = deps.fetchRemote;
+  if (!fetchRemote) return undefined;
+  try {
+    return await publishCacheEntry({
+      env: deps.env,
+      key: args.key,
+      compatibility: args.compatibility,
+      worktreeRoot: deps.worktreeRoot,
+      udid: args.udid,
+      deps: {
+        ...deps,
+        build: async ({ derivedDataPath }) => {
+          const productsDir = path.join(
+            derivedDataPath,
+            'Build',
+            'Products',
+            'Debug-iphonesimulator'
+          );
+          fs.mkdirSync(productsDir, { recursive: true });
+          const fetched = await fetchRemote({
+            nativeHash: args.compatibility.nativeHash,
+            productsDir,
+            toolchain: {
+              xcodeBuildVersion: args.compatibility.xcodeBuildVersion,
+              simulatorSdkVersion: args.compatibility.simulatorSdkVersion,
+            },
+          });
+          if (!fetched) throw new Error('remote native artifact unavailable');
+        },
+      },
+    });
+  } catch (error) {
+    process.stderr.write(
+      `remote native build unavailable (${error instanceof Error ? error.message : error}); building locally\n`
+    );
+    return undefined;
+  }
+}
+
 export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
   // 1. Validate exclusive claim for the current worktree.
   deps.validateClaim(udid, deps.worktreeRoot, deps.claimRoot);
@@ -1078,8 +1145,13 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
     key,
     lockRoot,
     deps: lockDeps,
-    producer: () =>
-      deps.withNativeBuildSlot(() =>
+    // A remote artifact is tried first, outside the native-build semaphore:
+    // downloading (or waiting on a remote runner) burns no local CPU, so it
+    // must not serialize behind or block a local compile.
+    producer: async () => {
+      const remote = await tryRemotePublish({ key, compatibility, udid, deps });
+      if (remote) return remote;
+      return deps.withNativeBuildSlot(() =>
         publishCacheEntry({
           env: deps.env,
           key,
@@ -1088,7 +1160,8 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
           udid,
           deps,
         })
-      ),
+      );
+    },
     readResult: async () =>
       lookupCache({
         env: deps.env,
@@ -1210,6 +1283,8 @@ async function main(): Promise<void> {
         }),
       validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
         validateSimulatorClaim(udid, worktreeRoot, claimRoot),
+      fetchRemote: async ({ nativeHash, productsDir, toolchain }) =>
+        fetchIosApp({ nativeHash, productsDir, toolchain }),
     });
     process.stdout.write(`Installed ${parsed.udid}\n`);
     return;

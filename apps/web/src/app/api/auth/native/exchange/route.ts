@@ -1,7 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import {
+  getUserFromBearerForCredentialExchange,
+  getUserFromSessionForCredentialIssuance,
+} from '@/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { APP_URL } from '@/lib/constants';
 
 /**
  * Token exchange endpoint. Authenticates with the existing long-lived bearer
@@ -17,9 +21,9 @@ import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-
  *   403 — blocked user
  */
 export async function POST(request: NextRequest) {
-  const auth = await getUserFromAuth({
-    adminOnly: false,
-  });
+  const auth = request.headers.has('authorization')
+    ? await getUserFromBearerForCredentialExchange(request.headers, { legacy: 'five-year-api' })
+    : await getSessionAuth(request);
 
   if (auth.authFailedResponse) {
     return auth.authFailedResponse;
@@ -42,6 +46,18 @@ export async function POST(request: NextRequest) {
       refreshToken: pair.refreshToken,
       expiresIn: pair.expiresIn,
     },
-    { status: 200 }
+    { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );
+}
+
+async function getSessionAuth(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  if (origin !== new URL(APP_URL).origin) {
+    return {
+      user: null,
+      authFailedResponse: NextResponse.json({ error: 'Invalid origin' }, { status: 403 }),
+    };
+  }
+
+  return getUserFromSessionForCredentialIssuance();
 }

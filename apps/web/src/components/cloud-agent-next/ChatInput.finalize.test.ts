@@ -258,6 +258,66 @@ describe('ChatInput finalize failure', () => {
     }
   });
 
+  it.each([true, false])(
+    'routes /new locally and rejects files before finalization with attachments=%s',
+    async hasAttachments => {
+      const upload = buildMockUpload({
+        attachments: hasAttachments
+          ? [
+              {
+                id: 'attachment',
+                file: new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+                contentType: 'text/plain',
+                kind: 'document',
+                status: 'complete',
+                progress: 100,
+                r2Key: 'owner/cloud-agent/message/notes.txt',
+              },
+            ]
+          : [],
+      });
+      mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+      const onSend = jest.fn(async () => true);
+      const onNewChat = jest.fn(async () => true);
+      const dom = installLinkedomDom();
+      let root: Root | undefined;
+      try {
+        act(() => {
+          root = createRoot(dom.container);
+          root.render(
+            createElement(ChatInput, {
+              onSend,
+              onNewChat,
+              initialValue: '/new ',
+              attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+            })
+          );
+        });
+        await act(async () => {
+          pressEnter(dom.container);
+        });
+
+        expect(onSend).not.toHaveBeenCalled();
+        if (hasAttachments) {
+          expect(upload.finalizeAttachments).not.toHaveBeenCalled();
+          expect(onNewChat).not.toHaveBeenCalled();
+          expect(upload.removeAttachment).not.toHaveBeenCalled();
+          expect(toastError).toHaveBeenCalledWith('Files cannot be attached to slash commands', {
+            description: 'Remove the files or type a plain prompt instead.',
+          });
+          expect(dom.container.querySelector('textarea')?.value).toBe('/new ');
+        } else {
+          expect(upload.finalizeAttachments).toHaveBeenCalledTimes(1);
+          expect(onNewChat).toHaveBeenCalledTimes(1);
+          expect(dom.container.querySelector('textarea')?.value).toBe('');
+        }
+      } finally {
+        act(() => root?.unmount());
+        dom.cleanup();
+      }
+    }
+  );
+
   it('ignores a second Enter while the link RPC is still in flight', async () => {
     let resolveFinalize!: (value: CloudAgentAttachments | undefined) => void;
     const finalizeAttachments = jest.fn(

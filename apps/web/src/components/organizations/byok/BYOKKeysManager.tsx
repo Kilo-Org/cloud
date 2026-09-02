@@ -43,7 +43,7 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
-  AwsCredentialsSchema,
+  BedrockCredentialsSchema,
   VertexCredentialsSchema,
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -280,7 +280,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     if (!value) return null;
     const schema =
       providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-        ? AwsCredentialsSchema
+        ? BedrockCredentialsSchema
         : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
           ? VertexCredentialsSchema
           : null;
@@ -293,11 +293,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
     const result = schema.safeParse(parsed);
     if (!result.success) {
-      const providerName =
-        providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-          ? 'AWS'
-          : 'Google Vertex';
-      return `Invalid ${providerName} credentials:\n${z.prettifyError(result.error)}`;
+      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+        return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
+      }
+      return `Invalid Google Vertex credentials:\n${z.prettifyError(result.error)}`;
     }
     return null;
   };
@@ -581,7 +580,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
               <div className="space-y-2">
                 <Label htmlFor="apiKey">
                   {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-                    ? 'AWS Credentials'
+                    ? 'AWS Bedrock Credentials'
                     : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
                       ? 'Google Vertex Credentials'
                       : 'API Key'}
@@ -650,7 +649,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
-                      <p>Enter your AWS credentials as JSON:</p>
+                      <p>Enter a Bedrock API key and AWS region as JSON:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {'{"apiKey": "...", "region": "us-east-1"}'}
+                      </code>
+                      <p className="mt-1">
+                        Generate an API key in the AWS Bedrock console. Use a region where your key
+                        and model are available, and replace the key before it expires.
+                      </p>
+                      <p className="mt-1">Or enter IAM credentials as JSON:</p>
                       <code className="mt-1 block text-xs break-all">
                         {'{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'}
                       </code>

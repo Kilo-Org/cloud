@@ -3,7 +3,6 @@ import * as z from 'zod';
 
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
-import { takeDevSessionFromUrl } from './dev-session-inject';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 type DeepLinkSource = 'universal-link' | 'notification';
@@ -158,12 +157,7 @@ export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
 export function getPendingDeepLink(): string | null {
   const href = pendingDeepLink;
-  pendingDeepLink = null;
-  pendingSource = null;
-  pendingDeepLinkUserId = null;
-  pendingDeepLinkEpoch += 1;
-  deletePersistedPendingDeepLink();
-  notifyPendingDeepLinkListeners();
+  clearPendingDeepLink();
   return href;
 }
 
@@ -316,7 +310,6 @@ export function captureLaunchDeepLink(): void {
   if (!url) {
     return;
   }
-  takeDevSessionFromUrl(url);
   const href = resolveIncomingUrl(url);
   if (href) {
     setPendingDeepLink(href, 'universal-link');

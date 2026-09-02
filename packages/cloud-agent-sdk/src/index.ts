@@ -38,7 +38,7 @@ export type {
   PermissionResponse,
 } from './session';
 
-export { normalize, normalizeCliEvent, isChatEvent, isServiceEvent } from './normalizer';
+export { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';

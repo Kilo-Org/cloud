@@ -164,7 +164,7 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   posthog_manual_required: {
     title: 'PostHog deletion needs a manual search',
     action:
-      'Open PostHog, search for the target email, delete the person, then Retry or Mark done with evidence.',
+      'Open PostHog and search by user ID for ID-only requests, or email otherwise. Delete the matching person, then Retry or Mark done with evidence.',
   },
   posthog_acceptance_incomplete: {
     title: 'PostHog did not accept the full deletion',
@@ -384,10 +384,12 @@ function humanizeCode(code: string): string {
 export function deletionManualSearchHref(params: {
   stepKey: string;
   email?: string | null;
+  userId?: string | null;
 }): { href: string; label: string } | null {
   const email = params.email?.trim().toLowerCase();
   if (params.stepKey === 'posthog') {
-    const search = email ? `?search=${encodeURIComponent(email)}` : '';
+    const target = params.userId ?? email;
+    const search = target ? `?search=${encodeURIComponent(target)}` : '';
     return {
       href: `https://us.posthog.com/persons${search}`,
       label: 'Open PostHog persons',

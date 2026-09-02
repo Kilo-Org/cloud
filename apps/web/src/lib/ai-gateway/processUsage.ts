@@ -1079,10 +1079,20 @@ export async function parseMicrodollarUsageFromStream(
         if (typeof error.code === 'number') {
           effectiveStatusCode = error.code;
         }
-        captureException(new Error(`OpenRouter error: ${error.message}`), {
-          tags: { source: 'sse_processing' },
-          extra: { json, event },
-        });
+        if (error.message === 'Upstream error from Nvidia: Service temporarily overloaded') {
+          console.info(`OpenRouter error: ${error.message}`, {
+            source: 'sse_processing',
+            provider,
+            code: error.code,
+            messageId: json.id ?? messageId,
+            model: json.model ?? model,
+          });
+        } else {
+          captureException(new Error(`OpenRouter error: ${error.message}`), {
+            tags: { source: 'sse_processing' },
+            extra: { json, event },
+          });
+        }
       }
 
       model = json.model ?? model;

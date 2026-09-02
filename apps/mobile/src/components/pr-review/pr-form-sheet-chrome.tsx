@@ -51,6 +51,7 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
       <ScreenHeader
         title={props.title}
         eyebrow={props.eyebrow}
+        centerTitle
         onBack={props.onBack}
         backIcon="close"
         className="pt-3"

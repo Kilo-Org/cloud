@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { AppState, Modal, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 type SessionPageSheetProps = {
@@ -27,6 +28,7 @@ export function SessionPageSheet({
   children,
 }: Readonly<SessionPageSheetProps>) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const [coverClosed, setCoverClosed] = useState(false);
 
   // Close when the privacy cover fires (app backgrounds on a covered route).
@@ -64,6 +66,9 @@ export function SessionPageSheet({
     return (
       <Modal
         visible={open}
+        // RN Modal paints its container white. Android unmounts the children
+        // before the slide-out ends, so the container shows as a white flash.
+        backdropColor={colors.background}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={onClose}
@@ -75,7 +80,12 @@ export function SessionPageSheet({
   }
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={open}
+      backdropColor={colors.background}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <View
         style={{ paddingTop: insets.top }}
         className="flex-1 bg-background"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   SquarePen,
   Search,
@@ -10,6 +10,7 @@ import {
   X,
   Pencil,
   LoaderCircle,
+  Plus,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -18,8 +19,16 @@ import {
   SessionStatusIndicator,
 } from '@/components/shared/SessionStatusIndicator';
 import { usePathname, useRouter } from 'next/navigation';
-import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
 import type { StoredSession } from './types';
+import {
+  getSidebarWorktreeActivity,
+  getSidebarWorktreeLabel,
+  getSidebarWorktreePrSession,
+  groupSidebarSessionsByDate,
+  type SidebarForegroundSessionStatus,
+  type SidebarWorktreeDetails,
+  type SidebarWorktreeGroup,
+} from './hooks/useSidebarSessions';
 import { SessionPrIndicator } from './SessionPrIndicator';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
@@ -33,67 +42,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-type DateGroup = {
-  label: string;
-  sessions: StoredSession[];
-};
-
-function groupSessionsByDate(sessions: StoredSession[]): DateGroup[] {
-  const today: StoredSession[] = [];
-  const yesterday: StoredSession[] = [];
-  const namedDayBuckets = new Map<string, { daysAgo: number; sessions: StoredSession[] }>();
-  const older: StoredSession[] = [];
-
-  const now = new Date();
-  const todayStart = startOfDay(now);
-
-  for (const session of sessions) {
-    const date = new Date(session.updatedAt);
-    if (isToday(date)) {
-      today.push(session);
-    } else if (isYesterday(date)) {
-      yesterday.push(session);
-    } else {
-      const daysAgo = differenceInCalendarDays(todayStart, startOfDay(date));
-      if (daysAgo <= 7) {
-        const dayName = format(date, 'EEEE');
-        const bucket = namedDayBuckets.get(dayName);
-        if (bucket) {
-          bucket.sessions.push(session);
-        } else {
-          namedDayBuckets.set(dayName, { daysAgo, sessions: [session] });
-        }
-      } else {
-        older.push(session);
-      }
-    }
-  }
-
-  const groups: DateGroup[] = [];
-  if (today.length > 0) groups.push({ label: 'Today', sessions: today });
-  if (yesterday.length > 0) groups.push({ label: 'Yesterday', sessions: yesterday });
-
-  const sortedNamedDays = [...namedDayBuckets.entries()].sort(
-    (a, b) => a[1].daysAgo - b[1].daysAgo
-  );
-
-  const MAX_NAMED_DAYS = 3;
-  for (const [i, [dayName, bucket]] of sortedNamedDays.entries()) {
-    if (i < MAX_NAMED_DAYS) {
-      groups.push({ label: dayName, sessions: bucket.sessions });
-    } else {
-      older.push(...bucket.sessions);
-    }
-  }
-
-  if (older.length > 0) {
-    older.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    groups.push({ label: 'Older', sessions: older });
-  }
-
-  return groups;
-}
-
 type ActiveSession = {
   id: string;
   status: string;
@@ -106,12 +54,21 @@ type ActiveSession = {
 type ChatSidebarProps = {
   sessions: StoredSession[];
   currentSessionId?: string;
+  selectedWorktreeId?: string | null;
   organizationId?: string;
+  onOpenSession?: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
-  deletingSessionId?: string;
+  deletingSessionIds?: string[];
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
+  creatingWorktreeSourceSessionId?: string | null;
+  worktreeDetails?: Record<string, SidebarWorktreeDetails>;
+  onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
+  onDeleteWorktree?: (worktreeId: string) => void;
+  deletingWorktreeId?: string;
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
+  foregroundSession?: SidebarForegroundSessionStatus | null;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   platformFilter?: string[];
@@ -206,7 +163,7 @@ function SessionRow({
           <>
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
             <SessionPrIndicator session={session} />
-            <span className="relative flex w-6 shrink-0 justify-end">
+            <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
                 <LoaderCircle
                   className="text-muted-foreground h-4 w-4 animate-spin"
@@ -215,7 +172,7 @@ function SessionRow({
               ) : shouldReplaceTime ? (
                 <span
                   className={cn(
-                    'flex h-4 w-4 items-center justify-center',
+                    'flex h-4 w-4 items-center justify-center group-focus-within/session-actions:invisible',
                     showActions && 'invisible'
                   )}
                 >
@@ -229,7 +186,7 @@ function SessionRow({
               ) : (
                 <span
                   className={cn(
-                    'text-muted-foreground w-full text-right text-xs tabular-nums',
+                    'text-muted-foreground w-full text-right text-xs tabular-nums group-focus-within/session-actions:invisible [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto',
                     showActions && 'invisible'
                   )}
                 >
@@ -239,15 +196,17 @@ function SessionRow({
               {!isDeleting && (onDeleteSession || onStartRename) && (
                 <span
                   className={cn(
-                    'absolute inset-y-0 right-0 flex items-center',
-                    !showActions && 'invisible'
+                    'absolute inset-y-0 right-0 flex items-center opacity-0 transition-opacity focus-within:opacity-100 [@media(any-pointer:coarse)]:static [@media(any-pointer:coarse)]:ml-1 [@media(any-pointer:coarse)]:opacity-100 [@media(hover:none)]:static [@media(hover:none)]:ml-1 [@media(hover:none)]:opacity-100',
+                    showActions && 'opacity-100'
                   )}
                 >
                   <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                     <DropdownMenuTrigger asChild>
                       <button
+                        type="button"
+                        aria-label={`Session actions for ${session.prompt}`}
                         onClick={e => e.stopPropagation()}
-                        className="hover:bg-muted rounded-md p-0.5"
+                        className="hover:bg-muted focus-visible:ring-ring relative rounded-md p-0.5 before:absolute before:-inset-3 focus-visible:ring-2 focus-visible:outline-none"
                       >
                         <MoreHorizontal className="text-muted-foreground h-4 w-4" />
                       </button>
@@ -288,6 +247,278 @@ function SessionRow({
   );
 }
 
+function WorktreeGroupRow({
+  group,
+  currentSessionId,
+  selectedWorktreeId,
+  onOpenSession,
+  onCreateWorktreeChat,
+  creatingWorktreeSourceSessionId,
+  onRenameWorktree,
+  onDeleteWorktree,
+  isDeleting,
+  activeSessionStatuses,
+  foregroundSession,
+}: {
+  group: SidebarWorktreeGroup;
+  currentSessionId?: string;
+  selectedWorktreeId?: string | null;
+  onOpenSession: (sessionId: string) => void;
+  onCreateWorktreeChat?: (sourceKiloSessionId: string) => Promise<boolean>;
+  creatingWorktreeSourceSessionId?: string | null;
+  onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
+  onDeleteWorktree?: (worktreeId: string) => void;
+  isDeleting: boolean;
+  activeSessionStatuses: ReadonlyMap<string, string>;
+  foregroundSession?: SidebarForegroundSessionStatus | null;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [isSavingRename, setIsSavingRename] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const editingRef = useRef(false);
+  const savingRenameRef = useRef(false);
+  const restoreFocusRef = useRef(false);
+  const renameErrorId = useId();
+  const label = getSidebarWorktreeLabel(group);
+  const prSession = getSidebarWorktreePrSession(group);
+  const activity = getSidebarWorktreeActivity(
+    group.sessions,
+    activeSessionStatuses,
+    group.details?.sessions,
+    foregroundSession
+  );
+  const shouldReplaceTime = activity.isLive || activity.status !== null;
+  const hasActions = Boolean(onCreateWorktreeChat || onRenameWorktree || onDeleteWorktree);
+  const isActive =
+    selectedWorktreeId === group.worktreeId ||
+    group.sessions.some(session => session.sessionId === currentSessionId);
+  const isCreatingThisGroup = group.sessions.some(
+    session => session.sessionId === creatingWorktreeSourceSessionId
+  );
+  const isCreationPending = creatingWorktreeSourceSessionId != null;
+  const showActions = hasActions && (hovered || menuOpen || isCreatingThisGroup);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      openButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (renameError) inputRef.current?.focus();
+  }, [renameError]);
+
+  const finishRename = () => {
+    editingRef.current = false;
+    restoreFocusRef.current = document.activeElement === inputRef.current;
+    setIsEditing(false);
+    setRenameError(null);
+  };
+
+  const saveRename = async () => {
+    if (!editingRef.current || !onRenameWorktree || savingRenameRef.current || isDeleting) return;
+    const name = editName.trim();
+    if (!name || name === label) {
+      finishRename();
+      return;
+    }
+
+    savingRenameRef.current = true;
+    setIsSavingRename(true);
+    setRenameError(null);
+    try {
+      await onRenameWorktree(group.worktreeId, name);
+      finishRename();
+    } catch {
+      setRenameError('Failed to rename worktree. Please try again.');
+    } finally {
+      savingRenameRef.current = false;
+      setIsSavingRename(false);
+    }
+  };
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-busy={isDeleting || isSavingRename || isCreatingThisGroup || undefined}
+      className={cn(
+        'hover:bg-accent rounded-lg text-sm transition-colors',
+        isDeleting && 'cursor-wait opacity-60',
+        isActive && 'bg-accent font-medium'
+      )}
+    >
+      <div className="flex items-center gap-2 px-3 py-2">
+        {isEditing ? (
+          <>
+            <input
+              ref={inputRef}
+              aria-label={`Rename worktree ${label}`}
+              aria-invalid={Boolean(renameError)}
+              aria-describedby={renameError ? renameErrorId : undefined}
+              disabled={isDeleting}
+              readOnly={isSavingRename}
+              value={editName}
+              onChange={event => {
+                setEditName(event.target.value);
+                setRenameError(null);
+              }}
+              onBlur={() => void saveRename()}
+              onKeyDown={event => {
+                event.stopPropagation();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void saveRename();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  if (!savingRenameRef.current) finishRename();
+                }
+              }}
+              className="bg-muted focus:ring-ring min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none focus:ring-1"
+            />
+            {(isSavingRename || isDeleting) && (
+              <LoaderCircle
+                className="text-muted-foreground h-4 w-4 shrink-0 animate-spin"
+                aria-label={isDeleting ? 'Deleting worktree' : 'Renaming worktree'}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              ref={openButtonRef}
+              type="button"
+              disabled={isDeleting}
+              onClick={() => onOpenSession(group.latestSession.sessionId)}
+              aria-label={`Open worktree ${label}`}
+              aria-current={isActive ? 'page' : undefined}
+              className="focus-visible:ring-ring -my-2 -ml-3 flex min-w-0 flex-1 items-center rounded-md py-2 pl-3 text-left focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait"
+            >
+              <span className="line-clamp-1 min-w-0 leading-snug">{label}</span>
+            </button>
+            {prSession && <SessionPrIndicator session={prSession} />}
+            <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
+              {isDeleting ? (
+                <LoaderCircle
+                  className="text-muted-foreground h-4 w-4 animate-spin"
+                  aria-label="Deleting worktree"
+                />
+              ) : shouldReplaceTime ? (
+                <span
+                  className={cn(
+                    'flex h-4 w-4 items-center justify-center group-focus-within/session-actions:invisible',
+                    showActions && 'invisible'
+                  )}
+                >
+                  {activity.status && (
+                    <SessionStatusIndicator
+                      status={activity.status}
+                      statusUpdatedAt={activity.statusUpdatedAt}
+                    />
+                  )}
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    'text-muted-foreground w-full text-right text-xs tabular-nums group-focus-within/session-actions:invisible [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto',
+                    showActions && 'invisible'
+                  )}
+                >
+                  <TimeAgo timestamp={group.latestSession.updatedAt} compact />
+                </span>
+              )}
+              {!isDeleting && hasActions && (
+                <span
+                  className={cn(
+                    'absolute inset-y-0 right-0 flex items-center opacity-0 transition-opacity focus-within:opacity-100 [@media(any-pointer:coarse)]:static [@media(any-pointer:coarse)]:ml-1 [@media(any-pointer:coarse)]:opacity-100 [@media(hover:none)]:static [@media(hover:none)]:ml-1 [@media(hover:none)]:opacity-100',
+                    showActions && 'opacity-100'
+                  )}
+                >
+                  <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Worktree actions for ${label}`}
+                        onClick={event => event.stopPropagation()}
+                        className="hover:bg-muted focus-visible:ring-ring relative rounded-md p-0.5 before:absolute before:-inset-3 focus-visible:ring-2 focus-visible:outline-none"
+                      >
+                        {isCreatingThisGroup ? (
+                          <LoaderCircle
+                            className="text-muted-foreground h-4 w-4 animate-spin"
+                            aria-label="Creating chat"
+                          />
+                        ) : (
+                          <MoreHorizontal className="text-muted-foreground h-4 w-4" />
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      onCloseAutoFocus={event => {
+                        if (editingRef.current) event.preventDefault();
+                      }}
+                    >
+                      {onCreateWorktreeChat && (
+                        <DropdownMenuItem
+                          disabled={isCreationPending}
+                          onSelect={() => {
+                            void onCreateWorktreeChat(group.latestSession.sessionId);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                          New chat
+                        </DropdownMenuItem>
+                      )}
+                      {onRenameWorktree && (
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            editingRef.current = true;
+                            setEditName(label);
+                            setRenameError(null);
+                            setIsEditing(true);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Rename worktree
+                        </DropdownMenuItem>
+                      )}
+                      {onDeleteWorktree && (
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={isCreatingThisGroup}
+                          onSelect={() => onDeleteWorktree(group.worktreeId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete worktree
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              )}
+            </span>
+          </>
+        )}
+      </div>
+      {isEditing && renameError && (
+        <p id={renameErrorId} role="alert" className="text-destructive px-3 pb-2 text-xs">
+          {renameError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
@@ -322,12 +553,21 @@ function platformFilterLabel(p: string): string {
 export function ChatSidebar({
   sessions,
   currentSessionId,
+  selectedWorktreeId,
   organizationId,
+  onOpenSession,
   onDeleteSession,
-  deletingSessionId,
+  deletingSessionIds,
   onRenameSession,
+  onCreateWorktreeChat,
+  creatingWorktreeSourceSessionId,
+  worktreeDetails = {},
+  onRenameWorktree,
+  onDeleteWorktree,
+  deletingWorktreeId,
   isInSheet = false,
   activeSessions = [],
+  foregroundSession,
   searchQuery = '',
   onSearchChange,
   platformFilter,
@@ -377,6 +617,12 @@ export function ChatSidebar({
 
   const handleSessionClick = useCallback(
     (sessionId: string) => {
+      if (onOpenSession) {
+        onOpenSession(sessionId);
+        onMobileSheetOpenChange?.(false);
+        return;
+      }
+
       const targetUrl = `${chatPath}?sessionId=${sessionId}`;
       // When already on the chat page viewing a new-format session, update the
       // URL via pushState to avoid a full server-component re-execution which
@@ -389,7 +635,7 @@ export function ChatSidebar({
       }
       onMobileSheetOpenChange?.(false);
     },
-    [chatPath, pathname, router, onMobileSheetOpenChange]
+    [chatPath, pathname, router, onOpenSession, onMobileSheetOpenChange]
   );
 
   const toggleSearch = useCallback(() => {
@@ -401,7 +647,14 @@ export function ChatSidebar({
     });
   }, [onSearchChange]);
 
-  const activeSessionIds = new Set(activeSessions.map(s => s.id));
+  const activeSessionIds = useMemo(
+    () => new Set(activeSessions.map(session => session.id)),
+    [activeSessions]
+  );
+  const activeSessionStatuses = useMemo(
+    () => new Map(activeSessions.map(session => [session.id, session.status])),
+    [activeSessions]
+  );
 
   const liveOnlySessions = activeSessions.filter(
     activeS => !sessions.some(s => s.sessionId === activeS.id)
@@ -409,7 +662,42 @@ export function ChatSidebar({
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
-  const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
+  const dateGroups = useMemo(
+    () => groupSidebarSessionsByDate(sessions, undefined, worktreeDetails),
+    [sessions, worktreeDetails]
+  );
+  const renderSession = useCallback(
+    (session: StoredSession) => (
+      <SessionRow
+        key={session.sessionId}
+        session={session}
+        isActive={session.sessionId === currentSessionId}
+        isLive={activeSessionIds.has(session.sessionId)}
+        onDeleteSession={onDeleteSession}
+        onStartRename={onRenameSession ? () => handleStartRename(session) : undefined}
+        isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
+        isEditing={editingSessionId === session.sessionId}
+        editTitle={editTitle}
+        onEditTitleChange={setEditTitle}
+        onSaveRename={handleSaveRename}
+        onCancelRename={handleCancelRename}
+        onClick={() => handleSessionClick(session.sessionId)}
+      />
+    ),
+    [
+      activeSessionIds,
+      currentSessionId,
+      deletingSessionIds,
+      editingSessionId,
+      editTitle,
+      handleCancelRename,
+      handleSaveRename,
+      handleSessionClick,
+      handleStartRename,
+      onDeleteSession,
+      onRenameSession,
+    ]
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -600,23 +888,26 @@ export function ChatSidebar({
                 >
                   {group.label}
                 </div>
-                {group.sessions.map(session => (
-                  <SessionRow
-                    key={session.sessionId}
-                    session={session}
-                    isActive={session.sessionId === currentSessionId}
-                    isLive={activeSessionIds.has(session.sessionId)}
-                    onDeleteSession={onDeleteSession}
-                    onStartRename={onRenameSession ? () => handleStartRename(session) : undefined}
-                    isDeleting={deletingSessionId === session.sessionId}
-                    isEditing={editingSessionId === session.sessionId}
-                    editTitle={editTitle}
-                    onEditTitleChange={setEditTitle}
-                    onSaveRename={handleSaveRename}
-                    onCancelRename={handleCancelRename}
-                    onClick={() => handleSessionClick(session.sessionId)}
-                  />
-                ))}
+                {group.items.map(item => {
+                  if (item.type === 'session') return renderSession(item.session);
+
+                  return (
+                    <WorktreeGroupRow
+                      key={item.worktreeId}
+                      group={item}
+                      currentSessionId={currentSessionId}
+                      selectedWorktreeId={selectedWorktreeId}
+                      onOpenSession={handleSessionClick}
+                      onCreateWorktreeChat={onCreateWorktreeChat}
+                      creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
+                      onRenameWorktree={onRenameWorktree}
+                      onDeleteWorktree={onDeleteWorktree}
+                      isDeleting={deletingWorktreeId === item.worktreeId}
+                      activeSessionStatuses={activeSessionStatuses}
+                      foregroundSession={foregroundSession}
+                    />
+                  );
+                })}
               </div>
             ))}
           </>

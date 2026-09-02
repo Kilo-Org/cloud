@@ -1,7 +1,12 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { useOrganization } from '@/lib/organization-context';
 import { Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,6 +69,24 @@ export function RemoteSessionRow({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const connection = useUserWebConnection();
+  const { organizationId, isLoaded } = useOrganization();
+  const authEpoch = currentAuthEpoch();
+  const refreshScope = useMemo(
+    () => ({
+      queryKey: trpc.activeSessions.list.queryKey(buildActiveSessionsTrayInput(organizationId)),
+      authEpoch,
+      isLoaded,
+    }),
+    [trpc, organizationId, authEpoch, isLoaded]
+  );
+  const currentRefreshScope = useRef<typeof refreshScope | null>(refreshScope);
+  currentRefreshScope.current = refreshScope;
+  useEffect(() => {
+    currentRefreshScope.current = refreshScope;
+    return () => {
+      currentRefreshScope.current = null;
+    };
+  }, [refreshScope]);
   const exitingRef = useRef(false);
   const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
@@ -125,10 +148,23 @@ export function RemoteSessionRow({
     ) : undefined;
 
   const refreshActiveList = async () => {
-    if (await refreshActiveSessionsNow()) {
+    const { queryKey } = refreshScope;
+    const query = queryClient.getQueryCache().find({ queryKey, exact: true });
+    const isCurrent = () =>
+      refreshScope.isLoaded &&
+      currentRefreshScope.current === refreshScope &&
+      isCurrentAuthEpoch(refreshScope.authEpoch) &&
+      !isSignOutActive() &&
+      query === queryClient.getQueryCache().find({ queryKey, exact: true });
+    if (!isCurrent()) {
       return;
     }
-    await queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter());
+    if (await refreshActiveSessionsNow(queryKey)) {
+      return;
+    }
+    if (isCurrent()) {
+      await queryClient.invalidateQueries({ queryKey, exact: true });
+    }
   };
 
   const handleExit = () => {

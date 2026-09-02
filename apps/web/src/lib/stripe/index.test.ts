@@ -2819,10 +2819,19 @@ describe('releaseScheduledChangeForSubscription', () => {
         };
       },
     });
+    let markClaimObserved: (() => void) | null = null;
+    const claimObserved = new Promise<void>(resolve => {
+      markClaimObserved = resolve;
+    });
     const release = jest.fn(async (_scheduleId: string) => {
+      // Keep the winning release in flight until the other caller observes its claim.
+      await claimObserved;
       throw new Error('stripe release failed');
     });
-    const retrieve = jest.fn(async (_scheduleId: string) => ({ status: 'active' }));
+    const retrieve = jest.fn(async (_scheduleId: string) => {
+      markClaimObserved?.();
+      return { status: 'active' };
+    });
     const params = {
       dbOrTx: concurrentDb,
       stripe: { subscriptionSchedules: { release, retrieve } },

@@ -13,6 +13,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
 import { BookOpen, ChevronsUpDown, Download, FileDown, LogOut, UserCog } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 
 type User = {
   google_user_name: string;
@@ -35,6 +37,30 @@ function getUserInitials(name: string) {
 }
 
 export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooterProps) {
+  const trpc = useTRPC();
+  const { data: exportUIAccess, isSuccess } = useQuery(
+    trpc.userExports.uiAccess.queryOptions(undefined, {
+      enabled: !isLoading && !!user,
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnMount: 'always',
+    })
+  );
+  const showDataExport =
+    isSuccess &&
+    exportUIAccess?.enabled === true &&
+    exportUIAccess.email === user?.google_user_email;
+
+  return (
+    <SidebarUserFooterView user={user} isLoading={isLoading} dataExportEnabled={showDataExport} />
+  );
+}
+
+export function SidebarUserFooterView({
+  user,
+  isLoading,
+  dataExportEnabled = false,
+}: SidebarUserFooterProps & { dataExportEnabled?: boolean }) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -85,10 +111,12 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
               <UserCog className="h-4 w-4" />
               Connected Accounts
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/data-exports')}>
-              <FileDown className="h-4 w-4" />
-              Request data export
-            </DropdownMenuItem>
+            {dataExportEnabled === true && (
+              <DropdownMenuItem onClick={() => router.push('/data-exports')}>
+                <FileDown className="h-4 w-4" />
+                Request data export
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => router.push('/install')}>
               <Download className="h-4 w-4" />
               Install

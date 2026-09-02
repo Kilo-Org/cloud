@@ -32,14 +32,15 @@ describe('getCenteredStateLayout', () => {
     expect(380 + layout.paddingTop + 50).toBe(550);
   });
 
-  it('does not shift a short-sheet state when it fits at the exact center', () => {
+  it('balances a short sheet when exact centering would crowd the header', () => {
     const layout = getCenteredStateLayout({
       surface: { top: 0, bottom: 320 },
       viewport: { top: 60, bottom: 320 },
       contentHeight: 180,
     });
-    expect(layout.paddingTop).toBe(10);
-    expect(60 + layout.paddingTop + 90).toBe(160);
+    expect(layout.paddingTop).toBe(40);
+    expect(60 + layout.paddingTop + 90).toBe(190);
+    expect(layout.paddingBottom).toBe(40);
   });
 
   it('keeps content below a tall header when the target is obstructed', () => {
@@ -48,7 +49,7 @@ describe('getCenteredStateLayout', () => {
       viewport: { top: 450, bottom: 800 },
       contentHeight: 200,
     });
-    expect(layout.paddingTop).toBe(0);
+    expect(layout.paddingTop).toBe(48);
   });
 
   it('keeps content above an overlay without counting its inset twice', () => {
@@ -58,8 +59,46 @@ describe('getCenteredStateLayout', () => {
       contentHeight: 600,
       bottomInset: 80,
     });
-    expect(layout.paddingTop).toBe(0);
-    expect(layout.paddingBottom).toBe(20);
+    expect(layout.paddingTop).toBe(10);
+    expect(layout.paddingBottom).toBe(10);
+  });
+
+  it.each([
+    {
+      name: 'Android half-sheet',
+      surface: { top: 320, bottom: 640 },
+      viewport: { top: 384, bottom: 640 },
+      contentHeight: 177.5,
+      paddingTop: 39.25,
+    },
+    {
+      name: 'iOS language picker above the keyboard',
+      surface: { top: 30, bottom: 435 },
+      viewport: { top: 155, bottom: 667 },
+      contentHeight: 109,
+      paddingTop: 48,
+    },
+    {
+      name: 'Android language picker above the keyboard',
+      surface: { top: 48, bottom: 340 },
+      viewport: { top: 173, bottom: 640 },
+      contentHeight: 108.5,
+      paddingTop: 29.25,
+    },
+  ])('adds bounded clearance for the $name', ({ surface, viewport, contentHeight, paddingTop }) => {
+    const layout = getCenteredStateLayout({ surface, viewport, contentHeight });
+    expect(layout.paddingTop).toBe(paddingTop);
+    expect(viewport.top + layout.paddingTop + contentHeight).toBeLessThanOrEqual(surface.bottom);
+  });
+
+  it('does not force overflow when content exactly fills the available body', () => {
+    expect(
+      getCenteredStateLayout({
+        surface: { top: 0, bottom: 400 },
+        viewport: { top: 100, bottom: 400 },
+        contentHeight: 300,
+      })
+    ).toEqual({ minHeight: 300, paddingTop: 0, paddingBottom: 0 });
   });
 
   it('gives tall content normal scrollable padding rather than a negative offset', () => {

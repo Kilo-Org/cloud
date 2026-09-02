@@ -11,6 +11,7 @@ type CenteredStateLayoutInput = {
 };
 
 const STATE_GAP = 16;
+const PREFERRED_CLEARANCE = 48;
 
 export function getStateSurfaceInsets({
   surface,
@@ -49,8 +50,9 @@ export function getCenteredStateLayout({
   const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
   const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
   const fits = contentHeight <= bottom - top;
+  const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));
   const contentTop = fits
-    ? Math.max(top, Math.min(idealTop, bottom - contentHeight))
+    ? Math.max(top + clearance, Math.min(idealTop, bottom - contentHeight - clearance))
     : top + STATE_GAP;
 
   return {

@@ -17,7 +17,8 @@ import { KiloPassIssuanceItemKind, KiloPassPaymentProvider } from './enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/utils';
 
-const mockGetGooglePlaySubscriptionPurchase = jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
+const mockGetGooglePlaySubscriptionPurchase =
+  jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
@@ -227,6 +228,12 @@ describe('processGooglePlayKiloPassNotification', () => {
       }),
     });
 
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, undefined, {
+        subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+      })
+    );
+
     const result = await processGooglePlayKiloPassNotification({
       pubsubMessage: pubsubMessage({
         notificationType: 3,
@@ -247,6 +254,38 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
   });
 
+  it('ignores a stale cancellation when Play reports the subscription as active', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'purchase-token-cancel-stale',
+        messageId: 'cancel-stale-initial',
+      }),
+    });
+
+    const result = await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 3,
+        purchaseToken: 'purchase-token-cancel-stale',
+        messageId: 'cancel-stale-1',
+      }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: and(
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_subscriptions.provider_subscription_id, 'purchase-token-cancel-stale')
+      ),
+    });
+    expect(subscription?.cancel_at_period_end).toBe(false);
+    expect(subscription?.status).toBe('active');
+  });
+
   it('ends the subscription for an expired notification', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));
@@ -258,6 +297,19 @@ describe('processGooglePlayKiloPassNotification', () => {
         messageId: 'expire-initial',
       }),
     });
+
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, undefined, {
+        subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            expiryTime: '2026-05-02T09:00:00.000Z',
+            latestSuccessfulOrderId: `GPA.${crypto.randomUUID()}`,
+          },
+        ],
+      })
+    );
 
     const result = await processGooglePlayKiloPassNotification({
       pubsubMessage: pubsubMessage({
@@ -278,6 +330,38 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(subscription?.status).toBe('canceled');
     expect(subscription?.ended_at).not.toBeNull();
     expect(subscription?.cancel_at_period_end).toBe(false);
+  });
+
+  it('ignores a stale expiry when Play still reports a future expiry', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'purchase-token-expire-stale',
+        messageId: 'expire-stale-initial',
+      }),
+    });
+
+    const result = await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 13,
+        purchaseToken: 'purchase-token-expire-stale',
+        messageId: 'expire-stale-1',
+      }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: and(
+        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_subscriptions.provider_subscription_id, 'purchase-token-expire-stale')
+      ),
+    });
+    expect(subscription?.status).toBe('active');
+    expect(subscription?.ended_at).toBeNull();
   });
 
   it('reverses the matched purchase base plus issued bonus and promo credits and ends the subscription', async () => {

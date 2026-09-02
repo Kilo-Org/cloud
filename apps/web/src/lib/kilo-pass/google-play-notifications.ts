@@ -743,6 +743,13 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_CANCELED) {
+    // Pub/Sub does not guarantee order and Play is the source of truth. A stale
+    // cancellation must not flag a subscription that Play reports as active again
+    // after the buyer restored auto-renew.
+    if (decoded.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE') {
+      await markGooglePlayStoreEventProcessed(eventId);
+      return { processed: true };
+    }
     await markGooglePlaySubscriptionCancelingAtPeriodEnd(purchaseToken);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionCanceled,
@@ -757,6 +764,12 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_EXPIRED) {
+    // A delayed expiry can arrive after the subscription renewed or recovered.
+    // Play still reports a future expiry in that case, so this event is stale.
+    if (!isExpired) {
+      await markGooglePlayStoreEventProcessed(eventId);
+      return { processed: true };
+    }
     await markGooglePlaySubscriptionEnded(db, purchaseToken);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionExpired,
@@ -772,7 +785,7 @@ export async function processGooglePlayKiloPassNotification(params: {
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED) {
     await db.transaction(async tx => {
-      let reversal: CreditReversalResult | null = null;
+      let reversal: CreditReversalResult;
       try {
         reversal = await reverseGooglePlayRefundCredits(tx, purchaseToken, decoded.latestOrderId);
       } catch (error) {
@@ -782,6 +795,9 @@ export async function processGooglePlayKiloPassNotification(params: {
             latestOrderId: decoded.latestOrderId,
           },
         });
+        // A failed clawback must not be recorded as a successful revocation. The
+        // throw rolls this transaction back so Pub/Sub redelivers and retries.
+        throw error;
       }
       await markGooglePlaySubscriptionEnded(tx, purchaseToken);
       await appendKiloPassAuditLog(tx, {
@@ -791,10 +807,10 @@ export async function processGooglePlayKiloPassNotification(params: {
           messageId: messageId ?? null,
           providerSubscriptionId: purchaseToken,
           providerTransactionId: decoded.latestOrderId,
-          storePurchaseFound: reversal?.storePurchaseFound ?? false,
-          creditTransactionIds: reversal?.creditTransactionIds ?? [],
-          totalReversalMicrodollars: reversal?.totalReversalMicrodollars ?? 0,
-          reversedItemKinds: reversal?.reversedItemKinds ?? [],
+          storePurchaseFound: reversal.storePurchaseFound,
+          creditTransactionIds: reversal.creditTransactionIds,
+          totalReversalMicrodollars: reversal.totalReversalMicrodollars,
+          reversedItemKinds: reversal.reversedItemKinds,
         },
       });
       await tx

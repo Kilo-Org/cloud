@@ -1,13 +1,27 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { describe, it, expect } from '@jest/globals';
+import { afterEach, describe, it, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import type { User } from '@kilocode/db/schema';
 import {
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  KILO_API_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  isKiloCredentialExchangeEligible,
+  verifyKiloTokenForPolicy,
+  verifyKiloTokenForResource,
+} from '@kilocode/worker-utils/kilo-token-policy';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import {
   generateApiToken,
+  generateBoundedInternalServiceToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
   validateAuthorizationHeader,
   JWT_TOKEN_VERSION,
+  type BoundedInternalServiceAudience,
   type JWTTokenPayload,
 } from './tokens';
 
@@ -58,6 +72,157 @@ const mockUser: User = {
 };
 
 describe('Token Functions', () => {
+  describe('generateBoundedInternalServiceToken', () => {
+    const boundedTokenFlag = 'BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED';
+    const originalBoundedTokenFlag = process.env[boundedTokenFlag];
+
+    afterEach(() => {
+      if (originalBoundedTokenFlag === undefined) {
+        delete process.env[boundedTokenFlag];
+      } else {
+        process.env[boundedTokenFlag] = originalBoundedTokenFlag;
+      }
+    });
+
+    function claimsFor(
+      audience: BoundedInternalServiceAudience = BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+      expiresIn = 300,
+      organizationId?: string
+    ) {
+      const token = generateBoundedInternalServiceToken(mockUser.id, {
+        audience,
+        expiresIn,
+        organizationId,
+      });
+      return jwt.decode(token) as jwt.JwtPayload;
+    }
+
+    it.each([undefined, 'false', 'unexpected'])('uses legacy claims when the flag is %s', value => {
+      if (value === undefined) {
+        delete process.env[boundedTokenFlag];
+      } else {
+        process.env[boundedTokenFlag] = value;
+      }
+
+      const claims = claimsFor();
+
+      expect(claims.aud).toBe(BITBUCKET_REPOSITORY_LIST_AUDIENCE);
+      expect(claims.tokenPurpose).toBeUndefined();
+      expect(claims.credentialExchange).toBeUndefined();
+      expect(claims.apiTokenPepper).toBeUndefined();
+      expect(claims.env).toBeUndefined();
+      expect(claims.exp! - claims.iat!).toBe(300);
+    });
+
+    it('uses bounded modern claims only when enabled', async () => {
+      process.env[boundedTokenFlag] = 'true';
+
+      const token = generateBoundedInternalServiceToken(mockUser.id, {
+        audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+        expiresIn: 300,
+        organizationId: 'org-123',
+      });
+      const claims = jwt.decode(token) as jwt.JwtPayload;
+
+      expect(claims).toMatchObject({
+        kiloUserId: mockUser.id,
+        version: JWT_TOKEN_VERSION,
+        aud: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        organizationId: 'org-123',
+      });
+      expect(claims.exp! - claims.iat!).toBe(300);
+      expect(claims.apiTokenPepper).toBeUndefined();
+      expect(claims.env).toBeUndefined();
+      await expect(
+        verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+          audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+          mode: 'required',
+        })
+      ).resolves.toMatchObject({ kiloUserId: mockUser.id });
+      const auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+        audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+        mode: 'required',
+      });
+      expect(isKiloCredentialExchangeEligible(auth, { legacy: 'five-year-api' })).toBe(false);
+    });
+
+    it('omits an audience only for legacy-compatible generic service routes', () => {
+      delete process.env[boundedTokenFlag];
+
+      expect(claimsFor(SESSION_INGEST_AUDIENCE).aud).toBeUndefined();
+      expect(claimsFor(GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE).aud).toBeUndefined();
+
+      process.env[boundedTokenFlag] = 'true';
+      expect(claimsFor(GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE).aud).toBe(
+        GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE
+      );
+    });
+
+    it('rejects invalid inputs rather than falling back to legacy signing', () => {
+      delete process.env[boundedTokenFlag];
+
+      expect(() =>
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: KILO_API_AUDIENCE as never,
+          expiresIn: 300,
+        })
+      ).toThrow('Unsupported bounded internal service token audience');
+      expect(() =>
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: '' as never,
+          expiresIn: 300,
+        })
+      ).toThrow('Unsupported bounded internal service token audience');
+      expect(() =>
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+          expiresIn: 0,
+        })
+      ).toThrow();
+    });
+
+    it.each(['false', 'true'])('enforces audience lifetime ceilings when enabled=%s', enabled => {
+      process.env[boundedTokenFlag] = enabled;
+      expect(() =>
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+          expiresIn: 301,
+        })
+      ).toThrow('lifetime exceeds');
+      expect(() =>
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: SESSION_INGEST_AUDIENCE,
+          expiresIn: 3601,
+        })
+      ).toThrow('lifetime exceeds');
+      for (const expiresIn of [undefined, 0, -1, 0.5, NaN, Infinity]) {
+        expect(() =>
+          generateBoundedInternalServiceToken(mockUser.id, {
+            audience: SESSION_INGEST_AUDIENCE,
+            expiresIn,
+          } as never)
+        ).toThrow();
+      }
+    });
+
+    it('does not permit callers to add arbitrary bounded-token claims', () => {
+      process.env[boundedTokenFlag] = 'true';
+
+      const claims = jwt.decode(
+        generateBoundedInternalServiceToken(mockUser.id, {
+          audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+          expiresIn: 300,
+          extra: { internalApiUse: true },
+        } as never)
+      ) as jwt.JwtPayload;
+
+      expect(claims.internalApiUse).toBeUndefined();
+      expect(claims.aud).toBe(BITBUCKET_REPOSITORY_LIST_AUDIENCE);
+    });
+  });
+
   describe('generateInternalServiceToken', () => {
     it('generates a generic service token without an audience', () => {
       const token = generateInternalServiceToken(mockUser.id);

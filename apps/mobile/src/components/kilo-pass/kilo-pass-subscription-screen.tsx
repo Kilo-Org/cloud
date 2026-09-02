@@ -179,6 +179,8 @@ function KiloPassNativeIapContent() {
     ownedGoogleProductId,
     ownedGooglePurchaseToken,
     ownershipChecked,
+    ownershipCheckFailed,
+    retryOwnershipCheck,
   } = useKiloPassNativeIap();
   useInlinePurchaseErrorOwnership();
   const queryClient = useQueryClient();
@@ -324,6 +326,17 @@ function KiloPassNativeIapContent() {
             >
               {feedback.text}
             </Text>
+          )}
+
+          {ownershipCheckFailed && (
+            <Button
+              accessibilityLabel={t('kiloPass.retryLoading')}
+              className="self-start"
+              onPress={retryOwnershipCheck}
+              variant="outline"
+            >
+              <Text>{t('common.tryAgain')}</Text>
+            </Button>
           )}
 
           {preflightFailure?.kind === 'retryable' && (

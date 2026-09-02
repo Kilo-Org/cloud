@@ -25,6 +25,7 @@ import {
   KILO_PASS_PURCHASE_FAILED_EVENT,
   KILO_PASS_PURCHASE_STARTED_EVENT,
 } from '@/lib/analytics/posthog';
+import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   type AppStoreKiloPassProduct,
@@ -44,6 +45,10 @@ import { useTRPC } from '@/lib/trpc';
 
 const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
 const isAndroid = Platform.OS === 'android';
+// Shown when the store never answers the ownership lookup.
+const STORE_CONNECTION_ERROR_MESSAGE_KEY = isAndroid
+  ? 'kiloPass.couldNotConnectToPlay'
+  : 'kiloPass.couldNotConnectToAppStore';
 
 function getSubscriptionOfferToken(product: ProductSubscription): string | undefined {
   if (product.platform !== 'android') {
@@ -116,6 +121,10 @@ export type KiloPassNativeIapContextValue = {
   ownedGooglePurchaseToken: string | null;
   /** False until the store has answered once with what this device owns. */
   ownershipChecked: boolean;
+  /** True when the last ownership lookup failed, so purchasing stays blocked. */
+  ownershipCheckFailed: boolean;
+  /** Runs the ownership lookup again after a failure. */
+  retryOwnershipCheck: () => void;
 };
 
 const KiloPassNativeIapContext = createContext<KiloPassNativeIapContextValue | null>(null);
@@ -145,6 +154,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     setErrorMessage(null);
   }, []);
   const [ownershipChecked, setOwnershipChecked] = useState(false);
+  const [ownershipCheckFailed, setOwnershipCheckFailed] = useState(false);
+  const [ownershipAttempt, setOwnershipAttempt] = useState(0);
+  const retryOwnershipCheck = useCallback(() => {
+    setOwnershipCheckFailed(false);
+    setOwnershipAttempt(attempt => attempt + 1);
+  }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
   const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
@@ -405,14 +420,18 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await refreshAvailablePurchases();
-      } finally {
         // Purchases are only known after the store answers. Until then the screen
         // must not start a purchase: a device subscription owned by another Kilo
         // account would otherwise charge the user before any check can see it.
         setOwnershipChecked(true);
+      } catch {
+        // A failed lookup answers nothing, so purchasing stays blocked and the
+        // screen offers a retry instead of charging the user blind.
+        setOwnershipCheckFailed(true);
+        setErrorMessage(i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY));
       }
     })();
-  }, [connected, refreshAvailablePurchases]);
+  }, [connected, ownershipAttempt, refreshAvailablePurchases]);
 
   useEffect(() => {
     if (
@@ -475,6 +494,8 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       ownedGoogleProductId,
       ownedGooglePurchaseToken,
       ownershipChecked,
+      ownershipCheckFailed,
+      retryOwnershipCheck,
     }),
     [
       clearError,
@@ -489,6 +510,8 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       ownedGooglePurchaseToken,
       ownedOriginalTransactionId,
       ownershipChecked,
+      ownershipCheckFailed,
+      retryOwnershipCheck,
       productsQuery.errorMessage,
       productsQuery.isLoading,
       productsQuery.isRefetching,

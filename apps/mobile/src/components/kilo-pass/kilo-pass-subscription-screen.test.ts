@@ -36,6 +36,8 @@ const mocks = vi.hoisted(() => ({
     ownedGoogleProductId: null as string | null,
     ownedGooglePurchaseToken: null as string | null,
     ownershipChecked: true,
+    ownershipCheckFailed: false,
+    retryOwnershipCheck: vi.fn(),
   },
   routerPush: vi.fn(),
 }));
@@ -286,6 +288,8 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.ownedOriginalTransactionId = null;
     mocks.nativeIap.ownedGoogleProductId = null;
     mocks.nativeIap.ownedGooglePurchaseToken = null;
+    mocks.nativeIap.ownershipCheckFailed = false;
+    mocks.nativeIap.retryOwnershipCheck.mockReset();
     mocks.routerPush.mockReset();
   });
 
@@ -326,6 +330,31 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     const tiles = productTiles(renderer);
     expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('blocked: a failed ownership lookup keeps tiles disabled and offers a retry', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.ownershipChecked = false;
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    expect((first(productTiles(renderer)).props as { disabled?: boolean }).disabled).toBe(true);
+
+    const retry = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel ===
+          'Retry loading Kilo Pass'
+    );
+    await press(first(retry));
+
+    expect(mocks.nativeIap.retryOwnershipCheck).toHaveBeenCalledTimes(1);
+    expect(mocks.preflightMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

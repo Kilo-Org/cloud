@@ -152,7 +152,11 @@
     "appearanceDark": "داكن",
     "account": "الحساب",
     "prReviewAttribution": "أضِف إسناد التطبيق إلى مراجعات PR",
-    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة."
+    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة.",
+    "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
+    "returnSendsMessageSubtitle": "عند إيقاف هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول إدخال رسائل الوكلاء.",
+    "biometricUnlock": "إلغاء القفل باستخدام القياسات الحيوية",
+    "biometricUnlockSubtitle": "يلزم إلغاء القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -211,7 +215,8 @@
     "profile": "الملف الشخصي",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تبويب، {{position}} من {{total}}"
+    "position": "{{name}}، تبويب، {{position}} من {{total}}",
+    "chat": "المحادثات"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "خطأ في الشبكة",
       "uploadFailed": "فشل الرفع",
       "failedToUploadFile": "فشل رفع الملف: {{reason}}",
-      "nothingToPaste": "لا يوجد شيء للصق"
+      "nothingToPaste": "لا يوجد شيء للصق",
+      "metadataStripFailed": "تعذّر إزالة البيانات الوصفية للصورة."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -906,7 +912,23 @@
       "title": "مراجعة",
       "tokens": "الرموز",
       "tokensInOut": "{{input}} إدخال / {{output}} إخراج",
-      "pullRequest": "طلب سحب"
+      "pullRequest": "طلب سحب",
+      "transcriptWaiting": "في انتظار نص المراجعة.",
+      "transcriptEmpty": "لا يوجد نص لهذه المراجعة.",
+      "transcriptRetry": "تعذّر تحميل نص المراجعة.",
+      "transcriptLive": "مباشر",
+      "agentIdle": "الوكيل خامل",
+      "agentWorking": "الوكيل يعمل...",
+      "anErrorOccurred": "حدث خطأ",
+      "errorWithMessage": "خطأ: {{message}}",
+      "executionStarted": "بدأ التنفيذ",
+      "reviewCompleted": "اكتملت المراجعة",
+      "reviewInterrupted": "توقفت المراجعة",
+      "sessionError": "خطأ في الجلسة: {{error}}",
+      "statusWithValue": "الحالة: {{status}}",
+      "toolName": "الأداة: {{name}}",
+      "toolNameError": "الأداة: {{name}} — خطأ",
+      "unknownError": "خطأ غير معروف"
     },
     "reviewList": {
       "configureProvider": "تهيئة المزوّد",
@@ -1603,7 +1625,6 @@
     }
   },
   "agents": {
-    "activeNow": "نشط الآن",
     "search": {
       "searching": "جارٍ البحث",
       "searchSessions": "البحث في الجلسات",
@@ -1614,16 +1635,15 @@
     "sessionList": {
       "couldNotLoad": "تعذّر تحميل الجلسات",
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة",
-      "noSessionsYet": "لا توجد جلسات بعد",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
       "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
       "couldNotSearch": "تعذّر البحث في الجلسات",
-      "allActive": "جميع الجلسات نشطة",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
-      "live": "مباشر"
+      "live": "مباشر",
+      "updating": "جارٍ التحديث"
     },
     "sessionRow": {
       "deleteTitle": "حذف الجلسة؟",
@@ -1675,7 +1695,13 @@
     "sessionExited": "انتهت الجلسة",
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
     "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
-    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر.",
+    "liveCount_one": "{{count}} مباشر",
+    "liveCount_other": "{{count}} مباشر",
+    "liveCount_zero": "{{count}} مباشر",
+    "liveCount_two": "{{count}} مباشر",
+    "liveCount_few": "{{count}} مباشر",
+    "liveCount_many": "{{count}} مباشر"
   },
   "agentChat": {
     "session": {
@@ -1697,18 +1723,19 @@
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
-      "connectRepository": "ربط المستودع",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "continue": "متابعة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة",
-      "cloneFailed": "تعذّر استنساخ هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة.",
       "notEnoughCredits": "لا توجد ائتمانات كافية لتشغيل Cloud Agent. أضف ائتمانات وحاول مرة أخرى.",
       "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
       "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة.",
-      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى."
+      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى.",
+      "cancelQueuedFailed": "تعذّر إلغاء الرسالة.",
+      "cancelQueuedRestoreAvailable": "تم إلغاء الرسالة. اضغط على «استعادة» لإعادتها إلى حقل إدخال الرسالة.",
+      "cancelQueuedRestored": "تم إلغاء الرسالة. عادت المطالبة إلى حقل إدخال الرسالة.",
+      "cancelQueuedUpgradeRequired": "يتطلب إلغاء الرسائل في قائمة الانتظار إصدارًا أحدث من Kilo CLI. حدّث Kilo CLI وأعد الاتصال."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
@@ -1776,7 +1803,12 @@
       "noRepositoriesVisibleGitlab": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ GitLab، ثم حدّث.",
       "openBitbucket": "فتح Bitbucket",
       "openGitlab": "فتح GitLab",
-      "recentlyUsed": "مستخدم مؤخرًا"
+      "recentlyUsed": "مستخدم مؤخرًا",
+      "continueFrom": "متابعة {{title}}",
+      "importingSession": "جارٍ استيراد الجلسة",
+      "cliCannotContinue": "لا يمكن لهذه CLI متابعة جلسة. اختر وكيل سحابي أو CLI آخر.",
+      "importFailed": "تعذر استيراد هذه الجلسة.",
+      "discardWithUploadsMessage": "سيتم حذف مطالبتك وأي ملفات مرفوعة غير مرفقة برسائل مرسلة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -1838,7 +1870,9 @@
       "noCliInstancesDescription": "شغّل `kilo remote` في مشروع على جهاز الكمبيوتر الخاص بك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
       "instanceOnProject": "{{name}} على {{project}}",
       "instanceOnProjectSuffix": "{{name}} على {{project}} ({{suffix}})",
-      "runOnCloudAgent": "التشغيل على وكيل سحابي"
+      "runOnCloudAgent": "التشغيل على وكيل سحابي",
+      "terminals": "الطرفيات",
+      "remotes": "المثيلات البعيدة"
     },
     "modePicker": {
       "title": "اختيار الوضع",
@@ -2028,7 +2062,11 @@
       "queuedAccessibility": "الرسالة في قائمة الانتظار",
       "userMessage": "رسالة المستخدم",
       "assistantMessage": "رسالة المساعد",
-      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة"
+      "longPressHint": "اضغط مطولًا لعرض تفاصيل الرسالة",
+      "cancelQueued": "إلغاء الرسالة",
+      "cancelQueuedAccessibility": "إلغاء الرسالة في قائمة الانتظار",
+      "restoreQueued": "استعادة",
+      "restoreQueuedAccessibility": "استعادة الرسالة الملغاة إلى حقل إدخال الرسالة"
     },
     "olderMessages": {
       "arrived": "تم تحميل الرسائل السابقة",
@@ -2048,6 +2086,8 @@
       "viewTable": "عرض الجدول",
       "title": "جدول",
       "close": "إغلاق الجدول",
+      "loading": "جارٍ تحميل الجدول",
+      "empty": "لا يحتوي هذا الجدول على صفوف.",
       "columnCount_one": "عمود",
       "columnCount": "أعمدة",
       "columnCount_other": "أعمدة",
@@ -2066,9 +2106,6 @@
     },
     "sessionFilter": {
       "title": "تصفية الجلسات",
-      "sortBy": "ترتيب حسب",
-      "sortLastUpdated": "آخر تحديث",
-      "sortCreated": "تم الإنشاء",
       "platform": "المنصة",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",
@@ -2077,9 +2114,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "أخرى",
-      "project": "المشروع",
-      "removeProjectFilter": "إزالة عامل تصفية المشروع {{label}}",
-      "removePlatformFilter": "إزالة عامل تصفية المنصة {{label}}"
+      "project": "المشروع"
     },
     "suggestion": {
       "title": "اقتراح",
@@ -2122,7 +2157,9 @@
       "uploading": "جارٍ الرفع…",
       "uploaded": "تم الرفع",
       "uploadFailedRetry": "تعذّر الرفع. اضغط لإعادة المحاولة.",
-      "uploadFailedTerminal": "لا يمكن رفع هذا الملف."
+      "uploadFailedTerminal": "لا يمكن رفع هذا الملف.",
+      "moveLeft": "نقل {{filename}} إلى اليسار",
+      "moveRight": "نقل {{filename}} إلى اليمين"
     },
     "attachmentPasteHint": {
       "accessibility": "لصق صورة من الحافظة",
@@ -2152,7 +2189,11 @@
       "finalizingPlaceholder": "جارٍ الإنهاء...",
       "messagePlaceholder": "رسالة...",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
-      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى."
+      "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
+      "discardAttachmentsMessage": "سيتم حذف الملفات المرفوعة غير المرفقة برسائل مرسلة.",
+      "discardAttachmentsTitle": "تجاهل المرفقات؟",
+      "charactersRemaining": "الأحرف المتبقية: {{count}}",
+      "insertNewline": "إدراج سطر جديد"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",
@@ -2248,6 +2289,17 @@
       "hostConfirmMessage": "يفتح هذا الرابط {{host}} في متصفحك.",
       "open": "فتح",
       "trustThisHost": "الثقة بهذا المضيف"
+    },
+    "folderPicker": {
+      "accessibility": "المجلد: {{label}}",
+      "emptyDescription": "زر (تم) يستخدم هذا المجلد.",
+      "emptyTitle": "لا توجد مجلدات بداخله",
+      "fieldLabel": "المجلد",
+      "retryableDescription": "تحقق من اتصالك ثم اضغط (إعادة المحاولة). لا يزال زر (تم) يؤكد هذا المجلد.",
+      "retryableTitle": "تعذّر عرض المجلدات",
+      "tapToListHint": "اضغط على مجلد لعرض محتوياته",
+      "unsupportedDescription": "لا يمكن لهذا CLI عرض المجلدات. يحتفظ زر (تم) بمجلد الإطلاق، ويبدأ (بدء الجلسة) منه.",
+      "unsupportedTitle": "لا يمكن عرض المجلدات"
     }
   },
   "bootstrap": {
@@ -2300,7 +2352,7 @@
     "newCodingTask": "مهمة برمجة جديدة",
     "explore": "استكشف",
     "seeAll": "عرض الكل",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "لا شيء قيد التشغيل الآن"
   },
   "imageViewer": {
     "close": "إغلاق {{filename}}",
@@ -2364,7 +2416,8 @@
     "busy": "الإدخال الصوتي مشغول. حاول مرة أخرى.",
     "stopped": "توقف الإدخال الصوتي. اضغط على الميكروفون للمحاولة مرة أخرى.",
     "unavailableDevice": "الإدخال الصوتي غير متاح على هذا الجهاز.",
-    "unavailableLanguage": "الإدخال الصوتي غير متاح للغة الجهاز هذه."
+    "unavailableLanguage": "الإدخال الصوتي غير متاح للغة الجهاز هذه.",
+    "listeningStopped": "توقف الاستماع."
   },
   "share": {
     "title": "مشاركة إلى Kilo",
@@ -3233,5 +3286,19 @@
     "emptyDescription": "عندما تثق بمضيف رابط، يُفتح دون سؤال مرة أخرى.",
     "revoke": "إبطال {{host}}",
     "backToPreferences": "العودة إلى التفضيلات"
+  },
+  "quickChat": {
+    "title": "المحادثات",
+    "composer": {
+      "placeholder": "رسالة"
+    },
+    "empty": {
+      "title": "بدء محادثة",
+      "description": "أرسل رسالة للتحدث مع نموذج."
+    },
+    "working": "جارٍ العمل",
+    "historyRetry": "تعذّر تحميل سجل المحادثة.",
+    "catalogRetry": "تعذّر تحميل النماذج",
+    "sendError": "تعذّر إرسال الرسالة. حاول مرة أخرى."
   }
 }

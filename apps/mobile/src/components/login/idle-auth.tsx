@@ -25,7 +25,7 @@ export function IdleAuth({
   initialSsoRecovery = null,
   onBusyChange,
 }: Readonly<{
-  start: (mode: 'signin' | 'signup' | 'sso', ssoEmail?: string) => Promise<void>;
+  start: (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
   initialEmail?: string;
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;

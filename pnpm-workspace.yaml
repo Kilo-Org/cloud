@@ -155,6 +155,7 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
+  expo-router@57.0.15: patches/expo-router@57.0.15.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:

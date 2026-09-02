@@ -152,7 +152,11 @@
     "appearanceDark": "Цёмная",
     "account": "Уліковы запіс",
     "prReviewAttribution": "Дадаваць атрыбуцыю дадатку да рэцэнзій PR",
-    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі."
+    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі.",
+    "returnSendsMessage": "Клавіша ўводу адпраўляе паведамленне",
+    "returnSendsMessageSubtitle": "Калі выключана, клавіша ўводу ўстаўляе новы радок у кампазітарах агентаў.",
+    "biometricUnlock": "Разблакіроўваць з дапамогай біяметрыі",
+    "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску дадатку і пасля пяці хвілін у фонавым рэжыме."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -679,7 +683,8 @@
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, укладка, {{position}} з {{total}}"
+    "position": "{{name}}, укладка, {{position}} з {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -763,7 +768,8 @@
       "networkError": "Памылка сеткі",
       "uploadFailed": "Загрузка не ўдалася",
       "failedToUploadFile": "Не атрымалася загрузіць файл: {{reason}}",
-      "nothingToPaste": "Няма чаго ўставіць"
+      "nothingToPaste": "Няма чаго ўставіць",
+      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1317,7 +1323,23 @@
       "checkRun": "Запуск праверкі",
       "status": "Статус",
       "threshold": "Парогавае значэнне",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Чаканне стэнаграмы праверкі.",
+      "transcriptEmpty": "Няма стэнаграмы для гэтай праверкі.",
+      "transcriptRetry": "Не ўдалося загрузіць стэнаграму праверкі.",
+      "transcriptLive": "Live",
+      "agentIdle": "Агент бяздзейнічае",
+      "agentWorking": "Агент працуе...",
+      "anErrorOccurred": "Узнікла памылка",
+      "errorWithMessage": "Памылка: {{message}}",
+      "executionStarted": "Выкананне пачата",
+      "reviewCompleted": "Прагляд завершаны",
+      "reviewInterrupted": "Прагляд перапынены",
+      "sessionError": "Памылка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Інструмент: {{name}}",
+      "toolNameError": "Інструмент: {{name}} — памылка",
+      "unknownError": "Невядомая памылка"
     },
     "reviewMemory": {
       "title": "Памяць праверкі",
@@ -1433,7 +1455,7 @@
     "status": {
       "pending": "Чакае",
       "queued": "У чарзе",
-      "running": "ПРАЦУЕ",
+      "running": "Працуе",
       "completed": "Завершана",
       "failed": "Не атрымалася",
       "cancelled": "Адменена",
@@ -1699,12 +1721,12 @@
       "statusFixed": "Выпраўлена",
       "statusOpen": "Адкрыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Выпраўленне ўжо пачалося",
-      "reasonNoBandwidth": "Няма даступнай магчымасці",
-      "reasonTolerableRisk": "Рызыка прымальная",
-      "reasonInaccurate": "Знаходка недакладная",
-      "reasonNotUsed": "Уразлівы код не выкарыстоўваецца",
-      "reasonAfterReview": "Пасля праверкі"
+      "reasonFixStarted": "выпраўленне ўжо пачалося",
+      "reasonNoBandwidth": "няма даступнай магчымасці",
+      "reasonTolerableRisk": "рызыка прымальная",
+      "reasonInaccurate": "знаходка недакладная",
+      "reasonNotUsed": "уразлівы код не выкарыстоўваецца",
+      "reasonAfterReview": "пасля праверкі"
     },
     "settingsOverview": {
       "title": "Налады",
@@ -1882,7 +1904,7 @@
       "newFindingSeverityLabel": "Мінімальны ўзровень для новых знаходак",
       "newFindingSubtitle": "Адпраўляецца кожны раз, калі новая знаходка сінхранізуецца, уключаючы першую сінхранізацыю.",
       "readOnly": "Толькі ўладальнікі арганізацыі і менеджэры па аплаце могуць змяняць гэтыя налады.",
-      "slaLeadTimeAccessibility": "час папярэджання SLA у днях",
+      "slaLeadTimeAccessibility": "Час папярэджання SLA у днях",
       "slaLeadTimeError": "Увядзіце цэлы лік дзён ад 1 да 365.",
       "slaLeadTimeHint": "Увядзіце цэлы лік ад 1 да 365",
       "slaLeadTimeLabel": "Час папярэджання SLA (дні)",
@@ -2059,7 +2081,6 @@
     }
   },
   "agents": {
-    "activeNow": "Актыўны зараз",
     "search": {
       "searching": "Пошук…",
       "searchSessions": "Пошук сеансаў",
@@ -2070,16 +2091,15 @@
     "sessionList": {
       "couldNotLoad": "Не атрымалася загрузіць сеансы",
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы",
-      "noSessionsYet": "Сеансаў яшчэ няма",
       "noSessionsYetDescription": "Пачніце задачу кадавання з тэлефона. Вашы сеансы з'явяцца тут.",
       "noMatches": "Ніводны сеанс не адпавядае",
       "tryDifferentSearch": "Паспрабуйце іншы пошукавы запыт.",
       "tryAdjustFilters": "Паспрабуйце змяніць або ачысціць фільтры.",
       "couldNotSearch": "Не атрымалася выканаць пошук па сеансах",
-      "allActive": "Усе сеансы актыўныя",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма мінулых сеансаў",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Абнаўленне"
     },
     "sessionRow": {
       "deleteTitle": "Выдаліць сеанс?",
@@ -2127,7 +2147,11 @@
     "sessionExited": "Сеанс завершаны",
     "remoteSpawnRetryable": "Не ўдалося злучыцца з інстансам — магчыма, ён адключыўся.",
     "remoteSpawnNonRetryable": "Інстанс не змог запусціць сеанс — праверце машыну або абнавіце CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбраны інстанс адключыўся. Запусціце сеанс у Cloud Agent або абярыце іншы інстанс."
+    "remoteSpawnInstanceDisconnected": "Выбраны інстанс адключыўся. Запусціце сеанс у Cloud Agent або абярыце іншы інстанс.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE",
+    "liveCount_many": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2149,18 +2173,19 @@
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
-      "connectRepository": "Падключыць рэпазіторый",
       "cloningSession": "Кланаванне сеанса",
       "continue": "Працягнуць",
       "couldNotLoadThisSession": "Не атрымалася загрузіць гэты сеанс",
-      "cloneFailed": "Не атрымалася кланаваць гэты сеанс.",
       "cloneFailedRetry": "Не атрымалася кланаваць гэты сеанс. Паспрабуйце зноў.",
-      "connectRepositoryToContinue": "Падключыце рэпазіторый, каб працягнуць.",
       "notEnoughCredits": "Недастаткова крэдытаў для запуску Cloud Agent. Дадайце крэдыты і паспрабуйце зноў.",
       "previousTaskFinishing": "Папярэдняя задача ўсё яшчэ выконваецца. Пачакайце імгненне.",
       "serviceUnavailable": "Сэрвіс зараз недаступны. Паспрабуйце зноў.",
       "connectionTrouble": "Праблема з падключэннем. Паспрабуйце зноў праз імгненне.",
-      "modelUnavailable": "Гэтая мадэль недаступная для Cloud Agent. Выберыце іншую мадэль і паспрабуйце зноў."
+      "modelUnavailable": "Гэтая мадэль недаступная для Cloud Agent. Выберыце іншую мадэль і паспрабуйце зноў.",
+      "cancelQueuedFailed": "Не атрымалася адмяніць паведамленне.",
+      "cancelQueuedRestoreAvailable": "Паведамленне адменена. Націсніце «Аднавіць», каб вярнуць яго ў кампазітар.",
+      "cancelQueuedRestored": "Паведамленне адменена. Запыт зноў у кампазітары.",
+      "cancelQueuedUpgradeRequired": "Для адмены паведамленняў у чарзе патрабуецца навейшы Kilo CLI. Абнавіце Kilo CLI і падключыцеся зноў."
     },
     "remoteSession": {
       "failedToCreate": "Не атрымалася стварыць аддалены сеанс",
@@ -2228,7 +2253,12 @@
       "noRepositoriesVisibleGitlab": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў GitLab і абнавіце.",
       "openBitbucket": "Адкрыць Bitbucket",
       "openGitlab": "Адкрыць GitLab",
-      "recentlyUsed": "Нядаўна выкарыстаныя"
+      "recentlyUsed": "Нядаўна выкарыстаныя",
+      "continueFrom": "Працяг {{title}}",
+      "importingSession": "Імпартаванне сеанса",
+      "cliCannotContinue": "Гэты CLI не можа працягнуць сеанс. Выберыце Cloud Agent або іншы CLI.",
+      "importFailed": "Не атрымалася імпартаваць гэты сеанс.",
+      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2288,7 +2318,9 @@
       "noCliInstancesDescription": "Выканайце `kilo remote` у праекце на вашым кампутары або абнавіце Kilo CLI, калі ён ужо працуе.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запуск на Cloud Agent"
+      "runOnCloudAgent": "Запуск на Cloud Agent",
+      "terminals": "Тэрміналы",
+      "remotes": "Аддаленыя экзэмпляры"
     },
     "modePicker": {
       "title": "Выбраць рэжым",
@@ -2478,7 +2510,11 @@
       "queuedAccessibility": "Паведамленне ў чарзе",
       "userMessage": "Паведамленне карыстальніка",
       "assistantMessage": "Паведамленне памочніка",
-      "longPressHint": "Доўгае націсканне для дэталяў паведамлення"
+      "longPressHint": "Доўгае націсканне для дэталяў паведамлення",
+      "cancelQueued": "Адмяніць паведамленне",
+      "cancelQueuedAccessibility": "Адмяніць паведамленне ў чарзе",
+      "restoreQueued": "Аднавіць",
+      "restoreQueuedAccessibility": "Аднавіць адмененае паведамленне ў кампазітары"
     },
     "olderMessages": {
       "arrived": "Загружаныя больш раннія паведамленні",
@@ -2496,6 +2532,8 @@
       "viewTable": "Праглядзець табліцу",
       "title": "Табліца",
       "close": "Закрыць табліцу",
+      "loading": "Загрузка табліцы",
+      "empty": "У гэтай табліцы няма радкоў.",
       "columnCount_one": "слупок",
       "columnCount": "слупкі",
       "columnCount_other": "слупкі",
@@ -2510,9 +2548,6 @@
     },
     "sessionFilter": {
       "title": "Фільтраваць сеансы",
-      "sortBy": "Сартаваць па",
-      "sortLastUpdated": "Апошняе абнаўленне",
-      "sortCreated": "Створаны",
       "platform": "Платформа",
       "platformCloud": "Воблака",
       "platformExtension": "Пашырэнне",
@@ -2521,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Іншае",
-      "project": "Праект",
-      "removeProjectFilter": "Прыбраць фільтр праекта {{label}}",
-      "removePlatformFilter": "Прыбраць фільтр платформы {{label}}"
+      "project": "Праект"
     },
     "suggestion": {
       "title": "Прапанова",
@@ -2566,7 +2599,9 @@
       "uploading": "Загрузка…",
       "uploaded": "Загружана",
       "uploadFailedRetry": "Загрузка не ўдалася. Націсніце, каб паўтарыць.",
-      "uploadFailedTerminal": "Гэты файл нельга загрузіць."
+      "uploadFailedTerminal": "Гэты файл нельга загрузіць.",
+      "moveLeft": "Перамясціць {{filename}} улева",
+      "moveRight": "Перамясціць {{filename}} управа"
     },
     "attachmentPasteHint": {
       "accessibility": "Уставіць выяву з буфера абмену",
@@ -2596,7 +2631,11 @@
       "finalizingPlaceholder": "Завяршэнне...",
       "messagePlaceholder": "Паведамленне...",
       "cannotReceiveFiles": "Гэты сеанс не можа атрымліваць файлы. Прыбярыце ўкладанні, каб адправіць паведамленне.",
-      "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце «Адправіць», каб паспрабаваць яшчэ раз."
+      "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце «Адправіць», каб паспрабаваць яшчэ раз.",
+      "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
+      "discardAttachmentsTitle": "Выдаліць укладанні?",
+      "charactersRemaining": "Засталося сімвалаў: {{count}}",
+      "insertNewline": "Уставіць новы радок"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіраваная",
@@ -2690,6 +2729,17 @@
       "hostConfirmMessage": "Гэтая спасылка адкрые {{host}} у вашым браўзеры.",
       "open": "Адкрыць",
       "trustThisHost": "Давяраць гэтаму хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Гатова выкарыстоўвае гэтую папку.",
+      "emptyTitle": "Унутры няма папак",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Праверце падключэнне і паўтарыце. Гатова ўсё ж пацвердзіць гэтую папку.",
+      "retryableTitle": "Не атрымалася паказаць спіс папак",
+      "tapToListHint": "Націсніце на папку, каб паказаць яе змесціва",
+      "unsupportedDescription": "Гэта CLI не можа паказаць спіс папак. Гатова захавае папку запуску, а Пачаць сеанс пачнецца там.",
+      "unsupportedTitle": "Нельга паказаць спіс папак"
     }
   },
   "bootstrap": {
@@ -2742,7 +2792,7 @@
     "newCodingTask": "Новая задача праграмавання",
     "explore": "Даследаваць",
     "seeAll": "Паказаць усё",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Зараз нічога не выконваецца"
   },
   "imageViewer": {
     "close": "Закрыць {{filename}}",
@@ -2787,7 +2837,7 @@
     "optionsExpiredDescription": "Вярніцеся назад і адкрыйце гэты выбар з папярэдняга экрана."
   },
   "sessionRow": {
-    "needsInput": "патрабуецца ўвод"
+    "needsInput": "ПАТРАБУЕЦЦА ЎВОД"
   },
   "voiceInput": {
     "listening": "Слухаю...",
@@ -2806,7 +2856,8 @@
     "busy": "Галасавы ўвод заняты. Паспрабуйце яшчэ раз.",
     "stopped": "Галасавы ўвод спынены. Дакраніцеся да мікрафона, каб паспрабаваць зноў.",
     "unavailableDevice": "Галасавы ўвод недаступны на гэтай прыладзе.",
-    "unavailableLanguage": "Галасавы ўвод недаступны для мовы гэтай прылады."
+    "unavailableLanguage": "Галасавы ўвод недаступны для мовы гэтай прылады.",
+    "listeningStopped": "Праслухоўванне спынена."
   },
   "share": {
     "title": "Падзяліцца з Kilo",
@@ -3191,5 +3242,19 @@
     "emptyDescription": "Калі вы даверыцеся хосту спасылкі, яна адкрыецца без наступных запытаў.",
     "revoke": "Адабраць {{host}}",
     "backToPreferences": "Назад да наладаў"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Паведамленне"
+    },
+    "empty": {
+      "title": "Пачаць чат",
+      "description": "Адпраўце паведамленне, каб паразмаўляць з мадэллю."
+    },
+    "working": "Працуе",
+    "historyRetry": "Не атрымалася загрузіць гісторыю чата.",
+    "catalogRetry": "Не атрымалася загрузіць мадэлі",
+    "sendError": "Не атрымалася адправіць паведамленне. Паспрабуйце яшчэ раз."
   }
 }

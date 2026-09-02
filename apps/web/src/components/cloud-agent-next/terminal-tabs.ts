@@ -6,6 +6,7 @@ export type WorkspaceTabId = typeof CHAT_TAB_ID | TerminalTabId;
 export type TerminalWorkspaceTab = {
   id: string;
   title: string;
+  cloudAgentSessionId: string;
 };
 
 export type WorkspaceTabsState = {
@@ -23,6 +24,15 @@ export function terminalIdFromTabId(tabId: WorkspaceTabId): string | null {
   return tabId.slice('terminal:'.length);
 }
 
+export function getWorkspaceTabScope(
+  worktreeId: string | null | undefined,
+  kiloSessionId: string | null | undefined
+): string | null {
+  if (worktreeId) return `worktree:${worktreeId}`;
+  if (kiloSessionId) return `session:${kiloSessionId}`;
+  return null;
+}
+
 export function createWorkspaceTabsState(): WorkspaceTabsState {
   return {
     activeTabId: CHAT_TAB_ID,
@@ -35,12 +45,16 @@ export function resetWorkspaceTabs(_state: WorkspaceTabsState): WorkspaceTabsSta
   return createWorkspaceTabsState();
 }
 
-export function addTerminalTab(state: WorkspaceTabsState, terminalId: string): WorkspaceTabsState {
+export function addTerminalTab(
+  state: WorkspaceTabsState,
+  terminalId: string,
+  cloudAgentSessionId: string
+): WorkspaceTabsState {
   const title = `Terminal ${state.nextTerminalNumber}`;
 
   return {
     activeTabId: terminalTabId(terminalId),
-    terminals: [...state.terminals, { id: terminalId, title }],
+    terminals: [...state.terminals, { id: terminalId, title, cloudAgentSessionId }],
     nextTerminalNumber: state.nextTerminalNumber + 1,
   };
 }

@@ -21,7 +21,9 @@ import type {
 } from '../src/notifications-binding.js';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
 import { getSandboxControlStub, isSandboxControlId } from '../src/sandbox-control/stub';
-import { resolveSessionStub } from '../src/sandbox-session/session-stub';
+import { getSandboxSessionStub, resolveSessionStub } from '../src/sandbox-session/session-stub';
+import { SESSION_ID_RE } from '../src/shared/protocol.js';
+import { terminalPtyIdSchema } from '../src/shared/sandbox-control-protocol.js';
 import type { Env } from '../src/types';
 
 type RecordedPushCall = SendCloudAgentSessionNotificationParams;
@@ -86,6 +88,32 @@ function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): 
   return facade.fetch(new Request(request, { headers }));
 }
 
+function createTerminalUpgradeRequest(
+  request: Request,
+  role: 'browser' | 'wrapper',
+  ptyId: string
+): Request {
+  const url = new URL(request.url);
+  url.pathname = `/terminal/${role}`;
+  url.search = '';
+  url.searchParams.set('ptyId', ptyId);
+  const headers = new Headers({ Upgrade: 'websocket' });
+  if (role === 'wrapper') {
+    const authorization = request.headers.get('Authorization');
+    if (authorization !== null) headers.set('Authorization', authorization);
+  }
+  return new Request(url, { method: 'GET', headers });
+}
+
+function isTerminalRouteIdentity(ownerId: string, sessionId: string, ptyId: string): boolean {
+  return (
+    ownerId.length > 0 &&
+    sessionId.startsWith('workspace_') &&
+    SESSION_ID_RE.test(sessionId) &&
+    terminalPtyIdSchema.safeParse(ptyId).success
+  );
+}
+
 export default {
   async fetch(request: Request, env: TestEnv): Promise<Response> {
     const url = new URL(request.url);
@@ -100,6 +128,50 @@ export default {
         return new Response('Invalid sandboxId', { status: 400 });
       }
       return getSandboxControlStub(env, sandboxId).fetch(request);
+    }
+
+    if (url.pathname === '/terminal-test') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const ownerId = url.searchParams.get('ownerId');
+      const sessionId = url.searchParams.get('sessionId');
+      const ptyId = url.searchParams.get('ptyId');
+      if (
+        ownerId === null ||
+        sessionId === null ||
+        ptyId === null ||
+        !isTerminalRouteIdentity(ownerId, sessionId, ptyId)
+      ) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      return getSandboxSessionStub(env, ownerId, sessionId).fetch(
+        createTerminalUpgradeRequest(request, 'browser', ptyId)
+      );
+    }
+
+    if (url.pathname.startsWith('/sandbox-terminal/')) {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const segments = url.pathname.split('/');
+      if (segments.length !== 5 || !segments[2] || !segments[3] || !segments[4]) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      let ownerId: string;
+      try {
+        ownerId = decodeURIComponent(segments[2]);
+      } catch {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      const sessionId = segments[3];
+      const ptyId = segments[4];
+      if (!isTerminalRouteIdentity(ownerId, sessionId, ptyId)) {
+        return new Response('Invalid terminal identity', { status: 400 });
+      }
+      return getSandboxSessionStub(env, ownerId, sessionId).fetch(
+        createTerminalUpgradeRequest(request, 'wrapper', ptyId)
+      );
     }
 
     if (url.pathname === '/stream') {

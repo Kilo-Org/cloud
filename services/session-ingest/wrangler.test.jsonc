@@ -25,6 +25,10 @@
         "class_name": "SessionAccessCacheDO",
       },
       {
+        "name": "USER_CONNECTION_DO",
+        "class_name": "UserConnectionDO",
+      },
+      {
         "name": "CONNECTION_TICKET_DO",
         "class_name": "ConnectionTicketDO",
       },
@@ -39,6 +43,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["ConnectionTicketDO"],
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["UserConnectionDO"],
     },
   ],
 

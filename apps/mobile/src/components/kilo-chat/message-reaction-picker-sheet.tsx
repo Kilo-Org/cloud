@@ -78,14 +78,18 @@ export function MessageReactionPickerSheet({
           className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
           style={{ paddingBottom: insets.bottom + 24 }}
         >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-base font-semibold text-foreground">
+          <View className="flex-row items-center">
+            <View className="size-11 shrink-0" />
+            <Text
+              accessibilityRole="header"
+              className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
+            >
               {t('chat.reactions.title')}
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('chat.reactions.close')}
-              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+              className="size-11 shrink-0 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >
               <X size={18} color={colors.foreground} />

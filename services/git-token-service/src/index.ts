@@ -13,7 +13,11 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
-import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
+import {
+  GitHubTokenGenerationError,
+  GitHubTokenService,
+  type GitHubAppType,
+} from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
 import {
   resolveGitLabRuntimeToken,
@@ -825,19 +829,26 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'invalid_repo_format' };
     }
 
-    const token = await this.githubService.getTokenForRepo(
-      installation.installationId,
-      repoName,
-      installation.githubAppType
-    );
+    try {
+      const token = await this.githubService.getTokenForRepo(
+        installation.installationId,
+        repoName,
+        installation.githubAppType
+      );
 
-    return {
-      success: true,
-      token,
-      installationId: installation.installationId,
-      accountLogin: installation.accountLogin,
-      appType: installation.githubAppType,
-    };
+      return {
+        success: true,
+        token,
+        installationId: installation.installationId,
+        accountLogin: installation.accountLogin,
+        appType: installation.githubAppType,
+      };
+    } catch (error) {
+      if (error instanceof GitHubTokenGenerationError && error.reason !== undefined) {
+        return { success: false, reason: error.reason };
+      }
+      throw error;
+    }
   }
 
   async getCloudAgentAuthForRepo(
@@ -861,20 +872,29 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const installationAuthor = this.getInstallationAuthor(installation.githubAppType);
     const installationAuth = async (
       fallbackReason?: ManagedGitHubFallbackReason
-    ): Promise<GetCloudAgentAuthForRepoSuccess> => ({
-      success: true,
-      githubToken: await this.githubService.getTokenForRepo(
-        installation.installationId,
-        installation.repoName,
-        installation.githubAppType
-      ),
-      installationId: installation.installationId,
-      accountLogin: installation.accountLogin,
-      appType: installation.githubAppType,
-      source: 'installation',
-      gitAuthor: installationAuthor,
-      ...(fallbackReason !== undefined ? { fallbackReason } : {}),
-    });
+    ): Promise<GetCloudAgentAuthForRepoResult> => {
+      try {
+        return {
+          success: true,
+          githubToken: await this.githubService.getTokenForRepo(
+            installation.installationId,
+            installation.repoName,
+            installation.githubAppType
+          ),
+          installationId: installation.installationId,
+          accountLogin: installation.accountLogin,
+          appType: installation.githubAppType,
+          source: 'installation',
+          gitAuthor: installationAuthor,
+          ...(fallbackReason !== undefined ? { fallbackReason } : {}),
+        };
+      } catch (error) {
+        if (error instanceof GitHubTokenGenerationError && error.reason !== undefined) {
+          return { success: false, reason: error.reason };
+        }
+        throw error;
+      }
+    };
 
     if (params.allowUserAuthorization !== true) return installationAuth();
     if (installation.githubAppType === 'lite') return installationAuth('lite_installation');
@@ -1128,6 +1148,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         repositoryUuid: subject.repositoryUuid,
         repositoryFullName: subject.repositoryFullName,
         tokenDigest: await bitbucketTokenDigest(subject.token),
+        oauthCredentialId: subject.oauthCredentialId,
         outboundContainerId: params.outboundContainerId,
       });
       return {
@@ -1163,9 +1184,6 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     );
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
-    // Re-resolve the current token and confirm the workspace/repo identity and
-    // token digest still match what the capability was issued for. A rotated
-    // token or a changed integration invalidates the capability.
     const resolved = await resolveBitbucketCapabilitySubject(this.env, {
       userId: claims.userId,
       orgId: claims.orgId,
@@ -1184,9 +1202,15 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     ) {
       return { success: false, reason: 'source_unavailable' };
     }
-    const currentDigest = await bitbucketTokenDigest(subject.token);
-    if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
-      return { success: false, reason: 'source_unavailable' };
+    if (claims.oauthCredentialId !== undefined) {
+      if (subject.oauthCredentialId !== claims.oauthCredentialId) {
+        return { success: false, reason: 'source_unavailable' };
+      }
+    } else {
+      const currentDigest = await bitbucketTokenDigest(subject.token);
+      if (!timingSafeEqual(currentDigest, claims.tokenDigest)) {
+        return { success: false, reason: 'source_unavailable' };
+      }
     }
     return {
       success: true,

@@ -22,10 +22,11 @@ const buttonVariants = cva(
         // min-h (not fixed h) so the button grows to fit text scaled by large
         // Dynamic Type instead of clipping the label; the min still guarantees
         // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
-        default: 'min-h-11 px-4 py-2',
-        sm: 'min-h-9 gap-1.5 rounded-md px-3 py-1.5',
-        lg: 'min-h-11 rounded-md px-6 py-2',
-        icon: 'h-11 w-11',
+        // Use px because native rem defaults to 14pt, not 16pt.
+        default: 'min-h-[44px] px-4 py-2',
+        sm: 'min-h-[36px] gap-1.5 rounded-md px-3 py-1.5',
+        lg: 'min-h-[44px] rounded-md px-6 py-2',
+        icon: 'h-[44px] w-[44px]',
       },
     },
     defaultVariants: {
@@ -118,5 +119,5 @@ function Button({
   );
 }
 
-export { Button, buttonTextVariants, buttonVariants };
+export { Button };
 export type { ButtonProps };

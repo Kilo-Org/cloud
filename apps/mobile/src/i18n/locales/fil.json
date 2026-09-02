@@ -152,7 +152,11 @@
     "appearanceDark": "Dark",
     "account": "Account",
     "prReviewAttribution": "Magdagdag ng app attribution sa mga PR review",
-    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review."
+    "prReviewAttributionSubtitle": "Magdagdag ng footer na Reviewed via Kilo kapag nagsumite ka ng review.",
+    "returnSendsMessage": "Nagpapadala ng mensahe ang Return key",
+    "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga input ng mensahe ng agent.",
+    "biometricUnlock": "I-unlock gamit ang biometrika",
+    "biometricUnlockSubtitle": "Kailangang i-unlock sa pagbukas ng app at matapos ang limang minuto sa background."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",
@@ -665,7 +669,8 @@
     "profile": "Profile",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} sa {{total}}"
+    "position": "{{name}}, tab, {{position}} sa {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Error sa network",
       "uploadFailed": "Nabigo ang pag-upload",
       "failedToUploadFile": "Nabigong i-upload ang file: {{reason}}",
-      "nothingToPaste": "Walang maipa-paste"
+      "nothingToPaste": "Walang maipa-paste",
+      "metadataStripFailed": "Hindi maalis ang photo metadata."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -833,7 +839,7 @@
       "managedByAdmin": "Ang billing ay pinamamahalaan ng admin ng iyong organisasyon.",
       "couldNotLoad": "Hindi maload ang impormasyon ng billing",
       "manageOnWeb": "Pamahalaan ang Billing sa Web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Magtatapos ang iyong huling termino sa Commit sa {{date}}. Magpatuloy bilang Standard sa {{price}}, o magtatapos ang hosting.",
       "freeTrial": "Libreng Subok",
@@ -1288,7 +1294,7 @@
       "started": "Nagsimula",
       "completed": "Nakumpleto",
       "cost": "Halaga",
-      "tokens": "mga token",
+      "tokens": "Mga token",
       "tokensInOut": "{{input}} in / {{output}} out",
       "openPullRequest": "Buksan ang pull request",
       "council": "Council",
@@ -1299,7 +1305,23 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Threshold",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Naghihintay sa transcript ng pagsusuri.",
+      "transcriptEmpty": "Walang transcript para sa pagsusuring ito.",
+      "transcriptRetry": "Hindi maload ang transcript ng pagsusuri.",
+      "transcriptLive": "Live",
+      "agentIdle": "Naka-idle ang agent",
+      "agentWorking": "Gumagawa ang agent...",
+      "anErrorOccurred": "May naganap na error",
+      "errorWithMessage": "Error: {{message}}",
+      "executionStarted": "Nagsimula ang execution",
+      "reviewCompleted": "Natapos ang review",
+      "reviewInterrupted": "Naantala ang review",
+      "sessionError": "Error sa session: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — error",
+      "unknownError": "Hindi kilalang error"
     },
     "reviewMemory": {
       "title": "Review memory",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktibo ngayon",
     "search": {
       "searching": "Naghahanap",
       "searchSessions": "Maghanap ng mga session",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Hindi ma-load ang mga session",
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session",
-      "noSessionsYet": "Wala pang session",
       "noSessionsYetDescription": "Magsimula ng coding task mula sa iyong phone. Lalabas dito ang iyong mga session.",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukan ang ibang termino sa paghahanap.",
       "tryAdjustFilters": "Subukang ayusin o i-clear ang iyong mga filter.",
       "couldNotSearch": "Hindi ma-search ang mga session",
-      "allActive": "Aktibo ang lahat ng session",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Ina-update"
     },
     "sessionRow": {
       "deleteTitle": "Burahin ang session?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Lumabas sa session",
     "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
     "remoteSpawnNonRetryable": "Nabigong simulan ang session ng instance — suriin ang machine o i-update ang CLI.",
-    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance."
+    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "renameAccessibility": "Palitan ang pangalan ng session: {{title}}",
-      "connectRepository": "Ikonekta ang repository",
       "cloningSession": "Ini-clone ang session",
       "continue": "Magpatuloy",
       "couldNotLoadThisSession": "Hindi ma-load ang session na ito",
-      "cloneFailed": "Hindi ma-clone ang session na ito.",
       "cloneFailedRetry": "Hindi ma-clone ang session na ito. Subukang muli.",
-      "connectRepositoryToContinue": "Ikonekta ang repository para magpatuloy.",
       "notEnoughCredits": "Kulang ang credits para patakbuhin ang Cloud Agent. Magdagdag ng credits at subukan muli.",
       "previousTaskFinishing": "Tinatapos pa lang ang nakaraang gawain. Pakihintay sandali.",
       "serviceUnavailable": "Hindi available ang serbisyo ngayon. Pakisubukan muli.",
       "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali.",
-      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli."
+      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli.",
+      "cancelQueuedFailed": "Hindi makansela ang mensahe.",
+      "cancelQueuedRestoreAvailable": "Kinansela ang mensahe. I-tap ang I-restore para ibalik ito sa input ng mensahe.",
+      "cancelQueuedRestored": "Kinansela ang mensahe. Nasa input ng mensahe na muli ang prompt.",
+      "cancelQueuedUpgradeRequired": "Ang pagkansela ng mga nakapilang mensahe ay nangangailangan ng mas bagong Kilo CLI. I-update ang Kilo CLI at muling kumonekta."
     },
     "remoteSession": {
       "failedToCreate": "Nabigong gumawa ng remote session",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Walang nakikitang repository. Suriin ang access sa repository para sa GitLab, pagkatapos ay i-refresh.",
       "openBitbucket": "Buksan ang Bitbucket",
       "openGitlab": "Buksan ang GitLab",
-      "recentlyUsed": "Kamakailang ginamit"
+      "recentlyUsed": "Kamakailang ginamit",
+      "continueFrom": "Ipinagpapatuloy ang {{title}}",
+      "importingSession": "I-import ang session",
+      "cliCannotContinue": "Hindi maipagpapatuloy ng CLI na ito ang session. Pumili ng Cloud Agent o ibang CLI.",
+      "importFailed": "Hindi ma-import ang session na ito.",
+      "discardWithUploadsMessage": "Ide-delete ang iyong prompt at anumang na-upload na file na hindi nakalakip sa mga naipadalang mensahe."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} file",
@@ -2218,14 +2246,14 @@
       "contentTruncated": "Na-truncate ang content",
       "truncated": "Na-truncate",
       "toolRead": "read",
-      "toolEdit": "I-edit",
+      "toolEdit": "i-edit",
       "toolWrite": "write",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "Gawain",
+      "toolTask": "gawain",
       "readTodos": "Basahin ang mga todo",
       "updateTodos": "I-update ang mga todo",
       "linesBadge": "{{displayCount}} na linya",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Patakbuhin ang `kilo remote` sa isang project sa iyong computer, o i-update ang Kilo CLI kung mayroon nang tumatakbo.",
       "instanceOnProject": "{{name}} sa {{project}}",
       "instanceOnProjectSuffix": "{{name}} sa {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Patakbuhin sa Cloud Agent"
+      "runOnCloudAgent": "Patakbuhin sa Cloud Agent",
+      "terminals": "Mga terminal",
+      "remotes": "Mga instance ng kilo remote"
     },
     "modePicker": {
       "title": "Pumili ng mode",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Naka-queue ang mensahe",
       "userMessage": "Mensahe ng user",
       "assistantMessage": "Mensahe ng assistant",
-      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe"
+      "longPressHint": "Pindutin nang matagal para sa mga detalye ng mensahe",
+      "cancelQueued": "Kanselahin ang mensahe",
+      "cancelQueuedAccessibility": "Kanselahin ang nakapilang mensahe",
+      "restoreQueued": "I-restore",
+      "restoreQueuedAccessibility": "I-restore ang kinanselang mensahe sa input ng mensahe"
     },
     "olderMessages": {
       "arrived": "Ni-load ang mga naunang mensahe",
@@ -2462,6 +2496,8 @@
       "viewTable": "Tingnan ang table",
       "title": "Table",
       "close": "Isara ang table",
+      "loading": "Niloload ang table",
+      "empty": "Walang row ang table na ito.",
       "columnCount_one": "column",
       "columnCount": "mga column",
       "columnCount_other": "mga column",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "I-filter ang mga session",
-      "sortBy": "Ayusin ayon sa",
-      "sortLastUpdated": "Huling na-update",
-      "sortCreated": "Nalikha",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Iba pa",
-      "project": "Proyekto",
-      "removeProjectFilter": "Alisin ang {{label}} na filter ng proyekto",
-      "removePlatformFilter": "Alisin ang {{label}} na filter ng platform"
+      "project": "Proyekto"
     },
     "suggestion": {
       "title": "Mungkahi",
@@ -2528,7 +2559,9 @@
       "uploading": "Ina-upload…",
       "uploaded": "Na-upload",
       "uploadFailedRetry": "Nabigo ang upload. I-tap para subukang muli.",
-      "uploadFailedTerminal": "Hindi ma-upload ang file na ito."
+      "uploadFailedTerminal": "Hindi ma-upload ang file na ito.",
+      "moveLeft": "Ilipat ang {{filename}} pakaliwa",
+      "moveRight": "Ilipat ang {{filename}} pakanan"
     },
     "attachmentPasteHint": {
       "accessibility": "I-paste ang imahe mula sa clipboard",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Inaayos na…",
       "messagePlaceholder": "Mensahe...",
       "cannotReceiveFiles": "Hindi makakatanggap ng file ang session na ito. Alisin ang mga attachment para maipadala ang iyong mensahe.",
-      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli."
+      "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang send para subukang muli.",
+      "discardAttachmentsMessage": "Ide-delete ang mga na-upload na file na hindi nakalakip sa mga naipadalang mensahe.",
+      "discardAttachmentsTitle": "I-discard ang mga attachment?",
+      "charactersRemaining": "{{count}} na character ang natitira",
+      "insertNewline": "Magpasok ng bagong linya"
     },
     "chatLink": {
       "linkCopied": "Na-kopya ang link",
@@ -2634,7 +2671,7 @@
       "open": "buksan ang pull request",
       "closed": "isinara ang pull request",
       "merged": "ni-merge ang pull request",
-      "draft": "Draft na pull request",
+      "draft": "draft na pull request",
       "updating": "Ina-update, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Bubuksan ng link na ito ang {{host}} sa iyong browser.",
       "open": "Buksan",
       "trustThisHost": "Pagkatiwalaan ang host na ito"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Ginagamit ng Tapos ang folder na ito.",
+      "emptyTitle": "Walang folder sa loob",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Suriin ang iyong koneksyon at Subukan muli. Kinukumpirma pa rin ng Tapos ang folder na ito.",
+      "retryableTitle": "Hindi mailista ang mga folder",
+      "tapToListHint": "I-tap ang isang folder para ilista ang mga laman nito",
+      "unsupportedDescription": "Hindi mailista ng CLI na ito ang mga folder. Pinapanatili ng Tapos ang launch folder at nagsisimula ang Simulan ang session doon.",
+      "unsupportedTitle": "Hindi mailista ang mga folder"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Bagong coding task",
     "explore": "Mag-explore",
     "seeAll": "Tingnan lahat",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Walang tumatakbo sa ngayon"
   },
   "imageViewer": {
     "close": "Isara ang {{filename}}",
@@ -2766,7 +2814,8 @@
     "busy": "Abala ang voice input. Subukan muli.",
     "stopped": "Huminto ang voice input. Tap ang mikropono para subukan muli.",
     "unavailableDevice": "Hindi available ang voice input sa device na ito.",
-    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device."
+    "unavailableLanguage": "Hindi available ang voice input para sa wikang ito ng device.",
+    "listeningStopped": "Huminto ang pakikinig."
   },
   "share": {
     "title": "I-share sa Kilo",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
     "revoke": "Bawiin ang {{host}}",
     "backToPreferences": "Bumalik sa mga kagustuhan"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mensahe"
+    },
+    "empty": {
+      "title": "Magsimula ng chat",
+      "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
+    },
+    "working": "Gumagawa",
+    "historyRetry": "Hindi ma-load ang kasaysayan ng chat.",
+    "catalogRetry": "Hindi maload ang mga modelo",
+    "sendError": "Nabigong magpadala ng mensahe. Pakisubukang muli."
   }
 }

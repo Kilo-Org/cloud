@@ -66,6 +66,104 @@ describe('legacy execution callback enqueue', () => {
     });
   });
 
+  it.each([
+    {
+      name: 'uses the workspace branch when the upstream branch is absent',
+      upstreamBranch: undefined,
+      expectedBranch: 'kilo/quiet-forest-abcdefgh',
+    },
+    {
+      name: 'prefers the observed upstream branch over a different workspace branch',
+      upstreamBranch: 'feature/observed-branch',
+      expectedBranch: 'feature/observed-branch',
+    },
+  ])('$name in callback jobs', async ({ upstreamBranch, expectedBranch }) => {
+    const userId = 'user_legacy_callback_branch';
+    const sessionId = `agent_legacy_callback_branch_${upstreamBranch ? 'observed' : 'fallback'}`;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const jobs = await runInDurableObject(stub, async instance => {
+      const sentCallbackJobs: CallbackJob[] = [];
+      installCallbackQueue(instance, async job => {
+        sentCallbackJobs.push(job);
+      });
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        githubRepo: 'owner/repo',
+        branchName: 'kilo/quiet-forest-abcdefgh',
+        callbackTarget: { url: 'https://example.com/callback' },
+      });
+      if (upstreamBranch !== undefined) {
+        await instance.updateUpstreamBranch(upstreamBranch);
+      }
+      await instance.addExecution({
+        executionId: 'exc_legacy_callback_branch',
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: 'exc_legacy_callback_branch',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_legacy_callback_branch',
+        status: 'running',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_legacy_callback_branch',
+        status: 'completed',
+      });
+      return sentCallbackJobs;
+    });
+
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].payload.lastSeenBranch).toBe(expectedBranch);
+  });
+
+  it('leaves the branch absent for historical metadata without either branch', async () => {
+    const userId = 'user_legacy_callback_no_branch';
+    const sessionId = 'agent_legacy_callback_no_branch';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const jobs = await runInDurableObject(stub, async instance => {
+      const sentCallbackJobs: CallbackJob[] = [];
+      installCallbackQueue(instance, async job => {
+        sentCallbackJobs.push(job);
+      });
+      await instance.updateMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId, userId },
+        auth: {},
+        repository: { type: 'github', repo: 'owner/repo' },
+        callback: { target: { url: 'https://example.com/callback' } },
+        lifecycle: { version: 1, timestamp: Date.now() },
+      });
+      await instance.addExecution({
+        executionId: 'exc_legacy_callback_no_branch',
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: 'exc_legacy_callback_no_branch',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_legacy_callback_no_branch',
+        status: 'running',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_legacy_callback_no_branch',
+        status: 'completed',
+      });
+      return sentCallbackJobs;
+    });
+
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].payload.lastSeenBranch).toBeUndefined();
+  });
+
   it('adds retryable fallback client errors without parsing legacy error text', async () => {
     const userId = 'user_legacy_callback_error';
     const sessionId = 'agent_legacy_callback_error';

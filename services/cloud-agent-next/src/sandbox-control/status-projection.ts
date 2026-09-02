@@ -4,7 +4,6 @@ export type ReportedSandboxStatus =
   | 'ready'
   | 'working'
   | 'finalizing'
-  | 'stalled'
   | 'degraded'
   | 'shutting-down'
   | 'failed'
@@ -12,7 +11,7 @@ export type ReportedSandboxStatus =
 
 export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
 export type ConnectionState = 'disconnected' | 'connected' | 'ready';
-export type WorkState = 'idle' | 'active' | 'finalizing' | 'stalled';
+export type WorkState = 'idle' | 'active' | 'finalizing';
 
 export function projectReportedStatus(input: {
   physical: PhysicalState;
@@ -40,8 +39,6 @@ export function projectReportedStatus(input: {
           return 'working';
         case 'finalizing':
           return 'finalizing';
-        case 'stalled':
-          return 'stalled';
       }
   }
 }

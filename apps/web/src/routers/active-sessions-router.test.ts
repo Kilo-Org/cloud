@@ -186,8 +186,23 @@ describe('active-sessions-router', () => {
 
       expect(result).toEqual({
         instances: [
-          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
-          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+          {
+            connectionId: 'cli-A',
+            name: 'laptop-A',
+            projectName: 'kilo',
+            version: '0.1.2',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch: null,
+          },
+          {
+            connectionId: 'cli-B',
+            name: 'laptop-B',
+            projectName: 'kilo',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch: null,
+          },
         ],
       });
       // Verify it actually called the worker with the right path.
@@ -233,6 +248,9 @@ describe('active-sessions-router', () => {
             connectionId: 'cli-cap',
             name: 'laptop-cap',
             projectName: 'kilo',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch: null,
             capabilities: { attachments: true },
           },
         ],
@@ -252,9 +270,80 @@ describe('active-sessions-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.listInstances();
       expect(result).toEqual({
-        instances: [{ connectionId: 'cli-legacy', name: 'laptop-legacy', projectName: 'kilo' }],
+        instances: [
+          {
+            connectionId: 'cli-legacy',
+            name: 'laptop-legacy',
+            projectName: 'kilo',
+            kind: 'cli',
+            startedAt: null,
+            gitBranch: null,
+          },
+        ],
       });
       expect(result.instances[0]).not.toHaveProperty('capabilities');
+    });
+
+    it.each([
+      {
+        kind: 'remote',
+        startedAt: '2026-08-28T19:30:00.123Z',
+        gitBranch: 'feature/metadata-routing',
+      },
+      { kind: 'cli', startedAt: null, gitBranch: null },
+    ])('preserves $kind metadata and every existing instance field', async metadata => {
+      const instance = {
+        connectionId: 'cli-metadata',
+        name: 'laptop-metadata',
+        projectName: 'kilo',
+        version: '0.1.2',
+        capabilities: { attachments: true, sessionClone: true },
+        ...metadata,
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [instance] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).resolves.toEqual({
+        instances: [instance],
+      });
+    });
+
+    it.each([
+      { kind: 'cloud' },
+      { kind: null },
+      { startedAt: 'not-a-date' },
+      { startedAt: '2026-08-28T19:30:00Z' },
+      { startedAt: '2026-08-28T19:30:00.1234Z' },
+      { startedAt: '2026-08-28T19:30:00.123+00:00' },
+      { gitBranch: 'a'.repeat(25) },
+      { gitBranch: 42 },
+    ])('rejects invalid instance metadata %j instead of returning empty', async metadata => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            instances: [
+              {
+                connectionId: 'cli-invalid',
+                name: 'laptop-invalid',
+                projectName: 'kilo',
+                ...metadata,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        cause: expect.objectContaining({ name: 'ZodError' }),
+      });
     });
 
     it('throws a TRPCError when the upstream worker returns a non-2xx response', async () => {

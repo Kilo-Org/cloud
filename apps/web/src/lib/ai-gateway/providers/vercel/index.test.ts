@@ -10,7 +10,10 @@ import {
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterProviderConfig,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -155,6 +158,64 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
 });
 
 describe('convertProviderOptions', () => {
+  it.each([
+    { sort: 'price', expected: 'cost' },
+    { sort: 'throughput', expected: 'tps' },
+    { sort: 'latency', expected: 'ttft' },
+  ] as const)(
+    'converts sort $sort to $expected alongside existing preferences',
+    ({ sort, expected }) => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: 'anthropic/claude-sonnet-4.5',
+          messages: [{ role: 'user', content: 'hello' }],
+          provider: {
+            sort,
+            only: ['anthropic', 'amazon-bedrock'],
+            order: ['amazon-bedrock'],
+            zdr: true,
+            data_collection: 'deny',
+          },
+        },
+      };
+      const originalRequest = structuredClone(request);
+
+      expect(convertProviderOptions(request, null).gateway).toMatchObject({
+        sort: expected,
+        only: ['anthropic', 'bedrock'],
+        order: ['bedrock'],
+        zeroDataRetention: true,
+        disallowPromptTraining: true,
+      });
+      expect(request).toEqual(originalRequest);
+    }
+  );
+
+  it.each([
+    undefined,
+    null,
+    'future-sort',
+    'toString',
+    42,
+    true,
+    ['price'],
+    {},
+    { by: 'price' },
+    { by: 'latency', partition: 'none' },
+  ])('omits unsupported sort %j without rejecting the conversion', sort => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { sort: sort as OpenRouterProviderConfig['sort'] },
+      },
+    };
+
+    expect(convertProviderOptions(request, null).gateway?.sort).toBeUndefined();
+  });
+
   it('emits only available non-ignored providers without changing provider.only', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -192,6 +253,37 @@ describe('convertProviderOptions', () => {
       only: ['future-provider'],
       order: ['another-future-provider'],
     });
+  });
+
+  it('filters ignored providers from an explicit only list when metadata is unavailable', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: {
+          only: ['gmicloud', 'openai'],
+          ignore: ['openai'],
+        },
+      },
+    };
+
+    expect(convertProviderOptions(request, null).gateway?.only).toEqual(['gmicloud']);
+  });
+
+  it('still rejects ignore-only routing when metadata is unavailable', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore: ['openai'] },
+      },
+    };
+
+    expect(() => convertProviderOptions(request, null)).toThrow(
+      'Vercel inference provider data became unavailable during request transform'
+    );
   });
 });
 
@@ -251,6 +343,23 @@ describe('shouldRouteToVercel', () => {
     ).resolves.toBe(true);
   });
 
+  it('allows Vercel routing with an unrecognized sort preference', async () => {
+    const shouldRouteToVercel = await loadShouldRouteToVercel();
+    const provider: OpenRouterProviderConfig = {
+      sort: 'future-sort' as OpenRouterProviderConfig['sort'],
+      only: ['anthropic'],
+    };
+
+    await expect(
+      shouldRouteToVercel(
+        'anthropic/claude-sonnet-4.5',
+        request(provider),
+        'seed',
+        async () => provider
+      )
+    ).resolves.toBe(true);
+  });
+
   it('does not resolve provider policy for models opted out of Vercel routing', async () => {
     const shouldRouteToVercel = await loadShouldRouteToVercel({ optOut: true });
     const getRoutingProviderConfig = jest.fn(async () => ({ only: ['anthropic'] }));
@@ -296,6 +405,29 @@ describe('applyVercelSettings BYOK pinning', () => {
     },
   });
 
+  it.each([
+    { sort: 'throughput', expected: 'tps' },
+    { sort: 'future-sort', expected: undefined },
+  ])('converts sort $sort without changing BYOK pinning', async ({ sort, expected }) => {
+    const request = byokRequest([]);
+    request.body.provider = { sort: sort as OpenRouterProviderConfig['sort'] };
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' },
+      { decryptedAPIKey: bedrockCredentials, providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway).toEqual({
+      sort: expected,
+      only: ['anthropic', 'bedrock'],
+      byok: {
+        anthropic: [{ apiKey: 'sk-anthropic' }],
+        bedrock: [{ accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'secret', region: 'us-east-1' }],
+      },
+    });
+    expect(request.body.provider).toBeUndefined();
+  });
+
   it('drops a BYOK provider the caller ignored when another serving provider remains', async () => {
     const request = byokRequest(['anthropic']);
 
@@ -337,6 +469,60 @@ describe('applyVercelSettings BYOK pinning', () => {
     expect(request.body.providerOptions?.gateway?.byok).toEqual({
       anthropic: [{ apiKey: 'sk-anthropic' }],
     });
+  });
+
+  it.each<GatewayRequest>([
+    {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    },
+    {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        max_tokens: 100,
+      },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'anthropic/claude-sonnet-4.5', input: 'hello' },
+    },
+  ])('forwards Bedrock API key credentials for $kind', async request => {
+    const credentials = { apiKey: 'bedrock-api-key', region: 'eu-west-1' };
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  it('retains a Bedrock API key when the caller ignores its only BYOK provider', async () => {
+    const request = byokRequest(['amazon-bedrock']);
+    const credentials = { apiKey: 'bedrock-api-key', region: 'us-east-1' };
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, [
+      { decryptedAPIKey: JSON.stringify(credentials), providerId: 'bedrock' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  it.each([
+    'bedrock-secret',
+    '{"apiKey":"bedrock-secret"',
+    '{"apiKey":"bedrock-secret"}',
+    '{"apiKey":"bedrock-secret","region":"us-east-1","accessKeyId":"AKIAEXAMPLE","secretAccessKey":"secret"}',
+  ])('rejects malformed Bedrock credentials without exposing secrets: %s', async credentials => {
+    await expect(
+      applyVercelSettings('anthropic/claude-sonnet-4.5', byokRequest([]), [
+        { decryptedAPIKey: credentials, providerId: 'bedrock' },
+      ])
+    ).rejects.toEqual(new Error('Failed to parse AWS credentials'));
   });
 
   it('uses one Vertex credential key for Anthropic models served by Vertex', async () => {
@@ -416,6 +602,60 @@ describe('applyVercelSettings managed requests', () => {
       },
     };
   }
+
+  function managedRequestForApi(kind: GatewayRequest['kind'], model: string): GatewayRequest {
+    const provider = { ignore: ['openai'] };
+    if (kind === 'responses') {
+      return { kind, body: { model, input: 'hello', provider } };
+    }
+    if (kind === 'messages') {
+      return {
+        kind,
+        body: {
+          model,
+          max_tokens: 128,
+          messages: [{ role: 'user', content: 'hello' }],
+          provider,
+        },
+      };
+    }
+    return {
+      kind,
+      body: { model, messages: [{ role: 'user', content: 'hello' }], provider },
+    };
+  }
+
+  it.each(['chat_completions', 'messages', 'responses'] as const)(
+    'converts provider.sort for managed %s requests',
+    async kind => {
+      const request = managedRequestForApi(kind, 'anthropic/claude-sonnet-4.5');
+      request.body.provider = { sort: 'latency' };
+
+      await applyManagedVercelSettings('anthropic/claude-sonnet-4.5', request, ['anthropic']);
+
+      expect(request.body.providerOptions?.gateway?.sort).toBe('ttft');
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+
+  describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])('%s', modelId => {
+    it.each(['chat_completions', 'messages', 'responses'] as const)(
+      'preserves the model ID and honors provider preferences for %s requests',
+      async kind => {
+        const request = managedRequestForApi(kind, modelId);
+
+        const getVercelInferenceProvidersMock = await applyManagedVercelSettings(modelId, request, [
+          'minimax',
+          'openai',
+        ]);
+
+        expect(request.body.model).toBe(modelId);
+        expect(request.body.provider).toBeUndefined();
+        expect(request.body.providerOptions?.gateway?.only).toEqual(['minimax']);
+        expect(getVercelInferenceProvidersMock).toHaveBeenCalledWith(modelId);
+      }
+    );
+  });
 
   it('does not add managed Friendli credentials from the environment', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';

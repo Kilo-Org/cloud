@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import {
+  apiSessionToDbSession,
   extractRepoFromGitUrl,
   formatSessionDate,
   getSessionDisplayTitle,
@@ -14,6 +15,30 @@ import {
 // ============================================================================
 // extractRepoFromGitUrl Tests
 // ============================================================================
+
+describe('apiSessionToDbSession', () => {
+  test('preserves worktree identity while converting API timestamps', () => {
+    const result = apiSessionToDbSession({
+      session_id: 'ses_grouped',
+      title: 'Grouped session',
+      git_url: 'https://github.com/owner/repo',
+      git_branch: 'main',
+      cloud_agent_session_id: 'workspace_grouped',
+      cloud_agent_worktree_id: 'worktree_grouped',
+      created_on_platform: 'cloud-agent-web',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:01.000Z',
+      version: 2,
+      organization_id: null,
+      status: 'idle',
+      status_updated_at: null,
+      parent_session_id: null,
+    });
+
+    expect(result.cloud_agent_worktree_id).toBe('worktree_grouped');
+    expect(result.updated_at).toEqual(new Date('2026-01-01T00:00:01.000Z'));
+  });
+});
 
 describe('extractRepoFromGitUrl', () => {
   test('should extract owner/repo from HTTPS URL', () => {

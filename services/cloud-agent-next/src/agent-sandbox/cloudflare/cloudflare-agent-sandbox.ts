@@ -107,18 +107,17 @@ function elapsedMs(startedAt: number): number {
 }
 
 /**
- * `TOOL_CGROUP_*` knobs to pass through to the wrapper, gated by
- * `TOOL_CGROUP_ORG_IDS` (see MEMORY_CGROUPS_PLAN.md W4). Undefined when the
- * org isn't in the rollout list, so callers can omit the field entirely.
+ * `TOOL_CGROUP_*` knobs to pass through to the wrapper (see
+ * MEMORY_CGROUPS_PLAN.md W4). Undefined when no knobs are configured, so
+ * callers can omit the field entirely.
  */
-function buildToolCgroupEnv(env: Env, orgId: string | undefined): ToolCgroupEnv | undefined {
-  if (!isOrgInList(env.TOOL_CGROUP_ORG_IDS, orgId)) return undefined;
+function buildToolCgroupEnv(env: Env): ToolCgroupEnv | undefined {
   const vars: ToolCgroupEnv = {};
   for (const key of TOOL_CGROUP_ENV_KEYS) {
     const value = env[key];
     if (value) vars[key] = value;
   }
-  return vars;
+  return Object.keys(vars).length > 0 ? vars : undefined;
 }
 
 /**
@@ -697,7 +696,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           }
         );
       }
-      const toolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
+      const toolCgroupEnv = buildToolCgroupEnv(this.env);
       const kiloServerEnv = buildKiloServerEnv(this.env);
       let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;
       try {
@@ -759,7 +758,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       env: {},
       cwd: '/',
     });
-    const bootstrapToolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
+    const bootstrapToolCgroupEnv = buildToolCgroupEnv(this.env);
     const bootstrapKiloServerEnv = buildKiloServerEnv(this.env);
     const wrapper = await WrapperClient.ensureBootstrapWrapper(sandbox, bootstrapSession, {
       agentSessionId: sessionId,

@@ -10,11 +10,15 @@ describe('unavailable models', () => {
     expect(isUnavailableModel('sakana/fugu-ultra')).toBe(false);
     expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(isUnavailableModel('openai/gpt-oss-20b')).toBe(false);
+    expect(isUnavailableModel('tencent/hy3:free')).toBe(true);
+    expect(isUnavailableModel('tencent/hy3')).toBe(false);
   });
 
   test('matches normalized families for provider metadata', () => {
     expect(familyHasUnavailableFreeModel('openai/gpt-oss-20b:free')).toBe(true);
     expect(familyHasUnavailableFreeModel('openai/gpt-oss-20b')).toBe(true);
     expect(familyHasUnavailableFreeModel('cohere/north-mini-code')).toBe(false);
+    expect(familyHasUnavailableFreeModel('tencent/hy3:free')).toBe(true);
+    expect(familyHasUnavailableFreeModel('tencent/hy3')).toBe(true);
   });
 });

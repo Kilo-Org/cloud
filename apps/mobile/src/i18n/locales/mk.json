@@ -152,7 +152,11 @@
     "appearanceDark": "Темно",
     "account": "Сметка",
     "prReviewAttribution": "Додајте припишување на апликацијата во прегледите на PR",
-    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед."
+    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед.",
+    "returnSendsMessage": "Копчето за нов ред испраќа порака",
+    "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите.",
+    "biometricUnlock": "Отклучување со биометрија",
+    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -665,7 +669,8 @@
     "profile": "Профил",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, таб, {{position}} од {{total}}"
+    "position": "{{name}}, таб, {{position}} од {{total}}",
+    "chat": "Пораки во разговор"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Грешка во мрежата",
       "uploadFailed": "Испраќањето не успеа",
       "failedToUploadFile": "Не успеа испраќањето на датотеката: {{reason}}",
-      "nothingToPaste": "Нема што да се залепи"
+      "nothingToPaste": "Нема што да се залепи",
+      "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1129,9 +1135,9 @@
       "destroying": "СЕ УНИШТУВА",
       "provisioned": "ОБЕЗБЕДЕН",
       "restarting": "СЕ РЕСТАРТИРА",
-      "running": "Во тек",
+      "running": "ВО ТЕК",
       "shuttingDown": "СЕ ИСКЛУЧУВА",
-      "starting": "Започнува",
+      "starting": "ЗАПОЧНУВА",
       "stopped": "ЗАПРЕН",
       "stopping": "СЕ ЗАПИРА",
       "unknown": "НЕПОЗНАТО",
@@ -1299,7 +1305,23 @@
       "checkRun": "Проверка на извршување",
       "status": "Статус",
       "threshold": "Праг",
-      "pullRequest": "барање за повлекување"
+      "pullRequest": "барање за повлекување",
+      "transcriptWaiting": "Чекање на записот од прегледот.",
+      "transcriptEmpty": "Нема запис за овој преглед.",
+      "transcriptRetry": "Не можев да го вчитам записот од прегледот.",
+      "transcriptLive": "Воживо",
+      "agentIdle": "Агентот е неактивен",
+      "agentWorking": "Агентот работи...",
+      "anErrorOccurred": "Се појави грешка",
+      "errorWithMessage": "Грешка: {{message}}",
+      "executionStarted": "Извршувањето започна",
+      "reviewCompleted": "Прегледот е завршен",
+      "reviewInterrupted": "Прегледот е прекинат",
+      "sessionError": "Грешка на сесијата: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Алатка: {{name}}",
+      "toolNameError": "Алатка: {{name}} — грешка",
+      "unknownError": "Непозната грешка"
     },
     "reviewMemory": {
       "title": "Меморија на прегледи",
@@ -1640,7 +1662,7 @@
       "reasonNoBandwidth": "Нема достапен капацитет",
       "reasonTolerableRisk": "Ризикот е поднослив",
       "reasonInaccurate": "Наодот е неточен",
-      "reasonNotUsed": "ранливиот код не се користи",
+      "reasonNotUsed": "Ранливиот код не се користи",
       "commentLabel": "Коментар (опционално)",
       "commentAccessibility": "Коментар за отфрлање",
       "commentPlaceholder": "Додај контекст за ова отфрлање…",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активно сега",
     "search": {
       "searching": "Пребарување",
       "searchSessions": "Пребарувај сесии",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Не можеше да се вчитаат сесиите",
       "couldNotLoadActive": "Не можеше да се вчитаат активните сесии",
-      "noSessionsYet": "Сè уште нема сесии",
       "noSessionsYetDescription": "Започни задача за кодирање од твојот телефон. Твоите сесии ќе се појават тука.",
       "noMatches": "Нема соодветни сесии",
       "tryDifferentSearch": "Обиди се со различен поим за пребарување.",
       "tryAdjustFilters": "Обиди се да ги прилагодиш или исчистиш филтрите.",
       "couldNotSearch": "Не можеше да се пребаруваат сесиите",
-      "allActive": "Сите сесии се активни",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема минати сесии",
-      "live": "ВОЖИВО"
+      "live": "ВОЖИВО",
+      "updating": "Се ажурира"
     },
     "sessionRow": {
       "deleteTitle": "Да се избрише сесијата?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Сесијата е затворена",
     "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
     "remoteSpawnNonRetryable": "Инстанцата не успеа да ја започне сесијата — проверете ја машината или ажурирајте го CLI.",
-    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започнете сесија на Cloud Agent или изберете друга инстанца."
+    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започнете сесија на Cloud Agent или изберете друга инстанца.",
+    "liveCount_one": "{{count}} ВОЖИВО",
+    "liveCount_other": "{{count}} ВОЖИВО"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Скролај до дното",
       "emptyTitle": "Сè уште нема пораки",
       "renameAccessibility": "Преименувај сесија: {{title}}",
-      "connectRepository": "Поврзи складиште",
       "cloningSession": "Клонирање на сесија",
       "continue": "Продолжи",
       "couldNotLoadThisSession": "Не можеше да се вчита оваа сесија",
-      "cloneFailed": "Не можеше да се клонира оваа сесија.",
       "cloneFailedRetry": "Не можеше да се клонира оваа сесија. Обиди се повторно.",
-      "connectRepositoryToContinue": "Поврзи складиште за да продолжиш.",
       "notEnoughCredits": "Нема доволно кредити за да се изврши Cloud Agent. Додај кредити и обиди се повторно.",
       "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај момент.",
       "serviceUnavailable": "Услугата во моментов не е достапна. Обиди се повторно.",
       "connectionTrouble": "Проблем со врската. Обиди се повторно по момент.",
-      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно."
+      "modelUnavailable": "Овој модел не е достапен за Cloud Agent. Избери друг модел и обиди се повторно.",
+      "cancelQueuedFailed": "Не можеше да се откаже пораката.",
+      "cancelQueuedRestoreAvailable": "Пораката е откажана. Допрете „Вратете“ за да ја вратите во полето за внес на пораки.",
+      "cancelQueuedRestored": "Пораката е откажана. Предлогот е повторно во полето за внес на пораки.",
+      "cancelQueuedUpgradeRequired": "Откажувањето пораки во чекање бара понов Kilo CLI. Ажурирајте го Kilo CLI и поврзете се повторно."
     },
     "remoteSession": {
       "failedToCreate": "Не успеа да се создаде далечинска сесија",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Проверете го пристапот до репозиториуми за GitLab, па освежете.",
       "openBitbucket": "Отвори Битубакет",
       "openGitlab": "Отвори GitLab",
-      "recentlyUsed": "Неодамнешно користени"
+      "recentlyUsed": "Неодамнешно користени",
+      "continueFrom": "Продолжување со {{title}}",
+      "importingSession": "Внесување на сесија",
+      "cliCannotContinue": "Овој CLI не може да продолжи сесија. Изберете Cloud Agent или друг CLI.",
+      "importFailed": "Не можеше да се внесе оваа сесија.",
+      "discardWithUploadsMessage": "Вашиот предлог и сите прикачени датотеки што не се приложени кон испратени пораки ќе бидат избришани."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Изврши `kilo remote` во проект на твојот компјутер, или ажурирај го Kilo CLI ако еден веќе работи.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Изврши на Cloud Agent"
+      "runOnCloudAgent": "Изврши на Cloud Agent",
+      "terminals": "Терминали",
+      "remotes": "Оддалечени инстанци"
     },
     "modePicker": {
       "title": "Избери режим",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Пораката е во ред",
       "userMessage": "Корисничка порака",
       "assistantMessage": "Порака од асистентот",
-      "longPressHint": "Долго притиснете за детали за пораката"
+      "longPressHint": "Долго притиснете за детали за пораката",
+      "cancelQueued": "Откажете ја пораката",
+      "cancelQueuedAccessibility": "Откажете ја пораката во чекање",
+      "restoreQueued": "Вратете",
+      "restoreQueuedAccessibility": "Вратете ја откажаната порака во полето за внес на пораки"
     },
     "olderMessages": {
       "arrived": "Пораните пораки се вчитани",
@@ -2462,6 +2496,8 @@
       "viewTable": "Прикажи табела",
       "title": "Табела",
       "close": "Затвори табела",
+      "loading": "Вчитување табела",
+      "empty": "Оваа табела нема редови.",
       "columnCount_one": "колона",
       "columnCount": "колони",
       "columnCount_other": "колони",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Филтрирај сесии",
-      "sortBy": "Сортирај по",
-      "sortLastUpdated": "Последно ажурирано",
-      "sortCreated": "Создадено",
       "platform": "Платформа",
       "platformCloud": "Облак",
       "platformExtension": "Екстензија",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Друго",
-      "project": "Проект",
-      "removeProjectFilter": "Отстрани го филтерот за проект {{label}}",
-      "removePlatformFilter": "Отстрани го филтерот за платформа {{label}}"
+      "project": "Проект"
     },
     "suggestion": {
       "title": "Предлог",
@@ -2528,7 +2559,9 @@
       "uploading": "Испраќање…",
       "uploaded": "Испратено",
       "uploadFailedRetry": "Испраќањето не успеа. Допрете за да се обидете повторно.",
-      "uploadFailedTerminal": "Оваа датотека не може да се испрати."
+      "uploadFailedTerminal": "Оваа датотека не може да се испрати.",
+      "moveLeft": "Поместете ја {{filename}} налево",
+      "moveRight": "Поместете ја {{filename}} надесно"
     },
     "attachmentPasteHint": {
       "accessibility": "Залепи слика од таблата со исечоци",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Завршување...",
       "messagePlaceholder": "Порака...",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстранете ги прилозите за да ја испратите пораката.",
-      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно."
+      "couldNotAttachFiles": "Не можев да прикачам датотеки. Допрете испрати за да се обидете повторно.",
+      "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
+      "discardAttachmentsTitle": "Да се отфрлат прилозите?",
+      "charactersRemaining": "Преостануваат {{count}} знаци",
+      "insertNewline": "Вметнете нов ред"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Оваа врска го отвора {{host}} во вашиот прелистувач.",
       "open": "Отвори",
       "trustThisHost": "Верувај на овој домаќин"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Готово ја користи оваа папка.",
+      "emptyTitle": "Нема папки внатре",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Проверете ја вашата врска и Повтори. Готово сè уште ја потврдува оваа папка.",
+      "retryableTitle": "Не можеше да се прикажат папките",
+      "tapToListHint": "Допрете папка за да ги прикажете нејзините содржини",
+      "unsupportedDescription": "Овој CLI не може да прикаже папки. Готово ја задржува папката за стартување, а Започни сесија започнува таму.",
+      "unsupportedTitle": "Не може да се прикажат папките"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Нова задача за кодирање",
     "explore": "Истражувај",
     "seeAll": "Види ги сите",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Моментално ништо не се извршува"
   },
   "imageViewer": {
     "close": "Затвори {{filename}}",
@@ -2766,7 +2814,8 @@
     "busy": "Гласовниот внес е зафатен. Обидете се повторно.",
     "stopped": "Гласовниот внес е запрен. Допрете го микрофонот за да се обидете повторно.",
     "unavailableDevice": "Гласовниот внес не е достапен на овој уред.",
-    "unavailableLanguage": "Гласовниот внес не е достапен за јазикот на овој уред."
+    "unavailableLanguage": "Гласовниот внес не е достапен за јазикот на овој уред.",
+    "listeningStopped": "Слушањето е запрено."
   },
   "share": {
     "title": "Сподели во Kilo",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Кога ќе му верувате на домаќинот на врската, таа се отвора без да праша повторно.",
     "revoke": "Одземете {{host}}",
     "backToPreferences": "Назад до поставки"
+  },
+  "quickChat": {
+    "title": "Пораки во разговор",
+    "composer": {
+      "placeholder": "Порака"
+    },
+    "empty": {
+      "title": "Започнете разговор",
+      "description": "Испратете порака за да разговарате со модел."
+    },
+    "working": "Работи",
+    "historyRetry": "Не можев да ја вчитам историјата на разговорот.",
+    "catalogRetry": "Не можеше да се вчитаат моделите",
+    "sendError": "Не можеше да се испрати пораката. Обидете се повторно."
   }
 }

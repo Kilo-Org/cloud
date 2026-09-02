@@ -4,13 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import { CopyTokenButton } from '@/components/auth/CopyTokenButton';
 import { Code, Terminal } from 'lucide-react';
-import type { CustomerInfo } from '@/lib/customerInfo';
 import { ResetAPITokenDialog } from './ResetAPITokenDialog';
 import Image from 'next/image';
 import Link from 'next/link';
 
 type IntegrationsCardProps = {
-  customerInfo: CustomerInfo;
+  kiloToken: string;
   ideName: string;
   logoSrc: string | undefined;
   isProminent?: boolean;
@@ -35,7 +34,7 @@ function LastUsedBadge() {
 }
 
 export function IntegrationsCard({
-  customerInfo,
+  kiloToken,
   ideName,
   logoSrc,
   isProminent = false,
@@ -124,7 +123,7 @@ export function IntegrationsCard({
         </div>
         <div className="mt-6 space-y-3">
           <h3 className="text-sm font-medium">API Key</h3>
-          <CopyTokenButton kiloToken={customerInfo.kiloToken} />
+          <CopyTokenButton kiloToken={kiloToken} />
         </div>
       </CardContent>
     </Card>

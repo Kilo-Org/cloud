@@ -78,6 +78,12 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_authentication',
   'managed_model_configuration',
   'provider_unavailable',
+  'request_timeout',
+  'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
   'source_control_network',
   'assistant_unknown',
   'workspace_unknown',
@@ -101,6 +107,10 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'provider_unavailable',
   'timeout',
   'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
   'unknown',
 ] as const;
 export const CloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
@@ -188,12 +198,27 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
     if (input.providerOwnership === 'managed') {
       return classified('platform', 'managed_provider_authentication');
     }
-    return classified('unknown', 'assistant_unknown');
+    return classified('unknown', 'provider_authentication');
   }
-  if (input.assistantReason === 'provider_unavailable' || input.assistantReason === 'timeout') {
+  if (input.assistantReason === 'timeout') {
+    return classified(
+      input.providerOwnership === 'managed' ? 'platform' : 'unknown',
+      'request_timeout'
+    );
+  }
+  if (input.assistantReason === 'provider_unavailable') {
     return input.providerOwnership === 'managed'
       ? classified('platform', 'managed_provider_unavailable')
       : classified('unknown', 'provider_unavailable');
+  }
+  if (
+    input.assistantReason === 'invalid_request' ||
+    input.assistantReason === 'context_limit' ||
+    input.assistantReason === 'output_limit' ||
+    input.assistantReason === 'content_filter' ||
+    input.assistantReason === 'structured_output'
+  ) {
+    return classified('unknown', input.assistantReason);
   }
   return classified('unknown', 'assistant_unknown');
 }

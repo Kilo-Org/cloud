@@ -1,4 +1,9 @@
-import { activeSessionSchema, parseCustomerBillingFailure } from './schemas';
+import {
+  activeSessionSchema,
+  parseCustomerBillingFailure,
+  sessionEventPayloadSchema,
+  sessionEventV2RowSchema,
+} from './schemas';
 
 describe('parseCustomerBillingFailure', () => {
   const failure = {
@@ -33,6 +38,49 @@ describe('parseCustomerBillingFailure', () => {
       })
     ).toMatchObject({ remainingMicrodollars: 0, minimumRequiredMicrodollars: 0 });
   });
+});
+
+describe('session worktree event schemas', () => {
+  const session = {
+    source: 'v2' as const,
+    sessionId: 'ses_12345678901234567890123456',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:01.000Z',
+    title: 'Test',
+    createdOnPlatform: 'cloud-agent-web',
+    organizationId: null,
+    gitUrl: null,
+    gitBranch: null,
+    parentSessionId: null,
+    status: 'idle' as const,
+    statusUpdatedAt: null,
+  };
+
+  it.each([null, undefined])('accepts legacy worktree ID %s', worktreeId => {
+    const parsed = sessionEventV2RowSchema.parse({
+      ...session,
+      ...(worktreeId === undefined ? {} : { worktreeId }),
+    });
+
+    expect(parsed.worktreeId).toBe(worktreeId);
+  });
+
+  it.each(['session.created', 'session.updated'] as const)(
+    'retains worktree IDs in %s payloads',
+    type => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const event = sessionEventPayloadSchema.parse({
+        type,
+        data: {
+          source: 'v2',
+          session: { ...session, worktreeId },
+          changedAt: session.updatedAt,
+        },
+      });
+
+      expect(event.data).toHaveProperty('session.worktreeId', worktreeId);
+    }
+  );
 });
 
 describe('activeSessionSchema capabilities', () => {

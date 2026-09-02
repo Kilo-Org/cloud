@@ -6,6 +6,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { generateEphemeralDeploymentSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
   getSandboxProvider,
@@ -13,6 +14,10 @@ import {
   serializeSessionMetadata,
   type SessionMetadata,
 } from './session-metadata.js';
+import {
+  sessionRuntimeLocator,
+  type SessionRuntimeLocator,
+} from '../sandbox-control/worktree-ownership.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
@@ -38,7 +43,6 @@ import {
   type EventSourceId,
   type EventId,
   type SessionId,
-  type UserId,
 } from '../types/ids.js';
 import type {
   ExecutionMetadata,
@@ -78,6 +82,7 @@ import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-comman
 import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
+  AdmissionFailure,
   AgentSelection,
   ExecutionDeliveryContext,
   ExecutionTurnSubmission,
@@ -107,6 +112,7 @@ import {
 } from '../session/pending-messages.js';
 import {
   createSessionMessageQueue,
+  enqueuePendingSessionMessageIntent,
   PENDING_FLUSH_DEBOUNCE_MS,
   type SessionMessageQueue,
 } from '../session/session-message-queue.js';
@@ -126,6 +132,7 @@ import {
   type KiloGlobalFeedValidationResult,
 } from '../session/wrapper-global-feed-validation.js';
 import {
+  createQueuedSessionMessageState,
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
   markAgentActivityObserved,
@@ -154,6 +161,7 @@ import {
   type WrapperTerminalEvent,
 } from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
+import { ensureCloneSessionReport } from '../telemetry/session-reports.js';
 import { createAgentSandbox, createAgentSandboxLifecycle } from '../agent-sandbox/factory.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import type {
@@ -519,7 +527,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       ...(status === 'completed'
         ? {}
         : { clientError: projectTerminalClientError({ status, error }) }),
-      lastSeenBranch: metadata.repository?.upstreamBranch,
+      lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
@@ -644,6 +652,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     try {
       const sessionId = await this.resolveSessionId();
       if (!sessionId) return;
+      try {
+        await ensureCloneSessionReport(await this.getMetadata(), this.env);
+      } catch {
+        logger
+          .withFields({ sessionId, messageId: state.messageId })
+          .warn('Cloud Agent clone report anchor skipped');
+      }
       await emitRunStateReport({
         queue: { send: report => this.sendRunStateReport(report) },
         cloudAgentSessionId: sessionId,
@@ -774,10 +789,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return !(await this.hasDeletionIntent());
   }
 
-  private async containerBillingAdmissionFailure(): Promise<Extract<
-    SessionMessageAdmissionResult,
-    { success: false }
-  > | null> {
+  private async containerBillingAdmissionFailure(): Promise<AdmissionFailure | null> {
     const metadata = await this.getMetadata();
     if (!metadata) return null;
     if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
@@ -1107,7 +1119,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     return {
       sessionId: metadata.identity.sessionId as SessionId,
-      userId: metadata.identity.userId as UserId,
+      userId: metadata.identity.userId,
       orgId: metadata.identity.orgId,
       sandboxId,
       kiloSessionId: metadata.auth.kiloSessionId,
@@ -1148,6 +1160,31 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         reportQueuedState: state => {
           this.ctx.waitUntil(this.reportRunState(state));
         },
+        persistCloneQueuedMessage: (intent, callbackSnapshot) =>
+          this.ctx.storage.transaction(async () => {
+            const metadata = await this.getMetadata();
+            if (!metadata) throw new Error('Session metadata unavailable');
+            const now = Date.now();
+            await enqueuePendingSessionMessageIntent(
+              this.ctx.storage,
+              intent,
+              now,
+              callbackSnapshot
+            );
+            await putSessionMessageState(
+              this.ctx.storage,
+              createQueuedSessionMessageState(intent, callbackSnapshot, now)
+            );
+            if (metadata.clone?.reportingCreatedAt && !metadata.initialMessage?.id) {
+              await this.ctx.storage.put(
+                'metadata',
+                serializeSessionMetadata({
+                  ...metadata,
+                  initialMessage: { id: intent.turn.messageId },
+                })
+              );
+            }
+          }),
         ensureAcceptedMessageEffects: messageId => this.ensureAcceptedMessageEffects(messageId),
         persistTerminalTransition: (messageId, params, options) =>
           this.getMessageSettlementOutbox().persistTerminalTransition(messageId, params, options),
@@ -1630,6 +1667,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getStoredMetadata();
   }
 
+  async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
+    const metadata = await this.getStoredMetadata();
+    return metadata ? sessionRuntimeLocator(metadata) : null;
+  }
+
   async validateKiloGlobalFeedProducer(params: {
     kiloSessionId: string;
     wrapperRunId: string;
@@ -1728,6 +1770,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const newMetadata = serializeSessionMetadata(parseSessionMetadata(data));
     const existingMetadata = await this.getMetadata();
     if (existingMetadata) {
+      if (existingMetadata.clone?.reportingCreatedAt !== newMetadata.clone?.reportingCreatedAt) {
+        throw new Error('Clone reporting creation time cannot be changed');
+      }
+      if (existingMetadata.clone?.reportingCreatedAt && existingMetadata.initialMessage?.id) {
+        newMetadata.initialMessage = existingMetadata.initialMessage;
+      }
       if (getSandboxProvider(existingMetadata) !== getSandboxProvider(newMetadata)) {
         throw new Error('Registered sandbox provider cannot be changed');
       }
@@ -2053,6 +2101,44 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     // Current interrupt success intentionally does not expose arbitrary legacy
     // execution rows as the identity of message-native work.
     return { success: true, executionId: undefined };
+  }
+
+  /**
+   * Drop one pending (not yet accepted) queued message by id without touching
+   * the accepted/current run. The queue terminalizes the queued durable state
+   * and removes the pending row; this method then persists a
+   * `cloud.message.canceled` replay event after the queued event so a
+   * reconnecting client nets empty after replaying queued then canceled.
+   */
+  async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    const result = await this.getSessionMessageQueue().cancelQueuedMessage(messageId);
+    if (!result.dropped) {
+      return { dropped: false };
+    }
+
+    const sessionId = await this.requireSessionId();
+    const payload = JSON.stringify({ messageId });
+    const eventId = this.eventQueries.insertUnique({
+      executionId: '' as EventSourceId,
+      entityId: `canceled-message/${messageId}`,
+      sessionId,
+      streamEventType: 'cloud.message.canceled',
+      payload,
+      timestamp: Date.now(),
+    });
+    if (eventId !== null) {
+      this.broadcastEvent({
+        id: eventId,
+        execution_id: '' as EventSourceId,
+        session_id: sessionId,
+        stream_event_type: 'cloud.message.canceled',
+        payload,
+        timestamp: Date.now(),
+      });
+    }
+    const canceledState = await getSessionMessageState(this.ctx.storage, messageId);
+    if (canceledState) this.ctx.waitUntil(this.reportRunState(canceledState));
+    return { dropped: true };
   }
 
   private async getTerminalClient(): Promise<OperationResult<{ client: TerminalWrapperClient }>> {
@@ -2474,6 +2560,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       workspace: {
         ...input.workspace,
         sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
+        branchName: repository?.upstreamBranch ?? `kilo/${generateEphemeralDeploymentSlug()}`,
       },
       lifecycle: {
         version: now,
@@ -2522,7 +2609,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const initialTurn = input.message.initialTurn;
     const admitInitialTurn = () =>
       this.getSessionMessageQueue().admitAcceptedMessage({
-        userId: input.identity.userId as UserId,
+        userId: input.identity.userId,
         botId: input.identity.botId,
         turn: initialTurn,
         agent: input.agent,
@@ -3480,7 +3567,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const currentFenceMatches =
       runtime.wrapperRunId === firstAccepted.wrapperRunId && Boolean(runtime.wrapperConnectionId);
     const expired =
-      (runtime.noOutputDeadlineAt !== undefined && now >= runtime.noOutputDeadlineAt) ||
+      (runtime.noOutputDeadlineAt !== undefined &&
+        now >= runtime.noOutputDeadlineAt &&
+        !(await this.getWrapperSupervisor().isWaitingForInput(runtime))) ||
       (runtime.pingDeadlineAt !== undefined && now >= runtime.pingDeadlineAt);
     return {
       messageId: firstAccepted.messageId,

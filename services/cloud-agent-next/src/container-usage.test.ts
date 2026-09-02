@@ -148,10 +148,16 @@ function createSandbox(
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
+  const container = {
+    running: containerRunning,
+    destroy: vi.fn(async () => {
+      container.running = false;
+    }),
+  };
   const ctx = {
     id: { toString: () => 'do-id' },
     storage,
-    container: { running: containerRunning },
+    container,
     waitUntil: (promise: Promise<unknown>) => shadowTasks.push(promise),
   } as unknown as SandboxDurableObjectState;
   class TestSandbox extends MeteredSandbox {
@@ -171,6 +177,8 @@ function createSandbox(
   return {
     rpc,
     storage,
+    ctx,
+    container,
     flushShadowTasks: () => Promise.all(shadowTasks),
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
@@ -215,6 +223,171 @@ describe('MeteredSandbox', () => {
     expect(storage.size()).toBe(0);
     expect(rpc.recordStart).not.toHaveBeenCalled();
     expect(rpc.recordHeartbeat).not.toHaveBeenCalled();
+  });
+
+  it.each(['rejecting', 'hanging'] as const)(
+    'issues native control-plane destruction despite %s billing reads and unavailable SDK cleanup',
+    async failure => {
+      const { sandbox, container, storage, rpc, flushShadowTasks } = createSandbox();
+      await sandbox.configureBilling(billingInput);
+      await sandbox.onStart();
+      await flushShadowTasks();
+      const context = await getBillingContext(storage);
+      const read = vi.spyOn(storage, 'get');
+      if (failure === 'rejecting') {
+        read.mockRejectedValue(new Error('Billing storage unavailable'));
+      } else {
+        read.mockImplementation(() => new Promise(() => undefined));
+      }
+      storage.failWrites = true;
+      const sdkDestroy = vi
+        .spyOn(sdk.StockSandbox.prototype, 'destroy')
+        .mockRejectedValue(new Error('SDK housekeeping unavailable'));
+
+      await expect(sandbox.forceDestroyForControlPlane()).resolves.toBeUndefined();
+
+      expect(container.running).toBe(false);
+      expect(container.destroy).toHaveBeenCalledOnce();
+      expect(read).not.toHaveBeenCalled();
+      expect(sdkDestroy).not.toHaveBeenCalled();
+      expect(rpc.recordStop).not.toHaveBeenCalled();
+      read.mockRestore();
+      expect(await getBillingContext(storage)).toEqual(context);
+    }
+  );
+
+  it('preserves billing state through native destruction and settles at the physical stop', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordHeartbeat).mockResolvedValue({
+      ...ack(),
+      budget: { verdict: 'stop', remainingMicrodollars: 5_000_000 },
+    });
+    const { sandbox, container, storage, flushShadowTasks } = createSandbox(rpc);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true });
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+    sandbox.mockState = { status: 'healthy' };
+    now.mockReturnValue(301_000);
+    await sandbox.billingHeartbeatTick(active.generation);
+    const context = await getBillingContext(storage);
+    const block = await storage.get('container-usage:budget-block:v1');
+    const schedules = structuredClone(sandbox.schedules);
+    const put = vi.spyOn(storage, 'put');
+    const remove = vi.spyOn(storage, 'delete');
+    const destruction = Promise.withResolvers<void>();
+    container.destroy.mockImplementation(async () => {
+      await destruction.promise;
+      container.running = false;
+    });
+
+    now.mockReturnValue(400_000);
+    const stopping = sandbox.forceDestroyForControlPlane();
+    expect(container.running).toBe(true);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    now.mockReturnValue(421_000);
+    destruction.resolve();
+    await stopping;
+
+    expect(container.running).toBe(false);
+    expect(put).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(await getBillingContext(storage)).toEqual(context);
+    expect(await storage.get('container-usage:budget-block:v1')).toEqual(block);
+    expect(await storage.get('container-usage:start-ack-generation:v1')).toBe(active.generation);
+    expect(sandbox.schedules).toEqual(schedules);
+    expect(sandbox.superDestroyCalled).toBe(false);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+
+    now.mockReturnValue(500_000);
+    sandbox.mockState = { status: 'stopped' };
+    Object.assign(sandbox.mockState, { lastChange: 421_000 });
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+
+    expect(rpc.recordStop).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: active.startEpochMs,
+        usageSinceLast: 120,
+        reason: 'runtime_signal',
+      })
+    );
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(await sandbox.isBillingBlocked()).toBe(true);
+  });
+
+  it('recovers native-stop billing from stopped-state heartbeats when onStop is delayed', async () => {
+    const { sandbox, container, storage, rpc, flushShadowTasks } = createSandbox();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.configureBilling(billingInput);
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+
+    now.mockReturnValue(30_000);
+    await sandbox.forceDestroyForControlPlane();
+    expect(container.running).toBe(false);
+    expect(await getBillingContext(storage)).toEqual(active);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    sandbox.mockState = { status: 'stopped' };
+    Object.assign(sandbox.mockState, { lastChange: 30_000 });
+    now.mockReturnValue(60_000);
+    await sandbox.billingHeartbeatTick(active.generation);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    expect(await getBillingContext(storage)).toMatchObject({
+      generation: active.generation,
+      stoppedObservedAtMs: 30_000,
+    });
+
+    now.mockReturnValue(930_000);
+    await sandbox.billingHeartbeatTick(active.generation);
+    await flushShadowTasks();
+    await sandbox.onStop({ reason: 'runtime_signal' });
+    await flushShadowTasks();
+
+    expect(rpc.recordStop).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: active.startEpochMs,
+        usageSinceLast: 29,
+        reason: 'runtime_signal',
+      })
+    );
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, { running: true }, { running: true, destroy: true }])(
+    'rejects unavailable native container destruction: %j',
+    async container => {
+      const { sandbox, ctx, storage } = createSandbox();
+      Object.defineProperty(ctx, 'container', { value: container });
+
+      await expect(sandbox.forceDestroyForControlPlane()).rejects.toThrow(
+        'Native container destruction is unavailable'
+      );
+      expect(sandbox.superDestroyCalled).toBe(false);
+      expect(storage.size()).toBe(0);
+    }
+  );
+
+  it('propagates native destruction failure without settling billing or falling back to the SDK', async () => {
+    const { sandbox, container, rpc } = createSandbox(createRpc(), true);
+    const error = new Error('Native destruction unavailable');
+    container.destroy.mockRejectedValue(error);
+
+    await expect(sandbox.forceDestroyForControlPlane()).rejects.toBe(error);
+
+    expect(container.running).toBe(true);
+    expect(container.destroy).toHaveBeenCalledOnce();
+    expect(sandbox.superDestroyCalled).toBe(false);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
   });
 
   it('accepts any successful meter admission before a selected cold start', async () => {

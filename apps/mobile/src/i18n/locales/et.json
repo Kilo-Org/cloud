@@ -152,7 +152,11 @@
     "appearanceDark": "Tumedas",
     "account": "Konto",
     "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
-    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'."
+    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'.",
+    "returnSendsMessage": "Sisestusklahv saadab sõnumi",
+    "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
+    "biometricUnlock": "Lukust avamine biomeetria abil",
+    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -665,7 +669,8 @@
     "profile": "Profiil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, vaheleht, {{position}}/{{total}}"
+    "position": "{{name}}, vaheleht, {{position}}/{{total}}",
+    "chat": "Vestlus"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Võrguviga",
       "uploadFailed": "Üleslaadimine ebaõnnestus",
       "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}",
-      "nothingToPaste": "Pole midagi kleepida"
+      "nothingToPaste": "Pole midagi kleepida",
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "Kontrollikäit",
       "status": "Olek",
       "threshold": "Lävi",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Selle ülevaate jaoks transkriptsiooni pole.",
+      "transcriptLive": "Otse",
+      "transcriptRetry": "Ülevaate transkriptsiooni laadimine ebaõnnestus.",
+      "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni.",
+      "agentIdle": "Agent on jõude",
+      "agentWorking": "Agent töötab...",
+      "anErrorOccurred": "Juhtus viga",
+      "errorWithMessage": "Viga: {{message}}",
+      "executionStarted": "Täitmine alustatud",
+      "reviewCompleted": "Ülevaade lõpetatud",
+      "reviewInterrupted": "Ülevaade katkestatud",
+      "sessionError": "Seansi viga: {{error}}",
+      "statusWithValue": "Olek: {{status}}",
+      "toolName": "Tööriist: {{name}}",
+      "toolNameError": "Tööriist: {{name}} — viga",
+      "unknownError": "Tundmatu viga"
     },
     "reviewMemory": {
       "title": "Ülevaate mälu",
@@ -1415,7 +1437,7 @@
     "status": {
       "pending": "Ootel",
       "queued": "Järjekorras",
-      "running": "TÖÖTAB",
+      "running": "Töötab",
       "completed": "Lõpetatud",
       "failed": "Ebaõnnestus",
       "cancelled": "Tühistatud",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivne praegu",
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Seansse ei õnnestunud laadida",
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida",
-      "noSessionsYet": "Seansse pole veel",
       "noSessionsYetDescription": "Alusta oma telefonis kodeerimisülesannet. Sinu seansid ilmuvad siia.",
       "noMatches": "Ükski seanss ei vasta",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid kohandada või tühjendada.",
       "couldNotSearch": "Seansside otsimine ebaõnnestus",
-      "allActive": "Kõik seansid on aktiivsed",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Minevikuseansse pole",
-      "live": "OTSE"
+      "live": "OTSE",
+      "updating": "Uuendamine"
     },
     "sessionRow": {
       "deleteTitle": "Kustutan seansi?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Seanss lõpetatud",
     "remoteSpawnRetryable": "Ei õnnestunud instantsini jõuda — see võis ühenduse katkestada.",
     "remoteSpawnNonRetryable": "Instants ei suutnud seanssi alustada — kontrolli masinat või uuenda CLI-d.",
-    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants."
+    "remoteSpawnInstanceDisconnected": "Valitud instants lõpetas ühenduse. Alusta seanss Cloud Agent'is või vali mõni teine instants.",
+    "liveCount_one": "{{count}} OTSE",
+    "liveCount_other": "{{count}} OTSE"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Kerige alla",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
-      "connectRepository": "Ühenda hoidla",
       "cloningSession": "Seanssi kloonitakse",
       "continue": "Jätka",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida",
-      "cloneFailed": "Seda seanssi ei õnnestunud kloonida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla.",
       "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
       "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti.",
-      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti."
+      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti.",
+      "cancelQueuedFailed": "Sõnumi tühistamine ebaõnnestus.",
+      "cancelQueuedRestoreAvailable": "Sõnum on tühistatud. Selle sõnumi sisestusväljale tagasitoomiseks puudutage nuppu „Taastage“.",
+      "cancelQueuedRestored": "Sõnum on tühistatud. Päring on tagasi sõnumi sisestusväljal.",
+      "cancelQueuedUpgradeRequired": "Ootel sõnumite tühistamiseks on vaja uuemat Kilo CLI-d. Uuendage Kilo CLI-d ja ühenduge uuesti."
     },
     "remoteSession": {
       "failedToCreate": "Kaugseansi loomine ebaõnnestus",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
       "openBitbucket": "Ava Bitbucket",
       "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud"
+      "recentlyUsed": "Hiljuti kasutatud",
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
+      "continueFrom": "Jätkatakse {{title}}",
+      "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "importingSession": "Imporditakse seanssi",
+      "discardWithUploadsMessage": "Teie päring ja üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Käivita projektis arvutis käsk `kilo remote` või uuenda Kilo CLI-d, kui see juba töötab.",
       "instanceOnProject": "{{name}} saidil {{project}}",
       "instanceOnProjectSuffix": "{{name}} saidil {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Käita Cloud Agent'is"
+      "runOnCloudAgent": "Käita Cloud Agent'is",
+      "terminals": "Terminalid",
+      "remotes": "Kauginstantsid"
     },
     "modePicker": {
       "title": "Vali režiim",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Sõnum järjekorras",
       "userMessage": "Kasutaja sõnum",
       "assistantMessage": "Abistaja sõnum",
-      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt"
+      "longPressHint": "Sõnumi üksikasjade jaoks vajuta pikalt",
+      "cancelQueued": "Tühistage sõnum",
+      "cancelQueuedAccessibility": "Tühistage ootel sõnum",
+      "restoreQueued": "Taastage",
+      "restoreQueuedAccessibility": "Taastage tühistatud sõnum sõnumi sisestusväljale"
     },
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",
@@ -2462,6 +2496,8 @@
       "viewTable": "Vaata tabelit",
       "title": "Tabel",
       "close": "Sulge tabel",
+      "loading": "Laadin tabelit",
+      "empty": "Selles tabelis ei ole ridu.",
       "columnCount_one": "veerg",
       "columnCount": "veerud",
       "columnCount_other": "veerud",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtreeri seansse",
-      "sortBy": "Sorteeri",
-      "sortLastUpdated": "Viimati muudetud",
-      "sortCreated": "Loodud",
       "platform": "Platvorm",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
-      "project": "Projekt",
-      "removeProjectFilter": "Eemalda {{label}} projektifilter",
-      "removePlatformFilter": "Eemalda {{label}} platvormifilter"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Soovitus",
@@ -2528,7 +2559,9 @@
       "uploading": "Üleslaadimine…",
       "uploaded": "Üles laaditud",
       "uploadFailedRetry": "Üleslaadimine ebaõnnestus. Puudutage uuesti proovimiseks.",
-      "uploadFailedTerminal": "Seda faili ei saa üles laadida."
+      "uploadFailedTerminal": "Seda faili ei saa üles laadida.",
+      "moveLeft": "Liigutage {{filename}} vasakule",
+      "moveRight": "Liigutage {{filename}} paremale"
     },
     "attachmentPasteHint": {
       "accessibility": "Kleebi pilt lõikelaualt",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Lõpetamine...",
       "messagePlaceholder": "Sõnum...",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemaldage manused.",
-      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist."
+      "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puudutage saatmist.",
+      "discardAttachmentsMessage": "Üles laaditud failid, mida pole saadetud sõnumitele lisatud, kustutatakse.",
+      "discardAttachmentsTitle": "Kas loobuda manustest?",
+      "charactersRemaining": "{{count}} tähemärki jäänud",
+      "insertNewline": "Lisage reavahetus"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "See link avab {{host}} sinu brauseris.",
       "open": "Ava",
       "trustThisHost": "Usalda seda hosti"
+    },
+    "folderPicker": {
+      "accessibility": "Kaust: {{label}}",
+      "emptyDescription": "Valmis kasutab seda kausta.",
+      "emptyTitle": "Sees pole kaustu",
+      "fieldLabel": "Kaust",
+      "retryableDescription": "Kontrolli ühendust ja proovi uuesti. Valmis kinnitab endiselt seda kausta.",
+      "retryableTitle": "Kaustu ei õnnestunud loetleda",
+      "tapToListHint": "Puuduta kausta, et selle sisu loetleda",
+      "unsupportedDescription": "See CLI ei saa kaustu loetleda. Valmis jätab käivituskausta ja Alusta seanssi algab seal.",
+      "unsupportedTitle": "Kaustu ei saa loetleda"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Uus kodeerimisülesanne",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Praegu ei tööta midagi"
   },
   "imageViewer": {
     "close": "Sulge {{filename}}",
@@ -2766,7 +2814,8 @@
     "busy": "Häälsisestus on hõivatud. Proovi uuesti.",
     "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
-    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval."
+    "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
+    "listeningStopped": "Kuulamine peatus."
   },
   "share": {
     "title": "Jaga Kilosse",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Kui usaldad lingi hosti, avaneb see ilma uuesti küsimata.",
     "revoke": "Tühista {{host}}",
     "backToPreferences": "Tagasi eelistuste juurde"
+  },
+  "quickChat": {
+    "title": "Vestlus",
+    "composer": {
+      "placeholder": "Sõnum"
+    },
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "working": "Töötamine",
+    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
+    "catalogRetry": "Mudeleid ei õnnestunud laadida",
+    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
   }
 }

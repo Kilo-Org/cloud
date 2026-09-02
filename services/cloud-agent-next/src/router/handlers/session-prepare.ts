@@ -305,6 +305,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       callbackTarget: input.callbackTarget,
       kilocodeOrganizationId: input.kilocodeOrganizationId,
       createdOnPlatform: input.createdOnPlatform,
+      clientProvenance: input.clientProvenance,
       shallow: input.shallow,
       operationKey: input.operationKey,
     },

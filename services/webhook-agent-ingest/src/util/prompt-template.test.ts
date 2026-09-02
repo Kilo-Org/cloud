@@ -31,6 +31,29 @@ describe('renderPromptTemplate', () => {
     expect(result).toBe('Body: plain text body');
   });
 
+  it('renders a manually invoked scheduled request from its capture timestamp and empty body', () => {
+    const request = {
+      body: '{}',
+      method: 'SCHEDULED',
+      path: '/',
+      headers: {},
+      queryString: null,
+      sourceIp: null,
+      timestamp: '2026-08-28T15:00:00.000Z',
+    };
+
+    expect(
+      renderPromptTemplate(
+        '{{scheduledTime}} / {{timestamp}} / {{body}} / {{bodyJson}} / {{headers}}',
+        request
+      )
+    ).toBe('2026-08-28T15:00:00.000Z / 2026-08-28T15:00:00.000Z / {} / {} / {}');
+  });
+
+  it('does not substitute a scheduled time for an ordinary webhook', () => {
+    expect(renderPromptTemplate('Scheduled: {{scheduledTime}}', baseRequest)).toBe('Scheduled: ');
+  });
+
   it('replaces multiple placeholders in a template', () => {
     const template = `Process this {{method}} webhook to {{path}}:
 

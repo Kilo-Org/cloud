@@ -332,6 +332,8 @@ export function efficientPoolBlockedResponse() {
   const message =
     `${error} Configure a custom Efficient model pool with allowed models, ` +
     `or adjust your organization model restrictions.`;
+  const logMessage = `[efficientPoolBlockedResponse] ${message}`;
+  warnExceptInTest(logMessage);
   return NextResponse.json(
     {
       error,

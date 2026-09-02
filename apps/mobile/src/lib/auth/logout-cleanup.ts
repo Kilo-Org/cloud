@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
-import { getDevicePushTokenOutcome } from '@/lib/notifications';
+import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
@@ -111,6 +111,12 @@ export async function runLogoutCleanup(): Promise<void> {
     ]);
 
     const unregister = results[1];
+
+    // A fulfilled unregister for a real token is a definitive outcome; emit
+    // it. No emit when there is no token (nothing was unregistered).
+    if (pushToken !== null && unregister.status === 'fulfilled') {
+      emitNotificationTokenUpdated('unregistered');
+    }
 
     let needsPushUnregister = false;
     if (pushLookupFailed) {

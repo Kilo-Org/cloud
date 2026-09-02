@@ -1,0 +1,244 @@
+# Build the mobile debug dev-client natively and publish it as a run
+# artifact named mobile-native-<platform>-<nativeHash>. The nativeHash is
+# input-deterministic (dev/local/mobile-{ios,android}-build.ts), so any
+# machine with the same native inputs computes the same name and can install
+# the artifact instead of compiling (dev/local/mobile-remote-native.ts).
+#
+# Runs on pushes to main that can change native inputs, and on demand for
+# any pushed branch via workflow_dispatch. The gate job skips platforms
+# whose artifact already exists.
+name: mobile-native-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        options: [all, ios, android]
+        default: all
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - '.github/workflows/mobile-native-build.yml'
+  # Self-validation: a PR that edits this workflow builds it once, under a
+  # pr<N>-<workflow hash>- artifact prefix so hosts never install it.
+  # (workflow_dispatch only works after the file exists on main.)
+  pull_request:
+    paths:
+      - '.github/workflows/mobile-native-build.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a push build: it is producing an artifact hosts will
+  # install. A superseded pull_request build produces nothing anyone
+  # keeps, so it must not hold a macOS runner for 90 minutes.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      ios_hash: ${{ steps.decide.outputs.ios_hash }}
+      android_hash: ${{ steps.decide.outputs.android_hash }}
+      need_ios: ${{ steps.decide.outputs.need_ios }}
+      need_android: ${{ steps.decide.outputs.need_android }}
+      prefix: ${{ steps.decide.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compute hashes and check existing artifacts
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: ${{ inputs.platform || 'all' }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          ios_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts ios)
+          android_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts android)
+          echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
+          echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
+          # A pull_request run validates this workflow. Its artifacts stay out
+          # of the namespace hosts install from (dev/local/mobile-remote-native.ts)
+          # and are keyed on the workflow file as well, so each edit of it
+          # builds exactly once and a re-push of the same file skips.
+          prefix=''
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            workflow_hash=$(sha256sum .github/workflows/mobile-native-build.yml | cut -c1-8)
+            prefix="pr$PR_NUMBER-$workflow_hash-"
+          fi
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          exists() {
+            count=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=$1&per_page=10" \
+              --jq '[.artifacts[] | select(.expired | not)] | length')
+            [ "$count" -gt 0 ]
+          }
+          need() {
+            platform=$1 hash=$2
+            if [ "$PLATFORM" != all ] && [ "$PLATFORM" != "$platform" ]; then
+              echo false; return
+            fi
+            if exists "${prefix}mobile-native-$platform-$hash"; then
+              echo "artifact ${prefix}mobile-native-$platform-$hash already exists" >&2
+              echo false
+            else
+              echo true
+            fi
+          }
+          echo "need_ios=$(need ios "$ios_hash")" >> "$GITHUB_OUTPUT"
+          echo "need_android=$(need android "$android_hash")" >> "$GITHUB_OUTPUT"
+
+  ios:
+    needs: gate
+    if: needs.gate.outputs.need_ios == 'true'
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
+      # A consumer computes the hash on macOS; the gate computed it on
+      # Linux. A mismatch would publish an artifact nobody can ever find,
+      # so fail loudly instead. Android is checked here too: it builds on
+      # Linux but is consumed on macOS, and nothing else compares the two.
+      - name: Verify the hashes are platform-independent
+        run: |
+          set -euo pipefail
+          check() {
+            mac_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts "$1")
+            if [ "$mac_hash" != "$2" ]; then
+              echo "::error::$1 nativeHash differs between Linux ($2) and macOS ($mac_hash)"
+              exit 1
+            fi
+          }
+          check ios "${{ needs.gate.outputs.ios_hash }}"
+          check android "${{ needs.gate.outputs.android_hash }}"
+
+      - name: Expo prebuild
+        run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform ios
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace apps/mobile/ios/Kilo.xcworkspace \
+            -scheme Kilo \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            build
+
+      # A tarball keeps the executable bit that upload-artifact's zip drops.
+      # The artifact name keys only on nativeHash, but the local cache key
+      # also keys on the Xcode and simulator SDK. Record them so a consumer
+      # on a different toolchain refuses the binary (see
+      # dev/local/mobile-remote-native.ts) instead of caching an app its
+      # simulator runtime cannot launch.
+      - name: Package
+        run: |
+          set -euo pipefail
+          products="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator"
+          xcode=$(xcodebuild -version | sed -n 's/^Build version \(.*\)$/\1/p')
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          printf '{"xcodeBuildVersion":"%s","simulatorSdkVersion":"%s"}\n' "$xcode" "$sdk" \
+            > "$products/toolchain.json"
+          tar -C "$products" \
+            -czf "ios-${{ needs.gate.outputs.ios_hash }}.tar.gz" Kilo.app toolchain.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.gate.outputs.prefix }}mobile-native-ios-${{ needs.gate.outputs.ios_hash }}
+          path: ios-${{ needs.gate.outputs.ios_hash }}.tar.gz
+          compression-level: 0
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 90 }}
+          if-no-files-found: error
+
+  android:
+    needs: gate
+    if: needs.gate.outputs.need_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
+      - name: Expo prebuild
+        run: CI=1 pnpm --filter kilo-app exec expo prebuild --platform android
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          cd apps/mobile/android
+          ./gradlew --no-daemon app:assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/Kilo.apk"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.gate.outputs.prefix }}mobile-native-android-${{ needs.gate.outputs.android_hash }}
+          path: ${{ runner.temp }}/Kilo.apk
+          compression-level: 0
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 90 }}
+          if-no-files-found: error

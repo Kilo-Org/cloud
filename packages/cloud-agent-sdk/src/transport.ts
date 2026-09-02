@@ -28,6 +28,13 @@ type CreateRemoteSessionInput = {
     variant?: string;
   };
   orgId?: string;
+  /** Launch directory for the new remote session (`create_session` wire data). */
+  directory?: string;
+  /**
+   * Kilo session id to clone from. Old clients omit it; producer must omit
+   * it when the instance lacks sessionClone.
+   */
+  cloneFromKiloSessionId?: string;
 };
 
 /**
@@ -136,12 +143,21 @@ type Transport = {
    * connectionId fences the request to the active CLI. Optional inheritance
    * fields ride `protocolVersion: 1`; on a delivered `invalid create_session
    * command` the transport retries once with bare `{protocolVersion: 1}`
-   * (old-CLI degradation). Other failures are hard rejects. The caller does
-   * NOT switch the active session as a side effect.
+   * (old-CLI degradation) only when no clone id is present. A clone id never
+   * bare-retries, because a bare retry would create a fresh session. Other
+   * failures are hard rejects. The caller does NOT switch the active session
+   * as a side effect.
    */
   createSession?: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitSession?: () => Promise<void>;
   interrupt?: () => Promise<unknown>;
+  /**
+   * Drop one queued (not yet accepted) message by its client message id. The
+   * remote CLI transport relays `drop_queued_message`; the cloud-agent transport
+   * calls the `cancelQueuedMessage` tRPC mutation. Old remotes reject the drop
+   * with CLI_UPGRADE_REQUIRED.
+   */
+  dropQueuedMessage?: (messageId: string) => Promise<{ dropped: boolean }>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;
   respondToPermission?: (payload: {
@@ -171,6 +187,15 @@ type CloudAgentApi = {
     images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
+  /**
+   * Cancel one queued message by id (cloud-agent branch of
+   * `dropQueuedMessage`). Optional so legacy providers that predate the
+   * mutation keep compiling; the transport surfaces a clear error when absent.
+   */
+  cancelQueuedMessage?: (payload: {
+    sessionId: CloudAgentSessionId;
+    messageId: string;
+  }) => Promise<{ dropped: boolean }>;
   answer: (payload: {
     sessionId: CloudAgentSessionId;
     requestId: string;

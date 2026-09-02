@@ -5,6 +5,8 @@ const mockPrepareReviewPayload = jest.fn();
 const mockSendCodeReviewDisabledEmail = jest.fn();
 const mockGetIntegrationById = jest.fn();
 const mockUpdateCheckRun = jest.fn();
+const mockLogExceptInTest = jest.fn();
+const mockReviewIsStillReserved = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -41,6 +43,19 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  ...jest.requireActual<typeof utilsServer>('@/lib/utils.server'),
+  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
+}));
+
+jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
+  ...jest.requireActual<typeof codeReviewsDb>('../db/code-reviews'),
+  reviewIsStillReserved: (...args: unknown[]) => mockReviewIsStillReserved(...args),
+}));
+
+import { createHash, randomUUID } from 'node:crypto';
+import type * as utilsServer from '@/lib/utils.server';
+import type * as codeReviewsDb from '../db/code-reviews';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -56,6 +71,8 @@ import { eq } from 'drizzle-orm';
 import { or } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
 import { cronPendingCodeReviewCreatedAtWindowSql } from './dispatch-constants';
+import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
+import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
 import {
   cancelSupersededReviewsForPR,
   updateRepositoryReviewInstructionsMetadata,
@@ -64,6 +81,7 @@ import {
 const REPO = `test-org/dispatch-pending-${Date.now()}`;
 const FUNDED_BALANCE_MICRODOLLARS = 5_000_001;
 const DEFAULT_TIER_BALANCE_MICRODOLLARS = 5_000_000;
+const DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE = '[dispatchReview] Worker dispatch prompt diagnostics';
 
 type ReviewStatus = 'pending' | 'queued' | 'running';
 type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
@@ -145,6 +163,9 @@ describe('tryDispatchPendingReviews', () => {
     mockSendCodeReviewDisabledEmail.mockResolvedValue({ sent: true });
     mockGetIntegrationById.mockResolvedValue(null);
     mockUpdateCheckRun.mockResolvedValue(undefined);
+    mockReviewIsStillReserved.mockImplementation(
+      jest.requireActual<typeof codeReviewsDb>('../db/code-reviews').reviewIsStillReserved
+    );
   });
 
   afterEach(async () => {
@@ -166,6 +187,8 @@ describe('tryDispatchPendingReviews', () => {
     mockSendCodeReviewDisabledEmail.mockReset();
     mockGetIntegrationById.mockReset();
     mockUpdateCheckRun.mockReset();
+    mockLogExceptInTest.mockReset();
+    mockReviewIsStillReserved.mockReset();
   });
 
   afterAll(async () => {
@@ -1327,6 +1350,10 @@ describe('tryDispatchPendingReviews', () => {
       activeCount: 0,
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
+    expect(mockLogExceptInTest).not.toHaveBeenCalledWith(
+      DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE,
+      expect.anything()
+    );
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.terminal_reason).toBe('superseded');
   });
@@ -1596,46 +1623,176 @@ describe('tryDispatchPendingReviews', () => {
     );
   });
 
-  it('snapshots analytics enrollment and appends the protocol only when enabled', async () => {
-    const timestamp = minutesAgo(1);
-    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
-    mockGetAgentConfigForOwner.mockResolvedValue({
-      id: 'test-agent-config',
-      config: { review_analytics_enabled: true },
-      is_enabled: true,
-      runtime_state: {},
-    });
+  it.each([
+    { preference: true, persistedDecision: undefined, variant: 'max' },
+    { preference: false, persistedDecision: undefined, variant: undefined },
+    { preference: false, persistedDecision: true, variant: 'xhigh' },
+    { preference: true, persistedDecision: false, variant: undefined },
+  ])(
+    'logs only actual dispatch prompt diagnostics with analytics preference=$preference, persisted=$persistedDecision',
+    async ({ preference, persistedDecision, variant }) => {
+      const timestamp = minutesAgo(1);
+      const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+      const preparedPrompt = 'Review this change: café.\n';
+      const model = 'openai/gpt-5';
+      const analyticsEnabled = persistedDecision ?? preference;
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        id: 'test-agent-config',
+        config: {
+          review_analytics_enabled: preference,
+          model_slug: 'anthropic/claude-sonnet-4.6',
+          thinking_effort: 'high',
+        },
+        is_enabled: true,
+        runtime_state: {},
+      });
+      mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
+        reviewId: params.reviewId,
+        authToken: 'test-dispatch-auth-token',
+        sessionInput: {
+          prompt: preparedPrompt,
+          model,
+          variant,
+          githubToken: 'test-github-token',
+        },
+      }));
 
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        reviewValues({
-          owner,
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values(
+          reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+        )
+        .returning({ id: cloud_agent_code_reviews.id });
+      if (persistedDecision !== undefined) {
+        await db.insert(cloud_agent_code_review_attempts).values({
+          code_review_id: review.id,
+          attempt_number: 1,
           status: 'pending',
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        })
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
+          analytics_enabled_at_dispatch: persistedDecision,
+        });
+      }
 
-    await tryDispatchPendingReviews({
-      type: 'org',
-      id: testOrganizationId,
-      userId: testUser.id,
-    });
+      await tryDispatchPendingReviews({ ...owner, userId: testUser.id });
 
-    const [attempt] = await db
-      .select()
-      .from(cloud_agent_code_review_attempts)
-      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
-    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+      const [attempt] = await db
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+      const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0] as
+        | CodeReviewPayload
+        | undefined;
+      if (!attempt || !dispatchedPayload) {
+        throw new Error('Expected a persisted attempt and worker dispatch');
+      }
 
-    expect(attempt?.analytics_enabled_at_dispatch).toBe(true);
-    expect(dispatchedPayload.sessionInput.prompt).toContain('kilo-review-analytics:v1');
-    expect(dispatchedPayload.sessionInput.prompt.match(/kilo-review-analytics:v1/g)).toHaveLength(
-      1
-    );
-  });
+      expect(mockPrepareReviewPayload).toHaveBeenCalledTimes(1);
+      expect(mockDispatchReview).toHaveBeenCalledTimes(1);
+      expect(attempt.analytics_enabled_at_dispatch).toBe(analyticsEnabled);
+      expect(dispatchedPayload.sessionInput.prompt).toBe(
+        analyticsEnabled ? appendCodeReviewAnalyticsPromptAppendix(preparedPrompt) : preparedPrompt
+      );
+      expect(
+        mockLogExceptInTest.mock.calls.filter(
+          ([message]) => message === DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE
+        )
+      ).toEqual([
+        [
+          DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE,
+          {
+            reviewId: review.id,
+            attemptId: attempt.id,
+            promptSha256: createHash('sha256')
+              .update(dispatchedPayload.sessionInput.prompt, 'utf8')
+              .digest('hex'),
+            promptLength: dispatchedPayload.sessionInput.prompt.length,
+            model,
+            variant: variant ?? null,
+            analytics_enabled_at_dispatch: analyticsEnabled,
+            packagedCliVersion: '7.4.20',
+          },
+        ],
+      ]);
+    }
+  );
+
+  it.each(['admitted', 'cancelled', 'reclaimed'] as const)(
+    'withholds prompt diagnostics until the final reservation recheck resolves: %s',
+    async outcome => {
+      const timestamp = minutesAgo(1);
+      const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+      const recheckStarted = createDeferred<void>();
+      const releaseRecheck = createDeferred<void>();
+      const { reviewIsStillReserved } =
+        jest.requireActual<typeof codeReviewsDb>('../db/code-reviews');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        id: 'test-agent-config',
+        config: { review_analytics_enabled: true },
+        is_enabled: true,
+        runtime_state: {},
+      });
+      mockReviewIsStillReserved
+        .mockImplementationOnce(reviewIsStillReserved)
+        .mockImplementationOnce(reviewIsStillReserved)
+        .mockImplementationOnce(async (reviewId: string, reservationId: string) => {
+          recheckStarted.resolve(undefined);
+          await releaseRecheck.promise;
+          return reviewIsStillReserved(reviewId, reservationId);
+        });
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values(
+          reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+        )
+        .returning({ id: cloud_agent_code_reviews.id });
+
+      const dispatch = tryDispatchPendingReviews({ ...owner, userId: testUser.id });
+      await recheckStarted.promise;
+
+      expect(mockDispatchReview).not.toHaveBeenCalled();
+      expect(mockLogExceptInTest).not.toHaveBeenCalledWith(
+        DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE,
+        expect.anything()
+      );
+      const attempt = await db.query.cloud_agent_code_review_attempts.findFirst({
+        where: eq(cloud_agent_code_review_attempts.code_review_id, review.id),
+      });
+      expect(attempt?.analytics_enabled_at_dispatch).toBe(true);
+
+      if (outcome !== 'admitted') {
+        await db
+          .update(cloud_agent_code_reviews)
+          .set(
+            outcome === 'cancelled'
+              ? { status: 'cancelled' }
+              : { dispatch_reservation_id: randomUUID() }
+          )
+          .where(eq(cloud_agent_code_reviews.id, review.id));
+      }
+      releaseRecheck.resolve(undefined);
+      const result = await dispatch;
+
+      const dispatchCount = outcome === 'admitted' ? 1 : 0;
+      expect(result).toEqual({
+        dispatched: dispatchCount,
+        notDispatched: 1 - dispatchCount,
+        activeCount: dispatchCount,
+      });
+      expect(mockDispatchReview).toHaveBeenCalledTimes(dispatchCount);
+      expect(
+        mockLogExceptInTest.mock.calls.filter(
+          ([message]) => message === DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE
+        )
+      ).toHaveLength(dispatchCount);
+      if (outcome === 'admitted') {
+        const diagnosticCallIndex = mockLogExceptInTest.mock.calls.findIndex(
+          ([message]) => message === DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE
+        );
+        expect(mockLogExceptInTest.mock.invocationCallOrder[diagnosticCallIndex]).toBeLessThan(
+          mockDispatchReview.mock.invocationCallOrder[0]
+        );
+      }
+    }
+  );
 
   it('forces analytics off for Bitbucket even when its stored config enables collection', async () => {
     const timestamp = minutesAgo(1);
@@ -1746,6 +1903,13 @@ describe('tryDispatchPendingReviews', () => {
 
     const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
     expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
+    expect(mockLogExceptInTest).toHaveBeenCalledWith(
+      DISPATCH_PROMPT_DIAGNOSTICS_MESSAGE,
+      expect.objectContaining({
+        analytics_enabled_at_dispatch: true,
+        promptSha256: createHash('sha256').update('Review this change.', 'utf8').digest('hex'),
+      })
+    );
   });
 
   it('keeps an existing organization analytics snapshot after collection is disabled', async () => {

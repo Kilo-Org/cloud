@@ -452,24 +452,26 @@ export async function prepareReviewPayload(
         // Build complete review state for intelligent update/create decisions
         try {
           // Fetch all state in parallel for efficiency
-          const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
-            await Promise.all([
-              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
-              fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
-              getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
-              repositoryReviewInstructionsPromise ??
-                Promise.resolve(repositoryReviewInstructionsLookup),
-            ]);
+          const [reviewState, reviewInstructions] = await Promise.all([
+            prepareGitHubReviewContext({
+              installationId,
+              repoOwner,
+              repoName,
+              prNumber: review.pr_number,
+              appType,
+            }),
+            repositoryReviewInstructionsPromise ??
+              Promise.resolve(repositoryReviewInstructionsLookup),
+          ]);
           repositoryReviewInstructionsLookup = reviewInstructions;
-
-          existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
+          existingReviewState = reviewState;
 
           logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
             reviewId,
-            hasSummary: !!summaryComment,
-            inlineCount: inlineComments.length,
+            hasSummary: !!reviewState.summaryComment,
+            inlineCount: reviewState.inlineComments.length,
             previousStatus: existingReviewState.previousStatus,
-            headCommitSha: headCommitSha.substring(0, 8),
+            headCommitSha: reviewState.headCommitSha.substring(0, 8),
           });
         } catch (stateLookupError) {
           if (repositoryReviewInstructionsPromise) {
@@ -905,7 +907,23 @@ export async function prepareReviewPayload(
   }
 }
 
-type RepositoryReviewInstructionsLookup = {
+export async function prepareGitHubReviewContext(params: {
+  installationId: string;
+  repoOwner: string;
+  repoName: string;
+  prNumber: number;
+  appType: GitHubAppType;
+}): Promise<ExistingReviewState> {
+  const { installationId, repoOwner, repoName, prNumber, appType } = params;
+  const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
+    findKiloReviewComment(installationId, repoOwner, repoName, prNumber, appType),
+    fetchPRInlineComments(installationId, repoOwner, repoName, prNumber, appType),
+    getPRHeadCommit(installationId, repoOwner, repoName, prNumber, appType),
+  ]);
+  return buildReviewState(summaryComment, inlineComments, headCommitSha);
+}
+
+export type RepositoryReviewInstructionsLookup = {
   content: string | null;
   used: boolean;
   ref: string | null;
@@ -916,6 +934,21 @@ function unusedRepositoryReviewInstructionsLookup(): RepositoryReviewInstruction
   return { content: null, used: false, ref: null, truncated: false };
 }
 
+export async function readRepositoryReviewInstructions(params: {
+  ref: string;
+  fetchInstructions: () => Promise<string | null>;
+}): Promise<RepositoryReviewInstructionsLookup> {
+  const normalized = normalizeRepositoryReviewInstructions(await params.fetchInstructions());
+  return normalized
+    ? {
+        content: normalized.content,
+        used: true,
+        ref: params.ref,
+        truncated: normalized.truncated,
+      }
+    : unusedRepositoryReviewInstructionsLookup();
+}
+
 async function fetchRepositoryReviewInstructions(params: {
   platform: CodeReviewPlatform;
   repoFullName: string;
@@ -923,27 +956,20 @@ async function fetchRepositoryReviewInstructions(params: {
   fetchInstructions: () => Promise<string | null>;
 }): Promise<RepositoryReviewInstructionsLookup> {
   try {
-    const rawInstructions = await params.fetchInstructions();
-    const normalized = normalizeRepositoryReviewInstructions(rawInstructions);
+    const instructions = await readRepositoryReviewInstructions({
+      ref: params.baseRef,
+      fetchInstructions: params.fetchInstructions,
+    });
 
     logExceptInTest('[prepareReviewPayload] REVIEW.md lookup complete', {
       platform: params.platform,
       repoFullName: params.repoFullName,
       baseRef: params.baseRef,
-      found: !!normalized,
-      truncated: normalized?.truncated ?? false,
+      found: instructions.used,
+      truncated: instructions.truncated,
     });
 
-    if (!normalized) {
-      return unusedRepositoryReviewInstructionsLookup();
-    }
-
-    return {
-      content: normalized.content,
-      used: true,
-      ref: params.baseRef,
-      truncated: normalized.truncated,
-    };
+    return instructions;
   } catch (error) {
     warnExceptInTest('[prepareReviewPayload] REVIEW.md lookup failed; using default guidance', {
       platform: params.platform,

@@ -1480,7 +1480,7 @@ Usage:
   dev:env --missing-secrets-only
                           Create missing Secrets Store entries without refreshing existing ones
 
-Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
+Targets: app, app-builder, agents, code-review, isolate-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 

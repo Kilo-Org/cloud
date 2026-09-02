@@ -1,0 +1,11 @@
+{
+  "owner": "kilo-e2e",
+  "repo": "review-fixture",
+  "pullNumber": 1,
+  "headSha": "c635fad50bbe19b28cb3f68719f832c73cafe30f",
+  "baseSha": "201d93249b1d38c0d1b3b5960865fdf4f84990b9",
+  "source": {
+    "repository": "tj/commander.js",
+    "cloneUrl": "https://github.com/tj/commander.js.git"
+  }
+}

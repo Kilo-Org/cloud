@@ -345,6 +345,28 @@ test('keeps existing deletion provider keys when injecting deletion-mock hosts',
   assert.equal(env?.POSTHOG_HOST, 'http://127.0.0.1:4010');
 });
 
+test('registers isolate-review as an opt-in worker with token-service dependency', () => {
+  const service = getService('cloudflare-isolate-review');
+
+  assert.equal(service.group, 'isolate-review');
+  assert.equal(service.type, 'worker');
+  assert.equal(service.dir, 'services/isolate-review');
+  assert.equal(service.port, 8819 + portOffset);
+  assert.deepEqual(service.dependsOn, ['nextjs', 'cloudflare-git-token-service']);
+
+  const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
+  assert.ok(!alwaysOn.includes('cloudflare-isolate-review'));
+  assert.deepEqual(resolveTargets(['isolate-review']), [
+    'postgres',
+    'stripe',
+    'redis',
+    'cloudflare-git-token-service',
+    'redis-http',
+    'nextjs',
+    'cloudflare-isolate-review',
+  ]);
+});
+
 test('preserves auto routing backend auth secret name', () => {
   const service = getService('auto-routing');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');

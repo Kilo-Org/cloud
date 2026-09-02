@@ -7,6 +7,7 @@ import {
   getCurrentReviewSummaryForContext,
   stripReviewSummaryHistory,
 } from './history';
+import { appendReviewSummaryFooter } from './usage-footer';
 
 function countOccurrences(value: string, needle: string): number {
   return value.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length ?? 0;
@@ -288,6 +289,24 @@ describe('appendPreviousReviewSummaryHistory', () => {
 });
 
 describe('getCurrentReviewSummaryForContext', () => {
+  it('retains literal markers and later findings while stripping canonical history and footer', () => {
+    const visible = [
+      '## Code Review Summary',
+      '',
+      'Mentions <!-- kilo-usage --> and <!-- kilo-review-guidance --> as text.',
+      `Mentions ${REVIEW_SUMMARY_HISTORY_START} and ${REVIEW_SUMMARY_HISTORY_END} as text.`,
+      '',
+      'Current finding after the literal markers.',
+    ].join('\n');
+    const history = buildPreviousReviewSummaryHistory(summaryWithIssues);
+    const body = appendReviewSummaryFooter(`<!-- kilo-review -->\n${visible}\n\n${history}`, {
+      usage: { model: 'provider/current-model', tokensIn: 1_000, tokensOut: 200, cachedTokens: 0 },
+      reviewGuidance: { used: true, ref: 'main', truncated: false },
+    });
+
+    expect(getCurrentReviewSummaryForContext(body)).toBe(visible);
+  });
+
   it('strips history and backend footer from the current visible summary', () => {
     const history = buildPreviousReviewSummaryHistory(summaryWithIssues, {
       previousHeadSha: '9999999ddddddd',

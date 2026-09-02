@@ -52,6 +52,13 @@ import {
   createManualCodeReviewJob,
   ManualCodeReviewJobInputSchema,
 } from '@/lib/code-reviews/manual-code-review-jobs';
+import {
+  createManualIsolateReview,
+  getManualIsolateReview,
+  getManualIsolateReviewTranscript,
+  IsolateReviewRunInputSchema,
+  ManualIsolateReviewInputSchema,
+} from '@/lib/code-reviews/manual-isolate-reviews';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { getBitbucketCodeReviewerReadiness } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache';
 import {
@@ -197,6 +204,12 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
 
 const CreateManualReviewJobInputSchema = OrganizationIdInputSchema.extend(
   ManualCodeReviewJobInputSchema.shape
+);
+const CreateIsolateReviewInputSchema = ManualIsolateReviewInputSchema.safeExtend(
+  OrganizationIdInputSchema.shape
+);
+const OrganizationIsolateReviewRunInputSchema = IsolateReviewRunInputSchema.extend(
+  OrganizationIdInputSchema.shape
 );
 
 const TriggerBitbucketCodeReviewInputSchema = OrganizationIdInputSchema.extend({
@@ -363,6 +376,33 @@ async function ensureBitbucketWorkspaceWebhook(input: {
 }
 
 export const organizationReviewAgentRouter = createTRPCRouter({
+  createIsolateReview: organizationMemberMutationProcedure
+    .input(CreateIsolateReviewInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { organizationId, ...reviewInput } = input;
+      return createManualIsolateReview({ user: ctx.user, organizationId, input: reviewInput });
+    }),
+
+  getIsolateReview: organizationMemberProcedure
+    .input(OrganizationIsolateReviewRunInputSchema)
+    .query(async ({ ctx, input }) =>
+      getManualIsolateReview({
+        user: ctx.user,
+        organizationId: input.organizationId,
+        runId: input.runId,
+      })
+    ),
+
+  getIsolateReviewTranscript: organizationMemberProcedure
+    .input(OrganizationIsolateReviewRunInputSchema)
+    .query(async ({ ctx, input }) =>
+      getManualIsolateReviewTranscript({
+        user: ctx.user,
+        organizationId: input.organizationId,
+        runId: input.runId,
+      })
+    ),
+
   createManualReviewJob: organizationMemberMutationProcedure
     .input(CreateManualReviewJobInputSchema)
     .mutation(async ({ input }) => {

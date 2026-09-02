@@ -63,6 +63,9 @@ export async function verifyKiloBearerAgainstCurrentPepper(
     token: string | null;
     nextAuthSecret: KiloSecretBinding | string;
     workerEnv?: string;
+    requirePepper?: boolean;
+    requiredTokenSource?: string;
+    maxTokenLifetimeSeconds?: number;
     connectionString: string;
     getUserPepper?: GetKiloUserPepper;
     allowBlocked?: boolean;
@@ -97,6 +100,27 @@ export async function verifyKiloBearerAgainstCurrentPepper(
   // Env check is skipped only when the caller does not pass a workerEnv.
   // When workerEnv is set, a token without env (or with a mismatched env) fails.
   if (params.workerEnv && payload.env !== params.workerEnv) {
+    return null;
+  }
+
+  if (params.requirePepper && payload.apiTokenPepper === undefined) {
+    return null;
+  }
+
+  if (
+    params.requiredTokenSource !== undefined &&
+    payload.tokenSource !== params.requiredTokenSource
+  ) {
+    return null;
+  }
+
+  if (
+    params.maxTokenLifetimeSeconds !== undefined &&
+    (payload.exp === undefined ||
+      payload.iat === undefined ||
+      payload.exp - payload.iat > params.maxTokenLifetimeSeconds ||
+      payload.exp - Math.floor(Date.now() / 1000) > params.maxTokenLifetimeSeconds)
+  ) {
     return null;
   }
 

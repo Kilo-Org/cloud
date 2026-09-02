@@ -1,0 +1,37 @@
+[
+  {
+    "filename": "lib/argument.js",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 3,
+    "changes": 7
+  },
+  {
+    "filename": "lib/command.js",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 1,
+    "changes": 2
+  },
+  {
+    "filename": "lib/option.js",
+    "status": "modified",
+    "additions": 4,
+    "deletions": 3,
+    "changes": 7
+  },
+  {
+    "filename": "tests/argument.variadic.test.js",
+    "status": "modified",
+    "additions": 13,
+    "deletions": 0,
+    "changes": 13
+  },
+  {
+    "filename": "tests/options.variadic.test.js",
+    "status": "modified",
+    "additions": 8,
+    "deletions": 0,
+    "changes": 8
+  }
+]

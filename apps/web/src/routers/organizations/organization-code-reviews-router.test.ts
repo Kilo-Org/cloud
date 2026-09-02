@@ -1,6 +1,31 @@
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
 const mockGetBitbucketCodeReviewerReadiness = jest.fn();
+const mockCreateManualIsolateReview = jest.fn();
+const mockGetUnblockedBotUserForOrg = jest.fn();
+const mockEnsureBotUserForOrg = jest.fn();
+const mockCreateIsolateReviewWorkerClientForUser = jest.fn();
+const mockGetIsolateReview = jest.fn();
+const mockGetIsolateReviewTranscript = jest.fn();
+
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/config.server'),
+  ISOLATE_REVIEW_WORKER_URL: 'http://127.0.0.1:9019',
+}));
+jest.mock('@/lib/code-reviews/manual-isolate-reviews', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/code-reviews/manual-isolate-reviews'),
+  createManualIsolateReview: (...args: unknown[]) => mockCreateManualIsolateReview(...args),
+}));
+jest.mock('@/lib/bot-users/bot-user-service', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/bot-users/bot-user-service'),
+  getUnblockedBotUserForOrg: (...args: unknown[]) => mockGetUnblockedBotUserForOrg(...args),
+  ensureBotUserForOrg: (...args: unknown[]) => mockEnsureBotUserForOrg(...args),
+}));
+jest.mock('@/lib/isolate-review-worker-client', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/isolate-review-worker-client'),
+  createIsolateReviewWorkerClientForUser: (...args: unknown[]) =>
+    mockCreateIsolateReviewWorkerClientForUser(...args),
+}));
 
 jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
   syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
@@ -24,15 +49,20 @@ import { afterAll, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { generateBotUserId } from '@/lib/bot-users/types';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { db } from '@/lib/drizzle';
 import {
   agent_configs,
+  kilocode_users,
   organization_audit_logs,
   organizations,
   platform_integrations,
+  type User,
+  type Organization,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 const createdOrganizationIds: string[] = [];
 
 async function createFixtureOrganization() {
@@ -889,5 +919,269 @@ describe('organization review agent router: skip bot pull requests', () => {
       platform: 'github',
     });
     expect(cfg.skipBotPullRequests).toBe(false);
+  });
+});
+
+describe('organization review agent isolate API authorization', () => {
+  let owner: User;
+  let member: User;
+  let outsider: User;
+  let organization: Organization;
+  let bot: User;
+  const runId = '4a798dbc-d66d-4e1c-a2f4-705f132c159d';
+  const url = 'https://github.com/owner/repo/pull/42';
+
+  beforeAll(async () => {
+    owner = await insertTestUser();
+    member = await insertTestUser();
+    outsider = await insertTestUser();
+    organization = await createTestOrganization(
+      'Manual isolate authorization',
+      owner.id,
+      0,
+      {},
+      false
+    );
+    await addUserToOrganization(organization.id, member.id, 'member');
+    bot = { ...owner, id: generateBotUserId(organization.id, 'code-review'), is_bot: true };
+  });
+
+  beforeEach(async () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development' };
+    delete env.VERCEL_ENV;
+    jest.replaceProperty(process, 'env', env);
+    await db
+      .update(organizations)
+      .set({ require_seats: false, plan: 'enterprise', free_trial_end_at: null })
+      .where(eq(organizations.id, organization.id));
+    mockCreateManualIsolateReview.mockReset().mockResolvedValue({ runId });
+    mockGetUnblockedBotUserForOrg.mockReset().mockResolvedValue(bot);
+    mockEnsureBotUserForOrg.mockReset();
+    mockGetIsolateReview.mockReset().mockResolvedValue({
+      runId,
+      userId: bot.id,
+      organizationId: organization.id,
+      status: 'running',
+      requestedModel: 'model',
+      dryRun: true,
+    });
+    mockGetIsolateReviewTranscript
+      .mockReset()
+      .mockResolvedValue({ runId, messages: [], toolCalls: [] });
+    mockCreateIsolateReviewWorkerClientForUser.mockReset().mockReturnValue({
+      getReview: mockGetIsolateReview,
+      getTranscript: mockGetIsolateReviewTranscript,
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organization.id));
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [owner.id, member.id, outsider.id]));
+  });
+
+  it('uses the existing member mutation gate and preserves the requesting human and organization', async () => {
+    const caller = await createCallerForUser(member.id);
+    expect(
+      await caller.organizations.reviewAgent.createIsolateReview({
+        organizationId: organization.id,
+        url,
+      })
+    ).toEqual({ runId });
+    expect(mockCreateManualIsolateReview).toHaveBeenCalledWith({
+      user: expect.objectContaining({ id: member.id }),
+      organizationId: organization.id,
+      input: { url, reviewMode: 'full', dryRun: true },
+    });
+  });
+
+  it('keeps strict request fields and paired model/effort validation on the organization schema', async () => {
+    const caller = await createCallerForUser(member.id);
+    await expect(
+      caller.organizations.reviewAgent.createIsolateReview({
+        organizationId: organization.id,
+        url,
+        thinkingEffort: 'high',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    const injectedInput = { organizationId: organization.id, url, userId: outsider.id };
+    await expect(
+      caller.organizations.reviewAgent.createIsolateReview(injectedInput)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+  });
+
+  it.each(['full', 'incremental'] as const)(
+    'rejects nonmembers before %s creation or obtaining a bot credential for reads',
+    async reviewMode => {
+      const caller = await createCallerForUser(outsider.id);
+      await expect(
+        caller.organizations.reviewAgent.createIsolateReview({
+          organizationId: organization.id,
+          url,
+          reviewMode,
+          previousRunId: runId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
+        caller.organizations.reviewAgent.getIsolateReview({
+          organizationId: organization.id,
+          runId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(
+        caller.organizations.reviewAgent.getIsolateReviewTranscript({
+          organizationId: organization.id,
+          runId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+      expect(mockGetUnblockedBotUserForOrg).not.toHaveBeenCalled();
+      expect(mockCreateIsolateReviewWorkerClientForUser).not.toHaveBeenCalled();
+    }
+  );
+
+  it('inherits the incremental baseline requirement through the extended organization schema', async () => {
+    const caller = await createCallerForUser(member.id);
+    await expect(
+      caller.organizations.reviewAgent.createIsolateReview({
+        organizationId: organization.id,
+        url,
+        reviewMode: 'incremental',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.organizations.reviewAgent.createIsolateReview({
+        organizationId: organization.id,
+        url,
+        reviewMode: 'incremental',
+        previousRunId: 'not-a-uuid',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+    await caller.organizations.reviewAgent.createIsolateReview({
+      organizationId: organization.id,
+      url,
+      reviewMode: 'incremental',
+      previousRunId: runId,
+    });
+    expect(mockCreateManualIsolateReview).toHaveBeenCalledWith({
+      user: expect.objectContaining({ id: member.id }),
+      organizationId: organization.id,
+      input: { url, reviewMode: 'incremental', previousRunId: runId, dryRun: true },
+    });
+  });
+
+  it.each([
+    'previousSHA',
+    'previousHeadSha',
+    'previousSummaryBody',
+    'summaryContent',
+    'effectiveMode',
+    'fallbackReason',
+    'reviewSelection',
+  ])('rejects public organization %s claims before creation', async field => {
+    const caller = await createCallerForUser(member.id);
+    const input = { organizationId: organization.id, url, [field]: 'injected' };
+    await expect(caller.organizations.reviewAgent.createIsolateReview(input)).rejects.toMatchObject(
+      { code: 'BAD_REQUEST' }
+    );
+    expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+  });
+
+  it.each(['full', 'incremental'] as const)(
+    'requires the subscription gate for %s creation but only membership for status and transcript',
+    async reviewMode => {
+      await db
+        .update(organizations)
+        .set({ require_seats: true, plan: 'teams', free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+        .where(eq(organizations.id, organization.id));
+      const caller = await createCallerForUser(member.id);
+      await expect(
+        caller.organizations.reviewAgent.createIsolateReview({
+          organizationId: organization.id,
+          url,
+          reviewMode,
+          previousRunId: runId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+      expect(
+        await caller.organizations.reviewAgent.getIsolateReview({
+          organizationId: organization.id,
+          runId,
+        })
+      ).toMatchObject({ userId: bot.id });
+      expect(
+        await caller.organizations.reviewAgent.getIsolateReviewTranscript({
+          organizationId: organization.id,
+          runId,
+        })
+      ).toEqual({ runId, messages: [], toolCalls: [] });
+      expect(mockCreateIsolateReviewWorkerClientForUser).toHaveBeenCalledWith(bot);
+      expect(mockEnsureBotUserForOrg).not.toHaveBeenCalled();
+    }
+  );
+
+  it('allows another authorized human in the same organization to read the same bot run', async () => {
+    const ownerCaller = await createCallerForUser(owner.id);
+    const memberCaller = await createCallerForUser(member.id);
+    expect(
+      await ownerCaller.organizations.reviewAgent.getIsolateReview({
+        organizationId: organization.id,
+        runId,
+      })
+    ).toMatchObject({ userId: bot.id });
+    expect(
+      await memberCaller.organizations.reviewAgent.getIsolateReviewTranscript({
+        organizationId: organization.id,
+        runId,
+      })
+    ).toMatchObject({ runId });
+    expect(mockGetUnblockedBotUserForOrg).toHaveBeenCalledWith(organization.id, 'code-review');
+    expect(mockEnsureBotUserForOrg).not.toHaveBeenCalled();
+  });
+
+  it('rejects a different organization in returned Worker state before exposing transcript contents', async () => {
+    mockGetIsolateReview.mockResolvedValue({
+      runId,
+      userId: bot.id,
+      organizationId: crypto.randomUUID(),
+    });
+    const caller = await createCallerForUser(member.id);
+    await expect(
+      caller.organizations.reviewAgent.getIsolateReview({ organizationId: organization.id, runId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(
+      caller.organizations.reviewAgent.getIsolateReviewTranscript({
+        organizationId: organization.id,
+        runId,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetIsolateReviewTranscript).not.toHaveBeenCalled();
+  });
+
+  it('does not create a missing bot as a side effect of reads', async () => {
+    mockGetUnblockedBotUserForOrg.mockResolvedValue(null);
+    const caller = await createCallerForUser(member.id);
+    await expect(
+      caller.organizations.reviewAgent.getIsolateReview({ organizationId: organization.id, runId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    await expect(
+      caller.organizations.reviewAgent.getIsolateReviewTranscript({
+        organizationId: organization.id,
+        runId,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(mockEnsureBotUserForOrg).not.toHaveBeenCalled();
+    expect(mockCreateIsolateReviewWorkerClientForUser).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ import {
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { createDefaultCodeReviewConfig } from './core/default-config';
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
@@ -25,6 +25,7 @@ import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
+import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabMergeRequest } from '@/lib/integrations/platforms/gitlab/adapter';
@@ -87,6 +88,13 @@ type ResolvedManualReviewSource = {
   platformProjectId?: number;
 };
 
+export type ConnectedGitHubReviewSource = ResolvedManualReviewSource & {
+  integrationId: string;
+  installationId: string;
+  appType: GitHubAppType;
+  baseTipSha?: string;
+};
+
 type GitHubPullRequestFetchResult =
   | {
       status: 'ok';
@@ -112,6 +120,7 @@ const GitHubPullRequestApiSchema = z.object({
   }),
   base: z.object({
     ref: z.string(),
+    sha: z.string().optional(),
     repo: z.object({
       full_name: z.string(),
     }),
@@ -142,21 +151,6 @@ const GitLabMergeRequestApiSchema = z.object({
 });
 
 type GitLabMergeRequestApi = z.infer<typeof GitLabMergeRequestApiSchema>;
-
-const defaultCodeReviewAgentConfig: CodeReviewAgentConfig = {
-  review_style: 'balanced',
-  focus_areas: [],
-  custom_instructions: null,
-  model_slug: PRIMARY_DEFAULT_MODEL,
-  thinking_effort: null,
-  gate_threshold: 'off',
-  repository_selection_mode: 'all',
-  selected_repository_ids: [],
-  manually_added_repositories: [],
-  disable_review_md: true,
-  review_memory_enabled: false,
-  review_analytics_enabled: false,
-};
 
 export async function createManualCodeReviewJob(params: {
   owner: Owner;
@@ -306,9 +300,20 @@ export async function createManualCodeReviewJob(params: {
   }
 }
 
-function normalizeManualInstructions(value: string | undefined): string | null {
+export function normalizeManualInstructions(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
+}
+
+export async function getManualCodeReviewAgentConfig(
+  owner: Owner,
+  platform: CodeReviewPlatform
+): Promise<CodeReviewAgentConfig> {
+  const savedConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+  const parsedSavedConfig = savedConfig
+    ? CodeReviewAgentConfigSchema.safeParse(savedConfig.config)
+    : null;
+  return parsedSavedConfig?.success ? parsedSavedConfig.data : createDefaultCodeReviewConfig();
 }
 
 async function buildManualAgentConfig(params: {
@@ -318,13 +323,7 @@ async function buildManualAgentConfig(params: {
   thinkingEffort: string | null;
   council: CodeReviewAgentConfig['council'] | null;
 }): Promise<CodeReviewAgentConfig> {
-  const savedConfig = await getAgentConfigForOwner(params.owner, 'code_review', params.platform);
-  const parsedSavedConfig = savedConfig
-    ? CodeReviewAgentConfigSchema.safeParse(savedConfig.config)
-    : null;
-  const baseConfig = parsedSavedConfig?.success
-    ? parsedSavedConfig.data
-    : defaultCodeReviewAgentConfig;
+  const baseConfig = await getManualCodeReviewAgentConfig(params.owner, params.platform);
 
   return {
     ...baseConfig,
@@ -377,10 +376,10 @@ async function resolveLocalPublicSource(
   });
 }
 
-async function resolveConnectedGitHubSource(
+export async function resolveConnectedGitHubSource(
   owner: Owner,
   url: string
-): Promise<ResolvedManualReviewSource> {
+): Promise<ConnectedGitHubReviewSource> {
   const parsed = parseGitHubPullRequestUrl(url);
   const integrations = (await getAllIntegrationsForOwner(owner)).filter(
     integration =>
@@ -411,7 +410,13 @@ async function resolveConnectedGitHubSource(
     const result = await fetchGitHubPullRequest(parsed, tokenData.token);
     if (result.status === 'ok') {
       validateOpenGitHubPullRequest(result.pullRequest);
-      return buildGitHubSource(result.pullRequest, integration.id);
+      return {
+        ...buildGitHubSource(result.pullRequest, integration.id),
+        integrationId: integration.id,
+        installationId: integration.platform_installation_id,
+        appType,
+        baseTipSha: result.pullRequest.base.sha,
+      };
     }
     if (result.status === 'error') {
       errors.push(result.message);

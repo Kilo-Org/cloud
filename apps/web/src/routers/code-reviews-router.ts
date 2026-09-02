@@ -31,6 +31,13 @@ import {
   ManualCodeReviewJobInputSchema,
 } from '@/lib/code-reviews/manual-code-review-jobs';
 import {
+  createManualIsolateReview,
+  getManualIsolateReview,
+  getManualIsolateReviewTranscript,
+  IsolateReviewRunInputSchema,
+  ManualIsolateReviewInputSchema,
+} from '@/lib/code-reviews/manual-isolate-reviews';
+import {
   applyCodeReviewConfigPatch,
   type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
@@ -156,6 +163,22 @@ const PatchReviewConfigInputSchema = z.object({
 });
 
 export const personalReviewAgentRouter = createTRPCRouter({
+  createIsolateReview: baseProcedure
+    .input(ManualIsolateReviewInputSchema)
+    .mutation(async ({ ctx, input }) => createManualIsolateReview({ user: ctx.user, input })),
+
+  getIsolateReview: baseProcedure
+    .input(IsolateReviewRunInputSchema)
+    .query(async ({ ctx, input }) =>
+      getManualIsolateReview({ user: ctx.user, runId: input.runId })
+    ),
+
+  getIsolateReviewTranscript: baseProcedure
+    .input(IsolateReviewRunInputSchema)
+    .query(async ({ ctx, input }) =>
+      getManualIsolateReviewTranscript({ user: ctx.user, runId: input.runId })
+    ),
+
   createManualReviewJob: baseProcedure
     .input(ManualCodeReviewJobInputSchema)
     .mutation(async ({ ctx, input }) => {

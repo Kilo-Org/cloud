@@ -2870,7 +2870,7 @@
     "legalConnectorPrivacy": " ແລະ ຮັບຮູ້ ",
     "manageFailed": "ບໍ່ສາມາດເປີດການຈັດການການສະໝັກ App Store.",
     "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
-    "subscriptionHeaderDescription": "ການສະໝັກລາຍເດືອນທີ່ເພີ່ມເຄຣດິດໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App — Cloud Agents, ເຊດຊັນຫ່າງໄກ, ແລະ ການສົນທະນາ KiloClaw.",
+    "subscriptionHeaderDescription": "ການສະໝັກລາຍເດືອນທີ່ເພີ່ມເຄຣດິດໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App.",
     "tierDescription": "ເຄຣດິດທີ່ຊຳລະ {{price}} ເພີ່ມລາຍເດືອນສຳລັບການໃຊ້ Kilo App.",
     "subscribe": "ສະໝັກ",
     "subscribeDescription": "ເຄຣດິດລາຍເດືອນພ້ອມຄວາມຄືບໜ້າໂບນັດ",

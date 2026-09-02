@@ -2870,7 +2870,7 @@
     "legalConnectorPrivacy": " ja vahvistat ",
     "manageFailed": "App Store -tilauksen hallinnan avaaminen epäonnistui.",
     "kiloPassSetup": "Kilo Pass -asetukset",
-    "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa — Cloud Agentit, etäistunnot ja KiloClaw-chatit.",
+    "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa.",
     "tierDescription": "{{price}} maksettuja krediittejä lisätään kuukausittain Kilo-sovelluksen käyttöä varten.",
     "subscribe": "Tilaa",
     "subscribeDescription": "Kuukausikrediitit bonusedistymisen kanssa",

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  getAuthoredProductsErrorMessage,
+  KiloPassProductsError,
   loadAppStoreKiloPassProducts,
   NO_MATCHING_KILO_PASS_PRODUCTS_KEY,
   NO_MATCHING_KILO_PASS_PRODUCTS_PLAY_KEY,
@@ -108,5 +110,22 @@ describe('loadAppStoreKiloPassProducts', () => {
     });
 
     expect(fetchStoreProducts).toHaveBeenCalledWith(['kilopass_tier19', 'kilopass_tier49']);
+  });
+});
+
+describe('getAuthoredProductsErrorMessage', () => {
+  it('keeps a message this app wrote', () => {
+    expect(
+      getAuthoredProductsErrorMessage(new KiloPassProductsError('No matching products.'))
+    ).toBe('No matching products.');
+  });
+
+  it('drops a store SDK message so the screen uses its own localized copy', () => {
+    expect(getAuthoredProductsErrorMessage(new Error('Failed to query product'))).toBeNull();
+  });
+
+  it('drops a non-error rejection', () => {
+    expect(getAuthoredProductsErrorMessage('Failed to query product')).toBeNull();
+    expect(getAuthoredProductsErrorMessage(null)).toBeNull();
   });
 });

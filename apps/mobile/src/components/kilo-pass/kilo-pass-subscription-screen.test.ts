@@ -484,7 +484,7 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const retryButton = renderer.root.find(
       node =>
-        String(node.type) === 'Pressable' &&
+        String(node.type) === 'Button' &&
         (node.props as Record<string, unknown>).accessibilityLabel ===
           'Try loading Kilo Pass products again'
     );

@@ -7,7 +7,10 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
 import { getStoreKiloPassProductsState } from './store-products-state';
-import { loadAppStoreKiloPassProducts } from './store-products-loader';
+import {
+  getAuthoredProductsErrorMessage,
+  loadAppStoreKiloPassProducts,
+} from './store-products-loader';
 
 const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
 // Fixed bound on the store connection handshake — raise if real
@@ -75,8 +78,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     await refetchProducts();
   }, [refetchProducts]);
 
-  const queryErrorMessage =
-    productsQuery.error instanceof Error ? productsQuery.error.message : null;
+  const queryErrorMessage = getAuthoredProductsErrorMessage(productsQuery.error);
 
   useEffect(() => {
     if (productsQuery.isSuccess) {

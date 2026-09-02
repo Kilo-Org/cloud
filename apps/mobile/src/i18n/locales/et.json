@@ -2870,7 +2870,7 @@
     "legalConnectorPrivacy": " ja tunnustate ",
     "manageFailed": "App Store tellimuse haldust ei õnnestunud avada.",
     "kiloPassSetup": "Kilo Pass seadistus",
-    "subscriptionHeaderDescription": "Kuutellimus, mis lisab krediiti sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis — Cloud Agents, kaugseansid ja KiloClaw vestlused.",
+    "subscriptionHeaderDescription": "Kuutellimus, mis lisab krediiti sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis.",
     "tierDescription": "{{price}} tasulist krediiti lisatakse igakuiselt Kilo Appi kasutuse eest.",
     "subscribe": "Telli",
     "subscribeDescription": "Igakuine krediit boonusprogresseerumisega",

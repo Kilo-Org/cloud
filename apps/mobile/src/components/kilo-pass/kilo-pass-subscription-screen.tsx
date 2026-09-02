@@ -345,23 +345,11 @@ function KiloPassNativeIapContent() {
             ))}
 
           {!productsIsLoading && products.length === 0 && (
-            <Pressable
-              accessibilityLabel={t('kiloPass.tryLoadingProductsAgain')}
-              accessibilityRole="button"
-              accessibilityState={{
-                busy: productsIsRefetching,
-                disabled: isRetryDisabled,
-              }}
-              className="rounded-xl border border-border bg-card p-5 active:opacity-80"
-              disabled={isRetryDisabled}
-              onPress={() => {
-                void productsRefetch();
-              }}
-            >
+            <View className="gap-3 rounded-xl border border-border bg-card p-5">
               <Text className="font-semibold text-foreground">
                 {t(isAndroid ? 'kiloPass.productsUnavailablePlay' : 'kiloPass.productsUnavailable')}
               </Text>
-              <Text className="mt-1 text-sm text-muted-foreground">
+              <Text className="text-sm text-muted-foreground">
                 {productsError ??
                   t(
                     isAndroid
@@ -369,10 +357,24 @@ function KiloPassNativeIapContent() {
                       : 'kiloPass.productsCouldNotLoad'
                   )}
               </Text>
-              <Text className="mt-3 text-sm font-medium text-primary">
-                {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
-              </Text>
-            </Pressable>
+              <Button
+                accessibilityLabel={t('kiloPass.tryLoadingProductsAgain')}
+                accessibilityState={{
+                  busy: productsIsRefetching,
+                  disabled: isRetryDisabled,
+                }}
+                className="self-start"
+                disabled={isRetryDisabled}
+                onPress={() => {
+                  void productsRefetch();
+                }}
+                variant="outline"
+              >
+                <Text>
+                  {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
+                </Text>
+              </Button>
+            </View>
           )}
 
           {!productsIsLoading &&

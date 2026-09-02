@@ -2416,7 +2416,7 @@
     "legalConnectorPrivacy": " および以下を確認したものとします： ",
     "manageFailed": "App Storeのサブスクリプション管理を開けませんでした。",
     "kiloPassSetup": "Kilo Passセットアップ",
-    "subscriptionHeaderDescription": "毎月のサブスクリプションで、Kilo AppでのAIコーディングセッション（Cloud Agents、リモートセッション、KiloClawチャット）の実行に使えるクレジットをKilo残高に追加します。",
+    "subscriptionHeaderDescription": "毎月のサブスクリプションで、Kilo AppでのAIコーディングセッションの実行に使えるクレジットをKilo残高に追加します。",
     "tierDescription": "Kilo Appの利用に毎月{{price}}の有料クレジットが追加されます。",
     "subscribe": "登録する",
     "subscribeDescription": "ボーナス進行付きの月間クレジット",

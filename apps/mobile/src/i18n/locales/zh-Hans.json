@@ -2416,7 +2416,7 @@
     "legalConnectorPrivacy": " 并确认 ",
     "manageFailed": "无法打开 App Store 订阅管理。",
     "kiloPassSetup": "Kilo Pass 设置",
-    "subscriptionHeaderDescription": "一项月度订阅，为你的 Kilo 余额添加积分，用于在 Kilo App 中运行 AI 编程会话 — Cloud Agents、远程会话和 KiloClaw 聊天。",
+    "subscriptionHeaderDescription": "一项月度订阅，为你的 Kilo 余额添加积分，用于在 Kilo App 中运行 AI 编程会话。",
     "tierDescription": "每月为 Kilo App 使用添加 {{price}} 付费积分。",
     "subscribe": "订阅",
     "subscribeDescription": "月度积分及奖励进度",

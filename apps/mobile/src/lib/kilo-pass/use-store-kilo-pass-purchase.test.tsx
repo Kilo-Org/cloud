@@ -921,7 +921,6 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const showError = vi.fn();
     const purchase = createPurchase({
       store: 'google',
-      platform: 'android',
       productId: product.googleProductId,
       purchaseToken: null,
     });
@@ -951,7 +950,6 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
     const purchase = createPurchase({
       store: 'google',
-      platform: 'android',
       productId: product.googleProductId,
       purchaseToken: 'play-token',
     });
@@ -977,7 +975,6 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
   it('restores an unfinished Kilo Pass Google Play purchase', async () => {
     const purchase = createPurchase({
       store: 'google',
-      platform: 'android',
       productId: product.googleProductId,
       purchaseToken: 'play-token',
     });

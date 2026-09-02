@@ -2870,7 +2870,7 @@
     "legalConnectorPrivacy": " och erkänner ",
     "manageFailed": "Det gick inte att öppna App Store-prenumerationshanteringen.",
     "kiloPassSetup": "Kilo Pass-installation",
-    "subscriptionHeaderDescription": "En månadsprenumeration som lägger till krediter till ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen — Cloud-agenter, fjärrsessioner och KiloClaw-chattar.",
+    "subscriptionHeaderDescription": "En månadsprenumeration som lägger till krediter till ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen.",
     "tierDescription": "{{price}} betalda krediter läggs till månadsvis för Kilo-appanvändning.",
     "subscribe": "Prenumerera",
     "subscribeDescription": "Månatliga krediter med bonusframsteg",

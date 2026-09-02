@@ -115,11 +115,15 @@ export function KiloPassSubscriptionCard() {
       if (Platform.OS === 'android') {
         const tier = subscription?.tier;
         const skuAndroid =
-          (tier != null ? GOOGLE_PRODUCT_ID_BY_TIER[tier as keyof typeof GOOGLE_PRODUCT_ID_BY_TIER] : undefined) ??
-          'kilopass_tier19';
+          (tier != null
+            ? GOOGLE_PRODUCT_ID_BY_TIER[tier as keyof typeof GOOGLE_PRODUCT_ID_BY_TIER]
+            : undefined) ?? 'kilopass_tier19';
         void (async () => {
           const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
-          await openPlaySubscriptionManagement({ skuAndroid, invalidateAfter: invalidateKiloPassState });
+          await openPlaySubscriptionManagement({
+            skuAndroid,
+            invalidateAfter: invalidateKiloPassState,
+          });
         })();
         return;
       }

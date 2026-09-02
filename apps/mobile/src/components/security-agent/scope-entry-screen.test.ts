@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
+import { securityConfigFixture } from './security-config.test-fixture';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createElement } from 'react';
@@ -18,46 +19,13 @@ let permissionData = {
   hasPermissions: true,
   reauthorizeUrl: null as string | null,
 };
-type ConfigData = inferRouterOutputs<MobileRouter>['organizations']['securityAgent']['getConfig'];
-const defaultConfigData: ConfigData = {
-  hasConfig: false,
-  configRevision: 1,
-  isEnabled: false,
-  slaCriticalDays: 15,
-  slaHighDays: 30,
-  slaMediumDays: 45,
-  slaLowDays: 90,
-  slaEnabled: false,
-  autoSyncEnabled: true,
-  repositorySelectionMode: 'all',
-  selectedRepositoryIds: [],
-  modelSlug: 'test/model',
-  triageModelSlug: 'test/model',
-  analysisModelSlug: 'test/model',
-  analysisMode: 'auto',
-  autoDismissEnabled: false,
-  autoDismissConfidenceThreshold: 'high',
-  autoAnalysisEnabled: false,
-  autoAnalysisMinSeverity: 'high',
-  autoAnalysisIncludeExisting: false,
-  autoRemediationEnabled: false,
-  autoRemediationMinSeverity: 'high',
-  autoRemediationIncludeExisting: false,
-  autoRemediationRequireApproval: true,
-  autoRemediationEnabledAt: null,
-  remediationModelSlug: 'test/model',
-  slaNotificationsEnabled: false,
-  slaNotificationMinSeverity: 'high',
-  slaNotificationWarningDays: 3,
-  newFindingNotificationsEnabled: false,
-  newFindingNotificationMinSeverity: 'high',
-};
-let configData: ConfigData = structuredClone(defaultConfigData);
+let configData = structuredClone(securityConfigFixture);
 let repositoriesData: { id: number }[] = [];
 let roles: { organizationId: string; role: string }[] = [];
 let queryClient = new QueryClient();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
+let mintFailed = false;
 
 vi.mock('@/lib/trpc', async () => {
   const { createTRPCContext } = await import('@trpc/tanstack-react-query');
@@ -108,6 +76,8 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 
 function host(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
@@ -149,11 +119,15 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   permissionData = { hasIntegration: true, hasPermissions: true, reauthorizeUrl: null };
-  configData = structuredClone(defaultConfigData);
+  configData = structuredClone(securityConfigFixture);
+  mintFailed = false;
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   transport.mockReset().mockImplementation(async input => {
     await Promise.resolve();
+    if (mintFailed && procedureFor(input) === 'mintInstallState') {
+      throw new Error('Setup failed');
+    }
     const data: Record<string, unknown> = {
       getPermissionStatus: permissionData,
       getConfig: configData,
@@ -190,6 +164,20 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
     expect(host(root, 'Switch')).toHaveLength(0);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
   });
+
+  it.each([false, true])(
+    'keeps one header when setup mint fails with integration=%s',
+    async hasIntegration => {
+      permissionData = { hasIntegration, hasPermissions: false, reauthorizeUrl: null };
+      mintFailed = true;
+      const root = await mount(scope);
+      expect(host(root, 'ScreenHeader')).toHaveLength(1);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(host(root, 'QueryError')).toHaveLength(1);
+      expect(host(root, 'QueryError')[0]?.props.placement).not.toBe('top');
+      expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+    }
+  );
 
   it('uses the server reauthorization URL without minting another token', async () => {
     permissionData = {
@@ -239,6 +227,8 @@ describe.each([
       onlineManager.setOnline(false);
       const root = await mount('personal', Screen);
       await retry(root);
+      expect(host(root, 'CenteredState')).toHaveLength(1);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(0);
       expect(host(root, 'Switch')[0]?.props.value).toBe(false);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(expected.disabled);
       expect(

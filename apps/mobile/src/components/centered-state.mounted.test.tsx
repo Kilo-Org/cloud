@@ -15,9 +15,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+import { SearchX } from '@/components/ui/icons';
 
 import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
+import { EmptyState } from './empty-state';
+import { InvalidRouteState } from './invalid-route-state';
+import { QueryError } from './query-error';
 
 type ScrollNode = NonNullable<ReturnType<ScrollView['getNativeScrollRef']>>;
 type Measurement = Parameters<ScrollNode['measureInWindow']>[0];
@@ -51,6 +55,22 @@ vi.mock('react-native', () => ({
     return createElement('ScrollView', rest);
   },
 }));
+
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: () => null,
+  Lock: () => null,
+  SearchX: () => null,
+  ServerCrash: () => null,
+  WifiOff: () => null,
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#777777' }),
+}));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn<() => void>() }) }));
 
 const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
@@ -116,6 +136,50 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('Shared state placement', () => {
+  it.each([undefined, 'center', 'top'] as const)(
+    'owns one scroller only for centered placement: %s',
+    async placement => {
+      const mounted = await renderWithProviders(
+        <EmptyState icon={SearchX} title="Empty" description="No results" placement={placement} />
+      );
+      expect(mounted.renderer.root.findAllByType(CenteredState)).toHaveLength(
+        placement === 'top' ? 0 : 1
+      );
+      expect(mounted.renderer.root.findAllByType(ScrollView)).toHaveLength(
+        placement === 'top' ? 0 : 1
+      );
+      mounted.unmount();
+    }
+  );
+
+  it('keeps an invalid route state directly scrollable beneath a native sheet header', async () => {
+    const mounted = await renderWithProviders(<InvalidRouteState backTo="/" />);
+    expect(mounted.renderer.toJSON()).toMatchObject({ type: 'ScrollView' });
+    mounted.unmount();
+  });
+
+  it('keeps retry and refresh on the centered error body', async () => {
+    const onRetry = vi.fn<() => void>();
+    const refreshControl = createElement('RefreshControl', {
+      refreshing: false,
+      onRefresh: vi.fn(),
+    });
+    const mounted = await renderWithProviders(
+      <QueryError onRetry={onRetry} refreshControl={refreshControl} />
+    );
+    expect(mounted.renderer.root.findAllByType(ScrollView)).toHaveLength(1);
+    expect(mounted.renderer.root.findByType(ScrollView).props.refreshControl).toBe(refreshControl);
+    const retry = mounted.renderer.root.findByProps({ accessibilityLabel: 'common.retry' })
+      .props as {
+      onPress: () => void;
+    };
+    retry.onPress();
+    expect(onRetry).toHaveBeenCalledOnce();
+    mounted.unmount();
+  });
 });
 
 describe('CenteredState measurements', () => {

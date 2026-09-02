@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { toneColor, type ToneKey } from '@/lib/agent-color';
@@ -119,58 +120,62 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
     const iosIconColor = colors[iosTint.hueThemeKey];
 
     return (
-      <View className="w-full flex-1 items-center justify-center gap-6 px-6">
-        <View
-          className={cn(
-            'h-24 w-24 items-center justify-center rounded-3xl border',
-            iosTint.tileBgClass,
-            iosTint.tileBorderClass
-          )}
-        >
-          <AlertTriangle size={40} color={iosIconColor} />
+      <CenteredState>
+        <View className="w-full items-center gap-6 px-6">
+          <View
+            className={cn(
+              'h-24 w-24 items-center justify-center rounded-3xl border',
+              iosTint.tileBgClass,
+              iosTint.tileBorderClass
+            )}
+          >
+            <AlertTriangle size={40} color={iosIconColor} />
+          </View>
+          <View className="items-center gap-2">
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.accessRequired.iosTitle')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.accessRequired.iosBody')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.accessRequired.iosContact')}
+            </Text>
+          </View>
         </View>
-        <View className="items-center gap-2">
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.accessRequired.iosTitle')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.accessRequired.iosBody')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.accessRequired.iosContact')}
-          </Text>
-        </View>
-      </View>
+      </CenteredState>
     );
   }
 
   return (
-    <View className="w-full flex-1 items-center justify-center gap-6 px-6">
-      <View
-        className={cn(
-          'h-24 w-24 items-center justify-center rounded-3xl border',
-          tint.tileBgClass,
-          tint.tileBorderClass
-        )}
-      >
-        <Icon size={40} color={iconColor} />
+    <CenteredState>
+      <View className="w-full items-center gap-6 px-6">
+        <View
+          className={cn(
+            'h-24 w-24 items-center justify-center rounded-3xl border',
+            tint.tileBgClass,
+            tint.tileBorderClass
+          )}
+        >
+          <Icon size={40} color={iconColor} />
+        </View>
+        <View className="items-center gap-2">
+          <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
+          <Text variant="muted" className="text-center text-base">
+            {t(content.bodyKey)}
+          </Text>
+        </View>
+        <Button
+          variant={content.ctaVariant}
+          size="lg"
+          className="w-full"
+          onPress={onOpen}
+          accessibilityRole="link"
+        >
+          <Text className="text-base">{t(content.ctaLabelKey)}</Text>
+          <ExternalLink size={16} color={ctaIconColor} />
+        </Button>
       </View>
-      <View className="items-center gap-2">
-        <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
-        <Text variant="muted" className="text-center text-base">
-          {t(content.bodyKey)}
-        </Text>
-      </View>
-      <Button
-        variant={content.ctaVariant}
-        size="lg"
-        className="w-full"
-        onPress={onOpen}
-        accessibilityRole="link"
-      >
-        <Text className="text-base">{t(content.ctaLabelKey)}</Text>
-        <ExternalLink size={16} color={ctaIconColor} />
-      </Button>
-    </View>
+    </CenteredState>
   );
 }

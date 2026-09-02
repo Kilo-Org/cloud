@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
 import {
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -47,7 +48,6 @@ export function BitbucketOverview({
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const paddingBottom = useTabBarBottomPadding();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useAvailableModels(scope);
@@ -64,14 +64,12 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            onRetry={() => {
-              providerState.refetch();
-            }}
-            isRetrying={providerState.isRetrying}
-          />
-        </View>
+        <QueryError
+          onRetry={() => {
+            providerState.refetch();
+          }}
+          isRetrying={providerState.isRetrying}
+        />
       </View>
     );
   }
@@ -87,14 +85,29 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            onRetry={() => {
-              void config.refetch();
-            }}
-            isRetrying={config.isFetching}
-          />
-        </View>
+        <QueryError
+          onRetry={() => {
+            void config.refetch();
+          }}
+          isRetrying={config.isFetching}
+        />
+      </View>
+    );
+  }
+
+  if (!isLoading && !connected) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
+        <CenteredState className="px-6">
+          {canEdit ? (
+            <BitbucketConnectForm scope={scope} />
+          ) : (
+            <Text className="text-center text-xs text-muted-foreground">
+              {t('codeReviewer.bitbucket.notConnectedReadOnly')}
+            </Text>
+          )}
+        </CenteredState>
       </View>
     );
   }
@@ -149,18 +162,6 @@ export function BitbucketOverview({
                   <Skeleton key={index} className="h-12 w-full rounded-lg" />
                 ))}
               </View>
-            </Animated.View>
-          )}
-
-          {!isLoading && !connected && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {canEdit ? (
-                <BitbucketConnectForm scope={scope} />
-              ) : (
-                <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.bitbucket.notConnectedReadOnly')}
-                </Text>
-              )}
             </Animated.View>
           )}
 

@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, I18nManager, TextInput, View } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
 import { PickerSheet } from '@/components/picker-sheet';
@@ -163,11 +164,13 @@ export function LanguagePickerSheet({
         disabled={busy}
         scrollable={false}
       >
-        <View className="items-center gap-3 px-6 py-8">
-          <Text variant="muted" className="text-center">
-            {t('language.languageSaved')}
-          </Text>
-        </View>
+        <CenteredState>
+          <View className="items-center px-6">
+            <Text variant="muted" className="text-center">
+              {t('language.languageSaved')}
+            </Text>
+          </View>
+        </CenteredState>
       </PickerSheet>
     );
   }
@@ -185,12 +188,14 @@ export function LanguagePickerSheet({
         disabled
         scrollable={false}
       >
-        <View className="items-center gap-3 px-6 py-8">
-          <ActivityIndicator color={colors.mutedForeground} />
-          <Text variant="muted" className="text-center">
-            {t('language.restarting')}
-          </Text>
-        </View>
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <ActivityIndicator color={colors.mutedForeground} />
+            <Text variant="muted" className="text-center">
+              {t('language.restarting')}
+            </Text>
+          </View>
+        </CenteredState>
       </PickerSheet>
     );
   }
@@ -204,61 +209,61 @@ export function LanguagePickerSheet({
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}
+      headerContent={
+        <View className="px-4 pb-2 pt-3">
+          <TextInput
+            key={searchEpoch}
+            accessibilityLabel={t('language.search')}
+            // leading-[normal] so no lineHeight reaches the style: iOS otherwise
+            // draws the placeholder below the typed text and clips it. min-h-*
+            // sets the height without padding, so iOS centres the text rect.
+            className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
+            placeholder={t('language.search')}
+            placeholderTextColor={colors.mutedForeground}
+            // textAlign is applied inline, not via a class: NativeWind maps it
+            // to a native prop for TextInput and crashes on it in this version.
+            style={isRtl ? SEARCH_RTL : undefined}
+            // Uncontrolled: iOS drops keystrokes when state drives `value`. The
+            // input remounts on focus via `searchEpoch`, so a reopen starts empty.
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+        </View>
+      }
     >
-      <FlatList
-        className="flex-1 bg-background"
-        data={items}
-        keyExtractor={item => item.key}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerClassName="px-4 pb-4"
-        ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-        ListHeaderComponent={
-          <View className="pb-2 pt-3">
-            <TextInput
-              key={searchEpoch}
-              accessibilityLabel={t('language.search')}
-              // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-              // draws the placeholder below the typed text and clips it. min-h-*
-              // sets the height without padding, so iOS centres the text rect.
-              className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
-              placeholder={t('language.search')}
-              placeholderTextColor={colors.mutedForeground}
-              // textAlign is applied inline, not via a class: NativeWind maps it
-              // to a native prop for TextInput and crashes on it in this version.
-              style={isRtl ? SEARCH_RTL : undefined}
-              // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-              // input remounts on focus via `searchEpoch`, so a reopen starts empty.
-              onChangeText={setQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!busy}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
+      {items.length === 0 ? (
+        <EmptyState
+          icon={SearchX}
+          title={t('language.noMatches')}
+          description={t('agents.sessionList.tryDifferentSearch')}
+        />
+      ) : (
+        <FlatList
+          className="flex-1 bg-background"
+          data={items}
+          keyExtractor={item => item.key}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerClassName="px-4 pb-4"
+          ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
+          renderItem={({ item, index }) => (
+            <LanguagePickerRow
+              item={item}
+              first={index === 0}
+              showDivider={items[index + 1]?.kind !== 'section'}
+              selected={selected}
+              disabled={busy}
+              deviceEndonym={deviceEndonym}
+              isRtl={isRtl}
+              onSelect={setSelected}
             />
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            icon={SearchX}
-            placement="top"
-            title={t('language.noMatches')}
-            description={t('agents.sessionList.tryDifferentSearch')}
-          />
-        }
-        renderItem={({ item, index }) => (
-          <LanguagePickerRow
-            item={item}
-            first={index === 0}
-            showDivider={items[index + 1]?.kind !== 'section'}
-            selected={selected}
-            disabled={busy}
-            deviceEndonym={deviceEndonym}
-            isRtl={isRtl}
-            onSelect={setSelected}
-          />
-        )}
-      />
+          )}
+        />
+      )}
     </PickerSheet>
   );
 }

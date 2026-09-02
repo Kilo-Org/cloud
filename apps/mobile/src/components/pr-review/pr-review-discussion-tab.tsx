@@ -49,6 +49,7 @@ import { Platform, View } from 'react-native';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -208,52 +209,45 @@ export function PrReviewDiscussionTab({
   };
 
   // ── First-page error / terminal states ─────────────────────────────
+  const isEmpty = isDiscussionEmpty(threads, conversation);
+  const retainedContentError = !isEmpty && firstPageErrorState?.kind === 'retryable';
   const view = selectDiscussionTabView({
-    firstPageErrorState,
-    isPending: query.isPending,
-    isEmpty: isDiscussionEmpty(threads, conversation),
+    firstPageErrorState: retainedContentError ? null : firstPageErrorState,
+    isPending: query.isPending && isEmpty,
+    isEmpty,
   });
 
   if (view.kind === 'permission') {
     return (
-      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
-        <QueryError variant="permission" message={t('prReview.discussion.accessDeniedMessage')} />
-      </View>
+      <QueryError variant="permission" message={t('prReview.discussion.accessDeniedMessage')} />
     );
   }
   if (view.kind === 'not-found') {
     return (
-      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
-        <QueryError
-          variant="not-found"
-          title={t('prReview.discussion.unavailable')}
-          message={t('prReview.discussion.unavailableMessage')}
-        />
-      </View>
+      <QueryError
+        variant="not-found"
+        title={t('prReview.discussion.unavailable')}
+        message={t('prReview.discussion.unavailableMessage')}
+      />
     );
   }
   if (view.kind === 'reconnect') {
     return (
-      <View
-        className="flex-1 items-center justify-center px-6 py-12"
-        style={{ paddingBottom: bottomPadding }}
-      >
+      <CenteredState className="px-6">
         <PrReviewReconnectNotice />
-      </View>
+      </CenteredState>
     );
   }
   if (view.kind === 'retryable') {
     return (
-      <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
-        <QueryError
-          variant="server"
-          title={t('prReview.discussion.couldNotLoad')}
-          onRetry={() => {
-            void query.refetch();
-          }}
-          isRetrying={query.isFetching}
-        />
-      </View>
+      <QueryError
+        variant="server"
+        title={t('prReview.discussion.couldNotLoad')}
+        onRetry={() => {
+          void query.refetch();
+        }}
+        isRetrying={query.isFetching}
+      />
     );
   }
 
@@ -281,24 +275,22 @@ export function PrReviewDiscussionTab({
   // ── Empty (neither threads nor conversation comments) ──────────────
   if (view.kind === 'empty') {
     return (
-      <View className="flex-1 px-4" style={{ paddingBottom: bottomPadding }}>
-        <EmptyState
-          icon={MessageSquarePlus}
-          title={t('prReview.discussion.noDiscussion')}
-          description={t('prReview.discussion.noDiscussionDescription')}
-          action={
-            onRequestFiles ? (
-              <Button
-                variant="outline"
-                onPress={onRequestFiles}
-                accessibilityLabel={t('prReview.discussion.reviewFiles')}
-              >
-                <Text>{t('prReview.discussion.reviewFiles')}</Text>
-              </Button>
-            ) : null
-          }
-        />
-      </View>
+      <EmptyState
+        icon={MessageSquarePlus}
+        title={t('prReview.discussion.noDiscussion')}
+        description={t('prReview.discussion.noDiscussionDescription')}
+        action={
+          onRequestFiles ? (
+            <Button
+              variant="outline"
+              onPress={onRequestFiles}
+              accessibilityLabel={t('prReview.discussion.reviewFiles')}
+            >
+              <Text>{t('prReview.discussion.reviewFiles')}</Text>
+            </Button>
+          ) : null
+        }
+      />
     );
   }
 
@@ -320,7 +312,7 @@ export function PrReviewDiscussionTab({
       onScrollBeginDrag={invalidateSettle}
       hasNextPage={query.hasNextPage}
       isFetchingNextPage={query.isFetchingNextPage}
-      laterPageError={laterPageError}
+      laterPageError={laterPageError || retainedContentError}
       onLoadMore={() => {
         void query.fetchNextPage();
       }}

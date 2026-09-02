@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import {
@@ -131,6 +132,24 @@ export function PlatformOverviewScreen({
     );
   }
 
+  const handleConnected = status.refetch;
+  if (!isLoading && !connected) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
+        <CenteredState className="px-6">
+          {canEdit ? (
+            <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
+          ) : (
+            <Text className="text-center text-xs text-muted-foreground">
+              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+            </Text>
+          )}
+        </CenteredState>
+      </View>
+    );
+  }
+
   const pushField = (field: string) => {
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
@@ -187,23 +206,6 @@ export function PlatformOverviewScreen({
                   <Skeleton key={index} className="h-12 w-full rounded-lg" />
                 ))}
               </View>
-            </Animated.View>
-          )}
-
-          {!isLoading && !connected && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {canEdit ? (
-                <ProviderConnectCard
-                  scope={scope}
-                  platform={platform}
-                  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-                  onConnected={() => status.refetch()}
-                />
-              ) : (
-                <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
-                </Text>
-              )}
             </Animated.View>
           )}
 

@@ -1,20 +1,18 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
 import { createElement } from 'react';
+import { RefreshControl } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { EmptyFilesView, TabStateMessage } from './pr-diff-hunk-rows';
 
-const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  RefreshControl: 'RefreshControl',
 }));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insetsState,
-}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
@@ -32,77 +30,62 @@ function mountNode(node: React.ReactElement): TestRenderer.ReactTestRenderer {
   act(() => {
     ref.current = TestRenderer.create(node);
   });
-  const renderer = ref.current;
-  if (!renderer) {
+  if (!ref.current) {
     throw new Error('renderer was not created');
   }
-  return renderer;
+  return ref.current;
 }
 
-function rootView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
-  const views = renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'View'
-  );
-  const root = views[0];
-  if (!root) {
-    throw new Error('root View not found');
-  }
-  return root;
+function centeredContent(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.find(node => String(node.type) === 'CenteredState');
 }
 
-function paddingBottom(renderer: TestRenderer.ReactTestRenderer): number | undefined {
-  return (rootView(renderer).props.style as { paddingBottom?: number } | undefined)?.paddingBottom;
-}
-
-describe('TabStateMessage bottom inset (plan §6)', () => {
-  beforeEach(() => {
-    insetsState.bottom = 0;
-  });
-
-  it('pads the terminal message by the detail-screen padding at a zero inset', () => {
+describe('Files pane full-body states', () => {
+  it('centers the terminal message without local bottom padding', () => {
     const renderer = mountNode(
       createElement(TabStateMessage, { title: 'Access denied', message: 'No access.' })
     );
-
-    expect(paddingBottom(renderer)).toBe(32);
+    expect(centeredContent(renderer).findByProps({ children: 'No access.' })).toBeDefined();
+    expect(
+      renderer.root.findAll(
+        node =>
+          (node.props.style as { paddingBottom?: number } | undefined)?.paddingBottom !== undefined
+      )
+    ).toHaveLength(0);
   });
 
-  it('grows the terminal message padding with a nonzero system inset', () => {
-    insetsState.bottom = 34;
-    const renderer = mountNode(
-      createElement(TabStateMessage, { title: 'Access denied', message: 'No access.' })
-    );
-
-    expect(paddingBottom(renderer)).toBe(50);
-  });
-});
-
-describe('EmptyFilesView bottom inset (plan §6)', () => {
-  beforeEach(() => {
-    insetsState.bottom = 0;
+  it.each([0, 2])('centers the empty or waiting body for %s reported files', changedFiles => {
+    const renderer = mountNode(createElement(EmptyFilesView, { changedFiles }));
+    expect(centeredContent(renderer)).toBeDefined();
+    const texts = renderer.root.findAll(node => String(node.type) === 'Text');
+    expect(
+      texts.some(node =>
+        String(node.props.children).includes(changedFiles === 0 ? 'No files' : 'loading')
+      )
+    ).toBe(true);
   });
 
-  it('pads the empty state by the detail-screen padding at a zero inset', () => {
-    const renderer = mountNode(createElement(EmptyFilesView, { changedFiles: 0 }));
-
-    expect(paddingBottom(renderer)).toBe(32);
+  it('passes refresh to the single centered scroller in the waiting body', () => {
+    const refreshControl = createElement(RefreshControl, { refreshing: false });
+    const renderer = mountNode(createElement(EmptyFilesView, { changedFiles: 2, refreshControl }));
+    const centered = centeredContent(renderer);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+    expect(centered.props.refreshControl).toBe(refreshControl);
+    expect(
+      centered.findByProps({ children: 'Files are still loading. Pull to refresh.' })
+    ).toBeDefined();
   });
 
-  it('grows the empty state padding with a nonzero system inset', () => {
-    insetsState.bottom = 34;
-    const renderer = mountNode(createElement(EmptyFilesView, { changedFiles: 0 }));
-
-    expect(paddingBottom(renderer)).toBe(50);
-  });
-
-  it('keeps the Overview CTA inside the padded empty state', () => {
-    const onRequestOverview = vi.fn(() => undefined);
+  it('keeps the Overview action inside the centered body', () => {
+    const onRequestOverview = vi.fn<() => void>();
     const renderer = mountNode(
       createElement(EmptyFilesView, { changedFiles: 0, onRequestOverview })
     );
-
-    expect(paddingBottom(renderer)).toBe(32);
-    const cta = renderer.root.findByProps({ accessibilityLabel: 'Go to Overview tab' });
-    expect(cta).toBeTruthy();
+    const cta = centeredContent(renderer).findByProps({ accessibilityLabel: 'Go to Overview tab' });
+    act(() => {
+      (cta.props.onPress as () => void)();
+    });
+    expect(onRequestOverview).toHaveBeenCalledOnce();
   });
 });

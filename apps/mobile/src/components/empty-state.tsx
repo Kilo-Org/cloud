@@ -1,7 +1,8 @@
 import { type LucideIcon } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type ScrollViewProps, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ type EmptyStateProps = {
   className?: string;
   action?: ReactNode;
   placement?: 'center' | 'top';
+  refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
   iconSize?: number;
@@ -31,6 +33,7 @@ export function EmptyState({
   className,
   action,
   placement = 'center',
+  refreshControl,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconSize = 24,
   iconStrokeWidth = 1.5,
@@ -38,14 +41,8 @@ export function EmptyState({
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
 
-  return (
-    <View
-      className={cn(
-        'gap-4 px-6',
-        placement === 'center' ? 'flex-1 items-center justify-center' : 'items-center pt-16',
-        className
-      )}
-    >
+  const content = (
+    <View className={cn('items-center gap-4 px-6', placement === 'top' && 'pt-16', className)}>
       <View className={cn('items-center justify-center', iconContainerClassName)}>
         <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
       </View>
@@ -66,5 +63,11 @@ export function EmptyState({
       </View>
       {action}
     </View>
+  );
+
+  return placement === 'center' ? (
+    <CenteredState refreshControl={refreshControl}>{content}</CenteredState>
+  ) : (
+    content
   );
 }

@@ -332,7 +332,7 @@ describe('SheetHeader', () => {
       expect(tree).toHaveLength(2);
       expect(tree[0]?.type).toBe('View');
       expect(tree[0]?.props.collapsable).toBe(false);
-      expect(tree[1]?.type).toBe('ScrollView');
+      expect(tree[1]?.type).toBe(expired ? 'EmptyState' : 'ScrollView');
       expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(1);
 
       renderer.unmount();

@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+
+import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { QueryError } from '@/components/query-error';
@@ -84,9 +86,9 @@ export function PrReviewMergeScreen() {
   }
 
   const body: ReactNode = pr.isLoading ? (
-    <View className="flex-1 items-center justify-center py-16">
+    <CenteredState>
       <ActivityIndicator size="small" color={colors.mutedForeground} />
-    </View>
+    </CenteredState>
   ) : (
     <QueryError
       variant="server"
@@ -101,9 +103,7 @@ export function PrReviewMergeScreen() {
   return (
     <>
       <PrFormSheetHeader title={sheetTitle} eyebrow={eyebrow} onBack={dismiss} />
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="grow">
-        {body}
-      </ScrollView>
+      {body}
     </>
   );
 }

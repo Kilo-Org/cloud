@@ -43,26 +43,22 @@ export default function ChannelsScreen() {
 
     if (catalogQuery.isError) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.channels.couldNotLoad')}
-            onRetry={() => {
-              void catalogQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.channels.couldNotLoad')}
+          onRetry={() => {
+            void catalogQuery.refetch();
+          }}
+        />
       );
     }
 
     if (catalogQuery.data.length === 0) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <EmptyState
-            icon={MessageSquare}
-            title={t('kiloclaw.channels.noChannels')}
-            description={t('kiloclaw.channels.noChannelsDescription')}
-          />
-        </View>
+        <EmptyState
+          icon={MessageSquare}
+          title={t('kiloclaw.channels.noChannels')}
+          description={t('kiloclaw.channels.noChannelsDescription')}
+        />
       );
     }
 

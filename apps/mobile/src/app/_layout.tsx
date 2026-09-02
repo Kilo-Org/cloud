@@ -18,7 +18,7 @@ import * as Sentry from '@sentry/react-native';
 import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
-  ErrorBoundary as ExpoRouterErrorBoundary,
+  type ErrorBoundaryProps,
   type Href,
   Slot,
   ThemeProvider,
@@ -39,8 +39,10 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
+import { QueryError } from '@/components/query-error';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -964,7 +966,9 @@ function RootLayout() {
         <AppRootProviders languageReady={languageReady}>
           <StatusBar style="auto" />
           <AppContentReveal>
-            <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
+            <StateSurface className="flex-1">
+              <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
+            </StateSurface>
           </AppContentReveal>
           <AnimatedSplashOverlay />
         </AppRootProviders>
@@ -973,6 +977,14 @@ function RootLayout() {
   );
 }
 
-export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(ExpoRouterErrorBoundary);
+function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <StateSurface className="flex-1 bg-background">
+      <QueryError onRetry={() => void retry()} />
+    </StateSurface>
+  );
+}
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);
 
 export default Sentry.wrap(RootLayout);

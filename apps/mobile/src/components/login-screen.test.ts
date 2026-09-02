@@ -59,6 +59,7 @@ vi.mock('@/components/kilo-chat/app-aware-keyboard-padding-state', () => ({
   resolveAppAwareKeyboardPadding: vi.fn(),
   resolveKeyboardPaddingEventsForPlatform: () => null,
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/login/idle-auth', () => ({ IdleAuth: 'IdleAuth' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));

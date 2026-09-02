@@ -73,6 +73,7 @@ const confirmationRequests = vi.hoisted(() => ({
 }));
 
 const navigationRoutes = ['session-detail'];
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',

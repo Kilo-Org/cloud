@@ -1,8 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   EmptyStateContent,
@@ -20,14 +19,11 @@ import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
@@ -43,13 +39,6 @@ export default function KiloClawTab() {
   useForegroundInvalidateKiloclawState();
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
-  const emptyStateContainerStyle = {
-    paddingBottom: getEffectiveTabBarHeight({
-      bottomInset: bottom,
-      platform: Platform.OS,
-      fontScale,
-    }),
-  };
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchInstances,
@@ -71,13 +60,8 @@ export default function KiloClawTab() {
           showBackButton={false}
           className="px-[22px]"
         />
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          className="flex-1"
-          style={emptyStateContainerStyle}
-        >
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <QueryError
-            className="flex-1"
             message={t('kiloclaw.couldNotLoadInstances')}
             onRetry={() => {
               if (instancesQuery.isError) {
@@ -130,11 +114,7 @@ export default function KiloClawTab() {
             <Skeleton className="h-[72px] w-full rounded-2xl" />
           </Animated.View>
         ) : (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            className="flex-1 items-center justify-center"
-            style={emptyStateContainerStyle}
-          >
+          <Animated.View entering={FadeIn.duration(200)} className="flex-1">
             <EmptyStateContent
               foregroundColor={colors.foreground}
               state={onboardingQuery.data}

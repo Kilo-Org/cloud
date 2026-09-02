@@ -14,7 +14,12 @@ type CenteredStateProps = {
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
 
-export function CenteredState({ children, className, testID, refreshControl }: CenteredStateProps) {
+export function CenteredState({
+  children,
+  className,
+  testID = 'centered-state',
+  refreshControl,
+}: CenteredStateProps) {
   const surface = useStateSurface();
   const frame = surface?.frame;
   const scrollRef = useRef<ScrollView | null>(null);

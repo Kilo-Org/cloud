@@ -2,7 +2,6 @@ import { View } from 'react-native';
 
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
 
 /**
  * Full-screen "load failed" state: a ScreenHeader over a centered QueryError,
@@ -31,19 +30,16 @@ export function PlatformErrorScreen({
   onRetry?: () => void;
   isRetrying?: boolean;
 }>) {
-  const paddingBottom = useTabBarBottomPadding();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} eyebrow={eyebrow} />
-      <View className="flex-1" style={{ paddingBottom }}>
-        <QueryError
-          variant={variant}
-          title={errorTitle}
-          message={message}
-          onRetry={onRetry}
-          isRetrying={isRetrying}
-        />
-      </View>
+      <QueryError
+        variant={variant}
+        title={errorTitle}
+        message={message}
+        onRetry={onRetry}
+        isRetrying={isRetrying}
+      />
     </View>
   );
 }

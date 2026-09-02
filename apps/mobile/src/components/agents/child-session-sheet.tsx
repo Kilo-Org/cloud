@@ -112,7 +112,8 @@ export function ChildSessionSheet({
             message={hydrationError}
             onRetry={onRetry}
             isRetrying={hydrationState.status === 'loading'}
-            className="flex-none gap-3 border-b border-border py-3"
+            placement="top"
+            className="gap-3 border-b border-border py-3"
           />
         ) : null}
         <SessionMessageList
@@ -167,13 +168,11 @@ export function ChildSessionSheet({
     );
   } else {
     content = (
-      <View className="flex-1 items-center justify-center px-6">
-        <EmptyState
-          icon={Bot}
-          title={t('agentChat.childSessionSheet.loading')}
-          description={t('agentChat.childSessionSheet.loadingDescription')}
-        />
-      </View>
+      <EmptyState
+        icon={Bot}
+        title={t('agentChat.childSessionSheet.loading')}
+        description={t('agentChat.childSessionSheet.loadingDescription')}
+      />
     );
   }
 

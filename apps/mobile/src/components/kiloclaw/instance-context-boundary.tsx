@@ -15,37 +15,21 @@ type Props = {
   context: InstanceContextResult;
 };
 
-/**
- * Renders the full-screen shell (background + `ScreenHeader`) for the
- * terminal states of `useInstanceContext`: an error with retry, or an
- * "instance not found" empty state (destroyed instance / stale deep link).
- * Callers only reach this for `error`/`not_found` — `loading`/`ready` are
- * handled by the screen itself.
- */
 export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
   const router = useRouter();
   const { t } = useTranslation();
 
-  if (context.status === 'error') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={title} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.instance.couldNotLoad')}
-            onRetry={() => {
-              context.refetch();
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} />
-      <View className="flex-1 items-center justify-center">
+      {context.status === 'error' ? (
+        <QueryError
+          message={t('kiloclaw.instance.couldNotLoad')}
+          onRetry={() => {
+            context.refetch();
+          }}
+        />
+      ) : (
         <EmptyState
           icon={SearchX}
           title={t('kiloclaw.instance.notFound')}
@@ -61,7 +45,7 @@ export function InstanceContextBoundary({ title, context }: Readonly<Props>) {
             </Button>
           }
         />
-      </View>
+      )}
     </View>
   );
 }

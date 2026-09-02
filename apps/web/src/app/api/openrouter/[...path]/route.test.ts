@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { NextRequest } from 'next/server';
+import { zstdCompressSync } from 'node:zlib';
 import type { User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -292,6 +294,95 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it.each(['openrouter', 'gateway'])(
+    'decodes zstd JSON before blank-model validation through /api/%s',
+    async alias => {
+      const { POST } = await import('@/app/api/gateway/[...path]/route');
+      const response = await POST(
+        new NextRequest(`http://localhost/api/${alias}/chat/completions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'content-encoding': 'zstd' },
+          body: zstdCompressSync(JSON.stringify(makeBody(''))),
+        })
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        error: 'Model not found',
+        error_type: 'model_not_found',
+      });
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { encoding: 'zstd', status: 400, error: 'Invalid zstd request body.' },
+    {
+      encoding: 'zstd, identity',
+      status: 415,
+      error: 'Unsupported Content-Encoding. Use identity or zstd.',
+    },
+  ])(
+    'returns a stable $status error for invalid $encoding bodies',
+    async ({ encoding, status, error }) => {
+      const { POST } = await import('./route');
+      const response = await POST(
+        new NextRequest('http://localhost/api/openrouter/chat/completions', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'content-encoding': encoding },
+          body: JSON.stringify(makeBody('')),
+        })
+      );
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({
+        error,
+        error_type: 'invalid_request',
+        message: error,
+      });
+      expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards decoded JSON without compressed transport headers', async () => {
+    const actual = jest.requireActual<{ upstreamRequest: typeof upstreamRequest }>(
+      '@/lib/ai-gateway/providers/upstream-request'
+    );
+    mockedUpstreamRequest.mockImplementation(actual.upstreamRequest);
+    const fetch = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(upstreamJsonResponse({ choices: [] }));
+    try {
+      const { POST } = await import('./route');
+      const body = zstdCompressSync(JSON.stringify(makeBody()));
+      const response = await POST(
+        new NextRequest('http://localhost/api/openrouter/chat/completions', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'content-encoding': 'zstd',
+            'content-length': String(body.length),
+            'x-forwarded-for': '127.0.0.1',
+          },
+          body,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const init = fetch.mock.calls.at(0)?.[1];
+      const headers = new Headers(init?.headers);
+      expect(headers.get('content-type')).toBe('application/json');
+      expect(headers.has('content-encoding')).toBe(false);
+      expect(headers.has('content-length')).toBe(false);
+      expect(JSON.parse(String(init?.body))).toMatchObject(makeBody());
+    } finally {
+      fetch.mockRestore();
+    }
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {

@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { stripRequiredPrefix, toMicrodollars } from '@/lib/utils';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
+import { readGatewayRequestBody } from '@/lib/ai-gateway/request-body';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -187,7 +188,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const { path } = pathResult;
 
   // Parse body first to check model before auth (needed for anonymous access)
-  const requestBodyText = await request.text();
+  const decoded = await readGatewayRequestBody(request);
+  if ('error' in decoded) {
+    return NextResponse.json(
+      {
+        error: decoded.error,
+        error_type:
+          decoded.status === 499
+            ? ProxyErrorType.client_disconnect
+            : ProxyErrorType.invalid_request,
+        message: decoded.error,
+      },
+      { status: decoded.status }
+    );
+  }
+  const requestBodyText = decoded.text;
   const authPromise = getUserFromAuth({ adminOnly: false });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;

@@ -3,6 +3,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
+  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   preferredModels,
@@ -90,20 +91,16 @@ describe('isFreeModel', () => {
       expect(preferredModels).not.toContain(tencent_hy3_free_model.public_id);
     });
 
-    test('registers LongCat 2.0 as an Auto Free model', async () => {
+    test('disables LongCat 2.0 free and excludes it from Auto Free and preferred models', async () => {
       expect(kiloExclusiveModels).toContain(longcat_2_free_model);
-      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBe(longcat_2_free_model);
-      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(true);
-      expect(longcat_2_free_model).toMatchObject({
-        internal_id: 'LongCat-2.0',
-        gateway: 'longcat',
-        context_length: 1_048_756,
-        max_completion_tokens: 131_072,
-        status: 'public',
-      });
-      expect(autoFreeModels.map(({ model }) => model)).toContain(longcat_2_free_model.public_id);
-      expect(preferredModels).toContain(longcat_2_free_model.public_id);
-      expect(getAiSdkProvider(longcat_2_free_model.public_id, null)).toBeUndefined();
+      expect(longcat_2_free_model.status).toBe('disabled');
+      expect(isDisabledKiloExclusiveModel(longcat_2_free_model.public_id)).toBe(true);
+      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBeNull();
+      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(false);
+      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
+        longcat_2_free_model.public_id
+      );
+      expect(preferredModels).not.toContain(longcat_2_free_model.public_id);
     });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
@@ -218,7 +215,6 @@ describe('isFreeModel', () => {
       ).toEqual({
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
-        'meituan/longcat-2.0-free': { enabled: true, effort: 'high' },
         'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
       });
     });
@@ -229,7 +225,6 @@ describe('isFreeModel', () => {
       ).toEqual({
         'stepfun/step-3.7-flash:free': 1,
         'poolside/laguna-s-2.1:free': 1,
-        'meituan/longcat-2.0-free': 1,
         'minimax/minimax-m3:free': 1,
       });
     });

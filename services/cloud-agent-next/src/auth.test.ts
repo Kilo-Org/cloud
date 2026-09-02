@@ -162,6 +162,31 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
+  it('accepts legacy Kilo JWTs with no audience or a matching cloud-agent-next audience', async () => {
+    const tokens = [
+      jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
+        algorithm: 'HS256',
+        expiresIn: '1 minute',
+      }),
+      jwt.sign({ version: 3, kiloUserId: 'user-1', aud: 'cloud-agent-next' }, secret, {
+        algorithm: 'HS256',
+        expiresIn: '1 minute',
+      }),
+      jwt.sign(
+        { version: 3, kiloUserId: 'user-1', aud: ['other-service', 'cloud-agent-next'] },
+        secret,
+        { algorithm: 'HS256', expiresIn: '1 minute' }
+      ),
+    ];
+
+    for (const token of tokens) {
+      await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
+        success: true,
+        claims: { type: 'legacy_kilo_token', userId: 'user-1' },
+      });
+    }
+  });
+
   it('rejects an audience-scoped Kilo JWT on the legacy path', async () => {
     const audienceScopedToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
       algorithm: 'HS256',
@@ -172,6 +197,23 @@ describe('validateWrapperDispatchTicket', () => {
     await expect(
       validateWrapperDispatchTicket(`Bearer ${audienceScopedToken}`, secret)
     ).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket type',
+    });
+  });
+
+  it.each([
+    ['a different resource audience', 'kilo-gateway'],
+    ['a malformed empty audience list', []],
+    ['a malformed null audience list', [null]],
+    ['a malformed audience object', { audience: 'cloud-agent-next' }],
+  ])('rejects a legacy Kilo JWT with %s', async (_description, aud) => {
+    const token = jwt.sign({ version: 3, kiloUserId: 'user-1', aud }, secret, {
+      algorithm: 'HS256',
+      expiresIn: '1 minute',
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
       success: false,
       error: 'Invalid ticket type',
     });

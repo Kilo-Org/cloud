@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken } from '@kilocode/worker-utils';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
@@ -123,18 +125,15 @@ function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDisp
   );
 }
 
-/**
- * Re-verifies the token through the canonical verifyKiloToken so the legacy
- * path enforces the same version/audience/shape guards as validateKiloToken —
- * in particular, audience-scoped tokens (e.g. internal service tokens) must
- * not be accepted as wrapper auth.
- */
 async function legacyKiloTokenClaims(
   ticket: string,
   secret: string
 ): Promise<LegacyKiloTokenClaims | undefined> {
   try {
-    const payload = await verifyKiloToken(ticket, secret);
+    const payload = await verifyKiloTokenForResource(ticket, secret, {
+      audience: CLOUD_AGENT_NEXT_AUDIENCE,
+      mode: 'allow-legacy',
+    });
     return { type: 'legacy_kilo_token', userId: payload.kiloUserId };
   } catch {
     return undefined;

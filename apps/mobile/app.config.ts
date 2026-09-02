@@ -272,7 +272,7 @@ const config: ExpoConfig = {
           {
             name: 'ActiveAgentsWidget',
             displayName: 'Active Agents',
-            description: 'Counts of running, needs-input, and reconnecting agents',
+            description: 'Agents that need input, are working, or are idle',
             contentMarginsDisabled: false,
             supportedFamilies: [
               'systemSmall',

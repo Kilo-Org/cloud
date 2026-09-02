@@ -56,7 +56,7 @@ export async function refreshGlanceableSnapshot(
     const current = refreshStateSchema.parse(await tx.get(key));
     if (current.revision !== request.revision) return null;
     const eligibleStartedAt =
-      snapshot.running + snapshot.needsInput + snapshot.reconnecting > 0
+      snapshot.running + snapshot.needsInput + snapshot.idle > 0
         ? (current.eligibleStartedAt ?? snapshot.eligibleStartedAt ?? request.updatedAt)
         : null;
     await tx.put(key, { ...current, eligibleStartedAt });
@@ -74,7 +74,7 @@ export async function refreshGlanceableSnapshot(
   });
   if (committed === null) return;
 
-  const eligible = committed.running + committed.needsInput + committed.reconnecting > 0;
+  const eligible = committed.running + committed.needsInput + committed.idle > 0;
   await deliverGlanceableSnapshot(scope, {
     ...deps,
     buildSnapshot: async () => committed,

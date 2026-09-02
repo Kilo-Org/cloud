@@ -13,6 +13,7 @@ import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
+  guardSink,
 } from './sink-registry';
 
 /**
@@ -59,7 +60,7 @@ export function withStatus(
       ...snapshot,
       revision: snapshot.revision + 1,
       status: expired ? 'expired' : 'stale',
-      ...(expired ? { running: 0, needsInput: 0, reconnecting: 0, eligibleStartedAt: null } : {}),
+      ...(expired ? { running: 0, needsInput: 0, idle: 0, eligibleStartedAt: null } : {}),
     };
   }
   const updatedAt = new Date(now).toISOString();
@@ -217,14 +218,22 @@ export class GlanceablePublisher {
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {
     for (const sink of this.sinks) {
-      sink.publish(snapshot);
-      sink.startOrUpdate(snapshot, ctx);
+      // Guarded separately: a failing widget timeline write must not skip the
+      // Live Activity start that follows it.
+      guardSink('emit_publish', () => {
+        sink.publish(snapshot);
+      });
+      guardSink('emit_start_or_update', () => {
+        sink.startOrUpdate(snapshot, ctx);
+      });
     }
   }
 
   private publish(snapshot: GlanceableAgentsSnapshot): void {
     for (const sink of this.sinks) {
-      sink.publish(snapshot);
+      guardSink('publish', () => {
+        sink.publish(snapshot);
+      });
     }
   }
 
@@ -251,9 +260,11 @@ export class GlanceablePublisher {
       this.terminalTimer = null;
       this.activityStarted = false;
       for (const sink of this.sinks) {
-        if (!sink.waitForNativeTerminal) {
-          sink.endImmediate();
-        }
+        guardSink('terminal_end', () => {
+          if (!sink.waitForNativeTerminal) {
+            sink.endImmediate();
+          }
+        });
       }
     }, this.terminalMs);
   }

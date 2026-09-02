@@ -15,6 +15,7 @@ import {
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   type GlanceableViewProps,
+  toWidgetProps,
 } from './view-props';
 
 /** Open-agents destination, kept in step with the inlined widget URL. */
@@ -75,17 +76,19 @@ function refreshActivity(): boolean {
 }
 
 function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<GlanceableViewProps> {
-  return buildGlanceableViewProps(
-    {
-      ...snapshot,
-      status: 'expired',
-      running: 0,
-      needsInput: 0,
-      reconnecting: 0,
-      eligibleStartedAt: null,
-    },
-    {},
-    translate
+  return toWidgetProps(
+    buildGlanceableViewProps(
+      {
+        ...snapshot,
+        status: 'expired',
+        running: 0,
+        needsInput: 0,
+        idle: 0,
+        eligibleStartedAt: null,
+      },
+      {},
+      translate
+    )
   );
 }
 
@@ -266,7 +269,7 @@ export const iosSink: GlanceableSink = {
   },
 
   publish(snapshot) {
-    const props = buildGlanceableViewProps(snapshot, {}, translate);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot replaces the timeline, so terminal copy needs no expiry frame.
     if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {

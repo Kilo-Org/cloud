@@ -37,7 +37,7 @@ const snapshot: ActiveAgentsGlanceable = {
   status: 'happy',
   running: 2,
   needsInput: 1,
-  reconnecting: 0,
+  idle: 0,
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
   eligibleStartedAt: '2026-08-27T09:00:00.000Z',
@@ -401,7 +401,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     await service.refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:20:00.000Z'));
     current = freshSnapshot({ running: 0, needsInput: 1 });
@@ -412,7 +412,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .map(message => message.data)
     ).toMatchObject([
       { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 1 },
-      { reconnecting: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 2 },
+      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 2 },
       { needsInput: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 3 },
     ]);
   });
@@ -445,7 +445,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     release.resolve();
     await oldIdle;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:20:00.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(
       messages
@@ -455,7 +455,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       { status: 'happy', eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
       { status: 'empty', eligibleStartedAt: null },
       { status: 'happy', eligibleStartedAt: '2026-08-27T10:10:00.000Z' },
-      { reconnecting: 1, eligibleStartedAt: '2026-08-27T10:10:00.000Z' },
+      { idle: 1, eligibleStartedAt: '2026-08-27T10:10:00.000Z' },
     ]);
   });
 
@@ -515,7 +515,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     await createService().refreshGlanceableSessions(personalRefresh);
     unavailable = false;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('Expo unavailable'));
     await createService().refreshGlanceableSessions(personalRefresh);
     await createService().refreshGlanceableSessions(personalRefresh);
@@ -525,7 +525,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .map(message => message.data)
     ).toMatchObject([
       { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { reconnecting: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
+      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
     ]);
   });
 
@@ -536,7 +536,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     current = freshSnapshot({ status: 'stale', running: 0, eligibleStartedAt: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(
       messages
@@ -544,7 +544,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .map(message => message.data)
     ).toMatchObject([
       { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { reconnecting: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
+      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
     ]);
   });
 
@@ -581,19 +581,19 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
+      idle: 0,
       eligibleStartedAt: null,
     });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
       ['scope-token', 'start'],
     ]);
     expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
-      reconnecting: 1,
+      idle: 1,
       eligibleStartedAt: '2026-08-27T10:00:01.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token']);
@@ -739,13 +739,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       }
       expect(activityRows.get('old-activity')).toEqual(renewedRow);
       vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
-      current = freshSnapshot({ running: 0, reconnecting: 1 });
+      current = freshSnapshot({ running: 0, idle: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([
         {
           running: 0,
           needsInput: 0,
-          reconnecting: 1,
+          idle: 1,
           eligibleStartedAt: '2026-08-27T10:00:01.000Z',
         },
       ]);
@@ -800,7 +800,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           status: 'happy',
           running: 0,
           needsInput: 1,
-          reconnecting: 0,
+          idle: 0,
           eligibleStartedAt: '2026-08-27T10:00:01.000Z',
         },
       ]);
@@ -942,10 +942,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       });
     }
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
-    current = freshSnapshot({ running: 0, reconnecting: 1 });
+    current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([
-      { running: 0, needsInput: 0, reconnecting: 1, eligibleStartedAt: '2026-08-27T10:00:01.000Z' },
+      { running: 0, needsInput: 0, idle: 1, eligibleStartedAt: '2026-08-27T10:00:01.000Z' },
     ]);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
@@ -1088,9 +1088,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           });
         }
       }
-      current = freshSnapshot({ running: 0, reconnecting: 1 });
+      current = freshSnapshot({ running: 0, idle: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
-      expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 0, reconnecting: 1 }]);
+      expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 0, idle: 1 }]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
         ['old-activity', 'end'],
         ['old-activity', 'end'],
@@ -1344,7 +1344,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 status: 'empty',
                 running: 0,
                 needsInput: 0,
-                reconnecting: 0,
+                idle: 0,
                 eligibleStartedAt: null,
               },
             },
@@ -1632,7 +1632,7 @@ describe('toGlanceableContentState', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
-      reconnecting: 0,
+      idle: 0,
       eligibleStartedAt: '2026-08-27T09:00:00.000Z',
     });
   });
@@ -1718,7 +1718,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(props.status).toBe('happy');
     expect(props.running).toBe(2);
     expect(props.needsInput).toBe(1);
-    expect(props.reconnecting).toBe(0);
+    expect(props.idle).toBe(0);
     expect(props).not.toHaveProperty('type');
     expect(props).not.toHaveProperty('accountEpoch');
     expect(props).not.toHaveProperty('scopeKey');

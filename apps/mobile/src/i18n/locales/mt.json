@@ -3288,9 +3288,9 @@
     "signedOut": "Idħol biex tara l-aġenti",
     "privacy": "Aġenti moħbija",
     "openAgents": "Iftaħ l-aġenti",
-    "running": "Għaddej",
+    "running": "Qed jaħdem",
     "needsInput": "jeħtieġ input",
-    "reconnecting": "Qed jerġa' jaqbad",
+    "idle": "Idle",
     "channelName": "Aġenti attivi",
     "activityKitDisabledTitle": "L-Attivitajiet Diretti huma mitfija",
     "activityKitDisabledBody": "Ixgħel l-Attivitajiet Diretti fis-Settings biex tara l-Aġenti Attivi fuq l-Iskrin Imsakkar."

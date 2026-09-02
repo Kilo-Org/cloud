@@ -3222,9 +3222,9 @@
     "signedOut": "Konekte pou wè ajans yo",
     "privacy": "Ajans yo kache",
     "openAgents": "Louvri ajans yo",
-    "running": "AP KOURI",
+    "running": "Ap travay",
     "needsInput": "bezwen input",
-    "reconnecting": "Ap rekonekte",
+    "idle": "Anchaj",
     "channelName": "Ajans aktif yo",
     "activityKitDisabledTitle": "Aktivite an dirèk yo fèmen",
     "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."

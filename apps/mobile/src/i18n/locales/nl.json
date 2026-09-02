@@ -3224,7 +3224,7 @@
     "openAgents": "Agents openen",
     "running": "Bezig",
     "needsInput": "heeft invoer nodig",
-    "reconnecting": "Opnieuw verbinden",
+    "idle": "Inactief",
     "channelName": "Actieve agents",
     "activityKitDisabledTitle": "Liveactiviteiten staan uit",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via Instellingen om actieve agents op het toegangsscherm te zien."

@@ -3222,9 +3222,9 @@
     "signedOut": "Meld aan om agente te sien",
     "privacy": "Agente versteek",
     "openAgents": "Maak agente oop",
-    "running": "LOOP",
+    "running": "Werk",
     "needsInput": "benodig invoer",
-    "reconnecting": "Verbind tans weer",
+    "idle": "Onaktief",
     "channelName": "Aktiewe agente",
     "activityKitDisabledTitle": "Regstreekse Aktiwiteite is af",
     "activityKitDisabledBody": "Skakel Regstreekse Aktiwiteite in Instellings aan om Aktiewe Agente op die Sluitskerm te sien."

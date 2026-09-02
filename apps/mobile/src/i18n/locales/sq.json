@@ -3222,9 +3222,9 @@
     "signedOut": "Identifikohuni për të parë agjentët",
     "privacy": "Agjentët janë fshehur",
     "openAgents": "Hapni agjentët",
-    "running": "Në ekzekutim",
+    "running": "Duke punuar",
     "needsInput": "ka nevojë për të dhëna",
-    "reconnecting": "Duke u rilidhur",
+    "idle": "I papunë",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledTitle": "Aktivitetet e drejtpërdrejta janë çaktivizuar",
     "activityKitDisabledBody": "Aktivizoni Aktivitetet e drejtpërdrejta te Cilësimet për të parë Agjentët aktivë në Ekranin e kyçjes."

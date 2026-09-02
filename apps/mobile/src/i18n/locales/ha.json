@@ -3222,9 +3222,9 @@
     "signedOut": "Shiga don ganin wakilai",
     "privacy": "An ɓoye wakilai",
     "openAgents": "Buɗe wakilai",
-    "running": "Ana gudana",
+    "running": "Yana aiki",
     "needsInput": "yana buƙatar bayani",
-    "reconnecting": "Ana sake haɗawa",
+    "idle": "Rashin aiki",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledTitle": "Ayyukan Kai Tsaye suna a kashe",
     "activityKitDisabledBody": "Kunna Ayyukan Kai Tsaye a cikin Saituna don ganin Wakilai da ke Aiki a kan Allon Kulle."

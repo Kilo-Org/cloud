@@ -3222,9 +3222,9 @@
     "signedOut": "Ngena ngemvume ukuze ubone ama-agent",
     "privacy": "Ama-agent afihliwe",
     "openAgents": "Vula ama-agent",
-    "running": "IYASEBENZA",
+    "running": "Iyasebenza",
     "needsInput": "idinga okokufaka",
-    "reconnecting": "Ixhuma kabusha",
+    "idle": "Banga",
     "channelName": "Ama-agent asebenzayo",
     "activityKitDisabledTitle": "Imisebenzi Ebukhoma ivaliwe",
     "activityKitDisabledBody": "Vula Imisebenzi Ebukhoma ku-Izilungiselelo ukuze ubone Ama-agent asebenzayo Esikrinini Esikhiyiwe."

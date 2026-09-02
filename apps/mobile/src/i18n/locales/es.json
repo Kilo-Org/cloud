@@ -3244,9 +3244,9 @@
     "signedOut": "Inicia sesión para ver los agentes",
     "privacy": "Agentes ocultos",
     "openAgents": "Abrir agentes",
-    "running": "EN EJECUCIÓN",
+    "running": "Trabajando",
     "needsInput": "requiere entrada",
-    "reconnecting": "Reconectando",
+    "idle": "Inactivo",
     "channelName": "Agentes activos",
     "activityKitDisabledTitle": "Las actividades en directo están desactivadas",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."

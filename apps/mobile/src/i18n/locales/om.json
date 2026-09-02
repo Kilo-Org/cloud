@@ -3222,9 +3222,9 @@
     "signedOut": "Eejentoota arguuf seenaa",
     "privacy": "Eejentoonni dhokamaniiru",
     "openAgents": "Eejentoota banaa",
-    "running": "Hojii irra jira",
+    "running": "Hojachaa jira",
     "needsInput": "seensa barbaada",
-    "reconnecting": "Irra deebi'ee walqabachaa jira",
+    "idle": "Hojii irraa boqachaa",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledTitle": "Sochiiwwan Kallattii cufamaniiru",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran Iskiriinii Qulfii irratti arguuf, Qindaa'ina keessatti Sochiiwwan Kallattii banaa."

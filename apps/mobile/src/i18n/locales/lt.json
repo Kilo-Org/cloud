@@ -3268,7 +3268,7 @@
     "openAgents": "Atidaryti agentus",
     "running": "Vykdoma",
     "needsInput": "reikia įvesties",
-    "reconnecting": "Jungiamasi iš naujo",
+    "idle": "Neaktyvus",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledTitle": "Tiesioginės veiklos išjungtos",
     "activityKitDisabledBody": "Nustatymuose įjunkite tiesiogines veiklas, kad užrakinimo ekrane matytumėte aktyvius agentus."

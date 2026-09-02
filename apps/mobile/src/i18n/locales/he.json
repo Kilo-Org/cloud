@@ -3244,9 +3244,9 @@
     "signedOut": "היכנס כדי לראות סוכנים",
     "privacy": "הסוכנים מוסתרים",
     "openAgents": "פתח סוכנים",
-    "running": "רץ",
+    "running": "עובד",
     "needsInput": "נדרש קלט",
-    "reconnecting": "מתחבר מחדש",
+    "idle": "בטל",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledTitle": "פעילויות בזמן אמת כבויות",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."

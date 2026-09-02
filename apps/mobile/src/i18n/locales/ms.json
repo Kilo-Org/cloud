@@ -3222,9 +3222,9 @@
     "signedOut": "Log masuk untuk melihat ejen",
     "privacy": "Ejen disembunyikan",
     "openAgents": "Buka ejen",
-    "running": "Sedang berjalan",
+    "running": "Memproses…",
     "needsInput": "perlu input",
-    "reconnecting": "Menyambung semula",
+    "idle": "Melahu",
     "channelName": "Ejen aktif",
     "activityKitDisabledTitle": "Aktiviti Langsung dimatikan",
     "activityKitDisabledBody": "Hidupkan Aktiviti Langsung dalam Tetapan untuk melihat Ejen Aktif pada Skrin Kunci."

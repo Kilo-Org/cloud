@@ -123,7 +123,7 @@ function snapshotFor(
 const MIXED = {
   ...snapshotFor([], 0, 'happy'),
   needsInput: 2,
-  reconnecting: 3,
+  idle: 3,
   running: 4,
 };
 
@@ -179,9 +179,9 @@ afterEach(() => {
 });
 
 describe('androidSink start and update', () => {
-  it('keeps idle delivery available before and after work arrives in the background', async () => {
+  it('keeps scope delivery available before and after work arrives in the background', async () => {
     const publisher = new GlanceablePublisher({ sinks: [androidSink], now: () => NOW });
-    publisher.handleSessions([{ status: 'idle' }], CTX);
+    publisher.handleSessions([], CTX);
     await flushAsync();
     expect(mocks.getNotification()).toBeNull();
     expect(getCurrentWidgetProps()?.statusLine).toBe('No work in progress');
@@ -189,9 +189,9 @@ describe('androidSink start and update', () => {
 
     publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
     await flushAsync();
-    expect(mocks.getNotification()?.text).toBe('1 Running');
+    expect(mocks.getNotification()?.text).toBe('1 Working');
 
-    publisher.handleSessions([{ status: 'idle' }], CTX);
+    publisher.handleSessions([], CTX);
     await vi.advanceTimersByTimeAsync(8000);
     expect(mocks.getNotification()).toBeNull();
     expect(subscriptions).toEqual(new Set(['scope']));
@@ -203,7 +203,7 @@ describe('androidSink start and update', () => {
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: true,
     });
@@ -212,16 +212,16 @@ describe('androidSink start and update', () => {
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '3 Reconnecting, 4 Running',
-      compactText: '3',
+      text: '4 Working, 3 Idle',
+      compactText: '4',
       promotion: true,
     });
 
-    androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, reconnecting: 0 }, CTX);
+    androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, idle: 0 }, CTX);
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '4 Running',
+      text: '4 Working',
       compactText: '4',
       promotion: true,
     });
@@ -229,14 +229,14 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenCalledTimes(2);
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
-      '2 Needs input, 3 Reconnecting, 4 Running',
+      '2 Needs input, 4 Working, 3 Idle',
       'Open agents',
       '2',
       true
     );
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
-      '4 Running',
+      '4 Working',
       'Open agents',
       '4',
       true,
@@ -251,7 +251,7 @@ describe('androidSink start and update', () => {
 
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: false,
     });
@@ -268,8 +268,8 @@ describe('androidSink start and update', () => {
 
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '3 Reconnecting, 4 Running',
-      compactText: '3',
+      text: '4 Working, 3 Idle',
+      compactText: '4',
       promotion: true,
     });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -409,10 +409,10 @@ describe('androidSink widget publish and end', () => {
 
     const notification = mocks.getNotification();
     expect(notification?.text).toContain(i18n.t('glanceable.stale'));
-    expect(notification?.text).toContain('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(notification?.text).toContain('2 Needs input, 4 Working, 3 Idle');
     expect(notification?.compactText).toBe('2');
     expect(getCurrentWidgetProps()?.accessibilityLabel).toContain(
-      '2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+      '2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
@@ -554,7 +554,7 @@ describe('androidSink widget publish and end', () => {
     expect(() => {
       androidSink.publish(empty);
     }).toThrow('Cannot persist the active agents notification timeout');
-    expect(mocks.getNotification()?.text).toBe('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
     expect(mocks.getRequestedNotificationDeadline()).toBeNull();
 
     vi.setSystemTime(NOW + 3000);
@@ -588,7 +588,7 @@ describe('androidSink widget publish and end', () => {
 
       expect(mocks.getRequestedNotificationDeadline()).toBeNull();
       expect(mocks.getNotification()).toMatchObject({
-        text: '2 Needs input, 3 Reconnecting, 4 Running',
+        text: '2 Needs input, 4 Working, 3 Idle',
         compactText: '2',
       });
       expect(mocks.getWidgetDeadline()).toBe(method === 'publish' ? NOW + 28_800_000 : 0);
@@ -648,7 +648,7 @@ describe('handleAppStateActive permission alert', () => {
     await handleAppStateActive();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: true,
     });

@@ -78,7 +78,7 @@ const native = vi.hoisted(() => {
 
 vi.mock('expo-widgets', async () => {
   const { after } = await import('expo-widgets/src/Widgets');
-  return { after };
+  return { after, widgetsDirectory: 'file:///app-group/ExpoWidgets/' };
 });
 vi.mock('expo-widgets/src/ExpoWidgets', () => ({
   default: {
@@ -143,7 +143,7 @@ function firstActivity(): NativeRecord {
 
 function remoteEnd(record: NativeRecord): void {
   record.state = 'ended';
-  record.props = { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 };
+  record.props = { status: 'empty', running: 0, needsInput: 0, idle: 0 };
   record.dismissAt = Date.now() + 8000;
 }
 
@@ -165,7 +165,7 @@ describe('native adapter recovery', () => {
       const sink = await loadSink();
       sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
       remoteEnd(firstActivity());
-      const fresh = snapshot([{ status: 'busy' }, { status: 'retry' }], 2);
+      const fresh = snapshot([{ status: 'busy' }, { status: 'idle' }], 2);
       if (path === 'publish then start') {
         sink.publish(fresh);
       }
@@ -176,7 +176,7 @@ describe('native adapter recovery', () => {
         {
           props: {
             running: 1,
-            reconnecting: 1,
+            idle: 1,
             eligibleStartedAt: new Date(NOW - 60_000).toISOString(),
           },
         },
@@ -264,7 +264,9 @@ describe('native adapter terminal privacy', () => {
     await restarted.waitForNativeTerminal?.();
 
     expect(firstActivity()).toMatchObject({ state: 'dismissed', dismissAt: NOW });
-    expect(native.snapshots.at(-1)).toMatchObject({ primaryCount: 0, showOpenAgents: false });
+    expect(native.snapshots.at(-1)).toMatchObject({ primaryCount: 0 });
+    // Omitted, not null: UserDefaults rejects a null value. See toWidgetProps.
+    expect(Object.values(native.snapshots.at(-1) ?? {})).not.toContain(null);
     expect(native.ignoredUpdates).toEqual([]);
   });
 

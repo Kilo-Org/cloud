@@ -3266,9 +3266,9 @@
     "signedOut": "Zaloguj się, aby zobaczyć agentów",
     "privacy": "Agenci ukryci",
     "openAgents": "Otwórz agentów",
-    "running": "W toku",
+    "running": "Pracuję",
     "needsInput": "wymaga danych",
-    "reconnecting": "Ponowne łączenie",
+    "idle": "Bezczynny",
     "channelName": "Aktywni agenci",
     "activityKitDisabledTitle": "Wydarzenia na żywo są wyłączone",
     "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."

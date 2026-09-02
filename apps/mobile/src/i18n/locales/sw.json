@@ -3222,9 +3222,9 @@
     "signedOut": "Ingia ili uone mawakala",
     "privacy": "Mawakala wamefichwa",
     "openAgents": "Fungua mawakala",
-    "running": "Inaendelea",
+    "running": "Inafanya kazi",
     "needsInput": "inahitaji mchango",
-    "reconnecting": "Inaunganisha tena",
+    "idle": "Hakikazi",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledTitle": "Shughuli za Moja kwa Moja zimezimwa",
     "activityKitDisabledBody": "Washa Shughuli za Moja kwa Moja katika Mipangilio ili uone Mawakala wanaofanya kazi kwenye Skrini Iliyofungwa."

@@ -3222,9 +3222,9 @@
     "signedOut": "Midira mba hahitana ny agent",
     "privacy": "Nafenina ny agent",
     "openAgents": "Sokafy ny agent",
-    "running": "MANDEHA",
+    "running": "Miasa",
     "needsInput": "mila fampidirana",
-    "reconnecting": "Mampifandray indray",
+    "idle": "Tsy mihetsika",
     "channelName": "Agent mavitrika",
     "activityKitDisabledTitle": "Tsy mandeha ny Hetsika Mivantana",
     "activityKitDisabledBody": "Alefaso ao amin'ny Fikirana ny Hetsika Mivantana mba hahitana ny Agent Mavitrika eo amin'ny Efijery Fihidy."

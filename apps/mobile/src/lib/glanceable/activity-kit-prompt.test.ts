@@ -217,7 +217,7 @@ describe('recoverGlanceableActivityKit', () => {
         status: 'happy',
         running: 0,
         needsInput: 1,
-        reconnecting: 0,
+        idle: 0,
       });
       publisher.dispose();
     }

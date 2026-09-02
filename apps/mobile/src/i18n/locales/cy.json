@@ -3310,9 +3310,9 @@
     "signedOut": "Mewngofnodwch i weld asiantau",
     "privacy": "Asiantau wedi'u cuddio",
     "openAgents": "Agorwch asiantau",
-    "running": "YN RHEDEG",
+    "running": "Yn gweithio",
     "needsInput": "angen mewnbwn",
-    "reconnecting": "Yn ailgysylltu",
+    "idle": "Segur",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledTitle": "Mae Gweithgareddau Byw wedi'u diffodd",
     "activityKitDisabledBody": "Trowch Weithgareddau Byw ymlaen yn Gosodiadau i weld Asiantau gweithredol ar y Sgrin Glo."

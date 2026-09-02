@@ -3310,9 +3310,9 @@
     "signedOut": "سجّل الدخول لرؤية الوكلاء",
     "privacy": "الوكلاء مخفيون",
     "openAgents": "فتح الوكلاء",
-    "running": "قيد التشغيل",
+    "running": "جارٍ العمل",
     "needsInput": "يتطلب إدخالًا",
-    "reconnecting": "جارٍ إعادة الاتصال",
+    "idle": "خامل",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledTitle": "الأنشطة المباشرة متوقفة",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لرؤية الوكلاء النشطين على شاشة القفل."

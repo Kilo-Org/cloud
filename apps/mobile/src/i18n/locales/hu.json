@@ -3222,9 +3222,9 @@
     "signedOut": "Jelentkezzen be az ügynökök megtekintéséhez",
     "privacy": "Ügynökök elrejtve",
     "openAgents": "Ügynökök megnyitása",
-    "running": "Folyamatban",
+    "running": "Feldolgozás",
     "needsInput": "bemenetet igényel",
-    "reconnecting": "Újracsatlakozás",
+    "idle": "Tétlen",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledTitle": "Az Élő tevékenységek ki vannak kapcsolva",
     "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."

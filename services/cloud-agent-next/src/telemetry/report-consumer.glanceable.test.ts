@@ -236,7 +236,7 @@ describe('committed cloud eligibility refresh', () => {
         {
           status: 'happy',
           running: 1,
-          reconnecting: 0,
+          idle: 0,
           organizationBound: organizationId !== null,
         },
       ]);
@@ -271,9 +271,9 @@ describe('committed cloud eligibility refresh', () => {
         {
           status: 'happy',
           running: status === 'busy' ? 1 : 0,
-          reconnecting: status === 'retry' ? 1 : 0,
+          needsInput: status === 'retry' ? 1 : 0,
         },
-        { status: 'empty', running: 0, needsInput: 0, reconnecting: 0, eligibleStartedAt: null },
+        { status: 'empty', running: 0, needsInput: 0, idle: 0, eligibleStartedAt: null },
       ]);
     }
   );
@@ -290,7 +290,7 @@ describe('committed cloud eligibility refresh', () => {
     await fixture.consume();
     expect(fixture.messages.map(message => message.data)).toMatchObject([
       { running: 1, eligibleStartedAt: occurredAt },
-      { running: 0, reconnecting: 1, eligibleStartedAt: occurredAt },
+      { running: 0, needsInput: 1, eligibleStartedAt: occurredAt },
     ]);
   });
 
@@ -463,6 +463,8 @@ describe('committed cloud eligibility refresh', () => {
             message.data?.type === 'active_agents_glanceable' && !message.data.organizationBound
         )
         .map(message => message.data)
-    ).toMatchObject([{ running: 1, needsInput: 0, reconnecting: 0 }]);
+      // The busy CLI row counts as running and the warm-idle cloud row as idle:
+      // the counts read `status` alone, so cloud and CLI sessions merge.
+    ).toMatchObject([{ running: 1, needsInput: 0, idle: 1 }]);
   });
 });

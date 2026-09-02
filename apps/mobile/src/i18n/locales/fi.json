@@ -3222,9 +3222,9 @@
     "signedOut": "Kirjaudu sisään nähdäksesi agentit",
     "privacy": "Agentit piilotettu",
     "openAgents": "Avaa agentit",
-    "running": "KÄYNNISSÄ",
+    "running": "Työstetään",
     "needsInput": "vaatii syötettä",
-    "reconnecting": "Yhdistetään uudelleen",
+    "idle": "Vapaalla",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledTitle": "Live-aktiviteetit ovat pois päältä",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön Asetuksissa, niin näet aktiiviset agentit lukitulla näytöllä."

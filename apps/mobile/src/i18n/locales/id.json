@@ -3222,9 +3222,9 @@
     "signedOut": "Masuk untuk melihat agen",
     "privacy": "Agen disembunyikan",
     "openAgents": "Buka agen",
-    "running": "BERJALAN",
+    "running": "Mengerjakan",
     "needsInput": "memerlukan input",
-    "reconnecting": "Menghubungkan kembali",
+    "idle": "Idle",
     "channelName": "Agen aktif",
     "activityKitDisabledTitle": "Aktivitas Langsung nonaktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di Pengaturan untuk melihat Agen Aktif di Layar Terkunci."

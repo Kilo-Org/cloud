@@ -3222,9 +3222,9 @@
     "signedOut": "请登录以查看代理",
     "privacy": "代理已隐藏",
     "openAgents": "打开代理",
-    "running": "运行中",
+    "running": "工作中",
     "needsInput": "需要输入",
-    "reconnecting": "正在重新连接",
+    "idle": "空闲",
     "channelName": "活动代理",
     "activityKitDisabledTitle": "实时活动已关闭",
     "activityKitDisabledBody": "请在“设置”中开启“实时活动”，以在锁定屏幕上查看活动代理。"

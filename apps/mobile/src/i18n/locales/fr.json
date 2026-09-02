@@ -3244,9 +3244,9 @@
     "signedOut": "Connectez-vous pour voir les agents",
     "privacy": "Agents masqués",
     "openAgents": "Ouvrir les agents",
-    "running": "EN COURS",
+    "running": "En cours",
     "needsInput": "saisie requise",
-    "reconnecting": "Reconnexion en cours",
+    "idle": "Inactif",
     "channelName": "Agents actifs",
     "activityKitDisabledTitle": "Les activités en direct sont désactivées",
     "activityKitDisabledBody": "Activez les activités en direct dans Réglages pour voir les agents actifs sur l'écran verrouillé."

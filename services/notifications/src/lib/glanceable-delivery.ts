@@ -57,7 +57,7 @@ export function toGlanceableContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
-    reconnecting: snapshot.reconnecting,
+    idle: snapshot.idle,
     eligibleStartedAt: snapshot.eligibleStartedAt,
   };
   return {
@@ -144,7 +144,7 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput + snapshot.reconnecting > 0;
+  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
   const iosSends = apnsSendsForTokens(iosTokens, eligible);
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(

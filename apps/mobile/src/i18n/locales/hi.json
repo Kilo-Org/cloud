@@ -3222,9 +3222,9 @@
     "signedOut": "एजेंट देखने के लिए साइन इन करें",
     "privacy": "एजेंट छिपे हुए हैं",
     "openAgents": "एजेंट खोलें",
-    "running": "चालू",
+    "running": "काम कर रहा है",
     "needsInput": "इनपुट आवश्यक",
-    "reconnecting": "फिर से कनेक्ट हो रहा है",
+    "idle": "निष्क्रिय",
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledTitle": "लाइव ऐक्टिविटी बंद हैं",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"

@@ -3222,9 +3222,9 @@
     "signedOut": "Agentide nägemiseks logige sisse",
     "privacy": "Agendid on peidetud",
     "openAgents": "Avage agendid",
-    "running": "TÖÖTAB",
+    "running": "Töötamine",
     "needsInput": "vajab sisendit",
-    "reconnecting": "Ühenduse taastamine",
+    "idle": "Ooterežiimis",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledTitle": "Reaalajas tegevused on välja lülitatud",
     "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."

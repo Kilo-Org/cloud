@@ -3222,9 +3222,9 @@
     "signedOut": "Mag-sign in para makita ang mga agent",
     "privacy": "Nakatago ang mga agent",
     "openAgents": "Buksan ang mga agent",
-    "running": "TUMATAKBO",
+    "running": "Gumagawa",
     "needsInput": "kailangan ng input",
-    "reconnecting": "Muling kumokonekta",
+    "idle": "Idle",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledTitle": "Naka-off ang Mga Live na Aktibidad",
     "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."

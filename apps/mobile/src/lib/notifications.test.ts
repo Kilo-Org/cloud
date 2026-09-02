@@ -431,7 +431,7 @@ function glanceableSnapshot(
     status: 'happy',
     running: 1,
     needsInput: 0,
-    reconnecting: 0,
+    idle: 0,
     eligibleStartedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
@@ -620,7 +620,7 @@ describe('applyGlanceablePushData', () => {
         status: 'empty',
         running: 0,
         needsInput: 0,
-        reconnecting: 0,
+        idle: 0,
         eligibleStartedAt: null,
       })
     );
@@ -642,7 +642,7 @@ describe('applyGlanceablePushData', () => {
         status: 'empty',
         running: 0,
         needsInput: 0,
-        reconnecting: 0,
+        idle: 0,
         eligibleStartedAt: null,
       })
     );
@@ -672,7 +672,7 @@ describe('applyGlanceablePushData', () => {
         status: 'empty',
         running: 0,
         needsInput: 0,
-        reconnecting: 0,
+        idle: 0,
         eligibleStartedAt: null,
       })
     );
@@ -1402,7 +1402,7 @@ describe('cold iOS background delivery', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
+      idle: 0,
       eligibleStartedAt: null,
     });
     expect(rows.has('scope-token')).toBe(true);

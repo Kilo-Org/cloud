@@ -3244,9 +3244,9 @@
     "signedOut": "Accedi per vedere gli agenti",
     "privacy": "Agenti nascosti",
     "openAgents": "Apri agenti",
-    "running": "IN ESECUZIONE",
+    "running": "In corso",
     "needsInput": "richiede input",
-    "reconnecting": "Riconnessione in corso",
+    "idle": "Inattivo",
     "channelName": "Agenti attivi",
     "activityKitDisabledTitle": "Le attività in tempo reale sono disattivate",
     "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."

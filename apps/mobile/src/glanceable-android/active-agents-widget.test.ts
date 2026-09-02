@@ -31,8 +31,8 @@ type MockElement = {
 
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
-  'glanceable.reconnecting': 'Reconnecting',
-  'glanceable.running': 'Running',
+  'glanceable.idle': 'Idle',
+  'glanceable.running': 'Working',
   'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
   'glanceable.stale': 'Updates delayed',
@@ -122,20 +122,14 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, 250);
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1 Needs input', '1 Running', 'Open agents']);
+    expect(text).toEqual(['1 Needs input', '1 Working', 'Open agents']);
   });
 
   it.each([
     { width: 120, visibleText: ['2 Needs input'] },
     {
       width: 250,
-      visibleText: [
-        '2 Needs input',
-        '3 Reconnecting',
-        '4 Running',
-        'Updates delayed',
-        'Open agents',
-      ],
+      visibleText: ['2 Needs input', '4 Working', '3 Idle', 'Updates delayed', 'Open agents'],
     },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',
@@ -144,7 +138,7 @@ describe('renderActiveAgentsWidget', () => {
         {
           ...snapshotFor([], 0, 'stale'),
           needsInput: 2,
-          reconnecting: 3,
+          idle: 3,
           running: 4,
         },
         {},
@@ -154,7 +148,7 @@ describe('renderActiveAgentsWidget', () => {
 
       for (const surface of [rep.light, rep.dark]) {
         expect(surface.props.accessibilityLabel).toBe(
-          'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+          'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
         );
         expect(collectText(surface)).toEqual(visibleText);
         expect(surface.props.clickAction).toBe('OPEN_URI');
@@ -170,7 +164,7 @@ describe('renderActiveAgentsWidget', () => {
         status: 'expired',
         running: 0,
         needsInput: 0,
-        reconnecting: 0,
+        idle: 0,
       },
       {},
       translate

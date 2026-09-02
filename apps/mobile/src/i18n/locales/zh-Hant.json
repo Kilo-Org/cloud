@@ -3222,9 +3222,9 @@
     "signedOut": "請登入以查看代理",
     "privacy": "代理已隱藏",
     "openAgents": "開啟代理",
-    "running": "執行中",
+    "running": "處理中",
     "needsInput": "需要輸入",
-    "reconnecting": "正在重新連線",
+    "idle": "閒置",
     "channelName": "使用中的代理",
     "activityKitDisabledTitle": "即時動態已關閉",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，以在鎖定畫面上查看使用中的代理。"

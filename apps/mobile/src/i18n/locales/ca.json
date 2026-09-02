@@ -3244,9 +3244,9 @@
     "signedOut": "Inicia la sessió per veure els agents",
     "privacy": "Agents ocults",
     "openAgents": "Obre els agents",
-    "running": "EN EXECUCIÓ",
+    "running": "Treballant",
     "needsInput": "requereix entrada",
-    "reconnecting": "Reconnectant",
+    "idle": "Inactiu",
     "channelName": "Agents actius",
     "activityKitDisabledTitle": "Les activitats en directe estan desactivades",
     "activityKitDisabledBody": "Activa les activitats en directe a Configuració per veure els agents actius a la pantalla de bloqueig."

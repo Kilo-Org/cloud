@@ -1,15 +1,22 @@
-import { Text, VStack } from '@expo/ui/swift-ui';
+import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
+  cornerRadius,
   font,
   foregroundStyle,
   frame,
+  monospacedDigit,
+  multilineTextAlignment,
+  padding,
+  resizable,
 } from '@expo/ui/swift-ui/modifiers';
-import { createLiveActivity } from 'expo-widgets';
+import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
 import { PlatformColor } from 'react-native';
 
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+
+import { withWidgetLogo } from './widget-logo';
 
 /* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
 
@@ -20,10 +27,16 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 // The server pushes raw counts + status (it cannot translate), and the
 // foreground app passes the same raw shape, so the inlined English copy below
 // is the single producer of the displayed Live Activity copy.
+//
+// The one value resolved after stringification is the `__KILO_WIDGET_LOGO_URI__`
+// literal below: `withWidgetLogo` swaps it for the app-group path of the mark.
 
-export const ActiveAgentsLiveActivity = createLiveActivity<
-  Partial<GlanceableLiveActivityContentState>
->('ActiveAgentsLiveActivity', (props, environment) => {
+type ContentState = Partial<GlanceableLiveActivityContentState>;
+
+// Babel replaces the annotated arrow with its source string, so `layout` is a
+// string at runtime while TypeScript still checks it as a component — the same
+// shape `expo-widgets` casts internally.
+const layout: LiveActivityComponent<ContentState> = (props, environment) => {
   'widget';
 
   const dark = environment.colorScheme === 'dark';
@@ -39,26 +52,46 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
   } as const;
   const statusLine = status === 'happy' ? null : STATUS_LINE[status];
 
-  const countLines = [
-    { label: 'Needs input', count: props.needsInput ?? 0 },
-    { label: 'Reconnecting', count: props.reconnecting ?? 0 },
-    { label: 'Running', count: props.running ?? 0 },
-  ].filter(line => line.count > 0);
+  // Rank order: what the user must act on, then what is making progress, then
+  // what is only connected. The Dynamic Island shows one number, so this
+  // ranking decides what a glance says. The glyphs differ in shape as well as
+  // color (exclamation / filled / hollow) so the state reads without color.
+  const countLines = (
+    [
+      {
+        label: 'Needs input',
+        count: props.needsInput ?? 0,
+        icon: 'exclamationmark.circle.fill',
+        color: PlatformColor('systemOrange'),
+      },
+      {
+        label: 'Working',
+        count: props.running ?? 0,
+        icon: 'circle.fill',
+        color: PlatformColor('systemGreen'),
+      },
+      {
+        label: 'Idle',
+        count: props.idle ?? 0,
+        icon: 'circle',
+        color: PlatformColor('label'),
+      },
+    ] as const
+  ).filter(line => line.count > 0);
   const hasCounts = countLines.length > 0;
   const primary = countLines[0] ?? null;
-  const primaryLabel = primary === null ? null : primary.label;
   const primaryCount = String(primary === null ? 0 : primary.count);
-  // Elapsed time shows while eligible counts exist, including the stale status,
-  // so the running work keeps its elapsed timer when updates stop.
+  // Elapsed time shows while any count exists, including the stale status, so
+  // the work keeps its elapsed timer when updates stop.
   const elapsedAnchor = hasCounts ? (props.eligibleStartedAt ?? null) : null;
 
-  // Spoken label: status word, numeric counts, then Open agents. Stale keeps
-  // its status word; happy (no status line) speaks counts then Open agents.
-  const openAgentsCopy = 'Open agents';
+  // Spoken label: status word, numeric counts, then Open agents. The whole
+  // surface deep-links to the agents list, so "Open agents" stays in the
+  // spoken label even though no line draws it.
   const spokenParts = [
     ...(statusLine !== null ? [statusLine] : []),
     ...countLines.map(line => `${line.count} ${line.label}`),
-    openAgentsCopy,
+    'Open agents',
   ];
   const accessibility = spokenParts.join(', ');
 
@@ -67,71 +100,116 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
     dark ? PlatformColor('secondaryLabel') : PlatformColor('tertiaryLabel')
   );
 
-  const countRows = countLines.map(line => (
-    <Text key={line.label} modifiers={[font({ textStyle: 'body' }), primaryForeground]}>
-      {`${line.count} ${line.label}`}
-    </Text>
-  ));
+  // The literal, not the imported constant: the widget transform stringifies
+  // this function's source, so an imported binding would be an undefined global
+  // in the widget process. It must stay equal to `WIDGET_LOGO_PLACEHOLDER`, which
+  // `withWidgetLogo` replaces with the app-group path.
+  // The annotation widens the literal: the token is replaced after this file is
+  // stringified, so the empty-path branch below is reachable at runtime.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
+  const logoUri: string = '__KILO_WIDGET_LOGO_URI__';
+  const logo = (size: number) =>
+    logoUri.length === 0 ? null : (
+      <Image
+        uiImage={logoUri}
+        modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.24)]}
+      />
+    );
 
-  const showOpenAgents = status === 'happy' || status === 'stale';
-  const openAgentsControl = (
-    <Text
-      modifiers={[
-        font({ textStyle: 'body', weight: 'semibold' }),
-        primaryForeground,
-        frame({ minHeight: 44, alignment: 'leading' }),
-      ]}
-    >
-      {openAgentsCopy}
-    </Text>
+  // One row per non-zero state: a colored glyph carries the state (readable
+  // without color), a fixed-width count, then the label. The first row is
+  // emphasised so a glance lands on it.
+  const countRow = (line: (typeof countLines)[number], isPrimary: boolean) => (
+    <HStack key={line.label} alignment="center" spacing={6}>
+      <Image systemName={line.icon} color={line.color} size={isPrimary ? 14 : 12} />
+      <Text
+        modifiers={[
+          font({ textStyle: isPrimary ? 'headline' : 'subheadline', weight: 'semibold' }),
+          monospacedDigit(),
+          primaryForeground,
+        ]}
+      >
+        {String(line.count)}
+      </Text>
+      <Text
+        modifiers={[
+          font({ textStyle: 'subheadline' }),
+          isPrimary ? primaryForeground : mutedForeground,
+        ]}
+      >
+        {line.label}
+      </Text>
+    </HStack>
   );
+
+  const countRows = countLines.map((line, index) => countRow(line, index === 0));
+
+  const elapsed =
+    elapsedAnchor === null ? null : (
+      <Text
+        date={new Date(elapsedAnchor)}
+        dateStyle="relative"
+        modifiers={[
+          font({ textStyle: 'caption' }),
+          monospacedDigit(),
+          mutedForeground,
+          // A relative-date Text reserves width for the longest string it could
+          // ever show, so without this the timer sits far left of its own frame.
+          multilineTextAlignment('trailing'),
+        ]}
+      />
+    );
 
   return {
     banner: (
-      <VStack
-        alignment="leading"
-        spacing={4}
-        modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
-      >
-        {hasCounts ? (
-          <VStack alignment="leading" spacing={2}>
-            {countRows}
-          </VStack>
-        ) : null}
-        {statusLine !== null ? <Text modifiers={[mutedForeground]}>{statusLine}</Text> : null}
-        {elapsedAnchor !== null ? (
-          <Text date={new Date(elapsedAnchor)} dateStyle="relative" modifiers={[mutedForeground]} />
-        ) : null}
-        {showOpenAgents ? openAgentsControl : null}
-      </VStack>
-    ),
-    compactLeading: (
-      <Text
+      <HStack
+        alignment="center"
+        spacing={10}
         modifiers={[
-          font({ textStyle: 'headline', weight: 'bold' }),
-          primaryForeground,
+          // The banner draws to its own rounded edge, so without an inset the
+          // top-left corner clips the leading content.
+          padding({ all: 'default' }),
+          accessibilityElement('combine'),
           accessibilityLabel(accessibility),
         ]}
       >
-        {hasCounts ? primaryCount : statusLine}
-      </Text>
+        {logo(22)}
+        {hasCounts ? (
+          <VStack alignment="leading" spacing={3}>
+            {countRows}
+          </VStack>
+        ) : (
+          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+            {statusLine}
+          </Text>
+        )}
+        <Spacer />
+        {elapsed}
+      </HStack>
     ),
+    // The Dynamic Island's leading slot is the app-identity slot, so it holds
+    // the Kilo mark; the trailing slot carries the ranked count.
+    compactLeading: <HStack modifiers={[accessibilityLabel(accessibility)]}>{logo(18)}</HStack>,
+    // One number, colored by the state it counts: orange needs input, green
+    // working, white idle.
     compactTrailing: (
       <Text
         modifiers={[
-          font({ textStyle: 'footnote' }),
-          primaryForeground,
+          font({ textStyle: 'title3', weight: 'bold' }),
+          monospacedDigit(),
+          primary === null ? mutedForeground : foregroundStyle(primary.color),
           accessibilityLabel(accessibility),
         ]}
       >
-        {hasCounts ? (primaryLabel ?? primaryCount) : ''}
+        {hasCounts ? primaryCount : ''}
       </Text>
     ),
     minimal: (
       <Text
         modifiers={[
           font({ textStyle: 'headline', weight: 'bold' }),
-          primaryForeground,
+          monospacedDigit(),
+          primary === null ? mutedForeground : foregroundStyle(primary.color),
           accessibilityLabel(accessibility),
         ]}
       >
@@ -139,25 +217,33 @@ export const ActiveAgentsLiveActivity = createLiveActivity<
       </Text>
     ),
     expandedLeading: (
-      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
+      <VStack alignment="leading" spacing={3} modifiers={[accessibilityLabel(accessibility)]}>
         {countRows}
       </VStack>
     ),
     expandedTrailing: (
-      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
-        {statusLine !== null ? <Text modifiers={[mutedForeground]}>{statusLine}</Text> : null}
-        {elapsedAnchor !== null ? (
-          <Text date={new Date(elapsedAnchor)} dateStyle="relative" modifiers={[mutedForeground]} />
+      <VStack alignment="trailing" spacing={3} modifiers={[accessibilityLabel(accessibility)]}>
+        {statusLine !== null && hasCounts ? (
+          <Text modifiers={[font({ textStyle: 'caption' }), mutedForeground]}>{statusLine}</Text>
         ) : null}
+        {elapsed}
       </VStack>
     ),
     expandedBottom: (
-      <VStack alignment="leading" spacing={2} modifiers={[accessibilityLabel(accessibility)]}>
+      <HStack alignment="center" spacing={8} modifiers={[accessibilityLabel(accessibility)]}>
+        {logo(16)}
         {statusLine !== null && !hasCounts ? (
-          <Text modifiers={[mutedForeground]}>{statusLine}</Text>
+          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+            {statusLine}
+          </Text>
         ) : null}
-        {showOpenAgents ? openAgentsControl : null}
-      </VStack>
+        <Spacer />
+      </HStack>
     ),
   };
-});
+};
+
+export const ActiveAgentsLiveActivity = createLiveActivity<ContentState>(
+  'ActiveAgentsLiveActivity',
+  withWidgetLogo(layout)
+);

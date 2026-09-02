@@ -3288,9 +3288,9 @@
     "signedOut": "Sínigh isteach chun gníomhairí a fheiceáil",
     "privacy": "Gníomhairí i bhfolach",
     "openAgents": "Oscail gníomhairí",
-    "running": "AG RITH",
+    "running": "Ag obair",
     "needsInput": "teastaíonn ionchur",
-    "reconnecting": "Ag athcheangal",
+    "idle": "Díomhaoin",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledTitle": "Tá Gníomhaíochtaí Beo as",
     "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."

@@ -15,8 +15,8 @@ const NOW = 1_750_000_000_000;
 
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
-  'glanceable.reconnecting': 'Reconnecting',
-  'glanceable.running': 'Running',
+  'glanceable.idle': 'Idle',
+  'glanceable.running': 'Working',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -45,7 +45,7 @@ function snapshotFor(
 const MIXED = {
   ...snapshotFor([], 0, 'happy'),
   needsInput: 2,
-  reconnecting: 3,
+  idle: 3,
   running: 4,
 };
 
@@ -56,14 +56,14 @@ describe('buildAndroidWidgetProps', () => {
     expect(props.primaryCount).toBe(2);
     expect(props.countLines).toEqual([
       { label: 'Needs input', count: 2 },
-      { label: 'Reconnecting', count: 3 },
-      { label: 'Running', count: 4 },
+      { label: 'Working', count: 4 },
+      { label: 'Idle', count: 3 },
     ]);
   });
 
   it.each([
-    ['happy', '2 Needs input, 3 Reconnecting, 4 Running, Open agents'],
-    ['stale', 'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'],
+    ['happy', '2 Needs input, 4 Working, 3 Idle, Open agents'],
+    ['stale', 'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'],
   ] as const)(
     'includes numeric counts and the action in the %s spoken label',
     (status, expected) => {
@@ -165,13 +165,13 @@ describe('current widget deadline rendering', () => {
 describe('buildOngoingNotificationText', () => {
   it('lists every ranked numeric count for happy work', () => {
     expect(buildOngoingNotificationText(MIXED, {}, translate)).toBe(
-      '2 Needs input, 3 Reconnecting, 4 Running'
+      '2 Needs input, 4 Working, 3 Idle'
     );
   });
 
   it('adds the translated stale warning without losing eligible counts', () => {
     expect(buildOngoingNotificationText({ ...MIXED, status: 'stale' }, {}, translate)).toBe(
-      'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running'
+      'Updates delayed, 2 Needs input, 4 Working, 3 Idle'
     );
   });
 
@@ -190,10 +190,10 @@ describe('buildOngoingNotificationText', () => {
 
 describe('buildCompactNotificationText', () => {
   it.each([
-    { needsInput: 2, reconnecting: 3, running: 4, expected: '2' },
-    { needsInput: 0, reconnecting: 3, running: 4, expected: '3' },
-    { needsInput: 0, reconnecting: 0, running: 4, expected: '4' },
-    { needsInput: 0, reconnecting: 0, running: 0, expected: null },
+    { needsInput: 2, idle: 3, running: 4, expected: '2' },
+    { needsInput: 0, idle: 3, running: 4, expected: '4' },
+    { needsInput: 0, idle: 3, running: 0, expected: '3' },
+    { needsInput: 0, idle: 0, running: 0, expected: null },
   ])('uses the ranked primary number $expected, not the total or full summary', counts => {
     const snapshot = { ...MIXED, ...counts };
     expect(buildCompactNotificationText(snapshot, {})).toBe(counts.expected);

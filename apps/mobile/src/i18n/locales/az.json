@@ -3222,9 +3222,9 @@
     "signedOut": "Agentləri görmək üçün daxil olun",
     "privacy": "Agentlər gizlədilib",
     "openAgents": "Agentləri açın",
-    "running": "İŞLƏYİR",
+    "running": "İşlənir",
     "needsInput": "GİRİŞ TƏLƏB OLUNUR",
-    "reconnecting": "Yenidən qoşulur",
+    "idle": "Boşda",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledTitle": "Canlı fəaliyyətlər söndürülüb",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."

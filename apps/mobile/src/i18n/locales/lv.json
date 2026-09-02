@@ -3244,9 +3244,9 @@
     "signedOut": "Pieraksties, lai redzētu aģentus",
     "privacy": "Aģenti ir paslēpti",
     "openAgents": "Atvērt aģentus",
-    "running": "DARBOJAS",
+    "running": "Apstrādā",
     "needsInput": "nepieciešama ievade",
-    "reconnecting": "Atkārtoti izveido savienojumu",
+    "idle": "Dīkstāvē",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledTitle": "Tiešraides aktivitātes ir izslēgtas",
     "activityKitDisabledBody": "Ieslēdz tiešraides aktivitātes iestatījumos, lai bloķēšanas ekrānā redzētu aktīvos aģentus."

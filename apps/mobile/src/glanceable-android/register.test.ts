@@ -143,9 +143,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
     const expected =
-      width === 120
-        ? ['1 Needs input']
-        : ['1 Needs input', '1 Reconnecting', '2 Running', 'Open agents'];
+      width === 120 ? ['2 Needs input'] : ['2 Needs input', '2 Working', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -211,7 +209,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -233,7 +231,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -263,8 +261,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       const handler = await registerAfterRestart(null);
 
       const current = await runWidgetTask(handler, width);
-      expect(collectText(current.light)).toContain('1 Needs input');
-      expect(collectText(current.dark)).toContain('1 Needs input');
+      expect(collectText(current.light)).toContain('2 Needs input');
+      expect(collectText(current.dark)).toContain('2 Needs input');
       expect(mocks.getDeadline()).toBe(expiresAt);
 
       vi.setSystemTime(expiresAt);
@@ -311,7 +309,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);

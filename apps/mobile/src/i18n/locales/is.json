@@ -3222,9 +3222,9 @@
     "signedOut": "Skráðu þig inn til að sjá umboð",
     "privacy": "Umboð falin",
     "openAgents": "Opna umboð",
-    "running": "Í gangi",
+    "running": "Vinnur",
     "needsInput": "þarfnast inntaks",
-    "reconnecting": "Tengist aftur",
+    "idle": "Í bið",
     "channelName": "Virk umboð",
     "activityKitDisabledTitle": "Slökkt er á Beinni virkni",
     "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."

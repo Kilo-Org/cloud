@@ -3266,9 +3266,9 @@
     "signedOut": "Prihláste sa na zobrazenie agentov",
     "privacy": "Agenti sú skrytí",
     "openAgents": "Otvoriť agentov",
-    "running": "Prebieha",
+    "running": "Pracuje sa",
     "needsInput": "vyžaduje vstup",
-    "reconnecting": "Opätovné pripájanie",
+    "idle": "Nečinný",
     "channelName": "Aktívni agenti",
     "activityKitDisabledTitle": "Živé aktivity sú vypnuté",
     "activityKitDisabledBody": "Zapnite živé aktivity v Nastaveniach, aby sa aktívni agenti zobrazovali na zamknutej obrazovke."

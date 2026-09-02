@@ -3222,9 +3222,9 @@
     "signedOut": "Sign in to see agents",
     "privacy": "Agents hidden",
     "openAgents": "Open agents",
-    "running": "Running",
+    "running": "Working",
     "needsInput": "Needs input",
-    "reconnecting": "Reconnecting",
+    "idle": "Idle",
     "channelName": "Active agents",
     "activityKitDisabledTitle": "Live Activities are off",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."

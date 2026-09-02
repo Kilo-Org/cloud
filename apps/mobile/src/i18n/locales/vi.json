@@ -3222,9 +3222,9 @@
     "signedOut": "Đăng nhập để xem tác nhân",
     "privacy": "Đã ẩn tác nhân",
     "openAgents": "Mở tác nhân",
-    "running": "ĐANG CHẠY",
+    "running": "Đang xử lý",
     "needsInput": "cần nhập",
-    "reconnecting": "Đang kết nối lại",
+    "idle": "Không hoạt động",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledTitle": "Hoạt động trực tiếp đang tắt",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên Màn hình khóa."

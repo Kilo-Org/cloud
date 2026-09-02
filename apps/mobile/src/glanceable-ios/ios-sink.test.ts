@@ -21,7 +21,7 @@ import {
   getActivityKitDenied,
   iosSink,
 } from './ios-sink';
-import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
+import { buildGlanceableViewProps, type GlanceableViewProps, toWidgetProps } from './view-props';
 
 // Native surfaces are unreachable under vitest: expo-widgets factories, the
 // swift-ui component tree, and react-native are stubbed so the sink is the real
@@ -57,6 +57,7 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock('expo-widgets', () => ({
   after: (date: Date) => ({ after: date }),
+  widgetsDirectory: 'file:///app-group/ExpoWidgets/',
   createLiveActivity: () => ({
     start: (props: unknown, url?: string) => {
       if (mockState.startError !== null) {
@@ -182,9 +183,9 @@ afterEach(() => {
 });
 
 describe('iosSink start and update', () => {
-  it('registers an idle scope without a Live Activity and accepts later background work', () => {
+  it('registers a session-less scope without a Live Activity and accepts later background work', () => {
     const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
-    publisher.handleSessions([{ status: 'idle' }], CTX);
+    publisher.handleSessions([], CTX);
 
     expect(mockState.started).toEqual([]);
     expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No work in progress' });
@@ -528,14 +529,14 @@ describe('iosSink end', () => {
     vi.setSystemTime(NOW);
     const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
     publisher.handleSessions([{ status: 'busy' }], CTX);
-    publisher.handleSessions([{ status: 'idle' }], CTX);
+    publisher.handleSessions([], CTX);
     await iosSink.waitForNativeTerminal?.();
 
     expect(mockState.started).toMatchObject([
       {
         ended: true,
         dismissAt: NOW + 8000,
-        props: { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
       },
     ]);
     expect(subscriptions).toEqual(new Set(['scope']));
@@ -596,7 +597,7 @@ describe('iosSink end', () => {
       await iosSink.waitForNativeTerminal?.();
       expect(mockState.started[0]).toMatchObject({
         dismissAt: NOW,
-        props: { status, running: 0, needsInput: 0, reconnecting: 0 },
+        props: { status, running: 0, needsInput: 0, idle: 0 },
       });
     }
   );
@@ -626,7 +627,7 @@ describe('iosSink end', () => {
       await iosSink.waitForNativeTerminal?.();
 
       expect(visible).toBe(false);
-      expect(content).toMatchObject({ status, running: 0, needsInput: 0, reconnecting: 0 });
+      expect(content).toMatchObject({ status, running: 0, needsInput: 0, idle: 0 });
       expect(mockState.started[0]?.dismissAt).toBe(NOW);
     }
   );
@@ -667,19 +668,19 @@ describe('iosSink end', () => {
     expect(subscriptions).toEqual(new Set(['scope', 'activity']));
   });
 
-  it('retains the elapsed anchor when running work becomes reconnecting', async () => {
+  it('retains the elapsed anchor when running work becomes idle', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => Date.now() });
     publisher.handleSessions([{ status: 'busy' }], CTX);
     vi.setSystemTime(NOW + 60_000);
-    publisher.handleSessions([{ status: 'retry' }], CTX);
+    publisher.handleSessions([{ status: 'idle' }], CTX);
     await vi.advanceTimersByTimeAsync(1000);
     expect(mockState.started).toMatchObject([
       {
         ended: false,
         dismissAt: null,
-        props: { running: 0, reconnecting: 1, eligibleStartedAt: new Date(NOW).toISOString() },
+        props: { running: 0, idle: 1, eligibleStartedAt: new Date(NOW).toISOString() },
       },
     ]);
     publisher.dispose();
@@ -700,7 +701,7 @@ describe('iosSink widget publish', () => {
       expect(mockState.timeline).toHaveLength(2);
       expect(mockState.timeline[0]?.props).toMatchObject({
         primaryCount: 1,
-        showOpenAgents: true,
+        primaryKind: 'running',
       });
       const expired = mockState.timeline[1];
       expect(expired?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
@@ -709,7 +710,8 @@ describe('iosSink widget publish', () => {
       expect(expiredProps.countLines).toEqual([]);
       expect(expiredProps.primaryCount).toBe(0);
       expect(expiredProps.statusLine).toBe('Status expired');
-      expect(expiredProps.showOpenAgents).toBe(false);
+      // Omitted, not null: UserDefaults rejects a null value. See toWidgetProps.
+      expect(expiredProps.primaryKind).toBeUndefined();
     }
   );
 
@@ -746,10 +748,8 @@ describe('iosSink widget publish', () => {
         statusLine,
         countLines: [],
         primaryCount: 0,
-        primaryLabel: null,
-        elapsedAnchor: null,
-        showOpenAgents: false,
       });
+      expect(Object.values(visible?.props ?? {})).not.toContain(null);
     }
     expect(mockState.timeline).toHaveLength(1);
   });
@@ -768,12 +768,12 @@ describe('iosSink widget publish', () => {
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Agents hidden', 0, false],
     ];
-    for (const [status, sessions, statusLine, counts, showOpenAgents] of cases) {
+    for (const [status, sessions, statusLine, counts, hasPrimary] of cases) {
       iosSink.publish(snapshotFor(sessions, 0, status));
-      const props = mockState.snapshots.at(-1) as GlanceableViewProps;
+      const props = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
       expect(props.statusLine).toBe(statusLine);
       expect(props.countLines).toHaveLength(counts);
-      expect(props.showOpenAgents).toBe(showOpenAgents);
+      expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
   });
 });
@@ -787,7 +787,7 @@ describe('iosSink Live Activity content-state', () => {
     expect(mockState.started).toMatchObject([
       {
         ended: true,
-        props: { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
       },
     ]);
   });
@@ -839,7 +839,7 @@ describe('iosSink Live Activity content-state', () => {
     expect(mockState.ended).toMatchObject([
       {
         policy: { after: new Date(NOW + 8000) },
-        props: { status: 'empty', running: 0, needsInput: 0, reconnecting: 0 },
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
         contentDate: new Date(NOW),
       },
     ]);
@@ -885,10 +885,10 @@ describe('clearActivityKitDeniedIfAvailable', () => {
 });
 
 describe('buildGlanceableViewProps', () => {
-  it('ranks the compact primary count as needs-input, then reconnecting, then running', () => {
+  it('ranks the compact primary count as needs-input, then running, then idle', () => {
     const props = buildGlanceableViewProps(
       snapshotFor(
-        [{ status: 'busy' }, { status: 'busy' }, { status: 'retry' }, { status: 'question' }],
+        [{ status: 'busy' }, { status: 'busy' }, { status: 'idle' }, { status: 'question' }],
         0
       ),
       {},
@@ -898,8 +898,8 @@ describe('buildGlanceableViewProps', () => {
     expect(props.primaryCount).toBe(1);
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
-      'glanceable.reconnecting',
       'glanceable.running',
+      'glanceable.idle',
     ]);
   });
 
@@ -922,10 +922,9 @@ describe('buildGlanceableViewProps', () => {
       'accessibilityLabel',
       'countLines',
       'elapsedAnchor',
-      'openAgentsLabel',
       'primaryCount',
+      'primaryKind',
       'primaryLabel',
-      'showOpenAgents',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -964,5 +963,34 @@ describe('buildGlanceableViewProps', () => {
 
     const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
     expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');
+  });
+});
+
+describe('toWidgetProps', () => {
+  it('omits every null field so the UserDefaults write cannot throw', () => {
+    const props = toWidgetProps(
+      buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key)
+    );
+
+    expect(Object.values(props)).not.toContain(null);
+    expect('primaryLabel' in props).toBe(false);
+    expect('primaryKind' in props).toBe(false);
+    expect('elapsedAnchor' in props).toBe(false);
+    expect(props.statusLine).toBe('glanceable.empty');
+  });
+
+  it('keeps every non-null field', () => {
+    const source = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+
+    expect(toWidgetProps(source)).toMatchObject({
+      primaryLabel: 'glanceable.needsInput',
+      primaryKind: 'needsInput',
+      primaryCount: 1,
+      countLines: [{ kind: 'needsInput', count: 1 }],
+    });
   });
 });

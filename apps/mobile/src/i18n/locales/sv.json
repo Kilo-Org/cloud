@@ -3222,9 +3222,9 @@
     "signedOut": "Logga in för att se agenter",
     "privacy": "Agenter dolda",
     "openAgents": "Öppna agenter",
-    "running": "KÖRS",
+    "running": "Arbetar",
     "needsInput": "kräver indata",
-    "reconnecting": "Återansluter",
+    "idle": "Inaktiv",
     "channelName": "Aktiva agenter",
     "activityKitDisabledTitle": "Liveaktiviteter är avstängda",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."

@@ -3222,9 +3222,9 @@
     "signedOut": "Logg inn for å se agenter",
     "privacy": "Agenter er skjult",
     "openAgents": "Åpne agenter",
-    "running": "KJØRER",
+    "running": "Jobber",
     "needsInput": "trenger innspill",
-    "reconnecting": "Kobler til på nytt",
+    "idle": "Ledig",
     "channelName": "Aktive agenter",
     "activityKitDisabledTitle": "Oppdateringer i sanntid er av",
     "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."

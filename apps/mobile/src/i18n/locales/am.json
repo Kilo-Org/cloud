@@ -3222,9 +3222,9 @@
     "signedOut": "ወኪሎችን ለማየት ይግቡ",
     "privacy": "ወኪሎች ተደብቀዋል",
     "openAgents": "ወኪሎችን ይክፈቱ",
-    "running": "በስራ ላይ",
+    "running": "በመስራት ላይ",
     "needsInput": "ግብዓት ይፈልጋል",
-    "reconnecting": "እንደገና በመገናኘት ላይ",
+    "idle": "በእረፍት",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledTitle": "የቀጥታ እንቅስቃሴዎች ጠፍተዋል",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"

@@ -3244,9 +3244,9 @@
     "signedOut": "Autentifică-te pentru a vedea agenții",
     "privacy": "Agenți ascunși",
     "openAgents": "Deschide agenții",
-    "running": "Rulează",
+    "running": "Se procesează",
     "needsInput": "necesită introducere",
-    "reconnecting": "Se reconectează",
+    "idle": "Inactiv",
     "channelName": "Agenți activi",
     "activityKitDisabledTitle": "Activitățile live sunt dezactivate",
     "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."

@@ -11,7 +11,7 @@ import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
 import { readGlanceableEnabled } from '@/lib/glanceable/enabled';
-import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
+import { forEachSink } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 
@@ -89,7 +89,7 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
   if (!isEligibleGlanceableWork(snapshot)) {
     return;
   }
-  for (const sink of getGlanceableSinks()) {
+  forEachSink('recover_start_or_update', sink => {
     sink.startOrUpdate(snapshot, { userId, organizationId });
-  }
+  });
 }

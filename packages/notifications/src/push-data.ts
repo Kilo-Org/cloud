@@ -91,7 +91,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
     running: z.number().int().min(0),
     needsInput: z.number().int().min(0),
-    reconnecting: z.number().int().min(0),
+    idle: z.number().int().min(0),
     updatedAt: z.string(),
     expiresAt: z.string(),
     eligibleStartedAt: z.string().nullable(),
@@ -109,5 +109,5 @@ export type PushData = z.infer<typeof pushDataSchema>;
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
-  'status' | 'running' | 'needsInput' | 'reconnecting' | 'eligibleStartedAt'
+  'status' | 'running' | 'needsInput' | 'idle' | 'eligibleStartedAt'
 >;

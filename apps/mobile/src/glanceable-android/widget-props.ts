@@ -20,7 +20,7 @@ type AndroidWidgetCount = { label: string; count: number };
 export type AndroidWidgetProps = {
   /** Translated locked copy; null while counts show (happy). Stale carries both. */
   statusLine: string | null;
-  /** Non-zero count lines in rank order (needs-input, reconnecting, running). */
+  /** Non-zero count lines in rank order (needs-input, running, idle). */
   countLines: AndroidWidgetCount[];
   /** Top-ranked count label for compact widths; null when no eligible work. */
   primaryLabel: string | null;
@@ -85,7 +85,7 @@ function buildExpiredWidgetProps(
       status: 'expired',
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
+      idle: 0,
       eligibleStartedAt: null,
     },
     {},

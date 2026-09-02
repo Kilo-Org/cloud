@@ -3222,9 +3222,9 @@
     "signedOut": "Log ind for at se agenter",
     "privacy": "Agenter er skjult",
     "openAgents": "Åbn agenter",
-    "running": "KØRER",
+    "running": "Arbejder",
     "needsInput": "kræver input",
-    "reconnecting": "Genopretter forbindelsen",
+    "idle": "Inaktiv",
     "channelName": "Aktive agenter",
     "activityKitDisabledTitle": "Liveaktiviteter er slået fra",
     "activityKitDisabledBody": "Slå Liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."

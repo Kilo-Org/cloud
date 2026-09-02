@@ -12,7 +12,7 @@ import {
 const NOW = 1_750_000_000_000;
 
 describe('countGlanceableSessions', () => {
-  it('maps busy/question/permission/retry and ignores idle and unknown', () => {
+  it('maps busy to running, question/permission/retry to needs-input, idle to idle', () => {
     const counts = countGlanceableSessions([
       { status: 'busy' },
       { status: 'busy' },
@@ -26,7 +26,7 @@ describe('countGlanceableSessions', () => {
       { status: 'failed' },
       { status: 'mystery' },
     ]);
-    expect(counts).toEqual({ running: 2, needsInput: 3, reconnecting: 1 });
+    expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2 });
   });
 
   it('counts Cloud Agent-shaped and CLI-shaped rows together on status alone', () => {
@@ -34,17 +34,23 @@ describe('countGlanceableSessions', () => {
     const cliRow = { status: 'retry', connectionId: 'cli-1' };
     expect(countGlanceableSessions([cloudRow, cliRow])).toEqual({
       running: 1,
-      needsInput: 0,
-      reconnecting: 1,
+      needsInput: 1,
+      idle: 0,
     });
   });
 
-  it('produces zero eligible counts for idle-only sessions', () => {
+  it('counts idle-only sessions as idle', () => {
     expect(countGlanceableSessions([{ status: 'idle' }, { status: 'idle' }])).toEqual({
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
+      idle: 2,
     });
+  });
+
+  it('ignores a completed or unknown status entirely', () => {
+    expect(
+      countGlanceableSessions([{ status: 'completed' }, { status: 'failed' }, { status: 'nope' }])
+    ).toEqual({ running: 0, needsInput: 0, idle: 0 });
   });
 });
 
@@ -102,9 +108,9 @@ describe('buildGlanceableSnapshot', () => {
     expect(second.needsInput).toBe(1);
   });
 
-  it('clears eligibleStartedAt when no eligible work remains', () => {
+  it('clears eligibleStartedAt when no session is connected', () => {
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'idle' }],
+      sessions: [{ status: 'completed' }],
       userId: 'u1',
       organizationId: null,
       now: NOW,

@@ -18,30 +18,35 @@ export const GLANCEABLE_STATUS_COPY_KEY = {
   privacy: 'glanceable.privacy',
 } as const satisfies Record<Exclude<GlanceableStatus, 'happy'>, string>;
 
-export type GlanceableCountKey =
-  | 'glanceable.running'
-  | 'glanceable.needsInput'
-  | 'glanceable.reconnecting';
+export type GlanceableCountKey = 'glanceable.running' | 'glanceable.needsInput' | 'glanceable.idle';
 
-export type GlanceableCountLine = { key: GlanceableCountKey; count: number };
+/** The state a count line stands for. Surfaces map it to a glyph and a color. */
+export type GlanceableCountKind = 'needsInput' | 'running' | 'idle';
 
-/** Rank order: needs-input, then reconnecting, then running. */
-const COUNT_ORDER: readonly {
+export type GlanceableCountLine = {
   key: GlanceableCountKey;
-  field: 'running' | 'needsInput' | 'reconnecting';
-}[] = [
-  { key: 'glanceable.needsInput', field: 'needsInput' },
-  { key: 'glanceable.reconnecting', field: 'reconnecting' },
-  { key: 'glanceable.running', field: 'running' },
+  kind: GlanceableCountKind;
+  count: number;
+};
+
+/**
+ * Rank order: what the user must act on, then what is making progress, then
+ * what is only connected. Compact surfaces show the first line only, so this
+ * ranking decides what a glance says.
+ */
+const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind }[] = [
+  { key: 'glanceable.needsInput', kind: 'needsInput' },
+  { key: 'glanceable.running', kind: 'running' },
+  { key: 'glanceable.idle', kind: 'idle' },
 ];
 
 /** Every non-zero count in rank order (expanded, medium, large, spoken). */
 export function glanceableCountLines(snapshot: GlanceableAgentsSnapshot): GlanceableCountLine[] {
   const lines: GlanceableCountLine[] = [];
-  for (const { key, field } of COUNT_ORDER) {
-    const count = snapshot[field];
+  for (const { key, kind } of COUNT_ORDER) {
+    const count = snapshot[kind];
     if (count > 0) {
-      lines.push({ key, count });
+      lines.push({ key, kind, count });
     }
   }
   return lines;

@@ -3222,9 +3222,9 @@
     "signedOut": "Banye iji hụ ndị ọrụ",
     "privacy": "Ezochiri ndị ọrụ",
     "openAgents": "Mepee ndị ọrụ",
-    "running": "NA-AGBA",
+    "running": "Na-arụ ọrụ",
     "needsInput": "chọrọ ntinye",
-    "reconnecting": "Na-ejikọ ọzọ",
+    "idle": "Ọrụ na-agaghị",
     "channelName": "Ndị ọrụ na-arụ ọrụ",
     "activityKitDisabledTitle": "Agbanyụrụ Ihe Omume Dị Ndụ",
     "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."

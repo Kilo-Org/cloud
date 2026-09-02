@@ -46,9 +46,12 @@ export const glanceableAgentsSnapshotSchema = z.object({
   accountEpoch: z.number().int().optional(),
   organizationBound: z.boolean(),
   status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
+  /** Sessions actively doing something. */
   running: z.number().int().min(0),
+  /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
   needsInput: z.number().int().min(0),
-  reconnecting: z.number().int().min(0),
+  /** Sessions connected but doing nothing. */
+  idle: z.number().int().min(0),
   /** ISO 8601 timestamp or null; binds the elapsed-time display. */
   eligibleStartedAt: z.string().nullable(),
 });
@@ -58,18 +61,23 @@ export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSc
 export type GlanceableCounts = {
   running: number;
   needsInput: number;
-  reconnecting: number;
+  idle: number;
 };
 
 /**
- * Map session rows to the three eligible counts. `busy` → running,
- * `question`/`permission` → needs-input, `retry` → reconnecting. `idle` and
- * any unknown status are ignored. Do not call `isCompletedStatus` here.
+ * Map session rows to the three glanceable counts. `busy` → running,
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
+ * unknown status is ignored. Do not call `isCompletedStatus` here.
+ *
+ * `retry` folds into needs-input because it means one thing to the user: the
+ * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
+ * disconnects while that session was waiting on an answer, and the CLI writes
+ * it while backing off after a provider error.
  */
 export function countGlanceableSessions(sessions: readonly { status: string }[]): GlanceableCounts {
   let running = 0;
   let needsInput = 0;
-  let reconnecting = 0;
+  let idle = 0;
   for (const session of sessions) {
     switch (session.status) {
       case 'busy':
@@ -77,17 +85,18 @@ export function countGlanceableSessions(sessions: readonly { status: string }[])
         break;
       case 'question':
       case 'permission':
+      case 'retry':
         needsInput += 1;
         break;
-      case 'retry':
-        reconnecting += 1;
+      case 'idle':
+        idle += 1;
         break;
       default:
-        // idle and unknown statuses contribute nothing.
+        // An unknown status contributes nothing.
         break;
     }
   }
-  return { running, needsInput, reconnecting };
+  return { running, needsInput, idle };
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
@@ -142,7 +151,9 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  const eligible = counts.running + counts.needsInput + counts.reconnecting > 0;
+  // Idle counts: a connected agent doing nothing is still something the user
+  // wants on the Lock Screen, and the Dynamic Island ranks it last.
+  const eligible = counts.running + counts.needsInput + counts.idle > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
   const eligibleStartedAt = eligible ? (input.previousEligibleStartedAt ?? updatedAt) : null;
@@ -158,14 +169,14 @@ export function buildGlanceableSnapshot(
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,
-    reconnecting: counts.reconnecting,
+    idle: counts.idle,
     eligibleStartedAt,
   };
 }
 
-/** True when any eligible count is non-zero. */
+/** True when any agent is connected, whether working, waiting, or idle. */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.reconnecting > 0;
+  return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
 }
 
 /**

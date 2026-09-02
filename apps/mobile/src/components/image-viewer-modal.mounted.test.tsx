@@ -130,6 +130,50 @@ describe('ImageViewerModal mounted', () => {
     renderer.unmount();
   });
 
+  it('shows the unavailable row immediately on decode error and clears it in the same commit a renewed uri lands', async () => {
+    const renderer = await mountViewer({});
+
+    const image = findByType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('viewer Image missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+
+    // The error replaces the image with the unavailable row at once, and the
+    // row persists while the URL is unchanged.
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(
+      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
+    ).toHaveLength(1);
+
+    // A renewed uri clears the recorded error in the same commit, so the
+    // refreshed image shows with no "Image unavailable" flash.
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(
+        createElement(ImageViewerModal, {
+          visible: true,
+          uri: 'file:///cache/renewed.png',
+          filename: 'photo.png',
+          onClose: () => undefined,
+        })
+      );
+    });
+
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
+    expect(findByType(renderer.root, 'Image')[0]?.props.source).toEqual({
+      uri: 'file:///cache/renewed.png',
+    });
+    expect(
+      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
+    ).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
   it('renders the share error through AccessibleStatus with white pill text', async () => {
     const renderer = await mountViewer({
       shareError: 'Failed to share file. Please try again.',

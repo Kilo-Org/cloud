@@ -152,7 +152,11 @@
     "appearanceDark": "गाढा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाहरूमा एप विशेषता थप्नुहोस्",
-    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।"
+    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।",
+    "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
+    "returnSendsMessageSubtitle": "बन्द हुँदा, रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति घुसाउँछ।",
+    "biometricUnlock": "बायोमेट्रिक्स प्रयोग गरी अनलक गर्नुहोस्",
+    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -665,7 +669,8 @@
     "profile": "प्रोफाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ट्याब, {{total}} मध्ये {{position}}"
+    "position": "{{name}}, ट्याब, {{total}} मध्ये {{position}}",
+    "chat": "कुराकानी"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड असफल भयो",
       "failedToUploadFile": "फाइल अपलोड गर्न असफल: {{reason}}",
-      "nothingToPaste": "टाँस्न केही छैन"
+      "nothingToPaste": "टाँस्न केही छैन",
+      "metadataStripFailed": "फोटोको मेटाडेटा हटाउन सकिएन।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "जाँच चलाउनुहोस्",
       "status": "स्थिति",
       "threshold": "थ्रेसहोल्ड",
-      "pullRequest": "पुल अनुरोध"
+      "pullRequest": "पुल अनुरोध",
+      "transcriptWaiting": "समीक्षा ट्रान्सक्रिप्टको पर्खाइमा।",
+      "transcriptEmpty": "यस समीक्षाको लागि कुनै ट्रान्सक्रिप्ट छैन।",
+      "transcriptRetry": "समीक्षा ट्रान्सक्रिप्ट लोड गर्न सकिएन।",
+      "transcriptLive": "Live",
+      "agentIdle": "एजेन्ट निष्क्रिय",
+      "agentWorking": "एजेन्ट काम गर्दैछ…",
+      "anErrorOccurred": "एउटा त्रुटि भयो",
+      "errorWithMessage": "त्रुटि: {{message}}",
+      "executionStarted": "कार्यान्वयन सुरु भयो",
+      "reviewCompleted": "समीक्षा सम्पन्न",
+      "reviewInterrupted": "समीक्षा अवरुद्ध",
+      "sessionError": "सत्र त्रुटि: {{error}}",
+      "statusWithValue": "स्थिति: {{status}}",
+      "toolName": "उपकरण: {{name}}",
+      "toolNameError": "उपकरण: {{name}} — त्रुटि",
+      "unknownError": "अज्ञात त्रुटि"
     },
     "reviewMemory": {
       "title": "समीक्षा मेमोरी",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "अहिले सक्रिय",
     "search": {
       "searching": "खोज्दै",
       "searchSessions": "सत्रहरू खोज्नुहोस्",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "सत्रहरू लोड गर्न सकिएन",
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन",
-      "noSessionsYet": "अहिलेसम्म कुनै सत्रहरू छैनन्",
       "noSessionsYetDescription": "तपाईंको फोनबाट कोडिङ कार्य सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noMatches": "कुनै सत्र मेल खाएन",
       "tryDifferentSearch": "फरक खोज शब्द प्रयास गर्नुहोस्।",
       "tryAdjustFilters": "फिल्टरहरू समायोजन वा खाली गर्ने प्रयास गर्नुहोस्।",
       "couldNotSearch": "सत्रहरू खोज्न सकिएन",
-      "allActive": "सबै सत्रहरू सक्रिय छन्",
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "कुनै पुराना सत्रहरू छैनन्",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "अद्यावधिक हुँदै"
     },
     "sessionRow": {
       "deleteTitle": "सत्र मेटाउने?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "सत्र बाहिरियो",
     "remoteSpawnRetryable": "इन्स्ट्यान्समा पुग्न सकिएन — यो विच्छेद भएको हुन सक्छ।",
     "remoteSpawnNonRetryable": "इन्स्ट्यान्सले सत्र सुरु गर्न असफल भयो — मेसिन जाँच्नुहोस् वा CLI अपडेट गर्नुहोस्।",
-    "remoteSpawnInstanceDisconnected": "चयन गरिएको इन्स्ट्यान्स विच्छेद भयो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।"
+    "remoteSpawnInstanceDisconnected": "चयन गरिएको इन्स्ट्यान्स विच्छेद भयो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देशहरू छैनन्",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
-      "connectRepository": "भण्डार जडान गर्नुहोस्",
       "cloningSession": "सत्र क्लोन गर्दै",
       "continue": "जारी राख्नुहोस्",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन",
-      "cloneFailed": "यो सत्र क्लोन गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्र क्लोन गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।",
       "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
       "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
       "connectionTrouble": "जडान समस्या। कृपया केही क्षणमा फेरि प्रयास गर्नुहोस्।",
-      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।"
+      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।",
+      "cancelQueuedFailed": "सन्देश रद्द गर्न सकिएन।",
+      "cancelQueuedRestoreAvailable": "सन्देश रद्द गरियो। यसलाई सन्देश लेख्ने ठाउँमा फर्काउन “पुनः स्थापित गर्नुहोस्” मा ट्याप गर्नुहोस्।",
+      "cancelQueuedRestored": "सन्देश रद्द गरियो। प्रम्प्ट सन्देश लेख्ने ठाउँमा फर्किएको छ।",
+      "cancelQueuedUpgradeRequired": "लाममा रहेका सन्देशहरू रद्द गर्न नयाँ Kilo CLI चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र सिर्जना गर्न असफल भयो",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएन। गिटल्याबको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
       "openBitbucket": "बिटबकेट खोल्नुहोस्",
       "openGitlab": "गिटल्याब खोल्नुहोस्",
-      "recentlyUsed": "हालै प्रयोग गरिएका"
+      "recentlyUsed": "हालै प्रयोग गरिएका",
+      "continueFrom": "{{title}} जारी राख्दै",
+      "importingSession": "सत्र आयात गर्दै",
+      "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
+      "importFailed": "यो सत्र आयात गर्न सकिएन।",
+      "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "तपाईंको कम्प्युटरको एउटा प्रोजेक्टमा `kilo remote` चलाउनुहोस्, वा कुनै CLI पहिले नै चलिरहेको छ भने Kilo CLI अद्यावधिक गर्नुहोस्।",
       "instanceOnProject": "{{project}} मा {{name}}",
       "instanceOnProjectSuffix": "{{project}} मा {{name}} ({{suffix}})",
-      "runOnCloudAgent": "क्लाउड एजेन्टमा चलाउनुहोस्"
+      "runOnCloudAgent": "क्लाउड एजेन्टमा चलाउनुहोस्",
+      "terminals": "टर्मिनलहरू",
+      "remotes": "रिमोट इन्स्ट्यान्सहरू"
     },
     "modePicker": {
       "title": "मोड चयन गर्नुहोस्",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "सन्देश लाइनमा राखियो",
       "userMessage": "प्रयोगकर्ता सन्देश",
       "assistantMessage": "सहायक सन्देश",
-      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्"
+      "longPressHint": "सन्देश विवरणका लागि लामो थिच्नुहोस्",
+      "cancelQueued": "सन्देश रद्द गर्नुहोस्",
+      "cancelQueuedAccessibility": "लाममा रहेको सन्देश रद्द गर्नुहोस्",
+      "restoreQueued": "पुनः स्थापित गर्नुहोस्",
+      "restoreQueuedAccessibility": "रद्द गरिएको सन्देशलाई सन्देश लेख्ने ठाउँमा पुनः स्थापित गर्नुहोस्"
     },
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भयो",
@@ -2462,6 +2496,8 @@
       "viewTable": "तालिका हेर्नुहोस्",
       "title": "तालिका",
       "close": "तालिका बन्द गर्नुहोस्",
+      "loading": "तालिका लोड हुँदैछ",
+      "empty": "यो तालिकामा कुनै पङ्क्ति छैन।",
       "columnCount_one": "स्तम्भ",
       "columnCount": "स्तम्भहरू",
       "columnCount_other": "स्तम्भहरू",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "सत्र फिल्टर गर्नुहोस्",
-      "sortBy": "क्रमबद्ध गर्ने आधार",
-      "sortLastUpdated": "पछिल्लो अद्यावधिक",
-      "sortCreated": "सिर्जना गरिएको",
       "platform": "प्लेटफर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेन्सन",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "अन्य",
-      "project": "परियोजना",
-      "removeProjectFilter": "{{label}} परियोजना फिल्टर हटाउनुहोस्",
-      "removePlatformFilter": "{{label}} प्लेटफर्म फिल्टर हटाउनुहोस्"
+      "project": "परियोजना"
     },
     "suggestion": {
       "title": "सुझाव",
@@ -2528,7 +2559,9 @@
       "uploading": "अपलोड हुँदै…",
       "uploaded": "अपलोड गरियो",
       "uploadFailedRetry": "अपलोड असफल भयो। पुनःप्रयास गर्न ट्याप गर्नुहोस्।",
-      "uploadFailedTerminal": "यो फाइल अपलोड गर्न सकिँदैन।"
+      "uploadFailedTerminal": "यो फाइल अपलोड गर्न सकिँदैन।",
+      "moveLeft": "{{filename}} बायाँ सार्नुहोस्",
+      "moveRight": "{{filename}} दायाँ सार्नुहोस्"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्डबाट छवि टाँस्नुहोस्",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "समाप्त गर्दै...",
       "messagePlaceholder": "सन्देश...",
       "cannotReceiveFiles": "यो सत्रले फाइल प्राप्त गर्न सक्दैन। आफ्नो सन्देश पठाउन संलग्नहरू हटाउनुहोस्।",
-      "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न पठाउनुहोस् ट्याप गर्नुहोस्।"
+      "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न पठाउनुहोस् ट्याप गर्नुहोस्।",
+      "discardAttachmentsMessage": "पठाइएका सन्देशहरूमा संलग्न नभएका अपलोडहरू मेटिनेछन्।",
+      "discardAttachmentsTitle": "संलग्नकहरू खारेज गर्ने?",
+      "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
+      "insertNewline": "नयाँ पङ्क्ति घुसाउनुहोस्"
     },
     "chatLink": {
       "linkCopied": "लिंक प्रतिलिपि गरियो",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "यो लिंकले {{host}} तपाईंको ब्राउजरमा खोल्छ।",
       "open": "खोल्नुहोस्",
       "trustThisHost": "यो होस्टलाई भरोसा गर्नुहोस्"
+    },
+    "folderPicker": {
+      "fieldLabel": "फोल्डर",
+      "accessibility": "फोल्डर: {{label}}",
+      "tapToListHint": "यसको सामग्री सूचीबद्ध गर्न फोल्डर ट्याप गर्नुहोस्",
+      "emptyTitle": "भित्र कुनै फोल्डर छैन",
+      "emptyDescription": "सम्पन्नले यो फोल्डर प्रयोग गर्छ।",
+      "retryableTitle": "फोल्डरहरू सूचीबद्ध गर्न सकिएन",
+      "retryableDescription": "आफ्नो जडान जाँचेर पुनः प्रयास गर्नुहोस्। सम्पन्नले अझै पनि यो फोल्डर पुष्टि गर्छ।",
+      "unsupportedTitle": "फोल्डरहरू सूचीबद्ध गर्न सकिँदैन",
+      "unsupportedDescription": "यो CLI ले फोल्डरहरू सूचीबद्ध गर्न सक्दैन। सम्पन्नले सुरु गरिएको फोल्डर राख्छ र सत्र सुरु गर्नुहोस् त्यहीँबाट सुरु हुन्छ।"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "explore": "अन्वेषण",
     "seeAll": "सबै हेर्नुहोस्",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "अहिले केही पनि चलिरहेको छैन"
   },
   "imageViewer": {
     "close": "{{filename}} बन्द गर्नुहोस्",
@@ -2766,7 +2814,8 @@
     "busy": "भ्वाइस इनपुट व्यस्त छ। फेरि प्रयास गर्नुहोस्।",
     "stopped": "भ्वाइस इनपुट रोकियो। फेरि प्रयास गर्न माइक्रोफोनमा ट्याप गर्नुहोस्।",
     "unavailableDevice": "यो यन्त्रमा भ्वाइस इनपुट उपलब्ध छैन।",
-    "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।"
+    "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।",
+    "listeningStopped": "सुन्न रोकियो।"
   },
   "share": {
     "title": "Kilo मा साझेदारी गर्नुहोस्",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "जब तपाईं लिंकको होस्टलाई भरोसा गर्नुहुन्छ, यो फेरि नसोधी खुल्छ।",
     "revoke": "खारेज गर्नुहोस् {{host}}",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
+  },
+  "quickChat": {
+    "title": "कुराकानी",
+    "composer": {
+      "placeholder": "सन्देश"
+    },
+    "empty": {
+      "title": "कुराकानी सुरु गर्नुहोस्",
+      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
+    },
+    "working": "काम गर्दै",
+    "historyRetry": "कुराकानी इतिहास लोड गर्न सकिएन।",
+    "catalogRetry": "मोडेलहरू लोड गर्न सकिएन",
+    "sendError": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
   }
 }

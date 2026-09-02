@@ -4,6 +4,7 @@ import { WrapperClient } from '../../kilo/wrapper-client.js';
 import { logger } from '../../logger.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import type { SandboxBillingAdmissionResult } from '../../container-usage-context.js';
 import {
   AgentSandboxUnavailableError,
   type AgentSandbox,
@@ -20,6 +21,7 @@ import {
 import type { SandboxDeleteReason } from '../protocol.js';
 import type { SandboxCreateIntent } from '../runtime-intents.js';
 import type { VercelSandboxRuntimeConfig } from './vercel-runtime-config.js';
+import { classifyVercelSession } from './vercel-runtime-state.js';
 import {
   VercelSandboxRestClient,
   VercelSandboxRestError,
@@ -96,6 +98,22 @@ export class VercelAgentSandbox implements AgentSandbox {
     this.now = dependencies.now ?? Date.now;
     this.runtimeSessionId = metadata.workspace?.providerRuntime?.sessionId;
     this.wrapperProcess = metadata.workspace?.providerRuntime?.wrapper;
+  }
+
+  async ensureBillingAdmission(): Promise<SandboxBillingAdmissionResult> {
+    return {
+      success: false,
+      code: 'meter_unavailable',
+      message: 'Container billing admission is unavailable for Vercel sandbox sessions',
+    };
+  }
+
+  async isBillingBlocked(enforcementRequested = false): Promise<boolean> {
+    return enforcementRequested;
+  }
+
+  async getBillingRuntimeStatus(): Promise<undefined> {
+    return undefined;
   }
 
   private get sandboxName(): string {
@@ -406,24 +424,6 @@ export class VercelAgentSandbox implements AgentSandbox {
     throw new Error('Vercel wrapper did not report the persisted lease');
   }
 
-  // TODO: Vercel is not on the Cloudflare container meter. These admit and
-  // never block so AgentSandbox callers do not throw; wire real billing later.
-  async ensureBillingAdmission() {
-    return { success: true as const };
-  }
-
-  async isBillingBlocked(_enforcementRequested = false): Promise<boolean> {
-    return false;
-  }
-
-  async getBillingRuntimeStatus() {
-    return undefined;
-  }
-
-  observeWrappersWithoutWaking(): Promise<WrapperObservation> {
-    return this.discoverSessionWrappers();
-  }
-
   async ensureWrapper(request: EnsureWrapperRequest) {
     const instance = request.leasedInstance;
     if (!instance) throw new Error('Vercel wrapper startup requires a physical wrapper lease');
@@ -433,6 +433,41 @@ export class VercelAgentSandbox implements AgentSandbox {
     const client = this.wrapperClient(sessionId);
     await this.waitForHealthyWrapper(client, instance);
     return { status: 'wrapper-running' as const, client };
+  }
+
+  async observeWrappersWithoutWaking(): Promise<WrapperObservation> {
+    const runtime = this.persistedRuntime;
+    if (!runtime?.wrapper) return { status: 'absent' };
+
+    try {
+      const session = await this.restClient.getSession(runtime.sessionId, this.sandboxName);
+      if (classifyVercelSession(session.session.status) === 'terminal') {
+        return { status: 'absent' };
+      }
+      if (session.session.status !== 'running') {
+        return {
+          status: 'inspection-failed',
+          error: `Vercel sandbox runtime is ${session.session.status}`,
+        };
+      }
+
+      const command = await this.observeCommand(runtime.sessionId, runtime.wrapper.commandId);
+      if (!command) return { status: 'absent' };
+      return {
+        status: 'present',
+        observed: [
+          observedWrapper(command, {
+            instanceId: runtime.wrapper.instanceId,
+            instanceGeneration: runtime.wrapper.instanceGeneration,
+          }),
+        ],
+      };
+    } catch (error) {
+      if (error instanceof VercelSandboxRestError && error.status === 404) {
+        return { status: 'absent' };
+      }
+      return { status: 'inspection-failed', error: String(error) };
+    }
   }
 
   async discoverSessionWrappers(): Promise<WrapperObservation> {

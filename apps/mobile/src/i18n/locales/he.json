@@ -152,7 +152,11 @@
     "appearanceDark": "כהה",
     "account": "חשבון",
     "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
-    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה.",
+    "returnSendsMessage": "מקש החזרה שולח הודעה",
+    "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש החזרה מוסיף שורה חדשה בשדות ההודעה של הסוכנים.",
+    "biometricUnlock": "ביטול נעילה באמצעות זיהוי ביומטרי",
+    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע."
   },
   "notifications": {
     "title": "התראות",
@@ -211,7 +215,8 @@
     "profile": "פרופיל",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, טאב, {{position}} מתוך {{total}}"
+    "position": "{{name}}, טאב, {{position}} מתוך {{total}}",
+    "chat": "שיחה"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "שגיאת רשת",
       "uploadFailed": "ההעלאה נכשלה",
       "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}",
-      "nothingToPaste": "אין מה להדביק"
+      "nothingToPaste": "אין מה להדביק",
+      "metadataStripFailed": "לא ניתן היה להסיר את מטא-נתוני התמונה."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -900,7 +906,23 @@
       "title": "סקירה",
       "tokens": "אסימונים",
       "tokensInOut": "{{input}} קלט / {{output}} פלט",
-      "pullRequest": "בקשת משיכה"
+      "pullRequest": "בקשת משיכה",
+      "transcriptWaiting": "ממתין לתמליל הסקירה.",
+      "transcriptEmpty": "אין תמליל לסקירה זו.",
+      "transcriptRetry": "לא ניתן היה לטעון את תמליל הסקירה.",
+      "transcriptLive": "חי",
+      "agentIdle": "הסוכן בטל",
+      "agentWorking": "הסוכן עובד...",
+      "anErrorOccurred": "אירעה שגיאה",
+      "errorWithMessage": "שגיאה: {{message}}",
+      "executionStarted": "הביצוע התחיל",
+      "reviewCompleted": "הסקירה הושלמה",
+      "reviewInterrupted": "הסקירה הופסקה",
+      "sessionError": "שגיאת הפעלה: {{error}}",
+      "statusWithValue": "סטטוס: {{status}}",
+      "toolName": "כלי: {{name}}",
+      "toolNameError": "כלי: {{name}} — שגיאה",
+      "unknownError": "שגיאה לא ידועה"
     },
     "reviewList": {
       "configureProvider": "הגדר ספק",
@@ -1585,7 +1607,6 @@
     }
   },
   "agents": {
-    "activeNow": "פעיל כעת",
     "search": {
       "searching": "מחפש",
       "searchSessions": "חפש הפעלות",
@@ -1596,16 +1617,15 @@
     "sessionList": {
       "couldNotLoad": "לא ניתן היה לטעון הפעלות",
       "couldNotLoadActive": "לא ניתן היה לטעון הפעלות פעילות",
-      "noSessionsYet": "אין עדיין הפעלות",
       "noSessionsYetDescription": "התחל משימת קידוד מהטלפון שלך. ההפעלות שלך יופיעו כאן.",
       "noMatches": "אין הפעלות תואמות",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "tryAdjustFilters": "נסה להתאים או לנקות את המסננים שלך.",
       "couldNotSearch": "לא ניתן היה לחפש הפעלות",
-      "allActive": "כל ההפעלות פעילות",
       "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
       "noPastSessions": "אין הפעלות עבר",
-      "live": "חי"
+      "live": "חי",
+      "updating": "מעדכן"
     },
     "sessionRow": {
       "deleteTitle": "למחוק הפעלה?",
@@ -1651,7 +1671,10 @@
     "sessionExited": "ההפעלה הסתיימה",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להפעיל את הסשן — בדוק את המחשב או עדכן את ה-CLI.",
-    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר."
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר.",
+    "liveCount_one": "{{count}} חי",
+    "liveCount_other": "{{count}} חי",
+    "liveCount_two": "{{count}} חי"
   },
   "agentChat": {
     "session": {
@@ -1673,18 +1696,19 @@
       "scrollToBottom": "גלול לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
-      "connectRepository": "חיבור מאגר",
       "cloningSession": "משכפל סשן",
       "continue": "המשך",
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
-      "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
       "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע.",
-      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב."
+      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב.",
+      "cancelQueuedFailed": "לא ניתן היה לבטל את ההודעה.",
+      "cancelQueuedRestoreAvailable": "ההודעה בוטלה. הקש על שחזר כדי להחזיר אותה לשדה ההודעה.",
+      "cancelQueuedRestored": "ההודעה בוטלה. ההנחיה חזרה לשדה ההודעה.",
+      "cancelQueuedUpgradeRequired": "ביטול הודעות בתור דורש Kilo CLI חדש יותר. עדכן את Kilo CLI והתחבר מחדש."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
@@ -1752,7 +1776,12 @@
       "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
       "openBitbucket": "פתח את Bitbucket",
       "openGitlab": "פתח את GitLab",
-      "recentlyUsed": "בשימוש לאחרונה"
+      "recentlyUsed": "בשימוש לאחרונה",
+      "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
+      "continueFrom": "ממשיך {{title}}",
+      "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
+      "importingSession": "מייבא הפעלה",
+      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו."
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -1811,7 +1840,9 @@
       "noCliInstancesDescription": "הרץ `kilo remote` בפרויקט במחשב שלך, או עדכן את Kilo CLI אם אחד כבר פועל.",
       "instanceOnProject": "{{name}} ב-{{project}}",
       "instanceOnProjectSuffix": "{{name}} ב-{{project}} ({{suffix}})",
-      "runOnCloudAgent": "הרץ על סוכן ענן"
+      "runOnCloudAgent": "הרץ על סוכן ענן",
+      "terminals": "מסופים",
+      "remotes": "מופעים מרוחקים"
     },
     "modePicker": {
       "title": "בחר מצב",
@@ -2001,7 +2032,11 @@
       "queuedAccessibility": "ההודעה בתור",
       "userMessage": "הודעת משתמש",
       "assistantMessage": "הודעת עוזר",
-      "longPressHint": "לחיצה ארוכה לפרטי ההודעה"
+      "longPressHint": "לחיצה ארוכה לפרטי ההודעה",
+      "cancelQueued": "בטל הודעה",
+      "cancelQueuedAccessibility": "בטל הודעה בתור",
+      "restoreQueued": "שחזר",
+      "restoreQueuedAccessibility": "שחזר הודעה שבוטלה לשדה ההודעה"
     },
     "olderMessages": {
       "arrived": "הודעות קודמות נטענו",
@@ -2018,6 +2053,8 @@
       "viewTable": "צפה בטבלה",
       "title": "טבלה",
       "close": "סגור טבלה",
+      "loading": "טוען טבלה",
+      "empty": "לטבלה זו אין שורות.",
       "columnCount_one": "עמודה",
       "columnCount": "עמודות",
       "columnCount_other": "עמודות",
@@ -2030,9 +2067,6 @@
     },
     "sessionFilter": {
       "title": "סנן הפעלות",
-      "sortBy": "מיין לפי",
-      "sortLastUpdated": "עודכן לאחרונה",
-      "sortCreated": "נוצר",
       "platform": "פלטפורמה",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",
@@ -2041,9 +2075,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "אחר",
-      "project": "פרויקט",
-      "removeProjectFilter": "הסר מסנן פרויקט {{label}}",
-      "removePlatformFilter": "הסר מסנן פלטפורמה {{label}}"
+      "project": "פרויקט"
     },
     "suggestion": {
       "title": "הצעה",
@@ -2086,7 +2118,9 @@
       "uploading": "מעלה…",
       "uploaded": "הועלה",
       "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
-      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה."
+      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה.",
+      "moveLeft": "הזז את {{filename}} שמאלה",
+      "moveRight": "הזז את {{filename}} ימינה"
     },
     "attachmentPasteHint": {
       "accessibility": "הדבק תמונה מהלוח",
@@ -2116,7 +2150,11 @@
       "finalizingPlaceholder": "מסיים...",
       "messagePlaceholder": "הודעה...",
       "cannotReceiveFiles": "סשן זה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה.",
-      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב."
+      "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
+      "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
+      "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
+      "charactersRemaining": "נותרו {{count}} תווים",
+      "insertNewline": "הוסף שורה חדשה"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",
@@ -2209,6 +2247,17 @@
       "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
       "open": "פתח",
       "trustThisHost": "בטח במארח זה"
+    },
+    "folderPicker": {
+      "accessibility": "תיקייה: {{label}}",
+      "emptyDescription": "סיום משתמש בתיקייה זו.",
+      "emptyTitle": "אין תיקיות בפנים",
+      "fieldLabel": "תיקייה",
+      "retryableDescription": "בדוק את החיבור ונסה שוב. סיום עדיין מאשר את התיקייה הזו.",
+      "retryableTitle": "לא ניתן היה לרשום את התיקיות",
+      "tapToListHint": "הקש על תיקייה כדי לרשום את תוכנה",
+      "unsupportedDescription": "CLI זה לא יכול לרשום תיקיות. סיום שומר על תיקיית ההשקה והתחל הפעלה מתחיל שם.",
+      "unsupportedTitle": "לא ניתן לרשום תיקיות"
     }
   },
   "bootstrap": {
@@ -2261,7 +2310,7 @@
     "newCodingTask": "משימת קידוד חדשה",
     "explore": "חקור",
     "seeAll": "ראה הכל",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "שום דבר לא פועל כרגע"
   },
   "imageViewer": {
     "close": "סגור את {{filename}}",
@@ -2325,7 +2374,8 @@
     "busy": "קלט קולי עסוק. נסה שוב.",
     "stopped": "קלט קולי הופסק. הקש על המיקרופון כדי לנסות שוב.",
     "unavailableDevice": "קלט קולי אינו זמין במכשיר זה.",
-    "unavailableLanguage": "קלט קולי אינו זמין עבור שפת המכשיר הזו."
+    "unavailableLanguage": "קלט קולי אינו זמין עבור שפת המכשיר הזו.",
+    "listeningStopped": "ההאזנה הופסקה."
   },
   "share": {
     "title": "שתף ל-Kilo",
@@ -3170,5 +3220,19 @@
     "emptyDescription": "כשאתה בוטח במארח של קישור, הוא נפתח ללא שאלה נוספת.",
     "revoke": "בטל אמון ב{{host}}",
     "backToPreferences": "חזור להעדפות"
+  },
+  "quickChat": {
+    "title": "שיחה",
+    "composer": {
+      "placeholder": "הודעה"
+    },
+    "empty": {
+      "title": "התחל שיחה",
+      "description": "שלח הודעה כדי לשוחח עם מודל."
+    },
+    "working": "עובד",
+    "historyRetry": "לא ניתן היה לטעון את היסטוריית השיחה.",
+    "catalogRetry": "לא ניתן לטעון דגמים",
+    "sendError": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
   }
 }

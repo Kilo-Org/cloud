@@ -13,9 +13,11 @@ import {
   isTextPart,
   isCompactionPart,
   isFilePart,
+  isPartStreaming,
 } from './types';
 import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
+import { getVisibleAssistantParts } from './message-presentation';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -255,17 +257,11 @@ export function MessageBubble({
     const nonImageFileParts = fileParts.filter(part => !part.mime.startsWith('image/'));
 
     return (
-      <div className="group/msg flex flex-col items-end py-2">
-        <div className="mb-1 flex items-center gap-2">
-          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
-            {userContent && <CopyMessageButton getText={getTextForCopy} />}
-            <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
-          </div>
-        </div>
-        <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
+      <div className="group/msg flex flex-col items-end py-2" data-message-role="user">
+        <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-md px-3 py-2 sm:max-w-[85%] md:max-w-[80%]">
           {deliveryBadge && <DeliveryStatusIcon badge={deliveryBadge} />}
           {userContent && (
-            <p className="overflow-wrap-anywhere text-sm wrap-break-word whitespace-pre-wrap">
+            <p className="overflow-wrap-anywhere text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">
               <TextWithLinks text={userContent} />
             </p>
           )}
@@ -275,6 +271,10 @@ export function MessageBubble({
           {nonImageFileParts.map((part, index) => (
             <InlineFileAttachment key={part.id || index} part={part} />
           ))}
+        </div>
+        <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
+          {userContent && <CopyMessageButton getText={getTextForCopy} />}
+          <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
         </div>
       </div>
     );
@@ -292,20 +292,18 @@ export function MessageBubble({
       : undefined;
     const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
 
+    const parts = getVisibleAssistantParts(message.parts);
+    const hasText = parts.some(isTextPart);
+    if (parts.length === 0 && !showError) return null;
+
     return (
-      <div className="group/msg py-2">
-        <div className="mb-1 flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
-          <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
-          {!isStreaming && message.parts.some(isTextPart) && (
-            <CopyMessageButton getText={getTextForCopy} />
-          )}
-        </div>
-        <div className="space-y-2">
-          {message.parts.map((part, index) => (
+      <div className="group/msg py-1.5" data-message-role="assistant">
+        <div className="space-y-0.5">
+          {parts.map(part => (
             <PartRenderer
-              key={part.id || index}
+              key={part.id}
               part={part}
-              isStreaming={isStreaming}
+              isStreaming={isStreaming && isPartStreaming(part)}
               getChildMessages={getChildMessages}
               onOpenChildSession={onOpenChildSession}
             />
@@ -317,6 +315,12 @@ export function MessageBubble({
             <AlertCircle className="h-3 w-3" />
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
+        )}
+        {!isStreaming && hasText && (
+          <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">
+            <CopyMessageButton getText={getTextForCopy} />
+            <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
+          </div>
         )}
       </div>
     );

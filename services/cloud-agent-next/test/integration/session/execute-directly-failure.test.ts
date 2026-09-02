@@ -7,7 +7,7 @@
  */
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
@@ -15,7 +15,6 @@ import { listPendingSessionMessages } from '../../../src/session/pending-message
 import {
   getWrapperLease,
   getWrapperRuntimeState,
-  recordWrapperPong,
   allocateWrapperRuntimeState,
   recordWrapperAcceptedMessage,
 } from '../../../src/session/wrapper-runtime-state.js';
@@ -572,13 +571,13 @@ describe('new-path liveness without executionId', () => {
     expect(failedPayload).toMatchObject({
       messageId: 'msg_018f1e2d3c4bnewlivabcdefgh',
       status: 'failed',
-      error: 'Agent wrapper produced no output',
+      error: 'Agent wrapper made no execution progress during the watchdog window',
       delivery: 'sent',
       accepted: true,
       failure: {
         stage: 'post_dispatch_no_activity',
         code: 'wrapper_no_output',
-        message: 'Agent wrapper produced no output',
+        message: 'Agent wrapper made no execution progress during the watchdog window',
       },
     });
 
@@ -689,7 +688,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
-        execute: async (plan: FencedWrapperDispatchRequest) => {
+        execute: async () => {
           throw new Error('Sandbox connect failed');
         },
       };
@@ -792,7 +791,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
-        execute: async (plan: FencedWrapperDispatchRequest) => {
+        execute: async () => {
           throw new Error('Sandbox connect failed');
         },
       };

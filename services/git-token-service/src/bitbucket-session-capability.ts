@@ -33,10 +33,8 @@ const BitbucketSessionCapabilityClaimsSchema = z
     workspaceSlug: WorkspaceSlugSchema,
     repositoryUuid: z.uuid(),
     repositoryFullName: RepositoryFullNameSchema,
-    // A digest of the resolved token at issue time. The redeem path re-resolves
-    // the current token and compares digests, so a rotated token invalidates the
-    // capability regardless of which Bitbucket auth source backs it.
     tokenDigest: TokenDigestSchema,
+    oauthCredentialId: z.string().min(1).optional(),
     outboundContainerId: z.string().min(1),
     issuedAt: z.number().int().nonnegative(),
     expiresAt: z.number().int().positive(),

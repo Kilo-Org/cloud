@@ -57,6 +57,7 @@ export type MeteredSandboxInstance = SandboxInstance & {
   ensureBillingAdmission(input: unknown): Promise<SandboxBillingAdmissionResult>;
   isBillingBlocked(): Promise<boolean>;
   isContainerRunning(): Promise<boolean>;
+  forceDestroyForControlPlane(): Promise<void>;
   getBillingRuntimeStatus(): Promise<{
     sandboxClassName: SandboxClassName;
     running: boolean;
@@ -299,6 +300,24 @@ export async function isSandboxContainerRunning(
       .warn('Container running probe failed');
     return undefined;
   }
+}
+
+function supportsControlPlaneForceDestroy(
+  sandbox: unknown
+): sandbox is Pick<MeteredSandboxInstance, 'forceDestroyForControlPlane'> {
+  return (
+    typeof sandbox === 'object' &&
+    sandbox !== null &&
+    'forceDestroyForControlPlane' in sandbox &&
+    typeof sandbox.forceDestroyForControlPlane === 'function'
+  );
+}
+
+export async function forceDestroyControlPlaneSandbox(sandbox: unknown): Promise<void> {
+  if (!supportsControlPlaneForceDestroy(sandbox)) {
+    throw new Error('Cloudflare control-plane native destruction is unavailable');
+  }
+  await sandbox.forceDestroyForControlPlane();
 }
 
 export async function getSandboxBillingRuntimeStatus(sandbox: SandboxInstance): Promise<

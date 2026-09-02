@@ -152,7 +152,11 @@
     "appearanceDark": "Tmavý",
     "account": "Účet",
     "prReviewAttribution": "Přidat atribuci aplikace k recenzím PR",
-    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“."
+    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“.",
+    "returnSendsMessage": "Klávesa Enter odesílá zprávu",
+    "returnSendsMessageSubtitle": "Když je tato volba vypnutá, klávesa Enter vloží nový řádek do polí pro zprávu agentům.",
+    "biometricUnlock": "Odemykat pomocí biometrie",
+    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -679,7 +683,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, karta, {{position}} z {{total}}"
+    "position": "{{name}}, karta, {{position}} z {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -763,7 +768,8 @@
       "networkError": "Chyba sítě",
       "uploadFailed": "Nahrávání se nezdařilo",
       "failedToUploadFile": "Soubor se nepodařilo nahrát: {{reason}}",
-      "nothingToPaste": "Nic k vložení"
+      "nothingToPaste": "Nic k vložení",
+      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1317,7 +1323,23 @@
       "checkRun": "Kontrola běhu",
       "status": "Stav",
       "threshold": "Práh",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čeká se na přepis kontroly.",
+      "transcriptEmpty": "Pro tuto kontrolu neexistuje přepis.",
+      "transcriptRetry": "Nepodařilo se načíst přepis kontroly.",
+      "transcriptLive": "Živě",
+      "agentIdle": "Agent nečinný",
+      "agentWorking": "Agent pracuje…",
+      "anErrorOccurred": "Došlo k chybě",
+      "errorWithMessage": "Chyba: {{message}}",
+      "executionStarted": "Provádění spuštěno",
+      "reviewCompleted": "Recenze dokončena",
+      "reviewInterrupted": "Recenze přerušena",
+      "sessionError": "Chyba relace: {{error}}",
+      "statusWithValue": "Stav: {{status}}",
+      "toolName": "Nástroj: {{name}}",
+      "toolNameError": "Nástroj: {{name}} — chyba",
+      "unknownError": "Neznámá chyba"
     },
     "reviewMemory": {
       "title": "Paměť kontroly",
@@ -2059,7 +2081,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nyní aktivní",
     "search": {
       "searching": "Hledání",
       "searchSessions": "Hledat relace",
@@ -2070,16 +2091,15 @@
     "sessionList": {
       "couldNotLoad": "Relace se nepodařilo načíst",
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst",
-      "noSessionsYet": "Zatím žádné relace",
       "noSessionsYetDescription": "Spusťte programátorskou úlohu z telefonu. Vaše relace se zde zobrazí.",
       "noMatches": "Žádné relace neodpovídají",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "tryAdjustFilters": "Zkuste upravit nebo vymazat své filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat",
-      "allActive": "Všechny relace jsou aktivní",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné minulé relace",
-      "live": "ŽIVĚ"
+      "live": "ŽIVĚ",
+      "updating": "Aktualizuje se"
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",
@@ -2127,7 +2147,11 @@
     "sessionExited": "Relace ukončena",
     "remoteSpawnRetryable": "Instanci se nepodařilo dosáhnout — mohla se odpojit.",
     "remoteSpawnNonRetryable": "Instanci se nepodařilo spustit relaci — zkontrolujte stroj nebo aktualizujte CLI.",
-    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusťte relaci na Cloud Agent nebo vyberte jinou instanci."
+    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusťte relaci na Cloud Agent nebo vyberte jinou instanci.",
+    "liveCount_one": "{{count}} ŽIVĚ",
+    "liveCount_other": "{{count}} ŽIVĚ",
+    "liveCount_few": "{{count}} ŽIVĚ",
+    "liveCount_many": "{{count}} ŽIVĚ"
   },
   "agentChat": {
     "session": {
@@ -2149,18 +2173,19 @@
       "scrollToBottom": "Posunout dolů",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
-      "connectRepository": "Připojit repozitář",
       "cloningSession": "Klonování relace",
       "continue": "Pokračovat",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst",
-      "cloneFailed": "Tuto relaci se nepodařilo klonovat.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "connectRepositoryToContinue": "Pro pokračování připojte repozitář.",
       "notEnoughCredits": "Nemáte dost kreditů ke spuštění Cloud Agent. Přidejte kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úloha stále běží. Počkejte prosím chvíli.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
       "connectionTrouble": "Problém s připojením. Zkuste to prosím za chvíli.",
-      "modelUnavailable": "Tento model není pro Cloud Agent dostupný. Vyberte jiný model a zkuste to znovu."
+      "modelUnavailable": "Tento model není pro Cloud Agent dostupný. Vyberte jiný model a zkuste to znovu.",
+      "cancelQueuedFailed": "Zprávu se nepodařilo zrušit.",
+      "cancelQueuedRestoreAvailable": "Zpráva zrušena. Klepnutím na Obnovit ji vrátíte do pole pro zprávu.",
+      "cancelQueuedRestored": "Zpráva zrušena. Dotaz je zpět v poli pro zprávu.",
+      "cancelQueuedUpgradeRequired": "Rušení zpráv ve frontě vyžaduje novější Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "remoteSession": {
       "failedToCreate": "Vzdálenou relaci se nepodařilo vytvořit",
@@ -2228,7 +2253,12 @@
       "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
       "openBitbucket": "Otevřít Bitbucket",
       "openGitlab": "Otevřít GitLab",
-      "recentlyUsed": "Nedávno použité"
+      "recentlyUsed": "Nedávno použité",
+      "cliCannotContinue": "Toto CLI nemůže pokračovat v relaci. Vyberte Cloud Agent nebo jiné CLI.",
+      "continueFrom": "Pokračování {{title}}",
+      "importFailed": "Tuto relaci se nepodařilo importovat.",
+      "importingSession": "Importování relace",
+      "discardWithUploadsMessage": "Váš dotaz a všechny nahrané soubory nepřipojené k odeslaným zprávám budou smazány."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2257,7 +2287,7 @@
       "toolGrep": "grep",
       "toolList": "seznam",
       "toolPatch": "oprava",
-      "toolTask": "Úkol",
+      "toolTask": "úkol",
       "readTodos": "Přečíst úkoly",
       "updateTodos": "Aktualizovat úkoly",
       "linesBadge": "{{displayCount}} řádků",
@@ -2288,7 +2318,9 @@
       "noCliInstancesDescription": "Spusťte `kilo remote` v projektu na počítači, nebo aktualizujte Kilo CLI, pokud jeden již běží.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Spustit na Cloud Agent"
+      "runOnCloudAgent": "Spustit na Cloud Agent",
+      "terminals": "Terminály",
+      "remotes": "Vzdálené instance"
     },
     "modePicker": {
       "title": "Vybrat režim",
@@ -2478,7 +2510,11 @@
       "queuedAccessibility": "Zpráva ve frontě",
       "userMessage": "Uživatelská zpráva",
       "assistantMessage": "Zpráva asistenta",
-      "longPressHint": "Dlouhým stisknutím zobrazíte podrobnosti zprávy"
+      "longPressHint": "Dlouhým stisknutím zobrazíte podrobnosti zprávy",
+      "cancelQueued": "Zrušit zprávu",
+      "cancelQueuedAccessibility": "Zrušit zprávu ve frontě",
+      "restoreQueued": "Obnovit",
+      "restoreQueuedAccessibility": "Obnovit zrušenou zprávu do pole pro zprávu"
     },
     "olderMessages": {
       "arrived": "Načteny dřívější zprávy",
@@ -2496,6 +2532,8 @@
       "viewTable": "Zobrazit tabulku",
       "title": "Tabulka",
       "close": "Zavřít tabulku",
+      "loading": "Načítání tabulky",
+      "empty": "Tato tabulka nemá žádné řádky.",
       "columnCount_one": "sloupec",
       "columnCount": "sloupce",
       "columnCount_other": "sloupce",
@@ -2510,9 +2548,6 @@
     },
     "sessionFilter": {
       "title": "Filtrovat relace",
-      "sortBy": "Řadit podle",
-      "sortLastUpdated": "Poslední aktualizace",
-      "sortCreated": "Vytvořeno",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Rozšíření",
@@ -2521,9 +2556,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Jiné",
-      "project": "Projekt",
-      "removeProjectFilter": "Odebrat filtr projektu {{label}}",
-      "removePlatformFilter": "Odebrat filtr platformy {{label}}"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Návrh",
@@ -2566,7 +2599,9 @@
       "uploading": "Nahrává se…",
       "uploaded": "Nahráno",
       "uploadFailedRetry": "Nahrávání se nezdařilo. Klepnutím opakujte.",
-      "uploadFailedTerminal": "Tento soubor nelze nahrát."
+      "uploadFailedTerminal": "Tento soubor nelze nahrát.",
+      "moveLeft": "Posunout {{filename}} doleva",
+      "moveRight": "Posunout {{filename}} doprava"
     },
     "attachmentPasteHint": {
       "accessibility": "Vložit obrázek ze schránky",
@@ -2596,7 +2631,11 @@
       "finalizingPlaceholder": "Dokončuje se...",
       "messagePlaceholder": "Zpráva...",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
-      "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na odeslat to zkuste znovu."
+      "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na odeslat to zkuste znovu.",
+      "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
+      "discardAttachmentsTitle": "Zahodit přílohy?",
+      "charactersRemaining": "Zbývající počet znaků: {{count}}",
+      "insertNewline": "Vložit nový řádek"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",
@@ -2674,7 +2713,7 @@
       "open": "otevřený pull request",
       "closed": "uzavřený pull request",
       "merged": "sloučený pull request",
-      "draft": "Návrh pull requestu",
+      "draft": "návrh pull requestu",
       "updating": "Aktualizuje se, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2690,6 +2729,17 @@
       "hostConfirmMessage": "Tento odkaz otevře {{host}} ve vašem prohlížeči.",
       "open": "Otevřít",
       "trustThisHost": "Důvěřovat tomuto hostiteli"
+    },
+    "folderPicker": {
+      "accessibility": "Složka: {{label}}",
+      "emptyDescription": "Hotovo použije tuto složku.",
+      "emptyTitle": "Uvnitř nejsou žádné složky",
+      "fieldLabel": "Složka",
+      "retryableDescription": "Zkontrolujte připojení a stiskněte Zkusit znovu. Hotovo tuto složku i tak potvrdí.",
+      "retryableTitle": "Složky se nepodařilo zobrazit",
+      "tapToListHint": "Klepnutím na složku zobrazíte její obsah",
+      "unsupportedDescription": "Toto CLI neumí zobrazit složky. Hotovo ponechá spouštěcí složku a Spustit relaci začne tam.",
+      "unsupportedTitle": "Složky nelze zobrazit"
     }
   },
   "bootstrap": {
@@ -2742,7 +2792,7 @@
     "newCodingTask": "Nový programovací úkol",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Právě nic neběží"
   },
   "imageViewer": {
     "close": "Zavřít {{filename}}",
@@ -2806,7 +2856,8 @@
     "busy": "Hlasový vstup je zaneprázdněn. Zkuste to znovu.",
     "stopped": "Hlasový vstup se zastavil. Klepnutím na mikrofon to zkusíte znovu.",
     "unavailableDevice": "Hlasový vstup není na tomto zařízení k dispozici.",
-    "unavailableLanguage": "Hlasový vstup není k dispozici pro jazyk tohoto zařízení."
+    "unavailableLanguage": "Hlasový vstup není k dispozici pro jazyk tohoto zařízení.",
+    "listeningStopped": "Poslech zastaven."
   },
   "share": {
     "title": "Sdílet do Kilo",
@@ -3191,5 +3242,19 @@
     "emptyDescription": "Když důvěřujete hostiteli odkazu, otevře se bez dalšího dotázání.",
     "revoke": "Odebrat {{host}}",
     "backToPreferences": "Zpět na předvolby"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Zpráva"
+    },
+    "empty": {
+      "title": "Začněte chatovat",
+      "description": "Pošlete zprávu, abyste si popovídali s modelem."
+    },
+    "working": "Pracuji",
+    "historyRetry": "Historie chatu se nepodařila načíst.",
+    "catalogRetry": "Modely se nepodařilo načíst",
+    "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
   }
 }

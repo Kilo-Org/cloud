@@ -4,20 +4,33 @@ import { Pressable, View } from 'react-native';
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 export function SheetHeader({
   title,
+  titleEllipsis = 'tail',
   onDone,
   onCancel,
   doneLabel,
+  cancelLabel,
   onShare,
   sharing = false,
   disabled = false,
 }: {
   title: string;
+  /**
+   * 'middle' keeps a filename's extension visible. Android ignores middle
+   * truncation past the first line and falls back to tail.
+   */
+  titleEllipsis?: 'tail' | 'middle';
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
+  /**
+   * Overrides the leading control's visible text and accessibility label, so
+   * an in-sheet Back is announced as Back, not Cancel.
+   */
+  cancelLabel?: string;
   onShare?: () => void;
   sharing?: boolean;
   disabled?: boolean;
@@ -25,28 +38,15 @@ export function SheetHeader({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
-  // Logical `start-*`/`end-*` utilities mirror with the native layout
-  // direction (I18nManager), which forceRTL sets before the reload: Cancel and
-  // Share stay on the leading edge, Done on the trailing edge. Do not derive
-  // the side from i18n.dir() (Intl.Locale.getTextInfo is unreliable in Hermes)
-  // or I18nManager.isRTL (a stale module-load-time constant in RN 0.86).
-  const leadingClass = 'start-0';
-  const trailingClass = 'end-0';
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
+  // Native row direction and logical margin keep Cancel/Share leading and Done
+  // trailing. Do not derive sides from i18n.dir() or the stale I18nManager.isRTL.
   return (
     // collapsable={false}: react-native-screens lays out a formSheet's scroll
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
-      <View className="h-11 flex-row items-center justify-center">
-        <View className="flex-1 px-24">
-          <Text
-            className="text-center text-lg font-semibold text-foreground"
-            numberOfLines={1}
-            accessibilityRole="header"
-          >
-            {title}
-          </Text>
-        </View>
+      <View className="min-h-11 flex-row items-center gap-x-3">
         {onShare !== undefined ? (
           <Pressable
             onPress={onShare}
@@ -55,7 +55,7 @@ export function SheetHeader({
             accessibilityRole="button"
             accessibilityLabel={t('common.share', { title })}
             accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
-            className={`absolute ${leadingClass} px-2 py-2 active:opacity-70 disabled:opacity-50`}
+            className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
           >
             <Share size={20} color={colors.foreground} />
           </Pressable>
@@ -66,21 +66,40 @@ export function SheetHeader({
             disabled={disabled}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={t('common.cancel')}
-            className={`absolute ${leadingClass} px-2 py-2 active:opacity-70 disabled:opacity-50`}
+            accessibilityLabel={resolvedCancelLabel}
+            className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
           >
-            <Text className="text-base font-medium text-foreground">{t('common.cancel')}</Text>
+            <Text className="text-center text-base font-medium text-foreground">
+              {resolvedCancelLabel}
+            </Text>
           </Pressable>
         ) : null}
+        {/* min-w-0 lets the title shrink below its content width so it truncates
+            instead of pushing the trailing action out of the row. Cancel and
+            Done bracket the title, so center it between them; without Cancel the
+            title stays leading against the sheet edge. */}
+        <View className="min-w-0 shrink grow">
+          <Text
+            className={cn('text-lg font-semibold text-foreground', onCancel && 'text-center')}
+            numberOfLines={2}
+            ellipsizeMode={titleEllipsis}
+            accessibilityRole="header"
+            accessibilityLabel={title}
+          >
+            {title}
+          </Text>
+        </View>
         <Pressable
           onPress={onDone}
           disabled={disabled}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={resolvedDoneLabel}
-          className={`absolute ${trailingClass} rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable`}
+          className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
         >
-          <Text className="text-base font-medium text-foreground">{resolvedDoneLabel}</Text>
+          <Text className="text-center text-base font-medium text-foreground">
+            {resolvedDoneLabel}
+          </Text>
         </Pressable>
       </View>
     </View>

@@ -67,6 +67,7 @@ export type SessionCreateRequest = {
     callbackTarget?: CallbackTarget;
     kilocodeOrganizationId?: string;
     createdOnPlatform?: string;
+    clientProvenance?: 'browser' | 'mobile';
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;

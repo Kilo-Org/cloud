@@ -116,6 +116,25 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(row.owned_by_organization_id).toBe(orgId);
   });
 
+  test('rejects a second GitHub installation for an organization outside the allowlist', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+
+    const result = await upsertPlatformIntegrationForOwner(
+      owner,
+      baseInstallData(`${INSTALLATION_ID}-second`)
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
+  });
+
   test('same-owner refresh updates the existing row (by primary key)', async () => {
     const owner: Owner = { type: 'user', id: userId };
 

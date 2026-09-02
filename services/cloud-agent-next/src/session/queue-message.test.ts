@@ -1,24 +1,31 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 
-import { queueMessage } from './queue-message.js';
+import {
+  preflightAndQueuePromptMessage,
+  queueMessage,
+  type QueueMessageInput,
+} from './queue-message.js';
+import { preflightExistingPromptModel } from './model-preflight.js';
 import type {
+  CustomerBillingFailure,
   SessionMessageAdmissionResult,
   SubmittedSessionMessageRequest,
 } from '../execution/types.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 
-type QueueMessageEnv = Pick<Env, 'CLOUD_AGENT_SESSION'>;
+vi.mock('./model-preflight.js', () => ({ preflightExistingPromptModel: vi.fn() }));
 
-function makeDoStub(result: SessionMessageAdmissionResult): {
-  stub: unknown;
-  admitSubmittedMessage: ReturnType<typeof vi.fn>;
-} {
+type QueueMessageEnv = Pick<Env, 'CLOUD_AGENT_SESSION' | 'SANDBOX_SESSION'>;
+
+function makeDoStub(result: SessionMessageAdmissionResult) {
   const admitSubmittedMessage = vi.fn().mockResolvedValue(result);
+  const hasMessageAdmission = vi.fn().mockResolvedValue(false);
   return {
-    stub: { admitSubmittedMessage },
+    stub: { admitSubmittedMessage, hasMessageAdmission },
     admitSubmittedMessage,
+    hasMessageAdmission,
   };
 }
 
@@ -28,8 +35,53 @@ function makeEnv(stub: unknown): QueueMessageEnv {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => stub),
     } as unknown as Env['CLOUD_AGENT_SESSION'],
+    SANDBOX_SESSION: {
+      idFromName: vi.fn((name: string) => ({ toString: () => name })),
+      get: vi.fn(() => stub),
+    } as unknown as Env['SANDBOX_SESSION'],
   };
 }
+
+beforeEach(() => {
+  vi.mocked(preflightExistingPromptModel).mockReset().mockResolvedValue(undefined);
+});
+
+describe('preflightAndQueuePromptMessage', () => {
+  it('retains legacy routing and preflight for a control-plane opted-in user', async () => {
+    const { stub, admitSubmittedMessage, hasMessageAdmission } = makeDoStub({
+      success: true,
+      outcome: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      compatibilityDelivery: 'queued',
+    });
+    const env = { ...makeEnv(stub), CONTROL_PLANE_IDS: 'user_abc' } as Env;
+    const idFromName = vi.spyOn(env.CLOUD_AGENT_SESSION, 'idFromName');
+    const getSandboxSession = vi.spyOn(env.SANDBOX_SESSION, 'get');
+    const input: QueueMessageInput = {
+      cloudAgentSessionId: 'agent_existing',
+      turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'follow up' },
+      agent: { model: 'kilo/anthropic/claude-sonnet-4' },
+    };
+
+    await expect(
+      preflightAndQueuePromptMessage(input, { env, userId: 'user_abc' }, 'send')
+    ).resolves.toMatchObject({ delivery: 'queued', messageId: input.turn.id });
+
+    expect(hasMessageAdmission).toHaveBeenCalledExactlyOnceWith(input.turn.id);
+    expect(preflightExistingPromptModel).toHaveBeenCalledExactlyOnceWith({
+      env,
+      userId: 'user_abc',
+      cloudAgentSessionId: 'agent_existing',
+      requestedModel: 'kilo/anthropic/claude-sonnet-4',
+      procedure: 'send',
+    });
+    expect(vi.mocked(preflightExistingPromptModel).mock.invocationCallOrder[0]).toBeLessThan(
+      admitSubmittedMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+    expect(idFromName).toHaveBeenCalledWith('user_abc:agent_existing');
+    expect(getSandboxSession).not.toHaveBeenCalled();
+  });
+});
 
 describe('queueMessage', () => {
   it('returns the DO result mapped to an ExecutionResponse on success', async () => {
@@ -63,8 +115,44 @@ describe('queueMessage', () => {
       userId: 'user_abc',
       turn: { type: 'prompt', prompt: 'hello' },
     });
-    expect(request?.turn.id).toBeUndefined();
+    expect(request?.turn.id).toMatch(/^msg_/);
   });
+
+  it.each(['prompt', 'command'] as const)(
+    'reuses an omitted %s ID after a committed response is lost',
+    async type => {
+      const admissions = new Map<string, SubmittedSessionMessageRequest>();
+      let attempts = 0;
+      const admitSubmittedMessage = vi.fn(
+        async (request: SubmittedSessionMessageRequest): Promise<SessionMessageAdmissionResult> => {
+          const messageId = request.turn.id;
+          if (!messageId) throw new Error('Missing durable message identity');
+          if (!admissions.has(messageId)) admissions.set(messageId, structuredClone(request));
+          attempts += 1;
+          if (attempts === 1)
+            throw Object.assign(new Error('Response lost after admission'), { retryable: true });
+          return { success: true, outcome: 'queued', compatibilityDelivery: 'queued', messageId };
+        }
+      );
+      const response = await queueMessage(
+        {
+          cloudAgentSessionId: 'workspace_existing',
+          turn:
+            type === 'prompt'
+              ? { type, prompt: 'hello' }
+              : { type, command: 'review', arguments: '--all' },
+        },
+        { env: makeEnv({ admitSubmittedMessage }) as Env, userId: 'user_abc' }
+      );
+
+      expect(attempts).toBe(2);
+      expect(admissions.size).toBe(1);
+      expect(admissions.has(response.messageId)).toBe(true);
+      expect(admitSubmittedMessage.mock.calls[0]?.[0].turn.id).toBe(
+        admitSubmittedMessage.mock.calls[1]?.[0].turn.id
+      );
+    }
+  );
 
   it('projects an already runtime-accepted replay as sent at the public seam', async () => {
     const { stub } = makeDoStub({
@@ -172,7 +260,7 @@ describe('queueMessage', () => {
       botId: 'bot_payload',
       turn: {
         type: 'prompt',
-        id: undefined,
+        id: expect.stringMatching(/^msg_/),
         prompt: 'inspect the screenshot',
         attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',
@@ -209,6 +297,78 @@ describe('queueMessage', () => {
       )
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'nope' });
   });
+
+  it.each([
+    ['FORBIDDEN', 'FORBIDDEN', false, 'msg_018f1e2d3c4bAbCdEfGhIjKlMn'],
+    ['MODEL_VALIDATION_UNAVAILABLE', 'SERVICE_UNAVAILABLE', true, undefined],
+  ] as const)(
+    'preserves returned control %s as %s with retryable %s',
+    async (resultCode, trpcCode, retryable, messageId) => {
+      const message = 'Model validation rejected the prompt';
+      const { stub, admitSubmittedMessage, hasMessageAdmission } = makeDoStub({
+        success: false,
+        code: resultCode,
+        error: message,
+      });
+      const env = makeEnv(stub);
+      const idFromName = vi.spyOn(env.SANDBOX_SESSION, 'idFromName');
+      const getLegacySession = vi.spyOn(env.CLOUD_AGENT_SESSION, 'get');
+      const error: unknown = await preflightAndQueuePromptMessage(
+        {
+          cloudAgentSessionId: 'workspace_existing',
+          turn: { type: 'prompt', id: messageId, prompt: 'follow up' },
+        },
+        { env: env as Env, userId: 'user_abc' },
+        'send'
+      ).catch(error => error);
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect(error).toMatchObject({
+        code: trpcCode,
+        message,
+        cause: { error: resultCode, message, retryable },
+      });
+      expect(admitSubmittedMessage).toHaveBeenCalledOnce();
+      expect(idFromName).toHaveBeenCalledWith('user_abc:workspace_existing');
+      expect(getLegacySession).not.toHaveBeenCalled();
+      expect(hasMessageAdmission).not.toHaveBeenCalled();
+      expect(preflightExistingPromptModel).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['PAYMENT_REQUIRED', 'PAYMENT_REQUIRED', 'INSUFFICIENT_CREDITS', false],
+    ['COMPUTE_STOPPING', 'CONFLICT', 'COMPUTE_STOPPING', true],
+    ['BILLING_UNAVAILABLE', 'SERVICE_UNAVAILABLE', 'BILLING_UNAVAILABLE', true],
+  ] as const)(
+    'preserves %s billing failure details and retryability',
+    async (resultCode, trpcCode, billingCode, retryable) => {
+      const billingFailure: CustomerBillingFailure = {
+        code: billingCode,
+        payer: { type: 'org', id: 'org_abc' },
+        retryable,
+        remainingMicrodollars: 1,
+        minimumRequiredMicrodollars: 5,
+      };
+      const { stub } = makeDoStub({
+        success: false,
+        code: resultCode,
+        error: 'Compute billing rejected admission',
+        billingFailure,
+        failureBoundary: 'admission',
+      });
+
+      await expect(
+        queueMessage(
+          { cloudAgentSessionId: 'agent_existing', turn: { type: 'prompt', prompt: 'follow up' } },
+          { env: makeEnv(stub) as Env, userId: 'user_abc' }
+        )
+      ).rejects.toMatchObject({
+        code: trpcCode,
+        cause: { error: resultCode, retryable, billingFailure },
+      });
+    }
+  );
 
   it('maps PENDING_QUEUE_FULL to a retryable TOO_MANY_REQUESTS error', async () => {
     const { stub } = makeDoStub({ success: false, code: 'PENDING_QUEUE_FULL', error: 'full' });

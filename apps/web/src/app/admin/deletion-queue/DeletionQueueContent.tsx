@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { AlertCircle, KeyRound, Plus, RefreshCw, Search, X } from 'lucide-react';
@@ -38,9 +38,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { DeletionQueueDetailContent } from './[id]/DeletionQueueDetailContent';
+import { HistoricalUserIdsForm } from './HistoricalUserIdsForm';
 import { cn } from '@/lib/utils';
 import { deletionAttentionHint } from '@/lib/user/deletion-queue/deletion-hints';
 import {
@@ -461,26 +462,31 @@ function AddRequestsDialog({
   const trpc = useTRPC();
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [mode, setMode] = useState('standard');
+  const [historicalSubmitting, setHistoricalSubmitting] = useState(false);
+  const previewVersion = useRef(0);
   const entries = useMemo(() => parseDeletionEntries(text), [text]);
   const previewMutation = useMutation(trpc.admin.userDeletionQueue.preview.mutationOptions());
   const previewMutateAsync = previewMutation.mutateAsync;
   const submitMutation = useMutation(trpc.admin.userDeletionQueue.submit.mutationOptions());
   const canSubmit = (preview?.accepted.length ?? 0) > 0 && !submitMutation.isPending;
+  const submitting = submitMutation.isPending || historicalSubmitting;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || mode !== 'standard') return;
     if (entries.length === 0) {
       setPreview(null);
       return;
     }
     let cancelled = false;
+    const version = previewVersion.current;
     const handle = window.setTimeout(() => {
       void previewMutateAsync({ entries })
         .then(result => {
-          if (!cancelled) setPreview(result);
+          if (!cancelled && version === previewVersion.current) setPreview(result);
         })
         .catch(error => {
-          if (!cancelled) {
+          if (!cancelled && version === previewVersion.current) {
             toast.error(error instanceof Error ? error.message : 'Preview failed');
           }
         });
@@ -489,9 +495,10 @@ function AddRequestsDialog({
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [entries, open, previewMutateAsync]);
+  }, [entries, mode, open, previewMutateAsync]);
 
   const reset = () => {
+    previewVersion.current += 1;
     setText('');
     setPreview(null);
   };
@@ -500,107 +507,151 @@ function AddRequestsDialog({
     <Dialog
       open={open}
       onOpenChange={next => {
-        if (!next) reset();
+        if (submitting) return;
+        if (!next) {
+          reset();
+          setMode('standard');
+        }
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-xl">
+      <DialogContent
+        className="max-h-[85dvh] max-w-xl overflow-y-auto p-4 sm:p-6"
+        showCloseButton={!submitting}
+      >
         <DialogHeader>
           <DialogTitle>Add deletion requests</DialogTitle>
           <DialogDescription>
-            One request per line. Email and ticket can be on the same line.
+            {mode === 'historical'
+              ? 'Clean up previously deleted accounts by user ID, without contacting the customer.'
+              : 'One request per line. Email and ticket can be on the same line.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <Label htmlFor="deletion-entries">Targets</Label>
-          <Textarea
-            id="deletion-entries"
-            value={text}
-            onChange={event => {
-              setText(event.target.value);
-              setPreview(null);
-            }}
-            className="min-h-40 font-mono"
-            placeholder={
-              'customer@example.com 1234\ncustomer2@example.com\nhttps://app.usepylon.com/issues/5678\n#9999'
-            }
-          />
-          {preview ? (
-            <div className="flex flex-col gap-2 text-sm">
-              {preview.accepted.length > 0 ? (
-                <div>
-                  <p className="font-medium">Accepted ({preview.accepted.length})</p>
-                  <ul className="space-y-1 text-xs">
-                    {preview.accepted.map(entry => (
-                      <li key={`${entry.email}:${entry.pylonTicket ?? ''}`} className="font-mono">
-                        {entry.email || entry.pylonTicket}
-                        {entry.pylonTicket ? ` · ${entry.pylonTicket}` : ''}
-                        {entry.warnings.length > 0 ? (
-                          <span className="text-status-warning block font-sans">
-                            {entry.warnings
-                              .map(
-                                code => deletionAttentionHint(code)?.title ?? humanizeToken(code)
-                              )
-                              .join(' · ')}
-                          </span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {preview.rejected.length > 0 ? (
-                <div>
-                  <p className="font-medium">Rejected ({preview.rejected.length})</p>
-                  <ul className="space-y-1 text-xs">
-                    {preview.rejected.map(entry => (
-                      <li key={`${entry.email}:${entry.code}`} className="font-mono">
-                        {entry.email} · <span className="text-status-warning">{entry.code}</span>
-                      </li>
-                    ))}
-                  </ul>
+        <Tabs
+          value={mode}
+          onValueChange={value => {
+            reset();
+            setMode(value);
+          }}
+        >
+          <TabsList className="w-full" aria-label="Request type">
+            <TabsTrigger className="flex-1" value="standard" disabled={submitting}>
+              Email / ticket
+            </TabsTrigger>
+            <TabsTrigger className="flex-1" value="historical" disabled={submitting}>
+              Historical user IDs
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="historical">
+            <HistoricalUserIdsForm
+              onSubmitted={onSubmitted}
+              onSubmittingChange={setHistoricalSubmitting}
+            />
+          </TabsContent>
+          <TabsContent value="standard" className="space-y-4">
+            <div className="flex flex-col gap-3">
+              <Label htmlFor="deletion-entries">Targets</Label>
+              <Textarea
+                id="deletion-entries"
+                value={text}
+                onChange={event => {
+                  previewVersion.current += 1;
+                  setText(event.target.value);
+                  setPreview(null);
+                }}
+                className="min-h-40 font-mono"
+                placeholder={
+                  'customer@example.com 1234\ncustomer2@example.com\nhttps://app.usepylon.com/issues/5678\n#9999'
+                }
+              />
+              {preview ? (
+                <div className="flex flex-col gap-2 text-sm">
+                  {preview.accepted.length > 0 ? (
+                    <div>
+                      <p className="font-medium">Accepted ({preview.accepted.length})</p>
+                      <ul className="space-y-1 text-xs">
+                        {preview.accepted.map(entry => (
+                          <li
+                            key={`${entry.email}:${entry.pylonTicket ?? ''}`}
+                            className="font-mono"
+                          >
+                            {entry.email || entry.pylonTicket}
+                            {entry.pylonTicket ? ` · ${entry.pylonTicket}` : ''}
+                            {entry.warnings.length > 0 ? (
+                              <span className="text-status-warning block font-sans">
+                                {entry.warnings
+                                  .map(
+                                    code =>
+                                      deletionAttentionHint(code)?.title ?? humanizeToken(code)
+                                  )
+                                  .join(' · ')}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {preview.rejected.length > 0 ? (
+                    <div>
+                      <p className="font-medium">Rejected ({preview.rejected.length})</p>
+                      <ul className="space-y-1 text-xs">
+                        {preview.rejected.map(entry => (
+                          <li key={`${entry.email}:${entry.code}`} className="font-mono">
+                            {entry.email} ·{' '}
+                            <span className="text-status-warning">{entry.code}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          ) : null}
-        </div>
-        <DialogFooter>
-          <Button
-            variant={preview ? 'secondary' : 'default'}
-            onClick={async () => {
-              if (entries.length === 0) return;
-              try {
-                setPreview(await previewMutation.mutateAsync({ entries }));
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : 'Preview failed');
-              }
-            }}
-            disabled={entries.length === 0 || previewMutation.isPending}
-          >
-            Preview
-          </Button>
-          <Button
-            disabled={!canSubmit}
-            onClick={async () => {
-              if (!preview || preview.accepted.length === 0) return;
-              try {
-                await submitMutation.mutateAsync({
-                  entries: preview.accepted.map(entry => ({
-                    email: entry.email,
-                    pylonTicket: entry.pylonTicket ?? undefined,
-                  })),
-                });
-                toast.success('Requests submitted');
-                onSubmitted();
-                onOpenChange(false);
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : 'Submit failed');
-              }
-            }}
-          >
-            Confirm submit
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button
+                variant={preview ? 'secondary' : 'default'}
+                onClick={async () => {
+                  if (entries.length === 0) return;
+                  const version = previewVersion.current;
+                  try {
+                    const result = await previewMutation.mutateAsync({ entries });
+                    if (version === previewVersion.current) setPreview(result);
+                  } catch (error) {
+                    if (version === previewVersion.current) {
+                      toast.error(error instanceof Error ? error.message : 'Preview failed');
+                    }
+                  }
+                }}
+                disabled={entries.length === 0 || previewMutation.isPending}
+              >
+                Preview
+              </Button>
+              <Button
+                disabled={!canSubmit}
+                onClick={async () => {
+                  if (!preview || preview.accepted.length === 0) return;
+                  try {
+                    await submitMutation.mutateAsync({
+                      entries: preview.accepted.map(entry => ({
+                        email: entry.email,
+                        pylonTicket: entry.pylonTicket ?? undefined,
+                      })),
+                    });
+                    toast.success('Requests submitted');
+                    onSubmitted();
+                    reset();
+                    onOpenChange(false);
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Submit failed');
+                  }
+                }}
+              >
+                Confirm submit
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

@@ -91,6 +91,18 @@ export function hasInviteSeatCapacity({
   return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
 }
 
+/**
+ * Capture properties for `organization_member_invited`: `role` only. The old
+ * form also captured the organization id and the invitee email; do not
+ * restore it — the catalog schema allows `role` only and the deny-list
+ * forbids the email.
+ */
+export function organizationMemberInvitedCaptureProperties(role: OrganizationRole): {
+  role: OrganizationRole;
+} {
+  return { role };
+}
+
 export function InviteMemberDialog({
   open,
   onOpenChange,
@@ -181,7 +193,12 @@ export function InviteMemberDialog({
           onMemberInvited();
           onOpenChange(false);
           handleReset();
-          posthog?.capture('organization_member_invited', { organizationId, email, role });
+          // Compatibility: keep capture properties to `role` only. The old form
+          // also sent the organization id and the email; do not restore it.
+          posthog?.capture(
+            'organization_member_invited',
+            organizationMemberInvitedCaptureProperties(role)
+          );
         },
         onError: error => {
           toast.error(error instanceof Error ? error.message : 'Failed to invite member');

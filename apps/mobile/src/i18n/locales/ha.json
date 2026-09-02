@@ -152,7 +152,11 @@
     "appearanceDark": "Duhu",
     "account": "Asusu",
     "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
-    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita.",
+    "returnSendsMessage": "Maɓallin Komawa yana aika saƙo",
+    "returnSendsMessageSubtitle": "Idan a kashe yake, Komawa yana saka sabon layi a wuraren shigar da saƙo na wakilai.",
+    "biometricUnlock": "Buɗe kulle da tantance halittar jiki",
+    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -665,7 +669,8 @@
     "profile": "Bayanan",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, shafi, {{position}} na {{total}}"
+    "position": "{{name}}, shafi, {{position}} na {{total}}",
+    "chat": "Tattaunawa"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Kuskuren hanyar sadarwa",
       "uploadFailed": "Ɗorawa ya gaza",
       "failedToUploadFile": "An kasa ɗora fayil: {{reason}}",
-      "nothingToPaste": "Babu abin da za a manna"
+      "nothingToPaste": "Babu abin da za a manna",
+      "metadataStripFailed": "Ba a iya cire bayanan hoto ba."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1129,9 +1135,9 @@
       "destroying": "ANA RUSHEWA",
       "provisioned": "AN BAYAR",
       "restarting": "ANA SAKE FARWA",
-      "running": "Ana gudana",
+      "running": "ANA GUDANA",
       "shuttingDown": "ANA KASHEWA",
-      "starting": "Ana farawa",
+      "starting": "ANA FARAWA",
       "stopped": "YA TSAYA",
       "stopping": "ANA TSAYARWA",
       "unknown": "BA A SANI BA",
@@ -1299,7 +1305,23 @@
       "checkRun": "Gudanar da duba",
       "status": "Hali",
       "threshold": "Matakin",
-      "pullRequest": "buƙatar jan"
+      "pullRequest": "buƙatar jan",
+      "transcriptWaiting": "Jiran rubutun zaman na bita.",
+      "transcriptEmpty": "Babu rubutun zaman ga wannan bita.",
+      "transcriptRetry": "An kasa ɗora rubutun zaman na bita.",
+      "transcriptLive": "Raya",
+      "agentIdle": "Wakili baya aiki",
+      "agentWorking": "Wakili yana aiki...",
+      "anErrorOccurred": "An sami kuskure",
+      "errorWithMessage": "Kuskure: {{message}}",
+      "executionStarted": "An fara aiwatarwa",
+      "reviewCompleted": "An kammala bita",
+      "reviewInterrupted": "An katse bita",
+      "sessionError": "Kuskuren zama: {{error}}",
+      "statusWithValue": "Hali: {{status}}",
+      "toolName": "Kayan aiki: {{name}}",
+      "toolNameError": "Kayan aiki: {{name}} — kuskure",
+      "unknownError": "Kuskuren da ba a sani ba"
     },
     "reviewMemory": {
       "title": "Ƙwaƙwalwar bita",
@@ -1679,11 +1701,11 @@
       "statusFixed": "An gyara",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "An riga an fara gyara",
-      "reasonNoBandwidth": "Babu damar aiki",
-      "reasonTolerableRisk": "Haɗarin ya zama abin ɗauka",
-      "reasonInaccurate": "Sakamakon bai yi daidai ba",
-      "reasonNotUsed": "Ba a yi amfani da lambar mai rauni ba",
+      "reasonFixStarted": "an riga an fara gyara",
+      "reasonNoBandwidth": "babu damar aiki",
+      "reasonTolerableRisk": "haɗarin ya zama abin ɗauka",
+      "reasonInaccurate": "sakamakon bai yi daidai ba",
+      "reasonNotUsed": "ba a yi amfani da lambar mai rauni ba",
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Yana aiki a yanzu",
     "search": {
       "searching": "Ana nema",
       "searchSessions": "Nemo zaman",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "An kasa loda zaman",
       "couldNotLoadActive": "An kasa loda zaman da ke aiki",
-      "noSessionsYet": "Babu zaman har yanzu",
       "noSessionsYetDescription": "Fara aikin coding daga wayarka. Zamanka za su bayyana a nan.",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wani kalmar bincike dabam.",
       "tryAdjustFilters": "Gwada gyara ko share tacewarka.",
       "couldNotSearch": "An kasa nemo zaman",
-      "allActive": "Duk zaman suna aiki",
       "completedWillAppear": "Zaman da suka gama za su bayyana a nan.",
       "noPastSessions": "Babu zaman da suka gabata",
-      "live": "RAYA"
+      "live": "RAYA",
+      "updating": "Ana sabuntawa"
     },
     "sessionRow": {
       "deleteTitle": "Share zaman?",
@@ -2075,8 +2095,8 @@
       "dollar_one": "dala",
       "dollar": "daloli",
       "dollar_other": "daloli",
-      "costSpoken": "Farashi {{cost}}",
-      "costSpokenWithTime": "Farashi {{cost}}, {{time}}",
+      "costSpoken": "farashi {{cost}}",
+      "costSpokenWithTime": "farashi {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
@@ -2097,7 +2117,9 @@
     "sessionExited": "Zaman ya fita",
     "remoteSpawnRetryable": "An kasa isa ga instance — yana iya zama an yanke.",
     "remoteSpawnNonRetryable": "Instance ta kasa fara zaman — duba na'urar ko sabunta CLI.",
-    "remoteSpawnInstanceDisconnected": "Instance da aka zaɓa ta yanke. Fara zama a Cloud Agent ko zaɓi wata instance."
+    "remoteSpawnInstanceDisconnected": "Instance da aka zaɓa ta yanke. Fara zama a Cloud Agent ko zaɓi wata instance.",
+    "liveCount_one": "{{count}} RAYA",
+    "liveCount_other": "{{count}} RAYA"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "renameAccessibility": "Sake sunan zaman: {{title}}",
-      "connectRepository": "Haɗa ma'ajiya",
       "cloningSession": "Ana kwafa zaman",
       "continue": "Ci gaba",
       "couldNotLoadThisSession": "An kasa loda wannan zaman",
-      "cloneFailed": "An kasa kwafa wannan zaman.",
       "cloneFailedRetry": "An kasa kwafa wannan zaman. Sake gwadawa.",
-      "connectRepositoryToContinue": "Haɗa ma'ajiya domin ci gaba.",
       "notEnoughCredits": "Ba isassun kiredit don gudanar da Cloud Agent ba. Ƙara kiredit ka sake gwadawa.",
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
       "connectionTrouble": "Matsalar haɗi. Da fatan za ka sake gwadawa bayan ɗan lokaci.",
-      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa."
+      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa.",
+      "cancelQueuedFailed": "An kasa soke saƙon.",
+      "cancelQueuedRestoreAvailable": "An soke saƙon. Danna Maido don mayar da shi zuwa wurin shigar da saƙo.",
+      "cancelQueuedRestored": "An soke saƙon. Bayanin ya koma wurin shigar da saƙo.",
+      "cancelQueuedUpgradeRequired": "Soke saƙonnin da ke jira yana buƙatar sabuwar Kilo CLI. Sabunta Kilo CLI kuma sake haɗawa."
     },
     "remoteSession": {
       "failedToCreate": "An kasa ƙirƙirar zaman na nesa",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na GitLab, sannan ka sabunta.",
       "openBitbucket": "Buɗe Bitbucket",
       "openGitlab": "Buɗe GitLab",
-      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan"
+      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan",
+      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zama ba. Zaɓi Cloud Agent ko wani CLI.",
+      "continueFrom": "Ci gaba da {{title}}",
+      "importFailed": "An kasa shigo da wannan zaman.",
+      "importingSession": "Ana shigo da zama",
+      "discardWithUploadsMessage": "Za a share bayaninka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Gudanar da `kilo remote` a cikin aiki a kwamfutarka, ko sabunta Kilo CLI idan ɗaya yana gudana.",
       "instanceOnProject": "{{name}} a {{project}}",
       "instanceOnProjectSuffix": "{{name}} a {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Gudanar a Cloud Agent"
+      "runOnCloudAgent": "Gudanar a Cloud Agent",
+      "terminals": "Tashoshin umarni",
+      "remotes": "Misalan nesa"
     },
     "modePicker": {
       "title": "Zaɓi yanayin",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "An jera saƙon",
       "userMessage": "Saƙon mai amfani",
       "assistantMessage": "Saƙon mataimaki",
-      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo"
+      "longPressHint": "Danna tsayin lokaci don cikakkun bayanan saƙo",
+      "cancelQueued": "Soke saƙo",
+      "cancelQueuedAccessibility": "Soke saƙon da ke jira",
+      "restoreQueued": "Maido",
+      "restoreQueuedAccessibility": "Maido da saƙon da aka soke zuwa wurin shigar da saƙo"
     },
     "olderMessages": {
       "arrived": "An ɗora saƙonnin farko",
@@ -2462,6 +2496,8 @@
       "viewTable": "Duba tebur",
       "title": "Tebur",
       "close": "Rufe tebur",
+      "loading": "Ana lodin tebur",
+      "empty": "Wannan tebur ba shi da layuka.",
       "columnCount_one": "shafi",
       "columnCount": "shafuka",
       "columnCount_other": "shafuka",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Tace zaman",
-      "sortBy": "Tsara ta",
-      "sortLastUpdated": "An sabunta kwanan nan",
-      "sortCreated": "An ƙirƙira",
       "platform": "Dandali",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Sauran",
-      "project": "Aiki",
-      "removeProjectFilter": "Cire tace aikin {{label}}",
-      "removePlatformFilter": "Cire tace dandamalin {{label}}"
+      "project": "Aiki"
     },
     "suggestion": {
       "title": "Shawara",
@@ -2528,7 +2559,9 @@
       "uploading": "Ana ɗorawa…",
       "uploaded": "An ɗora",
       "uploadFailedRetry": "Ɗorawa ya gaza. Danna don sake gwadawa.",
-      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba."
+      "uploadFailedTerminal": "Ba za a iya ɗora wannan fayil ba.",
+      "moveLeft": "Matsar da {{filename}} zuwa hagu",
+      "moveRight": "Matsar da {{filename}} zuwa dama"
     },
     "attachmentPasteHint": {
       "accessibility": "Manna hoto daga clipboard",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Ana gamawa...",
       "messagePlaceholder": "Saƙo",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire abubuwan da aka haɗa don aika sakonka.",
-      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa."
+      "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna aika don sake gwadawa.",
+      "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
+      "discardAttachmentsTitle": "Watsi da haɗe-haɗe?",
+      "charactersRemaining": "Haruffa {{count}} suka rage",
+      "insertNewline": "Saka sabon layi"
     },
     "chatLink": {
       "linkCopied": "An kwafa hanyar",
@@ -2634,7 +2671,7 @@
       "open": "buɗe buƙatar jan",
       "closed": "rufaffiyar pull request",
       "merged": "haɗaɗɗiyar pull request",
-      "draft": "Daftarin buƙatar jan",
+      "draft": "daftarin buƙatar jan",
       "updating": "Ana sabuntawa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "buƙatar jan"
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Wannan hanyar tana buɗe {{host}} a cikin burauzar ka.",
       "open": "Buɗe",
       "trustThisHost": "Amince da wannan mazaba"
+    },
+    "folderPicker": {
+      "accessibility": "Jaka: {{label}}",
+      "emptyDescription": "An yi yana amfani da wannan jaka.",
+      "emptyTitle": "Babu jakuna a ciki",
+      "fieldLabel": "Jaka",
+      "retryableDescription": "Duba haɗinka kuma sake gwadawa. An yi har yanzu yana tabbatar da wannan jaka.",
+      "retryableTitle": "An kasa jera jakuna",
+      "tapToListHint": "Danna jaka don jera abubuwan da ke cikinta",
+      "unsupportedDescription": "Wannan CLI ba zai iya jera jakuna ba. An yi yana riƙe jakar fara kuma Fara zaman yana farawa a can.",
+      "unsupportedTitle": "Ba za a iya jera jakuna ba"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Sabon aikin shirye-shirye",
     "explore": "Bincika",
     "seeAll": "Duba duka",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Babu abin da ke gudana a yanzu"
   },
   "imageViewer": {
     "close": "Rufe {{filename}}",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Koma baya sannan ka sake buɗe wannan zaɓin daga shafin da ya gabata."
   },
   "sessionRow": {
-    "needsInput": "yana buƙatar bayani"
+    "needsInput": "YANA BUƘATAR BAYANI"
   },
   "voiceInput": {
     "listening": "Ana sauraro...",
@@ -2766,7 +2814,8 @@
     "busy": "Shigar da murya tana aiki. Sake gwadawa.",
     "stopped": "Shigar da murya ta tsaya. Danna makirufo don sake gwadawa.",
     "unavailableDevice": "Shigar da murya ba ta samuwa akan wannan na'ura.",
-    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura."
+    "unavailableLanguage": "Shigar da murya ba ta samuwa don harshen wannan na'ura.",
+    "listeningStopped": "An dakatar da sauraro."
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Idan ka amince da mazabar hanyar, za ta buɗe ba tare da sake tambaya ba.",
     "revoke": "Soke {{host}}",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
+  },
+  "quickChat": {
+    "title": "Tattaunawa",
+    "composer": {
+      "placeholder": "Saƙo"
+    },
+    "empty": {
+      "title": "Fara tattaunawa",
+      "description": "Aika saƙo don tattaunawa da samfurin."
+    },
+    "working": "Yana aiki",
+    "historyRetry": "Ba a iya loda tarihin tattaunawa.",
+    "catalogRetry": "An kasa ɗora samfuran",
+    "sendError": "An kasa aika saƙon. Sake gwadawa."
   }
 }

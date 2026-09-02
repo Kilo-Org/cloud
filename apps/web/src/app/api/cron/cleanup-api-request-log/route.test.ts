@@ -21,7 +21,7 @@ import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
-const BATCH_SIZE = 1_000;
+const BATCH_SIZE = 10_000;
 
 function daysAgo(days: number): string {
   const date = new Date();
@@ -83,10 +83,10 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     });
   });
 
-  it('deletes expired records and preserves recent records', async () => {
+  it('deletes records older than seven days and preserves recent records', async () => {
     await insertApiRequestLogRecord(daysAgo(45));
-    await insertApiRequestLogRecord(daysAgo(31));
-    const recent = await insertApiRequestLogRecord(daysAgo(1));
+    await insertApiRequestLogRecord(daysAgo(8));
+    const recent = await insertApiRequestLogRecord(daysAgo(6));
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 

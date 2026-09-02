@@ -195,7 +195,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, aba, {{position}} de {{total}}"
+    "position": "{{name}}, aba, {{position}} de {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -279,7 +280,8 @@
       "networkError": "Erro de rede",
       "uploadFailed": "Falha no envio",
       "failedToUploadFile": "Falha ao enviar o arquivo: {{reason}}",
-      "nothingToPaste": "Nada para colar"
+      "nothingToPaste": "Nada para colar",
+      "metadataStripFailed": "Não foi possível remover os metadados da foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -706,7 +708,7 @@
       "destroying": "DESTRUINDO",
       "provisioned": "PROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "Em execução",
+      "running": "EM EXECUÇÃO",
       "shuttingDown": "DESLIGANDO",
       "starting": "INICIANDO",
       "stopped": "PARADO",
@@ -884,7 +886,23 @@
       "title": "Revisão",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} de entrada / {{output}} de saída",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Aguardando a transcrição da revisão.",
+      "transcriptEmpty": "Nenhuma transcrição para esta revisão.",
+      "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
+      "transcriptLive": "Ao vivo",
+      "agentIdle": "Agente ocioso",
+      "agentWorking": "Agente trabalhando...",
+      "anErrorOccurred": "Ocorreu um erro",
+      "errorWithMessage": "Erro: {{message}}",
+      "executionStarted": "Execução iniciada",
+      "reviewCompleted": "Revisão concluída",
+      "reviewInterrupted": "Revisão interrompida",
+      "sessionError": "Erro de sessão: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Ferramenta: {{name}}",
+      "toolNameError": "Ferramenta: {{name}} — erro",
+      "unknownError": "Erro desconhecido"
     },
     "reviewList": {
       "configureProvider": "Configurar provedor",
@@ -1257,11 +1275,11 @@
       "statusFixed": "Corrigido",
       "statusOpen": "Aberto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Uma correção já foi iniciada",
-      "reasonNoBandwidth": "Não há capacidade disponível",
-      "reasonTolerableRisk": "O risco é tolerável",
-      "reasonInaccurate": "A descoberta é imprecisa",
-      "reasonNotUsed": "O código vulnerável não é usado",
+      "reasonFixStarted": "uma correção já foi iniciada",
+      "reasonNoBandwidth": "não há capacidade disponível",
+      "reasonTolerableRisk": "o risco é tolerável",
+      "reasonInaccurate": "a descoberta é imprecisa",
+      "reasonNotUsed": "o código vulnerável não é usado",
       "reasonAfterReview": "após a revisão"
     },
     "findingList": {
@@ -1569,7 +1587,6 @@
     }
   },
   "agents": {
-    "activeNow": "Ativo agora",
     "search": {
       "searching": "Pesquisando",
       "searchSessions": "Pesquisar sessões",
@@ -1580,16 +1597,15 @@
     "sessionList": {
       "couldNotLoad": "Não foi possível carregar as sessões",
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas",
-      "noSessionsYet": "Ainda não há sessões",
       "noSessionsYetDescription": "Inicie uma tarefa de codificação pelo celular. Suas sessões aparecerão aqui.",
       "noMatches": "Nenhuma sessão corresponde",
       "tryDifferentSearch": "Tente um termo de busca diferente.",
       "tryAdjustFilters": "Tente ajustar ou limpar seus filtros.",
       "couldNotSearch": "Não foi possível pesquisar as sessões",
-      "allActive": "Todas as sessões estão ativas",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Nenhuma sessão anterior",
-      "live": "AO VIVO"
+      "live": "AO VIVO",
+      "updating": "Atualizando"
     },
     "sessionRow": {
       "deleteTitle": "Excluir sessão?",
@@ -1635,7 +1651,10 @@
     "sessionExited": "Sessão encerrada",
     "remoteSpawnRetryable": "Não foi possível acessar a instância — ela pode ter se desconectado.",
     "remoteSpawnNonRetryable": "A instância não conseguiu iniciar a sessão — verifique a máquina ou atualize a CLI.",
-    "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância."
+    "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância.",
+    "liveCount_one": "{{count}} AO VIVO",
+    "liveCount_other": "{{count}} AO VIVO",
+    "liveCount_many": "{{count}} AO VIVO"
   },
   "agentChat": {
     "session": {
@@ -1657,18 +1676,19 @@
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
       "renameAccessibility": "Renomear sessão: {{title}}",
-      "connectRepository": "Conectar repositório",
       "cloningSession": "Clonando sessão",
       "continue": "Continuar",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão",
-      "cloneFailed": "Não foi possível clonar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "connectRepositoryToContinue": "Conecte um repositório para continuar.",
       "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está terminando. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível no momento. Tente novamente.",
       "connectionTrouble": "Problema de conexão. Tente novamente em um momento.",
-      "modelUnavailable": "Este modelo não está disponível para o Cloud Agent. Escolha outro modelo e tente novamente."
+      "modelUnavailable": "Este modelo não está disponível para o Cloud Agent. Escolha outro modelo e tente novamente.",
+      "cancelQueuedFailed": "Não foi possível cancelar a mensagem.",
+      "cancelQueuedRestoreAvailable": "Mensagem cancelada. Toque em Restaurar para devolvê-la ao campo de mensagem.",
+      "cancelQueuedRestored": "Mensagem cancelada. O prompt está de volta no campo de mensagem.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensagens na fila exige uma Kilo CLI mais recente. Atualize a Kilo CLI e reconecte."
     },
     "remoteSession": {
       "failedToCreate": "Falha ao criar a sessão remota",
@@ -1736,7 +1756,12 @@
       "noRepositoriesVisibleGitlab": "Nenhum repositório visível. Verifique o acesso ao repositório do GitLab e atualize.",
       "openBitbucket": "Abrir Bitbucket",
       "openGitlab": "Abrir GitLab",
-      "recentlyUsed": "Usados recentemente"
+      "recentlyUsed": "Usados recentemente",
+      "continueFrom": "Continuando {{title}}",
+      "importingSession": "Importando sessão",
+      "cliCannotContinue": "Esta CLI não pode continuar uma sessão. Escolha Cloud Agent ou outra CLI.",
+      "importFailed": "Não foi possível importar esta sessão.",
+      "discardWithUploadsMessage": "Seu prompt e todos os arquivos enviados que não estiverem anexados a mensagens enviadas serão excluídos."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo atualizado",
@@ -1795,7 +1820,9 @@
       "noCliInstancesDescription": "Execute `kilo remote` em um projeto no seu computador ou atualize a Kilo CLI se uma já estiver em execução.",
       "instanceOnProject": "{{name}} em {{project}}",
       "instanceOnProjectSuffix": "{{name}} em {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Executar em Agente na nuvem"
+      "runOnCloudAgent": "Executar em Agente na nuvem",
+      "terminals": "Terminais",
+      "remotes": "Instâncias remotas"
     },
     "modePicker": {
       "title": "Selecionar modo",
@@ -1985,7 +2012,11 @@
       "queuedAccessibility": "Mensagem na fila",
       "userMessage": "Mensagem do usuário",
       "assistantMessage": "Mensagem do assistente",
-      "longPressHint": "Pressione e segure para ver os detalhes da mensagem"
+      "longPressHint": "Pressione e segure para ver os detalhes da mensagem",
+      "cancelQueued": "Cancelar mensagem",
+      "cancelQueuedAccessibility": "Cancelar mensagem na fila",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar mensagem cancelada no campo de mensagem"
     },
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",
@@ -2002,6 +2033,8 @@
       "viewTable": "Ver tabela",
       "title": "Tabela",
       "close": "Fechar tabela",
+      "loading": "Carregando tabela",
+      "empty": "Esta tabela não tem linhas.",
       "columnCount_one": "coluna",
       "columnCount": "colunas",
       "columnCount_other": "colunas",
@@ -2014,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sessões",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Última atualização",
-      "sortCreated": "Criado",
       "platform": "Plataforma",
       "platformCloud": "Nuvem",
       "platformExtension": "Extensão",
@@ -2025,9 +2055,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Outro",
-      "project": "Projeto",
-      "removeProjectFilter": "Remover filtro de projeto {{label}}",
-      "removePlatformFilter": "Remover filtro de plataforma {{label}}"
+      "project": "Projeto"
     },
     "suggestion": {
       "title": "Sugestão",
@@ -2070,7 +2098,9 @@
       "uploading": "Enviando…",
       "uploaded": "Enviado",
       "uploadFailedRetry": "Falha no envio. Toque para tentar novamente.",
-      "uploadFailedTerminal": "Este arquivo não pode ser enviado."
+      "uploadFailedTerminal": "Este arquivo não pode ser enviado.",
+      "moveLeft": "Mover {{filename}} para a esquerda",
+      "moveRight": "Mover {{filename}} para a direita"
     },
     "attachmentPasteHint": {
       "accessibility": "Colar imagem da área de transferência",
@@ -2100,7 +2130,11 @@
       "finalizingPlaceholder": "Finalizando...",
       "messagePlaceholder": "Mensagem...",
       "cannotReceiveFiles": "Esta sessão não pode receber arquivos. Remova os anexos para enviar sua mensagem.",
-      "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em enviar para tentar novamente."
+      "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em enviar para tentar novamente.",
+      "discardAttachmentsMessage": "Os arquivos enviados que não estiverem anexados a mensagens enviadas serão excluídos.",
+      "discardAttachmentsTitle": "Descartar anexos?",
+      "charactersRemaining": "{{count}} caracteres restantes",
+      "insertNewline": "Inserir quebra de linha"
     },
     "chatLink": {
       "linkCopied": "Link copiado",
@@ -2193,6 +2227,17 @@
       "hostConfirmMessage": "Este link abre {{host}} no seu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar neste host"
+    },
+    "folderPicker": {
+      "accessibility": "Pasta: {{label}}",
+      "emptyDescription": "Concluído usa esta pasta.",
+      "emptyTitle": "Nenhuma pasta dentro",
+      "fieldLabel": "Pasta",
+      "retryableDescription": "Verifique sua conexão e tente novamente. Concluído ainda confirma esta pasta.",
+      "retryableTitle": "Não foi possível listar as pastas",
+      "tapToListHint": "Toque em uma pasta para listar o conteúdo",
+      "unsupportedDescription": "Esta CLI não pode listar pastas. Concluído mantém a pasta de inicialização e Iniciar sessão inicia nela.",
+      "unsupportedTitle": "Não é possível listar pastas"
     }
   },
   "bootstrap": {
@@ -2219,7 +2264,11 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "prReviewAttribution": "Adicionar atribuição do app às avaliações de PR",
-    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação."
+    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação.",
+    "returnSendsMessage": "A tecla Enter envia a mensagem",
+    "returnSendsMessageSubtitle": "Quando desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes.",
+    "biometricUnlock": "Desbloquear com biometria",
+    "biometricUnlockSubtitle": "Desbloqueie ao iniciar o app e após cinco minutos em segundo plano."
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2261,7 +2310,7 @@
     "newCodingTask": "Nova tarefa de codificação",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Nada em execução no momento"
   },
   "imageViewer": {
     "close": "Fechar {{filename}}",
@@ -2325,7 +2374,8 @@
     "busy": "A entrada de voz está ocupada. Tente novamente.",
     "stopped": "A entrada de voz foi interrompida. Toque no microfone para tentar novamente.",
     "unavailableDevice": "A entrada de voz não está disponível neste dispositivo.",
-    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo."
+    "unavailableLanguage": "A entrada de voz não está disponível para o idioma deste dispositivo.",
+    "listeningStopped": "Escuta interrompida."
   },
   "share": {
     "title": "Compartilhar no Kilo",
@@ -3170,5 +3220,19 @@
     "emptyDescription": "Quando você confia no host de um link, ele abre sem perguntar novamente.",
     "revoke": "Revogar {{host}}",
     "backToPreferences": "Voltar às preferências"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mensagem"
+    },
+    "empty": {
+      "title": "Iniciar um chat",
+      "description": "Envie uma mensagem para conversar com um modelo."
+    },
+    "working": "Trabalhando",
+    "historyRetry": "Não foi possível carregar o histórico do chat.",
+    "catalogRetry": "Não foi possível carregar os modelos",
+    "sendError": "Não foi possível enviar a mensagem. Tente novamente."
   }
 }

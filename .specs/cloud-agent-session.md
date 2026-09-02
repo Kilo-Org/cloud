@@ -12,8 +12,8 @@ which implementation they are on.
 
 ## Status
 
-Draft -- created 2026-08-24, revised 2026-08-24 after an audit against the
-implementation.
+Draft -- created 2026-08-24, revised 2026-08-26 for worktree navigation, grouped
+browser-chat tabs, and their filesystem durability boundary.
 
 ## Conventions
 
@@ -26,6 +26,8 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Worktree**: a group of independent browser chats that share the same
+  checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
   commands, restore.
 - **Turn**: one user message and the agent work it triggers.
@@ -108,6 +110,78 @@ repository.
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
 
+### Shared Worktrees
+
+1. Eligible browser chats for the same worktree MUST appear as exactly one
+   selectable row in the sidebar, without nested chat rows. Its label MUST use
+   the user-set worktree name, otherwise the first surviving chat's non-default
+   title, otherwise the repository and branch. This fallback MUST NOT depend on
+   which chats are visible in the current search or recent-session page.
+   Selecting the worktree MUST open its latest chat. The row MUST remain visibly
+   selected while any sibling is active and MUST reflect busy, question, or
+   permission activity across all its chats. Its timestamp and overflow menu
+   MUST share the session-row action slot. Associated pull-request information
+   MUST use the existing session indicator and refresh behavior.
+2. Each open chat in the selected worktree MUST appear as a distinct tab in the
+   main chat header. Each tab MUST reflect its chat's live title, status, and
+   progress, with only an **X** close action and no overflow menu. Double-clicking
+   or double-tapping a tab MUST rename it inline; keyboard rename MUST remain
+   available. Selecting a tab MUST open that chat's own address and transcript.
+   The header MUST offer a split **+** / downward-chevron control: **+** opens a
+   new chat, and the chevron offers **New chat** and eligible **New terminal**
+   actions. Creation controls and the session list MUST remain accessible when
+   tabs overflow, without a vertical scrollbar in the tab strip.
+3. The worktree-row action **New chat**, the header action **New chat**, and an
+   eligible chat's exact trimmed `/new` command MUST immediately open a new
+   empty chat in the same worktree without stopping, waiting for, or adding a
+   message to an already-running chat. The composer MUST suggest `/new` while
+   typing. Header and worktree-row actions MUST add a tab; `/new` MUST replace
+   the current tab in the same position only after creation succeeds, preserving
+   the previous chat.
+4. A failed new-chat action MUST keep the current chat and tab open, restore its
+   composer, and show a retryable error. Attachments MUST NOT be discarded.
+5. Grouped chats MUST see the same uncommitted files and Git changes while their
+   shared environment exists. They MAY run simultaneously; concurrent file or
+   Git changes are visible shared-state races.
+6. Each chat MUST keep its own streamed output, transcript, questions,
+   permissions, stop control, and recovery. Stopping or answering one chat MUST
+   NOT affect another chat in the worktree.
+7. Grouped chats MUST support platform-managed auto-commit and push after
+   successful turns, enabled by default for new worktrees and honoring explicit
+   opt-out. New sibling chats MUST inherit the source chat's auto-commit setting.
+   Platform-managed commit and push operations MUST be serialized per worktree.
+   Each commit captures the shared checkout and MAY include sibling-chat edits.
+   Rebuilt worktrees MUST restore their pushed working branch rather than restart
+   from the repository's default branch. An agent MAY still perform explicit Git
+   operations during its chat.
+8. Deleting one chat MUST leave its siblings usable. Deleting the final chat
+   MUST remove the worktree group from the session list.
+9. Existing ungrouped and legacy chats MUST remain individual sidebar rows and
+   retain their current behavior. Worktree grouping MUST NOT change
+   native-mobile chat behavior.
+10. Closing a chat tab MUST NOT delete its saved session, discard its transcript,
+    or stop its running work. Closed-tab preferences and tab order MUST survive
+    refresh and remain scoped to the current user and personal or organization
+    context.
+11. The selected worktree MUST offer a **Sessions** list inside the split control's
+    chevron menu, containing only closed chats and excluding already-open tabs.
+    Most recently closed chats MUST appear first, including after refresh;
+    session creation or activity timestamps MUST NOT determine this order.
+    Selecting a closed chat MUST reopen it and remove it from that list. Closing
+    the last chat MUST retain the selected worktree and access to its saved
+    sessions and new-chat action; existing terminal tabs MUST remain usable.
+12. The user MUST be able to rename a worktree independently of its chats.
+    A custom name MUST survive refresh and new sibling creation without changing
+    chat titles or activity timestamps. Later chat-title changes MUST NOT
+    override a custom worktree name.
+13. Deleting a worktree MUST require confirmation and remove all its chats,
+    descendants, saved content, terminals, checkout files, and associated runtime
+    state. It MUST preserve other worktrees and destroy a physical sandbox only
+    when that sandbox is exclusively owned by the deleted worktree. Ownership
+    and current personal or organization access MUST be checked server-side.
+    Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
+    MUST NOT permit late creation or ingestion to resurrect the worktree.
+
 ### Persistence
 
 1. Refresh MUST restore the transcript, the preparation history that was shown,
@@ -115,6 +189,9 @@ repository.
 2. Refresh MUST NOT start a new turn.
 3. If the environment dies, the next prompt MUST recover in the same chat. The
    user MUST NOT be forced to start a new session.
+4. Recovery MUST preserve each worktree chat, its transcript, and its grouping.
+   Uncommitted files are not guaranteed to survive replacement of the shared
+   physical environment.
 
 ### Errors
 
@@ -136,11 +213,11 @@ repository.
 
 ## Out of Scope
 
-The Cloud pages around the chat (sessions list, MCP Gateway, triggers,
-webhooks), profile and organization administration, the mobile app, and the CLI.
-Also out of scope, and deliberately so: which sandbox provider runs the
-environment, the shape of session ids, and the streaming wire protocol. A tester
-MUST NOT be able to tell those apart from the chat.
+Cloud administration surfaces beyond the existing chat sidebar (MCP Gateway,
+triggers, webhooks), profile and organization administration, the mobile app,
+and the CLI. Also out of scope, and deliberately so: which sandbox provider
+runs the environment, the shape of session ids, and the streaming wire protocol.
+A tester MUST NOT be able to tell those apart from the chat.
 
 ## Not Yet Implemented
 
@@ -156,6 +233,21 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-01 -- Shared worktree auto-commit
+
+- Restored automatic commit and push for shared worktrees, enabled by default,
+  with explicit opt-out, inherited sibling settings, and serialized per-worktree
+  Git finalization. Commits are checkpoints of the shared checkout, not isolated
+  changes belonging to one chat.
+
+### 2026-08-26 -- Shared worktree pilot
+
+- Defined selectable worktree sidebar rows, live per-chat header tabs,
+  concurrent sibling creation, shared files, independent chat controls,
+  disabled auto-commit, and group deletion.
+- Defined transcript and group recovery separately from physical filesystem
+  durability without changing terminal or permission requirements.
 
 ### 2026-08-24 -- Audit revision
 

@@ -25,6 +25,7 @@ import {
 import { getChildSessionModelLabel } from './child-session-model';
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+import { partRendersContent } from './message-visibility';
 import { isToolPart } from './part-types';
 
 export { getTaskToolSessionId } from './child-session-card-state';
@@ -110,19 +111,21 @@ export function ChildSessionSection({
             {taskName}
           </Text>
           {modelLabel ? <ChildSessionModelLabel modelLabel={modelLabel} /> : null}
-          <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-            {
-              // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
-              typeof latestActivity === 'string' ? (
-                latestActivity
-              ) : (
-                <>
-                  <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
-                  {latestActivity.context ? ` ${latestActivity.context}` : ''}
-                </>
-              )
-            }
-          </Text>
+          {latestActivity ? (
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+              {
+                // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ChildSessionActivity has no discriminant field to narrow on, and `'tool' in latestActivity` would throw for the string variant.
+                typeof latestActivity === 'string' ? (
+                  latestActivity
+                ) : (
+                  <>
+                    <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
+                    {latestActivity.context ? ` ${latestActivity.context}` : ''}
+                  </>
+                )
+              }
+            </Text>
+          ) : null}
         </View>
 
         <StatusBadge status={status} />
@@ -156,9 +159,14 @@ export function ChildSessionMessage({
     );
   }
 
+  const visibleParts = message.parts.filter(partRendersContent);
+  if (visibleParts.length === 0) {
+    return null;
+  }
+
   return (
     <View className="gap-1 rounded-md bg-secondary p-2">
-      {message.parts.map(p => {
+      {visibleParts.map(p => {
         if (isToolPart(p) && p.tool === 'task') {
           const nestedSessionId = getTaskToolSessionId(p);
           const nestedMessages = nestedSessionId ? getChildMessages(nestedSessionId) : [];

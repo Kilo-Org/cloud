@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import { SessionInfoDialog } from './SessionInfoDialog';
+import type { SessionCostBreakdown } from './session-cost-breakdown';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
@@ -36,7 +37,10 @@ type ChatHeaderProps = {
   gitUrl?: string | null;
   model?: string;
   modelDisplayName?: string;
-  tokenUsage?: number;
+  getSessionCostBreakdown?: () => SessionCostBreakdown;
+  sessionInfoOpen: boolean;
+  onSessionInfoOpenChange: (open: boolean) => void;
+  sessionInfoTriggerRef: RefObject<HTMLElement | null>;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
@@ -50,7 +54,10 @@ export function ChatHeader({
   gitUrl,
   model = 'Unknown',
   modelDisplayName,
-  tokenUsage = 0,
+  getSessionCostBreakdown,
+  sessionInfoOpen,
+  onSessionInfoOpenChange,
+  sessionInfoTriggerRef,
   soundEnabled = true,
   onToggleSound,
   kiloSessionId,
@@ -58,8 +65,12 @@ export function ChatHeader({
   sessionTitle,
   sessionActive,
 }: ChatHeaderProps) {
-  const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
+  const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const sessionCostBreakdown = useMemo(
+    () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
+    [getSessionCostBreakdown, sessionInfoOpen]
+  );
   const trpc = useTRPC();
   const computeQuery = useQuery({
     ...(organizationId
@@ -89,13 +100,20 @@ export function ChatHeader({
   return (
     <>
       <SessionInfoDialog
-        open={showInfoDialog}
-        onOpenChange={setShowInfoDialog}
+        open={sessionInfoOpen}
+        onOpenChange={onSessionInfoOpenChange}
+        onCloseAutoFocus={event => {
+          const trigger = sessionInfoTriggerRef.current;
+          sessionInfoTriggerRef.current = null;
+          if (!trigger?.isConnected) return;
+          event.preventDefault();
+          trigger.focus();
+        }}
         sessionId={cloudAgentSessionId}
         kiloSessionId={kiloSessionId}
         model={model}
         modelDisplayName={modelDisplayName}
-        tokenUsageMicrodollars={tokenUsage * 1_000_000}
+        sessionCostBreakdown={sessionCostBreakdown}
         computeStatus={computeStatus}
       />
       <SessionActionsDialog
@@ -111,7 +129,13 @@ export function ChatHeader({
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="More options">
+            <Button
+              ref={moreOptionsTriggerRef}
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              aria-label="More options"
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -128,7 +152,12 @@ export function ChatHeader({
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowInfoDialog(true)}>
+            <DropdownMenuItem
+              onSelect={() => {
+                sessionInfoTriggerRef.current = moreOptionsTriggerRef.current;
+                onSessionInfoOpenChange(true);
+              }}
+            >
               Session Info
             </DropdownMenuItem>
           </DropdownMenuContent>

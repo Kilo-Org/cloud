@@ -12,7 +12,7 @@ import {
 } from '@/lib/share-remote-file';
 
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { AttachmentPreviewStrip } from './attachment-preview-strip';
+import { AttachmentPreviewStrip, dragTargetIndex } from './attachment-preview-strip';
 
 const expoFileSystemMock = vi.hoisted(() => {
   const fileText = vi.fn(async () => {
@@ -38,6 +38,46 @@ const safeAreaMock = vi.hoisted(() => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
 }));
 
+const gestureHandlerMock = vi.hoisted(() => {
+  // One record per `Gesture.Pan()` call, in chip render order. Each builder
+  // method is chainable and captures its callback so the test can fire
+  // `onStart`/`onEnd` with a synthetic translation.
+  const gestures: {
+    onStart?: (event: { translationX: number }) => void;
+    onEnd?: (event: { translationX: number }) => void;
+  }[] = [];
+  function makeGesture(): Record<string, unknown> {
+    const record: (typeof gestures)[number] = {};
+    const g: Record<string, unknown> = {};
+    g.runOnJS = () => g;
+    g.activateAfterLongPress = () => g;
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock captures the builder callback so the test can fire the drag
+    g.onStart = (cb: unknown) => {
+      record.onStart = cb as (typeof gestures)[number]['onStart'];
+      return g;
+    };
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock captures the builder callback so the test can fire the drag
+    g.onEnd = (cb: unknown) => {
+      record.onEnd = cb as (typeof gestures)[number]['onEnd'];
+      return g;
+    };
+    gestures.push(record);
+    return g;
+  }
+  return {
+    gestures,
+    reset: () => {
+      gestures.length = 0;
+    },
+    makeGesture,
+  };
+});
+
+const a11yMock = vi.hoisted(() => ({
+  announceForA11y: vi.fn(),
+  moveA11yFocus: vi.fn(),
+}));
+
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
@@ -47,6 +87,12 @@ vi.mock('react-native', () => ({
   Platform: reactNativeMock.Platform,
   useWindowDimensions: reactNativeMock.useWindowDimensions,
 }));
+vi.mock('react-native-gesture-handler', () => ({
+  Gesture: { Pan: gestureHandlerMock.makeGesture },
+  GestureDetector: 'GestureDetector',
+  ScrollView: 'ScrollView',
+}));
+vi.mock('@/lib/a11y/announce', () => a11yMock);
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
@@ -109,7 +155,12 @@ type Renderer = TestRenderer.ReactTestRenderer;
 
 async function mount(
   attachments: AgentAttachment[],
-  handlers: { onRemove?: () => void; onRetry?: () => void } = {}
+  handlers: {
+    onRemove?: () => void;
+    onRetry?: () => void;
+    onMove?: (id: string, direction: 'left' | 'right') => void;
+    onReorder?: (fromIndex: number, toIndex: number) => void;
+  } = {}
 ): Promise<Renderer> {
   const ref: { current: Renderer | undefined } = { current: undefined };
   await act(async () => {
@@ -119,6 +170,8 @@ async function mount(
         attachments,
         onRemove: handlers.onRemove ?? (() => undefined),
         onRetry: handlers.onRetry ?? (() => undefined),
+        onMove: handlers.onMove ?? (() => undefined),
+        onReorder: handlers.onReorder ?? (() => undefined),
       })
     );
   });
@@ -137,6 +190,21 @@ function chipBody(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestI
       ((node.type as string) === 'View' || (node.type as string) === 'Pressable') &&
       node.props.accessible === true
   );
+}
+
+/** Every accessible chip body, in chip render order. */
+function chipBodies(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      ((node.type as string) === 'View' || (node.type as string) === 'Pressable') &&
+      node.props.accessible === true
+  );
+}
+
+/** Every chip wrapper carrying an `onLayout` width measurement. */
+function layoutNodes(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => typeof node.props.onLayout === 'function');
 }
 
 /** The hidden wrapper that isolates the chip body's visual descendants. */
@@ -227,6 +295,8 @@ function markdownAttachment(): AgentAttachment {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  gestureHandlerMock.reset();
+  a11yMock.moveA11yFocus.mockReset();
   fileText.mockResolvedValue('# Hello');
   reactNativeMock.Platform.OS = 'ios';
   reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
@@ -687,6 +757,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     const renderer = await openMarkdownPreview();
 
     const header = nodesByType(renderer.root, 'SheetHeader')[0];
+    expect(header?.props.titleEllipsis).toBe('middle');
     if (!header) {
       throw new Error('SheetHeader not found');
     }
@@ -759,6 +830,230 @@ describe('AttachmentPreviewStrip — thumbnail decode fallback', () => {
     expect(nodesByType(renderer.root, 'Image')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'AlertCircle')).toHaveLength(1);
     expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('dragTargetIndex', () => {
+  const UNIFORM = [192, 192, 192];
+
+  it('stays put below the midpoint crossing', () => {
+    expect(dragTargetIndex(0, UNIFORM, 0)).toBe(0);
+    expect(dragTargetIndex(0, UNIFORM, 199)).toBe(0);
+  });
+
+  it('crosses one slot at the midpoint and clamps at the end', () => {
+    expect(dragTargetIndex(0, UNIFORM, 200)).toBe(1);
+    expect(dragTargetIndex(0, UNIFORM, 400)).toBe(2);
+    expect(dragTargetIndex(0, UNIFORM, 9999)).toBe(2);
+  });
+
+  it('moves left symmetrically', () => {
+    expect(dragTargetIndex(2, UNIFORM, -200)).toBe(1);
+    expect(dragTargetIndex(2, UNIFORM, -400)).toBe(0);
+    expect(dragTargetIndex(2, UNIFORM, -9999)).toBe(0);
+  });
+
+  it('uses each chip width for mixed image/document rows', () => {
+    // image (80) then documents (192). Crossing 0 -> 1 needs 80/2 + 8 + 192/2 = 144.
+    expect(dragTargetIndex(0, [80, 192, 192], 143)).toBe(0);
+    expect(dragTargetIndex(0, [80, 192, 192], 144)).toBe(1);
+    // Crossing 1 -> 0 back needs 192/2 + 8 + 80/2 = 144.
+    expect(dragTargetIndex(1, [80, 192, 192], -143)).toBe(1);
+    expect(dragTargetIndex(1, [80, 192, 192], -144)).toBe(0);
+  });
+});
+
+describe('AttachmentPreviewStrip — accessible move actions', () => {
+  it('offers Move left/right actions on each chip body and dispatches them', async () => {
+    const onMove = vi.fn<(id: string, direction: 'left' | 'right') => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+        makeAttachment({ id: 'a3', filename: 'c.pdf' }),
+      ],
+      { onMove }
+    );
+
+    const bodies = chipBodies(renderer.root);
+    expect(bodies).toHaveLength(3);
+
+    // First chip: only Move right (no slot to the left).
+    expect(bodies[0]?.props.accessibilityActions).toEqual([
+      { name: 'moveRight', label: 'Move a.pdf right' },
+    ]);
+    // Last chip: only Move left.
+    expect(bodies[2]?.props.accessibilityActions).toEqual([
+      { name: 'moveLeft', label: 'Move c.pdf left' },
+    ]);
+    // Middle chip: both directions.
+    expect(bodies[1]?.props.accessibilityActions).toEqual([
+      { name: 'moveLeft', label: 'Move b.pdf left' },
+      { name: 'moveRight', label: 'Move b.pdf right' },
+    ]);
+
+    const firstBody = bodies[0];
+    if (!firstBody) {
+      throw new Error('first chip body missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (
+        firstBody.props.onAccessibilityAction as (event: {
+          nativeEvent: { actionName: string };
+        }) => void
+      )({ nativeEvent: { actionName: 'moveRight' } });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onMove).toHaveBeenCalledWith('a1', 'right');
+    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+
+    const middleBody = bodies[1];
+    if (!middleBody) {
+      throw new Error('middle chip body missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (
+        middleBody.props.onAccessibilityAction as (event: {
+          nativeEvent: { actionName: string };
+        }) => void
+      )({ nativeEvent: { actionName: 'moveLeft' } });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onMove).toHaveBeenLastCalledWith('a2', 'left');
+    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(2);
+
+    renderer.unmount();
+  });
+
+  it('offers no move actions on a single chip', async () => {
+    const renderer = await mount([makeAttachment({})]);
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityActions).toBeUndefined();
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — drag reorder', () => {
+  function measureChips(renderer: Renderer, width: number): void {
+    for (const node of layoutNodes(renderer.root)) {
+      (node.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+        nativeEvent: { layout: { width } },
+      });
+    }
+  }
+
+  it('reorders by drag once the finger crosses the neighbor midpoint', async () => {
+    const onReorder = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+        makeAttachment({ id: 'a3', filename: 'c.pdf' }),
+      ],
+      { onReorder }
+    );
+
+    // Every document chip measures 192pt wide (w-48).
+    measureChips(renderer, 192);
+
+    const firstGesture = gestureHandlerMock.gestures[0];
+    if (!firstGesture) {
+      throw new Error('first chip gesture not registered');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      firstGesture.onStart?.({ translationX: 0 });
+      firstGesture.onEnd?.({ translationX: 200 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    expect(onReorder).toHaveBeenCalledWith(0, 1);
+    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not reorder when the drag stays under the midpoint', async () => {
+    const onReorder = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    const renderer = await mount(
+      [
+        makeAttachment({ id: 'a1', filename: 'a.pdf' }),
+        makeAttachment({ id: 'a2', filename: 'b.pdf' }),
+      ],
+      { onReorder }
+    );
+    measureChips(renderer, 192);
+
+    const firstGesture = gestureHandlerMock.gestures[0];
+    if (!firstGesture) {
+      throw new Error('first chip gesture not registered');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      firstGesture.onStart?.({ translationX: 0 });
+      firstGesture.onEnd?.({ translationX: 100 });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(a11yMock.moveA11yFocus).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — control hit targets', () => {
+  // The Remove control renders a 28pt visible badge (h-7 w-7) and reaches the
+  // platform minimum through its hitSlop. This catches a revert to the old
+  // fixed 8pt slop, which leaves Android at 44dp instead of 48dp.
+  function removeHitSlop(root: TestRenderer.ReactTestInstance): {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  } {
+    const remove = pressableByLabel(root, 'Remove attachment doc.pdf');
+    if (!remove) {
+      throw new Error('Remove button missing');
+    }
+    return remove.props.hitSlop as {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
+  }
+
+  it('keeps the Remove target at the 44pt minimum on iOS', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(44);
+
+    renderer.unmount();
+  });
+
+  it('keeps the Remove target at the 48dp minimum on Android', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([makeAttachment({})]);
+
+    const hitSlop = removeHitSlop(renderer.root);
+    expect(28 + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(48);
+    expect(28 + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(48);
 
     renderer.unmount();
   });

@@ -17,6 +17,7 @@ import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
+import { quickChatRouter } from '@/routers/quick-chat-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
 /**
@@ -43,6 +44,7 @@ const mobileRouter = createTRPCRouter({
   githubPrReview: githubPrReviewRouter,
   moderation: moderationRouter,
   kiloChat: kiloChatRouter,
+  quickChat: quickChatRouter,
   agentProfiles: agentProfilesMobileRouter,
 });
 

@@ -175,12 +175,6 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
-  GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */
-  GITLAB_TOKEN_CONTAINMENT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose Kilo token uses credential containment, or `*` for all orgs */
-  KILOCODE_TOKEN_CONTAINMENT_ORG_IDS?: string;
   VERCEL_TOKEN?: string;
   VERCEL_TEAM_ID?: string;
   VERCEL_PROJECT_ID?: string;

@@ -62,7 +62,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { db } from '@/lib/drizzle';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
@@ -801,11 +801,6 @@ export const codeReviewRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Get historical session messages for a completed code review.
-   * Fetches from session-ingest (v2) or R2 blob storage (v1) and returns
-   * pre-formatted log entries for the terminal view.
-   */
   getSessionMessages: baseProcedure
     .input(
       z.object({
@@ -851,35 +846,41 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
-        const cliSessionId = attempt?.cli_session_id ?? review.cli_session_id;
-        if (!cliSessionId) {
+        const source = attempt ?? review;
+        const cliSessionId = source.cli_session_id;
+        const cloudAgentSessionId = source.session_id;
+        if (!cliSessionId && !cloudAgentSessionId) {
           return successResult({ entries: [] });
         }
 
-        // V2 sessions (ses_* prefix): fetch from session-ingest worker
-        if (isNewSession(cliSessionId)) {
-          const [session] = await db
-            .select({ kilo_user_id: cli_sessions_v2.kilo_user_id })
+        if (cliSessionId ? isNewSession(cliSessionId) : review.agent_version === 'v2') {
+          const [session, duplicateSession] = await db
+            .select({
+              session_id: cli_sessions_v2.session_id,
+              kilo_user_id: cli_sessions_v2.kilo_user_id,
+            })
             .from(cli_sessions_v2)
-            .where(eq(cli_sessions_v2.session_id, cliSessionId))
-            .limit(1);
+            .where(
+              and(
+                cloudAgentSessionId
+                  ? eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId)
+                  : undefined,
+                cliSessionId ? eq(cli_sessions_v2.session_id, cliSessionId) : undefined,
+                review.owned_by_organization_id
+                  ? eq(cli_sessions_v2.organization_id, review.owned_by_organization_id)
+                  : and(
+                      eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+                      isNull(cli_sessions_v2.organization_id)
+                    )
+              )
+            )
+            .limit(2);
 
-          if (!session) {
+          if (!session || duplicateSession) {
             return successResult({ entries: [] });
           }
 
-          let snapshot;
-          try {
-            snapshot = await fetchSessionSnapshot(cliSessionId, session.kilo_user_id);
-          } catch (snapshotError) {
-            // Network errors (e.g. session-ingest worker unreachable) should not
-            // bubble up as a hard failure â return empty entries instead.
-            logExceptInTest(
-              `[getSessionMessages] Failed to fetch session snapshot for ${cliSessionId}:`,
-              snapshotError
-            );
-            return successResult({ entries: [] });
-          }
+          const snapshot = await fetchSessionSnapshot(session.session_id, session.kilo_user_id);
           if (!snapshot) {
             return successResult({ entries: [] });
           }
@@ -889,6 +890,10 @@ export const codeReviewRouter = createTRPCRouter({
               includeFullAssistantText: isLocalKiloCodeReview(review),
             }),
           });
+        }
+
+        if (!cliSessionId) {
+          return successResult({ entries: [] });
         }
 
         // V1 sessions (UUID): fetch from R2 blob storage

@@ -1,14 +1,14 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from '@/components/ui/icons';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
+import { useContextPicker } from '@/components/context-control';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -29,9 +29,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
-  const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
-  const { organizationId, setOrganizationId } = useOrganization();
+  const openPicker = useContextPicker(orgs);
+  const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
@@ -104,7 +103,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       t('profile.organization'))
     : t('profile.personal');
 
-  const hasOrgs = orgs && orgs.length > 0;
+  const canPickContext = orgs !== undefined;
 
   // Personal (non-org) credits are a consumable purchased directly by the end
   // user, so Apple requires IAP for them — iOS can't show purchase language
@@ -118,56 +117,49 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
     : `${WEB_BASE_URL}/credits`;
 
-  const openPicker = () => {
-    if (!orgs || orgs.length === 0) {
-      return;
-    }
-    const options = [
-      t('profile.personal'),
-      ...orgs.map(o => o.organizationName),
-      t('common.cancel'),
-    ];
-    const cancelButtonIndex = options.length - 1;
-    showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex,
-        title: t('profile.selectAccount'),
-        containerStyle: { paddingBottom: bottom },
-      },
-      index => {
-        if (index === undefined || index === cancelButtonIndex) {
-          return;
-        }
-        if (index === 0) {
-          setOrganizationId(null);
-        } else {
-          const org = orgs[index - 1];
-          if (org) {
-            setOrganizationId(org.organizationId);
-          }
-        }
-      }
-    );
-  };
-
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+      <View className="min-h-11 flex-row items-center justify-between gap-3">
+        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
           {t('profile.credits')}
         </Text>
-        {hasOrgs && (
+        {canPickContext && (
           <Pressable
-            className="flex-row items-center gap-1 active:opacity-70"
+            className="min-h-11 min-w-0 max-w-[65%] shrink flex-row items-center justify-end gap-1 active:opacity-70"
             onPress={openPicker}
+            accessibilityRole="button"
+            accessibilityLabel={selectedLabel}
+            accessibilityHint={t('profile.selectAccount')}
             hitSlop={8}
           >
-            <Text className="text-xs font-medium text-muted-foreground">{selectedLabel}</Text>
+            <Text
+              className="min-w-0 shrink text-xs font-medium text-muted-foreground"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {selectedLabel}
+            </Text>
             <ChevronDown size={14} color={colors.mutedForeground} />
           </Pressable>
         )}
       </View>
+      {error === 'save' && (
+        <View>
+          <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            accessibilityHint={t('common.couldNotSaveSetting')}
+            accessibilityState={{ busy: isSaving, disabled: isSaving }}
+            disabled={isSaving}
+            onPress={retry}
+            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+          >
+            <Text className="text-sm text-primary">{t('common.retry')}</Text>
+            {isSaving && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+          </Pressable>
+        </View>
+      )}
 
       {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
       {balanceFailed && (

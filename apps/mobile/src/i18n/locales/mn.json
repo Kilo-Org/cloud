@@ -152,7 +152,11 @@
     "appearanceDark": "Харанхуй",
     "account": "Бүртгэл",
     "prReviewAttribution": "PR хяналтуудад аппын хамааралыг нэмэх",
-    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ."
+    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ.",
+    "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
+    "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна.",
+    "biometricUnlock": "Биометрээр түгжээ тайлах",
+    "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -412,7 +416,7 @@
         "outdatedOnLines": "{{lines}} дээрх хуучирсан",
         "outdatedOnPath": "{{path}} дээрх хуучирсан"
       },
-      "deletedUser": "Устгагдсан хэрэглэгч"
+      "deletedUser": "устгагдсан хэрэглэгч"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App тохиргоог нээх боломжгүй",
     "installKiloGitHubApp": "Kilo GitHub App суулгах",
@@ -665,7 +669,8 @@
     "profile": "Профайл",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}"
+    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Сүлжээний алдаа",
       "uploadFailed": "Байршуулалт амжилтгүй боллоо",
       "failedToUploadFile": "Файл байршуулах боломжгүй боллоо: {{reason}}",
-      "nothingToPaste": "Буулгах зүйл алга"
+      "nothingToPaste": "Буулгах зүйл алга",
+      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1131,7 +1137,7 @@
       "restarting": "ДАХИН ЭХЛҮҮЛЖ БАЙНА",
       "running": "АЖИЛЛАЖ БАЙНА",
       "shuttingDown": "УНТРААЖ БАЙНА",
-      "starting": "Эхэлж байна",
+      "starting": "ЭХЭЛЖ БАЙНА",
       "stopped": "ЗОГССОН",
       "stopping": "ЗОГСООЖ БАЙНА",
       "unknown": "ТОДОРХОЙГҮЙ",
@@ -1299,7 +1305,23 @@
       "checkRun": "Шалгалтын ажиллагаа",
       "status": "Статус",
       "threshold": "Босго",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шалгалтын бичлэгийг хүлээж байна.",
+      "transcriptEmpty": "Энэ шалгалтын бичлэг байхгүй.",
+      "transcriptRetry": "Шалгалтын бичлэгийг ачаалж чадсангүй.",
+      "transcriptLive": "Шууд",
+      "agentIdle": "Агент идэвхгүй",
+      "agentWorking": "Агент ажиллаж байна...",
+      "anErrorOccurred": "Алдаа гарлаа",
+      "errorWithMessage": "Алдаа: {{message}}",
+      "executionStarted": "Гүйцэтгэл эхэлсэн",
+      "reviewCompleted": "Шалгалт дууссан",
+      "reviewInterrupted": "Шалгалт тасарсан",
+      "sessionError": "Сессийн алдаа: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Хэрэгсэл: {{name}}",
+      "toolNameError": "Хэрэгсэл: {{name}} — алдаа",
+      "unknownError": "Тодорхойгүй алдаа"
     },
     "reviewMemory": {
       "title": "Шалгалтын санах ой",
@@ -1491,7 +1513,7 @@
       "all": "Бүгд",
       "statusOpen": "Нээлттэй",
       "fixed": "Засагдсан",
-      "statusIgnored": "үл тоомсорлосон",
+      "statusIgnored": "Үл тоомсорлосон",
       "statusClosed": "Хаалттай",
       "severityCritical": "Чухал",
       "severityHigh": "Өндөр",
@@ -1679,11 +1701,11 @@
       "statusFixed": "Засагдсан",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Засвар аль хэдийн эхэлсэн",
-      "reasonNoBandwidth": "Хүчин чадал боломжгүй",
-      "reasonTolerableRisk": "Эрсдэл хүлээх боломжтой",
-      "reasonInaccurate": "Олдвор буруу байна",
-      "reasonNotUsed": "Эмзэг код ашиглагдахгүй",
+      "reasonFixStarted": "засвар аль хэдийн эхэлсэн",
+      "reasonNoBandwidth": "хүчин чадал боломжгүй",
+      "reasonTolerableRisk": "эрсдэл хүлээх боломжтой",
+      "reasonInaccurate": "олдвор буруу байна",
+      "reasonNotUsed": "эмзэг код ашиглагдахгүй",
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
@@ -1728,8 +1750,8 @@
       "cancelMessage": "Security Agent нь явагдаж буй засварын оролдлогыг зогсооно.",
       "keepRunning": "Үргэлжлүүлэн ажиллуулах",
       "cancelRemediation": "Засварыг цуцлах",
-      "openPullRequest": "pull request нээх{{number}}",
-      "openDraftPullRequest": "draft pull request нээх{{number}}",
+      "openPullRequest": "Pull request нээх{{number}}",
+      "openDraftPullRequest": "Draft pull request нээх{{number}}",
       "progress": "Явц",
       "attemptHistory": "Оролдлогын түүх ({{displayCount}})",
       "attemptNumber": "Оролдлого #{{number}}",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Одоо идэвхтэй",
     "search": {
       "searching": "Хайж байна",
       "searchSessions": "Сессийг хайх",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Сессийг ачаалах боломжгүй",
       "couldNotLoadActive": "Идэвхтэй сессийг ачаалах боломжгүй",
-      "noSessionsYet": "Хараахан сесси байхгүй",
       "noSessionsYetDescription": "Утаснаасаа кодлох даалгаврыг эхлүүлээрэй. Таны сессүүд энд гарч ирнэ.",
       "noMatches": "Таарсан сесси байхгүй",
       "tryDifferentSearch": "Өөр хайлтын нэр томьёо туршиж үзнэ үү.",
       "tryAdjustFilters": "Шүүлтүүрүүдээ тохируулах эсвэл арилгаж үзнэ үү.",
       "couldNotSearch": "Сессийг хайх боломжгүй",
-      "allActive": "Бүх сессүүд идэвхтэй байна",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
-      "live": "ШУУД"
+      "live": "ШУУД",
+      "updating": "Шинэчилж байна"
     },
     "sessionRow": {
       "deleteTitle": "Сессийг устгах уу?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Сесс гарсан",
     "remoteSpawnRetryable": "Инстанц руу холбогдож чадсангүй — салсан байж магадгүй.",
     "remoteSpawnNonRetryable": "Инстанц сессийг эхлүүлж чадсангүй — машинаа шалга эсвэл CLI-г шинэчил.",
-    "remoteSpawnInstanceDisconnected": "Сонгосон инстанц салсан. Cloud Agent дээр сесс эхлүүл эсвэл өөр инстанц сонго."
+    "remoteSpawnInstanceDisconnected": "Сонгосон инстанц салсан. Cloud Agent дээр сесс эхлүүл эсвэл өөр инстанц сонго.",
+    "liveCount_one": "{{count}} ШУУД",
+    "liveCount_other": "{{count}} ШУУД"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Доод тал руу гүйлгэх",
       "emptyTitle": "Хараахан мессеж байхгүй",
       "renameAccessibility": "Сессийн нэр өөрчлөх: {{title}}",
-      "connectRepository": "Репозиторийг холбох",
       "cloningSession": "Сессийг клонлож байна",
       "continue": "Үргэлжлүүлэх",
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй",
-      "cloneFailed": "Энэ сессийг клонлож чадсангүй.",
       "cloneFailedRetry": "Энэ сессийг клонлож чадсангүй. Дахин оролдоно уу.",
-      "connectRepositoryToContinue": "Үргэлжлүүлэхийн тулд репозиторийг холбоно уу.",
       "notEnoughCredits": "Cloud Agent ажиллуулахад хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу.",
       "previousTaskFinishing": "Өмнөх ажил дуусаагүй байна. Түр хүлээнэ үү.",
       "serviceUnavailable": "Үйлчилгээ яг одоо боломжгүй байна. Дахин оролдоно уу.",
       "connectionTrouble": "Холболтын асуудал. Түр хүлээгээд дахин оролдоно уу.",
-      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу."
+      "modelUnavailable": "Энэ загвар Cloud Agent-д байхгүй. Өөр загвар сонгоод дахин оролдоно уу.",
+      "cancelQueuedFailed": "Мессежийг цуцалж чадсангүй.",
+      "cancelQueuedRestoreAvailable": "Мессеж цуцлагдсан. Мессеж оруулах талбарт буцаахын тулд «Сэргээх» товчийг товшино уу.",
+      "cancelQueuedRestored": "Мессеж цуцлагдсан. Заавар мессеж оруулах талбарт буцаж орсон.",
+      "cancelQueuedUpgradeRequired": "Дараалалд буй мессежийг цуцлахад Kilo CLI-ийн шинэ хувилбар шаардлагатай. Kilo CLI-ээ шинэчлээд дахин холбоно уу."
     },
     "remoteSession": {
       "failedToCreate": "Алсын сесс үүсгэхэд амжилтгүй болсон",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Харагдах repository байхгүй. GitLab-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
       "openBitbucket": "Bitbucket нээх",
       "openGitlab": "GitLab нээх",
-      "recentlyUsed": "Сүүлд ашигласан"
+      "recentlyUsed": "Сүүлд ашигласан",
+      "continueFrom": "{{title}} үргэлжлүүлж байна",
+      "importingSession": "Сесс импортлож байна",
+      "cliCannotContinue": "Энэ CLI сесс үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
+      "importFailed": "Энэ сессийг импортлох боломжгүй.",
+      "discardWithUploadsMessage": "Таны заавар болон илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Компьютерийнхээ төсөлд `kilo remote` ажиллуулах, эсвэл аль хэдийн ажиллаж байгаа бол Kilo CLI-г шинэчилнэ үү.",
       "instanceOnProject": "{{name}} дээр {{project}}",
       "instanceOnProjectSuffix": "{{name}} дээр {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах"
+      "runOnCloudAgent": "Cloud Agent дээр ажиллуулах",
+      "terminals": "Терминалууд",
+      "remotes": "Алсын инстанцууд"
     },
     "modePicker": {
       "title": "Режим сонгох",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Мэдээлэл дараалалд орлоо",
       "userMessage": "Хэрэглэгчийн мэдээлэл",
       "assistantMessage": "Туслахын мэдээлэл",
-      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу"
+      "longPressHint": "Мэдээллийн дэлгэрэнгүйг үзэхийн тулд удаан дарна уу",
+      "cancelQueued": "Мессежийг цуцлах",
+      "cancelQueuedAccessibility": "Дараалалд буй мессежийг цуцлах",
+      "restoreQueued": "Сэргээх",
+      "restoreQueuedAccessibility": "Цуцалсан мессежийг мессеж оруулах талбарт сэргээх"
     },
     "olderMessages": {
       "arrived": "Өмнөх мэдээллүүд ачаалагдлаа",
@@ -2462,6 +2496,8 @@
       "viewTable": "Хүснэгт үзэх",
       "title": "Хүснэгт",
       "close": "Хүснэгтийг хаах",
+      "loading": "Хүснэгт ачаалж байна",
+      "empty": "Энэ хүснэгтэд мөр байхгүй байна.",
       "columnCount_one": "багана",
       "columnCount": "баганууд",
       "columnCount_other": "баганууд",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Сессийг шүүх",
-      "sortBy": "Эрэмбэлэх",
-      "sortLastUpdated": "Сүүлд шинэчлэгдсэн",
-      "sortCreated": "Үүсгэсэн",
       "platform": "Платформ",
       "platformCloud": "Үүл",
       "platformExtension": "Өргөтгөл",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Бусад",
-      "project": "Төсөл",
-      "removeProjectFilter": "{{label}} төслийн шүүлтийг арилгах",
-      "removePlatformFilter": "{{label}} платформын шүүлтийг арилгах"
+      "project": "Төсөл"
     },
     "suggestion": {
       "title": "Санал",
@@ -2528,7 +2559,9 @@
       "uploading": "Байршуулж байна…",
       "uploaded": "Байршуулсан",
       "uploadFailedRetry": "Байршуулалт амжилтгүй боллоо. Дахин оролдохын тулд товшино уу.",
-      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй."
+      "uploadFailedTerminal": "Энэ файлыг байршуулах боломжгүй.",
+      "moveLeft": "{{filename}} файлыг зүүн тийш зөөх",
+      "moveRight": "{{filename}} файлыг баруун тийш зөөх"
     },
     "attachmentPasteHint": {
       "accessibility": "Самбараас зураг буулгах",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Дуусгаж байна...",
       "messagePlaceholder": "Мессеж",
       "cannotReceiveFiles": "Энэ сесси файл хүлээн авах боломжгүй. Мэдээлэл илгээхийн тулд хавсралтуудыг арилгана уу.",
-      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу."
+      "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу.",
+      "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй байршуулсан файлууд устах болно.",
+      "discardAttachmentsTitle": "Хавсралтуудыг хаях уу?",
+      "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
+      "insertNewline": "Шинэ мөр оруулах"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Энэ холбоос {{host}}-ыг таны хөтөч дээр нээнэ.",
       "open": "Нээх",
       "trustThisHost": "Энэ хостыг итгэмжлэх"
+    },
+    "folderPicker": {
+      "accessibility": "Хавтас: {{label}}",
+      "emptyDescription": "Болсон энэ хавтсыг ашигладаг.",
+      "emptyTitle": "Дотор нь хавтас алга",
+      "fieldLabel": "Хавтас",
+      "retryableDescription": "Холболтоо шалгаад Дахин оролдох. Болсон энэ хавтсыг баталгаажуулсаар байна.",
+      "retryableTitle": "Хавтасуудыг жагсаалж чадсангүй",
+      "tapToListHint": "Агуулгыг нь жагсаахын тулд хавтас дээр дарна уу",
+      "unsupportedDescription": "Энэ CLI хавтасуудыг жагсаалж чадахгүй. Болсон эхлүүлсэн хавтсыг хадгалж, Сессийг эхлүүлэх тэнд эхэлнэ.",
+      "unsupportedTitle": "Хавтасуудыг жагсаалж чадахгүй"
     }
   },
   "bootstrap": {
@@ -2693,7 +2741,7 @@
     "description": "Kilo-ийн шинэ хувилбар гарлаа. Үргэлжлүүлэхийн тулд шинэчлэнэ үү.",
     "title": "Шинэчлэлт шаардлагатай",
     "updateNow": "Одоо шинэчлэх",
-    "appStorePage": "Апп дэлгүүрийн хуудас"
+    "appStorePage": "апп дэлгүүрийн хуудас"
   },
   "home": {
     "couldNotLoadSessions": "Сессийг ачаалж чадсангүй",
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Шинэ кодчилолын даалгавар",
     "explore": "Судлах",
     "seeAll": "Бүгдийг үзэх",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Одоогоор юу ч ажиллаагүй байна"
   },
   "imageViewer": {
     "close": "{{filename}} хаах",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Буцаж, өмнөх дэлгэцээс энэ сонгогчийг дахин нээнэ үү."
   },
   "sessionRow": {
-    "needsInput": "оролт шаардлагатай"
+    "needsInput": "ОРОЛТ ШААРДЛАГАТАЙ"
   },
   "voiceInput": {
     "listening": "Сонсож байна...",
@@ -2766,7 +2814,8 @@
     "busy": "Дуу оруулалт завгүй байна. Дахин оролдоно уу.",
     "stopped": "Дуу оруулалт зогссон. Дахин оролдохын тулд микрофоныг товшино уу.",
     "unavailableDevice": "Энэ төхөөрөмж дээр дуу оруулалт боломжгүй.",
-    "unavailableLanguage": "Энэ төхөөрөмжийн хэлэнд дуу оруулалт боломжгүй."
+    "unavailableLanguage": "Энэ төхөөрөмжийн хэлэнд дуу оруулалт боломжгүй.",
+    "listeningStopped": "Сонсох ажиллагаа зогссон."
   },
   "share": {
     "title": "Kilo руу хуваалцах",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Холбоосын хостыг итгэмжлэхэд дахин асуултгүй нээгдэнэ.",
     "revoke": "{{host}} цуцлах",
     "backToPreferences": "Тохиргоо руу буцах"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Мессеж"
+    },
+    "empty": {
+      "title": "Чат эхлүүлэх",
+      "description": "Загвартай ярилцахын тулд мессеж илгээнэ үү."
+    },
+    "working": "Ажиллаж байна",
+    "historyRetry": "Чат түүхийг ачаалж чадсангүй.",
+    "catalogRetry": "Загваруудыг ачаалж чадсангүй",
+    "sendError": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
   }
 }

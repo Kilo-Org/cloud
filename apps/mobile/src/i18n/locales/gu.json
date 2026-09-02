@@ -152,7 +152,11 @@
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપ એટ્રિબ્યુશન ઉમેરો",
-    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો."
+    "prReviewAttributionSubtitle": "સમીક્ષા સબમિટ કરતી વખતે Reviewed via Kilo ફૂટર જોડો.",
+    "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
+    "returnSendsMessageSubtitle": "બંધ હોય ત્યારે, રિટર્ન એજન્ટના સંદેશ ઇનપુટમાં નવી લાઇન દાખલ કરે છે.",
+    "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
+    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -665,7 +669,8 @@
     "profile": "પ્રોફાઇલ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}"
+    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}",
+    "chat": "ચેટ"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "નેટવર્ક ભૂલ",
       "uploadFailed": "અપલોડ નિષ્ફળ",
       "failedToUploadFile": "ફાઇલ અપલોડ કરવામાં નિષ્ફળ: {{reason}}",
-      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી"
+      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી",
+      "metadataStripFailed": "ફોટો મેટાડેટા દૂર કરી શકાયું નહીં."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "ચેક રન",
       "status": "સ્થિતિ",
       "threshold": "થ્રેશોલ્ડ",
-      "pullRequest": "પુલ રિક્વેસ્ટ"
+      "pullRequest": "પુલ રિક્વેસ્ટ",
+      "transcriptWaiting": "સમીક્ષા ટ્રાન્સક્રિપ્ટની રાહ જોઈ રહ્યું છે.",
+      "transcriptEmpty": "આ સમીક્ષા માટે કોઈ ટ્રાન્સક્રિપ્ટ નથી.",
+      "transcriptRetry": "સમીક્ષા ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નહીં.",
+      "transcriptLive": "લાઇવ",
+      "agentIdle": "એજન્ટ નિષ્ક્રિય",
+      "agentWorking": "એજન્ટ કામ કરી રહ્યું છે...",
+      "anErrorOccurred": "ભૂલ થઈ",
+      "errorWithMessage": "ભૂલ: {{message}}",
+      "executionStarted": "એક્ઝેક્યુશન શરૂ થયું",
+      "reviewCompleted": "સમીક્ષા પૂર્ણ",
+      "reviewInterrupted": "સમીક્ષા વિક્ષિપ્ત થઈ",
+      "sessionError": "સત્ર ભૂલ: {{error}}",
+      "statusWithValue": "સ્થિતિ: {{status}}",
+      "toolName": "ટૂલ: {{name}}",
+      "toolNameError": "ટૂલ: {{name}} — ભૂલ",
+      "unknownError": "અજ્ઞાત ભૂલ"
     },
     "reviewMemory": {
       "title": "સમીક્ષા મેમરી",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "હવે સક્રિય",
     "search": {
       "searching": "શોધી રહ્યું છે",
       "searchSessions": "સત્રો શોધો",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
       "couldNotLoadActive": "સક્રિય સત્રો લોડ થઈ શક્યા નથી",
-      "noSessionsYet": "હજુ કોઈ સત્ર નથી",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "અલગ શોધ શબ્દ અજમાવો.",
       "tryAdjustFilters": "તમારા ફિલ્ટર ગોઠવવાનો અથવા સાફ કરવાનો પ્રયાસ કરો.",
       "couldNotSearch": "સત્રો શોધી શકાયા નથી",
-      "allActive": "બધા સત્રો સક્રિય છે",
       "completedWillAppear": "પૂર્ણ થયેલ સત્રો અહીં દેખાશે.",
       "noPastSessions": "કોઈ ભૂતકાળના સત્ર નથી",
-      "live": "લાઇવ"
+      "live": "લાઇવ",
+      "updating": "અપડેટ થઈ રહ્યું છે"
     },
     "sessionRow": {
       "deleteTitle": "સત્ર કાઢી નાખવું?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "સત્ર બહાર નીકળ્યું",
     "remoteSpawnRetryable": "ઇન્સ્ટન્સ સુધી પહોંચી શકાયું નહીં — તે ડિસ્કનેક્ટ થયું હોઈ શકે છે.",
     "remoteSpawnNonRetryable": "ઇન્સ્ટન્સ સત્ર શરૂ કરવામાં નિષ્ફળ ગયું — મશીન તપાસો અથવા CLI અપડેટ કરો.",
-    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો."
+    "remoteSpawnInstanceDisconnected": "પસંદ કરેલ ઇન્સ્ટન્સ ડિસ્કનેક્ટ થયું. Cloud Agent પર સત્ર શરૂ કરો અથવા બીજું ઇન્સ્ટન્સ પસંદ કરો.",
+    "liveCount_one": "{{count}} લાઇવ",
+    "liveCount_other": "{{count}} લાઇવ"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
-      "connectRepository": "રિપોઝિટરી કનેક્ટ કરો",
       "cloningSession": "સત્ર ક્લોન કરી રહ્યું છે",
       "continue": "ચાલુ રાખો",
       "couldNotLoadThisSession": "આ સત્ર લોડ થઈ શક્યું નથી",
-      "cloneFailed": "આ સત્ર ક્લોન થઈ શક્યું નથી.",
       "cloneFailedRetry": "આ સત્ર ક્લોન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
-      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો.",
       "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
       "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
       "connectionTrouble": "કનેક્શન સમસ્યા. થોડી વાર પછી ફરી પ્રયાસ કરો.",
-      "modelUnavailable": "આ મૉડલ Cloud Agent માટે ઉપલબ્ધ નથી. બીજું મૉડલ પસંદ કરીને ફરી પ્રયાસ કરો."
+      "modelUnavailable": "આ મૉડલ Cloud Agent માટે ઉપલબ્ધ નથી. બીજું મૉડલ પસંદ કરીને ફરી પ્રયાસ કરો.",
+      "cancelQueuedFailed": "સંદેશ રદ કરી શકાયો નહીં.",
+      "cancelQueuedRestoreAvailable": "સંદેશ રદ થયો. તેને સંદેશ ઇનપુટમાં પાછો લાવવા માટે પુનઃસ્થાપિત કરો પર ટેપ કરો.",
+      "cancelQueuedRestored": "સંદેશ રદ થયો. પ્રોમ્પ્ટ સંદેશ ઇનપુટમાં પાછો આવી ગયો છે.",
+      "cancelQueuedUpgradeRequired": "કતારમાં રહેલા સંદેશો રદ કરવા માટે Kilo CLI નું નવું સંસ્કરણ જરૂરી છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "remoteSession": {
       "failedToCreate": "રિમોટ સત્ર બનાવવામાં નિષ્ફળ",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરી એક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
       "openBitbucket": "Bitbucket ખોલો",
       "openGitlab": "GitLab ખોલો",
-      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું"
+      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
+      "continueFrom": "{{title}} ચાલુ કરી રહ્યાં છીએ",
+      "importingSession": "સત્ર આયાત કરી રહ્યાં છીએ",
+      "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
+      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી.",
+      "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "તમારા કમ્પ્યુટરના પ્રોજેક્ટમાં `kilo remote` ચલાવો, અથવા જો પહેલેથી ચાલતું હોય તો Kilo CLI અપડેટ કરો.",
       "instanceOnProject": "{{name}} {{project}} પર",
       "instanceOnProjectSuffix": "{{name}} {{project}} પર ({{suffix}})",
-      "runOnCloudAgent": "ક્લાઉડ એજન્ટ પર ચલાવો"
+      "runOnCloudAgent": "ક્લાઉડ એજન્ટ પર ચલાવો",
+      "terminals": "ટર્મિનલો",
+      "remotes": "રિમોટ ઇન્સ્ટન્સ"
     },
     "modePicker": {
       "title": "મોડ પસંદ કરો",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "સંદેશ કતારબદ્ધ",
       "userMessage": "વપરાશકર્તા સંદેશ",
       "assistantMessage": "સહાયક સંદેશ",
-      "longPressHint": "સંદેશ વિગતો માટે લાંબું દબાવો"
+      "longPressHint": "સંદેશ વિગતો માટે લાંબું દબાવો",
+      "cancelQueued": "સંદેશ રદ કરો",
+      "cancelQueuedAccessibility": "કતારમાં રહેલો સંદેશ રદ કરો",
+      "restoreQueued": "પુનઃસ્થાપિત કરો",
+      "restoreQueuedAccessibility": "રદ કરેલો સંદેશ સંદેશ ઇનપુટમાં પુનઃસ્થાપિત કરો"
     },
     "olderMessages": {
       "arrived": "અગાઉના સંદેશાઓ લોડ થયા",
@@ -2462,6 +2496,8 @@
       "viewTable": "કોષ્ટક જુઓ",
       "title": "કોષ્ટક",
       "close": "કોષ્ટક બંધ કરો",
+      "loading": "કોષ્ટક લોડ થઈ રહ્યું છે",
+      "empty": "આ કોષ્ટકમાં કોઈ પંક્તિઓ નથી.",
       "columnCount_one": "કૉલમ",
       "columnCount": "કૉલમ્સ",
       "columnCount_other": "કૉલમ્સ",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "સત્રો ફિલ્ટર કરો",
-      "sortBy": "ક્રમ આપો",
-      "sortLastUpdated": "છેલ્લે અપડેટ",
-      "sortCreated": "બનાવેલ",
       "platform": "પ્લેટફોર્મ",
       "platformCloud": "ક્લાઉડ",
       "platformExtension": "એક્સટેન્શન",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "અન્ય",
-      "project": "પ્રોજેક્ટ",
-      "removeProjectFilter": "{{label}} પ્રોજેક્ટ ફિલ્ટર દૂર કરો",
-      "removePlatformFilter": "{{label}} પ્લેટફોર્મ ફિલ્ટર દૂર કરો"
+      "project": "પ્રોજેક્ટ"
     },
     "suggestion": {
       "title": "સૂચન",
@@ -2528,7 +2559,9 @@
       "uploading": "અપલોડ થઈ રહ્યું છે…",
       "uploaded": "અપલોડ થયું",
       "uploadFailedRetry": "અપલોડ નિષ્ફળ. ફરી પ્રયાસ કરવા ટેપ કરો.",
-      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી."
+      "uploadFailedTerminal": "આ ફાઇલ અપલોડ કરી શકાતી નથી.",
+      "moveLeft": "{{filename}} ડાબે ખસેડો",
+      "moveRight": "{{filename}} જમણે ખસેડો"
     },
     "attachmentPasteHint": {
       "accessibility": "ક્લિપબોર્ડમાંથી ઇમેજ પેસ્ટ કરો",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
       "messagePlaceholder": "સંદેશ...",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો મેળવી શકતું નથી. તમારો સંદેશ મોકલવા માટે એટેચમેન્ટ્સ દૂર કરો.",
-      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો."
+      "couldNotAttachFiles": "ફાઇલો એટેચ કરી શકાઈ નહીં. ફરી પ્રયાસ કરવા મોકલો ટેપ કરો.",
+      "discardAttachmentsMessage": "મોકલેલા સંદેશોમાં એટેચ ન કરેલી અપલોડ થયેલી ફાઇલો કાઢી નાખવામાં આવશે.",
+      "discardAttachmentsTitle": "એટેચમેન્ટ્સ કાઢી નાખવા છે?",
+      "charactersRemaining": "{{count}} અક્ષરો બાકી",
+      "insertNewline": "નવી લાઇન દાખલ કરો"
     },
     "chatLink": {
       "linkCopied": "લિંક કૉપિ થઈ",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "આ લિંક તમારા બ્રાઉઝરમાં {{host}} ખોલે છે.",
       "open": "ખોલો",
       "trustThisHost": "આ હોસ્ટ પર ભરોસો રાખો"
+    },
+    "folderPicker": {
+      "accessibility": "ફોલ્ડર: {{label}}",
+      "emptyDescription": "થઈ ગયું આ ફોલ્ડર વાપરે છે.",
+      "emptyTitle": "અંદર કોઈ ફોલ્ડર નથી",
+      "fieldLabel": "ફોલ્ડર",
+      "retryableDescription": "તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો. થઈ ગયું હજુ પણ આ ફોલ્ડરની પુષ્ટિ કરે છે.",
+      "retryableTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાયા નહીં",
+      "tapToListHint": "તેની સામગ્રી સૂચિબદ્ધ કરવા ફોલ્ડરને ટેપ કરો",
+      "unsupportedDescription": "આ CLI ફોલ્ડર્સ સૂચિબદ્ધ કરી શકતું નથી. થઈ ગયું લોન્ચ ફોલ્ડર રાખે છે અને સત્ર શરૂ કરો ત્યાં શરૂ થાય છે.",
+      "unsupportedTitle": "ફોલ્ડર્સ સૂચિબદ્ધ કરી શકાતા નથી"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "explore": "શોધો",
     "seeAll": "બધા જુઓ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "અત્યારે કંઈ ચાલી રહ્યું નથી"
   },
   "imageViewer": {
     "close": "{{filename}} બંધ કરો",
@@ -2766,7 +2814,8 @@
     "busy": "વૉઇસ ઇનપુટ વ્યસ્ત છે. ફરી પ્રયત્ન કરો.",
     "stopped": "વૉઇસ ઇનપુટ બંધ થયું. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
     "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
-    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી."
+    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
+    "listeningStopped": "સાંભળવાનું બંધ થયું."
   },
   "share": {
     "title": "Kilo પર શેર કરો",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
     "revoke": "{{host}} રદ કરો",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
+  },
+  "quickChat": {
+    "title": "ચેટ",
+    "composer": {
+      "placeholder": "સંદેશ"
+    },
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "working": "કામ થઈ રહ્યું છે",
+    "historyRetry": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+    "catalogRetry": "મોડેલ લોડ કરી શકાયા નહીં",
+    "sendError": "સંદેશો મોકલી શકાયો નથી. ફરી પ્રયાસ કરો."
   }
 }

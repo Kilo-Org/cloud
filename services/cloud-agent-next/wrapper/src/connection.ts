@@ -592,12 +592,18 @@ export function createConnectionManager(
       return;
     }
 
-    const networkWaits = await config.kiloClient.getNetworkWaits();
-    await Promise.all(
-      networkWaits
-        .filter(wait => wait.sessionID === kiloSessionId && wait.restored)
-        .map(wait => resumeNetworkWait(wait.id))
-    );
+    try {
+      const networkWaits = await config.kiloClient.getNetworkWaits();
+      await Promise.all(
+        networkWaits
+          .filter(wait => wait.sessionID === kiloSessionId && wait.restored)
+          .map(wait => resumeNetworkWait(wait.id))
+      );
+    } catch (err) {
+      logToFile(
+        `failed to resume restored network waits: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   /**

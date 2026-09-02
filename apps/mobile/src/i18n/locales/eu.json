@@ -152,7 +152,11 @@
     "appearanceDark": "Iluna",
     "account": "Kontua",
     "prReviewAttribution": "Gehitu aplikazioaren atribuzioa PR berrikuspenetan",
-    "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean."
+    "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean.",
+    "returnSendsMessage": "Sartu teklak mezua bidaltzen du",
+    "returnSendsMessageSubtitle": "Desaktibatuta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen konpositoreetan.",
+    "biometricUnlock": "Desblokeatu biometriarekin",
+    "biometricUnlockSubtitle": "Aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren desblokeatu behar duzu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
@@ -665,7 +669,8 @@
     "profile": "Profila",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fitxa, {{position}} / {{total}}"
+    "position": "{{name}}, fitxa, {{position}} / {{total}}",
+    "chat": "Txata"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Sare-errorea",
       "uploadFailed": "Igoerak huts egin du",
       "failedToUploadFile": "Fitxategia igotzeak huts egin du: {{reason}}",
-      "nothingToPaste": "Ez dago ezer itsatsitzeko"
+      "nothingToPaste": "Ez dago ezer itsatsitzeko",
+      "metadataStripFailed": "Ezin izan da argazkiaren metadata kendu."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -833,7 +839,7 @@
       "managedByAdmin": "Fakturazioa zure erakundeko administratzaileak kudeatzen du.",
       "couldNotLoad": "Fakturazio-informazioa ezin izan da kargatu",
       "manageOnWeb": "Kudeatu fakturazioa webgunean",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Zure azken Commit epea {{date}}n amaitzen da. Jarraitu Standard gisa {{price}}rekin, edo hostinga amaitzen da.",
       "freeTrial": "Doako proba",
@@ -1129,7 +1135,7 @@
       "destroying": "SUNTSITZEN",
       "provisioned": "HORNITUTA",
       "restarting": "BERRABIARAZTEN",
-      "running": "Exekutatzen",
+      "running": "EXEKUTATZEN",
       "shuttingDown": "ITZALTZEN",
       "starting": "HASTEN",
       "stopped": "GELDITUTA",
@@ -1299,7 +1305,23 @@
       "checkRun": "Egiaztapen-exekuzioa",
       "status": "Egoera",
       "threshold": "Atalasea",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Berrikuspenaren transkripzioaren zain.",
+      "transcriptEmpty": "Berrikuspen honetarako transkripziorik ez.",
+      "transcriptRetry": "Ezin izan da berrikuspenaren transkripzioa kargatu.",
+      "transcriptLive": "Zuzenean",
+      "agentIdle": "Agentea geldirik",
+      "agentWorking": "Agentea lanean...",
+      "anErrorOccurred": "Errore bat gertatu da",
+      "errorWithMessage": "Errorea: {{message}}",
+      "executionStarted": "Exekuzioa hasita",
+      "reviewCompleted": "Berrikuspena osatuta",
+      "reviewInterrupted": "Berrikuspena etena",
+      "sessionError": "Saioaren errorea: {{error}}",
+      "statusWithValue": "Egoera: {{status}}",
+      "toolName": "Tresna: {{name}}",
+      "toolNameError": "Tresna: {{name}} — errorea",
+      "unknownError": "Errore ezezaguna"
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Orain aktibo",
     "search": {
       "searching": "Bilatzen",
       "searchSessions": "Bilatu saioak",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Ezin dira saioak kargatu",
       "couldNotLoadActive": "Ezin dira saio aktiboak kargatu",
-      "noSessionsYet": "Oraindik ez dago saiorik",
       "noSessionsYetDescription": "Hasi kodetze-lan bat zure telefonotik. Zure saioak hemen agertuko dira.",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "tryAdjustFilters": "Saiatu iragazkiak doitzen edo ezabatzen.",
       "couldNotSearch": "Ezin dira saioak bilatu",
-      "allActive": "Saio guztiak aktibo daude",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago iraganeko saiorik",
-      "live": "ZUZENEAN"
+      "live": "ZUZENEAN",
+      "updating": "Eguneratzen"
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Saioa itxi da",
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
     "remoteSpawnNonRetryable": "Instantziak ezin izan du saioa hasi; egiaztatu makina edo eguneratu CLI-a.",
-    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat."
+    "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat.",
+    "liveCount_one": "{{count}} ZUZENEAN",
+    "liveCount_other": "{{count}} ZUZENEAN"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Joan beherako ertzera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
-      "connectRepository": "Konektatu biltegia",
       "cloningSession": "Saioa klonatzen",
       "continue": "Jarraitu",
       "couldNotLoadThisSession": "Ezin da saio hau kargatu",
-      "cloneFailed": "Ezin da saio hau klonatu.",
       "cloneFailedRetry": "Ezin da saio hau klonatu. Saiatu berriro.",
-      "connectRepositoryToContinue": "Konektatu biltegia jarraitzeko.",
       "notEnoughCredits": "Kreditu nahikorik ez Cloud Agent exekutatzeko. Gehitu kreditua eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
       "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
       "connectionTrouble": "Konexio-arazoa. Saiatu berriro minutu baten buruan.",
-      "modelUnavailable": "Modelu hau ez dago eskuragarri Cloud Agent-erako. Aukeratu beste modelo bat eta saiatu berriro."
+      "modelUnavailable": "Modelu hau ez dago eskuragarri Cloud Agent-erako. Aukeratu beste modelo bat eta saiatu berriro.",
+      "cancelQueuedFailed": "Ezin izan da mezua bertan behera utzi.",
+      "cancelQueuedRestoreAvailable": "Mezua bertan behera utzi da. Sakatu Berreskuratu konpositorera itzultzeko.",
+      "cancelQueuedRestored": "Mezua bertan behera utzi da. Proposamena berriro konpositorean dago.",
+      "cancelQueuedUpgradeRequired": "Ilaran dauden mezuak bertan behera uzteko Kilo CLI bertsio berriago bat behar da. Eguneratu Kilo CLI eta konektatu berriro."
     },
     "remoteSession": {
       "failedToCreate": "Ezin da urruneko saioa sortu",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-erako biltegien sarbidea, eta gero freskatu.",
       "openBitbucket": "Ireki Bitbucket",
       "openGitlab": "Ireki GitLab",
-      "recentlyUsed": "Azken erabiliak"
+      "recentlyUsed": "Azken erabiliak",
+      "cliCannotContinue": "CLI honek ezin du saioa jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
+      "continueFrom": "Jarraitzen {{title}}",
+      "importFailed": "Ezin izan da saio hau inportatu.",
+      "importingSession": "Saioa inportatzen",
+      "discardWithUploadsMessage": "Zure proposamena eta bidalitako mezuei erantsi gabeko igotako fitxategiak ezabatuko dira."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Exekutatu `kilo remote` zure ordenagailuko projektuan, edo eguneratu Kilo CLI jada exekutatzen ari bada.",
       "instanceOnProject": "{{name}} {{project}}n",
       "instanceOnProjectSuffix": "{{name}} {{project}}n ({{suffix}})",
-      "runOnCloudAgent": "Exekutatu Cloud Agent-en"
+      "runOnCloudAgent": "Exekutatu Cloud Agent-en",
+      "terminals": "Terminalak",
+      "remotes": "Urruneko instantziak"
     },
     "modePicker": {
       "title": "Hautatu modua",
@@ -2427,7 +2457,7 @@
       "modelAccessibility": "Modeloa: {{modelLabel}}",
       "openHint": "Ireki subagentearen saioa",
       "subagent": "Subagentea",
-      "task": "zeregina",
+      "task": "Zeregina",
       "waitingForActivity": "Jardueraren zain"
     },
     "childSessionSheet": {
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Mezua antolatuta",
       "userMessage": "Erabiltzailearen mezua",
       "assistantMessage": "Laguntzailearen mezua",
-      "longPressHint": "Sakatuta eduki mezuen xehetasunak ikusteko"
+      "longPressHint": "Sakatuta eduki mezuen xehetasunak ikusteko",
+      "cancelQueued": "Utzi mezua bertan behera",
+      "cancelQueuedAccessibility": "Utzi ilaran dagoen mezua bertan behera",
+      "restoreQueued": "Berreskuratu",
+      "restoreQueuedAccessibility": "Berreskuratu bertan behera utzitako mezua konpositorean"
     },
     "olderMessages": {
       "arrived": "Aurreko mezuak kargatu dira",
@@ -2462,6 +2496,8 @@
       "viewTable": "Ikusi taula",
       "title": "Taula",
       "close": "Itxi taula",
+      "loading": "Taula kargatzen",
+      "empty": "Taula honek ez du ilararik.",
       "columnCount_one": "zutabea",
       "columnCount": "zutabeak",
       "columnCount_other": "zutabeak",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Iragazi saioak",
-      "sortBy": "Ordenatu honen arabera",
-      "sortLastUpdated": "Azken eguneratzea",
-      "sortCreated": "Sortuta",
       "platform": "Plataforma",
       "platformCloud": "Hodeia",
       "platformExtension": "Hedapena",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Beste bat",
-      "project": "Proiektua",
-      "removeProjectFilter": "Kendu {{label}} proiektuaren iragazkia",
-      "removePlatformFilter": "Kendu {{label}} plataformaren iragazkia"
+      "project": "Proiektua"
     },
     "suggestion": {
       "title": "Iradokizuna",
@@ -2528,7 +2559,9 @@
       "uploading": "Igotzen…",
       "uploaded": "Igota",
       "uploadFailedRetry": "Igoerak huts egin du. Sakatu berriro saiatzeko.",
-      "uploadFailedTerminal": "Fitxategi hau ezin da igo."
+      "uploadFailedTerminal": "Fitxategi hau ezin da igo.",
+      "moveLeft": "Mugitu {{filename}} ezkerrera",
+      "moveRight": "Mugitu {{filename}} eskuinera"
     },
     "attachmentPasteHint": {
       "accessibility": "Itsatsi irudia arbelatik",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Amaitzen...",
       "messagePlaceholder": "Mezua...",
       "cannotReceiveFiles": "Saio honek ezin du fitxategirik jaso. Kendu eranskinak zure mezua bidaltzeko.",
-      "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu bidali berriro saiatzeko."
+      "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu bidali berriro saiatzeko.",
+      "discardAttachmentsMessage": "Bidalitako mezuei erantsi gabeko igotako fitxategiak ezabatuko dira.",
+      "discardAttachmentsTitle": "Baztertu eranskinak?",
+      "charactersRemaining": "{{count}} karaktere geratzen dira",
+      "insertNewline": "Txertatu lerro-jauzia"
     },
     "chatLink": {
       "linkCopied": "Esteka kopiatuta",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Esteka honek {{host}} irekitzen du zure arakatzailean.",
       "open": "Ireki",
       "trustThisHost": "Konfiantza eman ostalari honi"
+    },
+    "folderPicker": {
+      "fieldLabel": "Karpeta",
+      "accessibility": "Karpeta: {{label}}",
+      "tapToListHint": "Ukitu karpeta bat haren edukiak zerrendatzeko",
+      "emptyTitle": "Ez dago karpetarik barruan",
+      "emptyDescription": "Egindak karpeta hau erabiltzen du.",
+      "retryableTitle": "Ezin dira karpetak zerrendatu",
+      "retryableDescription": "Egiaztatu konexioa eta Saiatu berriro. Egindak karpeta hau berretsiko du.",
+      "unsupportedTitle": "Karpetak ezin dira zerrendatu",
+      "unsupportedDescription": "CLI honek ezin ditu karpetak zerrendatu. Egindak abio-karpeta mantentzen du eta Hasi saioa han hasten da."
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Kodetze-lan berria",
     "explore": "Arakatu",
     "seeAll": "Ikusi guztiak",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ez dago ezer martxan une honetan"
   },
   "imageViewer": {
     "close": "Itxi {{filename}}",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Itzuli eta ireki hautatzaile hau aurreko pantailatik berriro."
   },
   "sessionRow": {
-    "needsInput": "sarreraren zain"
+    "needsInput": "SARRERAREN ZAIN"
   },
   "voiceInput": {
     "listening": "Entzuten...",
@@ -2766,7 +2814,8 @@
     "busy": "Ahots-sarrera lanpetuta dago. Saiatu berriro.",
     "stopped": "Ahots-sarrera gelditu da. Sakatu mikrofonoa berriro saiatzeko.",
     "unavailableDevice": "Ahots-sarrera ez dago eskuragarri gailu honetan.",
-    "unavailableLanguage": "Ahots-sarrera ez dago eskuragarri gailu honen hizkuntzarako."
+    "unavailableLanguage": "Ahots-sarrera ez dago eskuragarri gailu honen hizkuntzarako.",
+    "listeningStopped": "Entzutea gelditu da."
   },
   "share": {
     "title": "Partekatu Kilo-n",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Esteka baten ostalariari konfiantza ematean, berriro galdetu gabe irekiko da.",
     "revoke": "Baliogabetu {{host}}",
     "backToPreferences": "Itzuli hobespenetara"
+  },
+  "quickChat": {
+    "title": "Txata",
+    "composer": {
+      "placeholder": "Mezua"
+    },
+    "empty": {
+      "title": "Hasi txat bat",
+      "description": "Bidali mezu bat modelo batekin hitz egiteko."
+    },
+    "working": "Lanean",
+    "historyRetry": "Ezin izan da txat-historia kargatu.",
+    "catalogRetry": "Modeloak ezin izan dira kargatu",
+    "sendError": "Ezin izan da mezua bidali. Saiatu berriro."
   }
 }

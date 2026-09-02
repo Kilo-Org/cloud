@@ -1,8 +1,10 @@
+import { z } from 'zod';
 import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
+  'message.removed',
   'message.part.removed',
   'session.created',
   'session.updated',
@@ -10,7 +12,59 @@ const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'session.error',
   'session.idle',
   'session.turn.close',
+  'question.asked',
+  'question.replied',
+  'question.rejected',
+  'permission.asked',
+  'permission.replied',
 ]);
+
+export const pendingInteractionsSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
+
+export type PendingInteractions = z.infer<typeof pendingInteractionsSchema>;
+
+const interactionIdentitySchema = z.object({ id: z.string().min(1) }).passthrough();
+const interactionReplySchema = z.object({ requestID: z.string().min(1) });
+
+export function applyPendingInteractionEvent(
+  snapshot: PendingInteractions | undefined,
+  payload: SandboxControlSessionEventInput
+): PendingInteractions | undefined {
+  let collection: 'questions' | 'permissions';
+  switch (payload.type) {
+    case 'question.asked':
+    case 'question.replied':
+    case 'question.rejected':
+      collection = 'questions';
+      break;
+    case 'permission.asked':
+    case 'permission.replied':
+      collection = 'permissions';
+      break;
+    default:
+      return undefined;
+  }
+  const asked = payload.type.endsWith('.asked');
+  if (!snapshot && !asked) return undefined;
+  const request = asked ? interactionIdentitySchema.safeParse(payload.properties) : undefined;
+  const reply = asked ? undefined : interactionReplySchema.safeParse(payload.properties);
+  const id = request?.success ? request.data.id : reply?.success ? reply.data.requestID : undefined;
+  if (!id) return undefined;
+  const current = snapshot ?? { revision: 0, questions: [], permissions: [] };
+  const remaining = current[collection].filter(item => {
+    const parsed = interactionIdentitySchema.safeParse(item);
+    return !parsed.success || parsed.data.id !== id;
+  });
+  return {
+    ...current,
+    revision: current.revision + 1,
+    [collection]: asked ? [...remaining, payload.properties] : remaining,
+  };
+}
 
 export type SandboxControlEventQueries = {
   upsert(params: {
@@ -48,7 +102,11 @@ export function persistSandboxControlSessionEvent(params: {
     event: params.payload.type,
     properties: params.payload.properties,
   });
-  const entityId = extractEntityId(params.payload.type, { properties: params.payload.properties });
+  const entityId =
+    params.payload.type === 'autocommit_completed' &&
+    typeof params.payload.properties.messageId === 'string'
+      ? `autocommit/${params.payload.properties.messageId}`
+      : extractEntityId(params.payload.type, { properties: params.payload.properties });
   let eventId: EventId = 0;
   if (entityId) {
     eventId = params.eventQueries.upsert({

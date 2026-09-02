@@ -17,6 +17,7 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -95,6 +96,7 @@ const mockedConsumeInstallState = jest.mocked(consumeInstallState);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
+const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
@@ -524,6 +526,36 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       { type: 'org', id: 'org-db-owner' },
       expect.objectContaining({ platform: 'github' })
     );
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+      'org-db-owner',
+      ['owner', 'admin']
+    );
+  });
+
+  test('revalidates organization management access before storing an installation', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: 'org-demoted',
+      github_app_type: 'standard',
+      return_to: '/organizations/org-demoted/integrations/github',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedEnsureOrganizationAccess.mockRejectedValueOnce(new Error('Organization role required'));
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expectRedirectLocation(response, '/?error=installation_failed');
+    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
   test('handles a database-minted token with returnTo', async () => {
@@ -1031,6 +1063,38 @@ describe('GET /api/integrations/github/callback admin proof', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, `/integrations/github?error=installation_already_claimed`);
+  });
+
+  test('redirects when multiple installations are disabled for the organization', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    mockedConsumeInstallState.mockResolvedValue({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'org',
+      owner_id: organizationId,
+      github_app_type: 'standard',
+      return_to: null,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({
+      ok: false,
+      reason: 'multiple_installations_disabled',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/organizations/${organizationId}/integrations/github?error=multiple_installations_disabled`
+    );
   });
 
   test('logs distinct messages for code-absent vs non-admin', async () => {

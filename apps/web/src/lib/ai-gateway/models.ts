@@ -47,7 +47,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 7,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -75,6 +75,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
+  {
+    model: 'minimax/minimax-m3:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(

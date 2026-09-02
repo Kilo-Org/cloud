@@ -705,6 +705,47 @@ describe('MessageSettlementOutbox', () => {
     expect(JSON.stringify(harness.callbackJobs[0])).not.toContain('token=secret');
   });
 
+  it.each([
+    {
+      name: 'uses the workspace branch when the upstream branch is absent',
+      upstreamBranch: undefined,
+      branchName: 'kilo/quiet-forest-abcdefgh',
+      expectedBranch: 'kilo/quiet-forest-abcdefgh',
+    },
+    {
+      name: 'prefers the upstream branch over a different workspace branch',
+      upstreamBranch: 'feature/observed-branch',
+      branchName: 'kilo/quiet-forest-abcdefgh',
+      expectedBranch: 'feature/observed-branch',
+    },
+    {
+      name: 'leaves the branch absent for historical metadata without either branch',
+      upstreamBranch: undefined,
+      branchName: undefined,
+      expectedBranch: undefined,
+    },
+  ])('$name in callback jobs', async ({ upstreamBranch, branchName, expectedBranch }) => {
+    const harness = createHarness({
+      metadata: {
+        ...metadata,
+        repository: { type: 'github', repo: 'owner/repo', upstreamBranch },
+        workspace: branchName === undefined ? undefined : { branchName },
+      },
+    });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/callback' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.lastSeenBranch).toBe(expectedBranch);
+  });
+
   it('omits clientError from completed callback jobs', async () => {
     const harness = createHarness();
     await putSessionMessageState(

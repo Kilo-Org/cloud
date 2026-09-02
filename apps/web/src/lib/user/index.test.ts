@@ -126,20 +126,25 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  quick_chat_threads,
+  quick_chat_messages,
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
+  cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
+  anonymizeCloudUserData,
   assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
   findUserById,
   findUsersByIds,
   createOrUpdateUser,
   getAllUserProviders,
+  getCrossAccountEmailConflicts,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -197,6 +202,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(cloud_agent_worktrees);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
@@ -302,6 +308,8 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(quick_chat_messages);
+    await db.delete(quick_chat_threads);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -417,6 +425,56 @@ describe('User', () => {
       await expect(getAllUserProviders('shared@example.com')).resolves.toEqual({
         kind: 'ambiguous',
       });
+      await expect(
+        getCrossAccountEmailConflicts(['shared@example.com'], firstUser.id)
+      ).resolves.toEqual(new Map([['shared@example.com', true]]));
+      await expect(
+        getCrossAccountEmailConflicts(['shared@example.com'], secondUser.id)
+      ).resolves.toEqual(new Map([['shared@example.com', true]]));
+    });
+
+    it('does not report a conflict when provider emails resolve to one account', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'primary-only@example.com',
+        google_user_name: 'Single Account User',
+        normalized_email: 'primary-only@example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: `github-${user.id}`,
+        email: 'different-provider@example.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+
+      await expect(
+        getCrossAccountEmailConflicts(
+          [' DIFFERENT-PROVIDER@example.com ', 'primary-only@example.com'],
+          user.id
+        )
+      ).resolves.toEqual(
+        new Map([
+          [' DIFFERENT-PROVIDER@example.com ', false],
+          ['primary-only@example.com', false],
+        ])
+      );
+    });
+
+    it('reports normalized-primary conflicts without a provider email match', async () => {
+      const currentUser = await insertTestUser({
+        google_user_email: 'current@example.com',
+        google_user_name: 'Current User',
+      });
+      await insertTestUser({
+        google_user_email: 'normalized-owner@example.com',
+        google_user_name: 'Normalized Owner',
+        normalized_email: 'normalized-conflict@example.com',
+      });
+
+      await expect(
+        getCrossAccountEmailConflicts(['normalized-conflict@example.com'], currentUser.id)
+      ).resolves.toEqual(new Map([['normalized-conflict@example.com', true]]));
     });
 
     it('returns null for an email that is not linked to an account', async () => {
@@ -519,20 +577,116 @@ describe('User', () => {
       }
     );
 
-    it('does not infer a provider from an unknown legacy hosted domain', async () => {
+    it('recovers email discovery for a rowless UUID-era account', async () => {
       const user = await insertTestUser({
-        google_user_email: 'unknown-legacy@example.com',
-        google_user_name: 'Unknown Legacy User',
-        normalized_email: 'unknown-legacy@example.com',
-        hosted_domain: 'unknown.example.com',
+        id: randomUUID(),
+        google_user_email: 'rowless-email@example.com',
+        google_user_name: 'Rowless Email User',
+        normalized_email: 'rowless-email@example.com',
+        hosted_domain: 'example.com',
       });
 
-      await expect(getAllUserProviders('unknown-legacy@example.com')).resolves.toEqual({
+      await expect(getAllUserProviders('rowless-email@example.com')).resolves.toEqual({
         kind: 'found',
         user: {
           kiloUserId: user.id,
-          providers: [],
-          primaryEmail: 'unknown-legacy@example.com',
+          providers: ['email'],
+          primaryEmail: 'rowless-email@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('treats a rowless UUID account as Email despite a stale provider sentinel', async () => {
+      const user = await insertTestUser({
+        id: randomUUID(),
+        google_user_email: 'reset-email@example.com',
+        google_user_name: 'Reset Email User',
+        normalized_email: 'reset-email@example.com',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await expect(getAllUserProviders('reset-email@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: 'reset-email@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('recovers a reset UUID account through mailbox-verified Email linking', async () => {
+      const email = 'reset-recovery@example.com';
+      const user = await insertTestUser({
+        id: randomUUID(),
+        google_user_email: email,
+        google_user_name: 'Reset Recovery User',
+        normalized_email: email,
+        hosted_domain: hosted_domain_specials.github,
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: 'synthetic-reset-github',
+        email,
+        avatar_url: '',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await db.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, user.id));
+      await expect(getAllUserProviders(email)).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: email,
+          workosHostedDomain: undefined,
+        },
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Reset Recovery User',
+          google_user_image_url: '',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.id).toBe(user.id);
+      expect(result.isNew).toBe(false);
+      await expect(
+        db
+          .select({ provider: user_auth_provider.provider })
+          .from(user_auth_provider)
+          .where(eq(user_auth_provider.kilo_user_id, user.id))
+      ).resolves.toEqual([{ provider: 'email' }]);
+    });
+
+    it('uses the canonical UUID validator for rowless Email recovery', async () => {
+      const email = 'nil-uuid-email@example.com';
+      const user = await insertTestUser({
+        id: '00000000-0000-0000-0000-000000000000',
+        google_user_email: email,
+        google_user_name: 'Nil UUID Email User',
+        normalized_email: email,
+        hosted_domain: 'example.com',
+      });
+
+      await expect(getAllUserProviders(email)).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: email,
           workosHostedDomain: undefined,
         },
       });
@@ -1263,7 +1417,129 @@ describe('User', () => {
     });
   });
 
+  describe('anonymizeCloudUserData', () => {
+    const userId = 'oauth/google/Legacy.User';
+    const deletedEmail = `deleted+${userId}@deleted.invalid`;
+
+    it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
+      'preserves deletion history and scrubs new PII on replay with normalized_email %p',
+      async normalizedEmail => {
+        const blockedReason = 'soft-deleted at 2026-08-11T01:16:12.945+02:00';
+        const user = await insertTestUser({
+          id: userId,
+          google_user_email: deletedEmail,
+          normalized_email: normalizedEmail,
+          blocked_reason: blockedReason,
+          google_user_name: 'Reintroduced Name',
+          signup_ip: '203.0.113.10',
+        });
+        const [paymentMethod] = await db
+          .insert(payment_methods)
+          .values({
+            ...createTestPaymentMethod(user.id),
+            deleted_at: '2026-08-10 01:16:12.945+00',
+            name: 'Reintroduced Name',
+            address_city: 'NYC',
+            http_x_forwarded_for: '203.0.113.10',
+          })
+          .returning();
+        await db.insert(user_auth_provider).values({
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: 'reintroduced@example.com',
+          avatar_url: 'https://example.com/avatar.png',
+        });
+        await db.insert(enrichment_data).values({
+          user_id: user.id,
+          github_enrichment_data: { login: 'reintroduced-user', email: 'reintroduced@example.com' },
+        });
+        await db.insert(analytics_event_outbox).values({
+          event_uuid: randomUUID(),
+          event_name: 'session_create_settled',
+          distinct_id: user.id,
+          properties: { email: 'reintroduced@example.com' },
+        });
+
+        await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+        expect(await findUserById(user.id)).toMatchObject({
+          google_user_email: deletedEmail,
+          normalized_email: null,
+          blocked_reason: blockedReason,
+          google_user_name: 'Deleted User',
+          google_user_image_url: '',
+          signup_ip: null,
+        });
+        expect(
+          await db.select().from(payment_methods).where(eq(payment_methods.user_id, user.id))
+        ).toEqual([
+          expect.objectContaining({
+            id: paymentMethod.id,
+            deleted_at: paymentMethod.deleted_at,
+            name: null,
+            address_city: null,
+            http_x_forwarded_for: null,
+            stripe_fingerprint: paymentMethod.stripe_fingerprint,
+          }),
+        ]);
+        expect(
+          await db
+            .select()
+            .from(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db.select().from(enrichment_data).where(eq(enrichment_data.user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(analytics_event_outbox)
+            .where(eq(analytics_event_outbox.distinct_id, user.id))
+        ).toHaveLength(0);
+        expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
+      }
+    );
+  });
+
   describe('softDeleteUser', () => {
+    it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const worktreeId = `worktree_${randomUUID()}`;
+      const deletionStartedAt = '2026-08-27T08:00:00.000Z';
+      await db.insert(cloud_agent_worktrees).values([
+        {
+          worktree_id: worktreeId,
+          kilo_user_id: user.id,
+          name: 'Private customer incident',
+          deletion_started_at: deletionStartedAt,
+        },
+        {
+          worktree_id: `worktree_${randomUUID()}`,
+          kilo_user_id: otherUser.id,
+          name: 'Keep this name',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const [deletedUserWorktree] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.worktree_id, worktreeId));
+      expect(deletedUserWorktree.name).toBeNull();
+      expect(new Date(deletedUserWorktree.deletion_started_at ?? '').toISOString()).toBe(
+        deletionStartedAt
+      );
+      const [otherWorktree] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.kilo_user_id, otherUser.id));
+      expect(otherWorktree.name).toBe('Keep this name');
+    });
+
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
       const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
       const otherUser = await insertTestUser();
@@ -1395,6 +1671,55 @@ describe('User', () => {
           .select()
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
+      ).toHaveLength(1);
+    });
+
+    it('deletes quick chat threads and messages for the user and leaves other users intact', async () => {
+      const user = await insertTestUser({ google_user_email: 'quick-chat-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [thread] = await db
+        .insert(quick_chat_threads)
+        .values({ user_id: user.id, organization_id: null })
+        .returning();
+      const [otherThread] = await db
+        .insert(quick_chat_threads)
+        .values({ user_id: otherUser.id, organization_id: null })
+        .returning();
+      if (!thread || !otherThread) throw new Error('Failed to seed quick chat threads');
+
+      const [message] = await db
+        .insert(quick_chat_messages)
+        .values({ thread_id: thread.id, role: 'user', content: 'hello' })
+        .returning();
+      const [otherMessage] = await db
+        .insert(quick_chat_messages)
+        .values({ thread_id: otherThread.id, role: 'user', content: 'keep me' })
+        .returning();
+      if (!message || !otherMessage) throw new Error('Failed to seed quick chat messages');
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(quick_chat_messages)
+          .where(eq(quick_chat_messages.thread_id, thread.id))
+      ).toHaveLength(0);
+      expect(
+        await db.select().from(quick_chat_threads).where(eq(quick_chat_threads.user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_threads)
+          .where(eq(quick_chat_threads.user_id, otherUser.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_messages)
+          .where(eq(quick_chat_messages.thread_id, otherThread.id))
       ).toHaveLength(1);
     });
 
@@ -2143,6 +2468,7 @@ describe('User', () => {
         signup_ip: '203.0.113.10',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
+        blocked_reason: 'manual block',
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
@@ -2695,17 +3021,24 @@ describe('User', () => {
       );
     });
 
-    it('falls back to google_user_email when normalized_email is null', async () => {
+    it('tombstones a legacy real email once when normalized_email is null', async () => {
       // Pre-0090 users can have NULL normalized_email but a real google_user_email.
       // Soft-delete must still record a tombstone so a re-registration of the
       // same email cannot bypass the previously-deleted-referee guard.
       const legacyUser = await insertTestUser({
         google_user_email: 'legacy-no-normalized@example.com',
         normalized_email: null,
+        blocked_reason: 'deletion-in-progress at 2026-08-26T12:00:00.000Z',
       });
 
       await softDeleteUser(legacyUser.id);
 
+      const deletedUser = await findUserById(legacyUser.id);
+      expect(deletedUser).toMatchObject({
+        google_user_email: `deleted+${legacyUser.id}@deleted.invalid`,
+        normalized_email: null,
+        blocked_reason: expect.stringMatching(/^soft-deleted at \d{4}-\d{2}-\d{2}T/),
+      });
       const [tombstone] = await db
         .select()
         .from(deleted_user_email_tombstones)
@@ -2716,6 +3049,11 @@ describe('User', () => {
           )
         );
       expect(tombstone).toBeDefined();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, legacyUser.id));
+
+      expect((await findUserById(legacyUser.id))?.blocked_reason).toBe(deletedUser?.blocked_reason);
+      expect(await db.select().from(deleted_user_email_tombstones)).toEqual([tombstone]);
     });
 
     it('should delete auth providers', async () => {

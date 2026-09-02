@@ -5,7 +5,7 @@
 // locale sends English push copy, and a null app_version drops the Android
 // channel id, so omitting either field breaks a device enrolled from here.
 
-import { createElement } from 'react';
+import { createElement, type ElementType } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsStep } from './notifications-step';
@@ -30,6 +30,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-secure-store', () => ({ setItemAsync: vi.fn() }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.5' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: () => null }));
@@ -65,6 +66,26 @@ describe('NotificationsStep push registration', () => {
     registerForPushNotifications.mockResolvedValue('push-1');
     getResolvedLanguage.mockReturnValue('de');
     registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('preserves the permission spinner and the notification form scroller', async () => {
+    const permission = Promise.withResolvers<'undetermined'>();
+    getNotificationPermissionStatus.mockReturnValue(permission.promise);
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(NotificationsStep, { onComplete: vi.fn<() => void>(), botIdentity: null })
+    );
+    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
+    expect(
+      renderer.root.findByType('ActivityIndicator' as ElementType).parent?.props.className
+    ).toBe('flex-1 items-center justify-center gap-3 px-6');
+    expect(renderer.root.findAllByType('ScrollView' as ElementType)).toHaveLength(0);
+    permission.resolve('undetermined');
+    await waitFor(() => renderer.root.findAllByType('ScrollView' as ElementType).length === 1);
+    expect(
+      renderer.root.findByType('ScrollView' as ElementType).props.contentContainerClassName
+    ).toBe('p-4 gap-6');
+    expect(renderer.root.findAllByType('Button' as ElementType)).toHaveLength(2);
+    unmount();
   });
 
   it('registers the token with the active locale and the app version', async () => {

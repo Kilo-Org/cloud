@@ -106,9 +106,13 @@ export function OrganizationBoundary({
     }
   }
 
+  if (title == null) {
+    return content;
+  }
+
   return (
     <View className="flex-1 bg-background">
-      {title != null && <ScreenHeader title={title} />}
+      <ScreenHeader title={title} />
       {content}
     </View>
   );

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -133,31 +134,29 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     return <PermissionDenied description={t('organization.memberLimit.permissionDenied')} />;
   }
 
-  if (orgWithMembers.isError && !orgWithMembers.data) {
+  const loadFailed = orgWithMembers.isError && !orgWithMembers.data;
+  if (loadFailed || !member) {
     return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">
-          {t('organization.memberLimit.title')}
-        </Text>
-        <QueryError
-          onRetry={() => void orgWithMembers.refetch()}
-          isRetrying={orgWithMembers.isFetching}
-          placement="top"
-        />
-      </ScrollView>
-    );
-  }
-
-  if (!member) {
-    return (
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">
-          {t('organization.memberLimit.title')}
-        </Text>
-        <Text className="text-center text-sm text-muted-foreground">
-          {t('organization.memberLimit.memberNotFound')}
-        </Text>
-      </ScrollView>
+      <>
+        <View collapsable={false} className="bg-background px-6 pt-4">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('organization.memberLimit.title')}
+          </Text>
+        </View>
+        {loadFailed ? (
+          <QueryError
+            className="bg-background"
+            onRetry={() => void orgWithMembers.refetch()}
+            isRetrying={orgWithMembers.isFetching}
+          />
+        ) : (
+          <CenteredState className="bg-background px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('organization.memberLimit.memberNotFound')}
+            </Text>
+          </CenteredState>
+        )}
+      </>
     );
   }
 

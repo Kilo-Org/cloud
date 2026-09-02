@@ -1,9 +1,90 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
+import { isMarkdownPath, resolveReadCodeBody } from './read-tool-markdown';
+import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import { getToolDisplay } from './tool-card-display';
+import { buildResultRowsModel, buildTodoListModel } from './tool-list-model';
+
+const stringSchema = z.string();
+
+export function shouldCenterPartDetail(
+  part: Part | null,
+  hasCachedAttachment: boolean,
+  imageFailed = false
+): boolean {
+  if (part === null) {
+    return true;
+  }
+  if (!isToolPart(part)) {
+    return false;
+  }
+
+  const hasImages = getToolImageAttachments(part).length > 0;
+  const hasFiles = getToolFileAttachments(part).length > 0;
+  const hasAttachments = hasImages || hasFiles;
+  if (hasCachedAttachment && (hasFiles || (hasImages && !imageFailed))) {
+    return false;
+  }
+
+  const { state, tool } = part;
+  const { input } = state;
+  const output = state.status === 'completed' ? state.output : '';
+  const hasState = hasAttachments || (state.status === 'error' && state.error.length > 0);
+
+  switch (tool) {
+    case 'read': {
+      const body = resolveReadCodeBody(part);
+      const filePath = stringSchema.safeParse(input.filePath).data ?? '';
+      if (body && (!hasImages || isMarkdownPath(filePath))) {
+        return body.text === '';
+      }
+      return hasState && (hasImages || !output);
+    }
+    case 'write': {
+      const content = stringSchema.safeParse(input.content).data ?? '';
+      return content === '' && (state.status === 'completed' || state.status === 'error');
+    }
+    case 'todoread':
+    case 'todowrite': {
+      const model = buildTodoListModel(part);
+      return model ? model.tasks.length === 0 : hasState && !output;
+    }
+    case 'glob':
+    case 'grep':
+    case 'list': {
+      const model = output ? buildResultRowsModel(output, tool) : undefined;
+      return model
+        ? model.rows.length === 0 && (Boolean(model.caption) || model.truncated || hasAttachments)
+        : hasState;
+    }
+    case 'edit': {
+      return (
+        hasState &&
+        !stringSchema.safeParse(input.oldString).data &&
+        !stringSchema.safeParse(input.newString).data
+      );
+    }
+    case 'bash': {
+      return hasState && !stringSchema.safeParse(input.command).data && !output;
+    }
+    case 'task':
+    case 'websearch':
+    case 'codesearch':
+    case 'webfetch': {
+      return hasState && !output;
+    }
+    case 'suggest': {
+      return false;
+    }
+    default: {
+      return hasState && Object.keys(input).length === 0 && !output;
+    }
+  }
+}
 
 /**
  * Resolve a part by id from a surface's live messages. The sheet host calls

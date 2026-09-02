@@ -1,10 +1,25 @@
 name: kilo-app Release
 
 on:
-  schedule:
-    - cron: '0 6 * * *'
+  push:
+    branches: [main]
+    # kilo-app and its direct workspace:* inputs. No pnpm-lock.yaml: an
+    # unrelated bump elsewhere in the monorepo must not submit a build. A bump
+    # of an app dependency also edits apps/mobile/package.json, which is here.
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/trpc/**'
+      - 'packages/app-shared/**'
+      - 'packages/kilo-chat/**'
+      - 'packages/kilo-chat-hooks/**'
+      - 'packages/event-service/**'
+      - 'packages/notifications/**'
+      - 'packages/cloud-agent-sdk/**'
   workflow_dispatch:
 
+# cancel-in-progress: false lets a running release finish. GitHub keeps one run
+# pending per group and cancels the previously pending run, so a burst of merges
+# releases the newest commit, not every one of them.
 concurrency:
   group: kilo-app-release
   cancel-in-progress: false

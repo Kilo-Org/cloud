@@ -22,7 +22,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -34,6 +34,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,6 +68,7 @@ type PrDiffFileNavigatorProps = {
   /** Overview `changedFiles` count: the authoritative total for progress + truncation. */
   readonly changedFiles: number;
   readonly onDismiss?: () => void;
+  readonly header?: ReactNode;
 };
 
 function countViewed(files: PrReviewFile[], isViewed: (path: string) => boolean): number {
@@ -86,6 +88,7 @@ export function PrDiffFileNavigator({
   headSha,
   changedFiles,
   onDismiss,
+  header,
 }: PrDiffFileNavigatorProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -211,39 +214,38 @@ export function PrDiffFileNavigator({
     [viewed, getRowCallbacks]
   );
 
+  let body: ReactNode = null;
   if (firstPageErrorState?.kind === 'not-found') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">
+    body = (
+      <CenteredState>
+        <View className="items-center px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
             {t('prReview.pullRequestUnavailable')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
             {t('prReview.pullRequestUnavailableDescription')}
           </Text>
         </View>
-      </View>
+      </CenteredState>
     );
-  }
-  if (firstPageErrorState?.kind === 'permission') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">
+  } else if (firstPageErrorState?.kind === 'permission') {
+    body = (
+      <CenteredState>
+        <View className="items-center px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
             {t('prReview.accessDenied')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
             {t('prReview.accessDeniedDescription')}
           </Text>
         </View>
-      </View>
+      </CenteredState>
     );
-  }
-  if (firstPageErrorState?.kind === 'retryable' || firstPageErrorState?.kind === 'reconnect') {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-3 px-6 py-12">
-          <Text className="text-lg font-semibold text-foreground">
+  } else if (firstPageErrorState) {
+    body = (
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center text-lg font-semibold text-foreground">
             {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
           <Text variant="muted" className="text-center">
@@ -260,49 +262,56 @@ export function PrDiffFileNavigator({
             <Text className="text-sm font-medium text-foreground">{t('common.retry')}</Text>
           </Pressable>
         </View>
-      </View>
+      </CenteredState>
     );
-  }
-
-  if (query.isLoading && files.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <View className="flex-1 gap-3 px-4 pt-2">
-          <View className="flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-            <Search size={16} color={colors.mutedForeground} />
-            <TextInput
-              ref={inputRef}
-              defaultValue=""
-              editable={false}
-              placeholder={t('prReview.fileNavigator.filterPlaceholder')}
-              placeholderTextColor={colors.mutedForeground}
-              accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
-              className="flex-1 text-sm leading-[normal] text-foreground"
-            />
-          </View>
-          {[0, 1, 2, 3, 4].map(index => (
-            <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
-              <Skeleton className="h-5 w-5 rounded-md" />
-              <View className="flex-1 gap-1.5">
-                <Skeleton className="h-3.5 w-3/4 rounded-md" />
-                <Skeleton className="h-3 w-1/4 rounded-md" />
-              </View>
+  } else if (query.isLoading && files.length === 0) {
+    body = (
+      <View className="flex-1 gap-3 px-4 pt-2">
+        {[0, 1, 2, 3, 4].map(index => (
+          <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
+            <Skeleton className="h-5 w-5 rounded-md" />
+            <View className="flex-1 gap-1.5">
+              <Skeleton className="h-3.5 w-3/4 rounded-md" />
+              <Skeleton className="h-3 w-1/4 rounded-md" />
             </View>
-          ))}
-        </View>
+          </View>
+        ))}
       </View>
     );
-  }
-
-  if (!query.isLoading && files.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <EmptyState
-          icon={Search}
-          title={t('prReview.noFilesChanged')}
-          description={t('prReview.noFilesChangedDescription')}
-        />
-      </View>
+  } else if (files.length === 0) {
+    body = (
+      <EmptyState
+        icon={Search}
+        title={t('prReview.noFilesChanged')}
+        description={t('prReview.noFilesChangedDescription')}
+      />
+    );
+  } else if (filtered.length === 0) {
+    body = (
+      <CenteredState>
+        <View className="px-6">
+          <Text variant="muted" className="text-center text-sm">
+            {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
+          </Text>
+        </View>
+      </CenteredState>
+    );
+  } else {
+    body = (
+      <FlashList
+        data={filtered}
+        renderItem={renderItem}
+        keyExtractor={file => file.path}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={listContentStyle}
+        onEndReached={() => {
+          if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {
+            void query.fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+      />
     );
   }
 
@@ -323,88 +332,72 @@ export function PrDiffFileNavigator({
   const isTruncated = query.hasNextPage || Boolean(fetchAll.error) || changedFiles > files.length;
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-        <Search size={16} color={colors.mutedForeground} />
-        <TextInput
-          ref={inputRef}
-          defaultValue=""
-          placeholder={t('prReview.fileNavigator.filterPlaceholder')}
-          placeholderTextColor={colors.mutedForeground}
-          accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
-          onChangeText={value => {
-            searchRef.current = value;
-            setSearchVersion(version => version + 1);
-          }}
-          className="flex-1 text-sm leading-[normal] text-foreground"
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          clearButtonMode="while-editing"
-        />
-      </View>
+    <>
+      <View collapsable={false} className="bg-background pb-2">
+        {header}
+        <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
+          <Search size={16} color={colors.mutedForeground} />
+          <TextInput
+            ref={inputRef}
+            defaultValue=""
+            editable={!query.isLoading || files.length > 0}
+            placeholder={t('prReview.fileNavigator.filterPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
+            onChangeText={value => {
+              searchRef.current = value;
+              setSearchVersion(version => version + 1);
+            }}
+            className="flex-1 text-sm leading-[normal] text-foreground"
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+        </View>
 
-      <View className="mx-4 mt-2 flex-row items-center justify-between">
-        <Text variant="muted" className="text-xs">
-          {isTruncated
-            ? t('prReview.fileNavigator.viewedOfListed', {
-                viewed: formatNumber(viewedCount, i18n.language),
-                total: formatNumber(files.length, i18n.language),
-              })
-            : t('prReview.fileNavigator.viewedCount', {
-                viewed: formatNumber(viewedCount, i18n.language),
-                total: formatNumber(files.length, i18n.language),
-              })}
-        </Text>
-        {fetchAll.isRunning ? (
-          <View className="flex-row items-center gap-1.5">
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
+        {files.length > 0 && (
+          <View className="mx-4 mt-2 flex-row items-center justify-between">
             <Text variant="muted" className="text-xs">
-              {t('prReview.fileNavigator.loadingFiles', {
-                loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
-                total: formatNumber(changedFiles, i18n.language),
-              })}
+              {isTruncated
+                ? t('prReview.fileNavigator.viewedOfListed', {
+                    viewed: formatNumber(viewedCount, i18n.language),
+                    total: formatNumber(files.length, i18n.language),
+                  })
+                : t('prReview.fileNavigator.viewedCount', {
+                    viewed: formatNumber(viewedCount, i18n.language),
+                    total: formatNumber(files.length, i18n.language),
+                  })}
             </Text>
+            {fetchAll.isRunning ? (
+              <View className="flex-row items-center gap-1.5">
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+                <Text variant="muted" className="text-xs">
+                  {t('prReview.fileNavigator.loadingFiles', {
+                    loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
+                    total: formatNumber(changedFiles, i18n.language),
+                  })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {showRetry ? (
+          <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+            <Text className="text-xs text-destructive">{retryMessage}</Text>
+            <Pressable
+              onPress={() => void retryAction()}
+              className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
+              accessibilityRole="button"
+              accessibilityLabel={retryLabel}
+            >
+              <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
+            </Pressable>
           </View>
         ) : null}
       </View>
-
-      {showRetry ? (
-        <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-          <Text className="text-xs text-destructive">{retryMessage}</Text>
-          <Pressable
-            onPress={() => void retryAction()}
-            className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={retryLabel}
-          >
-            <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <FlashList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={file => file.path}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={listContentStyle}
-        onEndReached={() => {
-          // During a search, fetch-to-completion loads pages; a scroll fetch would race it.
-          if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {
-            void query.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        ListEmptyComponent={
-          <View className="px-6 py-12">
-            <Text variant="muted" className="text-center text-sm">
-              {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
-            </Text>
-          </View>
-        }
-      />
-    </View>
+      {body}
+    </>
   );
 }

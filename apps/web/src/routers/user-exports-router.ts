@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/data-export-download-codes';
 import { db } from '@/lib/drizzle';
 import { sendDataExportDownloadCodeEmail } from '@/lib/email';
+import { isCloudDataExportUIEnabled } from '@/lib/user-data-export-ui';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   ORGANIZATION_EXPORT_ROLES,
@@ -419,6 +420,14 @@ function downloadCodeError(result: Exclude<ReserveDownloadCodeResult, 'ok'>): TR
 }
 
 export const userExportsRouter = createTRPCRouter({
+  uiAccess: baseProcedure.query(async ({ ctx }) => {
+    requireWebSession(ctx.authViaToken);
+    return {
+      enabled: await isCloudDataExportUIEnabled(ctx.user.google_user_email),
+      email: ctx.user.google_user_email,
+    };
+  }),
+
   request: baseProcedure.mutation(async ({ ctx }) => {
     requireWebSession(ctx.authViaToken);
     const row = await createExportRequest({ kiloUserId: ctx.user.id, organizationId: null });

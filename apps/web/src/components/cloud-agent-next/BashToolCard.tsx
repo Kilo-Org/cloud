@@ -1,93 +1,83 @@
 import { Terminal } from 'lucide-react';
 import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
+import { ToolCodeBlock } from './ToolOutput';
+import { normalizeTerminalOutput } from './normalize-terminal-output';
 
 type BashToolCardProps = {
   toolPart: ToolPart;
 };
 
-type BashInput = {
-  command: string;
-  description?: string;
-  workdir?: string;
-  timeout?: number;
-};
-
-// Replace agent workspace paths like /workspace/<uuid>/<session>/sessions/<agent-id>
-// with "." so truncated command previews show the actual command content.
-const WORKSPACE_PATH_PATTERN = /\/workspace\/[^/\s]+\/[^/\s]+\/sessions\/[^/\s]+/g;
-
-function normalizeCommandForDisplay(command: string): string {
-  return command.replace(WORKSPACE_PATH_PATTERN, '.');
-}
+const WORKSPACE_PATH_PATTERN = /\/workspace\/(?:[^/\s]+\/)?[^/\s]+\/sessions\/[^/\s]+/g;
 
 function getCommandPreview(command: string): string {
-  // Get first line or first 60 chars, whichever is shorter
-  const firstLine =
-    normalizeCommandForDisplay(command).split('\n')[0] || normalizeCommandForDisplay(command);
-  if (firstLine.length > 60) {
-    return firstLine.slice(0, 57) + '...';
-  }
-  return firstLine;
+  const normalized = command.replace(WORKSPACE_PATH_PATTERN, '.');
+  const firstLine = normalized.split('\n')[0] || normalized;
+  return firstLine.length > 60 ? firstLine.slice(0, 57) + '...' : firstLine;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 export function BashToolCard({ toolPart }: BashToolCardProps) {
   const state = toolPart.state;
-  const input = state.input as BashInput;
-  const output = state.status === 'completed' ? state.output : undefined;
-  const error = state.status === 'error' ? state.error : undefined;
-  const commandPreview = getCommandPreview(input.command);
+  const input = state.input;
+  const metadata = state.status === 'pending' ? undefined : state.metadata;
+  const command = text(input.command) ?? text(metadata?.command) ?? '';
+  const description = text(input.description) ?? text(metadata?.description);
+  const cwd = text(input.workdir);
+  const rawOutput =
+    state.status === 'completed'
+      ? state.output
+      : state.status === 'running' && typeof metadata?.output === 'string'
+        ? metadata.output
+        : '';
+  const output = normalizeTerminalOutput(rawOutput);
 
   return (
-    <ToolCardShell icon={Terminal} title="Shell" subtitle={commandPreview} status={state.status}>
-      {/* Description if provided */}
-      {input.description && (
-        <div className="text-muted-foreground text-xs">{input.description}</div>
+    <ToolCardShell
+      icon={Terminal}
+      title="Shell"
+      subtitle={description ?? getCommandPreview(command)}
+      status={state.status}
+    >
+      {command && (
+        <ToolCodeBlock
+          content={command}
+          label="Command"
+          compact
+          icon={<Terminal className="size-3.5" />}
+        />
       )}
-
-      {/* Full command if different from preview */}
-      {input.command !== commandPreview && (
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs">Command:</div>
-          <pre className="bg-background max-h-40 overflow-auto rounded-md p-2 text-xs">
-            <code>{input.command}</code>
-          </pre>
+      {cwd && (
+        <div className="text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]">
+          cwd: {cwd}
         </div>
       )}
-
-      {/* Working directory */}
-      {input.workdir && (
-        <div className="text-muted-foreground truncate font-mono text-xs">cwd: {input.workdir}</div>
+      {output.trim() ? (
+        <ToolCodeBlock
+          content={output}
+          label="Output"
+          compact
+          isStreaming={state.status === 'running'}
+        />
+      ) : null}
+      {state.status === 'completed' && !output.trim() && (
+        <div className="text-muted-foreground text-xs">Command completed with no output.</div>
       )}
-
-      {/* Output */}
-      {output != null && output !== '' && (
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs">Output:</div>
-          <pre className="bg-background max-h-80 overflow-auto rounded-md p-2 text-xs">
-            <code>{output}</code>
-          </pre>
-        </div>
+      {state.status === 'error' && (
+        <ToolCodeBlock
+          content={normalizeTerminalOutput(state.error)}
+          label="Error"
+          className="[&_pre]:text-destructive"
+        />
       )}
-
-      {/* Error */}
-      {error && (
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs">Error:</div>
-          <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
-            <code>{error}</code>
-          </pre>
-        </div>
+      {state.status === 'running' && !output.trim() && (
+        <div className="text-muted-foreground text-xs">Waiting for output...</div>
       )}
-
-      {/* Running state */}
-      {state.status === 'running' && (
-        <div className="text-muted-foreground text-xs italic">Running command...</div>
-      )}
-
-      {/* Pending state */}
       {state.status === 'pending' && (
-        <div className="text-muted-foreground text-xs italic">Waiting to execute...</div>
+        <div className="text-muted-foreground text-xs">Waiting to execute...</div>
       )}
     </ToolCardShell>
   );

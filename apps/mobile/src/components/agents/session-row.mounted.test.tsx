@@ -69,6 +69,7 @@ vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 vi.mock('@/components/destination-option-row', () => ({
   DestinationOptionRow: 'DestinationOptionRow',
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',

@@ -1,5 +1,9 @@
 import { withTimeoutAndAbort } from '../utils.js';
 import {
+  emitControlDiagnostic,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
+import {
   createSandboxControlClient,
   type SandboxControlClient,
   type SandboxControlClientOptions,
@@ -21,6 +25,7 @@ type StartOptions = {
   onDisconnected?: () => void;
   getHeartbeatPayload?: () => unknown;
   isReady?: () => boolean;
+  onDiagnostic?: ControlDiagnosticReporter;
 };
 
 type SandboxControlEventFeedOptions = {
@@ -28,6 +33,7 @@ type SandboxControlEventFeedOptions = {
   open: (signal: AbortSignal) => Promise<{ stream?: AsyncIterable<unknown> }>;
   consume: (stream: AsyncIterable<unknown>) => Promise<void>;
   onUnexpectedClose: (error: unknown) => void;
+  onDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
 };
 
@@ -86,6 +92,7 @@ export async function startSandboxControlEventFeed(
   let feed: { stream?: AsyncIterable<unknown> };
   let iterator: AsyncIterator<unknown>;
   let first: IteratorResult<unknown>;
+  emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'opening' });
   try {
     feed = await withTimeoutAndAbort(options.open(signal), {
       signal,
@@ -108,20 +115,35 @@ export async function startSandboxControlEventFeed(
       throw new Error('Kilo global event feed ended before startup');
     }
   } catch (error) {
+    emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'start_failed' });
     controller.abort();
     throw error;
   }
 
   let lastEventAt = now();
+  let eventsReceived = 1;
+  const diagnostic = (phase: string): void =>
+    emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
+      phase,
+      lastEventAt,
+      ageMs: Math.max(0, now() - lastEventAt),
+      eventsReceived,
+    });
+  diagnostic('started');
   const isFresh = () => !signal.aborted && now() - lastEventAt < KILO_FEED_FRESHNESS_TIMEOUT_MS;
-  const fail = (error: unknown): void => {
+  const fail = (error: unknown, phase: 'stale' | 'ended' | 'failed'): void => {
     if (signal.aborted) return;
+    diagnostic(phase);
     controller.abort();
     options.onUnexpectedClose(error);
   };
   const freshnessTimer = setInterval(() => {
     if (!isFresh())
-      fail(new KiloEventFeedError('feed_stale', 'Kilo global event feed stopped responding'));
+      fail(
+        new KiloEventFeedError('feed_stale', 'Kilo global event feed stopped responding'),
+        'stale'
+      );
+    else diagnostic('freshness');
   }, 10_000);
   freshnessTimer.unref();
   signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
@@ -133,12 +155,14 @@ export async function startSandboxControlEventFeed(
         const next = await iterator.next();
         if (signal.aborted || next.done) return;
         if (isFeedConnectedEvent(next.value)) {
+          diagnostic('reconnected');
           throw new KiloEventFeedError(
             'feed_reconnected',
             'Kilo global event feed reconnected with a delivery gap'
           );
         }
         lastEventAt = now();
+        eventsReceived += 1;
         yield next.value;
       }
     } finally {
@@ -147,8 +171,8 @@ export async function startSandboxControlEventFeed(
   }
 
   void options.consume(establishedFeed()).then(
-    () => fail(new KiloEventFeedError('feed_ended', 'Kilo global event feed ended')),
-    error => fail(error)
+    () => fail(new KiloEventFeedError('feed_ended', 'Kilo global event feed ended'), 'ended'),
+    error => fail(error, 'failed')
   );
   return { isFresh };
 }
@@ -169,11 +193,21 @@ export function maybeStartSandboxControlClient(
   let heartbeat: ReturnType<typeof setTimeout> | null = null;
   let heartbeatInFlight = false;
   let closed = false;
+  let heartbeatSequence = 0;
+  let lastSentAt: number | undefined;
+  const diagnostic = (phase: string): void =>
+    emitControlDiagnostic(options.onDiagnostic, 'control.heartbeat', {
+      phase,
+      sequence: heartbeatSequence,
+      lastSentAt,
+      sinceLastSentMs: lastSentAt === undefined ? undefined : Date.now() - lastSentAt,
+    });
 
   function stopHeartbeat(): void {
     if (!heartbeat) return;
     clearTimeout(heartbeat);
     heartbeat = null;
+    diagnostic('stopped');
   }
 
   function handleDisconnected(): void {
@@ -192,16 +226,28 @@ export function maybeStartSandboxControlClient(
     )
       return;
     heartbeatInFlight = true;
+    heartbeatSequence += 1;
+    diagnostic('sending');
     try {
       const payload = await options.getHeartbeatPayload();
       if (closed || options.isReady?.() === false) return;
       try {
-        if (!active.sendEvent?.('sandbox.heartbeat', payload)) handleDisconnected();
+        if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
+          diagnostic('send_failed');
+          handleDisconnected();
+        } else {
+          lastSentAt = Date.now();
+          diagnostic('sent');
+        }
       } catch {
+        diagnostic('send_threw');
         handleDisconnected();
       }
     } catch {
-      if (!closed) log('sandbox control heartbeat failed');
+      if (!closed) {
+        diagnostic('send_threw');
+        log('sandbox control heartbeat failed');
+      }
     } finally {
       heartbeatInFlight = false;
       if (!closed && options.isReady?.() !== false) {
@@ -236,6 +282,7 @@ export function maybeStartSandboxControlClient(
     log,
     onDisconnected: handleDisconnected,
     ...(options.onRequest ? { onRequest: options.onRequest } : {}),
+    ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {}),
   });
 
   const originalClose = client.close.bind(client);

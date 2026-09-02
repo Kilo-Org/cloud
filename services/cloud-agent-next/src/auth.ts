@@ -124,10 +124,9 @@ function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDisp
 }
 
 /**
- * Re-verifies the token through the canonical verifyKiloToken so the legacy
- * path enforces the same version/audience/shape guards as validateKiloToken —
- * in particular, audience-scoped tokens (e.g. internal service tokens) must
- * not be accepted as wrapper auth.
+ * Grandfather only audience-less Kilo tokens for pre-migration wrappers.
+ * Resource-audience tokens, including cloud-agent-next, are not wrapper capabilities
+ * and must not inherit this legacy path's exemption from dispatch fence checks.
  */
 async function legacyKiloTokenClaims(
   ticket: string,

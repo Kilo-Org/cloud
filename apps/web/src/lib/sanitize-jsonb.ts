@@ -1,9 +1,9 @@
 /**
- * PostgreSQL JSONB rejects escaped NUL characters and lone UTF-16 surrogates.
+ * PostgreSQL text rejects NUL characters; JSONB also rejects lone UTF-16 surrogates.
  * JavaScript strings can contain both, so repair them before sending values to
- * a JSONB column.
+ * a PostgreSQL column.
  */
-function sanitizeJsonbString(value: string): string {
+export function sanitizePostgresString(value: string): string {
   if (value.isWellFormed() && !value.includes('\0')) {
     return value;
   }
@@ -13,7 +13,7 @@ function sanitizeJsonbString(value: string): string {
 
 export function sanitizeJsonbValue(value: unknown): unknown {
   if (typeof value === 'string') {
-    return sanitizeJsonbString(value);
+    return sanitizePostgresString(value);
   }
 
   if (Array.isArray(value)) {
@@ -23,7 +23,7 @@ export function sanitizeJsonbValue(value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value).map(([key, nestedValue]) => [
-        sanitizeJsonbString(key),
+        sanitizePostgresString(key),
         sanitizeJsonbValue(nestedValue),
       ])
     );

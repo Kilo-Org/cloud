@@ -6,7 +6,13 @@
 // that omits `remediationTimeline`, so the panel treats a missing field as an
 // empty list.
 
-import { createElement } from 'react';
+import { type ComponentProps, createElement } from 'react';
+import { CenteredState } from '@/components/centered-state';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +24,9 @@ const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   prReviewEnabled: true,
   openExternalUrl: vi.fn(),
+  start: vi.fn(),
+  retry: vi.fn(),
+  cancel: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -44,8 +53,10 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: () => null }));
-vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
@@ -58,9 +69,9 @@ vi.mock('@/components/ui/text', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-security-remediation', () => ({
-  useStartSecurityRemediation: () => ({ mutate: vi.fn(), isPending: false }),
-  useRetrySecurityRemediation: () => ({ mutate: vi.fn(), isPending: false }),
-  useCancelSecurityRemediation: () => ({ mutate: vi.fn(), isPending: false }),
+  useStartSecurityRemediation: () => ({ mutate: mocks.start, isPending: false }),
+  useRetrySecurityRemediation: () => ({ mutate: mocks.retry, isPending: false }),
+  useCancelSecurityRemediation: () => ({ mutate: mocks.cancel, isPending: false }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -70,8 +81,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
-  formatRemediationOrigin: (origin: string) => origin,
-  formatValidationEvidenceEntry: () => '',
   getRemediationStatusPresentation: () => ({
     label: 'Not started',
     tone: 'neutral',
@@ -85,14 +94,6 @@ type R = TestRenderer.ReactTestRenderer;
 
 function analysisFixture(overrides: Record<string, unknown> = {}): SecurityAnalysis {
   return {
-    findingState: { status: 'open' },
-    status: 'completed',
-    startedAt: null,
-    completedAt: null,
-    error: null,
-    analysis: null,
-    sessionId: null,
-    cliSessionId: null,
     remediationSummary: null,
     remediationCapability: {
       canStart: false,
@@ -108,7 +109,10 @@ function analysisFixture(overrides: Record<string, unknown> = {}): SecurityAnaly
   } as unknown as SecurityAnalysis;
 }
 
-function renderPanel(analysis: SecurityAnalysis): R {
+function renderPanel(
+  analysis: SecurityAnalysis | undefined,
+  props: Partial<ComponentProps<typeof FindingRemediationPanel>> = {}
+): R {
   const ref: { current: R | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -119,6 +123,7 @@ function renderPanel(analysis: SecurityAnalysis): R {
         isLoading: false,
         isError: false,
         onRetry: () => undefined,
+        ...props,
       })
     );
   });
@@ -143,6 +148,74 @@ function pressButtons(r: R): void {
 describe('FindingRemediationPanel remediation timeline', () => {
   beforeEach(() => {
     texts.items = [];
+  });
+
+  it('centers an empty remediation with its blocker reason', () => {
+    const tree = renderPanel(analysisFixture());
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+    expect(texts.items).toContain('Finding is no longer open.');
+    expect(tree.root.findAllByType(Button)).toHaveLength(0);
+  });
+
+  it.each([
+    { remediationSummary: { status: 'queued' } },
+    {
+      remediationAttempts: [
+        {
+          id: 'attempt-1',
+          status: 'running',
+          origin: 'manual',
+          updatedAt: '2026-04-29T02:00:00.000Z',
+        },
+      ],
+    },
+    {
+      remediationTimeline: [
+        { action: 'security.remediation.queued', occurredAt: '2026-04-29T01:16:12.945Z' },
+      ],
+    },
+  ])('keeps substantive remediation content in the report scroller: %j', content => {
+    const tree = renderPanel(analysisFixture(content), { isError: true });
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('centers the absent response without another container', () => {
+    const tree = renderPanel(undefined);
+    expect(tree.root.findByType(EmptyState).props.placement).not.toBe('top');
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+  });
+
+  it('keeps loading ahead of an absent response failure', () => {
+    const tree = renderPanel(undefined, { isLoading: true, isError: true });
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(2);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
+  });
+
+  it('keeps Retry in a full-body absent response failure', () => {
+    const onRetry = vi.fn<() => void>();
+    const tree = renderPanel(undefined, { isError: true, onRetry });
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.placement).not.toBe('top');
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+    act(error.props.onRetry as () => void);
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('preserves server-approved actions in the centered state', () => {
+    const tree = renderPanel(
+      analysisFixture({
+        remediationCapability: { canStart: true, canRetry: true, canCancel: false },
+      })
+    );
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    pressButtons(tree);
+    expect(mocks.start).toHaveBeenCalledWith({ findingId: 'finding-1' });
+    expect(mocks.retry).toHaveBeenCalledWith({ findingId: 'finding-1' });
   });
 
   it('renders remediation timeline labels in order', () => {
@@ -182,15 +255,8 @@ describe('FindingRemediationPanel remediation timeline', () => {
     expect(texts.items).toContain('Cancelled');
   });
 
-  it('renders nothing extra when the timeline is empty', () => {
-    renderPanel(analysisFixture({ remediationTimeline: [] }));
-
-    expect(texts.items).not.toContain('Progress');
-    expect(texts.items).not.toContain('Remediation requested');
-  });
-
-  it('renders without throwing when the response omits remediationTimeline', () => {
-    const r = renderPanel(analysisFixture({ remediationTimeline: undefined }));
+  it.each([[], undefined])('renders an empty or omitted timeline: %j', remediationTimeline => {
+    const r = renderPanel(analysisFixture({ remediationTimeline }));
 
     expect(r.toJSON()).not.toBeNull();
     expect(texts.items).not.toContain('Progress');
@@ -206,67 +272,22 @@ describe('FindingRemediationPanel pull request navigation', () => {
     mocks.prReviewEnabled = true;
   });
 
-  it('navigates in-app for a github.com PR URL when the flag is on', () => {
-    const r = renderPanel(
-      analysisFixture({
-        remediationSummary: {
-          status: 'pr_opened',
-          prUrl: 'https://github.com/kilo/kilo/pull/123',
-          prNumber: 123,
-          prDraft: false,
-          outcomeSummary: null,
-        },
-      })
+  it.each([
+    ['https://github.com/kilo/kilo/pull/123', true, true],
+    ['https://github.com/kilo/kilo/pull/123', false, false],
+    ['https://gitlab.com/kilo/kilo/-/merge_requests/123', true, false],
+  ] as const)('opens %s with PR review=%s in-app=%s', (prUrl, enabled, inApp) => {
+    mocks.prReviewEnabled = enabled;
+    pressButtons(
+      renderPanel(analysisFixture({ remediationSummary: { status: 'pr_opened', prUrl } }))
     );
-
-    pressButtons(r);
-
-    expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/kilo/123');
-    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the browser when the flag is off', () => {
-    mocks.prReviewEnabled = false;
-    const r = renderPanel(
-      analysisFixture({
-        remediationSummary: {
-          status: 'pr_opened',
-          prUrl: 'https://github.com/kilo/kilo/pull/123',
-          prNumber: 123,
-          prDraft: false,
-          outcomeSummary: null,
-        },
-      })
-    );
-
-    pressButtons(r);
-
-    expect(mocks.routerPush).not.toHaveBeenCalled();
-    expect(mocks.openExternalUrl).toHaveBeenCalledWith('https://github.com/kilo/kilo/pull/123', {
-      label: 'pull request',
-    });
-  });
-
-  it('falls back to the browser for a non-GitHub URL', () => {
-    const r = renderPanel(
-      analysisFixture({
-        remediationSummary: {
-          status: 'pr_opened',
-          prUrl: 'https://gitlab.com/kilo/kilo/-/merge_requests/123',
-          prNumber: 123,
-          prDraft: false,
-          outcomeSummary: null,
-        },
-      })
-    );
-
-    pressButtons(r);
-
-    expect(mocks.routerPush).not.toHaveBeenCalled();
-    expect(mocks.openExternalUrl).toHaveBeenCalledWith(
-      'https://gitlab.com/kilo/kilo/-/merge_requests/123',
-      { label: 'pull request' }
-    );
+    if (inApp) {
+      expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/kilo/123');
+      expect(mocks.openExternalUrl).not.toHaveBeenCalled();
+    } else {
+      expect(mocks.routerPush).not.toHaveBeenCalled();
+      expect(mocks.openExternalUrl).toHaveBeenCalledWith(prUrl, { label: 'pull request' });
+    }
   });
 
   it('routes both the summary and attempt buttons in-app', () => {

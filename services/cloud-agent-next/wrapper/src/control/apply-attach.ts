@@ -9,9 +9,13 @@ import {
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
+  emitControlDiagnostic,
+  type ControlDiagnosticRecord,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
+import {
   git,
   isTimeoutTermination,
-  logToFile,
   runProcess,
   withTimeoutAndAbort,
   type ExecResult,
@@ -47,6 +51,7 @@ const workspacePreparations = new Map<string, Promise<ControlHandlerResult | und
 export type AttachPreparingEmitter = (event: PreparingEventDataV2) => void;
 
 export type ApplyAttachDeps = {
+  onDiagnostic?: ControlDiagnosticReporter;
   kiloRuntimes?: WorktreeKiloRuntimes;
   canRefreshCredentials?: () => boolean;
   signal?: AbortSignal;
@@ -273,11 +278,33 @@ async function executeSessionAttach(
   deps: ApplyAttachDeps,
   directory: string
 ): Promise<ControlHandlerResult> {
+  const startedAt = Date.now();
+  let stage: ControlDiagnosticRecord['fields']['stage'] = 'attach_validation';
+  let workspaceAction: ControlDiagnosticRecord['fields']['workspaceAction'];
+  let sessionResolution: ControlDiagnosticRecord['fields']['sessionResolution'];
+  const diagnostic = (phase: 'completed' | 'failed'): void =>
+    emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
+      operation: 'session.attach',
+      phase,
+      stage,
+      sessionId: session.sessionId,
+      kiloSessionId: session.kiloSessionId,
+      messageId: attach.preparation?.triggerMessageId,
+      workspaceAction,
+      sessionResolution,
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+      ok: phase === 'completed',
+    });
   const existingDirectory = directoryForSession(session.kiloSessionId);
   if (existingDirectory && existingDirectory !== directory) {
+    diagnostic('failed');
     return fail('unauthorized', 'Session directory mismatch', false);
   }
-  if (!deps.kiloRuntimes) return fail('not_ready', 'Kilo is not ready', true);
+  stage = 'runtime_attach';
+  if (!deps.kiloRuntimes) {
+    diagnostic('failed');
+    return fail('not_ready', 'Kilo is not ready', true);
+  }
 
   let attachment: WorktreeKiloAttachment | undefined;
   const taskSignal = deps.signal ?? AbortSignal.timeout(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS);
@@ -297,6 +324,7 @@ async function executeSessionAttach(
       abortMessage: 'Session attachment cancelled',
     });
     signal.throwIfAborted();
+    stage = 'workspace_prepare';
     const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
     const hasGit = deps.hasGit ?? defaultHasGit;
     const hasBootstrapMarker = deps.hasBootstrapMarker ?? defaultHasBootstrapMarker;
@@ -317,10 +345,16 @@ async function executeSessionAttach(
         signal.throwIfAborted();
         const setupCommands = attach.setupCommands ?? [];
         const needsWorkspace = Boolean(attach.git) || setupCommands.length > 0;
+        workspaceAction = alreadyBootstrapped
+          ? 'reuse'
+          : needsWorkspace
+            ? 'bootstrap'
+            : 'not_needed';
         if (!alreadyBootstrapped && needsWorkspace) {
           await mkdir(directory);
           signal.throwIfAborted();
           if (attach.git) {
+            stage = 'git_setup';
             const needsClone = !(await hasGit(directory));
             signal.throwIfAborted();
             const cloneStepId = 'phase:cloning';
@@ -388,6 +422,7 @@ async function executeSessionAttach(
             signal.throwIfAborted();
           }
           for (const [index, command] of setupCommands.entries()) {
+            stage = 'setup_commands';
             signal.throwIfAborted();
             const stepId = `setup_command:${index}`;
             progress.start('setup_commands', stepId, `Running setup command ${index + 1}`, {
@@ -415,11 +450,13 @@ async function executeSessionAttach(
             }
             progress.complete('setup_commands', stepId);
           }
+          stage = 'bootstrap_marker';
           signal.throwIfAborted();
           await writeBootstrapMarker(directory);
           signal.throwIfAborted();
         }
         if (attach.kilo.containmentEnabled === false && attach.git?.token) {
+          stage = 'git_credentials';
           const refreshed = await runGit(
             [
               'remote',
@@ -443,8 +480,12 @@ async function executeSessionAttach(
         );
       }
     });
-    if (workspaceFailure) return workspaceFailure;
+    if (workspaceFailure) {
+      diagnostic('failed');
+      return workspaceFailure;
+    }
 
+    stage = 'session_registration';
     const kiloSessionId = attach.snapshotIdentity ?? session.kiloSessionId;
     const restore = deps.restoreSession ?? restoreSession;
     const sessionExists =
@@ -455,25 +496,33 @@ async function executeSessionAttach(
       progress.start('kilo_session', 'phase:kilo_session', 'Starting session…');
       await seedSessionIngestRegistration(session.kiloSessionId, env, signal);
       signal.throwIfAborted();
+      stage = 'session_probe';
       const exists = await withKiloRequestDeadline(
         probeSignal => sessionExists(kiloSessionId, directory, probeSignal),
         signal
       );
       signal.throwIfAborted();
+      sessionResolution = exists ? 'existing' : undefined;
       if (!exists) {
+        stage = 'session_restore';
         progress.progress('kilo_session', 'phase:kilo_session', 'Restoring session…');
         const restored = await restore(kiloSessionId, directory, undefined, { env, signal });
         signal.throwIfAborted();
         if (!restored.ok) {
           if (restored.code !== 404 && !restored.emptySnapshot) {
             progress.fail('kilo_session', 'phase:kilo_session', restored.error);
+            diagnostic('failed');
             return fail('not_ready', 'kilo session is not ready', true);
           }
+          stage = 'session_create';
           progress.progress('kilo_session', 'phase:kilo_session', 'Starting session…');
           await withKiloRequestDeadline(
             probeSignal => kiloClient.ensureSession(kiloSessionId, directory, probeSignal),
             signal
           );
+          sessionResolution = 'created';
+        } else {
+          sessionResolution = 'restored';
         }
       }
       signal.throwIfAborted();
@@ -481,8 +530,10 @@ async function executeSessionAttach(
     } catch {
       const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
       progress.fail('kilo_session', 'phase:kilo_session', message);
+      diagnostic('failed');
       return fail('not_ready', message, true);
     }
+    stage = 'attachment_commit';
     signal.throwIfAborted();
     const alreadyAttached = rootForSession(session.kiloSessionId) === session.kiloSessionId;
     rememberAttachedRoot(session.kiloSessionId, directory);
@@ -494,9 +545,10 @@ async function executeSessionAttach(
       if (!alreadyAttached) forgetAttachedRoot(session.kiloSessionId, directory);
       throw error;
     }
-    logToFile(`session.attach ready directory=${directory}`);
+    diagnostic('completed');
     return ok();
   } catch (error) {
+    diagnostic('failed');
     if (error instanceof WorktreeKiloRuntimeError || error instanceof ControlTerminalRuntimeError) {
       return fail(error.code, error.message, error.retryable);
     }

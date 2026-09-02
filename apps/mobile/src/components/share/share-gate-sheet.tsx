@@ -56,10 +56,6 @@ type ShareGateSheetProps = {
   shareId: string | undefined;
 };
 
-/**
- * Share gate formSheet body. Exactly two direct children of the screen
- * content: a collapsable={false} header block and the FlatList.
- */
 export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -383,14 +379,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   }, [sessions]);
 
   const showNewSession = state.showNewSession;
-  const showTerminalMessage =
-    state.kind === 'stale-share' || state.kind === 'non-retryable-classification';
   const previewPayload = payload !== null && state.kind !== 'stale-share' ? payload : null;
 
-  // Header block: title+close, preview, New session. collapsable={false} is
-  // required so react-native-screens finds it as the formSheet header.
   const header = (
-    <View collapsable={false} className="border-b border-border bg-background pt-4">
+    <View className="border-b border-border bg-background pt-4">
       <View className="min-h-11 flex-row items-center justify-center px-4">
         <Text
           className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
@@ -411,12 +403,6 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
       {previewPayload ? (
         <SharePayloadPreview payload={previewPayload} validation={validation} />
-      ) : null}
-
-      {showTerminalMessage ? (
-        <View className="items-center px-6 pb-6 pt-4">
-          <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
-        </View>
       ) : null}
 
       {reviewPr ? (
@@ -453,21 +439,18 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     </View>
   );
 
-  // Always pair the collapsable header with a FlatList (formSheet constraint).
   return (
-    <>
-      {header}
-      <ShareDestinationList
-        state={state}
-        destinations={destinations}
-        onSelect={handleSelectDestination}
-        onRetry={handleRetry}
-        instances={instanceRows}
-        spawningConnectionId={spawningConnectionId}
-        instanceRowsDisabled={instanceRowsDisabled}
-        destinationsDisabled={isSpawning}
-        onSpawnInstance={handleSpawnInstance}
-      />
-    </>
+    <ShareDestinationList
+      headerContent={header}
+      state={state}
+      destinations={destinations}
+      onSelect={handleSelectDestination}
+      onRetry={handleRetry}
+      instances={instanceRows}
+      spawningConnectionId={spawningConnectionId}
+      instanceRowsDisabled={instanceRowsDisabled}
+      destinationsDisabled={isSpawning}
+      onSpawnInstance={handleSpawnInstance}
+    />
   );
 }

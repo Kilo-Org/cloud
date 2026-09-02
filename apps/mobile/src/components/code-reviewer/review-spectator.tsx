@@ -21,6 +21,7 @@ import {
   createReviewSpectatorStream,
 } from '@/components/code-reviewer/review-spectator-stream';
 import { useRefetchSessionMessagesOnTerminal } from '@/components/code-reviewer/review-spectator-terminal-refetch';
+import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
 import { useTRPC } from '@/lib/trpc';
@@ -43,11 +44,11 @@ const renderSpectatorRow: ListRenderItem<SpectatorRow> = ({ item }) => (
 
 function SpectatorCopy({ message }: Readonly<{ message: string }>) {
   return (
-    <View className="px-4 py-2">
-      <Text variant="muted" className="text-xs">
+    <CenteredState className="px-6">
+      <Text variant="muted" className="text-center text-xs">
         {message}
       </Text>
-    </View>
+    </CenteredState>
   );
 }
 
@@ -195,7 +196,8 @@ export function ReviewSpectator({
     [sessionMessages.data]
   );
 
-  const transcriptRows = shouldLoadHistory ? historicalRows : liveRows;
+  const transcriptRows =
+    shouldLoadHistory || (info === null && liveRows.length === 0) ? historicalRows : liveRows;
 
   function renderRowsWithRetry(onRetry: () => void) {
     return (
@@ -246,7 +248,7 @@ export function ReviewSpectator({
       return <SessionSkeletonMessages />;
     }
     if (streamInfo.isError || (streamInfo.data && !streamInfo.data.success)) {
-      if (liveRows.length > 0) {
+      if (transcriptRows.length > 0) {
         return renderRowsWithRetry(() => {
           void streamInfo.refetch();
         });
@@ -255,7 +257,6 @@ export function ReviewSpectator({
         <QueryError
           variant="server"
           title={t('codeReviewer.reviewDetail.transcriptRetry')}
-          placement="top"
           onRetry={() => {
             void streamInfo.refetch();
           }}
@@ -277,7 +278,6 @@ export function ReviewSpectator({
           <QueryError
             variant="server"
             title={t('codeReviewer.reviewDetail.transcriptRetry')}
-            placement="top"
             onRetry={() => {
               void sessionMessages.refetch();
             }}
@@ -307,7 +307,6 @@ export function ReviewSpectator({
         <QueryError
           variant="server"
           title={t('codeReviewer.reviewDetail.transcriptRetry')}
-          placement="top"
           onRetry={() => {
             setLiveError(false);
             setRetryNonce(count => count + 1);

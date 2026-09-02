@@ -206,12 +206,12 @@ export function AgentSessionListContent({
   // Gated on !isLoading so a cold-open load never flashes this surface.
   if (surface.kind === 'full-screen-error') {
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
-        style={tabBarOnlyClearanceStyle}
-      >
-        <QueryError message={t('agents.sessionList.couldNotLoad')} onRetry={onRetry} />
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <QueryError
+          message={t('agents.sessionList.couldNotLoad')}
+          onRetry={onRetry}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
       </Animated.View>
     );
   }
@@ -222,16 +222,13 @@ export function AgentSessionListContent({
   // not flash this while queries run.
   if (surface.kind === 'history-empty') {
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1"
-        style={tabBarOnlyClearanceStyle}
-      >
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <BodyEmpty
           kind="no-past-sessions"
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
           onRetry={onRetry}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />
       </Animated.View>
     );
@@ -252,16 +249,19 @@ export function AgentSessionListContent({
       </Animated.View>
     );
   } else if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
-    emptyComponent = (
-      <BodyEmpty
-        kind={bodyModel.kind}
-        isSearching={isSearching}
-        secondaryAction={
-          bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
-        }
-        clearQueryAction={clearQueryAction}
-        onRetry={onRetry}
-      />
+    return (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <BodyEmpty
+          kind={bodyModel.kind}
+          isSearching={isSearching}
+          secondaryAction={
+            bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
+          }
+          clearQueryAction={clearQueryAction}
+          onRetry={onRetry}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
+      </Animated.View>
     );
   }
 

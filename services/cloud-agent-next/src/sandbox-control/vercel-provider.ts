@@ -10,6 +10,7 @@ import {
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
+import { logControlDiagnostic } from './diagnostics.js';
 import type { ObserveResult } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 
@@ -193,22 +194,61 @@ export function createVercelProviderAdapter(deps: {
     },
     async stop(ref) {
       const parsed = decodeOwnedProviderRef(ref);
-      if (parsed === null) return 'retryable';
+      const diagnostic = {
+        provider: 'vercel',
+        allocationName: deps.sandboxName,
+        providerSessionId: parsed?.sessionId,
+      };
+      if (parsed === null) {
+        logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
+        return 'retryable';
+      }
+      const startedAt = now();
+      logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
-        return TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';
+        const result = TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';
+        logControlDiagnostic('native_stop', {
+          ...diagnostic,
+          result,
+          durationMs: now() - startedAt,
+        });
+        return result;
       } catch (error) {
-        if (isNotFound(error)) return 'terminal';
-        return 'retryable';
+        const result = isNotFound(error) ? 'terminal' : 'retryable';
+        logControlDiagnostic('native_stop', {
+          ...diagnostic,
+          result,
+          durationMs: now() - startedAt,
+        });
+        return result;
       }
     },
     async ensureLeaseAtLeast(ref, ms) {
       const parsed = decodeOwnedProviderRef(ref);
-      if (parsed === null) return;
+      const diagnostic = {
+        provider: 'vercel',
+        allocationName: deps.sandboxName,
+        providerSessionId: parsed?.sessionId,
+        requestedLeaseMs: ms,
+      };
+      if (parsed === null) {
+        logControlDiagnostic('native_lease', { ...diagnostic, action: 'invalid_reference' });
+        return;
+      }
       const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
-      if (session.status !== 'running') return;
+      if (session.status !== 'running') {
+        logControlDiagnostic('native_lease', { ...diagnostic, action: 'not_running' });
+        return;
+      }
       const startedAt = session.startedAt ?? session.requestedAt;
       const remaining = startedAt + session.timeout - now();
+      logControlDiagnostic('native_lease', {
+        ...diagnostic,
+        remainingMs: remaining,
+        action: remaining > ms ? 'sufficient_remaining' : 'extension',
+        extensionMs: remaining > ms ? undefined : Math.max(ms, config.extendDurationMs),
+      });
       if (remaining > ms) return;
       await restClient.extendSessionTimeout(
         parsed.sessionId,

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
+import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 
 const {
   getRunningTerminalClientMock,
@@ -190,6 +191,18 @@ function signKiloToken(userId = 'usr_1'): string {
     {
       version: 3,
       kiloUserId: userId,
+    },
+    secret,
+    { algorithm: 'HS256' }
+  );
+}
+
+function signKiloTokenWithAudience(audience: string | string[], userId = 'usr_1'): string {
+  return jwt.sign(
+    {
+      version: 3,
+      kiloUserId: userId,
+      aud: audience,
     },
     secret,
     { algorithm: 'HS256' }
@@ -745,6 +758,43 @@ describe('server /kilo facade route', () => {
     expect(new URL(facadeFetch.mock.calls[0][0].url).pathname).toBe('/kilo');
   });
 
+  it.each([
+    ['a matching audience string', 'cloud-agent-next'],
+    ['a matching audience array', ['another-resource', 'cloud-agent-next']],
+  ])('accepts $0 before routing through the facade', async (_name, audience) => {
+    const env = createEnv();
+    const facadeFetch = vi.fn().mockResolvedValue(new Response('facade response', { status: 209 }));
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloTokenWithAudience(audience, 'usr_facade');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/kilo', { headers: { Authorization: `Bearer ${token}` } }),
+      env
+    );
+
+    expect(response.status).toBe(209);
+    expect(env.USER_KILO_FACADE.idFromName).toHaveBeenCalledWith('usr_facade');
+    expect(facadeFetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['a different explicit audience', 'another-resource'],
+    ['a malformed explicit audience', []],
+  ])('rejects $0 before facade dispatch', async (_name, audience) => {
+    const env = createEnv();
+    const token = signKiloTokenWithAudience(audience, 'usr_facade');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/kilo', { headers: { Authorization: `Bearer ${token}` } }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
+    expect(env.USER_KILO_FACADE.get).not.toHaveBeenCalled();
+  });
+
   it('routes valid bearer-authenticated requests to the per-user facade without public credentials', async () => {
     const env = createEnv();
     const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
@@ -754,8 +804,9 @@ describe('server /kilo facade route', () => {
     env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
     const token = signKiloToken('usr_facade');
 
-    const response = await fetchWorker(
-      new Request('http://worker.test/kilo/session/ses_12345678901234567890123456/message', {
+    const request = new Request(
+      'http://worker.test/kilo/session/ses_12345678901234567890123456/message',
+      {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -765,9 +816,9 @@ describe('server /kilo facade route', () => {
           'x-kilo-facade-auth-token': 'attacker-token',
         },
         body: JSON.stringify({ ok: true }),
-      }),
-      env
+      }
     );
+    const response = await fetchWorker(request, env);
 
     expect(response.status).toBe(209);
     expect(env.USER_KILO_FACADE.idFromName).toHaveBeenCalledWith('usr_facade');
@@ -781,10 +832,80 @@ describe('server /kilo facade route', () => {
     expect(forwarded.headers.get('x-kilo-facade-auth-token')).toBe(token);
     expect(forwarded.headers.get('content-type')).toBe('application/json');
     await expect(forwarded.text()).resolves.toBe('{"ok":true}');
+    expect(request.headers.get('authorization')).toBe(`Bearer ${token}`);
+    expect(request.headers.get('cookie')).toBe('session=secret');
+    expect(request.headers.get('x-kilo-facade-user-id')).toBe('usr_attacker');
+    expect(request.headers.get('x-kilo-facade-auth-token')).toBe('attacker-token');
   });
 });
 
 describe('server raw global feed route', () => {
+  it.each([
+    ['a different audience', 'another-resource'],
+    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
+    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
+  ])(
+    'rejects a raw Kilo JWT with $0 before session access or facade dispatch',
+    async (_name, audience) => {
+      const env = createEnv();
+      const token = signKiloTokenWithAudience(audience, 'usr_feed');
+
+      const response = await fetchWorker(
+        new Request(
+          'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+          { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
+        ),
+        env
+      );
+
+      expect(response.status).toBe(401);
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+      expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+      expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a raw Kilo JWT with a malformed explicit audience before session access', async () => {
+    const env = createEnv();
+    const token = signKiloTokenWithAudience([], 'usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('accepts an audience-less legacy raw Kilo JWT through producer fencing', async () => {
+    const env = createEnv();
+    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
+    const facadeFetch = vi.fn().mockResolvedValue(new Response('accepted', { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledOnce();
+    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledOnce();
+    expect(facadeFetch).toHaveBeenCalledOnce();
+  });
+
   it('validates producer fencing and forwards accepted producer WebSockets to the user facade', async () => {
     const env = createEnv();
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
@@ -967,6 +1088,70 @@ describe('server raw global feed route', () => {
 });
 
 describe('server wrapper ingest route', () => {
+  it.each([
+    ['a different audience', 'another-resource'],
+    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
+    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
+    ['a malformed explicit audience', []],
+  ])(
+    'rejects a raw Kilo JWT with $0 before session access or Durable Object dispatch',
+    async (_name, audience) => {
+      const env = createEnv();
+      const token = signKiloTokenWithAudience(audience, 'usr_feed');
+
+      const response = await fetchWorker(
+        new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
+          headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+        }),
+        env
+      );
+
+      expect(response.status).toBe(401);
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+      expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects an audience-less legacy raw Kilo JWT for a different session user before session access', async () => {
+    const env = createEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_other/agent_live/ingest', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Token does not match session user');
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
+    const env = createEnv();
+    const token = signKiloToken('usr_feed');
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_feed',
+      cloudAgentSessionId: 'agent_live',
+    });
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
   it('accepts a valid wrapper dispatch ticket and forwards to the session Durable Object', async () => {
     const env = createEnv();
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
@@ -1046,12 +1231,84 @@ describe('server wrapper ingest route', () => {
 });
 
 describe('server wrapper log upload route', () => {
+  it('does not accept legacy raw archives for control-plane sessions', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/workspace_test/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+        body: 'raw archive',
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
   function createLogEnv() {
     const env = createEnv();
     return Object.assign(env, {
       R2_BUCKET: { put: vi.fn().mockResolvedValue(undefined) },
     });
   }
+
+  it.each([
+    ['a different audience', 'another-resource'],
+    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
+    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
+    ['a malformed explicit audience', []],
+  ])(
+    'rejects a raw Kilo JWT with $0 before session access or R2 upload',
+    async (_name, audience) => {
+      const env = createLogEnv();
+      const token = signKiloTokenWithAudience(audience, 'usr_feed');
+
+      const response = await fetchWorker(
+        new Request(
+          'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+          {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: new Uint8Array([1, 2, 3]),
+          }
+        ),
+        env
+      );
+
+      expect(response.status).toBe(401);
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+      expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
+    const env = createLogEnv();
+    const token = signKiloToken('usr_feed');
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_feed',
+      cloudAgentSessionId: 'agent_live',
+      expectedKiloSessionId: 'ses_12345678901234567890123456',
+    });
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
 
   it('accepts a valid wrapper dispatch ticket and stores the upload in R2', async () => {
     const env = createLogEnv();
@@ -1486,6 +1743,59 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+});
+
+describe('server control log routes', () => {
+  it('accepts a log-only grant without touching sandbox liveness', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn().mockResolvedValue(null) } });
+    const identity = {
+      sandboxId: 'sandbox_test',
+      allocationId: 'allocation_test',
+      wrapperInstanceId: '0fce125c-54a3-4143-b503-b7775c4d2135',
+    };
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/sandbox-logs/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/5886f962-cc33-43f7-bd94-a31c0ed6c13b`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            version: 1,
+            sequence: 0,
+            droppedRecords: 0,
+            records: [
+              { timestamp: 100, event: 'wrapper.lifecycle', fields: { phase: 'starting' } },
+            ],
+          }),
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose log archives over HTTP', async () => {
+    const env = createEnv();
+    for (const path of [
+      '/internal/sandbox-logs/sandbox_test',
+      '/internal/sandbox-logs/sandbox_test/allocation_test/0fce125c-54a3-4143-b503-b7775c4d2135/5886f962-cc33-43f7-bd94-a31c0ed6c13b',
+    ]) {
+      const response = await fetchWorker(
+        new Request(`http://worker.test${path}`, {
+          headers: { 'x-internal-api-key': 'test-internal-secret' },
+        }),
+        env
+      );
+      expect(response.status).toBe(404);
+    }
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
   });
 });
 

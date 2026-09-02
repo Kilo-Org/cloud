@@ -3997,7 +3997,7 @@ describe('control wrapper heartbeat source policy', () => {
       'shuttingDown = true;',
       'heartbeatReason = diagnosticReason;',
       "control?.sendEvent?.('sandbox.heartbeat', withHeartbeatReason(buildHeartbeatPayload(deps)))",
-      'const stopped = cancelControlTasks(deps, reason,',
+      'cancelControlTasks(deps, reason,',
       'abort.abort();',
     ].map(step => source.indexOf(step));
     expect(steps.every(index => index >= 0)).toBe(true);

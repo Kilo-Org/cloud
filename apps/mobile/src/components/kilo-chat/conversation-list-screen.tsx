@@ -204,13 +204,8 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={sandboxLabel} size="large" className="px-[22px]" />
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          className="flex-1"
-          style={{ paddingBottom: tabBarHeight }}
-        >
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <QueryError
-            className="flex-1"
             message={t('chat.conversationList.couldNotLoad')}
             onRetry={() => {
               void listQuery.refetch();
@@ -223,6 +218,14 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   const conversations = listQuery.data?.conversations ?? [];
   const entries = flattenConversationGroups(conversations, now);
+  const refreshControl = (
+    <RefreshControl
+      refreshing={manualRefreshing}
+      onRefresh={handleRefresh}
+      colors={[colors.mutedForeground]}
+      tintColor={colors.mutedForeground}
+    />
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -244,56 +247,49 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
         }
       />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-        <FlashList
-          style={listStyle}
-          contentContainerStyle={listContentContainerStyle}
-          data={entries}
-          keyExtractor={entry =>
-            entry.kind === 'header' ? `header:${entry.label}` : entry.conversation.conversationId
-          }
-          renderItem={({ item }) =>
-            item.kind === 'header' ? (
-              <View className="bg-background px-5 pb-2 pt-4">
-                <Text variant="eyebrow">{item.label}</Text>
-              </View>
-            ) : (
-              <View className="px-4 pb-3">
-                <ConversationRow
-                  conversation={item.conversation}
-                  sandboxId={sandboxId}
-                  onPress={handleRowPress}
-                  onLeave={handleLeave}
-                />
-              </View>
-            )
-          }
-          ListEmptyComponent={
-            <EmptyConversationList
-              onStart={handleCreateAndNavigate}
-              isStarting={createConversation.isPending}
-            />
-          }
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View className="pb-6 pt-1">
-                <ConversationListSkeleton />
-              </View>
-            ) : null
-          }
-          onEndReached={fetchMoreConversations}
-          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl
-              refreshing={manualRefreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.mutedForeground]}
-              tintColor={colors.mutedForeground}
-            />
-          }
-        />
+        {entries.length === 0 ? (
+          <EmptyConversationList
+            onStart={handleCreateAndNavigate}
+            isStarting={createConversation.isPending}
+            refreshControl={refreshControl}
+          />
+        ) : (
+          <FlashList
+            style={listStyle}
+            contentContainerStyle={listContentContainerStyle}
+            data={entries}
+            keyExtractor={entry =>
+              entry.kind === 'header' ? `header:${entry.label}` : entry.conversation.conversationId
+            }
+            renderItem={({ item }) =>
+              item.kind === 'header' ? (
+                <View className="bg-background px-5 pb-2 pt-4">
+                  <Text variant="eyebrow">{item.label}</Text>
+                </View>
+              ) : (
+                <View className="px-4 pb-3">
+                  <ConversationRow
+                    conversation={item.conversation}
+                    sandboxId={sandboxId}
+                    onPress={handleRowPress}
+                    onLeave={handleLeave}
+                  />
+                </View>
+              )
+            }
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View className="pb-6 pt-1">
+                  <ConversationListSkeleton />
+                </View>
+              ) : null
+            }
+            onEndReached={fetchMoreConversations}
+            onEndReachedThreshold={0.5}
+            refreshControl={refreshControl}
+          />
+        )}
       </Animated.View>
-      {/* The empty state below already renders its own "Create conversation" CTA —
-          only one creation affordance should be visible at a time. */}
       {entries.length > 0 && (
         <Pressable
           accessibilityRole="button"

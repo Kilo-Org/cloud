@@ -122,6 +122,52 @@ const adjectives = [
   'wild',
   'winter',
   'young',
+  'airy',
+  'amber',
+  'arctic',
+  'azure',
+  'breezy',
+  'briny',
+  'bronze',
+  'cerulean',
+  'cherry',
+  'cloudy',
+  'coral',
+  'crisp',
+  'dewy',
+  'dusky',
+  'emerald',
+  'ferny',
+  'hazy',
+  'honey',
+  'indigo',
+  'ivory',
+  'jade',
+  'leafy',
+  'lilac',
+  'mellow',
+  'mossy',
+  'oceanic',
+  'peach',
+  'pearly',
+  'rainy',
+  'rosy',
+  'ruby',
+  'sandy',
+  'scarlet',
+  'shadowy',
+  'silvery',
+  'smoky',
+  'solar',
+  'starry',
+  'stormy',
+  'sunny',
+  'teal',
+  'verdant',
+  'violet',
+  'windy',
+  'wintry',
+  'woodsy',
   // neutral / general
   'bright',
   'broad',
@@ -163,6 +209,66 @@ const adjectives = [
   'steady',
   'true',
   'vast',
+  'able',
+  'adept',
+  'alert',
+  'amused',
+  'artful',
+  'astute',
+  'balanced',
+  'blissful',
+  'bouncy',
+  'brave',
+  'brisk',
+  'bubbly',
+  'buoyant',
+  'candid',
+  'capable',
+  'cheerful',
+  'clever',
+  'cozy',
+  'curious',
+  'dapper',
+  'daring',
+  'dazzling',
+  'eager',
+  'earnest',
+  'easy',
+  'elegant',
+  'epic',
+  'fair',
+  'fancy',
+  'fearless',
+  'festive',
+  'fleet',
+  'focused',
+  'friendly',
+  'gallant',
+  'glad',
+  'gleeful',
+  'graceful',
+  'handy',
+  'happy',
+  'hearty',
+  'honest',
+  'humble',
+  'jaunty',
+  'jolly',
+  'jovial',
+  'joyful',
+  'kind',
+  'lively',
+  'lofty',
+  'merry',
+  'mighty',
+  'patient',
+  'playful',
+  'plucky',
+  'polished',
+  'quirky',
+  'snappy',
+  'spirited',
+  'witty',
   // tech / computing
   'active',
   'agile',
@@ -190,6 +296,35 @@ const adjectives = [
   'turbo',
   'ultra',
   'wired',
+  'adaptive',
+  'analog',
+  'astral',
+  'bionic',
+  'celestial',
+  'clockwork',
+  'compact',
+  'digital',
+  'electric',
+  'fractal',
+  'fused',
+  'galactic',
+  'harmonic',
+  'hybrid',
+  'ionic',
+  'logical',
+  'lucid',
+  'magnetic',
+  'modular',
+  'orbital',
+  'plasma',
+  'quantum',
+  'radial',
+  'robotic',
+  'spectral',
+  'stellar',
+  'tuned',
+  'virtual',
+  'wireless',
 ] as const;
 
 const nouns = [
@@ -247,6 +382,70 @@ const nouns = [
   'wave',
   'wind',
   'wood',
+  'acorn',
+  'albatross',
+  'alpaca',
+  'badger',
+  'bamboo',
+  'bay',
+  'bear',
+  'beaver',
+  'bison',
+  'blossom',
+  'bobcat',
+  'canyon',
+  'capybara',
+  'chameleon',
+  'clover',
+  'comet',
+  'condor',
+  'cosmos',
+  'coyote',
+  'crane',
+  'cricket',
+  'dahlia',
+  'dolphin',
+  'dragon',
+  'eagle',
+  'falcon',
+  'finch',
+  'firefly',
+  'fjord',
+  'fox',
+  'gecko',
+  'heron',
+  'ibis',
+  'island',
+  'jaguar',
+  'juniper',
+  'koala',
+  'lagoon',
+  'lark',
+  'lemur',
+  'lotus',
+  'lynx',
+  'maple',
+  'meteor',
+  'nebula',
+  'otter',
+  'owl',
+  'panda',
+  'panther',
+  'penguin',
+  'phoenix',
+  'puffin',
+  'quail',
+  'raven',
+  'redwood',
+  'robin',
+  'sequoia',
+  'sparrow',
+  'tiger',
+  'tulip',
+  'turtle',
+  'willow',
+  'wolf',
+  'wren',
   // neutral / general
   'arch',
   'band',
@@ -298,6 +497,36 @@ const nouns = [
   'trail',
   'vault',
   'wing',
+  'anchor',
+  'anvil',
+  'arrow',
+  'atlas',
+  'beacon',
+  'canvas',
+  'chime',
+  'compass',
+  'copper',
+  'crystal',
+  'domino',
+  'fable',
+  'feather',
+  'flute',
+  'gadget',
+  'gem',
+  'glider',
+  'lantern',
+  'marble',
+  'mosaic',
+  'paddle',
+  'pebble',
+  'piano',
+  'ribbon',
+  'riddle',
+  'rocket',
+  'saddle',
+  'velvet',
+  'violin',
+  'voyage',
   // tech / computing
   'bit',
   'block',
@@ -343,6 +572,21 @@ const nouns = [
   'vector',
   'voxel',
   'wire',
+  'axiom',
+  'boson',
+  'circuit',
+  'diode',
+  'electron',
+  'engine',
+  'fractal',
+  'laser',
+  'logic',
+  'module',
+  'photon',
+  'qubit',
+  'radar',
+  'socket',
+  'vertex',
 ] as const;
 
 const MAX_SLUG_LENGTH = 63;
@@ -350,6 +594,7 @@ const MAX_SLUG_LENGTH = 63;
 const SUFFIX_LENGTH = 1 + 4;
 const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 const EPHEMERAL_SUFFIX_LENGTH = 8;
+const BRANCH_SUFFIX_LENGTH = 3;
 
 function cryptoRandomInt(max: number): number {
   const array = new Uint32Array(1);
@@ -378,7 +623,7 @@ function generateEphemeralSuffix(): string {
   return Array.from(values, value => BASE32_ALPHABET.charAt(value & 31)).join('');
 }
 
-function generatePronounceableDeploymentSlug(suffix: string): string {
+function generatePronounceableSlug(suffix: string): string {
   return `${pickRandom(adjectives)}-${pickRandom(nouns)}-${suffix}`;
 }
 
@@ -401,9 +646,16 @@ function sanitizePrefix(raw: string): string {
   return prefix;
 }
 
+export function generateBranchSlug(): string {
+  const suffix = cryptoRandomInt(36 ** BRANCH_SUFFIX_LENGTH)
+    .toString(36)
+    .padStart(BRANCH_SUFFIX_LENGTH, '0');
+  return generatePronounceableSlug(suffix);
+}
+
 /** Generate a pronounceable slug with a high-entropy suffix for public ephemeral deployments. */
 export function generateEphemeralDeploymentSlug(): string {
-  return generatePronounceableDeploymentSlug(generateEphemeralSuffix());
+  return generatePronounceableSlug(generateEphemeralSuffix());
 }
 
 /**
@@ -417,17 +669,17 @@ export function generateDeploymentSlug(repoName: string | null): string {
 
   let slug: string;
   if (repoName === null) {
-    slug = generatePronounceableDeploymentSlug(number);
+    slug = generatePronounceableSlug(number);
   } else {
     const prefix = sanitizePrefix(repoName);
-    slug = prefix ? `${prefix}-${number}` : generatePronounceableDeploymentSlug(number);
+    slug = prefix ? `${prefix}-${number}` : generatePronounceableSlug(number);
   }
 
   // Safety: if the generated slug doesn't pass validation (shouldn't happen
   // with curated word lists, but just in case), fall back to a simple pattern.
   const result = slugSchema.safeParse(slug);
   if (!result.success) {
-    slug = generatePronounceableDeploymentSlug(number);
+    slug = generatePronounceableSlug(number);
   }
 
   return slug;

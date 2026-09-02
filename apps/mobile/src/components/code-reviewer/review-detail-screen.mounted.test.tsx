@@ -111,6 +111,8 @@ vi.mock('@/components/code-reviewer/review-list-screen', () => ({
     className: 'text-good',
   }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/query-error', () => ({
   QueryError: (props: {
     variant?: string;
@@ -695,7 +697,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     );
     expect(spectatorError).toBeDefined();
     expect(spectatorError?.onRetry).toBeDefined();
-    expect(spectatorError?.placement).toBe('top');
+    expect(spectatorError?.placement).toBeUndefined();
   });
 
   it('fills the sheet with the transcript and clears the bottom safe area', () => {
@@ -729,6 +731,31 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(sessionListRenders.list[0]?.contentBottomInset).toBe(34);
   });
 
+  it.each([false, true])(
+    'keeps cached history after stream info fails with cached metadata %s',
+    hasMetadata => {
+      spectatorQueries.streamInfo.data = hasMetadata
+        ? makeStreamInfo({ status: 'completed' })
+        : { success: false, error: 'failed' };
+      spectatorQueries.streamInfo.isError = hasMetadata;
+      spectatorQueries.sessionMessages.data = {
+        success: true,
+        entries: [{ timestamp: 't1', message: 'Saved transcript', eventType: 'text' }],
+      };
+      detail.data = {
+        success: true,
+        review: makeReview({ status: 'completed' }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      renderScreen(true);
+
+      const items = sessionListRenders.list.at(-1)?.items as { message: string }[];
+      expect(items).toEqual([expect.objectContaining({ message: 'Saved transcript' })]);
+      expect(queryErrors.errors).toHaveLength(0);
+    }
+  );
+
   it('shows QueryError plus Retry when the session snapshot fails', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
     spectatorQueries.sessionMessages.data = { success: false };
@@ -745,7 +772,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     );
     expect(snapshotError).toBeDefined();
     expect(snapshotError?.onRetry).toBeDefined();
-    expect(snapshotError?.placement).toBe('top');
+    expect(snapshotError?.placement).toBeUndefined();
 
     act(() => {
       snapshotError?.onRetry?.();
@@ -868,7 +895,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(collectText(renderer.toJSON())).not.toContain('No transcript for this review.');
   });
 
-  it('shows a top-aligned QueryError when the live stream errors before any row', () => {
+  it('shows a centered QueryError when the live stream errors before any row', () => {
     const captured: { onError?: () => void } = {};
     spectatorStream.createReviewSpectatorStream.mockImplementation(
       (input: { onError: () => void }) => {
@@ -902,7 +929,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       error => error.title === 'Could not load the review transcript.'
     );
     expect(liveErrorState).toBeDefined();
-    expect(liveErrorState?.placement).toBe('top');
+    expect(liveErrorState?.placement).toBeUndefined();
     expect(liveErrorState?.onRetry).toBeDefined();
   });
 });

@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
+
+import { CenteredState } from '@/components/centered-state';
 
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { QueryError } from '@/components/query-error';
@@ -40,28 +41,19 @@ export function PrReviewFileNavigatorScreen() {
     )
   );
 
-  let content: ReactNode = null;
-  if (pr.isLoading) {
-    content = (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-      </View>
-    );
-  } else if (pr.isError || !pr.data) {
-    content = (
-      <View className="flex-1">
-        <QueryError
-          variant="server"
-          title={t('prReview.fileNavigator.couldNotLoadFiles')}
-          onRetry={() => {
-            void pr.refetch();
-          }}
-          isRetrying={pr.isFetching}
-        />
-      </View>
-    );
-  } else {
-    content = (
+  const header = (
+    <ScreenHeader
+      title={t('prReview.fileNavigator.title')}
+      eyebrow={`${owner}/${repo}#${rawNumber}`}
+      modal
+      onBack={() => {
+        router.back();
+      }}
+    />
+  );
+
+  if (pr.data) {
+    return (
       <PrDiffFileNavigator
         owner={owner}
         repo={repo}
@@ -71,21 +63,28 @@ export function PrReviewFileNavigatorScreen() {
         onDismiss={() => {
           router.back();
         }}
+        header={header}
       />
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('prReview.fileNavigator.title')}
-        eyebrow={`${owner}/${repo}#${rawNumber}`}
-        modal
-        onBack={() => {
-          router.back();
-        }}
-      />
-      {content}
-    </View>
+    <>
+      <View collapsable={false}>{header}</View>
+      {pr.isLoading ? (
+        <CenteredState>
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </CenteredState>
+      ) : (
+        <QueryError
+          variant="server"
+          title={t('prReview.fileNavigator.couldNotLoadFiles')}
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
+        />
+      )}
+    </>
   );
 }

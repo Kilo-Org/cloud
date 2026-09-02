@@ -4,9 +4,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { CheckCheck, GitPullRequest } from '@/components/ui/icons';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type ScrollViewProps, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
@@ -42,6 +43,7 @@ type PrReviewOverviewProps = {
    * inner `listChecks` consumer in `PrReviewChecksSection`.
    */
   readonly isActive: boolean;
+  readonly refreshControl?: ScrollViewProps['refreshControl'];
 };
 
 function OverviewSkeleton() {
@@ -71,6 +73,7 @@ export function PrReviewOverview({
   repo,
   number,
   isActive: _isActive,
+  refreshControl,
 }: PrReviewOverviewProps) {
   const trpc = useTRPC();
   const connection = useCheckGitHubConnection();
@@ -101,17 +104,12 @@ export function PrReviewOverview({
     })();
   }, [t]);
 
-  if (pr.isLoading) {
-    return <OverviewSkeleton />;
-  }
-
-  if (pr.isError) {
-    const state = classifyPrReviewQueryState(pr.error);
-
+  const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
+  if (state && (!pr.data || state.kind !== 'retryable')) {
     if (state.kind === 'not-found') {
       return (
         <EmptyState
-          placement="top"
+          refreshControl={refreshControl}
           icon={GitPullRequest}
           title={t('prReview.pullRequestUnavailable')}
           description={t('prReview.pullRequestUnavailableDescription')}
@@ -127,7 +125,7 @@ export function PrReviewOverview({
       // Terminal — no CTA. The user has no recourse from this screen.
       return (
         <EmptyState
-          placement="top"
+          refreshControl={refreshControl}
           icon={GitPullRequest}
           title={t('prReview.accessDenied')}
           description={t('prReview.accessDeniedDescription')}
@@ -137,7 +135,7 @@ export function PrReviewOverview({
     if (state.kind === 'reconnect') {
       return (
         <EmptyState
-          placement="top"
+          refreshControl={refreshControl}
           icon={GitPullRequest}
           title={t('prReview.connectionExpiredTitle')}
           description={t('prReview.connectionExpiredDescription')}
@@ -158,7 +156,7 @@ export function PrReviewOverview({
     // retryable
     return (
       <QueryError
-        placement="top"
+        refreshControl={refreshControl}
         variant="server"
         title={t('prReview.couldNotLoadPullRequest')}
         onRetry={() => {
@@ -171,12 +169,15 @@ export function PrReviewOverview({
 
   const data = pr.data;
   if (!data) {
-    // Belt-and-suspenders guard for TS — the isLoading + isError branches
-    // above already cover the runtime cases. If we got here, tanstack is
-    // reporting neither loading nor error but also has no data (e.g.
-    // enabled=false with no cached value). Render the skeleton rather
-    // than dereferencing an undefined DTO.
-    return <OverviewSkeleton />;
+    return (
+      <DetailScreenScrollView
+        className="flex-1"
+        contentContainerClassName="px-4"
+        refreshControl={refreshControl}
+      >
+        <OverviewSkeleton />
+      </DetailScreenScrollView>
+    );
   }
   const chip = describePrState({
     state: data.state,
@@ -185,7 +186,12 @@ export function PrReviewOverview({
   });
 
   return (
-    <View className="gap-5">
+    <DetailScreenScrollView
+      className="flex-1"
+      contentContainerClassName="gap-5 px-4"
+      keyboardShouldPersistTaps="handled"
+      refreshControl={refreshControl}
+    >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
         <Text className="text-[22px] font-semibold leading-7 text-foreground" numberOfLines={3}>
@@ -254,6 +260,6 @@ export function PrReviewOverview({
           sha: data.headSha.slice(0, 7),
         })}
       </Text>
-    </View>
+    </DetailScreenScrollView>
   );
 }

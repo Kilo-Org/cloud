@@ -1,5 +1,7 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 import { resolveSecret } from '../util/secret.util';
@@ -30,7 +32,10 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   }
 
   try {
-    const payload = await verifyKiloToken(token, secret);
+    const payload = await verifyKiloTokenForResource(token, secret, {
+      audience: GASTOWN_AUDIENCE,
+      mode: 'allow-legacy',
+    });
     c.set('kiloUserId', payload.kiloUserId);
     c.set('kiloIsAdmin', payload.isAdmin === true);
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);

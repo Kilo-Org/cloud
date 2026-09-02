@@ -566,6 +566,17 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('rejects the disabled LongCat free model before upstream', async () => {
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('meituan/longcat-2.0-free')) as never);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error_type: 'unavailable_model',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));
     mockedClassifyAbuse.mockResolvedValue(classifyResult('rate-limit'));
@@ -636,8 +647,12 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
 
     expect(response.status).toBe(200);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe('meituan/longcat-2.0-free');
-    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('LongCat-2.0');
+    expect(mockedGetProvider.mock.calls[1]?.[0].requestedModel).toBe(
+      stepfun_37_flash_free_model.public_id
+    );
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(
+      stepfun_37_flash_free_model.internal_id
+    );
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1]).toMatchObject({
       abuse_delay: 6000,
       abuse_downgraded_from: 'openai/gpt-4o',

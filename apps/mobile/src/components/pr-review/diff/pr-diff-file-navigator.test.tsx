@@ -55,6 +55,7 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -105,7 +106,7 @@ type ListQueryResult = {
     refetch: () => unknown;
   };
   files: PrReviewFile[];
-  firstPageErrorState: null;
+  firstPageErrorState: { kind: 'permission' | 'not-found' | 'retryable' | 'reconnect' } | null;
   laterPageError: boolean;
 };
 
@@ -286,6 +287,52 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       totalFiles: null,
       error: null,
     };
+  });
+
+  it('keeps the search input mounted while the list becomes empty and returns', async () => {
+    const { renderer } = await mountNavigator();
+    const input = findSearchInput(renderer);
+    typeSearch(renderer, 'missing');
+    expect(findSearchInput(renderer)).toBe(input);
+    const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
+    expect(centered.findByProps({ children: 'No files match "missing"' })).toBeDefined();
+    const header = renderer.root.findByProps({ collapsable: false });
+    expect(header.findByProps({ accessibilityLabel: 'Filter files by path' })).toBe(input);
+    expect(header.parent).toBe(centered.parent);
+    typeSearch(renderer, 'src');
+    expect(findSearchInput(renderer)).toBe(input);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+  });
+
+  it.each(['permission', 'not-found', 'retryable', 'reconnect'] as const)(
+    'centers the %s body outside the list',
+    async kind => {
+      listQueryResult.files = [];
+      listQueryResult.firstPageErrorState = { kind };
+      const { renderer } = await mountNavigator();
+      expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+      expect(flashListProps.current).toBeNull();
+      expect(findSearchInput(renderer)).toBeDefined();
+      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      if (kind === 'retryable' || kind === 'reconnect') {
+        expect(retries).toHaveLength(1);
+        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        act(() => {
+          (retry.props.onPress as () => void)();
+        });
+        expect(listQueryResult.query.refetch).toHaveBeenCalledOnce();
+      } else {
+        expect(retries).toHaveLength(0);
+      }
+    }
+  );
+
+  it('renders the empty state without mounting a list', async () => {
+    listQueryResult.files = [];
+    const { renderer } = await mountNavigator();
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.placement).toBeUndefined();
+    expect(flashListProps.current).toBeNull();
   });
 
   it('does not re-render the memoized row on a search keystroke', async () => {

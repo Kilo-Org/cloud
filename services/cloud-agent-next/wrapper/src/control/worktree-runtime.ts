@@ -6,6 +6,10 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
+import {
+  emitControlDiagnostic,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import type {
   ControlErrorCode,
   SessionAttachPayload,
@@ -272,6 +276,7 @@ export function createWorktreeKiloRuntimes(options: {
   inheritedEnv?: NodeJS.ProcessEnv;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => void;
+  onDiagnostic?: ControlDiagnosticReporter;
   onUnexpectedClose: (failure: WorktreeKiloFailure) => void;
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
@@ -419,6 +424,11 @@ export function createWorktreeKiloRuntimes(options: {
       entry.feed = await withTimeoutAndAbort(
         startSandboxControlEventFeed({
           signal: abort.signal,
+          onDiagnostic: (event, fields) =>
+            emitControlDiagnostic(options.onDiagnostic, event, {
+              ...fields,
+              scopeId: entry.kilo.scopeId,
+            }),
           open: signal =>
             eventClient.global.event({
               signal,

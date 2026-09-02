@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { GmailIcon, GoogleIcon } from '@/components/icons';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
@@ -62,14 +63,12 @@ export default function GoogleScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.google.title')} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.google.couldNotLoad')}
-            onRetry={() => {
-              void statusQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.google.couldNotLoad')}
+          onRetry={() => {
+            void statusQuery.refetch();
+          }}
+        />
       </View>
     );
   }
@@ -124,137 +123,136 @@ export default function GoogleScreen() {
     ]);
   }
 
-  return (
-    <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloclaw.google.title')} />
-      <DetailScreenScrollView
-        contentContainerClassName="px-4 pt-4 gap-4"
-        showsVerticalScrollIndicator={false}
-      >
+  const body = (
+    <Animated.View entering={FadeIn.duration(200)} className={cn('gap-4', !isConnected && 'px-4')}>
+      {/* Connection status card */}
+      <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
+        <View className="flex-row items-center gap-3">
+          <GoogleIcon size={20} />
+          <Text className="flex-1 text-base font-semibold">{t('kiloclaw.google.title')}</Text>
+          <View
+            className={cn('px-2 py-1 rounded-full', isConnected ? 'bg-good-tile-bg' : 'bg-muted')}
+          >
+            <Text
+              className={cn(
+                'text-xs font-medium',
+                isConnected ? 'text-good' : 'text-muted-foreground'
+              )}
+            >
+              {isConnected ? t('kiloclaw.google.connected') : t('kiloclaw.google.notConnected')}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {!isConnected && (
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
-          {/* Connection status card */}
+          {showRedeployPrompt && (
+            <View className="flex-row items-center gap-3 rounded-lg bg-warn-tile-bg p-3">
+              <Text className="flex-1 text-xs text-warn">{t('kiloclaw.google.disconnected')}</Text>
+              <Button
+                size="sm"
+                variant="outline"
+                loading={mutations.restartMachine.isPending}
+                onPress={handleRedeploy}
+                className="flex-row gap-1.5"
+              >
+                {!mutations.restartMachine.isPending && (
+                  <RefreshCw size={14} color={colors.foreground} />
+                )}
+                <Text>{t('kiloclaw.google.redeploy')}</Text>
+              </Button>
+            </View>
+          )}
+          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {t('kiloclaw.google.setupCommand')}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {t('kiloclaw.google.setupCommandHelp')}
+          </Text>
+          <View className="rounded-lg bg-muted p-3 gap-2">
+            {setupQuery.isPending && <Skeleton className="h-4 w-full rounded" />}
+            {setupQuery.isError && (
+              <View className="gap-2">
+                <Text className="text-xs text-destructive">
+                  {t('kiloclaw.google.failedToLoadCommand')}
+                </Text>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={setupQuery.isFetching}
+                  onPress={() => {
+                    void setupQuery.refetch();
+                  }}
+                >
+                  <Text>{t('common.retry')}</Text>
+                </Button>
+              </View>
+            )}
+            {setupQuery.isSuccess && (
+              <Text className="font-mono text-xs text-foreground">{setupQuery.data.command}</Text>
+            )}
+          </View>
+          <Button
+            variant="outline"
+            disabled={!setupQuery.data?.command}
+            onPress={() => {
+              void handleCopy();
+            }}
+          >
+            <Text>{copied ? t('kiloclaw.google.copied') : t('kiloclaw.google.copyCommand')}</Text>
+          </Button>
+        </Animated.View>
+      )}
+
+      {isConnected && (
+        <Animated.View entering={FadeIn.duration(200)} className="gap-4">
           <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
             <View className="flex-row items-center gap-3">
-              <GoogleIcon size={20} />
-              <Text className="flex-1 text-base font-semibold">{t('kiloclaw.google.title')}</Text>
-              <View
-                className={cn(
-                  'px-2 py-1 rounded-full',
-                  isConnected ? 'bg-good-tile-bg' : 'bg-muted'
-                )}
+              <GmailIcon size={20} />
+              <Text className="flex-1 text-base font-semibold">
+                {t('kiloclaw.google.gmailNotifications')}
+              </Text>
+              <Button
+                size="sm"
+                variant={gmailEnabled ? 'default' : 'outline'}
+                onPress={handleToggleGmail}
+                disabled={mutations.setGmailNotifications.isPending}
               >
-                <Text
-                  className={cn(
-                    'text-xs font-medium',
-                    isConnected ? 'text-good' : 'text-muted-foreground'
-                  )}
-                >
-                  {isConnected ? t('kiloclaw.google.connected') : t('kiloclaw.google.notConnected')}
+                <Text>
+                  {gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}
                 </Text>
-              </View>
+              </Button>
             </View>
           </View>
 
-          {!isConnected && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-4">
-              {showRedeployPrompt && (
-                <View className="flex-row items-center gap-3 rounded-lg bg-warn-tile-bg p-3">
-                  <Text className="flex-1 text-xs text-warn">
-                    {t('kiloclaw.google.disconnected')}
-                  </Text>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={mutations.restartMachine.isPending}
-                    onPress={handleRedeploy}
-                    className="flex-row gap-1.5"
-                  >
-                    {!mutations.restartMachine.isPending && (
-                      <RefreshCw size={14} color={colors.foreground} />
-                    )}
-                    <Text>{t('kiloclaw.google.redeploy')}</Text>
-                  </Button>
-                </View>
-              )}
-              <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {t('kiloclaw.google.setupCommand')}
-              </Text>
-              <Text variant="muted" className="text-xs">
-                {t('kiloclaw.google.setupCommandHelp')}
-              </Text>
-              <View className="rounded-lg bg-muted p-3 gap-2">
-                {setupQuery.isPending && <Skeleton className="h-4 w-full rounded" />}
-                {setupQuery.isError && (
-                  <View className="gap-2">
-                    <Text className="text-xs text-destructive">
-                      {t('kiloclaw.google.failedToLoadCommand')}
-                    </Text>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={setupQuery.isFetching}
-                      onPress={() => {
-                        void setupQuery.refetch();
-                      }}
-                    >
-                      <Text>{t('common.retry')}</Text>
-                    </Button>
-                  </View>
-                )}
-                {setupQuery.isSuccess && (
-                  <Text className="font-mono text-xs text-foreground">
-                    {setupQuery.data.command}
-                  </Text>
-                )}
-              </View>
-              <Button
-                variant="outline"
-                disabled={!setupQuery.data?.command}
-                onPress={() => {
-                  void handleCopy();
-                }}
-              >
-                <Text>
-                  {copied ? t('kiloclaw.google.copied') : t('kiloclaw.google.copyCommand')}
-                </Text>
-              </Button>
-            </Animated.View>
-          )}
-
-          {isConnected && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-4">
-              <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
-                <View className="flex-row items-center gap-3">
-                  <GmailIcon size={20} />
-                  <Text className="flex-1 text-base font-semibold">
-                    {t('kiloclaw.google.gmailNotifications')}
-                  </Text>
-                  <Button
-                    size="sm"
-                    variant={gmailEnabled ? 'default' : 'outline'}
-                    onPress={handleToggleGmail}
-                    disabled={mutations.setGmailNotifications.isPending}
-                  >
-                    <Text>
-                      {gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}
-                    </Text>
-                  </Button>
-                </View>
-              </View>
-
-              <Button
-                variant="outline"
-                onPress={handleDisconnect}
-                loading={mutations.disconnectGoogle.isPending}
-                className="flex-row gap-2"
-              >
-                {!mutations.disconnectGoogle.isPending && <Unplug size={16} color="#ef4444" />}
-                <Text className="text-destructive">{t('kiloclaw.google.disconnect')}</Text>
-              </Button>
-            </Animated.View>
-          )}
+          <Button
+            variant="outline"
+            onPress={handleDisconnect}
+            loading={mutations.disconnectGoogle.isPending}
+            className="flex-row gap-2"
+          >
+            {!mutations.disconnectGoogle.isPending && <Unplug size={16} color="#ef4444" />}
+            <Text className="text-destructive">{t('kiloclaw.google.disconnect')}</Text>
+          </Button>
         </Animated.View>
-      </DetailScreenScrollView>
+      )}
+    </Animated.View>
+  );
+
+  return (
+    <Animated.View layout={LinearTransition} className="flex-1 bg-background">
+      <ScreenHeader title={t('kiloclaw.google.title')} />
+      {isConnected ? (
+        <DetailScreenScrollView
+          contentContainerClassName="px-4 pt-4 gap-4"
+          showsVerticalScrollIndicator={false}
+        >
+          {body}
+        </DetailScreenScrollView>
+      ) : (
+        <CenteredState>{body}</CenteredState>
+      )}
     </Animated.View>
   );
 }

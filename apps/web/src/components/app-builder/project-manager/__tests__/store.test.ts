@@ -61,7 +61,6 @@ describe('createProjectStore', () => {
     gitRepoFullName: null,
     sessions: [],
     pendingNewSession: false,
-    isRecoveringSession: false,
   };
 
   describe('getState', () => {

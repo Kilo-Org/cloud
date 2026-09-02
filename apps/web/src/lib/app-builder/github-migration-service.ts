@@ -232,14 +232,11 @@ export async function migrateProjectToGitHub(
       });
 
       if (!migrateResult.success) {
-        throw new MigrationError(
-          migrateResult.error === 'push_failed' ? 'push_failed' : 'internal_error',
-          { cause: migrateResult }
-        );
+        throw new MigrationError('push_failed', { cause: migrateResult });
       }
     } catch (error) {
       if (error instanceof MigrationError) throw error;
-      throw new MigrationError('internal_error', { cause: error });
+      throw new MigrationError('push_failed', { cause: error });
     }
 
     // 5. Update deployment if exists

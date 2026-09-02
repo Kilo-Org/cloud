@@ -72,19 +72,6 @@ export type {
 
 const REQUIRED_WORKER_VERSION = 'v2' satisfies WorkerVersion;
 
-export function isDefinitiveSessionNotFoundError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-
-  const trpcError = error as {
-    code?: unknown;
-    data?: { code?: unknown; httpStatus?: unknown };
-    shape?: { data?: { code?: unknown; httpStatus?: unknown } };
-  };
-  const data = trpcError.data ?? trpcError.shape?.data;
-
-  return trpcError.code === 'NOT_FOUND' || data?.code === 'NOT_FOUND' || data?.httpStatus === 404;
-}
-
 /**
  * Construct the git URL for an App Builder project.
  */
@@ -573,7 +560,7 @@ export async function getProject(
           err
         );
         sessionInitiated = null;
-        sessionPrepared = isDefinitiveSessionNotFoundError(err) ? false : null;
+        sessionPrepared = null;
       }
     } else if (activeSession) {
       // Active session is a legacy v1 session — fetch its messages from R2 so

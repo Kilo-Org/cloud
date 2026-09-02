@@ -294,24 +294,15 @@ export async function migrateToGithub(
     body: JSON.stringify(config),
   });
 
-  const data = await response.json().catch(() => undefined);
-  const parsed = MigrateToGithubResponseSchema.safeParse(data);
-
-  if (parsed.success && !parsed.data.success) {
-    return parsed.data;
-  }
-
   if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
     throw new AppBuilderError(
-      `Failed to migrate project ${projectId} to GitHub: ${response.status} ${response.statusText}`,
+      `Failed to migrate project ${projectId} to GitHub: ${response.status} ${response.statusText} - ${errorText}`,
       response.status,
       endpoint
     );
   }
 
-  if (!parsed.success) {
-    throw parsed.error;
-  }
-
-  return parsed.data;
+  const data = await response.json();
+  return MigrateToGithubResponseSchema.parse(data);
 }

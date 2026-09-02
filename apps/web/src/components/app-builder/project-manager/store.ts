@@ -32,7 +32,6 @@ export function createInitialState(
     gitRepoFullName,
     sessions: [],
     pendingNewSession: false,
-    isRecoveringSession: false,
   };
 }
 

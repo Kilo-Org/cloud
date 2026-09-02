@@ -21,7 +21,6 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
     gitRepoFullName: null,
     sessions: [],
     pendingNewSession: false,
-    isRecoveringSession: false,
   };
 
   return {

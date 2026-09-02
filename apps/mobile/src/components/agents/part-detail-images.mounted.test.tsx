@@ -57,6 +57,7 @@ vi.mock('./mono-scroll-block', () => ({
 vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' }));
 vi.mock('./code-block', () => ({ CodeBlock: 'CodeBlock' }));
 vi.mock('./fixed-part-row', () => ({ FixedPartRow: 'FixedPartRow' }));
+vi.mock('./suggest-tool-card', () => ({ SuggestToolCardBody: 'SuggestToolCardBody' }));
 vi.mock('./tool-cards', async () => {
   const { ReadToolCardBody } = await import('./tool-cards/read-tool-card');
   const { GenericToolCardBody } = await import('./tool-cards/generic-tool-card');

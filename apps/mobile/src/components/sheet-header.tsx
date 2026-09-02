@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 export function SheetHeader({
   title,
@@ -74,10 +75,12 @@ export function SheetHeader({
           </Pressable>
         ) : null}
         {/* min-w-0 lets the title shrink below its content width so it truncates
-            instead of pushing the trailing action out of the row. */}
+            instead of pushing the trailing action out of the row. Cancel and
+            Done bracket the title, so center it between them; without Cancel the
+            title stays leading against the sheet edge. */}
         <View className="min-w-0 shrink grow">
           <Text
-            className="text-lg font-semibold text-foreground"
+            className={cn('text-lg font-semibold text-foreground', onCancel && 'text-center')}
             numberOfLines={2}
             ellipsizeMode={titleEllipsis}
             accessibilityRole="header"

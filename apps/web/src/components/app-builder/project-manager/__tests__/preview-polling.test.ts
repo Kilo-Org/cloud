@@ -12,7 +12,6 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
   const stateUpdates: Array<Record<string, unknown>> = [];
   let currentState: ProjectState = {
     isStreaming: false,
-    isConnecting: false,
     isInterrupting: false,
     previewUrl: null,
     previewStatus: 'idle',
@@ -22,7 +21,6 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
     gitRepoFullName: null,
     sessions: [],
     pendingNewSession: false,
-    isRecoveringSession: false,
   };
 
   return {

@@ -16,8 +16,6 @@ export type PreviewStatus = 'idle' | 'building' | 'running' | 'error';
 export type ProjectState = {
   /** Derived from active session — true if active session is streaming */
   isStreaming: boolean;
-  /** True while the active session is connecting and its streaming status is unknown */
-  isConnecting: boolean;
   isInterrupting: boolean;
   previewUrl: string | null;
   previewStatus: PreviewStatus;
@@ -31,8 +29,6 @@ export type ProjectState = {
   sessions: AppBuilderSession[];
   /** True while the user has clicked "New Chat" but hasn't sent the first message yet */
   pendingNewSession: boolean;
-  /** True when a missing backend session requires the next message to create a replacement */
-  isRecoveringSession: boolean;
 };
 
 export type StateListener = () => void;

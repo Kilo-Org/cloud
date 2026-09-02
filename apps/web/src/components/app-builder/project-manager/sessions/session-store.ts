@@ -10,7 +10,6 @@
 export type SessionState<TMessage> = {
   messages: TMessage[];
   isStreaming: boolean;
-  isConnecting: boolean;
   questionRequestIds: Map<string, string>;
   /** Messages from child/subagent sessions, keyed by child session ID */
   childSessionMessages: Map<string, TMessage[]>;
@@ -33,7 +32,6 @@ export function createSessionStore<TMessage>(initialMessages: TMessage[]): Sessi
   let state: SessionState<TMessage> = {
     messages: initialMessages,
     isStreaming: false,
-    isConnecting: false,
     questionRequestIds: new Map(),
     childSessionMessages: new Map(),
   };

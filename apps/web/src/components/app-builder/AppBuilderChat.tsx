@@ -508,15 +508,7 @@ function SessionMessages({
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const {
-    isStreaming,
-    isConnecting,
-    isInterrupting,
-    model: projectModel,
-    sessions,
-    pendingNewSession,
-    isRecoveringSession,
-  } = state;
+  const { isStreaming, isInterrupting, model: projectModel, sessions, pendingNewSession } = state;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -540,14 +532,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     setVisibleSessionCount(DEFAULT_VISIBLE_SESSIONS);
   }, [manager]);
 
-  // Clear the submit-count once the awaited new session has arrived, or once
-  // neither connection nor streaming is in progress after a failed request.
+  // Clear the submit-count once the awaited new session has arrived, or if
+  // the request failed (isStreaming drops back to false with no new session).
   useEffect(() => {
     if (sessionCountAtSubmit === null) return;
-    if (sessions.length > sessionCountAtSubmit || (!isStreaming && !isConnecting)) {
+    if (sessions.length > sessionCountAtSubmit || !isStreaming) {
       setSessionCountAtSubmit(null);
     }
-  }, [sessions.length, sessionCountAtSubmit, isStreaming, isConnecting]);
+  }, [sessions.length, sessionCountAtSubmit, isStreaming]);
 
   // Fetch eligibility to check if user can use App Builder
   const personalEligibilityQuery = useQuery({
@@ -699,7 +691,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         // until the new session object actually arrives in state.
         setSessionCountAtSubmit(sessions.length);
       }
-      await manager.sendMessage(value, images, selectedModel || undefined);
+      manager.sendMessage(value, images, selectedModel || undefined);
       // PromptInput clears itself internally after successful submit
       setMessageUuid(uuidv4());
     },
@@ -751,7 +743,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
                 variant="ghost"
                 size="icon"
                 onClick={handleNewChatToggle}
-                disabled={isStreaming || isConnecting || isRecoveringSession}
+                disabled={isStreaming}
                 className={pendingNewSession ? 'text-primary bg-primary/10 h-8 w-8' : 'h-8 w-8'}
                 aria-label="New chat"
               >
@@ -759,11 +751,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {isRecoveringSession
-                ? 'A new chat is required'
-                : pendingNewSession
-                  ? 'Cancel new chat'
-                  : 'New chat'}
+              {pendingNewSession ? 'Cancel new chat' : 'New chat'}
             </TooltipContent>
           </Tooltip>
           <FeedbackDialog organizationId={organizationId} />
@@ -851,15 +839,13 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         placeholder={
           isStreaming
             ? 'Building...'
-            : isConnecting
-              ? 'Connecting...'
-              : pendingNewSession
-                ? 'What would you like to change?'
-                : 'Describe changes to your app...'
+            : pendingNewSession
+              ? 'What would you like to change?'
+              : 'Describe changes to your app...'
         }
         disabled={(!hasAnyMessages && !pendingNewSession) || isBlocked}
-        isSubmitting={isStreaming || isConnecting}
-        onInterrupt={isStreaming ? handleInterrupt : undefined}
+        isSubmitting={isStreaming}
+        onInterrupt={handleInterrupt}
         isInterrupting={isInterrupting}
         onImagesChange={handleImagesChange}
         models={modelOptions}

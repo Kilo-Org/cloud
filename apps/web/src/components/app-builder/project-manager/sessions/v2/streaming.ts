@@ -177,10 +177,10 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
 
       onSessionStatusChanged: status => {
         if (status.type === 'idle') {
-          store.setState({ isStreaming: false, isConnecting: false });
+          store.setState({ isStreaming: false });
           onStreamComplete?.();
         } else if (status.type === 'busy') {
-          store.setState({ isStreaming: true, isConnecting: false });
+          store.setState({ isStreaming: true });
         }
       },
 
@@ -194,11 +194,11 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
 
       onError: (error, _sessionId) => {
         logger.logError('V2 EventProcessor error', new Error(error));
-        store.setState({ isStreaming: false, isConnecting: false });
+        store.setState({ isStreaming: false });
       },
 
       onStreamingChanged: streaming => {
-        store.setState({ isStreaming: streaming, isConnecting: false });
+        store.setState({ isStreaming: streaming });
         // onStreamComplete is called from onSessionStatusChanged (idle) — not here,
         // to avoid triggering preview polling twice per stream completion.
       },
@@ -232,7 +232,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
     if (state.status === 'error' || state.status === 'disconnected') {
       // Force-complete all in-flight messages so they don't appear stuck in streaming state
       processor?.forceCompleteAll();
-      store.setState({ isStreaming: false, isConnecting: false });
+      store.setState({ isStreaming: false });
       if (state.status === 'disconnected') {
         onStreamComplete?.();
       }
@@ -469,14 +469,14 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
     }
 
     logger.log('Connecting to existing V2 session', { sessionId });
-    store.setState({ isConnecting: true });
+    store.setState({ isStreaming: true });
 
     void (async () => {
       try {
         await connectWs(sessionId);
       } catch (err) {
         logger.logError('Failed to connect to existing V2 session', err);
-        store.setState({ isStreaming: false, isConnecting: false });
+        store.setState({ isStreaming: false });
       }
     })();
   }
@@ -503,7 +503,7 @@ export function createV2StreamingCoordinator(config: V2StreamingConfig): V2Strea
     // Force-complete all in-flight messages so they don't appear stuck in streaming state
     processor?.forceCompleteAll();
 
-    store.setState({ isStreaming: false, isConnecting: false });
+    store.setState({ isStreaming: false });
   }
 
   /**

@@ -23,12 +23,9 @@ import type {
 class MigrationError extends Error {
   constructor(
     public readonly code: MigrateToGitHubErrorCode,
-    public readonly logDetails?: {
-      source: 'github_repository_lookup' | 'app_builder_request' | 'app_builder_response';
-      workerError?: 'invalid_request' | 'internal_error' | 'token_failed' | 'push_failed';
-    }
+    options?: ErrorOptions
   ) {
-    super(`Migration failed: ${code}`);
+    super(`Migration failed: ${code}`, options);
     this.name = 'MigrationError';
   }
 }
@@ -214,8 +211,8 @@ export async function migrateProjectToGitHub(
 
     try {
       repoDetails = await getRepositoryDetails(integration.platform_installation_id, repoFullName);
-    } catch {
-      throw new MigrationError('internal_error', { source: 'github_repository_lookup' });
+    } catch (error) {
+      throw new MigrationError('internal_error', { cause: error });
     }
 
     if (!repoDetails) {
@@ -235,17 +232,11 @@ export async function migrateProjectToGitHub(
       });
 
       if (!migrateResult.success) {
-        throw new MigrationError(
-          migrateResult.error === 'push_failed' ? 'push_failed' : 'internal_error',
-          {
-            source: 'app_builder_response',
-            workerError: migrateResult.error,
-          }
-        );
+        throw new MigrationError('push_failed', { cause: migrateResult });
       }
     } catch (error) {
       if (error instanceof MigrationError) throw error;
-      throw new MigrationError('internal_error', { source: 'app_builder_request' });
+      throw new MigrationError('push_failed', { cause: error });
     }
 
     // 5. Update deployment if exists
@@ -282,8 +273,8 @@ export async function migrateProjectToGitHub(
       .where(eq(app_builder_projects.id, projectId));
 
     if (error instanceof MigrationError) {
-      if (error.logDetails) {
-        console.error(`Migration failed (${error.code}):`, error.logDetails);
+      if (error.cause) {
+        console.error(`Migration failed (${error.code}):`, error.cause);
       }
       return { success: false, error: error.code };
     }

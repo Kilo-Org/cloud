@@ -285,39 +285,24 @@ export async function migrateToGithub(
   const baseUrl = getBaseUrl();
   const endpoint = `${baseUrl}/apps/${encodeURIComponent(projectId)}/migrate-to-github`;
 
-  let response: Response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(APP_BUILDER_AUTH_TOKEN && { Authorization: `Bearer ${APP_BUILDER_AUTH_TOKEN}` }),
-      },
-      body: JSON.stringify(config),
-    });
-  } catch {
-    throw new AppBuilderError('App Builder GitHub migration request failed', undefined, endpoint);
-  }
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(APP_BUILDER_AUTH_TOKEN && { Authorization: `Bearer ${APP_BUILDER_AUTH_TOKEN}` }),
+    },
+    body: JSON.stringify(config),
+  });
 
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch {
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
     throw new AppBuilderError(
-      'App Builder GitHub migration returned an invalid response',
+      `Failed to migrate project ${projectId} to GitHub: ${response.status} ${response.statusText} - ${errorText}`,
       response.status,
       endpoint
     );
   }
 
-  const parsed = MigrateToGithubResponseSchema.safeParse(data);
-  if (!parsed.success || (!response.ok && parsed.data.success)) {
-    throw new AppBuilderError(
-      'App Builder GitHub migration returned an invalid response',
-      response.status,
-      endpoint
-    );
-  }
-
-  return parsed.data;
+  const data = await response.json();
+  return MigrateToGithubResponseSchema.parse(data);
 }

@@ -162,31 +162,6 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
-  it('accepts legacy Kilo JWTs with no audience or a matching cloud-agent-next audience', async () => {
-    const tokens = [
-      jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
-        algorithm: 'HS256',
-        expiresIn: '1 minute',
-      }),
-      jwt.sign({ version: 3, kiloUserId: 'user-1', aud: 'cloud-agent-next' }, secret, {
-        algorithm: 'HS256',
-        expiresIn: '1 minute',
-      }),
-      jwt.sign(
-        { version: 3, kiloUserId: 'user-1', aud: ['other-service', 'cloud-agent-next'] },
-        secret,
-        { algorithm: 'HS256', expiresIn: '1 minute' }
-      ),
-    ];
-
-    for (const token of tokens) {
-      await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
-        success: true,
-        claims: { type: 'legacy_kilo_token', userId: 'user-1' },
-      });
-    }
-  });
-
   it('rejects an audience-scoped Kilo JWT on the legacy path', async () => {
     const audienceScopedToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
       algorithm: 'HS256',
@@ -203,7 +178,11 @@ describe('validateWrapperDispatchTicket', () => {
   });
 
   it.each([
+    ['the Cloud Agent Next REST audience', 'cloud-agent-next'],
+    ['an array containing the REST audience', ['other-service', 'cloud-agent-next']],
     ['a different resource audience', 'kilo-gateway'],
+    ['an explicit null audience', null],
+    ['an explicit empty audience', ''],
     ['a malformed empty audience list', []],
     ['a malformed null audience list', [null]],
     ['a malformed audience object', { audience: 'cloud-agent-next' }],

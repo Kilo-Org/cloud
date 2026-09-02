@@ -1,7 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { extractBearerToken } from '@kilocode/worker-utils';
-import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 
 type StreamTicketPayload = {
   type: 'stream_ticket';
@@ -125,15 +123,17 @@ function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDisp
   );
 }
 
+/**
+ * Grandfather only audience-less Kilo tokens for pre-migration wrappers.
+ * Resource-audience tokens, including cloud-agent-next, are not wrapper capabilities
+ * and must not inherit this legacy path's exemption from dispatch fence checks.
+ */
 async function legacyKiloTokenClaims(
   ticket: string,
   secret: string
 ): Promise<LegacyKiloTokenClaims | undefined> {
   try {
-    const payload = await verifyKiloTokenForResource(ticket, secret, {
-      audience: CLOUD_AGENT_NEXT_AUDIENCE,
-      mode: 'allow-legacy',
-    });
+    const payload = await verifyKiloToken(ticket, secret);
     return { type: 'legacy_kilo_token', userId: payload.kiloUserId };
   } catch {
     return undefined;

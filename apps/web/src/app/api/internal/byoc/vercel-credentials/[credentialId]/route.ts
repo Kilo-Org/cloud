@@ -50,7 +50,6 @@ const CredentialUpdateSchema = z
   .superRefine((value, ctx) => {
     if (value.setupStatus !== 'ready') return;
     const required: Array<keyof typeof value> = [
-      'teamSlug',
       'projectSlug',
       'runtimeSnapshotId',
       'setupCompletedAt',
@@ -86,6 +85,7 @@ function toCredentialResponse(row: OrganizationVercelComputeCredential) {
     credentialId: row.id,
     organizationId: row.organization_id,
     tokenEncrypted: row.token_encrypted,
+    tokenScope: row.token_scope,
     teamId: row.team_id,
     projectId: row.project_id,
     teamSlug: row.team_slug,

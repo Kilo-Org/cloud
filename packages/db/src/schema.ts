@@ -153,6 +153,7 @@ import type {
   EncryptedData,
   VercelComputeCredentialEnvelope,
   VercelComputeSetupStatus,
+  VercelComputeTokenScope,
   VercelComputeSetupStep,
   AuthProviderId,
   AbuseClassification,
@@ -3818,6 +3819,7 @@ export const organization_vercel_compute_credentials = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     token_encrypted: jsonb().$type<VercelComputeCredentialEnvelope>().notNull(),
+    token_scope: text().$type<VercelComputeTokenScope>().notNull().default('team'),
     team_id: text().notNull(),
     project_id: text().notNull(),
     team_slug: text(),
@@ -3845,12 +3847,16 @@ export const organization_vercel_compute_credentials = pgTable(
       sql`length(trim(${table.team_id})) > 0 AND length(trim(${table.project_id})) > 0`
     ),
     check(
+      'organization_vercel_compute_credentials_token_scope_check',
+      sql`${table.token_scope} IN ('team', 'project')`
+    ),
+    check(
       'organization_vercel_compute_credentials_status_check',
       sql`${table.setup_status} IN ('pending', 'building', 'ready', 'failed')`
     ),
     check(
       'organization_vercel_compute_credentials_ready_fields_check',
-      sql`${table.setup_status} <> 'ready' OR (${table.runtime_snapshot_id} IS NOT NULL AND ${table.team_slug} IS NOT NULL AND ${table.project_slug} IS NOT NULL AND ${table.setup_completed_at} IS NOT NULL)`
+      sql`${table.setup_status} <> 'ready' OR (${table.runtime_snapshot_id} IS NOT NULL AND ${table.project_slug} IS NOT NULL AND ${table.setup_completed_at} IS NOT NULL)`
     ),
   ]
 );

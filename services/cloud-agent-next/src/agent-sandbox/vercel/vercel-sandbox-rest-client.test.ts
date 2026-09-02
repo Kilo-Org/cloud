@@ -76,11 +76,12 @@ function snapshot(overrides: Partial<VercelSandboxSnapshot> = {}): VercelSandbox
   };
 }
 
-function clientFor(providerFetch: typeof fetch) {
+function clientFor(providerFetch: typeof fetch, scope?: 'team' | 'project') {
   return new VercelSandboxRestClient({
     accessToken: 'secret-access-token',
     projectId: 'prj_test',
     teamId: 'team_test',
+    scope,
     fetch: providerFetch,
   });
 }
@@ -168,6 +169,35 @@ describe('VercelSandboxRestClient', () => {
         [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: 'runtime-build-123',
       },
     });
+  });
+
+  it('omits team scope parameters for a project-scoped token', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        sandbox: sandbox(),
+        session: session(),
+        routes: [],
+      })
+    );
+
+    await clientFor(providerFetch, 'project').createSandbox(createInput());
+
+    expect(providerFetch.mock.calls[0]?.[0]).toBe('https://api.vercel.com/v2/sandboxes');
+  });
+
+  it('validates the inferred project account without a team scope parameter', async () => {
+    const providerFetch = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ id: 'prj_test', name: 'test-project', accountId: 'team_test' })
+      );
+
+    await expect(clientFor(providerFetch, 'project').inspectProject()).resolves.toEqual({
+      id: 'prj_test',
+      name: 'test-project',
+      accountId: 'team_test',
+    });
+    expect(providerFetch.mock.calls[0]?.[0]).toBe('https://api.vercel.com/v9/projects/prj_test');
   });
 
   it('creates a contained sandbox with a nested REST-native policy and redirects disabled', async () => {

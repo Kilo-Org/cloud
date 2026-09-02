@@ -68,7 +68,6 @@ import {
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { BUILTIN_AGENT_MODES } from '../schema.js';
 import type { MessageResultRPCResponse } from '../session/message-result.js';
-import { classifyAssistantFailureMessage } from '../shared/assistant-failure.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import type { LatestAssistantMessage } from '../session/types.js';
 import { createEventQueries, type EventQueries } from '../session/queries/index.js';
@@ -78,6 +77,7 @@ import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
   persistSandboxControlSessionEvent,
+  sanitizeControlSessionEvent,
   type PendingInteractions,
   type SandboxControlSessionEventInput,
 } from './sandbox-control-event.js';
@@ -245,40 +245,6 @@ const pendingRuntimeCleanupSchema = z.object({
 
 type MessageRecord = SessionMessageRecord;
 type DispatchPhase = 'preparing' | 'attach' | 'prompt';
-
-function sanitizeControlSessionEvent(
-  payload: SandboxControlSessionEventInput
-): SandboxControlSessionEventInput {
-  if (payload.type === 'session.error') {
-    return {
-      ...payload,
-      properties: {
-        ...payload.properties,
-        error: classifyAssistantFailureMessage(payload.properties.error),
-      },
-    };
-  }
-  if (payload.type !== 'message.updated') return payload;
-  const info = payload.properties.info;
-  if (
-    typeof info !== 'object' ||
-    info === null ||
-    !('role' in info) ||
-    info.role !== 'assistant' ||
-    !('error' in info) ||
-    info.error === undefined ||
-    info.error === null
-  ) {
-    return payload;
-  }
-  return {
-    ...payload,
-    properties: {
-      ...payload.properties,
-      info: { ...info, error: classifyAssistantFailureMessage(info.error) },
-    },
-  };
-}
 
 function registrationMetadata(input: SandboxSessionRegistrationInput): SessionMetadata {
   validateControlSessionOptions(input);

@@ -3,6 +3,10 @@ import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
+import {
+  classifyAssistantFailureMessage,
+  projectSafeSdkAssistantError,
+} from '../shared/assistant-failure.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -90,6 +94,39 @@ export type SandboxControlSessionEventInput = {
   properties: Record<string, unknown>;
   timestamp?: string;
 };
+
+export function sanitizeControlSessionEvent(
+  payload: SandboxControlSessionEventInput
+): SandboxControlSessionEventInput {
+  if (payload.type === 'session.error') {
+    return {
+      ...payload,
+      properties: {
+        ...payload.properties,
+        error: classifyAssistantFailureMessage(payload.properties.error),
+      },
+    };
+  }
+  if (payload.type !== 'message.updated') return payload;
+  const info = payload.properties.info;
+  if (
+    typeof info !== 'object' ||
+    info === null ||
+    !('role' in info) ||
+    info.role !== 'assistant' ||
+    !('error' in info) ||
+    info.error === undefined
+  ) {
+    return payload;
+  }
+  return {
+    ...payload,
+    properties: {
+      ...payload.properties,
+      info: { ...info, error: projectSafeSdkAssistantError(info.error) },
+    },
+  };
+}
 
 export function persistSandboxControlSessionEvent(params: {
   sessionId: string;

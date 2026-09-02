@@ -32,6 +32,8 @@ import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { generateSandboxCredential, hashSandboxCredential } from '../sandbox-control/credential.js';
 import { buildControlWrapperLaunchEnv } from '../sandbox-control/wrapper-launch-env.js';
+import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
+import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { withDORetry } from '../utils/do-retry.js';
 
 const BUILD_ALARM_DELAY_MS = 1_000;
@@ -68,7 +70,6 @@ const BuildStepSchema = z.enum([
   'confirm_terminal',
 ]);
 
-type BuildStep = z.infer<typeof BuildStepSchema>;
 type BuildDb = ReturnType<typeof drizzle>;
 type BuildRow = typeof vercelSnapshotBuilds.$inferSelect;
 type BuildOwnership = Pick<BuildRow, 'organization_id' | 'credential_id' | 'build_generation'>;
@@ -398,7 +399,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     const state = this.load();
-    if (!state || state.next_attempt_at === null || state.next_attempt_at > now()) return;
+    if (!state || state.next_attempt_at === null) return;
+    if (state.next_attempt_at > now()) {
+      await this.arm(state, state.next_attempt_at);
+      return;
+    }
 
     let credential: ByocVercelCredential;
     try {
@@ -414,9 +419,24 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       return;
     }
 
-    let client: VercelSandboxRestClient | undefined;
     try {
       if (credential.buildGeneration !== state.build_generation) {
+        await this.abandon(state);
+        return;
+      }
+      if (state.step === 'project_failure' || state.step === 'cleanup') {
+        if (state.step === 'project_failure') {
+          await this.external(state, () =>
+            projectByocVercelStatus(this.env, {
+              ...this.projection(state),
+              setupStatus: 'failed',
+              setupError: state.last_error,
+              setupStep: null,
+              runtimeSnapshotId: null,
+              setupCompletedAt: null,
+            })
+          );
+        }
         await this.abandon(state);
         return;
       }
@@ -427,8 +447,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           credentialId: state.credential_id,
         })
       );
-      client = this.createClient(config);
-      const next = await this.runStep(state, client);
+      const client = this.createClient(config);
+      const next = await this.runStep(state, client, config);
       if (!next || !this.save(next)) return;
 
       const terminalConfirmed = state.step === 'confirm_terminal';
@@ -447,17 +467,18 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       }
     } catch (error) {
       if (error instanceof SnapshotBuildOwnershipLostError) return;
-      await this.handleFailure(state, error, client);
+      await this.handleFailure(state, error);
     }
   }
 
   private async runStep(
     state: BuildRow,
-    client: VercelSandboxRestClient
+    client: VercelSandboxRestClient,
+    config: VercelSandboxRuntimeConfig
   ): Promise<BuildRow | null> {
     switch (BuildStepSchema.parse(state.step)) {
       case 'validating_access': {
-        if (!state.team_slug) {
+        if (config.scope !== 'project' && !state.team_slug) {
           const team = await this.external(state, () => client.inspectTeam());
           return this.next(state, { team_slug: team.slug });
         }
@@ -621,19 +642,49 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         }
 
         if (!this.env.WORKER_URL) throw new Error('provider_configuration_failed');
+        const { session } = await this.external(state, () =>
+          client.getSession(validatorSessionId, state.validator_name)
+        );
+        if (session.status === 'pending') {
+          throw new VercelSandboxRestError('request_failed', 'get-session');
+        }
+        if (session.status !== 'running') throw new Error('validator_not_running');
         const credential = generateSandboxCredential();
         const credentialHash = await this.external(state, () => hashSandboxCredential(credential));
-        await this.external(state, () =>
+        const providerRef = encodeVercelProviderRef({
+          sandboxName: state.validator_name,
+          sessionId: validatorSessionId,
+        });
+        const prepared = this.next(state, { validator_control_id: validatorControlId });
+        if (!this.save(prepared)) throw new SnapshotBuildOwnershipLostError();
+        await this.external(prepared, () =>
           withDORetry(
             () => getSandboxControlStub(this.env, validatorControlId),
-            stub => stub.setWrapperCredentialHash(credentialHash),
+            stub =>
+              stub.initializeSnapshotValidator({
+                build: {
+                  organizationId: state.organization_id,
+                  credentialId: state.credential_id,
+                  generation: state.build_generation,
+                },
+                allocation: {
+                  providerRef,
+                  locator: {
+                    teamId: config.teamId,
+                    projectId: config.projectId,
+                    snapshotId: requiredBuildField(state.snapshot_id, 'snapshot_result_missing'),
+                    runtimeBuildId: state.runtime_build_id,
+                    runtime: 'node24',
+                  },
+                  createdAt: session.requestedAt,
+                  expiresAt: (session.startedAt ?? session.requestedAt) + session.timeout,
+                },
+                credentialHash,
+              }),
             'seedByocValidatorControl'
           )
         );
-        const intent = this.next(state, {
-          validator_wrapper_requested: 1,
-          validator_control_id: validatorControlId,
-        });
+        const intent = this.next(prepared, { validator_wrapper_requested: 1 });
         if (!this.save(intent)) throw new SnapshotBuildOwnershipLostError();
         const command = await this.external(intent, () =>
           client.executeCommand(validatorSessionId, {
@@ -643,11 +694,14 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
               `exec bun run /usr/local/bin/kilocode-control-wrapper.js # byoc-call-home:${state.build_generation}`,
             ],
             cwd: '/',
-            env: buildControlWrapperLaunchEnv({
-              workerUrl: this.env.WORKER_URL,
-              sandboxId: validatorControlId,
-              credential,
-            }),
+            env: {
+              ...buildControlWrapperLaunchEnv({
+                workerUrl: this.env.WORKER_URL,
+                sandboxId: validatorControlId,
+                credential,
+              }),
+              PROVIDER_INSTANCE_ID: providerRef,
+            },
             sudo: false,
             wait: false,
           })
@@ -684,6 +738,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             'verifyByocValidatorCallHome'
           )
         );
+        if (status.physical !== 'running') throw new Error('validator_call_home_failed');
         return status.connection === 'ready'
           ? this.next(state, { step: 'stop_validator' })
           : this.next(state, { step: 'verify_validator_call_home' });
@@ -693,16 +748,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           state.validator_session_id,
           'validator_session_missing'
         );
-        const session = await this.external(state, () =>
-          client.stopSession(validatorSessionId, state.validator_name)
-        );
-        if (
-          session.status !== 'stopped' &&
-          session.status !== 'failed' &&
-          session.status !== 'aborted'
-        ) {
-          throw new VercelSandboxRestError('request_failed', 'stop-session');
-        }
+        await this.stopBuildSession(state, client, validatorSessionId, state.validator_name, false);
+        await this.confirmValidatorStopped(state, state, validatorSessionId, false);
         return this.next(state, { step: 'confirm_terminal' });
       }
       case 'confirm_terminal': {
@@ -834,7 +881,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       credentialId: state.credential_id,
       buildGeneration: state.build_generation,
       setupStatus: ready ? ('ready' as const) : ('building' as const),
-      setupStep: ready ? null : (state.step as BuildStep),
+      setupStep:
+        ready || state.step === 'project_failure' || state.step === 'cleanup'
+          ? null
+          : BuildStepSchema.parse(state.step),
       setupError: null,
       teamSlug: state.team_slug,
       projectSlug: state.project_slug,
@@ -845,11 +895,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     };
   }
 
-  private async handleFailure(
-    owner: BuildRow,
-    error: unknown,
-    client?: VercelSandboxRestClient
-  ): Promise<void> {
+  private async handleFailure(owner: BuildRow, error: unknown): Promise<void> {
     const state = this.loadOwned(owner);
     if (!state) return;
 
@@ -858,13 +904,14 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       return;
     }
 
+    const terminal = state.step === 'project_failure' || state.step === 'cleanup';
     const attempt = state.retry_count + 1;
-    if (isRetryable(error) && attempt <= MAX_RETRIES) {
+    if (terminal || (isRetryable(error) && attempt <= MAX_RETRIES)) {
       const retrying = {
         ...state,
-        retry_count: attempt,
+        retry_count: Math.min(attempt, MAX_RETRIES + 1),
         next_attempt_at: now() + (RETRY_DELAY_MS[attempt - 1] ?? MAX_RETRY_DELAY_MS),
-        last_error: safeError(error),
+        last_error: terminal ? state.last_error : safeError(error),
         updated_at: now(),
       } satisfies BuildRow;
       if (!this.save(retrying)) return;
@@ -872,35 +919,12 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       return;
     }
 
-    const failed = {
-      ...state,
-      retry_count: attempt,
-      next_attempt_at: null,
+    const failed = this.next(state, {
+      step: 'project_failure',
       last_error: safeError(error),
-      updated_at: now(),
-    } satisfies BuildRow;
+    });
     if (!this.save(failed)) return;
-
-    try {
-      await this.external(failed, () =>
-        projectByocVercelStatus(this.env, {
-          ...this.projection(failed),
-          setupStatus: 'failed',
-          setupError: safeError(error),
-          setupStep: null,
-          runtimeSnapshotId: null,
-          setupCompletedAt: null,
-        })
-      );
-      await this.abandon(failed, client);
-    } catch (failure) {
-      if (failure instanceof SnapshotBuildOwnershipLostError) return;
-      if (failure instanceof ByocCredentialMissingError) {
-        await this.erase(failed);
-        return;
-      }
-      throw failure;
-    }
+    await this.arm(failed, now() + BUILD_ALARM_DELAY_MS);
   }
 
   private createClient(
@@ -909,6 +933,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     return new VercelSandboxRestClient({
       accessToken: config.accessToken,
       teamId: config.teamId,
+      scope: config.scope,
       projectId: config.projectId,
       fetch,
     });
@@ -929,40 +954,46 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
   }
 
   private async abandon(owner: BuildOwnership, client?: VercelSandboxRestClient): Promise<void> {
-    const state = this.loadOwned(owner);
+    let state = this.loadOwned(owner);
     if (!state) return;
+    if (state.step !== 'cleanup') {
+      state = this.next(state, { step: 'cleanup' });
+      if (!this.save(state)) return;
+      await this.arm(state, now() + BUILD_ALARM_DELAY_MS);
+    }
+    const cleanup = state;
 
-    if (this.hasBuildResources(state)) {
+    if (this.hasBuildResources(cleanup)) {
       let credential: ByocVercelCredential;
       try {
-        credential = await this.external(state, () =>
+        credential = await this.external(cleanup, () =>
           fetchByocVercelCredential(this.env, {
-            organizationId: state.organization_id,
-            credentialId: state.credential_id,
+            organizationId: cleanup.organization_id,
+            credentialId: cleanup.credential_id,
           })
         );
       } catch (error) {
         if (error instanceof ByocCredentialMissingError) {
-          await this.erase(state);
+          await this.erase(cleanup);
           return;
         }
         throw error;
       }
 
-      if (!client || credential.buildGeneration !== state.build_generation) {
-        const config = await this.external(state, () =>
+      if (!client || credential.buildGeneration !== cleanup.build_generation) {
+        const config = await this.external(cleanup, () =>
           resolveByocVercelAccessConfig(this.env, {
-            organizationId: state.organization_id,
-            credentialId: state.credential_id,
+            organizationId: cleanup.organization_id,
+            credentialId: cleanup.credential_id,
           })
         );
         client = this.createClient(config);
       }
 
-      await this.removeBuildResources(state, client, state);
+      await this.removeBuildResources(cleanup, client, cleanup);
     }
 
-    await this.erase(state);
+    await this.erase(cleanup);
   }
 
   private async removeBuildResources(
@@ -1000,6 +1031,9 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
 
     if (sessionId) {
       await this.stopBuildSession(owner, client, sessionId, sandboxName, allowMissingOwner);
+      if (kind === 'validator') {
+        await this.confirmValidatorStopped(owner, state, sessionId, allowMissingOwner);
+      }
       return;
     }
 
@@ -1019,6 +1053,31 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     }
 
     await this.stopBuildSession(owner, client, existing.session.id, sandboxName, allowMissingOwner);
+    if (kind === 'validator') {
+      await this.confirmValidatorStopped(owner, state, existing.session.id, allowMissingOwner);
+    }
+  }
+
+  private async confirmValidatorStopped(
+    owner: BuildOwnership,
+    state: BuildRow,
+    sessionId: string,
+    allowMissingOwner: boolean
+  ): Promise<void> {
+    const validatorControlId = state.validator_control_id;
+    if (!validatorControlId) return;
+    const providerRef = encodeVercelProviderRef({ sandboxName: state.validator_name, sessionId });
+    const confirm = () =>
+      withDORetry(
+        () => getSandboxControlStub(this.env, validatorControlId),
+        stub => stub.confirmSnapshotValidatorStopped(providerRef),
+        'confirmByocValidatorStopped'
+      );
+    if (allowMissingOwner) {
+      await this.cleanupExternal(owner, confirm);
+    } else {
+      await this.external(owner, confirm);
+    }
   }
 
   private async stopBuildSession(

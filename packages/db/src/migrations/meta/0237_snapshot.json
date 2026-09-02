@@ -1,6 +1,6 @@
 {
-  "id": "5e69fda6-9d6d-4cfe-8e45-e92c22ce827b",
-  "prevId": "b5de8925-0d2d-415c-afbc-709f14f3a458",
+  "id": "4e9064ac-64c8-4cf6-b6ab-6acd577e8834",
+  "prevId": "5e69fda6-9d6d-4cfe-8e45-e92c22ce827b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -28273,6 +28273,172 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_vercel_compute_credentials": {
+      "name": "organization_vercel_compute_credentials",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_encrypted": {
+          "name": "token_encrypted",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_scope": {
+          "name": "token_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'team'"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "team_slug": {
+          "name": "team_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_slug": {
+          "name": "project_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_status": {
+          "name": "setup_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "setup_step": {
+          "name": "setup_step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_error": {
+          "name": "setup_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "build_generation": {
+          "name": "build_generation",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "runtime_build_id": {
+          "name": "runtime_build_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "runtime_snapshot_id": {
+          "name": "runtime_snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_started_at": {
+          "name": "setup_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_completed_at": {
+          "name": "setup_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_vercel_compute_credentials_organization_id_organizations_id_fk": {
+          "name": "organization_vercel_compute_credentials_organization_id_organizations_id_fk",
+          "tableFrom": "organization_vercel_compute_credentials",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_organization_vercel_compute_credentials_organization": {
+          "name": "UQ_organization_vercel_compute_credentials_organization",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_vercel_compute_credentials_ids_non_empty": {
+          "name": "organization_vercel_compute_credentials_ids_non_empty",
+          "value": "length(trim(\"organization_vercel_compute_credentials\".\"team_id\")) > 0 AND length(trim(\"organization_vercel_compute_credentials\".\"project_id\")) > 0"
+        },
+        "organization_vercel_compute_credentials_token_scope_check": {
+          "name": "organization_vercel_compute_credentials_token_scope_check",
+          "value": "\"organization_vercel_compute_credentials\".\"token_scope\" IN ('team', 'project')"
+        },
+        "organization_vercel_compute_credentials_status_check": {
+          "name": "organization_vercel_compute_credentials_status_check",
+          "value": "\"organization_vercel_compute_credentials\".\"setup_status\" IN ('pending', 'building', 'ready', 'failed')"
+        },
+        "organization_vercel_compute_credentials_ready_fields_check": {
+          "name": "organization_vercel_compute_credentials_ready_fields_check",
+          "value": "\"organization_vercel_compute_credentials\".\"setup_status\" <> 'ready' OR (\"organization_vercel_compute_credentials\".\"runtime_snapshot_id\" IS NOT NULL AND \"organization_vercel_compute_credentials\".\"project_slug\" IS NOT NULL AND \"organization_vercel_compute_credentials\".\"setup_completed_at\" IS NOT NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.organizations": {

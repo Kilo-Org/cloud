@@ -94,10 +94,12 @@ describe('discoverVercelTeams', () => {
   });
 
   it('returns an empty list without falling back to a personal account', async () => {
-    fetchMock.mockResolvedValueOnce(Response.json(teamsPage([])));
+    fetchMock
+      .mockResolvedValueOnce(Response.json(teamsPage([])))
+      .mockResolvedValueOnce(Response.json(projectsPage([])));
 
     await expect(discoverVercelTeams(TOKEN)).resolves.toEqual([]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('finishes pagination before excluding teams the token has no readable access to', async () => {
@@ -116,11 +118,28 @@ describe('discoverVercelTeams', () => {
   });
 
   it('returns no readable teams for a token with only limited team metadata', async () => {
-    fetchMock.mockResolvedValueOnce(
-      Response.json(teamsPage([{ ...TEAM, limited: true, limitedBy: ['scope'] }]))
-    );
+    fetchMock
+      .mockResolvedValueOnce(
+        Response.json(teamsPage([{ ...TEAM, limited: true, limitedBy: ['scope'] }]))
+      )
+      .mockResolvedValueOnce(Response.json(projectsPage([])));
 
     await expect(discoverVercelTeams(TOKEN)).resolves.toEqual([]);
+  });
+
+  it('infers the owning team from a project-scoped token when team access is denied', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json([{ ...PROJECT, slug: 'project-slug' }]));
+
+    await expect(discoverVercelTeams(TOKEN)).resolves.toEqual([
+      { id: TEAM.id, slug: TEAM.id, name: 'Project-scoped token', scope: 'project' },
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.vercel.com/v10/projects?limit=100',
+      expect.objectContaining({ cache: 'no-store', redirect: 'error' })
+    );
   });
 
   it.each([
@@ -301,16 +320,23 @@ describe('discoverVercelProjects', () => {
     await expect(discoverVercelProjects(TOKEN, TEAM.id)).resolves.toEqual([]);
   });
 
-  it('does not let a project-only token bypass team inspection', async () => {
-    fetchMock.mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }));
+  it('discovers projects with a project-only token without team scope parameters', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json([{ ...PROJECT, slug: 'project-slug' }]));
 
-    await expectSafeError(discoverVercelProjects(TOKEN, TEAM.id), 'FORBIDDEN');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(discoverVercelProjects(TOKEN, TEAM.id)).resolves.toEqual([
+      { id: PROJECT.id, name: PROJECT.name, slug: PROJECT.name, teamId: TEAM.id },
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `https://api.vercel.com/v10/projects?limit=100`,
+      expect.objectContaining({ cache: 'no-store', redirect: 'error' })
+    );
   });
 
   it.each([
     ['a null response', null],
-    ['an unpaginated array', [PROJECT]],
     ['a malformed project list', { ...projectsPage([]), projects: {} }],
     ['a missing account ID', projectsPage([{ id: PROJECT.id, name: PROJECT.name }])],
     ['an empty project ID', projectsPage([{ ...PROJECT, id: '' }])],
@@ -383,6 +409,11 @@ describe('Vercel request failures', () => {
       );
       const readBody = jest.spyOn(response, 'json');
       fetchMock.mockResolvedValueOnce(response);
+      if (status === 403) {
+        fetchMock.mockResolvedValueOnce(
+          Response.json({ error: `${TOKEN} ${PROVIDER_DETAIL}` }, { status: 403 })
+        );
+      }
 
       await expectSafeError(discoverVercelTeams(TOKEN), code);
       expect(readBody).not.toHaveBeenCalled();
@@ -474,7 +505,11 @@ describe('validateVercelSelection', () => {
     );
     teamResponse.resolve(Response.json(TEAM));
 
-    await expect(result).resolves.toBeUndefined();
+    await expect(result).resolves.toEqual({
+      teamSlug: TEAM.slug,
+      projectSlug: PROJECT.name,
+      tokenScope: 'team',
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       `https://api.vercel.com/v9/projects/${PROJECT.id}?teamId=${TEAM.id}`,
@@ -490,9 +525,27 @@ describe('validateVercelSelection', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(fetchMock.mock.calls[1]?.[1]?.signal);
   });
 
+  it('validates a project-scoped token with the inferred project and no team request', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json({ ...PROJECT, slug: 'project-slug' }));
+
+    await expect(validateVercelSelection(TOKEN, TEAM.id, PROJECT.id)).resolves.toEqual({
+      teamSlug: null,
+      projectSlug: PROJECT.name,
+      tokenScope: 'project',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `https://api.vercel.com/v9/projects/${PROJECT.id}`,
+      expect.objectContaining({
+        headers: { Accept: 'application/json', Authorization: `Bearer ${TOKEN}` },
+      })
+    );
+  });
+
   it.each([
     [401, 'UNAUTHORIZED'],
-    [403, 'FORBIDDEN'],
     [404, 'NOT_FOUND'],
   ] as const)(
     'rejects unavailable team access (%s) without trying the project',
@@ -503,6 +556,24 @@ describe('validateVercelSelection', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('rejects a personally owned project even when its account ID matches the submitted team ID', async () => {
+    const accountId = 'user_personal';
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json({ ...PROJECT, accountId }));
+
+    await expectSafeError(validateVercelSelection(TOKEN, accountId, PROJECT.id), 'FORBIDDEN');
+  });
+
+  it('maps denied project-scope validation to the provider error', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }));
+
+    await expectSafeError(validateVercelSelection(TOKEN, TEAM.id, PROJECT.id), 'FORBIDDEN');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 
   it.each([
     ['a different team', { ...TEAM, id: 'team_other' }, 'FORBIDDEN'],

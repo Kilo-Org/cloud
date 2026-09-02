@@ -1,10 +1,8 @@
 // These files are bundled as Wrangler Data modules. The wrapper build runs in
 // the Worker package's predeploy hook, so the DO never depends on an operator's
 // local filesystem at runtime.
-// @ts-expect-error Wrangler Data rule supplies the module at bundle time.
-import wrapperArtifact from '../../wrapper/dist/wrapper.js';
-// @ts-expect-error Wrangler Data rule supplies the module at bundle time.
-import controlWrapperArtifact from '../../wrapper/dist/control-wrapper.js';
+import wrapperArtifact from '../../wrapper/dist/wrapper.js?binary';
+import controlWrapperArtifact from '../../wrapper/dist/control-wrapper.js?binary';
 
 export type RuntimeArtifact = {
   path: string;

@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canonicalControlEventJson } from '../shared/control-event-canonical.js';
+import type { AssistantMessage } from '@kilocode/sdk/v2';
+import { persistedKiloSdkMessageHistorySchema } from '@kilocode/session-ingest-contracts';
+import { classifyAssistantFailure, isAssistantInterrupt } from '../shared/assistant-failure.js';
 import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
 import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
 import { SandboxSession } from './SandboxSession.js';
@@ -1363,12 +1366,12 @@ describe('SandboxSession orchestration', () => {
       failureReason: reason,
     });
     await fixture.flush();
-    for (const id of [MESSAGE_A, MESSAGE_B]) {
-      expect(fixture.record(id)).toMatchObject({ state: 'failed', failedReason: reason });
-      expect(fixture.record(id)?.acceptedAt).toBeUndefined();
-    }
+    expect(fixture.record(MESSAGE_A)).toMatchObject({ state: 'failed', failedReason: reason });
+    expect(fixture.record(MESSAGE_A)?.acceptedAt).toBeUndefined();
+    expect(fixture.record(MESSAGE_B)).toMatchObject({ state: 'queued' });
+    expect(fixture.record(MESSAGE_B)?.acceptedAt).toBeUndefined();
     expect(fixture.control.request).not.toHaveBeenCalled();
-    expect(fixture.terminalEvents()).toHaveLength(2);
+    expect(fixture.terminalEvents()).toHaveLength(1);
   });
 
   it.each([
@@ -1587,6 +1590,144 @@ describe('SandboxSession orchestration', () => {
     expect(assistantForMessage).toHaveBeenCalledWith(SESSION_ID, 'kilo_root', MESSAGE_A);
   });
 
+  it.each([
+    {
+      label: 'retryable APIError',
+      error: {
+        name: 'APIError',
+        data: { message: 'Too Many Requests', statusCode: 429, isRetryable: true },
+      },
+    },
+    {
+      label: 'non-retryable APIError',
+      error: {
+        name: 'APIError',
+        data: { message: 'Too Many Requests', statusCode: 429, isRetryable: false },
+      },
+    },
+    {
+      label: 'MessageAbortedError',
+      error: { name: 'MessageAbortedError', data: { message: 'aborted mid-tool' } },
+    },
+  ] as const)(
+    'preserves $label in complete SDK history and stored, streamed and ingested messages',
+    async ({ error }) => {
+      const kiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+      const fixture = sessionFixture({
+        auth: { kiloSessionId, kilocodeToken: 'test-token' },
+      });
+      const ingestRequests: unknown[] = [];
+      Object.assign(fixture.session['env'], {
+        SESSION_INGEST: {
+          fetch: async (request: Request) => {
+            ingestRequests.push(await request.json());
+            return Response.json({ success: true });
+          },
+        },
+      });
+      await fixture.admit(MESSAGE_A);
+      await fixture.flush();
+      const info = {
+        id: MESSAGE_B,
+        sessionID: kiloSessionId,
+        role: 'assistant',
+        parentID: MESSAGE_A,
+        time: { created: Date.now() },
+        modelID: 'test-model',
+        providerID: 'kilo',
+        mode: 'code',
+        agent: 'code',
+        path: { cwd: DIRECTORY, root: DIRECTORY },
+        cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        error,
+      } satisfies AssistantMessage;
+      await expect(
+        fixture.session.receiveSandboxControlEvent({
+          identity: { directory: DIRECTORY, kiloSessionId, rootKiloSessionId: kiloSessionId },
+          wrapperInstanceId: RUNTIME_ID,
+          payload: {
+            type: 'message.updated',
+            properties: {
+              info: {
+                ...info,
+                error: {
+                  ...error,
+                  data: {
+                    ...error.data,
+                    message: `${error.data.message} private-provider-detail`,
+                    responseHeaders: { authorization: 'Bearer private-provider-token' },
+                    responseBody: 'private-provider-body',
+                    metadata: { token: 'private-provider-metadata' },
+                  },
+                },
+              },
+            },
+          },
+        })
+      ).resolves.toEqual({ applied: true });
+      await fixture.flush();
+
+      const event = fixture.eventQueries.findByEntityId(`message/${info.id}`);
+      if (!event) throw new Error('Expected stored assistant message');
+      const payload = JSON.parse(event.payload) as { properties: { info: unknown } };
+      const ingested = ingestRequests[0] as { data: Array<{ data: unknown }> };
+      const serializedHistory = JSON.stringify({
+        messages: [{ info: ingested.data[0]?.data, parts: [] }],
+        nextCursor: null,
+      });
+      const history = persistedKiloSdkMessageHistorySchema.parse(JSON.parse(serializedHistory));
+      const expectedError =
+        error.name === 'APIError'
+          ? {
+              name: error.name,
+              data: { ...error.data, message: 'Assistant request was rate limited' },
+            }
+          : {
+              name: error.name,
+              data: { message: 'The message was interrupted by the user' },
+            };
+      expect(history).toEqual({
+        messages: [{ info: { ...info, error: expectedError }, parts: [] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      const restored = 'messages' in history ? history.messages[0]?.info : undefined;
+      if (restored?.role !== 'assistant') throw new Error('Expected restored assistant message');
+      expect(isAssistantInterrupt(restored.error)).toBe(error.name === 'MessageAbortedError');
+      if (error.name === 'APIError') {
+        expect(restored.error).toMatchObject({
+          name: 'APIError',
+          data: { statusCode: 429, isRetryable: error.data.isRetryable },
+        });
+        expect(classifyAssistantFailure(restored.error).reason).toBe('rate_limited');
+      }
+      expect(payload.properties.info).toEqual({
+        id: info.id,
+        sessionID: info.sessionID,
+        role: info.role,
+        parentID: info.parentID,
+        time: info.time,
+        error: expectedError.data.message,
+      });
+      const broadcast = orchestrationMocks.broadcast.mock.calls
+        .map(([item]) => item)
+        .find(item => item.id === event.id && item.stream_event_type === 'kilocode');
+      expect(broadcast).toBeDefined();
+      expect(ingestRequests).toEqual([{ data: [{ type: 'message', data: restored }] }]);
+      for (const serialized of [
+        event.payload,
+        JSON.stringify(broadcast),
+        JSON.stringify(ingestRequests),
+        serializedHistory,
+        JSON.stringify(history),
+      ]) {
+        expect(serialized).not.toMatch(/private-provider|responseHeaders|responseBody|metadata/);
+      }
+      expect(fixture.record(MESSAGE_A)?.state).toBe('accepted');
+    }
+  );
+
   it('sanitizes assistant errors while requiring a matching fenced outcome before sending a failure callback', async () => {
     const fixture = sessionFixture({
       callback: { target: { url: 'https://callbacks.example.test/failure' } },
@@ -1786,23 +1927,12 @@ describe('SandboxSession orchestration', () => {
 
   it('commits one canonical outcome with its receipt and replays it after a lost response', async () => {
     const fixture = sessionFixture();
-    await fixture.admit('receipt');
+    await fixture.admit(MESSAGE_C);
     await fixture.flush();
-    const event = {
-      identity: {
-        directory: DIRECTORY,
-        kiloSessionId: 'kilo_root',
-        rootKiloSessionId: 'kilo_root',
-      },
-      wrapperInstanceId: RUNTIME_ID,
-      receiptId: '11111111-1111-4111-8111-111111111111',
-      receiptHash: 'fe56f74e2e533bffb077a4b73ded75450cdbb4752e421e6bb77d44093fd762f8',
-      sequence: 1,
-      payload: {
-        type: 'session.message.outcome',
-        properties: { messageId: 'receipt', status: 'completed' },
-      },
-    };
+    const event = receiptedEvent(1, {
+      type: 'session.message.outcome',
+      properties: { messageId: MESSAGE_C, status: 'completed' },
+    });
 
     await expect(
       Promise.all([
@@ -1810,7 +1940,7 @@ describe('SandboxSession orchestration', () => {
         fixture.session.receiveSandboxControlEvent(event),
       ])
     ).resolves.toEqual([{ applied: true }, { applied: true }]);
-    expect(fixture.record('receipt')?.state).toBe('completed');
+    expect(fixture.record(MESSAGE_C)?.state).toBe('completed');
     expect(fixture.terminalEvents()).toHaveLength(1);
     expect(fixture.values.get('control_event_receipts')).toMatchObject({
       highWater: { [RUNTIME_ID]: 1 },
@@ -1861,8 +1991,8 @@ describe('SandboxSession orchestration', () => {
             version: 2,
             authorization,
             completedAt: Date.now(),
-            result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
-            outcome: { messageId: 'a', status: 'completed' },
+            result: { ok: true, result: { messageId: MESSAGE_A, status: 'accepted' } },
+            outcome: { messageId: MESSAGE_A, status: 'completed' },
             events: [],
             preparing: [],
           },
@@ -1993,8 +2123,8 @@ describe('SandboxSession orchestration', () => {
         version: 2,
         authorization,
         completedAt,
-        result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
-        outcome: { messageId: 'a', status: 'completed' },
+        result: { ok: true, result: { messageId: MESSAGE_A, status: 'accepted' } },
+        outcome: { messageId: MESSAGE_A, status: 'completed' },
         events: [],
         preparing: [],
       };
@@ -2125,8 +2255,8 @@ describe('SandboxSession orchestration', () => {
             version: 2,
             authorization: promptAuthorization,
             completedAt: Date.now(),
-            result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
-            outcome: { messageId: 'a', status: 'completed' },
+            result: { ok: true, result: { messageId: MESSAGE_A, status: 'accepted' } },
+            outcome: { messageId: MESSAGE_A, status: 'completed' },
             events: [],
             preparing: [],
           },
@@ -2347,7 +2477,7 @@ describe('SandboxSession orchestration', () => {
             receiptedEvent(1, payload, RUNTIME_ID, NEXT_RUNTIME_ID)
           )
         ).resolves.toEqual({ applied: true });
-        prompt.resolve(controlResponse({ messageId: 'a', status: 'accepted' }));
+        prompt.resolve(controlResponse({ messageId: MESSAGE_A, status: 'accepted' }));
         await fixture.flush();
         fixture.reload();
         await expect(fixture.session.receiveSandboxControlEvent(stale)).resolves.toEqual({
@@ -2379,11 +2509,11 @@ describe('SandboxSession orchestration', () => {
         const previousAuthorization = {
           ...proof.authorization,
           operationId: 'attach-a',
-          messageId: 'a',
+          messageId: MESSAGE_A,
         };
         fixture.storage.kv.put('session_messages', [
           {
-            messageId: 'a',
+            messageId: MESSAGE_A,
             state: 'completed',
             wrapperInstanceId: RUNTIME_ID,
             operations: {
@@ -2608,7 +2738,10 @@ describe('SandboxSession orchestration', () => {
       fixture.session.receiveSandboxControlEvent(
         receiptedEvent(
           2,
-          { type: 'session.message.outcome', properties: { messageId: 'b', status: 'failed' } },
+          {
+            type: 'session.message.outcome',
+            properties: { messageId: MESSAGE_B, status: 'failed' },
+          },
           RUNTIME_ID,
           nativeRuntimeId
         )
@@ -2669,7 +2802,7 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     const originalEvent = receiptedEvent(1, {
       type: 'session.message.outcome',
-      properties: { messageId: 'a', status: 'completed' },
+      properties: { messageId: MESSAGE_A, status: 'completed' },
     });
     await expect(fixture.session.receiveSandboxControlEvent(originalEvent)).resolves.toEqual({
       applied: true,
@@ -2726,7 +2859,7 @@ describe('SandboxSession orchestration', () => {
       fixture.session.receiveSandboxControlEvent(
         receiptedEvent(2, {
           type: 'session.message.outcome',
-          properties: { messageId: 'b', status: 'failed' },
+          properties: { messageId: MESSAGE_B, status: 'failed' },
         })
       )
     ).resolves.toEqual({ applied: false });
@@ -2745,7 +2878,7 @@ describe('SandboxSession orchestration', () => {
       const authorization: SessionOperationAuthorization = {
         operation: 'session.attach',
         operationId: 'attach-a',
-        messageId: 'a',
+        messageId: MESSAGE_A,
         session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
         wrapperInstanceId: RUNTIME_ID,
         dispatchDeadlineAt: Date.now() + 30_000,
@@ -2769,7 +2902,7 @@ describe('SandboxSession orchestration', () => {
         ...pending,
         ...(changed === 'native runtime'
           ? { nativeRuntimeId: NEXT_RUNTIME_ID }
-          : { authorization: { ...authorization, operationId: 'attach-b', messageId: 'b' } }),
+          : { authorization: { ...authorization, operationId: 'attach-b', messageId: MESSAGE_B } }),
       };
       fixture.values.set('pending_runtime_cleanup', newer);
       oldReply.resolve({ quarantined: true, disposition: 'native_retired' });
@@ -4122,15 +4255,15 @@ describe('SandboxSession orchestration', () => {
     if (!kiloSessionId) throw new Error('Missing Kilo session ID');
     const authorization = {
       operation: 'session.prompt',
-      operationId: 'a',
-      messageId: 'a',
+      operationId: MESSAGE_A,
+      messageId: MESSAGE_A,
       session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
       wrapperInstanceId: RUNTIME_ID,
       dispatchDeadlineAt: Date.now() + 60_000,
     } satisfies SessionOperationAuthorization;
     fixture.values.set('session_messages', [
       {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         state: 'accepted',
         wrapperInstanceId: RUNTIME_ID,
         operations: { prompt: { authorization, dispatched: true } },
@@ -4155,12 +4288,12 @@ describe('SandboxSession orchestration', () => {
           version: 2,
           authorization,
           completedAt: Date.now(),
-          result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
-          outcome: { messageId: 'a', status: 'completed' },
+          result: { ok: true, result: { messageId: MESSAGE_A, status: 'accepted' } },
+          outcome: { messageId: MESSAGE_A, status: 'completed' },
           events: [
             {
               type: 'autocommit_completed',
-              properties: { success: true, messageId: 'a' },
+              properties: { success: true, messageId: MESSAGE_A },
               timestamp: new Date().toISOString(),
             },
           ],
@@ -4251,15 +4384,15 @@ describe('SandboxSession orchestration', () => {
     if (!kiloSessionId) throw new Error('Missing Kilo session ID');
     const authorization = {
       operation: 'session.prompt',
-      operationId: 'a',
-      messageId: 'a',
+      operationId: MESSAGE_A,
+      messageId: MESSAGE_A,
       session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
       wrapperInstanceId: RUNTIME_ID,
       dispatchDeadlineAt: Date.now() + 60_000,
     } satisfies SessionOperationAuthorization;
     fixture.values.set('session_messages', [
       {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         state: 'accepted',
         wrapperInstanceId: RUNTIME_ID,
         operations: { prompt: { authorization, dispatched: true } },
@@ -4284,12 +4417,12 @@ describe('SandboxSession orchestration', () => {
           version: 2,
           authorization,
           completedAt: Date.now(),
-          result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
-          outcome: { messageId: 'a', status: 'completed' },
+          result: { ok: true, result: { messageId: MESSAGE_A, status: 'accepted' } },
+          outcome: { messageId: MESSAGE_A, status: 'completed' },
           events: [
             {
               type: 'autocommit_completed',
-              properties: { success: true, messageId: 'a' },
+              properties: { success: true, messageId: MESSAGE_A },
               timestamp: new Date().toISOString(),
             },
           ],
@@ -4308,14 +4441,14 @@ describe('SandboxSession orchestration', () => {
     const authorization = {
       operation: 'session.attach',
       operationId: '11111111-1111-4111-8111-111111111111',
-      messageId: 'a',
+      messageId: MESSAGE_A,
       session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
       wrapperInstanceId: RUNTIME_ID,
       dispatchDeadlineAt: Date.now() + 60_000,
     } satisfies SessionOperationAuthorization;
     fixture.values.set('session_messages', [
       {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         state: 'accepted',
         wrapperInstanceId: RUNTIME_ID,
         operations: { attach: { authorization, dispatched: true } },
@@ -4330,7 +4463,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.values.get('native_runtime_fence')).toBeUndefined();
     fixture.values.set('session_messages', [
       {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         state: 'accepted',
         wrapperInstanceId: RUNTIME_ID,
         operations: {
@@ -5140,9 +5273,9 @@ describe('SandboxSession orchestration', () => {
         heldRequest = input;
         return heldCapture.promise;
       });
-      await fixture.admit('cold');
+      await fixture.admit(MESSAGE_D);
       await fixture.flush();
-      await fixture.outcome('cold', 'completed');
+      await fixture.outcome(MESSAGE_D, 'completed');
       await fixture.flush();
       const saved = await fixture.session.getWorktreeChanges();
       expect(saved.snapshot).not.toBeNull();
@@ -5157,7 +5290,7 @@ describe('SandboxSession orchestration', () => {
       delegateRequest(fixture, 'session.prompt', async () =>
         ++prompts === 1 ? lostPrompt.promise : controlFailure(true, 'session_busy')
       );
-      await fixture.admit('warm');
+      await fixture.admit(MESSAGE_E);
       await fixture.flush();
       if (!heldRequest) throw new Error('Expected in-flight capture');
       heldCapture.resolve(captureResponse(heldRequest));
@@ -5171,13 +5304,16 @@ describe('SandboxSession orchestration', () => {
       attached.resolve(controlResponse({ attached: true }));
       await fixture.flush();
       expect(prompts).toBe(1);
-      expect(fixture.record('warm')).toMatchObject({ state: 'queued', unresolvedDispatch: true });
+      expect(fixture.record(MESSAGE_E)).toMatchObject({
+        state: 'queued',
+        unresolvedDispatch: true,
+      });
       const captured = await fixture.session.getWorktreeChanges();
       expect(captured.snapshot?.revision).toBeGreaterThan(saved.snapshot?.revision ?? 0);
       fixture.reload();
       await fixture.fireAlarm();
       await fixture.flush();
-      expect(fixture.record('warm')).toMatchObject({
+      expect(fixture.record(MESSAGE_E)).toMatchObject({
         state: 'queued',
         unresolvedDispatch: true,
         deliveryRetryScope: 'runtime',
@@ -5185,14 +5321,14 @@ describe('SandboxSession orchestration', () => {
       await expect(fixture.session.refreshWorktreeChanges()).resolves.toMatchObject({
         status: 'refreshed',
       });
-      expect(fixture.record('warm')?.unresolvedDispatch).toBe(true);
+      expect(fixture.record(MESSAGE_E)?.unresolvedDispatch).toBe(true);
       await fixture.session.interruptExecution();
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
       );
-      lostPrompt.resolve(controlResponse({ messageId: 'warm', status: 'accepted' }));
+      lostPrompt.resolve(controlResponse({ messageId: MESSAGE_E, status: 'accepted' }));
       await fixture.flush();
-      expect(fixture.record('warm')?.state).toBe('cancelled');
+      expect(fixture.record(MESSAGE_E)?.state).toBe('cancelled');
     }
   );
 
@@ -5681,7 +5817,7 @@ describe('SandboxSession durable Stop wiring', () => {
       .find(input => input.operation === 'session.abort');
     expect(abort).toMatchObject({
       payload: {
-        messageId: 'a',
+        messageId: MESSAGE_A,
         operationId: request.operationId,
         cleanupDeadlineAt: request.cleanupDeadlineAt,
       },

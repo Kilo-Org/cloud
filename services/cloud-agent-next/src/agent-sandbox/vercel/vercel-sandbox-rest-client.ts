@@ -100,7 +100,7 @@ const teamDetailsSchema = z
   .object({ id: z.string().min(1), slug: z.string().min(1) })
   .passthrough();
 const projectDetailsSchema = z
-  .object({ id: z.string().min(1), name: z.string().min(1) })
+  .object({ id: z.string().min(1), name: z.string().min(1), accountId: z.string().min(1) })
   .passthrough();
 
 export type VercelSandboxRuntime = z.infer<typeof runtimeSchema>;
@@ -132,6 +132,7 @@ export type VercelSandboxRestClientConfig = {
   accessToken: string;
   projectId?: string;
   teamId: string;
+  scope?: 'team' | 'project';
   fetch: typeof fetch;
 };
 
@@ -428,7 +429,7 @@ export class VercelSandboxRestClient {
       `/v2/sandboxes/snapshots/${encodeURIComponent(snapshotId)}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     const response = await this.fetchProvider(operation, url, { method: 'DELETE' });
     if (response.status === 404 || response.status === 410) {
       await response.body?.cancel().catch(() => undefined);
@@ -445,7 +446,7 @@ export class VercelSandboxRestClient {
     const operation = 'list-snapshots';
     const projectId = this.requireProjectConfiguration(operation);
     const url = new URL('/v2/sandboxes/snapshots', VERCEL_SANDBOX_API_BASE_URL);
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     url.searchParams.set('project', projectId);
     url.searchParams.set('limit', '50');
     const response = await this.fetchProvider(operation, url, { method: 'GET' });
@@ -461,7 +462,7 @@ export class VercelSandboxRestClient {
       `/v2/sandboxes/snapshots/${encodeURIComponent(snapshotId)}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     const response = await this.fetchProvider(operation, url, { method: 'GET' });
     await this.requireSuccessfulResponse(response, operation);
     const snapshot = (await this.parseJson(response, snapshotEnvelopeSchema, operation)).snapshot;
@@ -487,18 +488,18 @@ export class VercelSandboxRestClient {
     return team;
   }
 
-  async inspectProject(): Promise<{ id: string; name: string }> {
+  async inspectProject(): Promise<{ id: string; name: string; accountId: string }> {
     const operation = 'get-project';
     const projectId = this.requireProjectConfiguration(operation);
     const url = new URL(
       `/v9/projects/${encodeURIComponent(projectId)}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     const response = await this.fetchProvider(operation, url, { method: 'GET' });
     await this.requireSuccessfulResponse(response, operation);
     const project = await this.parseJson(response, projectDetailsSchema, operation);
-    if (project.id !== projectId) {
+    if (project.id !== projectId || project.accountId !== this.config.teamId) {
       throw new VercelSandboxRestError('correlation_mismatch', operation);
     }
     return project;
@@ -602,7 +603,7 @@ export class VercelSandboxRestClient {
       `${this.commandUrl(sessionId, commandId).pathname}/kill`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     const response = await this.fetchProvider(operation, url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -770,14 +771,14 @@ export class VercelSandboxRestClient {
 
   private collectionUrl(): URL {
     const url = new URL('/v2/sandboxes', VERCEL_SANDBOX_API_BASE_URL);
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
   private namedSandboxUrl(name: string, projectId: string): URL {
     const url = new URL(`/v2/sandboxes/${encodeURIComponent(name)}`, VERCEL_SANDBOX_API_BASE_URL);
     url.searchParams.set('projectId', projectId);
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
@@ -786,13 +787,13 @@ export class VercelSandboxRestClient {
       `/v2/sandboxes/sessions/${encodeURIComponent(sessionId)}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
   private commandsUrl(sessionId: string): URL {
     const url = new URL(`${this.sessionUrl(sessionId).pathname}/cmd`, VERCEL_SANDBOX_API_BASE_URL);
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
@@ -801,7 +802,7 @@ export class VercelSandboxRestClient {
       `${this.commandsUrl(sessionId).pathname}/${encodeURIComponent(commandId)}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
@@ -810,12 +811,16 @@ export class VercelSandboxRestClient {
       `${this.sessionUrl(sessionId).pathname}/${action}`,
       VERCEL_SANDBOX_API_BASE_URL
     );
-    url.searchParams.set('teamId', this.config.teamId);
+    this.applyTeamScope(url);
     return url;
   }
 
   private fileActionUrl(sessionId: string, action: 'read' | 'write'): URL {
     return this.sessionActionUrl(sessionId, `fs/${action}`);
+  }
+
+  private applyTeamScope(url: URL): void {
+    if (this.config.scope !== 'project') url.searchParams.set('teamId', this.config.teamId);
   }
 
   private requestDeadlineMs(operation: VercelSandboxOperation): number {

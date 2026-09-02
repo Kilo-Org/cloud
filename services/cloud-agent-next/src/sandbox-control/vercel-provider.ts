@@ -112,6 +112,7 @@ export function createVercelProviderAdapter(deps: {
     new VercelSandboxRestClient({
       accessToken: config.accessToken,
       teamId: config.teamId,
+      scope: config.scope,
       projectId: config.projectId,
       fetch,
     });

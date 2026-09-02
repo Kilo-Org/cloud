@@ -148,6 +148,30 @@ describe('Vercel discovery authorization', () => {
     await expectNoSetup();
   });
 
+  it('accepts a project-scoped token and preserves the missing team slug', async () => {
+    const caller = createCaller({ user: owner });
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json(PROJECT));
+
+    const status = await caller.add(setupInput);
+    const credential = await getCredential();
+
+    expect(status).toMatchObject({
+      teamId: TEAM.id,
+      projectId: PROJECT.id,
+      teamSlug: null,
+      projectSlug: PROJECT.name,
+    });
+    expect(credential).toMatchObject({
+      token_scope: 'project',
+      team_id: TEAM.id,
+      project_id: PROJECT.id,
+      team_slug: null,
+    });
+    expect(mockStartBuild).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects billing managers, members, and nonmembers before checking enrollment or Vercel', async () => {
     for (const user of [billingManager, member, outsider]) {
       const caller = createCaller({ user });
@@ -320,6 +344,17 @@ describe('Vercel setup validation', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer changed-invalid-token' }),
       })
     );
+    await expectNoSetup();
+  });
+
+  it('rejects a personally owned project before storing a credential or starting setup', async () => {
+    const caller = createCaller({ user: owner });
+    const accountId = 'user_personal';
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ error: TOKEN }, { status: 403 }))
+      .mockResolvedValueOnce(Response.json({ ...PROJECT, accountId }));
+
+    await expectSanitizedError(caller.add({ ...setupInput, teamId: accountId }), 'FORBIDDEN');
     await expectNoSetup();
   });
 

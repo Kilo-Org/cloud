@@ -55,6 +55,7 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
       accessToken: credentials.accessToken,
       projectId,
       teamId: credentials.teamId,
+      scope: credentials.scope,
       fetch,
     });
   }

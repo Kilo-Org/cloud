@@ -7,6 +7,8 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { vercelSnapshotBuilds } from '../db/vercel-snapshot-schema.js';
+import { hashSandboxCredential } from '../sandbox-control/credential.js';
+import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 
 const mocks = vi.hoisted(() => {
   class CredentialMissingError extends Error {}
@@ -43,6 +45,11 @@ const mocks = vi.hoisted(() => {
     CredentialResolverError,
     SandboxRestError,
     client,
+    control: {
+      initializeSnapshotValidator: vi.fn(),
+      confirmSnapshotValidatorStopped: vi.fn(),
+      getStatus: vi.fn(),
+    },
     fetchCredential: vi.fn(),
     resolveAccess: vi.fn(),
     projectStatus: vi.fn(),
@@ -192,18 +199,23 @@ function createStorage(database: DatabaseSync) {
   };
 }
 
-function createFixture(): BuildFixture {
-  const database = new DatabaseSync(':memory:');
-  const storage = createStorage(database);
+function createBuild(storage: StorageFixture): InstanceType<typeof VercelSnapshotBuild> {
   const ctx = {
     id: { name: ORGANIZATION_ID },
     storage,
     blockConcurrencyWhile: vi.fn((action: () => Promise<void>) => action()),
   };
-  const env = { WORKER_URL: 'https://worker.invalid' };
-  const build = new VercelSnapshotBuild(ctx as never, env as never);
+  const env = {
+    WORKER_URL: 'https://worker.invalid',
+    SANDBOX_CONTROL: { getByName: () => mocks.control },
+  };
+  return new VercelSnapshotBuild(ctx as never, env as never);
+}
 
-  return { database, storage, build };
+function createFixture(): BuildFixture {
+  const database = new DatabaseSync(':memory:');
+  const storage = createStorage(database);
+  return { database, storage, build: createBuild(storage) };
 }
 
 function storedRow(fixture: BuildFixture): BuildRow | undefined {
@@ -220,6 +232,14 @@ function updateRow(fixture: BuildFixture, changes: BuildChanges): void {
     .set(changes)
     .where(eq(vercelSnapshotBuilds.organization_id, ORGANIZATION_ID))
     .run();
+}
+
+async function runNextAlarm(fixture: BuildFixture): Promise<void> {
+  const state = storedRow(fixture);
+  expect(state?.next_attempt_at).toEqual(expect.any(Number));
+  expect(await fixture.storage.getAlarm()).not.toBeNull();
+  updateRow(fixture, { next_attempt_at: Date.now() - 1 });
+  await fixture.build.alarm();
 }
 
 function prepareCreation(fixture: BuildFixture, kind: ManagedSandboxKind, requested = 1): BuildRow {
@@ -298,6 +318,12 @@ beforeEach(() => {
     projectId: 'project-test',
   });
   mocks.projectStatus.mockResolvedValue(true);
+  mocks.control.initializeSnapshotValidator.mockResolvedValue(undefined);
+  mocks.control.confirmSnapshotValidatorStopped.mockResolvedValue(undefined);
+  mocks.control.getStatus.mockResolvedValue({ physical: 'running', connection: 'ready' });
+  mocks.client.getSession.mockImplementation(async () => ({
+    session: { status: 'running', requestedAt: Date.now(), timeout: 600_000 },
+  }));
   mocks.client.inspectTeam.mockResolvedValue({ id: 'team-test', slug: 'team-test' });
   mocks.client.inspectProject.mockResolvedValue({ id: 'project-test', name: 'project-test' });
   mocks.client.inspectByName.mockResolvedValue(null);
@@ -305,10 +331,14 @@ beforeEach(() => {
   mocks.client.stopSession.mockResolvedValue({ status: 'stopped' });
   mocks.client.deleteSnapshot.mockResolvedValue(undefined);
   mocks.client.writeFiles.mockResolvedValue(undefined);
-  mocks.client.executeCommand.mockResolvedValue({
-    command: { id: 'command-test', exitCode: null },
-    finished: { id: 'command-test', exitCode: 0 },
-  });
+  mocks.client.executeCommand.mockImplementation(async (_sessionId, input) =>
+    input.wait === false
+      ? { id: 'command-test', exitCode: null }
+      : {
+          command: { id: 'command-test', exitCode: null },
+          finished: { id: 'command-test', exitCode: 0 },
+        }
+  );
   mocks.getArtifacts.mockResolvedValue([
     {
       path: 'usr/local/bin/kilocode-wrapper.js',
@@ -360,6 +390,24 @@ describe('VercelSnapshotBuild persistence isolation', () => {
       expect.arrayContaining(['events', 'command_queue', 'execution_leases'])
     );
     expect(sessionTables).not.toContain('vercel_snapshot_builds');
+  });
+});
+
+describe('VercelSnapshotBuild token scope', () => {
+  it('does not inspect team metadata for a project-scoped credential', async () => {
+    const fixture = createFixture();
+    mocks.resolveAccess.mockResolvedValueOnce({
+      accessToken: 'test-vercel-credential',
+      teamId: 'team-test',
+      scope: 'project',
+      projectId: 'project-test',
+    });
+
+    await fixture.build.start(startInput());
+    await fixture.build.alarm();
+
+    expect(mocks.client.inspectTeam).not.toHaveBeenCalled();
+    expect(mocks.client.inspectProject).toHaveBeenCalledOnce();
   });
 });
 
@@ -1212,6 +1260,7 @@ describe('VercelSnapshotBuild cleanup', () => {
     mocks.client.getCommand.mockResolvedValueOnce({ exitCode: 1 });
 
     await fixture.build.alarm();
+    await runNextAlarm(fixture);
 
     expect(mocks.projectStatus).toHaveBeenCalledWith(
       expect.anything(),
@@ -1224,29 +1273,38 @@ describe('VercelSnapshotBuild cleanup', () => {
     expect(storedRow(fixture)).toBeUndefined();
   });
 
-  it('retains failed builder ownership when provider stop cannot be confirmed', async () => {
+  it('replays failed builder cleanup from its alarm without rerunning the failed build step', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, { builder_session_id: 'builder-failed' });
-    mocks.client.inspectTeam.mockRejectedValueOnce(new Error('deterministic-failure'));
+    mocks.client.inspectTeam.mockRejectedValueOnce(new Error('setup_command_failed'));
     mocks.client.stopSession.mockRejectedValueOnce(
       new mocks.SandboxRestError('request_failed', 'stop-session', 503)
     );
 
-    await expect(fixture.build.alarm()).rejects.toMatchObject({
-      operation: 'stop-session',
-      status: 503,
+    await fixture.build.alarm();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'project_failure',
+      last_error: 'setup_command_failed',
+      next_attempt_at: expect.any(Number),
     });
+    await runNextAlarm(fixture);
 
     expect(storedRow(fixture)).toMatchObject({
+      step: 'cleanup',
       builder_session_id: 'builder-failed',
-      next_attempt_at: null,
+      last_error: 'setup_command_failed',
+      next_attempt_at: expect.any(Number),
     });
     expect(fixture.storage.deleteAlarm).not.toHaveBeenCalled();
 
-    await fixture.build.cleanup(startInput());
+    await runNextAlarm(fixture);
 
+    expect(mocks.client.inspectTeam).toHaveBeenCalledOnce();
+    expect(mocks.projectStatus).toHaveBeenCalledOnce();
+    expect(mocks.client.stopSession).toHaveBeenCalledTimes(2);
     expect(storedRow(fixture)).toBeUndefined();
+    expect(await fixture.storage.getAlarm()).toBeNull();
   });
 
   it('deletes failed snapshots while their credential remains available', async () => {
@@ -1256,6 +1314,7 @@ describe('VercelSnapshotBuild cleanup', () => {
     mocks.client.inspectTeam.mockRejectedValueOnce(new Error('deterministic-failure'));
 
     await fixture.build.alarm();
+    await runNextAlarm(fixture);
 
     expect(mocks.projectStatus).toHaveBeenCalledWith(
       expect.anything(),
@@ -1267,7 +1326,413 @@ describe('VercelSnapshotBuild cleanup', () => {
   });
 });
 
+describe('VercelSnapshotBuild terminal replay', () => {
+  it('replays projection and cleanup after restart beyond the original build lifetime without changing the public failure', async () => {
+    const startedAt = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(startedAt);
+    try {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        step: 'verify_validator_call_home',
+        snapshot_id: 'snapshot-overdue',
+        validator_session_id: 'validator-overdue',
+        validator_wrapper_command_id: 'validator-command',
+        validator_control_id: 'validator-control',
+      });
+      mocks.client.getCommand.mockRejectedValueOnce(
+        new mocks.SandboxRestError('request_failed', 'get-command', 403)
+      );
+      await fixture.build.alarm();
+      const failed = storedRow(fixture);
+      if (!failed) throw new Error('Expected durable terminal projection');
+      mocks.projectStatus.mockRejectedValueOnce(new mocks.CredentialResolverError('unavailable'));
+      mocks.client.stopSession.mockRejectedValueOnce(
+        new mocks.SandboxRestError('request_failed', 'stop-session', 503)
+      );
+      mocks.client.deleteSnapshot.mockRejectedValueOnce(
+        new mocks.SandboxRestError('request_failed', 'delete-snapshot', 503)
+      );
+
+      for (const [index, step] of ['project_failure', 'cleanup', 'cleanup'].entries()) {
+        clock.mockReturnValue(startedAt + (index + 1) * 2 * 60 * 60_000);
+        fixture.build = createBuild(fixture.storage);
+        await fixture.build.alarm();
+        const retained = storedRow(fixture);
+        expect(retained).toMatchObject({
+          step,
+          created_at: startedAt,
+          build_generation: FIRST_GENERATION,
+          last_error: 'byoc_vercel_forbidden',
+          snapshot_id: failed.snapshot_id,
+          validator_session_id: failed.validator_session_id,
+          validator_name: failed.validator_name,
+          validator_operation_id: failed.validator_operation_id,
+          validator_control_id: failed.validator_control_id,
+        });
+        expect(retained?.next_attempt_at).toBeGreaterThan(Date.now());
+        expect(await fixture.storage.getAlarm()).toBe(retained?.next_attempt_at);
+      }
+
+      clock.mockReturnValue(startedAt + 8 * 60 * 60_000);
+      fixture.build = createBuild(fixture.storage);
+      mocks.client.stopSession.mockRejectedValueOnce(
+        new mocks.SandboxRestError('request_failed', 'stop-session', 404)
+      );
+      await fixture.build.alarm();
+
+      expect(storedRow(fixture)).toBeUndefined();
+      expect(await fixture.storage.getAlarm()).toBeNull();
+      expect(mocks.client.getCommand).toHaveBeenCalledOnce();
+      expect(mocks.client.createSandbox).not.toHaveBeenCalled();
+      expect(mocks.client.stopSession.mock.calls).toEqual([
+        ['validator-overdue', failed.validator_name],
+        ['validator-overdue', failed.validator_name],
+        ['validator-overdue', failed.validator_name],
+      ]);
+      expect(mocks.client.deleteSnapshot.mock.calls).toEqual([
+        ['snapshot-overdue'],
+        ['snapshot-overdue'],
+      ]);
+      expect(mocks.projectStatus).toHaveBeenCalledTimes(2);
+      for (const [, projection] of mocks.projectStatus.mock.calls) {
+        expect(projection).toMatchObject({
+          organizationId: ORGANIZATION_ID,
+          credentialId: CREDENTIAL_ID,
+          buildGeneration: FIRST_GENERATION,
+          setupStatus: 'failed',
+          setupStep: null,
+          setupError: 'byoc_vercel_forbidden',
+          runtimeSnapshotId: null,
+          setupStartedAt: new Date(startedAt).toISOString(),
+          setupCompletedAt: null,
+        });
+      }
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('retains the original safe failure and resources through repeated projection failures', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'verify_validator_call_home',
+      snapshot_id: 'snapshot-failed',
+      validator_session_id: 'validator-failed',
+      validator_wrapper_command_id: 'validator-command',
+      validator_control_id: 'validator-control',
+    });
+    mocks.client.getCommand.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'get-command', 403)
+    );
+    await fixture.build.alarm();
+    const failed = storedRow(fixture);
+    mocks.projectStatus.mockRejectedValue(new mocks.CredentialResolverError('unavailable'));
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await runNextAlarm(fixture);
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'project_failure',
+        build_generation: FIRST_GENERATION,
+        snapshot_id: 'snapshot-failed',
+        validator_session_id: 'validator-failed',
+        validator_name: failed?.validator_name,
+        last_error: 'byoc_vercel_forbidden',
+        next_attempt_at: expect.any(Number),
+      });
+    }
+    expect(mocks.client.getCommand).toHaveBeenCalledOnce();
+    expect(mocks.client.stopSession).not.toHaveBeenCalled();
+    expect(mocks.client.deleteSnapshot).not.toHaveBeenCalled();
+    expect(
+      mocks.projectStatus.mock.calls.every(
+        ([, projection]) =>
+          projection.setupStatus === 'failed' && projection.setupError === 'byoc_vercel_forbidden'
+      )
+    ).toBe(true);
+
+    mocks.projectStatus.mockResolvedValue(true);
+    await runNextAlarm(fixture);
+
+    expect(mocks.client.stopSession).toHaveBeenCalledWith(
+      'validator-failed',
+      failed?.validator_name
+    );
+    expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('snapshot-failed');
+    expect(storedRow(fixture)).toBeUndefined();
+    expect(await fixture.storage.getAlarm()).toBeNull();
+  });
+
+  it('retries snapshot deletion after the failure projection and validator stop are complete', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'verify_validator_call_home',
+      snapshot_id: 'snapshot-failed',
+      validator_session_id: 'validator-failed',
+      validator_wrapper_command_id: 'validator-command',
+      validator_control_id: 'validator-control',
+    });
+    mocks.client.getCommand.mockResolvedValueOnce({ exitCode: 1 });
+    mocks.client.deleteSnapshot.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'delete-snapshot', 503)
+    );
+    await fixture.build.alarm();
+    await runNextAlarm(fixture);
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'cleanup',
+      snapshot_id: 'snapshot-failed',
+      validator_session_id: 'validator-failed',
+      last_error: 'provider_request_failed',
+      next_attempt_at: expect.any(Number),
+    });
+    expect(mocks.control.confirmSnapshotValidatorStopped).toHaveBeenCalledOnce();
+    mocks.client.stopSession.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'stop-session', 404)
+    );
+    await runNextAlarm(fixture);
+
+    expect(mocks.projectStatus).toHaveBeenCalledOnce();
+    expect(mocks.client.getCommand).toHaveBeenCalledOnce();
+    expect(mocks.client.deleteSnapshot.mock.calls).toEqual([
+      ['snapshot-failed'],
+      ['snapshot-failed'],
+    ]);
+    expect(storedRow(fixture)).toBeUndefined();
+  });
+
+  it('continues abandoned-generation cleanup without projecting a new failure', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, { builder_session_id: 'builder-superseded' });
+    mocks.fetchCredential.mockResolvedValue(makeCredential(SECOND_GENERATION));
+    mocks.client.stopSession.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'stop-session', 503)
+    );
+
+    await fixture.build.alarm();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'cleanup',
+      build_generation: FIRST_GENERATION,
+      builder_session_id: 'builder-superseded',
+      next_attempt_at: expect.any(Number),
+    });
+    await runNextAlarm(fixture);
+
+    expect(mocks.projectStatus).not.toHaveBeenCalled();
+    expect(mocks.client.inspectTeam).not.toHaveBeenCalled();
+    expect(mocks.client.stopSession).toHaveBeenCalledTimes(2);
+    expect(storedRow(fixture)).toBeUndefined();
+  });
+
+  it('does not let a delayed terminal projection touch replacement resources or scheduling', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, { snapshot_id: 'snapshot-old' });
+    mocks.client.inspectTeam.mockRejectedValueOnce(new Error('setup_command_failed'));
+    await fixture.build.alarm();
+    const projection = deferred<boolean>();
+    mocks.projectStatus.mockImplementationOnce(() => projection.promise);
+    const staleAlarm = runNextAlarm(fixture);
+    await vi.waitFor(() => expect(mocks.projectStatus).toHaveBeenCalledOnce());
+
+    mocks.fetchCredential.mockResolvedValue(makeCredential(SECOND_GENERATION));
+    await fixture.build.start(startInput(SECOND_GENERATION));
+    updateRow(fixture, { snapshot_id: 'snapshot-new', validator_session_id: 'validator-new' });
+    const alarmCount = fixture.storage.setAlarm.mock.calls.length;
+    projection.reject(new mocks.CredentialResolverError('unavailable'));
+    await staleAlarm;
+
+    expect(storedRow(fixture)).toMatchObject({
+      build_generation: SECOND_GENERATION,
+      step: 'validating_access',
+      snapshot_id: 'snapshot-new',
+      validator_session_id: 'validator-new',
+    });
+    expect(mocks.client.deleteSnapshot.mock.calls).toEqual([['snapshot-old']]);
+    expect(mocks.client.stopSession).not.toHaveBeenCalled();
+    expect(fixture.storage.setAlarm).toHaveBeenCalledTimes(alarmCount);
+    expect(fixture.storage.deleteAlarm).not.toHaveBeenCalled();
+  });
+
+  it('erases local terminal state when credentials disappear without attempting provider cleanup', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, { builder_session_id: 'builder-inaccessible' });
+    mocks.client.inspectTeam.mockRejectedValueOnce(new Error('setup_command_failed'));
+    await fixture.build.alarm();
+    mocks.fetchCredential.mockRejectedValue(new mocks.CredentialMissingError('removed'));
+
+    await runNextAlarm(fixture);
+
+    expect(storedRow(fixture)).toBeUndefined();
+    expect(mocks.client.stopSession).not.toHaveBeenCalled();
+    expect(mocks.client.deleteSnapshot).not.toHaveBeenCalled();
+    expect(await fixture.storage.getAlarm()).toBeNull();
+  });
+});
+
 describe('VercelSnapshotBuild runtime preparation', () => {
+  it('registers the fenced validator allocation before launching its matching wrapper identity', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    const state = storedRow(fixture);
+    if (!state) throw new Error('Expected validator state');
+    const createdAt = Date.now() - 1_000;
+    mocks.client.getSession.mockResolvedValueOnce({
+      session: { status: 'running', requestedAt: createdAt, timeout: 600_000 },
+    });
+    mocks.control.initializeSnapshotValidator.mockImplementationOnce(async () => {
+      expect(storedRow(fixture)).toMatchObject({
+        validator_control_id: `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`,
+        validator_wrapper_requested: 0,
+      });
+      expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+    });
+
+    await fixture.build.alarm();
+
+    const providerRef = encodeVercelProviderRef({
+      sandboxName: state.validator_name,
+      sessionId: 'validator-session',
+    });
+    const launch = mocks.client.executeCommand.mock.calls[0]?.[1];
+    expect(launch.env.PROVIDER_INSTANCE_ID).toBe(providerRef);
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith({
+      build: {
+        organizationId: ORGANIZATION_ID,
+        credentialId: CREDENTIAL_ID,
+        generation: FIRST_GENERATION,
+      },
+      allocation: {
+        providerRef,
+        locator: {
+          teamId: 'team-test',
+          projectId: 'project-test',
+          snapshotId: 'snapshot-validator',
+          runtimeBuildId: state.runtime_build_id,
+          runtime: 'node24',
+        },
+        createdAt,
+        expiresAt: createdAt + 600_000,
+      },
+      credentialHash: await hashSandboxCredential(launch.env.SANDBOX_CONTROL_CREDENTIAL),
+    });
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'verify_validator_call_home',
+      validator_wrapper_requested: 1,
+      validator_wrapper_command_id: 'command-test',
+    });
+  });
+
+  it('waits for the validator allocation to run before registering or launching the wrapper', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    mocks.client.getSession.mockResolvedValueOnce({ session: { status: 'pending' } });
+
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'launch_validator_wrapper',
+      validator_wrapper_requested: 0,
+    });
+    expect(mocks.control.initializeSnapshotValidator).not.toHaveBeenCalled();
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+    await runNextAlarm(fixture);
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledOnce();
+    expect(mocks.client.executeCommand).toHaveBeenCalledOnce();
+  });
+
+  it('cleans up a validator whose control failed readiness even while its command still runs', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'verify_validator_call_home',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+      validator_control_id: 'validator-control',
+      validator_wrapper_command_id: 'validator-command',
+    });
+    mocks.client.getCommand.mockResolvedValueOnce({ exitCode: null });
+    mocks.control.getStatus.mockResolvedValueOnce({
+      physical: 'failed',
+      connection: 'disconnected',
+    });
+
+    await fixture.build.alarm();
+    expect(storedRow(fixture)?.step).toBe('project_failure');
+    await runNextAlarm(fixture);
+
+    expect(mocks.client.getCommand).toHaveBeenCalledOnce();
+    expect(mocks.client.stopSession).toHaveBeenCalledOnce();
+    expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('snapshot-validator');
+    expect(storedRow(fixture)).toBeUndefined();
+  });
+
+  it('recovers an ambiguous validator launch without rotating its credential or launching twice', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    mocks.client.executeCommand.mockRejectedValueOnce(
+      new mocks.SandboxRestError('request_failed', 'execute-command', 503)
+    );
+    await fixture.build.alarm();
+    mocks.client.listCommands.mockResolvedValueOnce([
+      { id: 'recovered-command', args: [`byoc-call-home:${FIRST_GENERATION}`] },
+    ]);
+
+    await runNextAlarm(fixture);
+
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledOnce();
+    expect(mocks.client.executeCommand).toHaveBeenCalledOnce();
+    expect(mocks.client.createSandbox).not.toHaveBeenCalled();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'verify_validator_call_home',
+      validator_wrapper_command_id: 'recovered-command',
+    });
+  });
+
+  it('retries validator registration before recording a wrapper launch intent', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    mocks.control.initializeSnapshotValidator.mockRejectedValueOnce(
+      new mocks.CredentialResolverError('registration unavailable')
+    );
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'launch_validator_wrapper',
+      validator_wrapper_requested: 0,
+    });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+    await runNextAlarm(fixture);
+
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledTimes(2);
+    expect(mocks.client.executeCommand).toHaveBeenCalledOnce();
+    expect(mocks.client.createSandbox).not.toHaveBeenCalled();
+  });
+
   it('projects a ready snapshot without deleting it when the validator is terminal', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());

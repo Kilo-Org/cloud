@@ -1236,6 +1236,8 @@ export type VercelComputeCredentialEnvelope = {
 
 export type VercelComputeSetupStatus = 'pending' | 'building' | 'ready' | 'failed';
 
+export type VercelComputeTokenScope = 'team' | 'project';
+
 export type VercelComputeSetupStep =
   | 'validating_access'
   | 'create_builder'

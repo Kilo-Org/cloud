@@ -11,7 +11,12 @@ import {
   type WorktreeChangesCapture,
   type WorktreeChangesSnapshot,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { generateKeyPairSync } from 'node:crypto';
+import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import snapshotMigrations from '../../drizzle/vercel-snapshot/migrations.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingContext } from '@kilocode/container-usage';
 import {
@@ -33,7 +38,13 @@ import {
   ByocCredentialMissingError,
   ByocCredentialResolverError,
   ByocVercelNotReadyError,
+  resolveByocVercelAccessConfig,
+  resolveByocVercelRuntimeConfig,
+  type ByocVercelCredential,
+  type ByocVercelStatusProjection,
 } from '../../src/byoc/vercel-credential-resolver.js';
+import { VercelSnapshotBuild } from '../../src/persistence/VercelSnapshotBuild.js';
+import { vercelSnapshotBuilds } from '../../src/db/vercel-snapshot-schema.js';
 import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
@@ -140,6 +151,12 @@ import {
 } from '../../src/shared/worktree-changes-wire.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { StoredEvent } from '../../src/websocket/types.js';
+
+vi.mock('../../src/byoc/vercel-runtime-artifacts.js', () => ({
+  getVercelRuntimeArtifacts: () => {
+    throw new Error('Validator integration tests start after runtime artifact preparation');
+  },
+}));
 
 vi.mock('../../src/session-access.js', () => ({
   requireCurrentSessionAccess: vi.fn(),
@@ -292,6 +309,7 @@ function readyByocSnapshotCredential(overrides: Record<string, unknown> = {}) {
         version: 1,
       },
     },
+    tokenScope: 'team',
     teamId: 'team-1',
     projectId: 'project-1',
     teamSlug: 'team-slug',
@@ -14295,6 +14313,505 @@ describe('SandboxControl BYOC worktree ownership', () => {
   });
 });
 
+describe('SandboxControl snapshot validator allocation', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('Snapshot validator tests must not access external services');
+    });
+  });
+
+  async function validatorFixture(initialize = true) {
+    const generation = crypto.randomUUID();
+    const id = `ses-byoc-validator-${generation.replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(id);
+    const credential = generateSandboxCredential();
+    const createdAt = Date.now() - 1_000;
+    const input = {
+      build: {
+        organizationId: byocSnapshotBinding.source.organizationId,
+        credentialId: byocSnapshotBinding.source.credentialId,
+        generation,
+      },
+      allocation: {
+        providerRef: encodeVercelProviderRef({
+          sandboxName: 'ses-snapshot-validator',
+          sessionId: 'validator-session',
+        }),
+        locator: {
+          teamId: 'team-validator',
+          projectId: 'project-validator',
+          snapshotId: 'snapshot-validator',
+          runtimeBuildId: 'runtime-validator',
+          runtime: 'node24' as const,
+        },
+        createdAt,
+        expiresAt: createdAt + 600_000,
+      },
+      credentialHash: await hashSandboxCredential(credential),
+    };
+    if (initialize) await control.initializeSnapshotValidator(input);
+    return { control, credential, input, id };
+  }
+
+  it('validates and renews a building credential before publishing its snapshot through real control RPC', async () => {
+    const keys = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const scheme = 'byoc-vercel-credential-rsa-aes-256-gcm';
+    const accessToken = 'fixture-building-vercel-token';
+    const generation = crypto.randomUUID();
+    const organizationId = byocSnapshotBinding.source.organizationId;
+    const credentialId = byocSnapshotBinding.source.credentialId;
+    const controlId = `ses-byoc-validator-${generation.replaceAll('-', '')}`;
+    const control = env.SANDBOX_CONTROL.getByName(controlId);
+    const snapshotId = 'snapshot-not-yet-published';
+    const credential: ByocVercelCredential = {
+      organizationId,
+      credentialId,
+      buildGeneration: generation,
+      tokenEncrypted: parseKeyedEnvelope(
+        encryptKeyedEnvelope(
+          accessToken,
+          scheme,
+          { keyId: 'agent-env-vars-v1', publicKeyPem: keys.publicKey },
+          `byoc-vercel-credential:v1:${organizationId}:${credentialId}`
+        ),
+        scheme
+      ),
+      tokenScope: 'team',
+      teamId: 'team-building',
+      projectId: 'project-building',
+      teamSlug: 'building-team',
+      projectSlug: 'building-project',
+      setupStatus: 'building',
+      setupStep: 'launch_validator_wrapper',
+      setupError: null,
+      runtimeBuildId: 'runtime-building',
+      runtimeSnapshotId: null,
+      setupStartedAt: new Date(Date.now() - 7 * 60_000).toISOString(),
+      setupCompletedAt: null,
+    };
+    const environment = {
+      ...env,
+      ...VERCEL_ENV,
+      WORKER_URL: 'https://worker.test',
+      KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+      AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'fixture-internal-secret' },
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '600000',
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+    } satisfies Env;
+    let nativeSession: VercelSandboxSession = {
+      id: 'vsess_validator_building',
+      sourceSandboxName: 'ses-snapshot-validator-building',
+      sourceSnapshotId: snapshotId,
+      projectId: credential.projectId,
+      runtime: 'node24',
+      status: 'running',
+      memory: 2048,
+      vcpus: 2,
+      region: 'iad1',
+      timeout: 600_000,
+      requestedAt: Date.now() - 241_000,
+      startedAt: Date.now() - 241_000,
+      cwd: '/',
+      createdAt: Date.now() - 241_000,
+      updatedAt: Date.now(),
+    };
+    let launchEnv: Record<string, string> | undefined;
+    const command = {
+      id: 'cmd_validator_building',
+      name: 'sh',
+      args: [] as string[],
+      cwd: '/',
+      sessionId: nativeSession.id,
+      exitCode: null,
+      startedAt: Date.now(),
+    };
+    const projections: ByocVercelStatusProjection[] = [];
+    const credentialReads: Array<Pick<ByocVercelCredential, 'setupStatus' | 'runtimeSnapshotId'>> =
+      [];
+    const providerRequests: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (
+        url.origin === environment.KILOCODE_BACKEND_BASE_URL &&
+        url.pathname === `/api/internal/byoc/vercel-credentials/${credentialId}`
+      ) {
+        expect(request.headers.get('x-internal-api-key')).toBe('fixture-internal-secret');
+        if (request.method === 'GET') {
+          expect(url.searchParams.get('organizationId')).toBe(organizationId);
+          credentialReads.push({
+            setupStatus: credential.setupStatus,
+            runtimeSnapshotId: credential.runtimeSnapshotId,
+          });
+          return Response.json(credential);
+        }
+        if (request.method === 'PATCH') {
+          const projection = await request.json<ByocVercelStatusProjection>();
+          expect(projection.buildGeneration).toBe(generation);
+          projections.push(projection);
+          Object.assign(credential, projection);
+          return Response.json({ updated: true });
+        }
+      }
+      if (url.origin === 'https://api.vercel.com') {
+        expect(request.headers.get('authorization')).toBe(`Bearer ${accessToken}`);
+        expect(url.searchParams.get('teamId')).toBe('team-building');
+        const path = `/v2/sandboxes/sessions/${nativeSession.id}`;
+        providerRequests.push(`${request.method} ${url.pathname}`);
+        if (request.method === 'GET' && url.pathname === path) {
+          return Response.json({ session: nativeSession, routes: [] });
+        }
+        if (request.method === 'POST' && url.pathname === `${path}/cmd`) {
+          const body = await request.json<{ env: Record<string, string>; args: string[] }>();
+          launchEnv = body.env;
+          command.args = body.args;
+          expect(Object.values(body.env).includes(accessToken)).toBe(false);
+          return Response.json({ command });
+        }
+        if (request.method === 'GET' && url.pathname === `${path}/cmd/${command.id}`) {
+          return Response.json({ command });
+        }
+        if (request.method === 'POST' && url.pathname === `${path}/extend-timeout`) {
+          expect(await request.json()).toEqual({ duration: 600_000 });
+          nativeSession = { ...nativeSession, timeout: nativeSession.timeout + 600_000 };
+          return Response.json({ session: nativeSession });
+        }
+        if (request.method === 'POST' && url.pathname === `${path}/stop`) {
+          nativeSession = { ...nativeSession, status: 'stopped' };
+          return Response.json({ session: nativeSession });
+        }
+      }
+      throw new Error(`Unexpected fixture request: ${request.method} ${url.origin}${url.pathname}`);
+    });
+    await runInDurableObject(control, instance => {
+      Object.assign(instance, { env: environment });
+    });
+    await expect(
+      resolveByocVercelRuntimeConfig(environment, byocSnapshotBinding.source)
+    ).rejects.toBeInstanceOf(ByocVercelNotReadyError);
+    await expect(
+      resolveByocVercelAccessConfig(environment, byocSnapshotBinding.source)
+    ).resolves.toMatchObject({
+      snapshotId: 'pending',
+      teamId: 'team-building',
+      projectId: 'project-building',
+    });
+
+    const buildStorage = env.SANDBOX_CONTROL.getByName(organizationId);
+    await runInDurableObject(buildStorage, async (_instance, state) => {
+      const db = drizzle(state.storage);
+      await migrate(db, snapshotMigrations);
+      const build = new VercelSnapshotBuild(state, environment);
+      await build.start({ organizationId, credentialId, buildGeneration: generation });
+      const prepared = db
+        .update(vercelSnapshotBuilds)
+        .set({
+          step: 'launch_validator_wrapper',
+          builder_session_id: 'builder-snapshotted',
+          snapshot_id: snapshotId,
+          validator_session_id: nativeSession.id,
+          validator_create_requested: 2,
+        })
+        .where(eq(vercelSnapshotBuilds.organization_id, organizationId))
+        .returning()
+        .get();
+      if (!prepared) throw new Error('Missing snapshot build fixture');
+      nativeSession.sourceSandboxName = prepared.validator_name;
+    });
+    const advanceBuild = () =>
+      runInDurableObject(buildStorage, async (_instance, state) => {
+        const build = new VercelSnapshotBuild(state, environment);
+        await build.alarm();
+        return drizzle(state.storage)
+          .select()
+          .from(vercelSnapshotBuilds)
+          .where(eq(vercelSnapshotBuilds.organization_id, organizationId))
+          .get();
+      });
+    const launched = await advanceBuild();
+    expect(launched, JSON.stringify({ providerRequests, credentialReads })).toMatchObject({
+      step: 'verify_validator_call_home',
+      last_error: null,
+      retry_count: 0,
+    });
+    expect(await advanceBuild()).toMatchObject({ step: 'verify_validator_call_home' });
+    if (!launchEnv) throw new Error('Missing validator wrapper launch');
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      providerRef: launchEnv.PROVIDER_INSTANCE_ID,
+      createIntent: { vercel: { snapshotId } },
+      containment: { kilocode: false, github: false, worktreeScoped: true },
+    });
+    expect(credential.setupStatus).toBe('building');
+    expect(credential.runtimeSnapshotId).toBeNull();
+    expect(launchEnv.PROVIDER_INSTANCE_ID).toBe(
+      encodeVercelProviderRef({
+        sandboxName: nativeSession.sourceSandboxName,
+        sessionId: nativeSession.id,
+      })
+    );
+    const socket = await connect(launchEnv.SANDBOX_CONTROL_CREDENTIAL, controlId);
+    try {
+      await completeHello(socket, 'building-validator-hello', {
+        providerInstanceId: launchEnv.PROVIDER_INSTANCE_ID,
+        wrapperInstanceId: crypto.randomUUID(),
+      });
+      signalWrapperReady(socket);
+      await vi.waitFor(async () => {
+        await expect(control.getStatus()).resolves.toMatchObject({
+          physical: 'running',
+          connection: 'ready',
+          failureReason: undefined,
+        });
+      });
+      socket.send(
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.heartbeat',
+          payload: { state: 'idle', kilo: { ready: true }, sessions: [] },
+        })
+      );
+      await vi.waitFor(async () => {
+        expect(providerRequests.filter(path => path.endsWith('/extend-timeout'))).toHaveLength(1);
+        await runInDurableObject(control, async (_instance, state) => {
+          expect(await state.storage.get('next_lease_check_at')).toBeGreaterThan(Date.now());
+          expect(await state.storage.get('failure_reason')).toBeUndefined();
+        });
+      });
+      expect(credential.setupStatus).toBe('building');
+      expect(credential.runtimeSnapshotId).toBeNull();
+      expect(await advanceBuild()).toMatchObject({ step: 'stop_validator' });
+      expect(await advanceBuild()).toMatchObject({ step: 'confirm_terminal' });
+      expect(credential.runtimeSnapshotId).toBeNull();
+      expect(await advanceBuild()).toBeUndefined();
+      expect(credential).toMatchObject({
+        setupStatus: 'ready',
+        runtimeSnapshotId: snapshotId,
+        setupStep: null,
+      });
+      expect(
+        credentialReads.every(
+          value => value.setupStatus === 'building' && value.runtimeSnapshotId === null
+        )
+      ).toBe(true);
+      expect(providerRequests.filter(path => path.endsWith('/cmd'))).toHaveLength(1);
+      expect(providerRequests.filter(path => path.endsWith('/stop'))).toHaveLength(1);
+      expect(projections.filter(value => value.setupStatus === 'ready')).toHaveLength(1);
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
+        expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+        expect(await state.storage.getAlarm()).toBeNull();
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('accepts the real fenced validator handshake and preserves ready state on initialization replay', async () => {
+    const { control, credential, input, id } = await validatorFixture();
+    const providerRef = input.allocation.providerRef;
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      providerRef,
+      createIntent: {
+        intentId: `byoc-validator-${input.build.generation}`,
+        allocationName: 'ses-snapshot-validator',
+        vercel: {
+          projectId: 'project-validator',
+          snapshotId: 'snapshot-validator',
+          runtimeBuildId: 'runtime-validator',
+        },
+      },
+      containment: { kilocode: false, github: false, worktreeScoped: true, providerRef },
+    });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.get('provider_binding')).toEqual(byocSnapshotBinding);
+      expect(await state.storage.get('provider_locator')).toEqual(input.allocation.locator);
+      expect(await state.storage.get('next_lease_check_at')).toBe(
+        input.allocation.expiresAt - leaseAtLeastMs()
+      );
+      expect(await loadDeadlines(state.storage)).toEqual({ wrapperReadiness: expect.any(Number) });
+      expect(await state.storage.get('billing_input')).toBeUndefined();
+      expect(await loadSessionCredentialGrants(state.storage)).toEqual([]);
+    });
+
+    await rejectHello(await connect(credential, id), 'logical-validator-id', id);
+    await rejectHello(
+      await connect(credential, id),
+      'wrong-validator-session',
+      encodeVercelProviderRef({
+        sandboxName: 'ses-snapshot-validator',
+        sessionId: 'another-session',
+      })
+    );
+    const socket = await connect(credential, id);
+    try {
+      await completeHello(socket, 'snapshot-validator-hello', {
+        providerInstanceId: providerRef,
+        wrapperInstanceId: crypto.randomUUID(),
+      });
+      signalWrapperReady(socket);
+      await vi.waitFor(async () => {
+        await expect(control.getStatus()).resolves.toMatchObject({
+          physical: 'running',
+          connection: 'ready',
+        });
+      });
+      const deadlines = await runInDurableObject(control, (_instance, state) =>
+        loadDeadlines(state.storage)
+      );
+      await control.initializeSnapshotValidator(input);
+      await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual(deadlines);
+        expect(await state.storage.get('wrapper_credential_hash')).toBe(input.credentialHash);
+      });
+
+      await control.confirmSnapshotValidatorStopped(providerRef);
+      await control.confirmSnapshotValidatorStopped(providerRef);
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'stopped',
+        providerRef: null,
+      });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await state.storage.getAlarm()).toBeNull();
+        expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
+        expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+      });
+      await runInDurableObject(control, async instance => {
+        await expect(instance.initializeSnapshotValidator(input)).rejects.toThrow(
+          'Snapshot validator allocation changed'
+        );
+      });
+    } finally {
+      socket.close();
+    }
+  });
+
+  it.each(['providerRef', 'credentialId', 'locator', 'generation'] as const)(
+    'rejects initialization replay with a different %s without adopting it',
+    async changed => {
+      const { control, input } = await validatorFixture();
+      const original = await control.getPhysicalRecord();
+      const conflicting = {
+        ...input,
+        build: {
+          ...input.build,
+          ...(changed === 'credentialId' ? { credentialId: crypto.randomUUID() } : {}),
+          ...(changed === 'generation' ? { generation: crypto.randomUUID() } : {}),
+        },
+        allocation: {
+          ...input.allocation,
+          ...(changed === 'providerRef'
+            ? {
+                providerRef: encodeVercelProviderRef({
+                  sandboxName: 'ses-snapshot-validator',
+                  sessionId: 'replacement-session',
+                }),
+              }
+            : {}),
+          ...(changed === 'locator'
+            ? { locator: { ...input.allocation.locator, projectId: 'another-project' } }
+            : {}),
+        },
+      };
+
+      await runInDurableObject(control, async instance => {
+        await expect(instance.initializeSnapshotValidator(conflicting)).rejects.toThrow(
+          /Snapshot validator (allocation changed|identity mismatch)/
+        );
+      });
+      await expect(control.getPhysicalRecord()).resolves.toEqual(original);
+      await control.confirmSnapshotValidatorStopped(input.allocation.providerRef);
+    }
+  );
+
+  it('does not initialize a validator after cancellation wins the registration race', async () => {
+    const { control, input } = await validatorFixture(false);
+    await control.confirmSnapshotValidatorStopped(input.allocation.providerRef);
+    await runInDurableObject(control, async (instance, state) => {
+      await expect(instance.initializeSnapshotValidator(input)).rejects.toThrow(
+        'Snapshot validator allocation changed'
+      );
+      expect(await state.storage.getAlarm()).toBeNull();
+      expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
+    });
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
+  });
+
+  it('does not adopt or stop another allocation already owned by the control', async () => {
+    const { control, input } = await validatorFixture(false);
+    await runInDurableObject(control, async instance => {
+      await instance.claimCreate('another-intent', false, 'another-allocation');
+      const original = await instance.getPhysicalRecord();
+      await expect(instance.initializeSnapshotValidator(input)).rejects.toThrow(
+        'Snapshot validator control is unavailable'
+      );
+      await expect(
+        instance.confirmSnapshotValidatorStopped(input.allocation.providerRef)
+      ).rejects.toThrow('Snapshot validator allocation changed');
+      await expect(instance.getPhysicalRecord()).resolves.toEqual(original);
+    });
+  });
+
+  it('can reissue an unlaunched credential without extending readiness or lease deadlines', async () => {
+    const { control, credential, input, id } = await validatorFixture();
+    const original = await control.getPhysicalRecord();
+    const deadlines = await runInDurableObject(control, (_instance, state) =>
+      loadDeadlines(state.storage)
+    );
+    const replacement = generateSandboxCredential();
+    await control.initializeSnapshotValidator({
+      ...input,
+      credentialHash: await hashSandboxCredential(replacement),
+    });
+    await expect(control.getPhysicalRecord()).resolves.toEqual(original);
+    const unauthorized = await SELF.fetch(`http://worker.test/sandbox-control/${id}`, {
+      headers: { Upgrade: 'websocket', Authorization: `Bearer ${credential}` },
+    });
+    expect(unauthorized.status).toBe(401);
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await loadDeadlines(state.storage)).toEqual(deadlines);
+      expect(await state.storage.get('next_lease_check_at')).toBe(
+        input.allocation.expiresAt - leaseAtLeastMs()
+      );
+    });
+    const socket = await connect(replacement, id);
+    try {
+      await completeHello(socket, 'reissued-validator-hello', {
+        providerInstanceId: input.allocation.providerRef,
+      });
+      await control.confirmSnapshotValidatorStopped(input.allocation.providerRef);
+    } finally {
+      socket.close();
+    }
+  });
+
+  it('fails closed when the validator misses its readiness deadline', async () => {
+    const { control, input } = await validatorFixture();
+    await fireControlDeadline(control, 'wrapperReadiness');
+
+    await expect(control.getStatus()).resolves.toMatchObject({ physical: 'failed' });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.get('wrapper_credential_hash')).toBeUndefined();
+      expect(await state.storage.get('next_lease_check_at')).toBeUndefined();
+      expect((await loadDeadlines(state.storage)).stopAttempt).toEqual(expect.any(Number));
+    });
+    await runInDurableObject(control, async instance => {
+      await expect(instance.initializeSnapshotValidator(input)).rejects.toThrow(
+        'Snapshot validator allocation changed'
+      );
+    });
+    await control.confirmSnapshotValidatorStopped(input.allocation.providerRef);
+  });
+});
+
 describe('SandboxControl BYOC provider failures', () => {
   it.each([
     {
@@ -14669,13 +15186,11 @@ describe('SandboxControl BYOC provider failures', () => {
     });
   });
 
-  it('retries transient resolution using the existing user-approved create intent', async () => {
-    const {
-      control: stub,
-      registration,
-      vercel,
-    } = await credentialFixture('vercel', undefined, byocBinding);
-    await runInDurableObject(stub, async (instance, state) => {
+  it('retries transient pre-create resolution through the message queue without duplicate allocation or dispatch', async () => {
+    const fixture = await credentialFixture('vercel', undefined, byocBinding);
+    const { control, session, vercel } = fixture;
+    const messageId = fixtureMessageId('msg_byoc_resolution_retry');
+    await runInDurableObject(control, instance => {
       let attempts = 0;
       const createProvider = instance['createProviderAdapter'].bind(instance);
       instance['createProviderAdapter'] = async (...args) => {
@@ -14683,40 +15198,176 @@ describe('SandboxControl BYOC provider failures', () => {
         if (attempts === 1) throw new ByocCredentialResolverError();
         return createProvider(...args);
       };
-
-      await expect(
-        instance.ensureReady({
-          ...credentialInput(registration),
-          providerBinding: byocBinding,
-          allowCreate: true,
-        })
-      ).rejects.toThrow('BYOC credential lookup failed');
-
-      const intent = (await instance.getPhysicalRecord()).createIntent;
-      expect(intent?.intentId).toBeDefined();
-      if (!intent?.allocationName) throw new Error('Missing retained allocation intent');
+    });
+    const queued = await runInDurableObject(session, async (instance, state) => {
+      state.storage.kv.put('session_messages', [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'retry credential resolution' },
+          agent: { mode: 'code', model: 'test' },
+        }),
+      ]);
+      await instance['dispatchQueued'](messageId, { allowCreate: true });
+      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages');
+      expect(messages).toMatchObject([{ messageId, state: 'queued' }]);
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      return messages;
+    });
+    const intent = (await control.getPhysicalRecord()).createIntent;
+    if (!intent?.allocationName) throw new Error('Missing retained allocation intent');
+    expect(vercel.runtime.creates).toBe(0);
+    await runInDurableObject(control, async (instance, state) => {
       await expect(instance.getStatus()).resolves.toMatchObject({ physical: 'creating' });
       expect(await state.storage.get('failure_reason')).toBeUndefined();
       expect(await state.storage.get('provider_resolution_retry')).toBe(true);
+    });
 
-      await expect(
-        instance.ensureReady({
-          ...credentialInput(registration),
-          providerBinding: byocBinding,
-          allowCreate: false,
-        })
-      ).resolves.toMatchObject({ physical: 'running' });
-      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
-        providerRef: encodeVercelProviderRef({
-          sandboxName: intent.allocationName,
-          sessionId: 'vsess_joined_1',
-        }),
-        createIntent: intent,
-      });
-      expect(vercel.runtime.creates).toBe(1);
-      expect(attempts).toBe(3);
+    await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+
+    await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      createIntent: intent,
+      providerRef: encodeVercelProviderRef({
+        sandboxName: intent.allocationName,
+        sessionId: 'vsess_joined_1',
+      }),
+    });
+    expect(vercel.runtime.creates).toBe(1);
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get('session_messages')).toEqual(queued);
+    });
+    await runInDurableObject(control, async (_instance, state) => {
       expect(await state.storage.get('provider_resolution_retry')).toBeUndefined();
     });
+
+    const { socket } = await connectCredentialWrapper(fixture);
+    const requests = captureAndAcceptControlRequests(socket);
+    try {
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
+        type: 'found',
+        result: { status: 'running' },
+      });
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      expect(requests.map(request => request.operation)).toEqual([
+        'session.attach',
+        'session.prompt',
+      ]);
+      expect(requests[1]?.payload).toMatchObject({ messageId });
+      expect(vercel.runtime.creates).toBe(1);
+      expect(vercel.runtime.launches).toHaveLength(1);
+    } finally {
+      socket.close();
+    }
+  });
+
+  it.each(['generic-resolution', 'provider-create', 'provider-launch'] as const)(
+    'does not turn %s failures into pre-create queue retries',
+    async phase => {
+      const { control, session, vercel } = await credentialFixture(
+        'vercel',
+        undefined,
+        byocBinding
+      );
+      const messageId = fixtureMessageId(`msg_byoc_no_retry_${phase}`);
+      let resolutions = 0;
+      let creates = 0;
+      await runInDurableObject(control, instance => {
+        const createProvider = instance['createProviderAdapter'].bind(instance);
+        instance['createProviderAdapter'] = async (...args) => {
+          resolutions += 1;
+          if (phase === 'generic-resolution')
+            throw new Error('Generic provider resolution failure');
+          const provider = await createProvider(...args);
+          return {
+            ...provider,
+            create: async intent => {
+              creates += 1;
+              if (phase === 'provider-create') {
+                throw new VercelSandboxRestError('request_failed', 'create', 503);
+              }
+              return provider.create(intent);
+            },
+            launch: async () => {
+              throw new ByocCredentialResolverError();
+            },
+          };
+        };
+      });
+      const failed = await runInDurableObject(session, async (instance, state) => {
+        state.storage.kv.put('session_messages', [
+          createSessionMessageRecord({
+            turn: { type: 'prompt', messageId, prompt: 'do not retry ambiguous creation' },
+            agent: { mode: 'code', model: 'test' },
+          }),
+        ]);
+        await instance['dispatchQueued'](messageId, { allowCreate: true });
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages');
+        expect(messages).toMatchObject([{ messageId, state: 'failed' }]);
+        return messages;
+      });
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await state.storage.get('provider_resolution_retry')).toBeUndefined();
+      });
+      await runDurableObjectAlarm(session);
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('session_messages')).toEqual(failed);
+      });
+      expect(resolutions).toBe(1);
+      expect(creates).toBe(phase === 'generic-resolution' ? 0 : 1);
+      expect(vercel.runtime.creates).toBe(phase === 'provider-launch' ? 1 : 0);
+    }
+  );
+
+  it('does not retry a transient resolver failure after the retained startup deadline expires', async () => {
+    const { control, session, vercel } = await credentialFixture('vercel', undefined, byocBinding);
+    const messageId = fixtureMessageId('msg_byoc_resolution_expired');
+    let resolutions = 0;
+    await runInDurableObject(control, instance => {
+      instance['createProviderAdapter'] = async () => {
+        resolutions += 1;
+        throw new ByocCredentialResolverError();
+      };
+    });
+    await runInDurableObject(session, async (instance, state) => {
+      state.storage.kv.put('session_messages', [
+        createSessionMessageRecord({
+          turn: { type: 'prompt', messageId, prompt: 'bounded resolution retry' },
+          agent: { mode: 'code', model: 'test' },
+        }),
+      ]);
+      await instance['dispatchQueued'](messageId, { allowCreate: true });
+      expect(state.storage.kv.get('session_messages')).toMatchObject([{ state: 'queued' }]);
+    });
+    await runInDurableObject(control, async (instance, state) => {
+      const physical = await instance.getPhysicalRecord();
+      if (!physical.createIntent) throw new Error('Expected create intent');
+      await savePhysicalRecord(state.storage, {
+        ...physical,
+        createIntent: {
+          ...physical.createIntent,
+          createdAt: Date.now() - DEADLINE_MS.startup - 1,
+        },
+      });
+    });
+    await runDurableObjectAlarm(session);
+    expect(resolutions).toBe(1);
+    expect(vercel.runtime.creates).toBe(0);
+    await fireControlDeadline(control, 'startup');
+    await expect(control.getStatus()).resolves.toMatchObject({ physical: 'failed' });
+    await runInDurableObject(session, async (instance, state) => {
+      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      state.storage.kv.put(
+        'session_messages',
+        messages.map(message => ({ ...message, deliveryDeadlineAt: Date.now() - 1 }))
+      );
+      await instance.alarm();
+    });
+    await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
+      type: 'found',
+      result: { status: 'failed' },
+    });
+    expect(resolutions).toBe(1);
+    expect(vercel.runtime.creates).toBe(0);
   });
 
   it('retains a providerless failed create until cleanup can confirm absence', async () => {

@@ -125,6 +125,7 @@ export class VercelAgentSandbox implements AgentSandbox {
       this.restClient = new VercelSandboxRestClient({
         accessToken: config.accessToken,
         teamId: config.teamId,
+        scope: config.scope,
         projectId: config.projectId,
         fetch,
       });
@@ -179,6 +180,7 @@ export class VercelAgentSandbox implements AgentSandbox {
       new VercelSandboxRestClient({
         accessToken: this.currentConfig.accessToken,
         teamId: this.currentConfig.teamId,
+        scope: this.currentConfig.scope,
         projectId,
         fetch,
       })

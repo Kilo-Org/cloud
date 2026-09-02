@@ -216,6 +216,7 @@ import {
 } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import {
   ByocCredentialMissingError,
+  ByocCredentialResolverError,
   ByocVercelNotReadyError,
   projectByocVercelSnapshotMissing,
   resolveByocVercelCredentials,
@@ -298,6 +299,22 @@ const FAILURE_REASON_KEY = 'failure_reason';
 const PROVIDER_RESOLUTION_RETRY_KEY = 'provider_resolution_retry';
 const NEXT_LEASE_CHECK_AT_KEY = 'next_lease_check_at';
 const BYOC_SNAPSHOT_RECOVERY_KEY = 'byoc_snapshot_recovery';
+const SNAPSHOT_VALIDATOR_REF_KEY = 'snapshot_validator_ref';
+
+const snapshotValidatorInputSchema = z.object({
+  build: z.object({
+    organizationId: z.uuid(),
+    credentialId: z.uuid(),
+    generation: z.uuid(),
+  }),
+  allocation: z.object({
+    providerRef: z.string().min(1),
+    locator: vercelProviderLocatorSchema,
+    createdAt: z.number().int().nonnegative().safe(),
+    expiresAt: z.number().int().positive().safe(),
+  }),
+  credentialHash: z.string().regex(/^[0-9a-f]{64}$/),
+});
 
 export type SandboxProviderFailureReason =
   | 'byoc_credential_missing'
@@ -659,6 +676,140 @@ export class SandboxControl extends DurableObject<Env> {
     if (previous?.wrapperInstanceId) {
       await this.invalidateTerminalRuntime(previous.wrapperInstanceId, true);
     }
+  }
+
+  async initializeSnapshotValidator(
+    input: z.infer<typeof snapshotValidatorInputSchema>
+  ): Promise<void> {
+    await this.ensureOperationalInitialized();
+    const { build, allocation, credentialHash } = snapshotValidatorInputSchema.parse(input);
+    const expectedId = `ses-byoc-validator-${build.generation.replaceAll('-', '')}`;
+    const reference = decodeVercelProviderRef(allocation.providerRef);
+    if (this.sandboxId !== expectedId || !reference) {
+      throw new Error('Snapshot validator identity mismatch');
+    }
+    const binding = {
+      kind: 'vercel',
+      source: {
+        kind: 'byoc',
+        organizationId: build.organizationId,
+        credentialId: build.credentialId,
+      },
+    } satisfies SandboxProviderBinding;
+    const intentId = `byoc-validator-${build.generation}`;
+    await this.ctx.storage.transaction(async () => {
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      const registered = await this.ctx.storage.get<string>(SNAPSHOT_VALIDATOR_REF_KEY);
+      const storedBinding = SandboxProviderBindingSchema.optional().parse(
+        await this.ctx.storage.get(PROVIDER_BINDING_KEY)
+      );
+      if (registered !== undefined) {
+        const locator = vercelProviderLocatorSchema
+          .optional()
+          .parse(await this.ctx.storage.get(PROVIDER_LOCATOR_KEY));
+        if (
+          registered !== allocation.providerRef ||
+          !storedBinding ||
+          !sameSandboxProviderBinding(storedBinding, binding) ||
+          JSON.stringify(locator) !== JSON.stringify(allocation.locator) ||
+          current.state !== 'running' ||
+          current.stopTombstone ||
+          current.providerRef !== allocation.providerRef ||
+          current.createIntent?.intentId !== intentId ||
+          current.createIntent.allocationName !== reference.sandboxName
+        ) {
+          throw new Error('Snapshot validator allocation changed');
+        }
+        if ((await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === credentialHash) return;
+        if (
+          (await this.ctx.storage.get(ACTIVE_WRAPPER_RUNTIME_KEY)) !== undefined ||
+          this.ctx.getWebSockets().length > 0
+        ) {
+          throw new Error('Snapshot validator wrapper already connected');
+        }
+        await this.ctx.storage.put(CREDENTIAL_HASH_KEY, credentialHash);
+        await this.appendLog(credentialTransition(Date.now(), 'rotated'));
+        return;
+      }
+      if (
+        current.state !== 'stopped' ||
+        current.createIntent ||
+        current.providerRef ||
+        current.stopTombstone ||
+        storedBinding !== undefined ||
+        (await this.ctx.storage.get(PROVIDER_KIND_KEY)) !== undefined ||
+        (await this.readOwner()) !== null ||
+        this.runtimeDeleted ||
+        allocation.expiresAt <= Math.max(Date.now(), allocation.createdAt)
+      ) {
+        throw new Error('Snapshot validator control is unavailable');
+      }
+      const { teamId: _teamId, ...vercel } = allocation.locator;
+      const claimed = claimCreate(
+        current,
+        intentId,
+        allocation.createdAt,
+        reference.sandboxName,
+        getWorktreeCredentialContainment(false)
+      );
+      if (!claimed.createIntent) throw new Error('Snapshot validator intent is unavailable');
+      claimed.createIntent = { ...claimed.createIntent, vercel };
+      await this.persistPhysicalState(current, claimed, 'snapshot validator');
+      await this.persistPhysicalState(
+        claimed,
+        confirmRunning(claimed, allocation.providerRef, Date.now()),
+        'snapshot validator confirmed'
+      );
+      await this.ctx.storage.put({
+        [PROVIDER_BINDING_KEY]: binding,
+        [PROVIDER_KIND_KEY]: binding.kind,
+        [PROVIDER_LOCATOR_KEY]: allocation.locator,
+        [SNAPSHOT_VALIDATOR_REF_KEY]: allocation.providerRef,
+        [CREDENTIAL_HASH_KEY]: credentialHash,
+        [NEXT_LEASE_CHECK_AT_KEY]: allocation.expiresAt - leaseAtLeastMs(),
+      });
+      const deadlines = armDeadline(
+        cancelDeadline(await loadDeadlines(this.ctx.storage), 'startup'),
+        'wrapperReadiness',
+        Math.min(Date.now() + DEADLINE_MS.wrapperReadiness, allocation.expiresAt)
+      );
+      await saveDeadlines(this.ctx.storage, deadlines);
+      await this.scheduleAlarm(deadlines);
+      await this.appendLog(credentialTransition(Date.now(), 'issued'));
+    });
+    this.providerBinding = binding;
+    this.vercelLocator = allocation.locator;
+  }
+
+  async confirmSnapshotValidatorStopped(providerRef: string): Promise<void> {
+    await this.ensureOperationalInitialized();
+    if (
+      !/^ses-byoc-validator-[0-9a-f]{32}$/i.test(this.sandboxId) ||
+      !decodeVercelProviderRef(providerRef)
+    ) {
+      throw new Error('Snapshot validator identity mismatch');
+    }
+    await this.ctx.storage.transaction(async () => {
+      const registered = await this.ctx.storage.get(SNAPSHOT_VALIDATOR_REF_KEY);
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (registered === undefined && current.state === 'stopped') {
+        await this.ctx.storage.put(SNAPSHOT_VALIDATOR_REF_KEY, providerRef);
+      } else if (registered !== providerRef) {
+        throw new Error('Snapshot validator allocation changed');
+      }
+      if (current.state !== 'stopped' && current.providerRef !== providerRef) {
+        throw new Error('Snapshot validator allocation changed');
+      }
+      const stopped =
+        current.state === 'stopped'
+          ? current
+          : confirmStopped(beginStop(current, 'snapshot validator stopped', Date.now()));
+      await this.persistPhysicalState(current, stopped, 'snapshot validator stopped');
+    });
+    this.activeConnection = null;
+    this.readyConnectionId = null;
+    this.kiloReady = false;
+    this.socketHandler.closeAll('Snapshot validator stopped');
   }
 
   async initializeOwner(ownerId: string): Promise<{ ownerId: string }> {
@@ -1533,8 +1684,11 @@ export class SandboxControl extends DurableObject<Env> {
       creating = await this.ctx.storage.transaction(async () => {
         const current = await loadPhysicalRecord(this.ctx.storage);
         if (
+          binding.kind !== 'vercel' ||
+          binding.source.kind !== 'byoc' ||
           !sameAllocation(current, physical) ||
           current.state !== 'creating' ||
+          current.providerRef !== null ||
           current.stopTombstone ||
           !current.createIntent ||
           Date.now() >= current.createIntent.createdAt + DEADLINE_MS.startup ||
@@ -1636,16 +1790,26 @@ export class SandboxControl extends DurableObject<Env> {
             'Sandbox provider resolution timed out'
           );
         } catch (error) {
-          const current = await loadPhysicalRecord(this.ctx.storage);
           if (
             binding.kind === 'vercel' &&
             binding.source.kind === 'byoc' &&
-            providerFailureReason(binding, error) === undefined &&
-            sameAllocation(current, physical) &&
-            current.state === 'creating' &&
-            !current.stopTombstone
+            error instanceof ByocCredentialResolverError
           ) {
-            await this.ctx.storage.put(PROVIDER_RESOLUTION_RETRY_KEY, true);
+            const retrying = await this.ctx.storage.transaction(async () => {
+              const current = await loadPhysicalRecord(this.ctx.storage);
+              if (
+                !sameAllocation(current, physical) ||
+                current.state !== 'creating' ||
+                current.providerRef !== null ||
+                current.stopTombstone ||
+                Date.now() >= resolutionDeadline
+              ) {
+                return false;
+              }
+              await this.ctx.storage.put(PROVIDER_RESOLUTION_RETRY_KEY, true);
+              return true;
+            });
+            if (retrying) return currentStatus();
           }
           throw error;
         }

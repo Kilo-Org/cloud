@@ -47,6 +47,7 @@ const CredentialSchema = z.object({
   credentialId: z.uuid(),
   organizationId: z.uuid(),
   tokenEncrypted: EnvelopeSchema,
+  tokenScope: z.enum(['team', 'project']),
   teamId: z.string().min(1),
   projectId: z.string().min(1),
   teamSlug: z.string().nullable(),
@@ -303,6 +304,7 @@ export async function resolveByocVercelCredentials(
   return {
     accessToken: decryptCredentialAccessToken(env, credential),
     teamId: credential.teamId,
+    scope: credential.tokenScope,
   };
 }
 
@@ -329,6 +331,7 @@ function decryptCredentialRuntimeConfig(
     ...defaults,
     accessToken: decryptCredentialAccessToken(env, credential),
     teamId: credential.teamId,
+    scope: credential.tokenScope,
     projectId: credential.projectId,
     snapshotId: credential.runtimeSnapshotId ?? 'pending',
     runtimeBuildId: credential.runtimeBuildId,

@@ -20,6 +20,8 @@ const runtimeConfigSchema = z.object({
 export type VercelSandboxRuntimeConfig = {
   accessToken: string;
   teamId: string;
+  /** Project-scoped tokens must omit team-level query parameters. */
+  scope?: 'team' | 'project';
   projectId: string;
   snapshotId: string;
   runtimeBuildId: string;
@@ -36,6 +38,8 @@ export type VercelSandboxRuntimeDefaults = Pick<
 export type VercelSandboxCredentials = {
   accessToken: string;
   teamId: string;
+  /** Project-scoped tokens must omit team-level query parameters. */
+  scope?: 'team' | 'project';
 };
 
 export type VercelSandboxRuntimeConfigEnv = {

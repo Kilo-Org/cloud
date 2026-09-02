@@ -64,6 +64,7 @@ function credentialResponse(
 ) {
   return {
     ...input,
+    tokenScope: 'team',
     teamId: 'team-1',
     projectId: 'project-1',
     teamSlug: 'team-slug',
@@ -102,6 +103,7 @@ describe('BYOC Vercel credential encryption', () => {
     await expect(resolveByocVercelCredentials(env, identity)).resolves.toEqual({
       accessToken,
       teamId: 'team-1',
+      scope: 'team',
     });
   });
 
@@ -178,10 +180,32 @@ describe('BYOC Vercel credential encryption', () => {
         identity,
         onSnapshotResolved
       )
-    ).resolves.toMatchObject({ snapshotId: snapshot.runtimeSnapshotId });
+    ).resolves.toMatchObject({ snapshotId: snapshot.runtimeSnapshotId, scope: 'team' });
 
     expect(onSnapshotResolved).toHaveBeenCalledExactlyOnceWith(snapshot);
     expect(JSON.stringify(onSnapshotResolved.mock.calls)).not.toContain(accessToken);
+  });
+
+  it('marks a credential without team metadata as project-scoped', async () => {
+    stubCredentialResponse({
+      ...identity,
+      tokenEncrypted: encryptCredentialToken(),
+    });
+    const fetchMock = vi.mocked(globalThis.fetch);
+    fetchMock.mockImplementationOnce(async () =>
+      Response.json(
+        credentialResponse(
+          { ...identity, tokenEncrypted: encryptCredentialToken() },
+          { tokenScope: 'project', teamSlug: null }
+        )
+      )
+    );
+
+    await expect(resolveByocVercelCredentials(env, identity)).resolves.toMatchObject({
+      accessToken,
+      teamId: 'team-1',
+      scope: 'project',
+    });
   });
 });
 

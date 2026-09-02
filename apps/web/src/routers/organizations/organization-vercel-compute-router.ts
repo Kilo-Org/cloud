@@ -219,9 +219,11 @@ export const organizationVercelComputeRouter = createTRPCRouter({
         });
       }
 
-      await validateVercelSelection(input.token, input.teamId, input.projectId).catch(
-        rethrowVercelApiError
-      );
+      const selection = await validateVercelSelection(
+        input.token,
+        input.teamId,
+        input.projectId
+      ).catch(rethrowVercelApiError);
 
       const credentialId = crypto.randomUUID();
       const buildGeneration = newBuildGeneration();
@@ -250,8 +252,11 @@ export const organizationVercelComputeRouter = createTRPCRouter({
             id: credentialId,
             organization_id: input.organizationId,
             token_encrypted: tokenEncrypted,
+            token_scope: selection.tokenScope,
             team_id: input.teamId,
             project_id: input.projectId,
+            team_slug: selection.teamSlug,
+            project_slug: selection.projectSlug,
             setup_status: 'pending',
             setup_step: 'validating_access',
             build_generation: buildGeneration,
@@ -308,8 +313,6 @@ export const organizationVercelComputeRouter = createTRPCRouter({
         setup_status: 'pending',
         setup_step: 'validating_access',
         setup_error: null,
-        team_slug: null,
-        project_slug: null,
         runtime_build_id: runtimeBuild,
         runtime_snapshot_id: null,
         build_generation: buildGeneration,

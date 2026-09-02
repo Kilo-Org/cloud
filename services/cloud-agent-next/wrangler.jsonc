@@ -14,7 +14,7 @@
     { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
     {
       "type": "Data",
-      "globs": ["**/wrapper/dist/wrapper.js", "**/wrapper/dist/control-wrapper.js"],
+      "globs": ["**/wrapper/dist/wrapper.js?binary", "**/wrapper/dist/control-wrapper.js?binary"],
     },
   ],
   "workers_dev": true,

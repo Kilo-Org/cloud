@@ -50,6 +50,15 @@ function dashboardUrl(teamSlug: string | null, projectSlug: string | null): stri
   return `https://vercel.com/${encodeURIComponent(teamSlug)}/${encodeURIComponent(projectSlug)}`;
 }
 
+function projectLabel(
+  teamSlug: string | null,
+  projectSlug: string | null,
+  projectId: string
+): string {
+  if (teamSlug && projectSlug) return `${teamSlug}/${projectSlug}`;
+  return projectSlug || projectId;
+}
+
 function statusCopy(
   status: string,
   enrollment: 'enrolled' | 'not-enrolled' | 'unavailable' | 'checking'
@@ -294,9 +303,9 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
       return;
     } finally {
       if (generation === requestGeneration.current) resetAddMutation();
+      void invalidateStatus();
     }
 
-    void invalidateStatus();
     if (generation !== requestGeneration.current) return;
 
     setToken('');
@@ -441,7 +450,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
                       }
                     />
                     <p id="vercel-token-help" className="text-muted-foreground text-xs">
-                      Use a token with access to your Vercel team.
+                      Use a team- or project-scoped Vercel token.
                     </p>
                     <p
                       id="vercel-teams-status"
@@ -666,21 +675,23 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
                 {setupStatus && <Badge variant={setupStatus.variant}>{setupStatus.label}</Badge>}
               </CardHeader>
               <CardContent className="space-y-5">
-                {status.setupStatus === 'ready' && projectLink ? (
+                {status.setupStatus === 'ready' ? (
                   <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-medium">
-                        {status.teamSlug}/{status.projectSlug}
+                        {projectLabel(status.teamSlug, status.projectSlug, status.projectId)}
                       </p>
                       <p className="text-muted-foreground text-xs">
                         Runtime snapshot {status.runtimeSnapshotId}
                       </p>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={projectLink} target="_blank" rel="noreferrer">
-                        Open Vercel project <ExternalLink className="ml-2 size-3.5" />
-                      </Link>
-                    </Button>
+                    {projectLink && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={projectLink} target="_blank" rel="noreferrer">
+                          Open Vercel project <ExternalLink className="ml-2 size-3.5" />
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 ) : status.setupStatus === 'failed' ? (
                   <Alert variant="destructive">

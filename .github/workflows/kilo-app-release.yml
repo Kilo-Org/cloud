@@ -3,8 +3,9 @@ name: kilo-app Release
 on:
   push:
     branches: [main]
-    # kilo-app and its direct workspace:* inputs. Keep this list and the
-    # check-changes git diff below in step.
+    # kilo-app and its direct workspace:* inputs. No pnpm-lock.yaml: an
+    # unrelated bump elsewhere in the monorepo must not submit a build. A bump
+    # of an app dependency also edits apps/mobile/package.json, which is here.
     paths:
       - 'apps/mobile/**'
       - 'packages/trpc/**'
@@ -14,7 +15,6 @@ on:
       - 'packages/event-service/**'
       - 'packages/notifications/**'
       - 'packages/cloud-agent-sdk/**'
-      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 # cancel-in-progress: false lets a running release finish. GitHub keeps one run

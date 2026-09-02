@@ -1,5 +1,11 @@
 import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, type ScrollViewProps, View } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  PixelRatio,
+  ScrollView,
+  type ScrollViewProps,
+  View,
+} from 'react-native';
 
 import { useStateSurface } from '@/components/centered-state-surface';
 import { getCenteredStateLayout, type StateFrame } from '@/lib/centered-state-layout';
@@ -74,7 +80,7 @@ export function CenteredState({
   }, [measure]);
 
   const measureContent = useCallback((event: LayoutChangeEvent) => {
-    setContentHeight(event.nativeEvent.layout.height);
+    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
   const layout = useMemo(
     () =>
@@ -91,7 +97,14 @@ export function CenteredState({
         : undefined,
     [surface, viewport, contentHeight]
   );
-  const contentStyle = useMemo(() => ({ flexGrow: 1, ...layout }), [layout]);
+  const contentStyle = useMemo(
+    () => ({
+      flexGrow: 1,
+      ...layout,
+      paddingTop: layout ? PixelRatio.roundToNearestPixel(layout.paddingTop) : undefined,
+    }),
+    [layout]
+  );
   const ready = layout !== undefined;
 
   if (!surface) {

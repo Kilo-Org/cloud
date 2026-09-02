@@ -48,6 +48,7 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
+  PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;

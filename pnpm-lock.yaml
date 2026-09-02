@@ -1056,9 +1056,6 @@ importers:
       dayjs:
         specifier: 1.11.20
         version: 1.11.20
-      discord-api-types:
-        specifier: 0.38.47
-        version: 0.38.47
       discord-interactions:
         specifier: 4.4.0
         version: 4.4.0
@@ -11963,9 +11960,6 @@ packages:
 
   discord-api-types@0.38.42:
     resolution: {integrity: sha512-qs1kya7S84r5RR8m9kgttywGrmmoHaRifU1askAoi+wkoSefLpZP6aGXusjNw5b0jD3zOg3LTwUa3Tf2iHIceQ==}
-
-  discord-api-types@0.38.47:
-    resolution: {integrity: sha512-XgXQodHQBAE6kfD7kMvVo30863iHX1LHSqNq6MGUTDwIFCCvHva13+rwxyxVXDqudyApMNAd32PGjgVETi5rjA==}
 
   discord-interactions@4.4.0:
     resolution: {integrity: sha512-jjJx8iwAeJcj8oEauV43fue9lNqkf38fy60aSs2+G8D1nJmDxUIrk08o3h0F3wgwuBWWJUZO+X/VgfXsxpCiJA==}
@@ -29320,8 +29314,6 @@ snapshots:
   dijkstrajs@1.0.3: {}
 
   discord-api-types@0.38.42: {}
-
-  discord-api-types@0.38.47: {}
 
   discord-interactions@4.4.0: {}
 

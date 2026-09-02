@@ -3,8 +3,18 @@ name: kilo-app Release
 on:
   push:
     branches: [main]
+    # kilo-app and its direct workspace:* inputs. Keep this list and the
+    # check-changes git diff below in step.
     paths:
       - 'apps/mobile/**'
+      - 'packages/trpc/**'
+      - 'packages/app-shared/**'
+      - 'packages/kilo-chat/**'
+      - 'packages/kilo-chat-hooks/**'
+      - 'packages/event-service/**'
+      - 'packages/notifications/**'
+      - 'packages/cloud-agent-sdk/**'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 # cancel-in-progress: false lets a running release finish. GitHub keeps one run

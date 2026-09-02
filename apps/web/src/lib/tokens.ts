@@ -3,6 +3,8 @@ import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { isKiloResourceAudienceAllowed } from '@kilocode/worker-utils/kilo-token-policy';
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
@@ -128,7 +130,10 @@ function tryJwtVerify(token: string) {
   }
 }
 
-export function validateAuthorizationHeader(headers: Headers) {
+export function validateAuthorizationHeader(
+  headers: Headers,
+  options?: { expectedAudience?: string }
+) {
   const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
@@ -140,6 +145,16 @@ export function validateAuthorizationHeader(headers: Headers) {
   const payload = tryJwtVerify(token);
 
   if (!payload) {
+    warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+    return { error: `Invalid token (${traceability_logging_id})` };
+  }
+
+  if (
+    !isKiloResourceAudienceAllowed(payload.aud, {
+      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    })
+  ) {
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return { error: `Invalid token (${traceability_logging_id})` };
   }

@@ -17,6 +17,8 @@ export type GlanceableSinkContext = {
 
 export type GlanceableSink = {
   publish(snapshot: GlanceableAgentsSnapshot): void;
+  /** Owns native terminal dismissal; await submission, never schedule a later JS end. */
+  waitForNativeTerminal?(): Promise<void>;
   endImmediate(): void;
   startOrUpdate(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void;
 };

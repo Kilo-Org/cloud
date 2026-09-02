@@ -91,14 +91,18 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: mocks.deleteItemAsync,
 }));
 
-vi.mock('expo-widgets', () => ({
-  addPushToStartTokenListener: (
-    listener: (event: { activityPushToStartToken: string }) => void
-  ) => {
-    mocks.startTokenListeners.add(listener);
-    return { remove: () => mocks.startTokenListeners.delete(listener) };
-  },
-}));
+vi.mock('expo-widgets', async () => {
+  const { after } = await import('expo-widgets/src/Widgets');
+  return {
+    after,
+    addPushToStartTokenListener: (
+      listener: (event: { activityPushToStartToken: string }) => void
+    ) => {
+      mocks.startTokenListeners.add(listener);
+      return { remove: () => mocks.startTokenListeners.delete(listener) };
+    },
+  };
+});
 
 vi.mock('expo-widgets/src/ExpoWidgets', () => ({
   default: {
@@ -115,7 +119,9 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', async () => {
   // Keep the real expo-widgets wrapper between the sink and the native handles.
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
-    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => null),
+    ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
+      banner: null,
+    })),
   };
 });
 vi.mock('@/glanceable-ios/active-agents-widget', () => ({
@@ -938,9 +944,18 @@ describe('setupNotificationBackgroundHandler', () => {
 describe('cold iOS background delivery', () => {
   const rows = new Map<string, { kind: string; organizationId: string | null }>();
   const native = {
+    id: 'remote-activity',
     exists: true,
     token: null as string | null,
     tokenRead: null as Promise<void> | null,
+    updateRead: null as Promise<void> | null,
+    endRead: null as Promise<void> | null,
+    endError: null as Error | null,
+    infoError: null as Error | null,
+    dismissAt: null as number | null,
+    props: null as string | null,
+    contentDate: null as number | null,
+    policies: [] as string[],
     observers: new Set<(token: string) => void>(),
   };
 
@@ -954,12 +969,13 @@ describe('cold iOS background delivery', () => {
   async function loadColdBackground() {
     vi.resetModules();
     await import('@/lib/glanceable/delivery-registration');
-    const [notifications, registry, persist, sink, cleanup] = await Promise.all([
+    const [notifications, registry, persist, sink, cleanup, blank] = await Promise.all([
       import('./notifications'),
       import('@/lib/glanceable/sink-registry'),
       import('@/lib/glanceable/persist'),
       import('@/glanceable-ios/ios-sink'),
       import('@/lib/auth/logout-cleanup'),
+      import('@/lib/glanceable/cleanup'),
     ]);
     persist._setSecureStoreForTests(secureStoreMock);
     for (const listener of mocks.startTokenListeners) {
@@ -977,6 +993,8 @@ describe('cold iOS background delivery', () => {
     }) => Promise<number>;
     return {
       cleanup,
+      blank,
+      sink,
       deliver: async (overrides: Partial<GlanceableAgentsSnapshot>) => {
         const result = await executor({
           data: {
@@ -1035,26 +1053,51 @@ describe('cold iOS background delivery', () => {
       rows.delete(token);
       return { success: true };
     });
+    native.id = 'remote-activity';
     native.exists = true;
     native.token = null;
     native.tokenRead = null;
+    native.updateRead = null;
+    native.endRead = null;
+    native.endError = null;
+    native.infoError = null;
+    native.dismissAt = null;
+    native.props = null;
+    native.contentDate = null;
+    native.policies = [];
     native.observers.clear();
-    mocks.nativeInstances.mockImplementation(() => {
-      if (!native.exists) {
+    mocks.nativeInstances.mockImplementation((includeEnded = false) => {
+      if (
+        !native.exists &&
+        (!includeEnded || native.dismissAt === null || native.dismissAt <= Date.now())
+      ) {
         return [];
       }
+      const id = native.id;
+      const isDismissed = () =>
+        id !== native.id ||
+        (!native.exists && (native.dismissAt === null || native.dismissAt <= Date.now()));
       const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
-      // Model the patched native factory: adoption starts observation on this handle.
+      // Model native adoption and retained end handles; the JS adapter remains real.
       native.observers.add(token => {
         for (const listener of listeners) {
-          listener({ activityId: 'remote-activity', pushToken: token });
+          listener({ activityId: id, pushToken: token });
         }
       });
       return [
         {
+          getInfo: () => {
+            if (native.infoError !== null) {
+              throw native.infoError;
+            }
+            if (isDismissed()) {
+              return { id, state: 'dismissed' };
+            }
+            return { id, state: native.exists ? 'active' : 'ended' };
+          },
           getPushToken: async () => {
             await native.tokenRead;
-            if (!native.exists) {
+            if (!native.exists || id !== native.id) {
               throw new Error('Activity no longer exists');
             }
             return native.token;
@@ -1069,13 +1112,29 @@ describe('cold iOS background delivery', () => {
             listeners.add(listener);
             return { remove: () => listeners.delete(listener) };
           },
-          update: async () => {
-            await Promise.resolve();
+          update: async (props: string) => {
+            await native.updateRead;
+            if (!isDismissed()) {
+              native.props = props;
+            }
           },
-          end: async () => {
+          // eslint-disable-next-line max-params -- match the installed expo-widgets native end contract
+          end: async (policy: string, afterDate?: number, props?: string, contentDate?: number) => {
+            await native.endRead;
+            if (isDismissed()) {
+              throw Object.assign(new Error('Live Activity not found'), {
+                code: 'ERR_LIVE_ACTIVITY_NOT_FOUND',
+              });
+            }
+            if (native.endError !== null) {
+              throw native.endError;
+            }
             native.exists = false;
+            native.dismissAt = policy === 'after' ? (afterDate ?? null) : Date.now();
+            native.props = props ?? null;
+            native.contentDate = contentDate ?? null;
+            native.policies.push(policy);
             native.observers.clear();
-            await Promise.resolve();
           },
         },
       ];
@@ -1087,6 +1146,100 @@ describe('cold iOS background delivery', () => {
     vi.clearAllTimers();
     vi.useRealTimers();
   });
+
+  it.each(['dismissed', 'missing'] as const)(
+    'completes fresh background terminal work after a %s target during a pending update',
+    async absence => {
+      const update = deferred();
+      native.updateRead = update.promise;
+      const background = await loadColdBackground();
+      expect(await background.deliver({ running: 2 })).toBe(0);
+      const applying = background.deliver({
+        updatedAt: '2026-01-02T00:00:01.000Z',
+        status: 'empty',
+        running: 0,
+        eligibleStartedAt: null,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(native.policies).toEqual([]);
+
+      native.exists = false;
+      native.dismissAt = absence === 'dismissed' ? Date.now() : null;
+      update.resolve();
+      const earlierResults = await Promise.allSettled([applying]);
+
+      native.id = 'fresh-activity';
+      native.exists = true;
+      native.dismissAt = null;
+      native.updateRead = null;
+      expect(await background.deliver({ updatedAt: '2026-01-02T00:00:02.000Z', running: 3 })).toBe(
+        0
+      );
+      expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'happy', running: 3 });
+      await expect(
+        background.deliver({
+          updatedAt: '2026-01-02T00:00:03.000Z',
+          status: 'empty',
+          running: 0,
+          eligibleStartedAt: null,
+        })
+      ).resolves.toBe(0);
+
+      expect(native.exists).toBe(false);
+      expect(native.policies).toEqual(['after']);
+      expect(native.dismissAt).toBe(Date.now() + 8000);
+      expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'empty', running: 0 });
+      expect(earlierResults).toEqual([{ status: 'fulfilled', value: 0 }]);
+    }
+  );
+
+  it.each(['active', 'ended', 'unavailable'] as const)(
+    'rejects and retries a native end failure when the target state is %s',
+    async state => {
+      const background = await loadColdBackground();
+      expect(await background.deliver({ running: 2 })).toBe(0);
+      const end = deferred();
+      native.endRead = end.promise;
+      native.endError = new Error('Native end temporarily unavailable');
+      const applying = background.deliver({
+        updatedAt: '2026-01-02T00:00:01.000Z',
+        status: 'empty',
+        running: 0,
+        eligibleStartedAt: null,
+      });
+      const rejected = expect(applying).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(0);
+      background.sink.iosSink.endImmediate();
+      if (state === 'ended') {
+        native.exists = false;
+        native.dismissAt = Date.now() + 8000;
+      }
+      if (state === 'unavailable') {
+        native.infoError = new Error('Native state temporarily unavailable');
+      }
+      end.resolve();
+      await rejected;
+      expect(native.policies).toEqual([]);
+      expect(JSON.parse(native.props ?? '{}')).toMatchObject({ running: 2 });
+
+      native.endError = null;
+      native.infoError = null;
+      native.endRead = null;
+      // Remotely ended content is absent from eligible discovery, but still needs cleanup.
+      native.exists = false;
+      native.dismissAt = Date.now() + 8000;
+      await expect(
+        background.deliver({
+          updatedAt: '2026-01-02T00:00:02.000Z',
+          status: 'empty',
+          running: 0,
+          eligibleStartedAt: null,
+        })
+      ).resolves.toBe(0);
+      expect(native.policies).toEqual(['immediate']);
+      expect(native.dismissAt).toBe(Date.now());
+    }
+  );
 
   it('registers late and rotated tokens from an adopted native handle through the real widget wrapper', async () => {
     const background = await loadColdBackground();
@@ -1125,13 +1278,14 @@ describe('cold iOS background delivery', () => {
       return { success: true };
     });
     const background = await loadColdBackground();
-    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
-      0
-    );
+    const applying = background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null });
+    await vi.advanceTimersByTimeAsync(0);
     expect(native.exists).toBe(true);
     read.resolve();
-    await vi.advanceTimersByTimeAsync(0);
+    expect(await applying).toBe(0);
     expect(native.exists).toBe(false);
+    expect(native.policies).toEqual(['after']);
+    expect(native.dismissAt).toBe(Date.now() + 8000);
     expect(rows.has('ended-activity-token')).toBe(true);
 
     deletion.resolve();
@@ -1140,6 +1294,77 @@ describe('cold iOS background delivery', () => {
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
     expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+  });
+
+  it('waits for the real adapter to submit the native deadline before background completion', async () => {
+    vi.setSystemTime(Date.parse('2026-01-02T00:00:00.000Z'));
+    const end = deferred();
+    native.endRead = end.promise;
+    const background = await loadColdBackground();
+    let completed = false;
+    const apply = async () => {
+      const result = await background.deliver({
+        status: 'empty',
+        running: 0,
+        eligibleStartedAt: null,
+      });
+      completed = true;
+      return result;
+    };
+    const applying = apply();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(completed).toBe(false);
+    expect(native.policies).toEqual([]);
+
+    end.resolve();
+    expect(await applying).toBe(0);
+    expect(native.policies).toEqual(['after']);
+    expect(native.dismissAt).toBe(Date.parse('2026-01-02T00:00:08.000Z'));
+    expect(native.contentDate).toBe(Date.parse('2026-01-02T00:00:00.000Z'));
+    expect(JSON.parse(native.props ?? '{}')).toEqual({
+      status: 'empty',
+      running: 0,
+      needsInput: 0,
+      reconnecting: 0,
+      eligibleStartedAt: null,
+    });
+    expect(rows.has('scope-token')).toBe(true);
+  });
+
+  it('immediately dismisses an ended adopted handle and rejects old-scope work after privacy', async () => {
+    const background = await loadColdBackground();
+    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
+      0
+    );
+    expect(native.dismissAt).toBe(Date.now() + 8000);
+    background.blank.writePrivacySnapshotAndEnd();
+    await background.sink.iosSink.waitForNativeTerminal?.();
+    await background.cleanup.awaitActivityCleanupSettled();
+
+    expect(native.policies).toEqual(['after', 'immediate']);
+    expect(native.dismissAt).toBe(Date.now());
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'privacy', running: 0 });
+    emitNativeToken('late-old-token');
+    expect(await background.deliver({ running: 7 })).toBe(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rows.size).toBe(0);
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'privacy', running: 0 });
+  });
+
+  it('orders privacy after an already-submitted terminal end without restoring terminal content', async () => {
+    const end = deferred();
+    native.endRead = end.promise;
+    const background = await loadColdBackground();
+    const applying = background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null });
+    await vi.advanceTimersByTimeAsync(0);
+    background.blank.writeSignedOutSnapshotAndEnd();
+    end.resolve();
+    expect(await applying).toBe(0);
+    await background.sink.iosSink.waitForNativeTerminal?.();
+
+    expect(native.policies).toEqual(['after', 'immediate']);
+    expect(native.dismissAt).toBe(Date.now());
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'signed_out', running: 0 });
   });
 
   it('tombstones only the failed cold idle token after native discovery disappears', async () => {

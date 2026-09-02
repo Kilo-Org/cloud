@@ -251,7 +251,9 @@ export class GlanceablePublisher {
       this.terminalTimer = null;
       this.activityStarted = false;
       for (const sink of this.sinks) {
-        sink.endImmediate();
+        if (!sink.waitForNativeTerminal) {
+          sink.endImmediate();
+        }
       }
     }, this.terminalMs);
   }

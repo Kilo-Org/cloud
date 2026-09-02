@@ -70,11 +70,9 @@ export function parseNotificationData(data: unknown): PushData | null {
   return parsed.success ? parsed.data : null;
 }
 
-// Pending 8 s terminal end for a non-eligible remote snapshot. Mirrors the
-// in-app publisher's terminal window: publish the empty counts, then end the
-// Live Activity / Android ongoing after GLANCEABLE_TERMINAL_MS. A newer
-// eligible snapshot cancels it, and the terminal-blank epoch gate skips a
-// stale end after a logout/org switch already ended the surface.
+// Fallback terminal end for sinks without a native terminal contract.
+// Native sinks submit dismissal during publish and never receive this later end.
+// A newer eligible snapshot or terminal-blank epoch cancels the fallback.
 let glanceableTerminalTimer: ReturnType<typeof setTimeout> | null = null;
 
 function cancelGlanceableTerminalEnd(): void {
@@ -102,7 +100,9 @@ function scheduleGlanceableTerminalEnd(): void {
       return;
     }
     for (const sink of getGlanceableSinks()) {
-      sink.endImmediate();
+      if (!sink.waitForNativeTerminal) {
+        sink.endImmediate();
+      }
     }
   }, GLANCEABLE_TERMINAL_MS);
 }
@@ -164,7 +164,8 @@ export async function applyGlanceablePushData(
   };
 
   const ctx = { userId, organizationId };
-  if (isEligibleGlanceableWork(snapshot)) {
+  const eligible = isEligibleGlanceableWork(snapshot);
+  if (eligible) {
     cancelGlanceableTerminalEnd();
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
@@ -174,10 +175,16 @@ export async function applyGlanceablePushData(
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
     }
-    // A remote snapshot with no eligible work must end the Live Activity and
-    // the Android ongoing after the terminal window; widgets keep the last
-    // published counts (their endImmediate is a no-op).
+    // Native sinks already submitted their terminal work during publish.
+    // Keep the existing fallback for other sinks; widgets retain their timeline.
     scheduleGlanceableTerminalEnd();
+  }
+  // Do not finish a background task before ActivityKit accepts the native end.
+  // All publication happens before this await, so it cannot restore an old scope.
+  if (!eligible) {
+    await Promise.all(
+      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
+    );
   }
   return true;
 }

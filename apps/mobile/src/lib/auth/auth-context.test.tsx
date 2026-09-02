@@ -203,19 +203,13 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
 
-const {
-  clearKeepScreenOnPreference,
-  clearReasoningPreference,
-  clearPrReviewFooterPreference,
-  clearGlanceablePreference,
-} = vi.hoisted(() => ({
-  clearKeepScreenOnPreference: vi.fn(),
-  clearReasoningPreference: vi.fn(),
-  clearPrReviewFooterPreference: vi.fn(),
-  clearGlanceablePreference: vi.fn(),
-}));
+const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
+  vi.hoisted(() => ({
+    clearKeepScreenOnPreference: vi.fn(),
+    clearReasoningPreference: vi.fn(),
+    clearPrReviewFooterPreference: vi.fn(),
+  }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
-vi.mock('@/lib/hooks/use-glanceable-preference', () => ({ clearGlanceablePreference }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
@@ -569,7 +563,6 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
-    expect(clearGlanceablePreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
   });

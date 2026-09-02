@@ -69,7 +69,7 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     running: 0,
     needsInput: 0,
     idle: 0,
-    eligibleStartedAt: null,
+    needsInputSince: null,
   };
 }
 

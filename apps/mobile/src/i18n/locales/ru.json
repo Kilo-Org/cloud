@@ -144,7 +144,6 @@
     "autoExpandThinkingSubtitle": "Показывать мышление агента раскрытым по завершении.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
     "keepScreenOnSubtitle": "Держать экран включенным, пока сеанс работает.",
-    "activeAgentsSubtitle": "Показывать количество агентов в виджетах и на экране блокировки.",
     "appearance": "Внешний вид",
     "notifications": "Уведомления",
     "notificationsSubtitle": "Настройки push-уведомлений",

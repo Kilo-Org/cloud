@@ -146,7 +146,6 @@
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
     "keepScreenOn": "Keep screen on while on session page",
     "keepScreenOnSubtitle": "Hold the screen awake while the session is working.",
-    "activeAgentsSubtitle": "Show agent counts on your widgets and Lock Screen.",
     "appearance": "Appearance",
     "notifications": "Notifications",
     "notificationsSubtitle": "Push preferences",

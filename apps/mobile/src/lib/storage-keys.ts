@@ -38,7 +38,6 @@ export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
  * Android ongoing). Off blanks every surface and unregisters its push tokens. */
-export const GLANCEABLE_ENABLED_KEY = 'glanceable-surfaces-enabled';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**

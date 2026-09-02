@@ -634,6 +634,9 @@ importers:
       '@kilocode/kilo-chat-hooks':
         injected: true
     devDependencies:
+      '@expo/plist':
+        specifier: 0.8.1
+        version: 0.8.1
       '@sentry/cli':
         specifier: 'catalog:'
         version: 3.6.2

@@ -20,11 +20,7 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
-import {
-  ACTIVE_USER_ID_KEY,
-  GLANCEABLE_ENABLED_KEY,
-  ORGANIZATION_STORAGE_KEY,
-} from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -432,7 +428,7 @@ function glanceableSnapshot(
     running: 1,
     needsInput: 0,
     idle: 0,
-    eligibleStartedAt: '2026-01-01T00:00:00.000Z',
+    needsInputSince: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -549,28 +545,6 @@ describe('applyGlanceablePushData', () => {
     unregisterGlanceableSink(sink);
   });
 
-  it('drops a remote snapshot while the Active Agents switch is off', async () => {
-    mocks.getItemAsync.mockImplementation((key: string) => {
-      if (key === GLANCEABLE_ENABLED_KEY) {
-        return 'false';
-      }
-      return key === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9';
-    });
-    _setLastGlanceableSnapshotForTests(glanceableSnapshot({ scopeKey: SCOPE_KEY, revision: 1 }));
-    const sink = makeFakeSink();
-    registerGlanceableSink(sink);
-
-    const result = await applyGlanceablePushData(
-      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-03T00:00:00.000Z' })
-    );
-
-    expect(result).toBe(false);
-    expect(sink.publish).not.toHaveBeenCalled();
-    expect(sink.startOrUpdate).not.toHaveBeenCalled();
-
-    unregisterGlanceableSink(sink);
-  });
-
   it('applies a newer remote snapshot and re-registers under the selected organization', async () => {
     _setLastGlanceableSnapshotForTests(
       glanceableSnapshot({
@@ -621,7 +595,7 @@ describe('applyGlanceablePushData', () => {
         running: 0,
         needsInput: 0,
         idle: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       })
     );
 
@@ -643,7 +617,7 @@ describe('applyGlanceablePushData', () => {
         running: 0,
         needsInput: 0,
         idle: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       })
     );
 
@@ -673,7 +647,7 @@ describe('applyGlanceablePushData', () => {
         running: 0,
         needsInput: 0,
         idle: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       })
     );
     await applyGlanceablePushData(
@@ -860,7 +834,7 @@ describe('glanceable publication storage fences', () => {
               updatedAt: '2026-01-02T00:00:00.000Z',
               running,
               status: running === 0 ? 'empty' : 'happy',
-              eligibleStartedAt: running === 0 ? null : '2026-01-01T00:00:00.000Z',
+              needsInputSince: running === 0 ? null : '2026-01-01T00:00:00.000Z',
             })
           );
           await read.started;
@@ -1235,7 +1209,7 @@ describe('cold iOS background delivery', () => {
         updatedAt: '2026-01-02T00:00:01.000Z',
         status: 'empty',
         running: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       });
       await vi.advanceTimersByTimeAsync(0);
       expect(native.policies).toEqual([]);
@@ -1258,7 +1232,7 @@ describe('cold iOS background delivery', () => {
           updatedAt: '2026-01-02T00:00:03.000Z',
           status: 'empty',
           running: 0,
-          eligibleStartedAt: null,
+          needsInputSince: null,
         })
       ).resolves.toBe(0);
 
@@ -1282,7 +1256,7 @@ describe('cold iOS background delivery', () => {
         updatedAt: '2026-01-02T00:00:01.000Z',
         status: 'empty',
         running: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       });
       const rejected = expect(applying).rejects.toThrow();
       await vi.advanceTimersByTimeAsync(0);
@@ -1310,7 +1284,7 @@ describe('cold iOS background delivery', () => {
           updatedAt: '2026-01-02T00:00:02.000Z',
           status: 'empty',
           running: 0,
-          eligibleStartedAt: null,
+          needsInputSince: null,
         })
       ).resolves.toBe(0);
       expect(native.policies).toEqual(['immediate']);
@@ -1355,7 +1329,7 @@ describe('cold iOS background delivery', () => {
       return { success: true };
     });
     const background = await loadColdBackground();
-    const applying = background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null });
+    const applying = background.deliver({ status: 'empty', running: 0, needsInputSince: null });
     await vi.advanceTimersByTimeAsync(0);
     expect(native.exists).toBe(true);
     read.resolve();
@@ -1383,7 +1357,7 @@ describe('cold iOS background delivery', () => {
       const result = await background.deliver({
         status: 'empty',
         running: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       });
       completed = true;
       return result;
@@ -1403,14 +1377,14 @@ describe('cold iOS background delivery', () => {
       running: 0,
       needsInput: 0,
       idle: 0,
-      eligibleStartedAt: null,
+      needsInputSince: null,
     });
     expect(rows.has('scope-token')).toBe(true);
   });
 
   it('immediately dismisses an ended adopted handle and rejects old-scope work after privacy', async () => {
     const background = await loadColdBackground();
-    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
+    expect(await background.deliver({ status: 'empty', running: 0, needsInputSince: null })).toBe(
       0
     );
     expect(native.dismissAt).toBe(Date.now() + 8000);
@@ -1432,7 +1406,7 @@ describe('cold iOS background delivery', () => {
     const end = deferred();
     native.endRead = end.promise;
     const background = await loadColdBackground();
-    const applying = background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null });
+    const applying = background.deliver({ status: 'empty', running: 0, needsInputSince: null });
     await vi.advanceTimersByTimeAsync(0);
     background.blank.writeSignedOutSnapshotAndEnd();
     end.resolve();
@@ -1449,7 +1423,7 @@ describe('cold iOS background delivery', () => {
     rows.set(native.token, { kind: 'ios_activity', organizationId: 'org-9' });
     mocks.unregisterActivityToken.mockRejectedValueOnce(new Error('network unavailable'));
     const background = await loadColdBackground();
-    expect(await background.deliver({ status: 'empty', running: 0, eligibleStartedAt: null })).toBe(
+    expect(await background.deliver({ status: 'empty', running: 0, needsInputSince: null })).toBe(
       0
     );
     await background.cleanup.awaitActivityCleanupSettled();

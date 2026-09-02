@@ -10,7 +10,6 @@ import { clearActivityKitDeniedIfAvailable, getActivityKitDenied } from '@/glanc
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
-import { readGlanceableEnabled } from '@/lib/glanceable/enabled';
 import { forEachSink } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
@@ -23,15 +22,11 @@ import { i18n } from '@/i18n';
 
 let alertShown = false;
 
-export async function showActivityKitDisabledAlertOnce(): Promise<void> {
+export function showActivityKitDisabledAlertOnce(): void {
   if (Platform.OS !== 'ios' || alertShown) {
     return;
   }
   if (!getActivityKitDenied()) {
-    return;
-  }
-  // Never ask for an OS permission the user turned the feature off for.
-  if (!(await readGlanceableEnabled())) {
     return;
   }
   alertShown = true;
@@ -52,9 +47,6 @@ export async function showActivityKitDisabledAlertOnce(): Promise<void> {
  */
 export async function recoverGlanceableActivityKit(): Promise<void> {
   if (Platform.OS !== 'ios' || !getActivityKitDenied()) {
-    return;
-  }
-  if (!(await readGlanceableEnabled())) {
     return;
   }
   const authEpoch = currentAuthEpoch();

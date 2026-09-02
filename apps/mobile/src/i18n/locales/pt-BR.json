@@ -2256,7 +2256,6 @@
     "autoExpandThinkingSubtitle": "Mostrar o raciocínio do agente expandido quando ele terminar.",
     "keepScreenOn": "Manter a tela ligada na página da sessão",
     "keepScreenOnSubtitle": "Mantenha a tela ativa enquanto a sessão trabalha.",
-    "activeAgentsSubtitle": "Mostre a contagem de agentes nos widgets e na tela de bloqueio.",
     "appearance": "Aparência",
     "notifications": "Notificações",
     "notificationsSubtitle": "Preferências de push",

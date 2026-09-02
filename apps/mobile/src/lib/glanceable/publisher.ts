@@ -5,6 +5,7 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   type GlanceableAgentsSnapshotStatus,
+  type GlanceableSessionRow,
   isEligibleGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -60,7 +61,7 @@ export function withStatus(
       ...snapshot,
       revision: snapshot.revision + 1,
       status: expired ? 'expired' : 'stale',
-      ...(expired ? { running: 0, needsInput: 0, idle: 0, eligibleStartedAt: null } : {}),
+      ...(expired ? { running: 0, needsInput: 0, idle: 0, needsInputSince: null } : {}),
     };
   }
   const updatedAt = new Date(now).toISOString();
@@ -101,7 +102,7 @@ export class GlanceablePublisher {
   }
 
   /** Cache success: derive the next snapshot from the current session rows. */
-  handleSessions(sessions: readonly { status: string }[], ctx: GlanceablePublisherContext): void {
+  handleSessions(sessions: readonly GlanceableSessionRow[], ctx: GlanceablePublisherContext): void {
     if (this.isGated()) {
       return;
     }
@@ -115,7 +116,6 @@ export class GlanceablePublisher {
       organizationId: ctx.organizationId,
       now,
       previousRevision: this.current?.revision ?? 0,
-      previousEligibleStartedAt: this.current?.eligibleStartedAt ?? null,
     });
 
     if (isEligibleGlanceableWork(snapshot)) {

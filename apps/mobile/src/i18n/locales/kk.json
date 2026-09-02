@@ -144,7 +144,6 @@
     "autoExpandThinkingSubtitle": "Агент аяқтағанда оның ойлауын ашылған күйде көрсету.",
     "keepScreenOn": "Сессия бетінде экранды қосулы ұстау",
     "keepScreenOnSubtitle": "Сессия жұмыс істеп тұрғанда экранды ояу ұстау.",
-    "activeAgentsSubtitle": "Агент сандарын виджеттерде және құлып экранында көрсету.",
     "appearance": "Көрініс",
     "notifications": "Хабарландырулар",
     "notificationsSubtitle": "Push параметрлері",

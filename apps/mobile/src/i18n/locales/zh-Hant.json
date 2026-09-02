@@ -144,7 +144,6 @@
     "autoExpandThinkingSubtitle": "代理完成時，以展開狀態顯示其思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕開啟",
     "keepScreenOnSubtitle": "工作階段運作時保持螢幕喚醒。",
-    "activeAgentsSubtitle": "在小工具與鎖定畫面上顯示代理程式數量。",
     "appearance": "外觀",
     "notifications": "通知",
     "notificationsSubtitle": "推播偏好設定",

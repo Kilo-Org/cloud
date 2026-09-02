@@ -259,6 +259,11 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Declares the app's languages on the widget extension, which expo-widgets
+    // leaves English-only. This must be registered BEFORE 'expo-widgets':
+    // dangerous mods run in reverse registration order, so the earlier entry
+    // runs last and sees the Info.plist expo-widgets has already written.
+    ['./plugins/withWidgetLocalizations', { languages: [...SUPPORTED_LANGUAGES] }],
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
@@ -272,12 +277,15 @@ const config: ExpoConfig = {
           {
             name: 'ActiveAgentsWidget',
             displayName: 'Active Agents',
-            description: 'Agents that need input, are working, or are idle',
+            description: 'Your agents at a glance: needs input, working, idle',
             contentMarginsDisabled: false,
+            // Home Screen: the small square and the medium row. `systemLarge`
+            // is deliberately absent — three counts cannot fill a card that
+            // tall, and the whitespace read as an unfinished widget. Add it
+            // back only with a layout that earns the extra area.
             supportedFamilies: [
               'systemSmall',
               'systemMedium',
-              'systemLarge',
               'accessoryCircular',
               'accessoryRectangular',
               'accessoryInline',

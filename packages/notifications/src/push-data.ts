@@ -94,7 +94,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     idle: z.number().int().min(0),
     updatedAt: z.string(),
     expiresAt: z.string(),
-    eligibleStartedAt: z.string().nullable(),
+    needsInputSince: z.string().nullable(),
   }),
 ]);
 
@@ -102,12 +102,12 @@ export type PushData = z.infer<typeof pushDataSchema>;
 
 /**
  * The raw content-state the Active Agents Live Activity renders. The server
- * pushes exactly this shape (counts + status + the safe eligible-start
+ * pushes exactly this shape (counts + status + the safe needs-input wait
  * timestamp) and the widget extension renders it directly with inlined English
  * copy. It must never carry a title, session id, repository name, organization
  * name, generated text, or a raw account id.
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
-  'status' | 'running' | 'needsInput' | 'idle' | 'eligibleStartedAt'
+  'status' | 'running' | 'needsInput' | 'idle' | 'needsInputSince'
 >;

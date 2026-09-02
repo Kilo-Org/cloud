@@ -153,7 +153,6 @@ function setup(options: { beforeCommit?: () => Promise<void>; refreshError?: Err
                   sessions,
                   now: Date.now(),
                   previousRevision: prior?.revision,
-                  previousEligibleStartedAt: prior?.eligibleStartedAt,
                 });
                 previous.set(organizationId, snapshot);
                 return { type: 'active_agents_glanceable', ...snapshot };
@@ -273,12 +272,12 @@ describe('committed cloud eligibility refresh', () => {
           running: status === 'busy' ? 1 : 0,
           needsInput: status === 'retry' ? 1 : 0,
         },
-        { status: 'empty', running: 0, needsInput: 0, idle: 0, eligibleStartedAt: null },
+        { status: 'empty', running: 0, needsInput: 0, idle: 0, needsInputSince: null },
       ]);
     }
   );
 
-  it('retains the eligible interval when nonterminal retry work refreshes', async () => {
+  it('reports the wait only once nonterminal retry work needs input', async () => {
     fixture = setup();
     await fixture.seed();
     await fixture.consume();
@@ -288,9 +287,11 @@ describe('committed cloud eligibility refresh', () => {
       .set({ status: 'retry', updated_at: new Date().toISOString() })
       .where(eq(cli_sessions_v2.session_id, cliSessionId));
     await fixture.consume();
+    // The wait reaches the wire from the row's own `status_updated_at`, so
+    // running work carries none and the retry carries the seeded timestamp.
     expect(fixture.messages.map(message => message.data)).toMatchObject([
-      { running: 1, eligibleStartedAt: occurredAt },
-      { running: 0, needsInput: 1, eligibleStartedAt: occurredAt },
+      { running: 1, needsInputSince: null },
+      { running: 0, needsInput: 1, needsInputSince: occurredAt },
     ]);
   });
 

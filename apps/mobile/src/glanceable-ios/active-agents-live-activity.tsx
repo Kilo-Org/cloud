@@ -2,12 +2,16 @@ import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
+  allowsTightening,
   cornerRadius,
+  environment,
   font,
   foregroundStyle,
   frame,
+  layoutPriority,
+  lineLimit,
+  minimumScaleFactor,
   monospacedDigit,
-  multilineTextAlignment,
   padding,
   resizable,
 } from '@expo/ui/swift-ui/modifiers';
@@ -16,6 +20,7 @@ import { PlatformColor } from 'react-native';
 
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
+import { withGlanceableCopy } from './layout-copy';
 import { withWidgetLogo } from './widget-logo';
 
 /* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
@@ -24,66 +29,75 @@ import { withWidgetLogo } from './widget-logo';
 // stringifies it and the watcher extension re-evaluates the source. Everything
 // it references must be a watcher global (`Text`, `VStack`, the modifiers,
 // `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n from here.
-// The server pushes raw counts + status (it cannot translate), and the
-// foreground app passes the same raw shape, so the inlined English copy below
-// is the single producer of the displayed Live Activity copy.
 //
-// The one value resolved after stringification is the `__KILO_WIDGET_LOGO_URI__`
-// literal below: `withWidgetLogo` swaps it for the app-group path of the mark.
+// Two values are resolved after stringification, both from literals below:
+// `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__` for the app-group path of
+// the mark, and `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the
+// translated copy. The copy is baked in rather than passed through the content
+// state because the notifications Worker pushes the same raw shape and knows
+// no locale.
 
 type ContentState = Partial<GlanceableLiveActivityContentState>;
 
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component — the same
 // shape `expo-widgets` casts internally.
-const layout: LiveActivityComponent<ContentState> = (props, environment) => {
+const layout: LiveActivityComponent<ContentState> = props => {
   'widget';
 
-  const dark = environment.colorScheme === 'dark';
+  // The literal, not the imported constant: the widget transform stringifies
+  // this function's source, so an imported binding would be an undefined
+  // global in the widget process. `withGlanceableCopy` replaces the token,
+  // quotes included, with the translated copy as a JSON source literal.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
+  const copySource: string = '__KILO_GLANCEABLE_COPY__';
+  const COPY = JSON.parse(copySource) as Record<string, string>;
+  // The tag SwiftUI formats the relative wait with; English when the bake is
+  // somehow missing it, which is what the widget process would have used anyway.
+  const locale = COPY.locale ?? 'en';
 
   const status = props.status ?? 'empty';
-  const STATUS_LINE = {
-    waiting: 'Updating agents',
-    empty: 'No work in progress',
-    stale: "Can't update now",
-    expired: 'Status expired',
-    signed_out: 'Sign in to see agents',
-    privacy: 'Agents hidden',
-  } as const;
-  const statusLine = status === 'happy' ? null : STATUS_LINE[status];
+  const statusLine = status === 'happy' ? null : COPY[status];
 
   // Rank order: what the user must act on, then what is making progress, then
   // what is only connected. The Dynamic Island shows one number, so this
   // ranking decides what a glance says. The glyphs differ in shape as well as
   // color (exclamation / filled / hollow) so the state reads without color.
-  const countLines = (
-    [
-      {
-        label: 'Needs input',
-        count: props.needsInput ?? 0,
-        icon: 'exclamationmark.circle.fill',
-        color: PlatformColor('systemOrange'),
-      },
-      {
-        label: 'Working',
-        count: props.running ?? 0,
-        icon: 'circle.fill',
-        color: PlatformColor('systemGreen'),
-      },
-      {
-        label: 'Idle',
-        count: props.idle ?? 0,
-        icon: 'circle',
-        color: PlatformColor('label'),
-      },
-    ] as const
-  ).filter(line => line.count > 0);
-  const hasCounts = countLines.length > 0;
-  const primary = countLines[0] ?? null;
+  const countLines = [
+    {
+      kind: 'needsInput',
+      label: COPY.needsInput,
+      count: props.needsInput ?? 0,
+      icon: 'exclamationmark.circle.fill',
+      color: PlatformColor('systemOrange'),
+    },
+    {
+      kind: 'running',
+      label: COPY.running,
+      count: props.running ?? 0,
+      icon: 'circle.fill',
+      color: PlatformColor('systemGreen'),
+    },
+    {
+      kind: 'idle',
+      label: COPY.idle,
+      count: props.idle ?? 0,
+      icon: 'circle',
+      color: PlatformColor('label'),
+    },
+    // `as const` keeps each `icon` an SF Symbol literal, which the Image prop
+    // type requires.
+  ] as const;
+  // A zero row still draws, so the rows never reflow as work changes state.
+  // `primary` skips the zeros: one number on the Dynamic Island must be a
+  // number worth showing.
+  const primary = countLines.find(line => line.count > 0) ?? null;
+  const hasCounts = primary !== null;
   const primaryCount = String(primary === null ? 0 : primary.count);
-  // Elapsed time shows while any count exists, including the stale status, so
-  // the work keeps its elapsed timer when updates stop.
-  const elapsedAnchor = hasCounts ? (props.eligibleStartedAt ?? null) : null;
+  // Only the needs-input row carries a duration, and only the oldest wait: a
+  // blocked agent is the one interval the user can act on. Working and idle
+  // durations tell the user nothing they can use.
+  const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
@@ -91,14 +105,14 @@ const layout: LiveActivityComponent<ContentState> = (props, environment) => {
   const spokenParts = [
     ...(statusLine !== null ? [statusLine] : []),
     ...countLines.map(line => `${line.count} ${line.label}`),
-    'Open agents',
+    COPY.openAgents,
   ];
   const accessibility = spokenParts.join(', ');
 
   const primaryForeground = foregroundStyle(PlatformColor('label'));
-  const mutedForeground = foregroundStyle(
-    dark ? PlatformColor('secondaryLabel') : PlatformColor('tertiaryLabel')
-  );
+  // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
+  // background left the ranked-down rows too faint to read.
+  const mutedForeground = foregroundStyle(PlatformColor('secondaryLabel'));
 
   // The literal, not the imported constant: the widget transform stringifies
   // this function's source, so an imported binding would be an undefined global
@@ -117,15 +131,20 @@ const layout: LiveActivityComponent<ContentState> = (props, environment) => {
     );
 
   // One row per non-zero state: a colored glyph carries the state (readable
-  // without color), a fixed-width count, then the label. The first row is
-  // emphasised so a glance lands on it.
+  // without color), a fixed-width count, then the label. Every row shares one
+  // type size so the counts line up on a grid; only the label dims to rank
+  // them, because a second font size in a two-line banner reads as a mistake.
   const countRow = (line: (typeof countLines)[number], isPrimary: boolean) => (
-    <HStack key={line.label} alignment="center" spacing={6}>
-      <Image systemName={line.icon} color={line.color} size={isPrimary ? 14 : 12} />
+    <HStack key={line.label} alignment="center" spacing={7}>
+      <Image systemName={line.icon} color={line.color} size={13} />
       <Text
         modifiers={[
-          font({ textStyle: isPrimary ? 'headline' : 'subheadline', weight: 'semibold' }),
+          font({ textStyle: 'subheadline', weight: 'semibold' }),
           monospacedDigit(),
+          // The number is the whole point of the row, so it takes its space
+          // first. Without the priority a long label squeezed it to nothing
+          // and the row drew a glyph and a word with no count.
+          layoutPriority(1),
           primaryForeground,
         ]}
       >
@@ -134,57 +153,75 @@ const layout: LiveActivityComponent<ContentState> = (props, environment) => {
       <Text
         modifiers={[
           font({ textStyle: 'subheadline' }),
+          // The label carries the meaning, so it shrinks and tightens rather
+          // than truncating: a German or Albanian label wrapped to two lines
+          // otherwise, which broke the row grid the three counts read on. Do
+          // not add `truncationMode` here — it suppresses the scaling and the
+          // label truncates again. Tail is the default.
+          lineLimit(1),
+          minimumScaleFactor(0.6),
+          allowsTightening(true),
           isPrimary ? primaryForeground : mutedForeground,
         ]}
       >
         {line.label}
       </Text>
+      {line.kind === 'needsInput' && needsInputSince !== null ? (
+        <Text
+          date={new Date(needsInputSince)}
+          dateStyle="relative"
+          modifiers={[
+            font({ textStyle: 'subheadline' }),
+            monospacedDigit(),
+            // The relative style picks its own unit count per surface: one
+            // unit in the banner, two in the expanded island. A fixed width
+            // cannot force the short form — it only truncates it — so the
+            // text keeps its natural width.
+            lineLimit(1),
+            mutedForeground,
+          ]}
+        />
+      ) : null}
     </HStack>
   );
 
-  const countRows = countLines.map((line, index) => countRow(line, index === 0));
+  // The emphasised row is the ranked primary, not the first row: with zeros
+  // drawn the first row is often a 0, and emphasising that would point the
+  // user at the state with nothing in it.
+  const countRows = countLines.map(line => countRow(line, line === primary));
 
-  const elapsed =
-    elapsedAnchor === null ? null : (
-      <Text
-        date={new Date(elapsedAnchor)}
-        dateStyle="relative"
-        modifiers={[
-          font({ textStyle: 'caption' }),
-          monospacedDigit(),
-          mutedForeground,
-          // A relative-date Text reserves width for the longest string it could
-          // ever show, so without this the timer sits far left of its own frame.
-          multilineTextAlignment('trailing'),
-        ]}
-      />
-    );
+  // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
+  // Island draw the same block, so one glance teaches both surfaces.
+  const markAndRows = (markSize: number) => (
+    <HStack alignment="center" spacing={12}>
+      {logo(markSize)}
+      {hasCounts ? (
+        <VStack alignment="leading" spacing={5}>
+          {countRows}
+        </VStack>
+      ) : (
+        <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>{statusLine}</Text>
+      )}
+      <Spacer />
+    </HStack>
+  );
 
   return {
     banner: (
       <HStack
-        alignment="center"
-        spacing={10}
         modifiers={[
           // The banner draws to its own rounded edge, so without an inset the
           // top-left corner clips the leading content.
           padding({ all: 'default' }),
+          // The widget process takes its locale from the device language, so
+          // without this the relative wait would be formatted in a different
+          // language than the baked labels.
+          environment({ key: 'locale', value: locale }),
           accessibilityElement('combine'),
           accessibilityLabel(accessibility),
         ]}
       >
-        {logo(22)}
-        {hasCounts ? (
-          <VStack alignment="leading" spacing={3}>
-            {countRows}
-          </VStack>
-        ) : (
-          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
-            {statusLine}
-          </Text>
-        )}
-        <Spacer />
-        {elapsed}
+        {markAndRows(26)}
       </HStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds
@@ -216,34 +253,42 @@ const layout: LiveActivityComponent<ContentState> = (props, environment) => {
         {hasCounts ? primaryCount : ''}
       </Text>
     ),
-    expandedLeading: (
-      <VStack alignment="leading" spacing={3} modifiers={[accessibilityLabel(accessibility)]}>
-        {countRows}
-      </VStack>
-    ),
-    expandedTrailing: (
-      <VStack alignment="trailing" spacing={3} modifiers={[accessibilityLabel(accessibility)]}>
-        {statusLine !== null && hasCounts ? (
-          <Text modifiers={[font({ textStyle: 'caption' }), mutedForeground]}>{statusLine}</Text>
-        ) : null}
-        {elapsed}
-      </VStack>
-    ),
+    // The whole expanded island is the bottom region: it is the only one wide
+    // enough for a labelled row, and it clears the rounded corners that clip
+    // the flanking regions. The leading and trailing regions stay empty and
+    // take no height.
     expandedBottom: (
-      <HStack alignment="center" spacing={8} modifiers={[accessibilityLabel(accessibility)]}>
-        {logo(16)}
-        {statusLine !== null && !hasCounts ? (
-          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
-            {statusLine}
-          </Text>
-        ) : null}
-        <Spacer />
+      <HStack
+        modifiers={[
+          // The island's rounded corner cuts into the leading edge, so the
+          // mark needs an inset the banner gets from its own padding.
+          padding({ vertical: 2, leading: 14 }),
+          environment({ key: 'locale', value: locale }),
+          accessibilityLabel(accessibility),
+        ]}
+      >
+        {markAndRows(24)}
       </HStack>
     ),
   };
 };
 
-export const ActiveAgentsLiveActivity = createLiveActivity<ContentState>(
-  'ActiveAgentsLiveActivity',
-  withWidgetLogo(layout)
-);
+const LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
+
+const registerLayout = () =>
+  createLiveActivity<ContentState>(LIVE_ACTIVITY_NAME, withGlanceableCopy(withWidgetLogo(layout)));
+
+export const ActiveAgentsLiveActivity = registerLayout();
+
+/**
+ * Re-bake the stored layout in the active language.
+ *
+ * Constructing the factory only writes the layout into the shared app group,
+ * and the name identifies the native Live Activity type, so the fresh factory
+ * is discarded and `ActiveAgentsLiveActivity` stays the handle. The app boots
+ * in English and applies the stored language afterwards, so this runs once the
+ * language settles as well as on every later change.
+ */
+export function refreshActiveAgentsLiveActivityCopy(): void {
+  registerLayout();
+}

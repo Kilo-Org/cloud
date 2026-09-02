@@ -3,7 +3,6 @@ import {
   Bell,
   Brain,
   CornerDownLeft,
-  Gauge,
   Globe,
   type LucideIcon,
   MessageSquare,
@@ -22,7 +21,6 @@ import { Text } from '@/components/ui/text';
 import { useAppUnlock } from '@/lib/app-unlock-context';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useGlanceablePreference } from '@/lib/hooks/use-glanceable-preference';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
@@ -104,11 +102,6 @@ export function PreferencesScreen() {
     setKeepScreenOn,
   } = useKeepScreenOnPreference();
   const {
-    glanceableEnabled,
-    hasLoaded: glanceableLoaded,
-    setGlanceableEnabled,
-  } = useGlanceablePreference();
-  const {
     prReviewFooter,
     hasLoaded: prReviewFooterLoaded,
     setPrReviewFooter,
@@ -160,14 +153,6 @@ export function PreferencesScreen() {
           value={keepScreenOn}
           disabled={!keepScreenOnLoaded}
           onValueChange={setKeepScreenOn}
-        />
-        <PreferenceRow
-          icon={Gauge}
-          title={t('glanceable.channelName')}
-          subtitle={t('preferences.activeAgentsSubtitle')}
-          value={glanceableEnabled}
-          disabled={!glanceableLoaded}
-          onValueChange={setGlanceableEnabled}
         />
         <PreferenceRow
           icon={MessageSquare}

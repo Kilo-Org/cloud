@@ -33,6 +33,14 @@ export const activeSessionSchema = z.object({
    */
   lastActivityAt: z.string().optional(),
   /**
+   * When this session's status last changed, from
+   * `cli_sessions_v2.status_updated_at`, normalized to ISO 8601. Omitted when
+   * the column is NULL, unparseable, or the row was never enriched. The
+   * glanceable snapshot reads it to report how long the longest-waiting agent
+   * has needed input, and Hermes only parses the ISO form.
+   */
+  statusUpdatedAt: z.string().optional(),
+  /**
    * Capabilities advertised by the CLI connection that owns this session.
    * Omitted when the owning connection's latest heartbeat did not include a
    * capabilities object (legacy CLI, or a CLI that predates the field).
@@ -94,6 +102,7 @@ type EnrichmentRow = {
   title: string | null;
   organization_id: string | null;
   last_activity_at: string | null;
+  status_updated_at: string | null;
   total_cost_microdollars: number | null;
   // Session's own stored PR link, aliased so it never collides with the
   // cache keys below.
@@ -162,6 +171,18 @@ export function resolveActiveSessionStatus(
   return liveStatus;
 }
 
+/**
+ * Normalize a raw `timestamptz` text to ISO 8601, or null when it will not
+ * parse. Hermes rejects the Postgres form (`2026-09-02 17:28:02.242039+00`),
+ * so a field a React Native client passes to `Date` must be converted here.
+ * The older timestamp fields stay raw: their consumers already handle the
+ * Postgres form and changing them would be a wire change with no reader.
+ */
+function toIsoTimestamp(value: string): string | null {
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : new Date(at).toISOString();
+}
+
 function mapEnrichedHeartbeatSession(
   session: ActiveSession,
   row: EnrichmentRow | undefined
@@ -188,6 +209,11 @@ function mapEnrichedHeartbeatSession(
   };
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
+  }
+  const statusUpdatedAt =
+    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+  if (statusUpdatedAt !== null) {
+    mapped.statusUpdatedAt = statusUpdatedAt;
   }
   if (row.total_cost_microdollars != null) {
     mapped.totalCostMicrodollars = row.total_cost_microdollars;
@@ -218,6 +244,11 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   };
   if (row.last_activity_at != null) {
     mapped.lastActivityAt = row.last_activity_at;
+  }
+  const statusUpdatedAt =
+    row.status_updated_at == null ? null : toIsoTimestamp(row.status_updated_at);
+  if (statusUpdatedAt !== null) {
+    mapped.statusUpdatedAt = statusUpdatedAt;
   }
   if (row.total_cost_microdollars != null) {
     mapped.totalCostMicrodollars = row.total_cost_microdollars;
@@ -320,6 +351,7 @@ export async function listActiveSessions({
           title: cli_sessions_v2.title,
           organization_id: cli_sessions_v2.organization_id,
           last_activity_at: cli_sessions_v2.last_activity_at,
+          status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
@@ -415,6 +447,7 @@ export async function listActiveSessions({
           git_url: cli_sessions_v2.git_url,
           git_branch: cli_sessions_v2.git_branch,
           last_activity_at: cli_sessions_v2.last_activity_at,
+          status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
           session_pr_platform: cli_sessions_v2.platform,

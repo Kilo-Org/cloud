@@ -40,7 +40,7 @@ const snapshot: ActiveAgentsGlanceable = {
   idle: 0,
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
-  eligibleStartedAt: '2026-08-27T09:00:00.000Z',
+  needsInputSince: '2026-08-27T09:00:00.000Z',
 };
 
 function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
@@ -300,7 +300,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInput: 0,
       updatedAt: new Date(Date.now()).toISOString(),
       expiresAt: new Date(Date.now() + 28_800_000).toISOString(),
-      eligibleStartedAt: new Date(Date.now()).toISOString(),
+      needsInputSince: new Date(Date.now()).toISOString(),
       ...overrides,
     };
   }
@@ -326,7 +326,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const busy = service.refreshGlanceableSessions(personalRefresh);
     await started.promise;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
-    current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:01:00.000Z'));
     release.resolve();
@@ -335,13 +335,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       {
         status: 'empty',
         running: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
         updatedAt: '2026-08-27T10:00:01.000Z',
       },
       {
         status: 'empty',
         running: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
         updatedAt: '2026-08-27T10:00:01.000Z',
       },
     ]);
@@ -384,17 +384,17 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     const busy = service.refreshGlanceableSessions(personalRefresh);
     await started.promise;
-    current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     release.resolve();
     await busy;
     expect(messages.map(message => message.data)).toMatchObject([
-      { status: 'empty', running: 0, eligibleStartedAt: null },
-      { status: 'empty', running: 0, eligibleStartedAt: null },
+      { status: 'empty', running: 0, needsInputSince: null },
+      { status: 'empty', running: 0, needsInputSince: null },
     ]);
   });
 
-  it('retains the eligible start through retry and reconstructed worker and DO instances', async () => {
+  it('keeps the revision monotonic across retry and reconstructed worker and DO instances', async () => {
     let current = freshSnapshot();
     const { service, createService, messages } = setupService({
       response: () => Response.json(current),
@@ -411,13 +411,15 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .filter(message => message.to === 'ExponentPushToken[ios]')
         .map(message => message.data)
     ).toMatchObject([
-      { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 1 },
-      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 2 },
-      { needsInput: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z', revision: 3 },
+      { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z', revision: 1 },
+      // The wait is read from the rows on every build, so each delivery carries
+      // its own snapshot's value instead of one latched at the first emit.
+      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z', revision: 2 },
+      { needsInput: 1, needsInputSince: '2026-08-27T10:20:00.000Z', revision: 3 },
     ]);
   });
 
-  it('clears on authoritative empty and prevents an older empty read resetting the new interval', async () => {
+  it('fences an older empty read behind the newer authoritative reads', async () => {
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     let current = freshSnapshot();
@@ -434,7 +436,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       },
     });
     await createService().refreshGlanceableSessions(personalRefresh);
-    current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     deferNext = true;
     const oldIdle = createService().refreshGlanceableSessions(personalRefresh);
     await started.promise;
@@ -452,14 +454,14 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .filter(message => message.to === 'ExponentPushToken[ios]')
         .map(message => message.data)
     ).toMatchObject([
-      { status: 'happy', eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { status: 'empty', eligibleStartedAt: null },
-      { status: 'happy', eligibleStartedAt: '2026-08-27T10:10:00.000Z' },
-      { idle: 1, eligibleStartedAt: '2026-08-27T10:10:00.000Z' },
+      { status: 'happy', needsInputSince: '2026-08-27T10:00:00.000Z' },
+      { status: 'empty', needsInputSince: null },
+      { status: 'happy', needsInputSince: '2026-08-27T10:10:00.000Z' },
+      { idle: 1, needsInputSince: '2026-08-27T10:20:00.000Z' },
     ]);
   });
 
-  it('keeps user and organization intervals separate while another scope has a deferred read', async () => {
+  it('keeps user and organization scopes separate while another scope has a deferred read', async () => {
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     let first = true;
@@ -496,15 +498,15 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .filter(message => message.to === 'ExponentPushToken[ios]')
         .map(message => message.data)
     ).toMatchObject([
-      { scopeKey: 'usr_1:org-1', eligibleStartedAt: '2026-08-27T10:01:00.000Z' },
-      { scopeKey: 'usr_1:org-2', eligibleStartedAt: '2026-08-27T10:02:00.000Z' },
-      { scopeKey: 'usr_2:personal', eligibleStartedAt: '2026-08-27T10:03:00.000Z' },
-      { scopeKey: 'usr_1:personal', eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { scopeKey: 'usr_1:personal', eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
+      { scopeKey: 'usr_1:org-1', needsInputSince: '2026-08-27T10:01:00.000Z' },
+      { scopeKey: 'usr_1:org-2', needsInputSince: '2026-08-27T10:02:00.000Z' },
+      { scopeKey: 'usr_2:personal', needsInputSince: '2026-08-27T10:03:00.000Z' },
+      { scopeKey: 'usr_1:personal', needsInputSince: '2026-08-27T10:00:00.000Z' },
+      { scopeKey: 'usr_1:personal', needsInputSince: '2026-08-27T10:04:00.000Z' },
     ]);
   });
 
-  it('preserves the interval after snapshot and delivery failures instead of clearing or replacing it', async () => {
+  it('recovers delivery after snapshot and delivery failures', async () => {
     let current = freshSnapshot();
     let unavailable = false;
     const { createService, messages } = setupService({
@@ -524,16 +526,16 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .filter(message => message.to === 'ExponentPushToken[ios]')
         .map(message => message.data)
     ).toMatchObject([
-      { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
+      { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z' },
+      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
     ]);
   });
 
-  it('does not clear an interval from a non-authoritative zero-count response', async () => {
+  it('delivers nothing from a non-authoritative zero-count response', async () => {
     let current = freshSnapshot();
     const { createService, messages } = setupService({ response: () => Response.json(current) });
     await createService().refreshGlanceableSessions(personalRefresh);
-    current = freshSnapshot({ status: 'stale', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'stale', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
     current = freshSnapshot({ running: 0, idle: 1 });
@@ -543,8 +545,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .filter(message => message.to === 'ExponentPushToken[ios]')
         .map(message => message.data)
     ).toMatchObject([
-      { running: 2, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
-      { idle: 1, eligibleStartedAt: '2026-08-27T10:00:00.000Z' },
+      { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z' },
+      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
     ]);
   });
 
@@ -562,7 +564,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
 
   it('ends empty work and starts later eligible work without mobile token cleanup', async () => {
     const pem = await generateTestPrivateKeyPem();
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -582,7 +584,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       running: 0,
       needsInput: 0,
       idle: 0,
-      eligibleStartedAt: null,
+      needsInputSince: null,
     });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
@@ -594,7 +596,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     ]);
     expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
       idle: 1,
-      eligibleStartedAt: '2026-08-27T10:00:01.000Z',
+      needsInputSince: '2026-08-27T10:00:01.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token']);
   });
@@ -610,7 +612,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       ],
       apnsStatus: token => (token === 'failed-token' ? 503 : 200),
       response: () =>
-        Response.json(freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null })),
+        Response.json(freshSnapshot({ status: 'empty', running: 0, needsInputSince: null })),
     });
     await service.refreshGlanceableSessions(personalRefresh);
     expect([...activityRows.keys()]).toEqual(['scope-token', 'failed-token']);
@@ -623,7 +625,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const started = Promise.withResolvers<void>();
       const release = Promise.withResolvers<void>();
       let first = true;
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const { createService, activityRows, activities, liveActivityProps } = setupService({
         privateKey: async () => pem,
         iosTokens: [
@@ -683,7 +685,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const started = Promise.withResolvers<void>();
       const release = Promise.withResolvers<void>();
       let first = true;
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const renewedRow = {
         id: renewal === 'version' ? `row-${withPushToStart ? 1 : 0}` : 'renewed-row',
         kind: 'ios_activity' as const,
@@ -746,7 +748,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           running: 0,
           needsInput: 0,
           idle: 1,
-          eligibleStartedAt: '2026-08-27T10:00:01.000Z',
+          // Forwarded from this refresh's snapshot, not latched at the earlier one.
+          needsInputSince: '2026-08-27T10:00:02.000Z',
         },
       ]);
       const liveToken = withPushToStart ? 'started-2' : 'live-activity';
@@ -774,7 +777,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         started.resolve();
         await release.promise;
       };
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const { createService, apns, activityRows, liveActivityProps, messages } = setupService({
         privateKey: async () => pem,
         iosTokens: [
@@ -801,7 +804,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           running: 0,
           needsInput: 1,
           idle: 0,
-          eligibleStartedAt: '2026-08-27T10:00:01.000Z',
+          needsInputSince: '2026-08-27T10:00:01.000Z',
         },
       ]);
       expect([...activityRows.keys()]).toEqual(['scope-token']);
@@ -820,7 +823,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     let first = true;
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -888,7 +891,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     async unusableKey => {
       const pem = await generateTestPrivateKeyPem();
       let configured = false;
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const { createService, apns, activityRows, liveActivityProps } = setupService({
         privateKey: async () => (configured ? pem : unusableKey),
         iosTokens: [
@@ -912,7 +915,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
 
   it('recovers after a delivered end loses its HTTP response across coordinator reconstruction', async () => {
     const pem = await generateTestPrivateKeyPem();
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows, activities, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -945,7 +948,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([
-      { running: 0, needsInput: 0, idle: 1, eligibleStartedAt: '2026-08-27T10:00:01.000Z' },
+      { running: 0, needsInput: 0, idle: 1, needsInputSince: '2026-08-27T10:00:02.000Z' },
     ]);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
@@ -959,7 +962,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     async withPushToStart => {
       const pem = await generateTestPrivateKeyPem();
       let rejected = true;
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const iosTokens: IosActivityToken[] = [{ token: 'old-activity', kind: 'ios_activity' }];
       if (withPushToStart) iosTokens.push({ token: 'scope-token', kind: 'ios_push_to_start' });
       const { createService, apns, activityRows, liveActivityProps } = setupService({
@@ -974,7 +977,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       current = freshSnapshot({ running: 0, needsInput: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([
-        { running: 0, needsInput: 1, eligibleStartedAt: '2026-08-27T10:00:01.000Z' },
+        { running: 0, needsInput: 1, needsInputSince: '2026-08-27T10:00:01.000Z' },
       ]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
         ['old-activity', 'end'],
@@ -986,7 +989,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
 
   it('starts fresh work after an unregistered end target across reconstruction', async () => {
     const pem = await generateTestPrivateKeyPem();
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows, activities, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -1032,7 +1035,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const rejectedIndex = rejectedAttempt === 'older' ? 1 : 2;
       let requests = 0;
       let responses = 0;
-      let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       const { createService, apns, activityRows, activities, liveActivityProps } = setupService({
         privateKey: async () => pem,
         iosTokens: [
@@ -1106,7 +1109,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const release = Promise.withResolvers<void>();
     let first = true;
     let rejected = true;
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -1143,7 +1146,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const release = Promise.withResolvers<void>();
     let first = true;
     let rejected = false;
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -1201,7 +1204,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
   it('retries a rejected end without starting an empty activity', async () => {
     const pem = await generateTestPrivateKeyPem();
     let rejected = true;
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows, liveActivityProps } = setupService({
       privateKey: async () => pem,
       iosTokens: [
@@ -1228,7 +1231,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const started = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     let first = true;
-    let current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    let current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     const { createService, apns, activityRows } = setupService({
       response: () => Response.json(current),
       privateKey: async () => {
@@ -1273,14 +1276,14 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     const busy = createService().refreshGlanceableSessions(personalRefresh);
     await started.promise;
-    current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
     release.resolve();
     await busy;
     expect(apns.map(request => request.aps.event)).toEqual(['end', 'update']);
     expect(apns.map(request => JSON.parse(request.aps['content-state'].props))).toMatchObject([
-      { status: 'empty', running: 0, eligibleStartedAt: null },
+      { status: 'empty', running: 0, needsInputSince: null },
       { status: 'happy', running: 2 },
     ]);
     expect(apns[1].aps.timestamp).toBeLessThan(apns[0].aps.timestamp);
@@ -1323,7 +1326,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     const busy = createService().refreshGlanceableSessions(personalRefresh);
     await started.promise;
-    current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
     release.resolve();
@@ -1345,14 +1348,14 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 running: 0,
                 needsInput: 0,
                 idle: 0,
-                eligibleStartedAt: null,
+                needsInputSince: null,
               },
             },
           ]
     );
     expect(messages.map(message => message.data)).toMatchObject([
-      { status: 'empty', running: 0, eligibleStartedAt: null },
-      { status: 'empty', running: 0, eligibleStartedAt: null },
+      { status: 'empty', running: 0, needsInputSince: null },
+      { status: 'empty', running: 0, needsInputSince: null },
     ]);
   });
 
@@ -1379,7 +1382,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       });
       const busy = createService().refreshGlanceableSessions(personalRefresh);
       await started.promise;
-      current = freshSnapshot({ status: 'empty', running: 0, eligibleStartedAt: null });
+      current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
       await createService().refreshGlanceableSessions(personalRefresh);
       release.resolve();
       await busy;
@@ -1388,7 +1391,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         messages
           .filter(message => message.to === `ExponentPushToken[${platform}]`)
           .map(message => message.data)
-      ).toMatchObject([{ status: 'empty', running: 0, eligibleStartedAt: null }]);
+      ).toMatchObject([{ status: 'empty', running: 0, needsInputSince: null }]);
     }
   );
 
@@ -1488,7 +1491,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     () => Response.json({ ...snapshot, running: -1 }),
     () => Response.json({ ...snapshot, updatedAt: 'invalid-date' }),
     () => Response.json({ ...snapshot, expiresAt: 'invalid-date' }),
-    () => Response.json({ ...snapshot, eligibleStartedAt: 'invalid-date' }),
+    () => Response.json({ ...snapshot, needsInputSince: 'invalid-date' }),
   ])('rejects an unusable snapshot without poisoning the next refresh', async response => {
     let currentResponse = response;
     const { service, createService, messages } = setupService({
@@ -1499,8 +1502,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     currentResponse = () => Response.json(snapshot);
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(messages.map(message => message.data)).toMatchObject([
-      { running: 2, eligibleStartedAt: '2026-08-27T09:00:00.000Z' },
-      { running: 2, eligibleStartedAt: '2026-08-27T09:00:00.000Z' },
+      { running: 2, needsInputSince: '2026-08-27T09:00:00.000Z' },
+      { running: 2, needsInputSince: '2026-08-27T09:00:00.000Z' },
     ]);
   });
 
@@ -1633,7 +1636,7 @@ describe('toGlanceableContentState', () => {
       running: 2,
       needsInput: 1,
       idle: 0,
-      eligibleStartedAt: '2026-08-27T09:00:00.000Z',
+      needsInputSince: '2026-08-27T09:00:00.000Z',
     });
   });
 

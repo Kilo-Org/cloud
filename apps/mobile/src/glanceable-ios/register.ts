@@ -1,5 +1,8 @@
+import { i18n } from '@/i18n';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 
+import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
+import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { iosSink } from './ios-sink';
 import { ensureWidgetLogo } from './widget-logo';
 
@@ -14,3 +17,12 @@ registerGlanceableSink(iosSink);
 // it. Fire and forget: it lands long before the first snapshot arrives, and a
 // failure only costs the logo.
 void ensureWidgetLogo();
+
+// The layouts bake their copy in at import, when i18n still holds English: the
+// stored language is applied a few ticks later. Re-bake on every language
+// change so both the Live Activity and the widget gallery placeholder follow
+// the user's language.
+i18n.on('languageChanged', () => {
+  refreshActiveAgentsLiveActivityCopy();
+  refreshActiveAgentsWidgetCopy();
+});

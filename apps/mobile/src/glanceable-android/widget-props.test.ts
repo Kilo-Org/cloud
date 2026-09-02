@@ -82,7 +82,9 @@ describe('buildAndroidWidgetProps', () => {
     ][] = [
       ['waiting', [], 'Waiting for agents', 0, false],
       ['empty', [], 'No work in progress', 0, false],
-      ['stale', [{ status: 'busy' }], 'Updates delayed', 1, true],
+      // Counts show for stale, and all three rows draw whenever they show, so
+      // the widget's rows never reflow as work moves between states.
+      ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Agents hidden', 0, false],
@@ -97,11 +99,10 @@ describe('buildAndroidWidgetProps', () => {
 
   it('carries no title, organization name, or raw id into the widget payload', () => {
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
       userId: 'user-9f3a-leak',
       organizationId: 'org-acme-7-leak',
       now: NOW,
-      previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
     });
 
     const props = buildAndroidWidgetProps(snapshot, {}, translate);

@@ -1,7 +1,4 @@
-import {
-  type GlanceableAgentsSnapshot,
-  isEligibleGlanceableWork,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import {
@@ -11,6 +8,7 @@ import {
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
+  resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
 
 /** One translated count line. `kind` picks the glyph and the color. */
@@ -32,8 +30,13 @@ export type GlanceableViewProps = {
   primaryKind: GlanceableCountKind | null;
   /** Top-ranked count value for compact surfaces; 0 when no eligible work. */
   primaryCount: number;
-  /** ISO anchor for the elapsed timer; shows while eligible work runs, incl. stale. */
-  elapsedAnchor: string | null;
+  /**
+   * ISO timestamp of the longest-running needs-input wait, or null when
+   * nothing waits. Only the needs-input row carries a duration: a wait is the
+   * one interval the user can act on. Only `systemMedium` is wide enough to
+   * draw it.
+   */
+  needsInputSince: string | null;
   /** Spoken label: status word, numeric counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
@@ -46,10 +49,14 @@ export function buildGlanceableViewProps(
 ): GlanceableViewProps {
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
   const primary = primaryGlanceableCount(snapshot);
+  // Only these two statuses draw rows; the rest draw their status line, so the
+  // locked frames carry no count payload at all.
+  const status = resolveGlanceableStatus(snapshot, flags);
+  const showCounts = status === 'happy' || status === 'stale';
 
   return {
     statusLine: statusKey === null ? null : translate(statusKey),
-    countLines: glanceableCountLines(snapshot).map(line => ({
+    countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       label: translate(line.key),
       kind: line.kind,
       count: line.count,
@@ -57,7 +64,7 @@ export function buildGlanceableViewProps(
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
-    elapsedAnchor: isEligibleGlanceableWork(snapshot) ? snapshot.eligibleStartedAt : null,
+    needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
@@ -88,6 +95,6 @@ export function buildGlanceableLiveActivityContentState(
     running: snapshot.running,
     needsInput: snapshot.needsInput,
     idle: snapshot.idle,
-    eligibleStartedAt: snapshot.eligibleStartedAt,
+    needsInputSince: snapshot.needsInputSince,
   };
 }

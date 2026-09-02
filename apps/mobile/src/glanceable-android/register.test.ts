@@ -143,7 +143,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
     const expected =
-      width === 120 ? ['2 Needs input'] : ['2 Needs input', '2 Working', 'Open agents'];
+      width === 120 ? ['2 Needs input'] : ['2 Needs input', '2 Working', '0 Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -209,7 +209,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
+    const expected =
+      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -231,7 +232,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
+    const expected =
+      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -309,7 +311,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected = width === 120 ? ['1 Working'] : ['1 Working', 'Open agents'];
+    const expected =
+      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);

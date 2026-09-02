@@ -58,7 +58,7 @@ export function toGlanceableContentState(
     running: snapshot.running,
     needsInput: snapshot.needsInput,
     idle: snapshot.idle,
-    eligibleStartedAt: snapshot.eligibleStartedAt,
+    needsInputSince: snapshot.needsInputSince,
   };
   return {
     name: ACTIVE_AGENTS_LIVE_ACTIVITY_NAME,

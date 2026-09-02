@@ -174,7 +174,7 @@ describe('cleanup', () => {
       running: 2,
       needsInput: 1,
       idle: 1,
-      eligibleStartedAt: '2026-08-26T23:00:00.000Z',
+      needsInputSince: '2026-08-26T23:00:00.000Z',
     };
     _setLastGlanceableSnapshotForTests(seeded);
 
@@ -202,7 +202,7 @@ describe('cleanup', () => {
           running: 0,
           needsInput: 0,
           idle: 0,
-          eligibleStartedAt: null,
+          needsInputSince: null,
         });
       }
     } finally {
@@ -225,7 +225,7 @@ describe('cleanup', () => {
         running: 0,
         needsInput: 0,
         idle: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       };
       _setLastGlanceableSnapshotForTests(terminal);
 
@@ -243,7 +243,7 @@ describe('cleanup', () => {
             running: 0,
             needsInput: 0,
             idle: 0,
-            eligibleStartedAt: null,
+            needsInputSince: null,
           });
         }
       } finally {

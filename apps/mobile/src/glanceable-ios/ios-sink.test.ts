@@ -21,7 +21,12 @@ import {
   getActivityKitDenied,
   iosSink,
 } from './ios-sink';
-import { buildGlanceableViewProps, type GlanceableViewProps, toWidgetProps } from './view-props';
+import {
+  buildGlanceableLiveActivityContentState,
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+  toWidgetProps,
+} from './view-props';
 
 // Native surfaces are unreachable under vitest: expo-widgets factories, the
 // swift-ui component tree, and react-native are stubbed so the sink is the real
@@ -146,7 +151,7 @@ const delivery = {
 };
 
 function snapshotFor(
-  sessions: { status: string }[],
+  sessions: { status: string; statusUpdatedAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -668,20 +673,24 @@ describe('iosSink end', () => {
     expect(subscriptions).toEqual(new Set(['scope', 'activity']));
   });
 
-  it('retains the elapsed anchor when running work becomes idle', async () => {
+  it('carries the wait only while a row needs input', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
+    const waited = new Date(NOW - 600_000).toISOString();
     const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => Date.now() });
-    publisher.handleSessions([{ status: 'busy' }], CTX);
-    vi.setSystemTime(NOW + 60_000);
-    publisher.handleSessions([{ status: 'idle' }], CTX);
+    publisher.handleSessions([{ status: 'question', statusUpdatedAt: waited }], CTX);
     await vi.advanceTimersByTimeAsync(1000);
     expect(mockState.started).toMatchObject([
-      {
-        ended: false,
-        dismissAt: null,
-        props: { running: 0, idle: 1, eligibleStartedAt: new Date(NOW).toISOString() },
-      },
+      { ended: false, props: { needsInput: 1, needsInputSince: waited } },
+    ]);
+
+    // The wait clears with the state it described; it is read from the rows, so
+    // no stale anchor survives the transition to work that needs nothing.
+    vi.setSystemTime(NOW + 60_000);
+    publisher.handleSessions([{ status: 'busy' }], CTX);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mockState.started).toMatchObject([
+      { ended: false, props: { running: 1, needsInput: 0, needsInputSince: null } },
     ]);
     publisher.dispose();
   });
@@ -763,7 +772,9 @@ describe('iosSink widget publish', () => {
       boolean,
     ][] = [
       ['empty', [], 'No work in progress', 0, false],
-      ['stale', [{ status: 'busy' }], "Can't update now", 1, true],
+      // Stale draws rows, and all three draw whenever rows draw, so the
+      // surface never reflows as work moves between states.
+      ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Agents hidden', 0, false],
@@ -904,15 +915,13 @@ describe('buildGlanceableViewProps', () => {
   });
 
   it('carries no title, organization name, or raw id into the widget JSON', () => {
-    // Decouple the eligible-start anchor from `updatedAt` so the assertion below
-    // proves the builder copies `eligibleStartedAt` (not `updatedAt`) into
-    // `elapsedAnchor`; on a fresh snapshot the two timestamps are equal.
+    // A waiting row with its own status timestamp, so the assertion below
+    // covers the one field that carries a time into the widget payload.
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
       userId: 'user-9f3a-leak',
       organizationId: 'org-acme-7-leak',
       now: NOW,
-      previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
     });
 
     const props = buildGlanceableViewProps(snapshot, {}, key => key);
@@ -921,7 +930,7 @@ describe('buildGlanceableViewProps', () => {
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'countLines',
-      'elapsedAnchor',
+      'needsInputSince',
       'primaryCount',
       'primaryKind',
       'primaryLabel',
@@ -935,17 +944,25 @@ describe('buildGlanceableViewProps', () => {
     expect(json).not.toContain('title');
   });
 
-  it('shows the elapsed anchor for stale with eligible counts', () => {
-    const stale = snapshotFor([{ status: 'busy' }], 1, 'stale');
-    const props = buildGlanceableViewProps(stale, {}, key => key);
+  it('carries the oldest wait through the stale status', () => {
+    const waited = new Date(NOW - 600_000).toISOString();
+    const stale = snapshotFor([{ status: 'question', statusUpdatedAt: waited }], 1, 'stale');
 
-    expect(props.elapsedAnchor).toBe(stale.eligibleStartedAt);
+    // Stale means updates stopped, not that the wait ended, so the Live
+    // Activity keeps reporting how long the agent has been blocked. Only that
+    // surface carries the wait — no widget family is wide enough for it.
+    expect(buildGlanceableLiveActivityContentState(stale).needsInputSince).toBe(waited);
   });
 
-  it('hides the elapsed anchor when no eligible counts exist', () => {
-    const props = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
+  it('reports no wait unless a row needs input', () => {
+    const working = snapshotFor(
+      [{ status: 'busy', statusUpdatedAt: new Date(NOW - 600_000).toISOString() }],
+      1
+    );
+    expect(buildGlanceableLiveActivityContentState(working).needsInputSince).toBeNull();
 
-    expect(props.elapsedAnchor).toBeNull();
+    const empty = snapshotFor([], 1, 'empty');
+    expect(buildGlanceableLiveActivityContentState(empty).needsInputSince).toBeNull();
   });
 
   it('speaks the status word, numeric counts, then Open agents', () => {
@@ -975,7 +992,7 @@ describe('toWidgetProps', () => {
     expect(Object.values(props)).not.toContain(null);
     expect('primaryLabel' in props).toBe(false);
     expect('primaryKind' in props).toBe(false);
-    expect('elapsedAnchor' in props).toBe(false);
+    expect('needsInputSince' in props).toBe(false);
     expect(props.statusLine).toBe('glanceable.empty');
   });
 
@@ -990,7 +1007,11 @@ describe('toWidgetProps', () => {
       primaryLabel: 'glanceable.needsInput',
       primaryKind: 'needsInput',
       primaryCount: 1,
-      countLines: [{ kind: 'needsInput', count: 1 }],
+      countLines: [
+        { kind: 'needsInput', count: 1 },
+        { kind: 'running', count: 0 },
+        { kind: 'idle', count: 0 },
+      ],
     });
   });
 });

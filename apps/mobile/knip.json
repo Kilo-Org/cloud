@@ -3,6 +3,7 @@
   "entry": ["src/app/**/*.{ts,tsx}", "src/glanceable-android/register.ts"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreDependencies": [
+    "@expo/plist",
     "expo-updates",
     "expo-system-ui",
     "react-native-android-widget",

@@ -86,7 +86,7 @@ function buildExpiredWidgetProps(
       running: 0,
       needsInput: 0,
       idle: 0,
-      eligibleStartedAt: null,
+      needsInputSince: null,
     },
     {},
     translate
@@ -118,7 +118,9 @@ export function buildOngoingNotificationText(
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status === 'happy' || status === 'stale') {
-    const lines = glanceableCountLines(snapshot);
+    // A sentence, not a layout: a zero row holds a widget's rows still, but
+    // "0 Working" in a notification line is only noise.
+    const lines = glanceableCountLines(snapshot).filter(line => line.count > 0);
     if (lines.length > 0) {
       const counts = lines.map(line => `${line.count} ${translate(line.key)}`).join(', ');
       return status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;

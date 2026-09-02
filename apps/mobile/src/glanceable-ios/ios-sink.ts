@@ -84,7 +84,7 @@ function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<Glanceab
         running: 0,
         needsInput: 0,
         idle: 0,
-        eligibleStartedAt: null,
+        needsInputSince: null,
       },
       {},
       translate

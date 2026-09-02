@@ -40,23 +40,27 @@ const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind
   { key: 'glanceable.idle', kind: 'idle' },
 ];
 
-/** Every non-zero count in rank order (expanded, medium, large, spoken). */
+/**
+ * All three counts in rank order, zeros included.
+ *
+ * A zero row still draws: dropping it would move every remaining row as work
+ * changes state, and a surface the user only glances at must not reflow. The
+ * surfaces show these rows only while some work exists — a snapshot with three
+ * zeros carries the `empty` status and draws its status line instead.
+ */
 export function glanceableCountLines(snapshot: GlanceableAgentsSnapshot): GlanceableCountLine[] {
-  const lines: GlanceableCountLine[] = [];
-  for (const { key, kind } of COUNT_ORDER) {
-    const count = snapshot[kind];
-    if (count > 0) {
-      lines.push({ key, kind, count });
-    }
-  }
-  return lines;
+  return COUNT_ORDER.map(({ key, kind }) => ({ key, kind, count: snapshot[kind] }));
 }
 
-/** The single ranked count for compact surfaces; null when nothing is eligible. */
+/**
+ * The single ranked count for compact surfaces; null when nothing is eligible.
+ * Zero rows are skipped here: one number on the Dynamic Island must be a
+ * number worth showing.
+ */
 export function primaryGlanceableCount(
   snapshot: GlanceableAgentsSnapshot
 ): GlanceableCountLine | null {
-  return glanceableCountLines(snapshot)[0] ?? null;
+  return glanceableCountLines(snapshot).find(line => line.count > 0) ?? null;
 }
 
 export type GlanceableSurfaceFlags = {
@@ -101,7 +105,9 @@ export function glanceableSpokenLabelKeys(
   const status = resolveGlanceableStatus(snapshot, flags);
   const parts: string[] = [];
   if (status === 'happy' || status === 'stale') {
-    for (const { key } of glanceableCountLines(snapshot)) {
+    // Zeros draw on the surfaces to hold the layout still, but "0 Working" is
+    // only noise to a screen reader, so the spoken label keeps the real counts.
+    for (const { key } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
       parts.push(key);
     }
   } else {
@@ -123,7 +129,7 @@ export function glanceableSpokenLabel(
     parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
   }
   if (status === 'happy' || status === 'stale') {
-    for (const { key, count } of glanceableCountLines(snapshot)) {
+    for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
       parts.push(`${count} ${translate(key)}`);
     }
   }

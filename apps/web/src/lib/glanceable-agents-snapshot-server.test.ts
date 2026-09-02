@@ -32,6 +32,7 @@ describe('buildGlanceableSnapshotForUser', () => {
         status: 'question',
         title: 'Another secret',
         connectionId: 'conn-2',
+        statusUpdatedAt: '2026-08-27T10:00:00.000Z',
       },
     ];
     mockedListActiveSessions.mockResolvedValue({ sessions });
@@ -54,5 +55,29 @@ describe('buildGlanceableSnapshotForUser', () => {
     expect(snapshot.status).toBe('happy');
     expect(snapshot.running).toBe(1);
     expect(snapshot.needsInput).toBe(1);
+    // A timestamp is the one session-derived value the snapshot may carry.
+    expect(snapshot.needsInputSince).toBe('2026-08-27T10:00:00.000Z');
+  });
+
+  it('reports no wait when nothing needs input', async () => {
+    mockedListActiveSessions.mockResolvedValue({
+      sessions: [
+        {
+          id: 'ses_raw_3',
+          status: 'busy',
+          title: 'Running',
+          connectionId: 'conn-3',
+          statusUpdatedAt: '2026-08-27T10:00:00.000Z',
+        },
+      ],
+    });
+
+    const snapshot = await buildGlanceableSnapshotForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(snapshot.running).toBe(1);
+    expect(snapshot.needsInputSince).toBeNull();
   });
 });

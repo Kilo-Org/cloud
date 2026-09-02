@@ -2256,7 +2256,6 @@
     "autoExpandThinkingSubtitle": "Mostra il pensiero dell'agente espanso quando termina.",
     "keepScreenOn": "Mantieni lo schermo acceso nella pagina della sessione",
     "keepScreenOnSubtitle": "Tieni lo schermo attivo mentre la sessione lavora.",
-    "activeAgentsSubtitle": "Mostra il numero di agenti nei widget e nella schermata di blocco.",
     "appearance": "Aspetto",
     "notifications": "Notifiche",
     "notificationsSubtitle": "Preferenze push",

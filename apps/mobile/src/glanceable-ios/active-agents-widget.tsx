@@ -2,11 +2,16 @@ import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
+  allowsTightening,
   containerBackground,
   cornerRadius,
+  environment,
   font,
   foregroundStyle,
   frame,
+  layoutPriority,
+  lineLimit,
+  minimumScaleFactor,
   monospacedDigit,
   resizable,
   widgetURL,
@@ -14,6 +19,7 @@ import {
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 import { PlatformColor } from 'react-native';
 
+import { withGlanceableCopy } from './layout-copy';
 import { type GlanceableViewProps } from './view-props';
 import { withWidgetLogo } from './widget-logo';
 
@@ -23,31 +29,48 @@ import { withWidgetLogo } from './widget-logo';
 // stringifies it and the widget extension re-evaluates the source. Everything
 // it references must be a widget global (`Text`, `VStack`, the modifiers,
 // `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n from here —
-// translated copy arrives through `props`. The inlined English fallbacks below
-// only render while the gallery placeholder has no snapshot props.
+// translated copy arrives through `props`, and the gallery placeholder (which
+// has no props) falls back to the baked copy below.
 //
-// The one value resolved after stringification is the `__KILO_WIDGET_LOGO_URI__`
-// literal below: `withWidgetLogo` swaps it for the app-group path of the mark.
+// Two values are resolved after stringification, both from literals below:
+// `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__` for the app-group path of
+// the mark, and `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the
+// translated copy.
 
 type WidgetProps = Partial<GlanceableViewProps>;
 
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component.
-const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.Element = (
+const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => React.JSX.Element = (
   props,
-  environment
+  widgetEnvironment
 ) => {
   'widget';
 
-  const family = environment.widgetFamily;
-  const dark = environment.colorScheme === 'dark';
+  // The literal, not the imported constant: the widget transform stringifies
+  // this function's source, so an imported binding would be an undefined
+  // global in the widget process. `withGlanceableCopy` replaces the token,
+  // quotes included, with the translated copy as a JSON source literal.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
+  const copySource: string = '__KILO_GLANCEABLE_COPY__';
+  const COPY = JSON.parse(copySource) as Record<string, string>;
+  // The tag SwiftUI formats the relative wait with; English when the bake is
+  // somehow missing it, which is what the widget process would have used anyway.
+  const locale = COPY.locale ?? 'en';
+
+  const family = widgetEnvironment.widgetFamily;
   const counts = props.countLines ?? [];
-  const hasCounts = counts.length > 0;
   const primaryLabel = props.primaryLabel ?? null;
   const primaryKind = props.primaryKind ?? null;
+  // Only the medium row is wide enough for a wait beside the label; in the
+  // small square the pair wraps and truncates both halves.
+  const wide = family === 'systemMedium';
+  const needsInputSince = props.needsInputSince ?? null;
+  // The rows carry zeros too, so their number never says whether work exists —
+  // the ranked primary does, because it is null only when every count is zero.
+  const hasCounts = primaryKind !== null;
   const primaryCount = props.primaryCount ?? 0;
-  const statusLine = props.statusLine ?? (hasCounts ? null : 'No work in progress');
-  const elapsedAnchor = props.elapsedAnchor ?? null;
+  const statusLine = props.statusLine ?? (hasCounts ? null : COPY.empty);
 
   // Circle-based glyphs whose shapes differ as well as their colors, because
   // the Lock Screen families render in an accented mode that flattens tint.
@@ -58,10 +81,14 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
   } as const;
 
   const primaryForeground = foregroundStyle(PlatformColor('label'));
-  const mutedForeground = foregroundStyle(
-    dark ? PlatformColor('secondaryLabel') : PlatformColor('tertiaryLabel')
-  );
+  // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
+  // background left the ranked-down rows too faint to read.
+  const mutedForeground = foregroundStyle(PlatformColor('secondaryLabel'));
   const a11y = [
+    // The widget process takes its locale from the device language, so without
+    // this the relative wait would be formatted in a different language than
+    // the labels the app translated into the props.
+    environment({ key: 'locale', value: locale }),
     accessibilityElement('combine'),
     accessibilityLabel(props.accessibilityLabel ?? ''),
   ];
@@ -90,17 +117,21 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
     compact: boolean
   ) => {
     const glyph = GLYPH[line.kind as keyof typeof GLYPH];
-    const emphasis = isPrimary ? 'headline' : 'subheadline';
-    const countStyle = compact ? 'caption' : emphasis;
-    const labelStyle = compact ? 'caption' : 'subheadline';
-    const glyphSize = isPrimary ? 14 : 12;
+    // Every row shares one type size and one glyph size so the counts and the
+    // labels line up on a grid; only the label colour ranks them, because a
+    // second font size in a three-row list reads as a mistake.
+    const textStyle = compact ? 'caption' : 'subheadline';
     return (
-      <HStack key={line.label} alignment="center" spacing={compact ? 4 : 6}>
-        <Image systemName={glyph.icon} color={glyph.color} size={compact ? 11 : glyphSize} />
+      <HStack key={line.label} alignment="center" spacing={compact ? 4 : 7}>
+        <Image systemName={glyph.icon} color={glyph.color} size={compact ? 11 : 13} />
         <Text
           modifiers={[
-            font({ textStyle: countStyle, weight: 'semibold' }),
+            font({ textStyle, weight: 'semibold' }),
             monospacedDigit(),
+            // The number is the whole point of the row, so it takes its space
+            // first. Without the priority a long label squeezed it to nothing
+            // and the row drew a glyph and a word with no count.
+            layoutPriority(1),
             primaryForeground,
           ]}
         >
@@ -108,12 +139,28 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
         </Text>
         <Text
           modifiers={[
-            font({ textStyle: labelStyle }),
+            font({ textStyle }),
+            // The label carries the meaning, so it shrinks and tightens
+            // rather than truncating: a German or Albanian label wrapped to
+            // two lines otherwise, which broke the row grid the three counts
+            // read on. Do not add `truncationMode` here — it suppresses the
+            // scaling and the label truncates again. Tail is the default.
+            lineLimit(1),
+            minimumScaleFactor(0.6),
+            allowsTightening(true),
             isPrimary ? primaryForeground : mutedForeground,
           ]}
         >
           {line.label}
         </Text>
+        {wide ? <Spacer /> : null}
+        {wide && line.kind === 'needsInput' && needsInputSince !== null ? (
+          <Text
+            date={new Date(needsInputSince)}
+            dateStyle="relative"
+            modifiers={[font({ textStyle }), monospacedDigit(), lineLimit(1), mutedForeground]}
+          />
+        ) : null}
       </HStack>
     );
   };
@@ -127,7 +174,7 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
           <Image
             systemName={GLYPH[primaryKind as keyof typeof GLYPH].icon}
             color={GLYPH[primaryKind as keyof typeof GLYPH].color}
-            size={12}
+            size={17}
           />
         )}
         <Text
@@ -162,15 +209,6 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
     );
   }
 
-  const elapsed =
-    elapsedAnchor === null ? null : (
-      <Text
-        date={new Date(elapsedAnchor)}
-        dateStyle="relative"
-        modifiers={[font({ textStyle: 'caption' }), monospacedDigit(), mutedForeground]}
-      />
-    );
-
   // accessoryRectangular is the Lock Screen row: the mark plus the two
   // top-ranked lines is all that fits.
   if (family === 'accessoryRectangular') {
@@ -180,10 +218,10 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
         spacing={6}
         modifiers={[widgetURL('kiloapp:///cloud/sessions'), ...a11y]}
       >
-        {logo(14)}
+        {logo(18)}
         {hasCounts ? (
           <VStack alignment="leading" spacing={1}>
-            {counts.slice(0, 2).map((line, index) => countRow(line, index === 0, true))}
+            {counts.map(line => countRow(line, line.kind === primaryKind, true))}
           </VStack>
         ) : (
           <Text modifiers={[font({ textStyle: 'subheadline' })]}>{statusLine}</Text>
@@ -193,39 +231,59 @@ const layout: (props: WidgetProps, environment: WidgetEnvironment) => React.JSX.
     );
   }
 
-  // systemSmall has room for the mark, then every non-zero line; the wider
-  // families add the elapsed timer on the header row.
-  const wide = family !== 'systemSmall';
-  return (
-    <VStack
-      alignment="leading"
-      spacing={8}
-      modifiers={[
-        widgetURL('kiloapp:///cloud/sessions'),
-        containerBackground(PlatformColor('systemBackground'), 'widget'),
-        ...a11y,
-      ]}
-    >
-      <HStack alignment="center" spacing={8}>
-        {logo(20)}
-        <Spacer />
-        {wide ? elapsed : null}
+  const systemRows = hasCounts ? (
+    <VStack alignment="leading" spacing={wide ? 6 : 4}>
+      {counts.map(line => countRow(line, line.kind === primaryKind, false))}
+    </VStack>
+  ) : (
+    <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
+  );
+
+  const systemModifiers = [
+    widgetURL('kiloapp:///cloud/sessions'),
+    containerBackground(PlatformColor('systemBackground'), 'widget'),
+    ...a11y,
+  ];
+
+  // The medium family is wide, not tall: the mark sits beside the rows and the
+  // whole block centres, the same composition as the Live Activity banner. A
+  // vertical layout there left the right half of the card empty.
+  if (wide) {
+    return (
+      <HStack alignment="center" spacing={14} modifiers={systemModifiers}>
+        {logo(34)}
+        {systemRows}
       </HStack>
-      {hasCounts ? (
-        <VStack alignment="leading" spacing={4}>
-          {counts.map((line, index) => countRow(line, index === 0, false))}
-        </VStack>
-      ) : null}
-      {statusLine !== null ? (
-        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
-      ) : null}
-      {wide ? null : elapsed}
+    );
+  }
+
+  return (
+    <VStack alignment="leading" spacing={8} modifiers={systemModifiers}>
+      <HStack alignment="center" spacing={8}>
+        {logo(26)}
+        <Spacer />
+      </HStack>
+      {/* The mark sits at the top and the counts at the bottom, so the card
+          reads as one composed block. */}
       <Spacer />
+      {systemRows}
     </VStack>
   );
 };
 
-export const ActiveAgentsWidget = createWidget<WidgetProps>(
-  'ActiveAgentsWidget',
-  withWidgetLogo(layout)
-);
+const WIDGET_NAME = 'ActiveAgentsWidget';
+
+const registerLayout = () =>
+  createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)));
+
+export const ActiveAgentsWidget = registerLayout();
+
+/**
+ * Re-bake the stored layout in the active language. Only the gallery
+ * placeholder reads this copy — a placed widget gets translated copy through
+ * its timeline props — but the placeholder is the first thing the user sees in
+ * the widget picker, so it must not stay English after a language change.
+ */
+export function refreshActiveAgentsWidgetCopy(): void {
+  registerLayout();
+}

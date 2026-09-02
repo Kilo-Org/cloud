@@ -122,7 +122,6 @@ function snapshot(sessions: { status: string }[], revision = 0): GlanceableAgent
     sessions,
     now: NOW + revision,
     previousRevision: revision,
-    previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
   });
 }
 
@@ -174,11 +173,8 @@ describe('native adapter recovery', () => {
 
       expect(native.records.filter(record => record.state === 'active')).toMatchObject([
         {
-          props: {
-            running: 1,
-            idle: 1,
-            eligibleStartedAt: new Date(NOW - 60_000).toISOString(),
-          },
+          // No row needs input, so the content state carries no wait.
+          props: { running: 1, idle: 1, needsInputSince: null },
         },
       ]);
       expect(native.records).toHaveLength(2);

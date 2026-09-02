@@ -176,7 +176,7 @@ describe('GlanceablePublisher', () => {
         idle: expectedCount,
       });
     }
-    expect(lastSnapshot(calls, 'publish').eligibleStartedAt).toBeNull();
+    expect(lastSnapshot(calls, 'publish').needsInputSince).toBeNull();
     publisher.dispose();
   });
 

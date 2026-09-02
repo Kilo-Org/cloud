@@ -113,7 +113,7 @@ describe('renderActiveAgentsWidget', () => {
     expect(text).toEqual(['1 Needs input']);
   });
 
-  it('shows every non-zero count and the Open agents affordance at a wide width', () => {
+  it('shows every count, zeros included, and the Open agents affordance at a wide width', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
       {},
@@ -122,7 +122,8 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, 250);
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1 Needs input', '1 Working', 'Open agents']);
+    // The zero row draws so the rows hold still as work moves between states.
+    expect(text).toEqual(['1 Needs input', '1 Working', '0 Idle', 'Open agents']);
   });
 
   it.each([

@@ -3,6 +3,10 @@ import { describe, it, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import type { User } from '@kilocode/db/schema';
 import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
   generateApiToken,
   generateInternalServiceToken,
   generateOrganizationApiToken,
@@ -113,6 +117,27 @@ describe('Token Functions', () => {
   });
 
   describe('validateAuthorizationHeader', () => {
+    function signedToken(claims: Record<string, unknown>) {
+      return jwt.sign(
+        {
+          env: process.env.NODE_ENV,
+          kiloUserId: mockUser.id,
+          apiTokenPepper: mockUser.api_token_pepper,
+          version: JWT_TOKEN_VERSION,
+          ...claims,
+        },
+        getEnvVariable('NEXTAUTH_SECRET'),
+        { algorithm: 'HS256' }
+      );
+    }
+
+    function validationResult(claims: Record<string, unknown>, expectedAudience?: string) {
+      return validateAuthorizationHeader(
+        new Headers({ authorization: `Bearer ${signedToken(claims)}` }),
+        { expectedAudience }
+      );
+    }
+
     it('should validate a valid Bearer token successfully', () => {
       const token = generateApiToken(mockUser);
       const headers = new Headers();
@@ -258,6 +283,59 @@ describe('Token Functions', () => {
       headers.set('authorization', `BeArEr ${token}`); // mixed case
 
       const result = validateAuthorizationHeader(headers);
+
+      expect(result.error).toBeUndefined();
+      expect(result.kiloUserId).toBe(mockUser.id);
+    });
+
+    it.each([
+      ['matching API audience', KILO_API_AUDIENCE, true],
+      ['legacy audience', undefined, true],
+      ['gateway audience', KILO_GATEWAY_AUDIENCE, false],
+      ['worker operation audience', 'session-ingest', false],
+      ['null audience', null, false],
+      ['blank audience', '', false],
+      ['duplicate audience array', [KILO_API_AUDIENCE, KILO_API_AUDIENCE], false],
+      ['invalid audience array', [KILO_API_AUDIENCE, 1], false],
+    ])('applies the API audience policy to a %s', (_name, aud, allowed) => {
+      const result = validationResult({ aud });
+
+      expect(result.error === undefined).toBe(allowed);
+    });
+
+    it('allows explicit gateway and legacy audiences but rejects API-only tokens', () => {
+      expect(
+        validationResult({ aud: KILO_GATEWAY_AUDIENCE }, KILO_GATEWAY_AUDIENCE).error
+      ).toBeUndefined();
+      expect(
+        validationResult({ aud: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE] }, KILO_GATEWAY_AUDIENCE)
+          .error
+      ).toBeUndefined();
+      expect(validationResult({}, KILO_GATEWAY_AUDIENCE).error).toBeUndefined();
+      expect(validationResult({ aud: KILO_API_AUDIENCE }, KILO_GATEWAY_AUDIENCE).error).toMatch(
+        /^Invalid token \([a-f0-9-]+\)$/
+      );
+    });
+
+    it.each<[string, Record<string, unknown>, boolean]>([
+      ['missing issuance', { exp: Math.floor(Date.now() / 1000) + 3600 }, true],
+      ['future issuance', { iat: Math.floor(Date.now() / 1000) + 3600 }, false],
+      ['no dates', {}, true],
+      ['partial modern claim', { tokenPurpose: 'human-api' }, false],
+    ])('preserves historical JWT behavior for %s', (_name, payloadClaims, noTimestamp) => {
+      const token = jwt.sign(
+        {
+          env: process.env.NODE_ENV,
+          kiloUserId: mockUser.id,
+          apiTokenPepper: mockUser.api_token_pepper,
+          version: JWT_TOKEN_VERSION,
+          ...payloadClaims,
+        },
+        getEnvVariable('NEXTAUTH_SECRET'),
+        { algorithm: 'HS256', noTimestamp }
+      );
+
+      const result = validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` }));
 
       expect(result.error).toBeUndefined();
       expect(result.kiloUserId).toBe(mockUser.id);

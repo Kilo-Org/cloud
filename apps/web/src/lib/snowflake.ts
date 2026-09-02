@@ -158,15 +158,16 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
       return;
     }
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-      },
-      { once: true }
-    );
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -181,7 +182,6 @@ function authHeaders(token: string): Record<string, string> {
 
 async function parseAllRows(
   config: SnowflakeConfig,
-  token: string,
   response: SnowflakeApiResponse,
   signal?: AbortSignal
 ): Promise<SnowflakeRow[]> {
@@ -204,8 +204,9 @@ async function parseAllRows(
 
   for (let partition = 1; partition < partitionCount; partition++) {
     url.searchParams.set('partition', String(partition));
+    signal?.throwIfAborted();
     const partitionResponse = await fetch(url, {
-      headers: authHeaders(token),
+      headers: authHeaders(getOrBuildJwt(config)),
       signal,
     });
 
@@ -225,9 +226,9 @@ async function parseAllRows(
 
 async function pollStatement(
   config: SnowflakeConfig,
-  token: string,
   statusUrl: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  pollTimeoutMs?: number
 ): Promise<SnowflakeApiResponse> {
   const url = new URL(statusUrl, `https://${config.accountHost}`);
 
@@ -235,23 +236,46 @@ async function pollStatement(
     throw new Error(`Snowflake returned unexpected poll host: ${url.hostname}`);
   }
 
-  for (let attempt = 1; attempt <= SNOWFLAKE_MAX_POLL_ATTEMPTS; attempt++) {
-    const response = await fetch(url, { headers: authHeaders(token), signal });
+  const controller = new AbortController();
+  const pollSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  const timer =
+    pollTimeoutMs === undefined
+      ? undefined
+      : setTimeout(
+          () => controller.abort(new DOMException('Snowflake polling timed out', 'TimeoutError')),
+          pollTimeoutMs
+        );
 
-    if (response.status === 200) {
-      return (await response.json()) as SnowflakeApiResponse;
+  try {
+    for (
+      let attempt = 1;
+      pollTimeoutMs !== undefined || attempt <= SNOWFLAKE_MAX_POLL_ATTEMPTS;
+      attempt++
+    ) {
+      pollSignal.throwIfAborted();
+      const response = await fetch(url, {
+        headers: authHeaders(getOrBuildJwt(config)),
+        signal: pollSignal,
+      });
+
+      if (response.status === 200) {
+        return (await response.json()) as SnowflakeApiResponse;
+      }
+
+      if (response.status === 202 || response.status === 429) {
+        const delay = SNOWFLAKE_POLL_BASE_DELAY_MS * attempt;
+        await sleep(pollTimeoutMs === undefined ? delay : Math.min(delay, 5_000), pollSignal);
+        continue;
+      }
+
+      const body = await response.text().catch(() => '');
+      throw new Error(`Snowflake poll failed (${response.status}): ${body.slice(0, 500)}`);
     }
 
-    if (response.status === 202 || response.status === 429) {
-      await sleep(SNOWFLAKE_POLL_BASE_DELAY_MS * attempt, signal);
-      continue;
-    }
-
-    const body = await response.text().catch(() => '');
-    throw new Error(`Snowflake poll failed (${response.status}): ${body.slice(0, 500)}`);
+    throw new Error('Snowflake query timed out after polling');
+  } finally {
+    clearTimeout(timer);
   }
-
-  throw new Error('Snowflake query timed out after polling');
 }
 
 // ---------------------------------------------------------------------------
@@ -272,8 +296,18 @@ export async function executeSnowflakeStatement(params: {
   statement: string;
   bindings?: SnowflakeBinding[];
   timeoutSeconds?: number;
+  pollTimeoutMs?: number;
   signal?: AbortSignal;
 }): Promise<SnowflakeRow[]> {
+  if (
+    params.pollTimeoutMs !== undefined &&
+    (!Number.isFinite(params.pollTimeoutMs) ||
+      params.pollTimeoutMs <= 0 ||
+      params.pollTimeoutMs > 2_147_483_647)
+  ) {
+    throw new Error('Invalid Snowflake polling timeout');
+  }
+  params.signal?.throwIfAborted();
   const token = getOrBuildJwt(params.config);
   const requestId = crypto.randomUUID();
 
@@ -305,7 +339,7 @@ export async function executeSnowflakeStatement(params: {
 
   if (response.status === 200) {
     const payload = (await response.json()) as SnowflakeApiResponse;
-    return parseAllRows(params.config, token, payload, params.signal);
+    return parseAllRows(params.config, payload, params.signal);
   }
 
   if (response.status === 202) {
@@ -315,12 +349,12 @@ export async function executeSnowflakeStatement(params: {
     }
     const completed = await pollStatement(
       params.config,
-      token,
       payload.statementStatusUrl,
-      params.signal
+      params.signal,
+      params.pollTimeoutMs
     );
     if (completed.code === '090001' || Array.isArray(completed.data)) {
-      return parseAllRows(params.config, token, completed, params.signal);
+      return parseAllRows(params.config, completed, params.signal);
     }
     throw new Error(completed.message ?? 'Snowflake async query failed');
   }

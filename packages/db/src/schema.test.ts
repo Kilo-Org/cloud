@@ -712,6 +712,16 @@ describe('database schema', () => {
     // Snapshot of expected enum values - update this when intentionally changing enums
     // After updating, run 'pnpm drizzle generate' to create the migration
     const expectedEnumValues = {
+      WorkspaceFolderColor: [
+        'default',
+        'red',
+        'orange',
+        'yellow',
+        'green',
+        'teal',
+        'blue',
+        'purple',
+      ],
       KiloPassTier: ['tier_19', 'tier_49', 'tier_199'],
       KiloPassCadence: ['monthly', 'yearly'],
       KiloPassPaymentProvider: ['stripe', 'app_store', 'google_play'],

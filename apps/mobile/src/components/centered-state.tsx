@@ -93,18 +93,12 @@ export function CenteredState({
             bottomInset: surface.bottomInset,
             nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
             nativeViewportBottom: surface.bounds?.bottom,
+            roundToPixel: value => PixelRatio.roundToNearestPixel(value),
           })
         : undefined,
     [surface, viewport, contentHeight]
   );
-  const contentStyle = useMemo(
-    () => ({
-      flexGrow: 1,
-      ...layout,
-      paddingTop: layout ? PixelRatio.roundToNearestPixel(layout.paddingTop) : undefined,
-    }),
-    [layout]
-  );
+  const contentStyle = useMemo(() => ({ flexGrow: 1, ...layout }), [layout]);
   const ready = layout !== undefined;
 
   if (!surface) {

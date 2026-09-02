@@ -8,6 +8,7 @@ type CenteredStateLayoutInput = {
   bottomInset?: number;
   nativeViewportFillsSurface?: boolean;
   nativeViewportBottom?: number;
+  roundToPixel?: (value: number) => number;
 };
 
 const STATE_GAP = 16;
@@ -43,23 +44,28 @@ export function getCenteredStateLayout({
   bottomInset = 0,
   nativeViewportFillsSurface = false,
   nativeViewportBottom = surface.bottom,
+  roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
   const visible = intersectStateFrames(viewport, surface);
   const top = Math.max(visible.top, surface.top + topInset);
   const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
   const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
-  const fits = contentHeight <= bottom - top;
+  const fits = contentHeight <= roundToPixel(bottom - top);
   const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));
   const contentTop = fits
     ? Math.max(top + clearance, Math.min(idealTop, bottom - contentHeight - clearance))
     : top + STATE_GAP;
 
+  const paddingTop = Math.max(0, contentTop - viewport.top);
+  const paddingBottom = fits
+    ? Math.max(0, viewportBottom - contentTop - contentHeight)
+    : Math.max(STATE_GAP, viewportBottom - bottom + STATE_GAP);
+  const roundedPaddingTop = roundToPixel(paddingTop);
+
   return {
-    minHeight: Math.max(0, viewportBottom - viewport.top),
-    paddingTop: Math.max(0, contentTop - viewport.top),
-    paddingBottom: fits
-      ? Math.max(0, viewportBottom - contentTop - contentHeight)
-      : Math.max(STATE_GAP, viewportBottom - bottom + STATE_GAP),
+    minHeight: roundToPixel(Math.max(0, viewportBottom - viewport.top)),
+    paddingTop: roundedPaddingTop,
+    paddingBottom: roundToPixel(paddingTop + paddingBottom) - roundedPaddingTop,
   };
 }

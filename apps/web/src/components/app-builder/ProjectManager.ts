@@ -101,8 +101,10 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   }
 
   function getActiveSession(): AppBuilderSession | undefined {
-    const sessions = store.getState().sessions;
-    return sessions[sessions.length - 1];
+    if (!cloudAgentSessionId) return undefined;
+    return store
+      .getState()
+      .sessions.find(session => session.info.cloud_agent_session_id === cloudAgentSessionId);
   }
 
   function subscribeToSession(session: AppBuilderSession): void {
@@ -123,12 +125,16 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     const sessionInfos = proj.sessions;
     if (sessionInfos.length === 0) return [];
 
-    const activeInfo =
-      sessionInfos.find(s => s.ended_at === null) ?? sessionInfos[sessionInfos.length - 1];
+    const activeInfo = project.session_id
+      ? sessionInfos.find(s => s.cloud_agent_session_id === project.session_id)
+      : undefined;
 
+    const orderedSessionInfos = activeInfo
+      ? [...sessionInfos.filter(info => info.id !== activeInfo.id), activeInfo]
+      : sessionInfos;
     const sessions: AppBuilderSession[] = [];
 
-    for (const info of sessionInfos) {
+    for (const info of orderedSessionInfos) {
       const isActive = info.id === activeInfo?.id;
 
       if (!isActive) {
@@ -199,6 +205,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     store.setState({
       sessions: [...currentSessions, newSession],
       isStreaming: true,
+      isRecoveringSession: false,
     });
     cloudAgentSessionId = newSessionId;
 
@@ -259,15 +266,22 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
 
   // Determine if the active session needs initial streaming from the backend session info.
   // `initiated` lives on ProjectSessionInfo (routing data), not on SessionDisplayInfo.
-  const activeProjectSessionInfo =
-    project.sessions.find(s => s.ended_at === null) ??
-    project.sessions[project.sessions.length - 1];
+  const activeProjectSessionInfo = project.session_id
+    ? project.sessions.find(s => s.cloud_agent_session_id === project.session_id)
+    : undefined;
 
-  if (activeProjectSessionInfo?.initiated === false) {
+  if (activeProjectSessionInfo?.prepared === true && activeProjectSessionInfo.initiated === false) {
     pendingInitialStreamingStart = true;
-  } else if (cloudAgentSessionId) {
+  } else if (
+    cloudAgentSessionId &&
+    activeProjectSessionInfo &&
+    activeProjectSessionInfo.prepared !== false
+  ) {
     pendingReconnect = true;
   } else {
+    if (cloudAgentSessionId) {
+      store.setState({ pendingNewSession: true, isRecoveringSession: true });
+    }
     startPreviewPollingIfNeeded();
   }
 
@@ -339,6 +353,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     }
 
     const effectiveModel = model ?? store.getState().model;
+    const isRecoveringSession = store.getState().isRecoveringSession;
 
     store.setState({ pendingNewSession: false, isStreaming: true });
 
@@ -370,7 +385,11 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
       .catch((err: Error) => {
         if (destroyed) return;
         logger.logError('Failed to start new session', err);
-        store.setState({ isStreaming: false });
+        store.setState({
+          pendingNewSession: true,
+          isRecoveringSession,
+          isStreaming: false,
+        });
       });
   }
 
@@ -423,11 +442,12 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     if (currentActive) {
       currentActive.info.ended_at = new Date().toISOString();
     }
-    store.setState({ pendingNewSession: true });
+    store.setState({ pendingNewSession: true, isRecoveringSession: false });
   }
 
   function cancelNewSession(): void {
     if (destroyed) return;
+    if (store.getState().isRecoveringSession) return;
     const currentActive = getActiveSession();
     if (currentActive) {
       currentActive.info.ended_at = null;

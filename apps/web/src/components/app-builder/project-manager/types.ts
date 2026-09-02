@@ -29,6 +29,8 @@ export type ProjectState = {
   sessions: AppBuilderSession[];
   /** True while the user has clicked "New Chat" but hasn't sent the first message yet */
   pendingNewSession: boolean;
+  /** True when a missing backend session requires the next message to create a replacement */
+  isRecoveringSession: boolean;
 };
 
 export type StateListener = () => void;

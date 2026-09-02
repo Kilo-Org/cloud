@@ -110,6 +110,105 @@ async function expectStorePurchaseConstraintViolation(
   });
 }
 
+describe('code review reviewer affinity migration', () => {
+  it('preserves historical attempts and releases the expansion lock before validation', async () => {
+    const expansion = fs.readFileSync(
+      path.join(__dirname, 'migrations/0235_isolate_review_attempt_state.sql'),
+      'utf8'
+    );
+    const validation = fs.readFileSync(
+      path.join(__dirname, 'migrations/0236_validate_isolate_review_attempt_state.sql'),
+      'utf8'
+    );
+    expect(expansion).not.toMatch(/^COMMIT;/m);
+    expect(validation.trimStart()).toMatch(/^COMMIT;/);
+    const statements = [expansion, validation]
+      .join('\n--> statement-breakpoint\n')
+      .split('--> statement-breakpoint')
+      .map(statement => statement.trim())
+      .filter(
+        statement =>
+          statement.startsWith('ALTER TABLE "cloud_agent_code_review_attempts"') ||
+          statement === 'COMMIT;' ||
+          statement === 'BEGIN;'
+      );
+    const addedConstraints = statements.flatMap(statement => {
+      const name = statement.match(/ADD CONSTRAINT "([^"]+)"/)?.[1];
+      return name ? [name] : [];
+    });
+    expect(addedConstraints).toContain('code_review_attempt_reviewer_affinity_check');
+    const client = await schemaTestDb.pool.connect();
+    try {
+      await client.query(`CREATE TEMP TABLE review_attempt_upgrade
+        (LIKE cloud_agent_code_review_attempts INCLUDING DEFAULTS)`);
+      await client.query(`ALTER TABLE review_attempt_upgrade
+        DROP COLUMN reviewer_backend, DROP COLUMN reviewer_execution_id,
+        DROP COLUMN reviewer_selected_at, DROP COLUMN publication_state`);
+      await client.query(
+        `INSERT INTO review_attempt_upgrade
+          (id, code_review_id, attempt_number, status, execution_id, session_id, started_at)
+          VALUES ($1, $2, 1, 'running', 'legacy-execution', 'agent_historical', '2026-04-29 01:16:12.945+00')`,
+        [crypto.randomUUID(), crypto.randomUUID()]
+      );
+      const before = await client.query('SELECT * FROM review_attempt_upgrade');
+      await client.query('BEGIN');
+      for (const statement of statements) {
+        await client.query(
+          statement.replaceAll('"cloud_agent_code_review_attempts"', '"review_attempt_upgrade"')
+        );
+        const addedConstraint = statement.match(/ADD CONSTRAINT "([^"]+)"/)?.[1];
+        if (addedConstraint) {
+          const constraint = await client.query<{ convalidated: boolean }>(
+            `SELECT convalidated FROM pg_constraint
+              WHERE conrelid = 'pg_temp.review_attempt_upgrade'::regclass
+                AND conname = $1`,
+            [addedConstraint]
+          );
+          expect(constraint.rows).toEqual([{ convalidated: false }]);
+        }
+        if (statement.includes('VALIDATE CONSTRAINT')) {
+          const locks = await client.query<{ mode: string }>(
+            `SELECT mode FROM pg_locks
+              WHERE pid = pg_backend_pid()
+                AND relation = 'pg_temp.review_attempt_upgrade'::regclass
+                AND granted`
+          );
+          expect(locks.rows).toContainEqual({ mode: 'ShareUpdateExclusiveLock' });
+          expect(locks.rows).not.toContainEqual({ mode: 'AccessExclusiveLock' });
+        }
+      }
+      await client.query('COMMIT');
+      const after = await client.query('SELECT * FROM review_attempt_upgrade');
+      expect(after.rows).toEqual(
+        before.rows.map(row => ({
+          ...row,
+          reviewer_backend: 'legacy',
+          reviewer_execution_id: null,
+          reviewer_selected_at: null,
+          publication_state: null,
+        }))
+      );
+      const constraints = await client.query<{ conname: string; convalidated: boolean }>(
+        `SELECT conname, convalidated FROM pg_constraint
+          WHERE conrelid = 'pg_temp.review_attempt_upgrade'::regclass
+            AND conname = ANY($1::text[])
+          ORDER BY conname`,
+        [addedConstraints]
+      );
+      expect(constraints.rows).toEqual(
+        addedConstraints.toSorted().map(conname => ({ conname, convalidated: true }))
+      );
+    } finally {
+      try {
+        await client.query('ROLLBACK');
+        await client.query('DROP TABLE IF EXISTS pg_temp.review_attempt_upgrade');
+      } finally {
+        client.release();
+      }
+    }
+  });
+});
+
 describe('user data export cleanup reasons', () => {
   afterEach(async () => {
     await schemaTestDb.db.execute(sql`
@@ -1603,8 +1702,8 @@ describe('database schema', () => {
       await expect(lite).resolves.not.toThrow();
     });
 
-    it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+    it('runs migration 0205 against duplicates before creating its unique index', async () => {
+      const migrationPath = path.join(__dirname, 'migrations/0205_device_auth_hardening.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
       const statements = fullMigration.split('--> statement-breakpoint');
       // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
@@ -1617,7 +1716,7 @@ describe('database schema', () => {
         )
       );
       if (migration === undefined || createUniqueIndex === undefined) {
-        throw new Error('migration 0204 backfill or unique index statement not found');
+        throw new Error('migration 0205 backfill or unique index statement not found');
       }
       const rollback = new Error('rollback migration test');
 
@@ -1675,7 +1774,7 @@ describe('database schema', () => {
           expect(loser).toMatchObject({ status: 'suspended', installationId: null });
           expect(loser?.metadata).toMatchObject({
             github_dedup: {
-              reason: 'Duplicate installation resolved by migration 0204',
+              reason: 'Duplicate installation resolved by migration 0205',
               original_installation_id: installationId,
             },
           });

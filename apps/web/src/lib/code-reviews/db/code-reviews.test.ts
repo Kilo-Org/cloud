@@ -10,12 +10,17 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type { CodeReviewCouncilResult, ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import {
+  admitCodeReviewAttemptForDispatch,
+  admitCodeReviewLedgerRow,
+  pinCodeReviewAttemptReviewer,
   bitbucketCodeReviewerLifecycleLockKey,
+  cancelCodeReview,
+  prepareCodeReviewCancellation,
   cancelActiveCodeReviewsById,
   cancelActiveCodeReviewsForIntegration,
   cancelSupersededReviewsForPR,
@@ -28,6 +33,7 @@ import {
   findActiveReviewsForPR,
   findExistingReview,
   getCodeReviewAttemptForReview,
+  getCodeReviewAttemptMetadataForReview,
   getCodeReviewCouncilResult,
   getSessionUsageFromBilling,
   listCodeReviewAttempts,
@@ -35,6 +41,7 @@ import {
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
   updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
   resetCodeReviewForRetry,
   failReservedQueuedReview,
   updatePreviousReviewSummary,
@@ -1745,11 +1752,11 @@ describe('findPreviousCompletedReview', () => {
     expect(attempts.filter(attempt => attempt.retry_reason === 'infra_failure')).toHaveLength(0);
   });
 
-  it('updates an explicit attempt id even when a newer attempt exists', async () => {
+  it('updates an explicit nonterminal historical attempt without changing a newer attempt', async () => {
     const reviewId = await createReview('sha-explicit-attempt');
     const firstAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
-      status: 'failed',
+      status: 'running',
       sessionId: 'agent-first',
     });
     const newerAttempt = await createCodeReviewAttempt({
@@ -1828,6 +1835,387 @@ describe('findPreviousCompletedReview', () => {
   });
 });
 
+describe('reviewer attempt affinity', () => {
+  let user: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    user = await insertTestUser({ id: `oauth/github/affinity-${crypto.randomUUID()}` });
+  });
+
+  afterAll(async () => {
+    if (reviewIds.length)
+      await db
+        .delete(cloud_agent_code_reviews)
+        .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+  });
+
+  async function reservedReview() {
+    const reservation = crypto.randomUUID();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: user.id,
+        repo_full_name: 'affinity/repo',
+        pr_number: 42,
+        pr_url: 'https://github.com/affinity/repo/pull/42',
+        pr_title: 'Affinity fixture',
+        pr_author: 'author',
+        base_ref: 'main',
+        head_ref: 'feature',
+        head_sha: 'a'.repeat(40),
+        status: 'queued',
+        dispatch_reservation_id: reservation,
+      })
+      .returning();
+    reviewIds.push(review.id);
+    return { codeReviewId: review.id, dispatchReservationId: reservation };
+  }
+
+  it('admits one unselected attempt concurrently and pins execution with selection', async () => {
+    const reserved = await reservedReview();
+    const attempts = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        admitCodeReviewAttemptForDispatch({ ...reserved, previousStatus: 'pending' })
+      )
+    );
+    expect(new Set(attempts.map(attempt => attempt.id)).size).toBe(1);
+    expect(attempts[0].reviewer_backend).toBe('unselected');
+    expect(attempts[0].reviewer_execution_id).toBeNull();
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        db.transaction(tx =>
+          pinCodeReviewAttemptReviewer(tx, {
+            ...reserved,
+            attemptId: attempts[0].id,
+            backend: 'legacy',
+          })
+        )
+      )
+    );
+    expect(results.filter(result => result.selected)).toHaveLength(1);
+    for (const { attempt } of results) {
+      expect(attempt.reviewer_backend).toBe('legacy');
+      expect(attempt.reviewer_execution_id).toBe(attempt.id);
+      expect(attempt.reviewer_selected_at).not.toBeNull();
+    }
+    const changed = await db.transaction(tx =>
+      pinCodeReviewAttemptReviewer(tx, {
+        ...reserved,
+        attemptId: attempts[0].id,
+        backend: 'isolate',
+      })
+    );
+    expect(changed.selected).toBe(false);
+    expect(changed.attempt.reviewer_backend).toBe('legacy');
+  });
+
+  it.each([true, false])(
+    'retains explicit legacy affinity for the one infrastructure retry (selected source: %s)',
+    async selected => {
+      const reserved = await reservedReview();
+      const source = await createCodeReviewAttempt({
+        codeReviewId: reserved.codeReviewId,
+        status: 'failed',
+        terminalReason: 'sandbox_error',
+        analyticsEnabledAtDispatch: true,
+      });
+      if (selected)
+        await db
+          .update(cloud_agent_code_review_attempts)
+          .set({
+            reviewer_execution_id: source.id,
+            reviewer_selected_at: '2026-04-29 01:16:12.945+00',
+          })
+          .where(eq(cloud_agent_code_review_attempts.id, source.id));
+      const original = await getCodeReviewAttemptForReview(reserved.codeReviewId, source.id);
+      const results = await Promise.all(
+        Array.from({ length: 3 }, () =>
+          createInfraRetryAttemptIfMissing({
+            codeReviewId: reserved.codeReviewId,
+            retryOfAttemptId: source.id,
+          })
+        )
+      );
+      const created = results.find(result => result.outcome === 'created');
+      if (!created || created.outcome !== 'created') throw new Error('Expected a created retry');
+      expect(results.filter(result => result.outcome === 'created')).toHaveLength(1);
+      expect(results.filter(result => result.outcome === 'existing-for-attempt')).toHaveLength(2);
+      expect(created.attempt).toMatchObject({
+        reviewer_backend: 'legacy',
+        reviewer_execution_id: created.attempt.id,
+        reviewer_selected_at: expect.any(String),
+        analytics_enabled_at_dispatch: true,
+        retry_of_attempt_id: source.id,
+        retry_reason: 'infra_failure',
+        status: 'pending',
+        session_id: null,
+        cli_session_id: null,
+        execution_id: null,
+      });
+      expect(created.attempt.id).not.toBe(source.id);
+      expect(new Date(created.attempt.reviewer_selected_at ?? '').getTime()).toBeGreaterThan(
+        Date.parse('2026-04-29T01:16:12.945Z')
+      );
+      expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, source.id)).toEqual(
+        original
+      );
+      const reselection = await db.transaction(tx =>
+        pinCodeReviewAttemptReviewer(tx, {
+          ...reserved,
+          attemptId: created.attempt.id,
+          backend: 'isolate',
+        })
+      );
+      expect(reselection).toEqual({ selected: false, attempt: created.attempt });
+      const anotherSource = await createCodeReviewAttempt({
+        codeReviewId: reserved.codeReviewId,
+        status: 'failed',
+      });
+      expect(
+        await createInfraRetryAttemptIfMissing({
+          codeReviewId: reserved.codeReviewId,
+          retryOfAttemptId: anotherSource.id,
+        })
+      ).toEqual({
+        outcome: 'existing-for-review',
+        attempt: created.attempt,
+      });
+    }
+  );
+
+  it.each(['unselected', 'isolate'] as const)(
+    'rejects infrastructure retries from %s affinity',
+    async backend => {
+      const reserved = await reservedReview();
+      const source = await createCodeReviewAttempt({
+        codeReviewId: reserved.codeReviewId,
+        status: 'failed',
+      });
+      await db
+        .update(cloud_agent_code_review_attempts)
+        .set({
+          reviewer_backend: backend,
+          reviewer_execution_id: backend === 'isolate' ? source.id : null,
+          reviewer_selected_at: backend === 'isolate' ? '2026-04-29 01:16:12.945+00' : null,
+        })
+        .where(eq(cloud_agent_code_review_attempts.id, source.id));
+      const before = await listCodeReviewAttempts(reserved.codeReviewId);
+
+      await expect(
+        createInfraRetryAttemptIfMissing({
+          codeReviewId: reserved.codeReviewId,
+          retryOfAttemptId: source.id,
+        })
+      ).rejects.toThrow('legacy attempt affinity');
+      expect(await listCodeReviewAttempts(reserved.codeReviewId)).toEqual(before);
+    }
+  );
+
+  it('reads attempt metadata without selecting or returning publication state', async () => {
+    const reserved = await reservedReview();
+    const attempt = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    const unrelated = await reservedReview();
+    const { publication_state: _publicationState, ...metadata } = attempt;
+    const select = jest.spyOn(db, 'select');
+    try {
+      expect(await listCodeReviewAttempts(reserved.codeReviewId)).toEqual([metadata]);
+      expect(
+        await getCodeReviewAttemptMetadataForReview(reserved.codeReviewId, attempt.id)
+      ).toEqual(metadata);
+      expect(
+        await getCodeReviewAttemptMetadataForReview(unrelated.codeReviewId, attempt.id)
+      ).toBeNull();
+      expect(select).toHaveBeenCalledTimes(3);
+      for (const [columns] of select.mock.calls) {
+        expect(columns).toBeDefined();
+        expect(columns).not.toHaveProperty('publication_state');
+        expect(columns).toHaveProperty('id', cloud_agent_code_review_attempts.id);
+      }
+    } finally {
+      select.mockRestore();
+    }
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, attempt.id)).toEqual(attempt);
+  });
+
+  it('retains historical queued affinity and the pre-reservation status without metadata', async () => {
+    const reserved = await reservedReview();
+    const attempt = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'queued',
+    });
+    expect(attempt.status).toBe('queued');
+    expect(attempt.reviewer_backend).toBe('legacy');
+    expect(attempt.reviewer_execution_id).toBeNull();
+    const later = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    expect(later).toEqual(attempt);
+    const selected = await db.transaction(tx =>
+      pinCodeReviewAttemptReviewer(tx, { ...reserved, attemptId: attempt.id, backend: 'isolate' })
+    );
+    expect(selected.attempt).toEqual(attempt);
+  });
+
+  it('keeps existing and reconstructed executing attempts legacy', async () => {
+    const reserved = await reservedReview();
+    const historical = await createCodeReviewAttempt({
+      codeReviewId: reserved.codeReviewId,
+      status: 'running',
+      executionId: 'legacy-execution',
+    });
+    const unchanged = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    expect(unchanged.id).toBe(historical.id);
+    expect(unchanged.reviewer_backend).toBe('legacy');
+    const another = await reservedReview();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ session_id: 'agent_old', started_at: '2026-04-29 01:16:12.945+00' })
+      .where(eq(cloud_agent_code_reviews.id, another.codeReviewId));
+    const recovered = await admitCodeReviewAttemptForDispatch({
+      ...another,
+      previousStatus: 'queued',
+    });
+    expect(recovered.reviewer_backend).toBe('legacy');
+    expect(recovered.session_id).toBe('agent_old');
+    expect(new Date(recovered.started_at ?? '').toISOString()).toBe('2026-04-29T01:16:12.945Z');
+  });
+
+  it('fails only the reserved current attempt and preserves historical and unrelated attempts', async () => {
+    const reserved = await reservedReview();
+    const historical = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    const current = await createCodeReviewAttempt({ codeReviewId: reserved.codeReviewId });
+    const unrelated = await reservedReview();
+    const unrelatedAttempt = await admitCodeReviewAttemptForDispatch({
+      ...unrelated,
+      previousStatus: 'pending',
+    });
+
+    expect(
+      await failReservedQueuedReview(
+        reserved.codeReviewId,
+        reserved.dispatchReservationId,
+        'Preparation failed',
+        'abandoned',
+        current.id
+      )
+    ).toBe(true);
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, current.id)).toMatchObject({
+      status: 'failed',
+      error_message: 'Preparation failed',
+      terminal_reason: 'abandoned',
+      completed_at: expect.any(String),
+    });
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, historical.id)).toEqual(
+      historical
+    );
+    expect(
+      await getCodeReviewAttemptForReview(unrelated.codeReviewId, unrelatedAttempt.id)
+    ).toEqual(unrelatedAttempt);
+  });
+
+  it.each([
+    { status: 'running' as const },
+    { status: 'completed' as const },
+    { status: 'queued' as const, sessionId: 'agent_existing' },
+  ])('does not fail an executing or terminal reserved attempt: %j', async fields => {
+    const reserved = await reservedReview();
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reserved.codeReviewId,
+      ...fields,
+    });
+    expect(
+      await failReservedQueuedReview(
+        reserved.codeReviewId,
+        reserved.dispatchReservationId,
+        'Preparation failed',
+        undefined,
+        attempt.id
+      )
+    ).toBe(false);
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, attempt.id)).toEqual(attempt);
+    expect(
+      await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, reserved.codeReviewId),
+      })
+    ).toMatchObject({ status: 'queued', dispatch_reservation_id: reserved.dispatchReservationId });
+  });
+
+  it('does not let a stale reservation or attempt fail its successor', async () => {
+    const reserved = await reservedReview();
+    const attempt = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    expect(
+      await failReservedQueuedReview(
+        reserved.codeReviewId,
+        crypto.randomUUID(),
+        'Preparation failed',
+        undefined,
+        attempt.id
+      )
+    ).toBe(false);
+    const successor = await createCodeReviewAttempt({ codeReviewId: reserved.codeReviewId });
+    expect(
+      await failReservedQueuedReview(
+        reserved.codeReviewId,
+        reserved.dispatchReservationId,
+        'Preparation failed',
+        undefined,
+        attempt.id
+      )
+    ).toBe(false);
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, attempt.id)).toEqual(attempt);
+    expect(await getCodeReviewAttemptForReview(reserved.codeReviewId, successor.id)).toEqual(
+      successor
+    );
+    expect(
+      await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, reserved.codeReviewId),
+      })
+    ).toMatchObject({ status: 'queued', dispatch_reservation_id: reserved.dispatchReservationId });
+  });
+
+  it('rejects stale reservations and superseded attempts without pinning', async () => {
+    const reserved = await reservedReview();
+    const attempt = await admitCodeReviewAttemptForDispatch({
+      ...reserved,
+      previousStatus: 'pending',
+    });
+    await expect(
+      db.transaction(tx =>
+        pinCodeReviewAttemptReviewer(tx, {
+          ...reserved,
+          dispatchReservationId: 'wrong',
+          attemptId: attempt.id,
+          backend: 'legacy',
+        })
+      )
+    ).rejects.toThrow('reservation changed');
+    await createCodeReviewAttempt({ codeReviewId: reserved.codeReviewId });
+    await expect(
+      db.transaction(tx =>
+        pinCodeReviewAttemptReviewer(tx, { ...reserved, attemptId: attempt.id, backend: 'legacy' })
+      )
+    ).rejects.toThrow('not current');
+    expect(
+      (await getCodeReviewAttemptForReview(reserved.codeReviewId, attempt.id))?.reviewer_backend
+    ).toBe('unselected');
+  });
+});
+
 describe('getSessionUsageFromBilling', () => {
   const usageIds: string[] = [];
 
@@ -1900,12 +2288,697 @@ describe('getSessionUsageFromBilling', () => {
   });
 });
 
+describe('code review cancellation and callback guards', () => {
+  let user: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    user = await insertTestUser({ id: `oauth/github/cancellation-${crypto.randomUUID()}` });
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length)
+      await db
+        .delete(cloud_agent_code_reviews)
+        .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+  });
+
+  async function queuedReview(
+    overrides: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {}
+  ) {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: user.id,
+        repo_full_name: REPO,
+        pr_number: 42,
+        pr_url: `https://github.com/${REPO}/pull/42`,
+        pr_title: 'Cancellation fixture',
+        pr_author: 'author',
+        base_ref: 'main',
+        head_ref: 'feature',
+        head_sha: crypto.randomUUID(),
+        status: 'queued',
+        dispatch_reservation_id: crypto.randomUUID(),
+        trigger_source: 'manual',
+        updated_at: '2026-04-29 01:16:12.945+00',
+        ...overrides,
+      })
+      .returning();
+    reviewIds.push(review.id);
+    await admitCodeReviewLedgerRow({
+      reviewId: review.id,
+      userId: user.id,
+      triggerSource: review.trigger_source,
+    });
+    return review;
+  }
+
+  async function readState(reviewId: string) {
+    const review = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    const ledger = await db.query.operation_ledgers.findFirst({
+      where: eq(operation_ledgers.operation_key, `review:${reviewId}`),
+    });
+    const attempts = await listCodeReviewAttempts(reviewId);
+    return { review, ledger, attempts };
+  }
+
+  async function waitForBlockedCallback(lockingPid: number): Promise<void> {
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const { rows } = await db.execute<{ waiting: boolean }>(sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND ${lockingPid}::integer = ANY(pg_blocking_pids(pid))
+        ) AS waiting
+      `);
+      if (rows[0]?.waiting) return;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    throw new Error('Callback did not wait on the expected row lock');
+  }
+
+  it.each(['pending', 'queued'] as const)(
+    'atomically cancels the current %s legacy attempt once and releases its reservation',
+    async status => {
+      const review = await queuedReview({
+        status,
+        total_tokens_in: 0,
+        total_tokens_out: 0,
+        total_cost_musd: 0,
+      });
+      const historical = await createCodeReviewAttempt({
+        codeReviewId: review.id,
+        status: 'completed',
+        sessionId: 'agent-old',
+      });
+      const current = await createCodeReviewAttempt({ codeReviewId: review.id, status });
+      const unrelated = await queuedReview();
+      await createCodeReviewAttempt({ codeReviewId: unrelated.id, status: 'queued' });
+      const unrelatedBefore = await readState(unrelated.id);
+      const expected = { attemptId: current.id, updatedAt: '2026-04-29 01:16:12.945+00' };
+
+      const results = await Promise.all(
+        Array.from({ length: 3 }, () => cancelCodeReview(review.id, expected))
+      );
+
+      expect(results.filter(Boolean)).toHaveLength(1);
+      const stored = await readState(review.id);
+      expect(stored.review).toMatchObject({
+        status: 'cancelled',
+        completed_at: expect.any(String),
+        dispatch_reservation_id: null,
+        session_id: null,
+        cli_session_id: null,
+        total_tokens_in: 0,
+        total_tokens_out: 0,
+        total_cost_musd: 0,
+      });
+      expect(stored.attempts[1]).toMatchObject({
+        id: current.id,
+        status: 'cancelled',
+        completed_at: stored.review?.completed_at,
+        updated_at: stored.review?.updated_at,
+        reviewer_backend: 'legacy',
+      });
+      expect(stored.ledger).toMatchObject({ status: 'no_op', kilo_user_id: user.id });
+      expect(await getCodeReviewAttemptForReview(review.id, historical.id)).toEqual(historical);
+      expect(await readState(unrelated.id)).toEqual(unrelatedBefore);
+      expect(await cancelCodeReview(review.id, expected)).toBe(false);
+      expect(await readState(review.id)).toEqual(stored);
+    }
+  );
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+    'preserves a %s parent and its attempt',
+    async status => {
+      const review = await queuedReview({ status });
+      await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+      const before = await readState(review.id);
+
+      expect(await cancelCodeReview(review.id)).toBe(false);
+      expect(await prepareCodeReviewCancellation(review.id)).toBeNull();
+      expect(await readState(review.id)).toEqual(before);
+    }
+  );
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+    'preserves a %s latest attempt under an active parent',
+    async status => {
+      const review = await queuedReview();
+      await createCodeReviewAttempt({ codeReviewId: review.id, status });
+      const before = await readState(review.id);
+
+      expect(await cancelCodeReview(review.id)).toBe(false);
+      expect(await prepareCodeReviewCancellation(review.id)).toBeNull();
+      expect(await readState(review.id)).toEqual(before);
+    }
+  );
+
+  it.each<{
+    name: string;
+    review?: Partial<typeof cloud_agent_code_reviews.$inferInsert>;
+    attempt?: Partial<typeof cloud_agent_code_review_attempts.$inferInsert>;
+  }>([
+    { name: 'parent session', review: { session_id: 'agent-started' } },
+    { name: 'parent CLI session', review: { cli_session_id: 'ses-started' } },
+    { name: 'parent start', review: { started_at: '2026-04-29 01:16:12.945+00' } },
+    { name: 'parent usage', review: { total_tokens_in: 1 } },
+    { name: 'attempt session', attempt: { session_id: 'agent-started' } },
+    { name: 'attempt CLI session', attempt: { cli_session_id: 'ses-started' } },
+    { name: 'attempt execution', attempt: { execution_id: 'exec-started' } },
+    { name: 'running attempt', attempt: { status: 'running' } },
+  ])('does not locally cancel started work: $name', async fields => {
+    const review = await queuedReview(fields.review);
+    const current = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    if (fields.attempt)
+      await db
+        .update(cloud_agent_code_review_attempts)
+        .set(fields.attempt)
+        .where(eq(cloud_agent_code_review_attempts.id, current.id));
+    const before = await readState(review.id);
+
+    expect(
+      await cancelCodeReview(review.id, { attemptId: current.id, updatedAt: review.updated_at })
+    ).toBe(false);
+    expect(await readState(review.id)).toEqual(before);
+  });
+
+  it.each([true, false])(
+    'rejects a successor admitted after preparation (previous attempt: %s)',
+    async existing => {
+      const review = await queuedReview();
+      const previous = existing
+        ? await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' })
+        : null;
+      const current = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+      const before = await readState(review.id);
+
+      expect(
+        await cancelCodeReview(review.id, {
+          attemptId: previous?.id ?? null,
+          updatedAt: review.updated_at,
+        })
+      ).toBe(false);
+      expect(await readState(review.id)).toEqual(before);
+      expect(await getCodeReviewAttemptForReview(review.id, current.id)).toEqual(current);
+    }
+  );
+
+  it('rejects a stale parent snapshot after a reservation changes', async () => {
+    const review = await queuedReview();
+    const current = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, review.id));
+    const before = await readState(review.id);
+
+    expect(
+      await cancelCodeReview(review.id, { attemptId: current.id, updatedAt: review.updated_at })
+    ).toBe(false);
+    expect(await readState(review.id)).toEqual(before);
+  });
+
+  it('does not use the local legacy fallback for a pinned isolate attempt', async () => {
+    const review = await queuedReview();
+    const attemptId = crypto.randomUUID();
+    await db.insert(cloud_agent_code_review_attempts).values({
+      id: attemptId,
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'queued',
+      reviewer_backend: 'isolate',
+      reviewer_execution_id: attemptId,
+      reviewer_selected_at: '2026-04-29 01:16:12.945+00',
+    });
+    const before = await readState(review.id);
+
+    expect(await cancelCodeReview(review.id)).toBe(false);
+    expect(await cancelCodeReview(review.id, { attemptId, updatedAt: review.updated_at })).toBe(
+      false
+    );
+    expect(await readState(review.id)).toEqual(before);
+  });
+
+  it.each([
+    ['running', true],
+    ['completed', true],
+    ['running', false],
+    ['completed', false],
+  ] as const)(
+    'preserves cancellation after a late %s callback (explicit ID: %s)',
+    async (status, explicit) => {
+      const review = await queuedReview();
+      const attempt = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+      expect(
+        await cancelCodeReview(review.id, { attemptId: attempt.id, updatedAt: review.updated_at })
+      ).toBe(true);
+      const cancelled = await getCodeReviewAttemptForReview(review.id, attempt.id);
+      const state = await readState(review.id);
+
+      const identified = await updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId: attempt.id,
+        status: 'running',
+        sessionId: 'agent-late',
+      });
+      expect(identified).toEqual({
+        ...cancelled,
+        session_id: 'agent-late',
+        updated_at: expect.any(String),
+      });
+      const payload = {
+        codeReviewId: review.id,
+        attemptId: explicit ? attempt.id : undefined,
+        status,
+        sessionId: 'agent-late',
+        cliSessionId: 'ses-late',
+        executionId: 'exec-late',
+        errorMessage: 'Late failure metadata',
+        terminalReason: 'sandbox_error' as const,
+        startedAt: new Date('2026-05-01T01:00:00Z'),
+        completedAt: new Date('2026-05-01T02:00:00Z'),
+      };
+      const updated = await updateCodeReviewAttemptForCallback(payload);
+      expect(updated).toEqual({
+        ...identified,
+        cli_session_id: 'ses-late',
+        execution_id: 'exec-late',
+        updated_at: expect.any(String),
+      });
+      expect(updated.status).toBe('cancelled');
+      expect(await updateCodeReviewAttemptForCallback(payload)).toEqual(updated);
+      const after = await readState(review.id);
+      expect(after.review).toEqual(state.review);
+      expect(after.ledger).toEqual(state.ledger);
+    }
+  );
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+    'retains the %s outcome of explicit and session-matched historical callbacks',
+    async status => {
+      const review = await queuedReview();
+      const source = await createCodeReviewAttempt({
+        codeReviewId: review.id,
+        status,
+        sessionId: 'agent-old',
+        cliSessionId: 'ses-old',
+        executionId: 'exec-old',
+        terminalReason: 'sandbox_error',
+        errorMessage: 'Original terminal error',
+      });
+      const latest = await createCodeReviewAttempt({
+        codeReviewId: review.id,
+        status: 'queued',
+        sessionId: 'agent-new',
+      });
+      for (const attemptId of [source.id, undefined]) {
+        expect(
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: review.id,
+            attemptId,
+            status: 'completed',
+            sessionId: 'agent-old',
+            cliSessionId: 'ses-old',
+            executionId: 'exec-old',
+            terminalReason: 'abandoned',
+            errorMessage: 'Replacement error',
+            completedAt: new Date('2026-05-01T02:00:00Z'),
+          })
+        ).toEqual(source);
+      }
+      expect(await getCodeReviewAttemptForReview(review.id, latest.id)).toEqual(latest);
+    }
+  );
+
+  it.each(['sessionId', 'cliSessionId', 'executionId'] as const)(
+    'does not mix late accounting IDs with an established different %s',
+    async field => {
+      const review = await queuedReview();
+      const attempt = await createCodeReviewAttempt({
+        codeReviewId: review.id,
+        status: 'cancelled',
+        [field]: 'retained-identity',
+      });
+      expect(
+        await updateCodeReviewAttemptForCallback({
+          codeReviewId: review.id,
+          attemptId: attempt.id,
+          status: 'completed',
+          sessionId: 'agent-late',
+          cliSessionId: 'ses-late',
+          executionId: 'exec-late',
+        })
+      ).toEqual(attempt);
+      expect(await getCodeReviewAttemptForReview(review.id, attempt.id)).toEqual(attempt);
+    }
+  );
+
+  it('keeps the historical running callback field filter for active attempts', async () => {
+    const review = await queuedReview();
+    const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'pending' });
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      status: 'running',
+      sessionId: 'agent-running',
+      cliSessionId: 'ses-running',
+      executionId: 'exec-running',
+      errorMessage: 'Unused running error',
+      terminalReason: 'abandoned',
+      startedAt: new Date('2026-04-29 01:16:12.945+00'),
+      completedAt: new Date('2026-04-29 02:16:12.945+00'),
+    });
+    expect(result).toMatchObject({
+      id: source.id,
+      status: 'running',
+      session_id: 'agent-running',
+      cli_session_id: 'ses-running',
+      execution_id: 'exec-running',
+      error_message: null,
+      terminal_reason: null,
+      completed_at: null,
+    });
+    expect(new Date(result.started_at ?? '').toISOString()).not.toBe('2026-04-29T01:16:12.945Z');
+  });
+
+  it('preserves terminal outcomes while completing CLI-session-matched accounting metadata', async () => {
+    const review = await queuedReview();
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'failed',
+      cliSessionId: 'ses-retained',
+    });
+    const updated = await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      status: 'completed',
+      cliSessionId: 'ses-retained',
+      sessionId: 'agent-late',
+      executionId: 'exec-late',
+    });
+    expect(updated).toEqual({
+      ...attempt,
+      session_id: 'agent-late',
+      execution_id: 'exec-late',
+      updated_at: expect.any(String),
+    });
+  });
+
+  it('allows matching completion redelivery to recover a still-active parent', async () => {
+    const review = await queuedReview();
+    const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    const completed = await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId: source.id,
+      status: 'completed',
+      sessionId: 'agent-completed',
+      cliSessionId: 'ses-completed',
+      completedAt: new Date('2026-04-29 02:16:12.945+00'),
+    });
+    expect(
+      await updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId: source.id,
+        status: 'completed',
+        completedAt: new Date('2026-05-01T02:00:00Z'),
+      })
+    ).toEqual(completed);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'completed',
+        {
+          sessionId: completed.session_id ?? undefined,
+          cliSessionId: completed.cli_session_id ?? undefined,
+          completedAt: new Date(completed.completed_at ?? ''),
+        },
+        undefined,
+        source.id
+      )
+    ).toBe(true);
+    expect((await readState(review.id)).review).toMatchObject({
+      status: 'completed',
+      completed_at: completed.completed_at,
+    });
+  });
+
+  it('rechecks a terminal attempt after waiting for cancellation to commit', async () => {
+    const review = await queuedReview();
+    const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    const locked = Promise.withResolvers<number>();
+    const release = Promise.withResolvers<void>();
+    const terminalFields = {
+      status: 'cancelled',
+      terminal_reason: 'user_cancelled',
+      error_message: 'Cancelled first',
+      completed_at: '2026-04-29 02:16:12.945+00',
+    };
+    const cancellation = db.transaction(async tx => {
+      await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, review.id))
+        .for('update');
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set(terminalFields)
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      await tx
+        .update(cloud_agent_code_review_attempts)
+        .set(terminalFields)
+        .where(eq(cloud_agent_code_review_attempts.id, source.id));
+      const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      locked.resolve(rows[0].pid);
+      await release.promise;
+    });
+    void cancellation.catch(locked.reject);
+    let callback: ReturnType<typeof updateCodeReviewAttemptForCallback> | undefined;
+    try {
+      const lockingPid = await locked.promise;
+      callback = updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId: source.id,
+        status: 'running',
+        sessionId: 'agent-late',
+        errorMessage: 'Replacement error',
+        terminalReason: 'abandoned',
+        completedAt: new Date('2026-05-01T02:00:00Z'),
+      });
+      await waitForBlockedCallback(lockingPid);
+      release.resolve();
+      const result = await callback;
+      expect(result).toMatchObject({
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Cancelled first',
+        session_id: 'agent-late',
+      });
+      expect(new Date(result.completed_at ?? '').toISOString()).toBe('2026-04-29T02:16:12.945Z');
+    } finally {
+      release.resolve();
+      await cancellation;
+      await callback;
+    }
+  }, 15_000);
+
+  it('preserves the fourth-position reservation guard without requiring an attempt', async () => {
+    const review = await queuedReview();
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(review.id, 'running', {}, crypto.randomUUID())
+    ).toBe(false);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'running',
+        {},
+        review.dispatch_reservation_id ?? undefined
+      )
+    ).toBe(true);
+    expect((await readState(review.id)).review?.status).toBe('running');
+  });
+
+  it('requires the latest local attempt and the reservation when both guards are supplied', async () => {
+    const review = await queuedReview();
+    const old = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    const current = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    const unrelated = await queuedReview();
+    const foreign = await createCodeReviewAttempt({ codeReviewId: unrelated.id, status: 'queued' });
+    const before = await readState(review.id);
+    for (const attemptId of [old.id, foreign.id, crypto.randomUUID()]) {
+      expect(
+        await updateCodeReviewStatusIfNonTerminal(review.id, 'running', {}, undefined, attemptId)
+      ).toBe(false);
+    }
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'running',
+        {},
+        crypto.randomUUID(),
+        current.id
+      )
+    ).toBe(false);
+    expect(await readState(review.id)).toEqual(before);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'running',
+        { sessionId: 'agent-current' },
+        review.dispatch_reservation_id ?? undefined,
+        current.id
+      )
+    ).toBe(true);
+    expect((await readState(review.id)).review).toMatchObject({
+      status: 'running',
+      session_id: 'agent-current',
+    });
+  });
+
+  it('does not fall back when the expected attempt or parent does not exist', async () => {
+    const review = await queuedReview();
+    const before = await readState(review.id);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'running',
+        {},
+        undefined,
+        crypto.randomUUID()
+      )
+    ).toBe(false);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        crypto.randomUUID(),
+        'running',
+        {},
+        undefined,
+        crypto.randomUUID()
+      )
+    ).toBe(false);
+    expect(await readState(review.id)).toEqual(before);
+  });
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+    'does not change a %s parent with a matching expected attempt',
+    async status => {
+      const review = await queuedReview({ status });
+      const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+      const before = await readState(review.id);
+      expect(
+        await updateCodeReviewStatusIfNonTerminal(
+          review.id,
+          'running',
+          { sessionId: 'agent-late' },
+          undefined,
+          source.id
+        )
+      ).toBe(false);
+      expect(await readState(review.id)).toEqual(before);
+    }
+  );
+
+  it('allows an allocated failed retry, but not its source, to terminalize the parent', async () => {
+    const review = await queuedReview();
+    const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'failed' });
+    const retry = await createInfraRetryAttemptIfMissing({
+      codeReviewId: review.id,
+      retryOfAttemptId: source.id,
+    });
+    if (retry.outcome !== 'created') throw new Error('Expected an allocated retry');
+    await updateCodeReviewAttemptForCallback({
+      codeReviewId: review.id,
+      attemptId: retry.attempt.id,
+      status: 'failed',
+      errorMessage: 'Retry startup failed',
+    });
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'failed',
+        { errorMessage: 'Old failure' },
+        undefined,
+        source.id
+      )
+    ).toBe(false);
+    expect(
+      await updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'failed',
+        { errorMessage: 'Retry startup failed' },
+        undefined,
+        retry.attempt.id
+      )
+    ).toBe(true);
+    expect((await readState(review.id)).review).toMatchObject({
+      status: 'failed',
+      error_message: 'Retry startup failed',
+    });
+  });
+
+  it('reads the latest attempt after a parent lock wait instead of using a stale subquery snapshot', async () => {
+    const review = await queuedReview();
+    const source = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+    const locked = Promise.withResolvers<number>();
+    const release = Promise.withResolvers<void>();
+    const successorId = crypto.randomUUID();
+    const successor = db.transaction(async tx => {
+      await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, review.id))
+        .for('update');
+      await tx.insert(cloud_agent_code_review_attempts).values({
+        id: successorId,
+        code_review_id: review.id,
+        attempt_number: 2,
+        status: 'queued',
+      });
+      const { rows } = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      locked.resolve(rows[0].pid);
+      await release.promise;
+    });
+    void successor.catch(locked.reject);
+    let callback: Promise<boolean> | undefined;
+    try {
+      const lockingPid = await locked.promise;
+      callback = updateCodeReviewStatusIfNonTerminal(
+        review.id,
+        'failed',
+        { errorMessage: 'Stale callback' },
+        undefined,
+        source.id
+      );
+      await waitForBlockedCallback(lockingPid);
+      release.resolve();
+      expect(await callback).toBe(false);
+      expect((await readState(review.id)).review).toEqual(review);
+      expect(await getCodeReviewAttemptForReview(review.id, successorId)).toMatchObject({
+        status: 'queued',
+      });
+    } finally {
+      release.resolve();
+      await successor;
+      await callback;
+    }
+  }, 15_000);
+});
+
 describe('resetCodeReviewForRetry', () => {
   let testUser: User;
   const reviewIds: string[] = [];
 
   beforeAll(async () => {
-    testUser = await insertTestUser();
+    testUser = await insertTestUser({ id: `oauth/github/retry-${crypto.randomUUID()}` });
   });
 
   afterEach(async () => {
@@ -1959,6 +3032,87 @@ describe('resetCodeReviewForRetry', () => {
     expect(stored?.session_id).toBeNull();
     expect(stored?.error_message).toBeNull();
   });
+
+  it.each(['pending', 'queued', 'running'] as const)(
+    'reconstructs the terminal parent on its %s legacy attempt before retriggering',
+    async status => {
+      const reviewId = await insertReview('cancelled', {
+        session_id: 'agent-current',
+        cli_session_id: 'ses-current',
+        error_message: 'Cancelled by user',
+        terminal_reason: 'user_cancelled',
+        started_at: '2026-04-29 01:16:12.945+00',
+        completed_at: '2026-04-29 02:16:12.945+00',
+        updated_at: '2026-04-29 02:16:12.945+00',
+      });
+      const historical = await createCodeReviewAttempt({
+        codeReviewId: reviewId,
+        status: 'failed',
+        sessionId: 'agent-old',
+      });
+      const source = await createCodeReviewAttempt({
+        codeReviewId: reviewId,
+        status,
+        executionId: 'exec-current',
+      });
+
+      expect(
+        await resetCodeReviewForRetry(reviewId, {
+          attemptId: source.id,
+          updatedAt: '2026-04-29 02:16:12.945+00',
+        })
+      ).toBe(1);
+
+      const reconstructed = await getCodeReviewAttemptForReview(reviewId, source.id);
+      expect(reconstructed).toMatchObject({
+        status: 'cancelled',
+        terminal_reason: 'user_cancelled',
+        error_message: 'Cancelled by user',
+        session_id: 'agent-current',
+        cli_session_id: 'ses-current',
+        execution_id: 'exec-current',
+        reviewer_backend: 'legacy',
+      });
+      expect(new Date(reconstructed?.started_at ?? '').toISOString()).toBe(
+        '2026-04-29T01:16:12.945Z'
+      );
+      expect(new Date(reconstructed?.completed_at ?? '').toISOString()).toBe(
+        '2026-04-29T02:16:12.945Z'
+      );
+      expect(await getCodeReviewAttemptForReview(reviewId, historical.id)).toEqual(historical);
+      const attempts = await listCodeReviewAttempts(reviewId);
+      expect(attempts).toHaveLength(3);
+      expect(attempts[2]).toMatchObject({
+        status: 'pending',
+        retry_of_attempt_id: source.id,
+        retry_reason: 'manual_retrigger',
+        reviewer_backend: 'unselected',
+        reviewer_execution_id: null,
+        reviewer_selected_at: null,
+        session_id: null,
+        cli_session_id: null,
+        started_at: null,
+        completed_at: null,
+      });
+    }
+  );
+
+  it.each(['completed', 'failed', 'cancelled', 'interrupted'] as const)(
+    'does not rewrite a terminal %s source attempt during retrigger',
+    async status => {
+      const reviewId = await insertReview('failed', { terminal_reason: 'sandbox_error' });
+      const source = await createCodeReviewAttempt({
+        codeReviewId: reviewId,
+        status,
+        sessionId: 'agent-old',
+      });
+
+      expect(await resetCodeReviewForRetry(reviewId, { attemptId: source.id })).toBe(1);
+
+      expect(await getCodeReviewAttemptForReview(reviewId, source.id)).toEqual(source);
+      expect(await listCodeReviewAttempts(reviewId)).toHaveLength(2);
+    }
+  );
 
   it('returns 0 for a review that is not in a retriggable terminal state', async () => {
     const reviewId = await insertReview('pending');
@@ -2102,11 +3256,13 @@ describe('listCodeReviews narrows the list DTO', () => {
     expect(row).not.toHaveProperty('council_result');
     expect(row).not.toHaveProperty('manual_config');
     expect(row).not.toHaveProperty('previous_summary_body');
+    expect(row).not.toHaveProperty('blocked_by_attempt_id');
 
     const {
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      blocked_by_attempt_id: _blockedByAttemptId,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());

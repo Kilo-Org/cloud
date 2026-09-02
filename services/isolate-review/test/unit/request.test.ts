@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  notifyQueuedReview,
+  requestQueuedAuthority,
+  type QueuedReviewState,
+} from '../../src/queued-review';
 import {
   MAX_REVIEW_PROMPT_CHARACTERS,
   StartReviewRequestSchema,
@@ -445,4 +450,125 @@ describe('isolate-review request schema', () => {
 
     expect(StartReviewRequestSchema.safeParse({ ...validRequest, userPrompt }).success).toBe(false);
   });
+});
+
+describe('queued review callback requests', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function fixture(): QueuedReviewState {
+    const identity = {
+      reviewId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      generation: crypto.randomUUID(),
+      organizationId: crypto.randomUUID(),
+      integrationId: crypto.randomUUID(),
+      executionUserId: 'review-bot',
+      target: { host: 'github.com' as const, repoFullName: 'acme/widget', prNumber: 42 },
+      snapshot: preparation.snapshot,
+    };
+    const safety = {
+      sequence: 1,
+      execution: 'running' as const,
+      cancellationRequested: false,
+      publication: 'not_started' as const,
+      quiescent: false,
+      observedAt: '2026-09-02T00:00:00.000Z',
+    };
+    return {
+      identity,
+      preparationHash: 'a'.repeat(64),
+      callback: { url: 'https://callback.offline.invalid/status', token: 'b'.repeat(64) },
+      maintenanceScheduleId: 'maintenance',
+      admitted: true,
+      cancellationRequested: false,
+      operations: [],
+      safety,
+      fenceReleased: false,
+      pendingNotification: { version: 1, identity, safety },
+      acknowledgedSequence: 0,
+      cleaned: false,
+    };
+  }
+
+  it.each(['execute', 'publish', 'reconcile'] as const)(
+    'uses supported no-follow semantics for %s authority',
+    async operation => {
+      const queued = fixture();
+      const operationId = crypto.randomUUID();
+      const body = {
+        version: 1,
+        identity: queued.identity,
+        operation,
+        operationId,
+        preparationHash: queued.preparationHash,
+      };
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const request = new Request(input, init);
+        expect(request.url).toBe(queued.callback.url);
+        expect(request.method).toBe('POST');
+        expect(request.redirect).toBe('manual');
+        expect(request.headers.get('X-Callback-Token')).toBe(queued.callback.token);
+        expect(await request.json()).toEqual(body);
+        return Response.json({
+          ...body,
+          authorized: true,
+          ...(operation === 'reconcile' ? { reconciliationUserId: 'review-bot' } : {}),
+        });
+      });
+
+      await expect(requestQueuedAuthority(queued, operation, operationId)).resolves.toBe(true);
+      expect(fetch).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('uses supported no-follow semantics for notifications', async () => {
+    const queued = fixture();
+    const acknowledgement = {
+      version: 1,
+      identity: queued.identity,
+      sequence: queued.safety.sequence,
+      notificationRecorded: true,
+      fenceReleased: false,
+      usageSettled: false,
+    };
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      expect(request.url).toBe(queued.callback.url);
+      expect(request.redirect).toBe('manual');
+      expect(request.headers.get('X-Callback-Token')).toBe(queued.callback.token);
+      expect(await request.json()).toEqual(queued.pendingNotification);
+      return Response.json(acknowledgement);
+    });
+
+    await expect(notifyQueuedReview(queued)).resolves.toEqual(acknowledgement);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([301, 302, 303, 307, 308])(
+    'rejects %s without following Location or accepting redirected callback data',
+    async status => {
+      for (const operation of ['execute', 'notify'] as const) {
+        const queued = fixture();
+        const cancel = vi.fn();
+        const response = new Response(new ReadableStream({ cancel }), {
+          status,
+          headers: { Location: 'https://redirect.offline.invalid/credentials' },
+        });
+        const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+          expect(input).toBe(queued.callback.url);
+          expect(init?.redirect).toBe('manual');
+          return response;
+        });
+        const result =
+          operation === 'execute'
+            ? requestQueuedAuthority(queued, 'execute', crypto.randomUUID())
+            : notifyQueuedReview(queued);
+
+        await expect(result).rejects.toThrow('Queued review callback unavailable');
+        expect(cancel).toHaveBeenCalledOnce();
+        expect(fetch).toHaveBeenCalledOnce();
+        fetch.mockRestore();
+      }
+    }
+  );
 });

@@ -60,6 +60,12 @@ const groups: ServiceGroup[] = [
     alwaysOn: false,
     sectionBreakBefore: true,
   },
+  {
+    id: 'code-review-public-tunnels',
+    label: 'Code Review Public Tunnels',
+    alwaysOn: false,
+    sectionBreakBefore: true,
+  },
 ];
 
 type ServiceDef = {
@@ -162,7 +168,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   // code-review
   'bitbucket-webhook-tunnel': {
-    group: 'code-review',
+    group: 'code-review-public-tunnels',
     dependsOn: ['nextjs'],
   },
   'cloudflare-code-review-infra': {
@@ -819,7 +825,9 @@ export const shortcuts: Record<string, string[]> = {
     'cloudflare-app-builder',
   ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
-  all: serviceDefs.map(s => s.name).filter(name => name !== 'cloud-agent-public-tunnels'),
+  all: serviceDefs
+    .map(s => s.name)
+    .filter(name => name !== 'cloud-agent-public-tunnels' && name !== 'bitbucket-webhook-tunnel'),
 };
 
 // Rebuild every port-derived service definition (ports, commands) for a new
@@ -833,7 +841,7 @@ export function applyPortOffset(offset: number): void {
   for (const def of serviceDefs) services.set(def.name, def);
   shortcuts.all = serviceDefs
     .map(s => s.name)
-    .filter(name => name !== 'cloud-agent-public-tunnels');
+    .filter(name => name !== 'cloud-agent-public-tunnels' && name !== 'bitbucket-webhook-tunnel');
 }
 
 // Successive +100 candidate offsets through the same (0, 5000] range the slug

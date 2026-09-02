@@ -4,10 +4,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 import { computePlan, computePlanAsync } from './plan';
-import { resolveAnnotatedValue } from './parse';
+import { parseEnvFile, resolveAnnotatedValue } from './parse';
 import type { ExampleEntry } from './types';
 import { serviceUrl } from '../mobile-env';
-import { getService } from '../services';
+import { applyPortOffset, getService, portOffset, resolveTargets } from '../services';
 
 const workerDir = 'services/cloud-agent-next';
 
@@ -887,6 +887,93 @@ test('keeps .env.local values ahead of wrangler vars for local overrides', () =>
     repo.cleanup();
   }
 });
+
+for (const targets of [
+  ['code-review', 'isolate-review'],
+  ['cloudflare-code-review-infra', 'cloudflare-isolate-review', 'fake-llm'],
+]) {
+  test(`plans local isolate callbacks at offset 2800 for ${targets.join(' ')}`, () => {
+    const codeReviewDir = 'services/code-review-infra';
+    const isolateReviewDir = 'services/isolate-review';
+    const repo = createRepo({
+      '.env.local': [
+        'NEXTAUTH_SECRET=local-nextauth-secret',
+        'INTERNAL_API_SECRET=local-internal-secret',
+        'CALLBACK_TOKEN_SECRET=local-callback-secret',
+        'KILOCODE_BACKEND_BASE_URL=https://app.kilo.ai',
+        '',
+      ].join('\n'),
+      [`${codeReviewDir}/.dev.vars.example`]: fs.readFileSync(
+        new URL('../../../services/code-review-infra/.dev.vars.example', import.meta.url),
+        'utf-8'
+      ),
+      [`${isolateReviewDir}/.dev.vars.example`]: fs.readFileSync(
+        new URL('../../../services/isolate-review/.dev.vars.example', import.meta.url),
+        'utf-8'
+      ),
+    });
+    const initialOffset = portOffset;
+    const initialPort = process.env.PORT;
+    try {
+      delete process.env.PORT;
+      applyPortOffset(2800);
+      assert.equal(getService('nextjs').port, 5800);
+      const selected = new Set(resolveTargets(targets));
+      const plan = computePlan(repo.root, selected);
+      assert.equal(plan.missingEnvLocal, false);
+
+      const codeReviewChange = plan.devVarsChanges.find(
+        change => change.workerDir === codeReviewDir
+      );
+      assert.ok(codeReviewChange?.newFileContent);
+      assert.equal(
+        parseEnvFile(codeReviewChange.newFileContent).get('API_URL'),
+        'http://localhost:5800'
+      );
+
+      const isolateChange = plan.devVarsChanges.find(
+        change => change.workerDir === isolateReviewDir
+      );
+      assert.ok(isolateChange?.isNew);
+      assert.ok(isolateChange.newFileContent);
+      const generatedVars = parseEnvFile(isolateChange.newFileContent);
+      assert.equal(generatedVars.get('KILOCODE_BACKEND_BASE_URL'), 'http://localhost:5800');
+      assert.equal(generatedVars.get('KILO_GATEWAY_URL'), 'http://localhost:5800/api/openrouter');
+
+      writeFile(repo.root, `${isolateReviewDir}/.dev.vars`, isolateChange.newFileContent);
+      const syncedPlan = computePlan(repo.root, selected);
+      const syncedChange = syncedPlan.devVarsChanges.find(
+        change => change.workerDir === isolateReviewDir
+      );
+      assert.ok(
+        !syncedChange?.keyChanges.some(change => change.key === 'KILOCODE_BACKEND_BASE_URL')
+      );
+
+      writeFile(
+        repo.root,
+        `${isolateReviewDir}/.dev.vars`,
+        isolateChange.newFileContent.replace(/^KILOCODE_BACKEND_BASE_URL=.*\n/m, '')
+      );
+      const missingPlan = computePlan(repo.root, selected);
+      const missingChange = missingPlan.devVarsChanges.find(
+        change => change.workerDir === isolateReviewDir
+      );
+      assert.deepEqual(
+        missingChange?.keyChanges.find(change => change.key === 'KILOCODE_BACKEND_BASE_URL'),
+        {
+          key: 'KILOCODE_BACKEND_BASE_URL',
+          oldValue: undefined,
+          newValue: 'http://localhost:5800',
+        }
+      );
+    } finally {
+      if (initialPort === undefined) delete process.env.PORT;
+      else process.env.PORT = initialPort;
+      applyPortOffset(initialOffset);
+      repo.cleanup();
+    }
+  });
+}
 
 test('preserves host.docker.internal in @url defaults for useLanIp services', () => {
   const repo = createRepo({

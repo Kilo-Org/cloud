@@ -2,13 +2,17 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 
 jest.mock('@/lib/posthog', () => {
   const mockGetFeatureFlag = jest.fn();
+  const mockGetFeatureFlagPayload = jest.fn();
 
   return {
     __esModule: true,
     default: jest.fn(() => ({
       getFeatureFlag: mockGetFeatureFlag,
+      getFeatureFlagPayload: mockGetFeatureFlagPayload,
     })),
+    shutdownPosthog: jest.fn(),
     mockGetFeatureFlag,
+    mockGetFeatureFlagPayload,
   };
 });
 
@@ -28,17 +32,19 @@ jest.mock('@sentry/nextjs', () => {
 import {
   isFeatureFlagEnabledOrDevelopment,
   isReleaseToggleEnabled,
+  isOrganizationAllowlistedForIsolateReviews,
 } from '@/lib/posthog-feature-flags';
 
 const posthogMock: {
   mockGetFeatureFlag: jest.Mock;
+  mockGetFeatureFlagPayload: jest.Mock;
 } = jest.requireMock('@/lib/posthog');
 
 const sentryMock: {
   mockCaptureException: jest.Mock;
 } = jest.requireMock('@sentry/nextjs');
 
-const { mockGetFeatureFlag } = posthogMock;
+const { mockGetFeatureFlag, mockGetFeatureFlagPayload } = posthogMock;
 const { mockCaptureException } = sentryMock;
 
 describe('isFeatureFlagEnabledOrDevelopment', () => {
@@ -77,6 +83,57 @@ describe('isFeatureFlagEnabledOrDevelopment', () => {
     } finally {
       replacedEnv.restore();
     }
+  });
+});
+
+describe('isOrganizationAllowlistedForIsolateReviews', () => {
+  const organizationId = '3d4a1f18-69cc-44ba-971e-04e9d9784e03';
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    const { startSpan } = jest.requireMock('@sentry/nextjs');
+    startSpan.mockImplementation((_context: unknown, run: () => Promise<unknown>) => run());
+  });
+
+  test('uses a strict boolean and its corresponding payload without development bypass', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+    mockGetFeatureFlagPayload.mockResolvedValue({ organizationIds: [organizationId] });
+    await expect(isOrganizationAllowlistedForIsolateReviews(organizationId)).resolves.toBe(true);
+    expect(mockGetFeatureFlagPayload).toHaveBeenCalledWith(
+      'code-review-isolate-organizations',
+      organizationId,
+      true
+    );
+    mockGetFeatureFlagPayload.mockResolvedValue({
+      organizationIds: [organizationId.toUpperCase()],
+    });
+    await expect(isOrganizationAllowlistedForIsolateReviews(organizationId)).resolves.toBe(false);
+  });
+
+  test('rejects malformed payloads atomically and never reports their contents', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+    mockGetFeatureFlagPayload.mockResolvedValue({
+      organizationIds: [organizationId, 'private-value'],
+    });
+    await expect(isOrganizationAllowlistedForIsolateReviews(organizationId)).resolves.toBe(false);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    mockGetFeatureFlagPayload.mockRejectedValue(new Error('private-payload-and-credentials'));
+    await expect(isOrganizationAllowlistedForIsolateReviews(organizationId)).resolves.toBe(false);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      new Error('Isolate review rollout lookup failed'),
+      {
+        tags: { source: 'posthog_feature_flag_boolean_enabled' },
+        extra: { flagName: 'code-review-isolate-organizations' },
+      }
+    );
+  });
+
+  test('rejects an oversized allowlist', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+    mockGetFeatureFlagPayload.mockResolvedValue({
+      organizationIds: Array(10_001).fill(organizationId),
+    });
+    await expect(isOrganizationAllowlistedForIsolateReviews(organizationId)).resolves.toBe(false);
   });
 });
 

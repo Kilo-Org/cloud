@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { and, count, eq, gte, lt, type SQL } from 'drizzle-orm';
 import { agent_configs, cloud_agent_code_reviews } from '@kilocode/db/schema';
+import { classifyCodeReviewProviderFailure } from '@kilocode/worker-utils/code-review-provider-failure';
 import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendCodeReviewDisabledEmail } from '@/lib/email';
@@ -36,14 +37,6 @@ const CodeReviewActionRequiredStateSchema = z.object({
   emailSentAt: z.string().optional(),
 });
 
-const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
-  'selected model is not available for this cloud agent session';
-const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
-  'the requested model is not allowed for your team';
-const BYOK_INVALID_KEY_MESSAGE =
-  '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
-const BYOK_PERMISSION_DENIED_MESSAGE =
-  '[byok] your api key does not have permission to access this resource. please check your api key permissions.';
 const REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON =
   'repeated_repository_clone_timeout' satisfies CodeReviewActionRequiredReason;
 const REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT = 'repository clone timed out';
@@ -118,12 +111,8 @@ export function classifyCodeReviewActionRequiredFailure(
     return 'github_installation_required';
   }
 
-  if (
-    normalized.includes(BYOK_INVALID_KEY_MESSAGE) ||
-    normalized.includes(BYOK_PERMISSION_DENIED_MESSAGE)
-  ) {
-    return 'byok_invalid_key';
-  }
+  const providerFailure = classifyCodeReviewProviderFailure(stripped);
+  if (providerFailure === 'byok_invalid_key') return providerFailure;
 
   if (
     normalized.includes('project access token') &&
@@ -143,19 +132,7 @@ export function classifyCodeReviewActionRequiredFailure(
     return 'github_ip_allow_list';
   }
 
-  if (
-    normalized.includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ||
-    normalized.includes(REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE) ||
-    normalized.includes('provider_not_allowed') ||
-    normalized.includes('no eligible provider can serve the selected model.') ||
-    normalized.includes('no allowed providers are specified.') ||
-    normalized.includes('no allowed providers are available for the selected model.') ||
-    normalized.includes('no endpoints found matching your data policy')
-  ) {
-    return 'selected_model_unavailable';
-  }
-
-  return null;
+  return providerFailure;
 }
 
 export function getCodeReviewActionRequiredState(
@@ -360,65 +337,70 @@ async function persistActionRequiredDisable(
   args: PersistActionRequiredDisableArgs,
   beforeUpdate?: PersistActionRequiredBeforeUpdate
 ): Promise<boolean | null> {
-  const copy = getCodeReviewActionRequiredCopy(args.reason);
-
-  return await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
-    );
-
-    const conditions = ownerConditions(args.owner, args.platform);
-    const [config] = await tx
-      .select()
-      .from(agent_configs)
-      .where(and(...conditions))
-      .for('update')
-      .limit(1);
-
-    if (!config) {
-      logExceptInTest('[code-review-action-required] Agent config not found', {
-        ownerType: args.owner.type,
-        ownerId: args.owner.id,
-        platform: args.platform,
-        reason: args.reason,
-        reviewId: args.reviewId,
-      });
-      throw new Error(
-        `Code Review agent config not found for owner ${args.owner.type}:${args.owner.id} on ${args.platform}`
-      );
-    }
-
-    if (beforeUpdate) {
-      const shouldPersist = await beforeUpdate(tx);
-      if (!shouldPersist) return null;
-    }
-
-    const now = new Date().toISOString();
-    const existingState = getCodeReviewActionRequiredState(config);
-    const shouldSendEmail =
-      !existingState || existingState.reason !== args.reason || !existingState.emailSentAt;
-
-    const nextState: CodeReviewActionRequiredState = {
-      reason: args.reason,
-      detectedAt:
-        existingState?.reason === args.reason && existingState.detectedAt
-          ? existingState.detectedAt
-          : now,
-      lastSeenAt: now,
-      ...(args.reviewId ? { triggeringReviewId: args.reviewId } : {}),
-      lastErrorMessage: copy.description,
-      ...(!shouldSendEmail && existingState?.emailSentAt
-        ? { emailSentAt: existingState.emailSentAt }
-        : {}),
-    };
-
-    await updateActionRequiredRuntimeState(tx, conditions, nextState);
-
-    return shouldSendEmail;
-  });
+  return db.transaction(tx => disableCodeReviewForActionRequiredFailureOn(tx, args, beforeUpdate));
 }
 
-async function sendAndMarkActionRequiredEmailNotifications(
+export async function disableCodeReviewForActionRequiredFailureOn(
+  tx: DrizzleTransaction,
+  args: PersistActionRequiredDisableArgs,
+  beforeUpdate?: PersistActionRequiredBeforeUpdate
+): Promise<boolean | null> {
+  const copy = getCodeReviewActionRequiredCopy(args.reason);
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
+  );
+
+  const conditions = ownerConditions(args.owner, args.platform);
+  const [config] = await tx
+    .select()
+    .from(agent_configs)
+    .where(and(...conditions))
+    .for('update')
+    .limit(1);
+
+  if (!config) {
+    logExceptInTest('[code-review-action-required] Agent config not found', {
+      ownerType: args.owner.type,
+      ownerId: args.owner.id,
+      platform: args.platform,
+      reason: args.reason,
+      reviewId: args.reviewId,
+    });
+    throw new Error(
+      `Code Review agent config not found for owner ${args.owner.type}:${args.owner.id} on ${args.platform}`
+    );
+  }
+
+  if (beforeUpdate) {
+    const shouldPersist = await beforeUpdate(tx);
+    if (!shouldPersist) return null;
+  }
+
+  const now = new Date().toISOString();
+  const existingState = getCodeReviewActionRequiredState(config);
+  const shouldSendEmail =
+    !existingState || existingState.reason !== args.reason || !existingState.emailSentAt;
+
+  const nextState: CodeReviewActionRequiredState = {
+    reason: args.reason,
+    detectedAt:
+      existingState?.reason === args.reason && existingState.detectedAt
+        ? existingState.detectedAt
+        : now,
+    lastSeenAt: now,
+    ...(args.reviewId ? { triggeringReviewId: args.reviewId } : {}),
+    lastErrorMessage: copy.description,
+    ...(!shouldSendEmail && existingState?.emailSentAt
+      ? { emailSentAt: existingState.emailSentAt }
+      : {}),
+  };
+
+  await updateActionRequiredRuntimeState(tx, conditions, nextState);
+
+  return shouldSendEmail;
+}
+
+export async function sendAndMarkActionRequiredEmailNotifications(
   args: PersistActionRequiredDisableArgs,
   shouldSendEmail: boolean
 ): Promise<void> {

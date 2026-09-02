@@ -46,12 +46,16 @@ app.use(
 
 // Route: POST /review
 app.post('/review', async (c: Context<HonoEnv>) => {
-  let body: CodeReviewRequest;
+  let body: CodeReviewRequest | null;
 
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ error: 'JSON body must be an object' }, 400);
   }
 
   // Validate required fields
@@ -172,11 +176,14 @@ app.post('/reviews/:reviewId/cancel', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'reviewId parameter required' }, 400);
   }
 
-  let body: { reason?: string; attemptId?: string };
+  let body: { reason?: string; attemptId?: string } | null;
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ error: 'JSON body must be an object' }, 400);
   }
   const reason = body.reason;
   const attemptId = c.req.query('attemptId') ?? body.attemptId;
@@ -209,13 +216,16 @@ app.post('/reviews/:reviewId/retry-fresh', async (c: Context<HonoEnv>) => {
     reason?: string;
     failedAttemptId?: string;
     retryAttemptId?: string;
-  };
+  } | null;
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ error: 'JSON body must be an object' }, 400);
+  }
   const reason = body.reason;
   if (!reason) {
     return c.json({ error: 'Missing required field: reason' }, 400);

@@ -190,6 +190,84 @@ describe('GitHub credential identity', () => {
     ).rejects.toThrow('git-token-service RPC failed');
   });
 
+  it.each([
+    {
+      result: {
+        success: true,
+        token: 'fixture-token',
+        installationId: '123',
+        appType: 'standard',
+      },
+      error: undefined,
+    },
+    {
+      result: { success: false, reason: 'repository_not_installed' },
+      error: 'repository_not_installed',
+    },
+    {
+      result: { success: true, token: 'fixture-token', appType: 'standard' },
+      error: 'returned invalid credentials or identity',
+    },
+    {
+      result: {
+        success: true,
+        token: 'fixture-token',
+        installationId: '456',
+        appType: 'standard',
+      },
+      error: 'installation does not match',
+    },
+    {
+      result: {
+        success: true,
+        token: 'fixture-token',
+        installationId: '123',
+        appType: 'lite',
+      },
+      error: 'GitHub Lite installations cannot publish reviews',
+    },
+  ])('disposes the unowned RPC result after validation: $error', async ({ result, error }) => {
+    const dispose = vi.fn();
+    const rawResult = { ...result, [Symbol.dispose]: dispose };
+    const service = { getTokenForRepo: vi.fn().mockResolvedValue(rawResult) };
+    const resolution = resolveGithubCredentials({
+      input: { ...input, expectedInstallationId: '123', dryRun: false },
+      service,
+      allowDirectToken: false,
+    });
+    if (error) await expect(resolution).rejects.toThrow(error);
+    else
+      await expect(resolution).resolves.toEqual({
+        token: 'fixture-token',
+        installationId: '123',
+        appType: 'standard',
+      });
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(dispose.mock.contexts).toEqual([rawResult]);
+  });
+
+  it('sanitizes a failed RPC disposer without exposing its credential-bearing error', async () => {
+    const dispose = vi.fn(() => {
+      throw new Error('fixture-secret');
+    });
+    const service = {
+      getTokenForRepo: vi.fn().mockResolvedValue({
+        success: true,
+        token: 'fixture-token',
+        installationId: '123',
+        appType: 'standard',
+        [Symbol.dispose]: dispose,
+      }),
+    };
+    await expect(
+      resolveGithubCredentials({ input, service, allowDirectToken: false })
+    ).rejects.toMatchObject({
+      name: 'GithubTokenResolutionError',
+      message: 'GitHub token unavailable: git-token-service RPC failed',
+    });
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
   it('returns explicitly absent fixture identity rather than inventing one', async () => {
     await expect(
       resolveGithubCredentials({

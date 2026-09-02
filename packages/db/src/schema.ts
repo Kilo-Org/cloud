@@ -122,6 +122,8 @@ import {
   MCPGatewayAuditOutcome,
 } from './schema-types';
 import type {
+  CodeReviewReviewerAffinity,
+  CodeReviewPublicationState,
   UserDeletionTaskProgress,
   UserDeletionManualEvidence,
   UserDeletionAuditDetails,
@@ -5450,6 +5452,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
     dispatch_reservation_id: text(),
+    blocked_by_attempt_id: uuid(),
     error_message: text(),
     terminal_reason: text(),
 
@@ -5633,6 +5636,10 @@ export const cloud_agent_code_review_attempts = pgTable(
     session_id: text(),
     cli_session_id: text(),
     execution_id: text(),
+    reviewer_backend: text().$type<CodeReviewReviewerAffinity>().notNull().default('legacy'),
+    reviewer_execution_id: uuid(),
+    reviewer_selected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    publication_state: jsonb().$type<CodeReviewPublicationState>(),
     analytics_enabled_at_dispatch: boolean(),
     status: text().notNull().default('pending'),
     error_message: text(),
@@ -5655,14 +5662,84 @@ export const cloud_agent_code_review_attempts = pgTable(
     index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_review_attempts_status').on(table.status),
     index('idx_cloud_agent_code_review_attempts_retry_reason').on(table.retry_reason),
+    uniqueIndex('UQ_code_review_attempt_publication_active_target')
+      .on(
+        sql`lower(${table.publication_state}->'identity'->'target'->>'repoFullName')`,
+        sql`(${table.publication_state}->'identity'->'target'->>'prNumber')`
+      )
+      .where(
+        sql`${table.publication_state} IS NOT NULL AND ${table.publication_state}->>'released_at' IS NULL`
+      )
+      .concurrently(),
+    index('idx_code_review_attempt_publication_recovery')
+      .on(table.updated_at)
+      .where(
+        sql`${table.publication_state} IS NOT NULL AND (${table.publication_state}->>'released_at' IS NULL OR ${table.publication_state}->>'queue_wakeup_at' IS NULL)`
+      )
+      .concurrently(),
+    index('idx_code_review_attempt_publication_execution_user')
+      .on(sql`(${table.publication_state}->'identity'->>'executionUserId')`)
+      .where(sql`${table.publication_state} IS NOT NULL`)
+      .concurrently(),
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
+    ),
+    check(
+      'code_review_attempt_reviewer_affinity_check',
+      sql`${table.reviewer_backend} IN ('unselected', 'legacy', 'isolate')
+        AND (${table.reviewer_execution_id} IS NULL) = (${table.reviewer_selected_at} IS NULL)
+        AND (${table.reviewer_backend} != 'unselected' OR ${table.reviewer_execution_id} IS NULL)
+        AND (${table.reviewer_backend} != 'isolate' OR ${table.reviewer_execution_id} IS NOT NULL)
+        AND (${table.reviewer_execution_id} IS NULL OR ${table.reviewer_execution_id} = ${table.id})`
+    ),
+    check(
+      'code_review_attempt_publication_target_check',
+      sql`${table.publication_state} IS NULL OR (
+        ${table.publication_state}->'identity'->'target'->>'host' = 'github.com'
+        AND ${table.publication_state}->'identity'->'target'->>'repoFullName' ~ '^[a-z0-9][a-z0-9-]{0,38}/[a-z0-9_.-]{1,100}$'
+        AND jsonb_typeof(${table.publication_state}->'identity'->'target'->'prNumber') = 'number'
+        AND (${table.publication_state}->'identity'->'target'->>'prNumber')::integer > 0
+      ) IS TRUE`
+    ),
+    check(
+      'code_review_attempt_publication_identity_check',
+      sql`${table.publication_state} IS NULL OR (
+        ${table.reviewer_backend} = 'isolate'
+        AND (${table.publication_state}->'identity'->>'generation')::uuid IS NOT NULL
+        AND ${table.publication_state}->'identity'->>'reviewId' = ${table.code_review_id}::text
+        AND ${table.publication_state}->'identity'->>'attemptId' = ${table.id}::text
+      ) IS TRUE`
+    ),
+    check(
+      'code_review_attempt_publication_finalization_check',
+      sql`${table.publication_state} IS NULL OR (
+        ${table.publication_state}->>'web_finalization' IN ('pending', 'uncertain', 'settled', 'suppressed')
+      ) IS TRUE`
+    ),
+    check(
+      'code_review_attempt_publication_release_check',
+      sql`${table.publication_state}->>'released_at' IS NULL OR (
+        ${table.publication_state}->'safety'->>'quiescent' = 'true'
+        AND ${table.publication_state}->'safety'->>'execution' IN ('completed', 'failed', 'cancelled')
+        AND ${table.publication_state}->'safety'->>'publication' IN ('not_started', 'settled')
+        AND ${table.publication_state}->>'web_finalization' IN ('settled', 'suppressed')
+      ) IS TRUE`
     ),
   ]
 );
 
 export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
+
+export type CodeReviewPublicationFence = CodeReviewPublicationState & {
+  generation: string;
+  code_review_id: string;
+  attempt_id: string;
+  repo_full_name: string;
+  pr_number: number;
+  created_at: string;
+  updated_at: string;
+};
 
 export const code_review_analytics_results = pgTable(
   'code_review_analytics_results',

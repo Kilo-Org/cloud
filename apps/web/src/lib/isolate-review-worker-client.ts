@@ -4,6 +4,7 @@ import type { User } from '@kilocode/db';
 import * as z from 'zod';
 import { ISOLATE_REVIEW_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { QueuedIsolateIdentitySchema } from '@/lib/code-reviews/queued-isolate-contract';
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -114,10 +115,29 @@ export const IsolateReviewInferenceSchema = z
 
 export type IsolateReviewInference = z.infer<typeof IsolateReviewInferenceSchema>;
 
+export const QueuedIsolatePublicationSchema = z
+  .object({
+    identity: QueuedIsolateIdentitySchema,
+    gateThreshold: z.enum(['off', 'all', 'warning', 'critical']),
+    summaryTarget: z
+      .object({
+        commentId: z.number().int().positive().safe(),
+        bodyHash: HashSchema,
+        authorId: z.number().int().positive().safe(),
+        authorLogin: z.string().min(1).max(100),
+        appId: z.number().int().positive().safe(),
+      })
+      .strict()
+      .optional(),
+    summaryHistory: z.string().max(24_000),
+  })
+  .strict();
+
 export const IsolateReviewPreparationSchema = z
   .object({
     version: z.literal(1),
     preparedAt: z.iso.datetime(),
+    queued: QueuedIsolatePublicationSchema.optional(),
     requestingUserId: IdentifierSchema,
     executionUserId: IdentifierSchema,
     organizationId: IdentifierSchema.optional(),
@@ -356,6 +376,7 @@ const ReviewStatusResponseSchema = z.object({
   appType: AppTypeSchema.optional(),
   summaryBodyHash: HashSchema.optional(),
   summaryContent: IsolateReviewSummaryContentSchema.optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
   cleanupAt: z.number().int().positive().safe().optional(),
   reviewSelection: IsolateReviewSelectionSchema.optional(),
   reviewFingerprint: HashSchema.optional(),
@@ -487,6 +508,8 @@ export class IsolateReviewWorkerClient {
 
   async startReview(input: IsolateReviewRequest): Promise<{ runId: string }> {
     const parsed = IsolateReviewRequestSchema.parse(input);
+    if (parsed.preparation?.queued)
+      throw new Error('Canonical publication requires queued admission');
     const response = await this.request('/reviews', {
       method: 'POST',
       body: JSON.stringify(parsed),

@@ -3,7 +3,7 @@ import {
   cloud_agent_code_reviews,
   type CloudAgentCodeReview,
 } from '@kilocode/db/schema';
-import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
 import { db } from '@/lib/drizzle';
@@ -73,6 +73,11 @@ export type ReapStaleReviewsSummary = {
 function staleReviewCondition() {
   return and(
     inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
+    isNull(cloud_agent_code_reviews.blocked_by_attempt_id),
+    sql`COALESCE((SELECT ${cloud_agent_code_review_attempts.reviewer_backend}
+      FROM ${cloud_agent_code_review_attempts}
+      WHERE ${cloud_agent_code_review_attempts.code_review_id} = ${cloud_agent_code_reviews.id}
+      ORDER BY ${cloud_agent_code_review_attempts.attempt_number} DESC LIMIT 1), 'legacy') != 'isolate'`,
     sql`COALESCE(
       ${cloud_agent_code_reviews.started_at},
       ${cloud_agent_code_reviews.updated_at},
@@ -143,7 +148,8 @@ async function terminalizeReview(review: CloudAgentCodeReview): Promise<boolean>
         and(
           eq(cloud_agent_code_reviews.id, review.id),
           inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
-          eq(cloud_agent_code_reviews.updated_at, review.updated_at)
+          eq(cloud_agent_code_reviews.updated_at, review.updated_at),
+          staleReviewCondition()
         )
       )
       .returning({ id: cloud_agent_code_reviews.id });

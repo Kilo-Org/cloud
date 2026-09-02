@@ -1,4 +1,5 @@
 import pLimit from 'p-limit';
+import { recoverQueuedIsolateReviews } from '../client/queued-isolate-review-client';
 import { captureException } from '@sentry/nextjs';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
@@ -74,9 +75,12 @@ export async function dispatchPendingCodeReviewOwners(): Promise<DispatchPending
     pendingCreatedAtWindow,
   });
   const limit = pLimit(OWNER_DISPATCH_CONCURRENCY);
-  const outcomes = await Promise.all(
-    candidates.owners.map(candidate => limit(() => drainOwner(candidate, pendingCreatedAtWindow)))
-  );
+  const [outcomes] = await Promise.all([
+    Promise.all(
+      candidates.owners.map(candidate => limit(() => drainOwner(candidate, pendingCreatedAtWindow)))
+    ),
+    recoverQueuedIsolateReviews({ pendingCreatedAtWindow }),
+  ]);
 
   const summary: DispatchPendingCodeReviewOwnersSummary = {
     ownersConsidered: candidates.owners.length,

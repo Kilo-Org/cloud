@@ -171,6 +171,57 @@ test('keeps public tunnels out of default and agents starts', () => {
   assert.ok(resolveTargets(['cloud-agent-public-tunnels']).includes('cloud-agent-public-tunnels'));
 });
 
+test('keeps Bitbucket public tunneling out of default, code review, and all selections', () => {
+  assert.ok(!resolveGroups(getAlwaysOnGroupIds()).includes('bitbucket-webhook-tunnel'));
+
+  for (const targets of [
+    ['code-review'],
+    ['cloudflare-code-review-infra'],
+    ['code-review', 'isolate-review'],
+    ['cloudflare-code-review-infra', 'cloudflare-isolate-review', 'fake-llm'],
+    ['all'],
+  ]) {
+    const selected = resolveTargets(targets);
+    assert.ok(selected.includes('cloudflare-code-review-infra'));
+    assert.ok(selected.includes('cloud-agent-next'));
+    assert.ok(selected.includes('nextjs'));
+    assert.ok(!selected.includes('bitbucket-webhook-tunnel'), targets.join(' '));
+    assert.ok(!selected.includes('cloud-agent-public-tunnels'), targets.join(' '));
+  }
+});
+
+test('selects the Bitbucket public tunnel only when its group or service is requested', () => {
+  assert.equal(getService('bitbucket-webhook-tunnel').group, 'code-review-public-tunnels');
+
+  for (const target of ['code-review-public-tunnels', 'bitbucket-webhook-tunnel']) {
+    for (const targets of [[target], ['code-review', 'isolate-review', target], ['all', target]]) {
+      const selected = resolveTargets(targets);
+      assert.ok(selected.includes('bitbucket-webhook-tunnel'));
+      assert.ok(selected.includes('nextjs'));
+      assert.ok(selected.indexOf('nextjs') < selected.indexOf('bitbucket-webhook-tunnel'));
+      assert.ok(!selected.includes('cloud-agent-public-tunnels'));
+    }
+  }
+});
+
+test('preserves public tunnel opt-in after rebuilding offset service definitions', () => {
+  const initialOffset = portOffset;
+  try {
+    applyPortOffset(2800);
+    const selected = resolveTargets(['all']);
+    assert.ok(!selected.includes('bitbucket-webhook-tunnel'));
+    assert.ok(!selected.includes('cloud-agent-public-tunnels'));
+    assert.ok(resolveTargets(['code-review-public-tunnels']).includes('bitbucket-webhook-tunnel'));
+    assert.deepEqual(getService('bitbucket-webhook-tunnel').command, [
+      'tsx',
+      'dev/local/scripts/start-bitbucket-webhook-tunnel.ts',
+      String(getService('nextjs').port),
+    ]);
+  } finally {
+    applyPortOffset(initialOffset);
+  }
+});
+
 test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');
 

@@ -106,6 +106,38 @@ describe('IsolateReviewWorkerClient', () => {
     global.fetch = originalFetch;
   });
 
+  it('does not send canonical publication through the direct experimental route', async () => {
+    const organizationId = crypto.randomUUID();
+    const integrationId = crypto.randomUUID();
+    const request = {
+      ...preparedRequest,
+      organizationId,
+      expectedIntegrationId: integrationId,
+      preparation: {
+        ...preparation,
+        organizationId,
+        github: { ...preparation.github, integrationId },
+        queued: {
+          identity: {
+            reviewId: crypto.randomUUID(),
+            attemptId: crypto.randomUUID(),
+            generation: crypto.randomUUID(),
+            organizationId,
+            integrationId,
+            executionUserId: preparation.executionUserId,
+            target: { host: 'github.com' as const, repoFullName: 'acme/widget', prNumber: 42 },
+            snapshot: preparation.snapshot,
+          },
+          gateThreshold: 'off' as const,
+          summaryHistory: '',
+        },
+      },
+    };
+    const client = createIsolateReviewWorkerClient('fixture-bearer', fixtureClientOptions);
+    await expect(client.startReview(request)).rejects.toThrow('requires queued admission');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('mints a one-hour review-specific bearer bound to the user, pepper, and environment', async () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
     fetchMock.mockResolvedValue(

@@ -1,4 +1,6 @@
+import { asSchema } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
+import { stripReviewSummaryHistory } from '@kilocode/worker-utils/review-summary-cleaning';
 import {
   createGithubClient,
   createGithubTools,
@@ -376,6 +378,50 @@ async function ownedSetup(body = oldSummary, extra: Partial<ToolOptions> = {}) {
   const proof = { previousRunId: 'previous-candidate', commentId: 9, bodyHash: await hash(body) };
   const fixture = setup({ ...extra, summaryOwnership: proof });
   fixture.api.issues.push(issueComment({ body, user: kiloBotUser }));
+  return { ...fixture, proof };
+}
+
+function queuedSetup(
+  publication: Partial<NonNullable<ToolOptions['queuedPublication']>> = {},
+  extra: Partial<ToolOptions> = {}
+) {
+  const identity = {
+    reviewId: crypto.randomUUID(),
+    attemptId: crypto.randomUUID(),
+    generation: crypto.randomUUID(),
+    organizationId: crypto.randomUUID(),
+    integrationId: crypto.randomUUID(),
+    executionUserId: 'oauth/github/queued-review-user',
+    target: { host: 'github.com' as const, repoFullName: 'acme/widget', prNumber: 42 },
+    snapshot,
+  };
+  return setup({
+    input: {
+      ...input,
+      userId: identity.executionUserId,
+      organizationId: identity.organizationId,
+      expectedIntegrationId: identity.integrationId,
+    },
+    runId: identity.attemptId,
+    queuedPublication: { identity, gateThreshold: 'off', summaryHistory: '', ...publication },
+    ...extra,
+  });
+}
+
+const canonicalBotUser = { id: 456, login: 'kiloconnect[bot]', type: 'Bot' };
+
+async function queuedOwnedSetup(body = oldSummary, history = '', extra: Partial<ToolOptions> = {}) {
+  const proof = {
+    commentId: 9,
+    bodyHash: await hash(body),
+    authorId: canonicalBotUser.id,
+    authorLogin: canonicalBotUser.login,
+    appId: 123,
+  };
+  const fixture = queuedSetup({ summaryTarget: proof, summaryHistory: history }, extra);
+  fixture.api.issues.push(
+    issueComment({ body, user: canonicalBotUser, performed_via_github_app: { id: proof.appId } })
+  );
   return { ...fixture, proof };
 }
 
@@ -2374,6 +2420,80 @@ describe('immutable and recoverable GitHub context', () => {
     expect(binary.onContextIncomplete).toHaveBeenCalledOnce();
   });
 
+  it.each([{}, { offset: 0 }, { bodyHash: '' }, { offset: 0, bodyHash: '' }])(
+    'reads the first PR-description page with absent or empty placeholders: %j',
+    async input => {
+      const { tools, api, onContextIncomplete } = setup();
+      const body = 'x'.repeat(50);
+      api.pull.body = body;
+      const validated = await asSchema(tools.pr_view.inputSchema).validate?.(input);
+      expect(validated).toMatchObject({ success: true, value: input });
+      await expect(executeTool(tools, 'pr_view', input)).resolves.toMatchObject({
+        body,
+        bodyHash: await hash(body),
+        bodyTruncated: false,
+        nextOffset: null,
+        snapshot,
+      });
+      expect(onContextIncomplete).not.toHaveBeenCalled();
+      expect(writes(api)).toEqual([]);
+    }
+  );
+
+  it.each([{ offset: null }, { bodyHash: null }, { offset: '0' }, { bodyHash: 0 }])(
+    'does not advertise or accept nullable or coerced PR-description arguments: %j',
+    async input => {
+      const { tools, api } = setup();
+      const schema = asSchema(tools.pr_view.inputSchema);
+      expect(await schema.validate?.(input)).toMatchObject({ success: false });
+      expect(api.requests).toEqual([]);
+    }
+  );
+
+  it.each([
+    { offset: 0, bodyHash: 'stale' },
+    { bodyHash: ' '.repeat(3) },
+    { offset: 0, bodyHash: 'd'.repeat(64) },
+    { offset: 1 },
+    { offset: 1, bodyHash: '' },
+    { offset: 1, bodyHash: 'd'.repeat(64) },
+  ])('keeps invalid PR-description hashes fail-closed after a reread: %j', async input => {
+    const persisted: GithubPublicationState = {};
+    const fixture = setup({
+      onContextIncomplete: async reason => {
+        persisted.contextIncompleteReasons = [reason];
+      },
+    });
+    await expect(executeTool(fixture.tools, 'pr_view', input)).rejects.toThrow(
+      'PR description changed or continuation lacks its body hash'
+    );
+    expect(persisted.contextIncompleteReasons).toHaveLength(1);
+    await expect(executeTool(fixture.tools, 'pr_view', {})).resolves.toMatchObject({
+      body: fixture.api.pull.body,
+    });
+    const restored = fixture.create({ publicationState: persisted });
+    for (const tools of [fixture.tools, restored]) {
+      expect(await executeTool(tools, 'submit_review', args)).toMatchObject({ publishable: false });
+      expect(await executeTool(tools, 'upsert_summary', { body: 'No issues' })).toMatchObject({
+        publishable: false,
+      });
+    }
+    expect(writes(fixture.api)).toEqual([]);
+  });
+
+  it('rejects changed PR-description bodies when continuing with the original hash', async () => {
+    const { tools, api, onContextIncomplete } = setup();
+    api.pull.body = 'x'.repeat(50_000);
+    const first = await executeTool(tools, 'pr_view', {});
+    api.pull.body = 'y'.repeat(50_000);
+    await expect(executeTool(tools, 'pr_view', first.retrieval)).rejects.toThrow(
+      'PR description changed'
+    );
+    expect(onContextIncomplete).toHaveBeenCalledOnce();
+    expect(await executeTool(tools, 'submit_review', args)).toMatchObject({ publishable: false });
+    expect(writes(api)).toEqual([]);
+  });
+
   it('recovers a long PR description through hash-bound cursors', async () => {
     const { tools, api, onContextIncomplete } = setup();
     api.pull.body = `${'x'.repeat(50_000)}END`;
@@ -2387,7 +2507,7 @@ describe('immutable and recoverable GitHub context', () => {
   });
 
   it.each(['inline', 'issue', 'reviews'] as const)(
-    'preserves the end of long %s comments with scoped full retrieval',
+    'preserves the end of long %s comments after an empty first-page hash',
     async category => {
       const { tools, api, onContextIncomplete } = setup();
       const body = `${'é'.repeat(40_000)}\nconclusion and suggestion`;
@@ -2410,7 +2530,13 @@ describe('immutable and recoverable GitHub context', () => {
       expect(new TextEncoder().encode(records[0].body as string).length).toBeLessThanOrEqual(
         MAX_COMMENT_BODY_LENGTH
       );
-      let result = await executeTool(tools, 'pr_comment', { category, id: 9 });
+      const firstPage = { category, id: 9, offset: 0, bodyHash: '' };
+      expect(await asSchema(tools.pr_comment.inputSchema).validate?.(firstPage)).toMatchObject({
+        success: true,
+        value: firstPage,
+      });
+      let result = await executeTool(tools, 'pr_comment', firstPage);
+      expect(result.bodyHash).toBe(await hash(body));
       let recovered = result.body as string;
       while (result.nextOffset !== null) {
         result = await executeTool(tools, 'pr_comment', {
@@ -2423,6 +2549,87 @@ describe('immutable and recoverable GitHub context', () => {
       }
       expect(recovered).toBe(body);
       expect(onContextIncomplete).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['inline', 'issue', 'reviews'] as const)(
+    'treats an empty first-page hash as omitted for %s comments without an offset',
+    async category => {
+      const { tools, api, onContextIncomplete } = setup();
+      const body = 'Existing review discussion';
+      if (category === 'inline') api.inline = [inlineComment({ id: 9, body })];
+      else if (category === 'issue') api.issues = [issueComment({ body })];
+      else api.reviews = [review({ id: 9, body })];
+
+      await expect(
+        executeTool(tools, 'pr_comment', { category, id: 9, bodyHash: '' })
+      ).resolves.toMatchObject({ body, bodyHash: await hash(body), offset: 0, nextOffset: null });
+      expect(onContextIncomplete).not.toHaveBeenCalled();
+      expect(writes(api)).toEqual([]);
+    }
+  );
+
+  it.each(
+    (['inline', 'issue', 'reviews'] as const).flatMap(category =>
+      [
+        { offset: 0, bodyHash: 'd'.repeat(64) },
+        { offset: 0, bodyHash: ' ' },
+        { offset: MAX_RETRIEVAL_BYTES },
+        { offset: MAX_RETRIEVAL_BYTES, bodyHash: '' },
+        { offset: MAX_RETRIEVAL_BYTES, bodyHash: 'd'.repeat(64) },
+      ].map(page => ({ category, page }))
+    )
+  )(
+    'keeps $category comment hash failures sticky after a valid retry: $page',
+    async ({ category, page }) => {
+      const persisted: GithubPublicationState = {};
+      const fixture = setup({
+        onContextIncomplete: async reason => {
+          persisted.contextIncompleteReasons = [reason];
+        },
+      });
+      const body = 'x'.repeat(MAX_RETRIEVAL_BYTES + 50);
+      if (category === 'inline') fixture.api.inline = [inlineComment({ id: 9, body })];
+      else if (category === 'issue') fixture.api.issues = [issueComment({ body })];
+      else fixture.api.reviews = [review({ id: 9, body })];
+      const bodyHash = await hash(body);
+      const reason = 'Comment body changed or continuation lacks a body hash; restart retrieval';
+
+      await expect(
+        executeTool(fixture.tools, 'pr_comment', { category, id: 9, ...page })
+      ).rejects.toThrow(reason);
+      expect(persisted.contextIncompleteReasons).toEqual([reason]);
+      await expect(
+        executeTool(fixture.tools, 'pr_comment', { category, id: 9, offset: page.offset, bodyHash })
+      ).resolves.toMatchObject({ bodyHash, offset: page.offset });
+
+      const restored = fixture.create({ publicationState: persisted });
+      for (const tools of [fixture.tools, restored]) {
+        expect(await executeTool(tools, 'submit_review', args)).toMatchObject({
+          publishable: false,
+        });
+        expect(
+          await executeTool(tools, 'upsert_summary', { body: 'No Issues Found' })
+        ).toMatchObject({
+          publishable: false,
+        });
+      }
+      expect(persisted.contextIncompleteReasons).toEqual([reason]);
+      expect(writes(fixture.api)).toEqual([]);
+    }
+  );
+
+  it.each([{ offset: null }, { bodyHash: null }])(
+    'continues rejecting nullable comment retrieval arguments: %j',
+    async page => {
+      const { tools, api } = setup();
+      const result = await asSchema(tools.pr_comment.inputSchema).validate?.({
+        category: 'issue',
+        id: 9,
+        ...page,
+      });
+      expect(result).toMatchObject({ success: false });
+      expect(api.requests).toEqual([]);
     }
   );
 
@@ -3952,6 +4159,168 @@ describe('publication target and summary ownership gates', () => {
   });
 });
 
+describe('queued publication ownership and rejection', () => {
+  it.each([
+    { id: 999, login: 'octocat', type: 'User' },
+    { id: 999, login: 'foreign[bot]', type: 'Bot' },
+    { id: 999, login: 'kilo-code', type: 'User' },
+    null,
+  ])('ignores foreign marked comments without adopting them: %j', async user => {
+    for (const existing of [false, true]) {
+      const fixture = existing ? await queuedOwnedSetup() : queuedSetup();
+      const foreign = issueComment({ id: 10, body: oldSummary, user });
+      fixture.api.issues.push(foreign);
+      const context = await executeTool(fixture.tools, 'pr_comments', {});
+      expect(context).toMatchObject({ summaryCount: existing ? 1 : 0 });
+      expect(context.issueComments).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: foreign.id })])
+      );
+      expect(await executeTool(fixture.tools, 'submit_review', args)).toHaveProperty('id');
+      expect(
+        await executeTool(fixture.tools, 'upsert_summary', { body: 'Current summary' })
+      ).toHaveProperty('id');
+      expect(foreign.body).toBe(oldSummary);
+      expect(writes(fixture.api)).toHaveLength(2);
+      expect(writes(fixture.api)[1]?.url.pathname).toBe(
+        existing ? `${repositoryPath}/issues/comments/9` : `${issuePath}/comments`
+      );
+    }
+  });
+
+  it('keeps a second verified Kilo bot summary fenced', async () => {
+    const fixture = await queuedOwnedSetup();
+    fixture.api.issues.push(
+      issueComment({
+        id: 10,
+        body: oldSummary,
+        user: canonicalBotUser,
+        performed_via_github_app: { id: 123 },
+      })
+    );
+    for (const [name, value] of [
+      ['submit_review', args],
+      ['upsert_summary', { body: 'Current summary' }],
+    ] as const) {
+      expect(await executeTool(fixture.tools, name, value)).toMatchObject({
+        publishable: false,
+        blockedReason: expect.stringContaining('Another marked summary'),
+      });
+    }
+    expect(writes(fixture.api)).toEqual([]);
+  });
+
+  it.each([
+    { user: { ...canonicalBotUser, id: 999 } },
+    { user: { ...canonicalBotUser, login: 'kilo-code[bot]' } },
+    { user: { ...canonicalBotUser, type: 'User' } },
+    { performed_via_github_app: { id: 999 } },
+    { body: `${oldSummary}\nEdited` },
+    { issue_url: 'https://api.github.com/repos/acme/widget/issues/43' },
+  ])('does not relax canonical target validation: %j', async changed => {
+    const fixture = await queuedOwnedSetup();
+    fixture.api.override = url =>
+      url.pathname === `${repositoryPath}/issues/comments/9`
+        ? Response.json({ ...fixture.api.issues[0], ...changed })
+        : undefined;
+    expect(
+      await executeTool(fixture.tools, 'upsert_summary', { body: 'Current summary' })
+    ).toMatchObject({ publishable: false });
+    expect(writes(fixture.api)).toEqual([]);
+  });
+
+  it.each([400, 401, 403, 404, 422])(
+    'persists definitive HTTP %s rejection for each publication kind before bounded retry',
+    async status => {
+      for (const kind of ['review', 'summary', 'patch'] as const) {
+        const fixture = kind === 'patch' ? await queuedOwnedSetup() : queuedSetup();
+        fixture.api.override = (_url, init) =>
+          ['POST', 'PATCH'].includes(init.method ?? 'GET')
+            ? new Response('Definitive rejection', { status })
+            : undefined;
+        const name = kind === 'review' ? 'submit_review' : 'upsert_summary';
+        const value = kind === 'review' ? args : { body: 'Current summary' };
+        for (let attempt = 0; attempt < MAX_PUBLICATION_ATTEMPTS; attempt++) {
+          expect(await executeTool(fixture.tools, name, value)).toEqual({
+            error: 'Definitive rejection',
+            status,
+            publicationOutcome: 'rejected',
+          });
+          expect(fixture.onPublicationRejected).toHaveBeenCalledTimes(attempt + 1);
+          expect(fixture.onPublicationRejected).toHaveBeenLastCalledWith(
+            kind === 'review' ? 'review' : 'summary'
+          );
+        }
+        await expect(executeTool(fixture.tools, name, value)).rejects.toThrow(
+          'retry budget exhausted'
+        );
+        expect(writes(fixture.api)).toHaveLength(MAX_PUBLICATION_ATTEMPTS);
+        expect(fixture.onPublished).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each([408, 429, 500, 502, 503, 504, 'timeout'] as const)(
+    'keeps HTTP %s or transport uncertainty fenced for all publication kinds',
+    async status => {
+      for (const kind of ['review', 'summary', 'patch'] as const) {
+        const fixture = kind === 'patch' ? await queuedOwnedSetup() : queuedSetup();
+        fixture.api.override = (_url, init) => {
+          if (!['POST', 'PATCH'].includes(init.method ?? 'GET')) return undefined;
+          if (status === 'timeout') throw new Error('Timed out');
+          return new Response('Uncertain result', { status });
+        };
+        const name = kind === 'review' ? 'submit_review' : 'upsert_summary';
+        const value = kind === 'review' ? args : { body: 'Current summary' };
+        await expect(executeTool(fixture.tools, name, value)).rejects.toThrow();
+        expect(fixture.onPublicationRejected).not.toHaveBeenCalled();
+        const details = fixture.onPublicationStarted.mock.calls[0]?.[1];
+        const recreated = fixture.create({
+          publicationState:
+            kind === 'review'
+              ? { reviewPending: true, reviewPendingFingerprint: details?.fingerprint }
+              : {
+                  summaryPending: true,
+                  summaryPendingFingerprint: details?.fingerprint,
+                  summaryPendingCommentId: details?.commentId,
+                },
+        });
+        await expect(executeTool(recreated, name, value)).rejects.toThrow('no matching GitHub');
+        expect(writes(fixture.api)).toHaveLength(1);
+        expect(fixture.onPublished).not.toHaveBeenCalled();
+        expect(fixture.onPublicationRejected).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(['review', 'summary', 'patch'] as const)(
+    'retains pending %s state until definitive rejection persistence succeeds',
+    async kind => {
+      const onPublicationRejected = vi
+        .fn()
+        .mockRejectedValue(new Error('Rejection storage failed'));
+      const fixture =
+        kind === 'patch'
+          ? await queuedOwnedSetup(oldSummary, '', { onPublicationRejected })
+          : queuedSetup({}, { onPublicationRejected });
+      fixture.api.override = (_url, init) =>
+        ['POST', 'PATCH'].includes(init.method ?? 'GET')
+          ? new Response('Forbidden', { status: 403 })
+          : undefined;
+      const name = kind === 'review' ? 'submit_review' : 'upsert_summary';
+      const value = kind === 'review' ? args : { body: 'Current summary' };
+      await expect(executeTool(fixture.tools, name, value)).rejects.toThrow(
+        'Rejection storage failed'
+      );
+      await expect(executeTool(fixture.tools, name, value)).rejects.toThrow(
+        'Rejection storage failed'
+      );
+      expect(writes(fixture.api)).toHaveLength(1);
+      expect(onPublicationRejected).toHaveBeenCalledTimes(2);
+      expect(fixture.onPublished).not.toHaveBeenCalled();
+    }
+  );
+});
+
 describe('cancellation and authorization at the write boundary', () => {
   it.each(['submit_review', 'upsert_summary'] as const)(
     'does not POST after abort while a head read is pending for %s',
@@ -4234,6 +4603,180 @@ describe('summary analysis content and publication hashes', () => {
     expect(await executeTool(tools, 'upsert_summary', { body })).toHaveProperty('error');
     expect(onProposal).not.toHaveBeenCalled();
     expect(writes(api)).toEqual([]);
+  });
+});
+
+describe('queued summary history byte budgets', () => {
+  const unicodeHistory = summaryHistory.replace('Archived finding', '界'.repeat(23_000));
+  const byteLength = (value: string) => new TextEncoder().encode(value).byteLength;
+
+  it.each([
+    { label: 'Unicode history', body: 'Current finding', history: unicodeHistory },
+    {
+      label: 'long current summary',
+      body: 'Current finding\n' + 'x'.repeat(60_000),
+      history: unicodeHistory,
+    },
+    {
+      label: 'long Unicode current summary',
+      body: 'Current finding\n' + '界'.repeat(20_000),
+      history: summaryHistory.replace('Archived finding', 'x'.repeat(23_000)),
+    },
+  ])(
+    'keeps $label publishable without changing current analysis or exact hashes',
+    async ({ body, history }) => {
+      const fixture = await queuedOwnedSetup(oldSummary, history);
+      expect(await executeTool(fixture.tools, 'upsert_summary', { body })).toEqual({ id: 9 });
+      const publishedBody = fixture.api.issues[0]?.body;
+      if (typeof publishedBody !== 'string') throw new Error('Missing published summary');
+      const analysisBody = `<!-- kilo-review -->\n${body}`;
+      expect(stripReviewSummaryHistory(publishedBody)).toBe(analysisBody);
+      expect(publishedBody).toContain('<!-- kilo-review-history -->');
+      expect(publishedBody.endsWith('</details>\n<!-- /kilo-review-history -->')).toBe(true);
+      expect(publishedBody).toContain('_[Snapshot truncated.]_');
+      expect(byteLength(publishedBody) + 2_048).toBeLessThanOrEqual(64 * 1024);
+      expect(byteLength(`${publishedBody}\n\n${summaryFooter}`)).toBeLessThanOrEqual(64 * 1024);
+      expect(fixture.onProposal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          summaryContent: { body: analysisBody, bodyHash: await hash(analysisBody) },
+          bodyHash: await hash(publishedBody),
+        })
+      );
+      expect(fixture.onPublished).toHaveBeenCalledWith({
+        kind: 'summary',
+        id: 9,
+        bodyHash: await hash(publishedBody),
+        fingerprint: await hash(
+          JSON.stringify([
+            'summary',
+            snapshot.headSha,
+            `${repositoryPath}/issues/comments/9`,
+            { body: publishedBody },
+          ])
+        ),
+      });
+    }
+  );
+
+  it('keeps complete fitting history unchanged', async () => {
+    const fixture = await queuedOwnedSetup(oldSummary, summaryHistory);
+    await executeTool(fixture.tools, 'upsert_summary', { body: 'Current finding' });
+    expect(fixture.api.issues[0]?.body).toBe(
+      `<!-- kilo-review -->\nCurrent finding\n\n${summaryHistory}`
+    );
+  });
+
+  it('omits history only when the remaining budget cannot hold an entry', async () => {
+    const fixture = await queuedOwnedSetup(oldSummary, unicodeHistory);
+    const body = 'x'.repeat(63_300);
+    await executeTool(fixture.tools, 'upsert_summary', { body });
+    expect(fixture.api.issues[0]?.body).toBe(`<!-- kilo-review -->\n${body}`);
+    expect(byteLength(String(fixture.api.issues[0]?.body)) + 2_048).toBeLessThanOrEqual(64 * 1024);
+  });
+
+  it('rejects current analysis that leaves no space for the backend footer instead of truncating it', async () => {
+    const fixture = await queuedOwnedSetup(oldSummary, unicodeHistory);
+    const body = '界'.repeat(21_200);
+    expect(await executeTool(fixture.tools, 'upsert_summary', { body })).toMatchObject({
+      error: expect.stringContaining('backend footer'),
+    });
+    expect(fixture.onProposal).not.toHaveBeenCalled();
+    expect(writes(fixture.api)).toEqual([]);
+  });
+
+  it.each([
+    { body: `Current finding\n\n${summaryHistory}`, error: 'server-owned' },
+    { body: '界'.repeat(21_200), error: 'backend footer' },
+  ])(
+    'revalidates fresh summary content after retrying rejection persistence',
+    async ({ body, error }) => {
+      const onPublicationRejected = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Rejection storage failed'))
+        .mockResolvedValue(undefined);
+      const fixture = await queuedOwnedSetup(oldSummary, unicodeHistory, { onPublicationRejected });
+      fixture.api.override = (_url, init) =>
+        init.method === 'PATCH' ? new Response('Forbidden', { status: 403 }) : undefined;
+      await expect(
+        executeTool(fixture.tools, 'upsert_summary', { body: 'Current finding' })
+      ).rejects.toThrow('Rejection storage failed');
+      expect(await executeTool(fixture.tools, 'upsert_summary', { body })).toMatchObject({
+        error: expect.stringContaining(error),
+      });
+      expect(onPublicationRejected).toHaveBeenCalledTimes(2);
+      expect(writes(fixture.api)).toHaveLength(1);
+    }
+  );
+
+  it.each(['create', 'patch'] as const)(
+    'reconciles truncated %s history using either analysis or exact persisted payload without rewriting',
+    async mode => {
+      for (const replayPayload of [false, true]) {
+        const fixture =
+          mode === 'patch'
+            ? await queuedOwnedSetup(oldSummary, unicodeHistory)
+            : queuedSetup({ summaryHistory: unicodeHistory });
+        fixture.api.loseWriteResponse = true;
+        const body = 'Current finding\n' + 'x'.repeat(60_000);
+        await expect(executeTool(fixture.tools, 'upsert_summary', { body })).rejects.toThrow(
+          'connection interrupted'
+        );
+        const publishedBody = fixture.api.issues[0]?.body;
+        if (typeof publishedBody !== 'string') throw new Error('Missing published summary');
+        expect(byteLength(publishedBody) + 2_048).toBeLessThanOrEqual(64 * 1024);
+        const details = fixture.onPublicationStarted.mock.calls[0]?.[1];
+        const recreated = fixture.create({
+          publicationState: {
+            summaryPending: true,
+            summaryPendingFingerprint: details?.fingerprint,
+            summaryPendingCommentId: details?.commentId,
+          },
+        });
+        const readsBefore = fixture.api.requests.length;
+        await expect(
+          executeTool(recreated, 'upsert_summary', {
+            body: publishedBody.replace('Current', 'Changed'),
+          })
+        ).rejects.toThrow('fingerprint does not match');
+        expect(fixture.api.requests).toHaveLength(readsBefore);
+        expect(
+          await executeTool(recreated, 'upsert_summary', {
+            body: replayPayload ? publishedBody : body,
+          })
+        ).toEqual({ id: mode === 'patch' ? 9 : 1_000 });
+        expect(fixture.onPublished).toHaveBeenCalledWith({
+          kind: 'summary',
+          id: mode === 'patch' ? 9 : 1_000,
+          fingerprint: details?.fingerprint,
+          bodyHash: await hash(publishedBody),
+        });
+        expect(writes(fixture.api)).toHaveLength(1);
+      }
+    }
+  );
+
+  it('preserves exact pending publication bytes from before footer reservation', async () => {
+    const fixture = await queuedOwnedSetup(oldSummary, summaryHistory);
+    const body = `<!-- kilo-review -->\n${'x'.repeat(64_000)}\n\n${summaryHistory}`;
+    const fingerprint = await hash(
+      JSON.stringify(['summary', snapshot.headSha, `${repositoryPath}/issues/comments/9`, { body }])
+    );
+    fixture.api.issues[0].body = body;
+    const recreated = fixture.create({
+      publicationState: {
+        summaryPending: true,
+        summaryPendingCommentId: 9,
+        summaryPendingFingerprint: fingerprint,
+      },
+    });
+    expect(await executeTool(recreated, 'upsert_summary', { body })).toEqual({ id: 9 });
+    expect(fixture.onPublished).toHaveBeenCalledWith({
+      kind: 'summary',
+      id: 9,
+      fingerprint,
+      bodyHash: await hash(body),
+    });
+    expect(writes(fixture.api)).toEqual([]);
   });
 });
 

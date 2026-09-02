@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { stripReviewSummaryFooter, stripReviewSummaryHistory } from './review-summary-cleaning.js';
+import {
+  buildPreviousReviewSummaryHistory,
+  stripReviewSummaryFooter,
+  stripReviewSummaryHistory,
+} from './review-summary-cleaning.js';
 
 const usage =
   '<!-- kilo-usage -->\n<sub>Reviewed by model · Input: 1K · Output: 200 · Cached: 0</sub>';
@@ -79,6 +83,77 @@ describe('stripReviewSummaryHistory', () => {
   it.each(markers)('preserves an unpaired %s marker and later findings', marker => {
     const body = `Current summary\n${marker}\nFinding after a literal marker`;
     expect(stripReviewSummaryFooter(stripReviewSummaryHistory(body))).toBe(body);
+  });
+});
+
+describe('byte-bounded summary history', () => {
+  const encoder = new TextEncoder();
+  const byteLength = (value: string) => encoder.encode(value).byteLength;
+
+  it.each(['界', '\u{20000}'])(
+    'truncates %s snapshots at complete Unicode boundaries with closed history details',
+    character => {
+      const previous = `<!-- kilo-review -->\n<details>\n<summary>Findings</summary>\n${character.repeat(23_000)}\n</details>`;
+      const result = buildPreviousReviewSummaryHistory(previous, { maxBytes: 24_000 });
+      expect(byteLength(result)).toBeLessThanOrEqual(24_000);
+      expect(result).toContain(character.repeat(100));
+      expect(result).toContain('_[Snapshot truncated.]_');
+      expect(result).toContain('Additional previous summary content was truncated');
+      expect(result.endsWith('\n</details>\n<!-- /kilo-review-history -->')).toBe(true);
+      expect(result.match(/<details>/g)).toHaveLength(2);
+      expect(result.match(/<\/details>/g)).toHaveLength(2);
+      expect(result).not.toContain('\uFFFD');
+      expect(new TextDecoder('utf-8', { fatal: true }).decode(encoder.encode(result))).toBe(result);
+      expect(stripReviewSummaryHistory(`Current\n\n${result}`)).toBe('Current');
+    }
+  );
+
+  it('preserves the complete rendering when both character and byte budgets fit', () => {
+    const previous = '<!-- kilo-review -->\nA complete 界 snapshot';
+    const original = buildPreviousReviewSummaryHistory(previous);
+    expect(
+      buildPreviousReviewSummaryHistory(previous, {
+        maxCharacters: original.length,
+        maxBytes: byteLength(original),
+      })
+    ).toBe(original);
+  });
+
+  it('retains recent snapshots first and counts only retained entries', () => {
+    const older = buildPreviousReviewSummaryHistory('Old finding\n' + '界'.repeat(5_000));
+    const previous = `<!-- kilo-review -->\nRecent finding\n\n${older}`;
+    const result = buildPreviousReviewSummaryHistory(previous, { maxBytes: 1_200 });
+    expect(result.indexOf('Recent finding')).toBeLessThan(result.indexOf('Old finding'));
+    expect(result).toContain('Previous Review Summaries</b> (2 snapshots)');
+    expect(result.match(/<!-- kilo-review-history-entry -->/g)).toHaveLength(2);
+    expect(byteLength(result)).toBeLessThanOrEqual(1_200);
+  });
+
+  it.each([0, 100, 300, 500, 700, 900, 1_200, 24_000])(
+    'keeps wrappers and truncation notices within the %i-byte budget',
+    maxBytes => {
+      const older = buildPreviousReviewSummaryHistory('Old finding\n' + '界'.repeat(5_000));
+      const result = buildPreviousReviewSummaryHistory(
+        `<!-- kilo-review -->\nRecent finding\n\n${older}`,
+        { maxBytes }
+      );
+      expect(byteLength(result)).toBeLessThanOrEqual(maxBytes);
+      if (result) {
+        expect(result).toContain('Recent finding');
+        expect(result.startsWith('<!-- kilo-review-history -->\n<details>')).toBe(true);
+        expect(result.endsWith('</details>\n<!-- /kilo-review-history -->')).toBe(true);
+      }
+    }
+  );
+
+  it('enforces character and byte limits together', () => {
+    const result = buildPreviousReviewSummaryHistory('界'.repeat(3_000), {
+      maxCharacters: 900,
+      maxBytes: 1_200,
+    });
+    expect(result.length).toBeLessThanOrEqual(900);
+    expect(byteLength(result)).toBeLessThanOrEqual(1_200);
+    expect(result).toContain('界'.repeat(100));
   });
 });
 

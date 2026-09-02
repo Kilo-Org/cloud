@@ -8,6 +8,8 @@ import {
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
+  getLatestCodeReviewAttempt,
+  getCodeReviewAttemptForReview,
   updateReviewHeadShaAndCheckRun,
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
@@ -210,7 +212,7 @@ export async function handlePullRequestCodeReview(
       // the check run goes on the *base* repo (where branch protection
       // lives and where the app is installed), not the head/fork repo.
       const [baseOwner, baseRepoName] = repository.full_name.split('/');
-      await migrateInFlightReviewsToMergeCommitHead({
+      const preserved = await migrateInFlightReviewsToMergeCommitHead({
         newHeadSha: pull_request.head.sha,
         integrationId: integration.id,
         installationId: integration.platform_installation_id as string,
@@ -220,7 +222,7 @@ export async function handlePullRequestCodeReview(
         reviewScope,
       });
 
-      return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
+      if (preserved) return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
     // 5. Cancel any existing reviews for this PR (different SHA)
@@ -239,9 +241,19 @@ export async function handlePullRequestCodeReview(
         cancellationCounts
       );
 
+      const cancelledWithAffinity = await Promise.all(
+        cancelledReviews.map(async review => ({
+          ...review,
+          isolate:
+            (review.latestActiveAttemptId
+              ? await getCodeReviewAttemptForReview(review.id, review.latestActiveAttemptId)
+              : await getLatestCodeReviewAttempt(review.id)
+            )?.reviewer_backend === 'isolate',
+        }))
+      );
       await Promise.allSettled(
-        cancelledReviews
-          .filter(review => review.prevStatus !== 'pending')
+        cancelledWithAffinity
+          .filter(review => review.prevStatus !== 'pending' || review.isolate)
           .map(async review => {
             try {
               const response = await codeReviewWorkerClient.cancelReview(
@@ -271,8 +283,10 @@ export async function handlePullRequestCodeReview(
 
       const [repoOwner, repoName] = repository.full_name.split('/');
       await Promise.allSettled(
-        cancelledReviews
-          .filter(review => review.checkRunId != null && review.platform === 'github')
+        cancelledWithAffinity
+          .filter(
+            review => !review.isolate && review.checkRunId != null && review.platform === 'github'
+          )
           .map(async review => {
             try {
               await updateCheckRun(
@@ -562,11 +576,13 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   appType: GitHubAppType;
   reviewScope: ReviewScope;
 }) {
-  if (args.appType === 'lite') return;
+  if (args.appType === 'lite') return true;
 
   try {
     const activeReviewIds = await findActiveReviewsForPR(args.reviewScope, args.newHeadSha);
-    if (activeReviewIds.length === 0) return;
+    if (activeReviewIds.length === 0) return true;
+    const attempts = await Promise.all(activeReviewIds.map(id => getLatestCodeReviewAttempt(id)));
+    if (attempts.some(attempt => attempt?.reviewer_backend === 'isolate')) return false;
 
     // In practice a PR has at most one active review at a time; migrate the
     // first one to the new SHA. Any extras stay pinned to their old SHAs
@@ -575,6 +591,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
 
     let newCheckRunId: number | undefined;
+    let snapshotPinned = false;
     try {
       newCheckRunId = await createCheckRun(
         args.installationId,
@@ -590,7 +607,10 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
         },
         args.appType
       );
-      await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, newCheckRunId);
+      if (!(await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, newCheckRunId))) {
+        snapshotPinned = true;
+        throw new Error('Isolate review snapshot cannot be repointed');
+      }
       logExceptInTest(
         `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} (check run ${newCheckRunId})`
       );
@@ -614,8 +634,10 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
         }
       }
     }
+    return !snapshotPinned;
   } catch (lookupError) {
     logExceptInTest('Failed to find active reviews for merge-commit migration:', lookupError);
+    return true;
   }
 }
 

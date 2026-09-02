@@ -65,6 +65,40 @@ function incrementalInput(previousSummaryBody = '<!-- kilo-review -->\nPrior unr
 }
 
 describe('renderIsolateReviewPrompt', () => {
+  it.each(['off', 'all', 'warning', 'critical'] as const)(
+    'preserves canonical queued identity and the %s gate policy',
+    async gateThreshold => {
+      const input = promptInput({ review_analytics_enabled: true });
+      const organizationId = crypto.randomUUID();
+      const identity = {
+        reviewId: crypto.randomUUID(),
+        attemptId: crypto.randomUUID(),
+        generation: crypto.randomUUID(),
+        organizationId,
+        integrationId: crypto.randomUUID(),
+        executionUserId: 'oauth/github/user',
+        target: { host: 'github.com' as const, repoFullName: 'owner/repo', prNumber: 42 },
+        snapshot: input.snapshot,
+      };
+      input.organizationId = organizationId;
+      input.dryRun = false;
+      input.queued = { identity, gateThreshold, summaryHistory: '' };
+      const result = await renderIsolateReviewPrompt(input);
+      expect(result.analyticsEnabled).toBe(true);
+      expect(result.userPrompt).toContain(
+        `canonical review ${identity.reviewId}, attempt ${identity.attemptId}`
+      );
+      expect(result.userPrompt).toContain(`The required threshold is ${gateThreshold}`);
+      expect(result.userPrompt).toContain('Missing or invalid required output cannot pass');
+      expect(result.userPrompt).toContain('Summary history and usage footers are managed by code');
+      expect(result.userPrompt).not.toContain('No canonical review row or review ID exists');
+      expect(result.userPrompt).not.toContain('Only the separately proved previous-run target');
+      expect(result.userPrompt).not.toContain('/cloud-agent-fork/');
+      expect(result.canonicalPrompt).toBe(
+        appendCodeReviewAnalyticsPromptAppendix((await canonicalPrompt(input)).prompt)
+      );
+    }
+  );
   it.each(['balanced', 'strict', 'lenient', 'roast'] as const)(
     'uses the actual canonical provider renderer for the %s style, including dry-run',
     async reviewStyle => {

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate as migrateDatabase } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../drizzle/migrations';
@@ -7,6 +7,7 @@ import { reviewApplicationState } from './db/sqlite-schema';
 export type ReviewPersistence = {
   get<T>(key: string): Promise<T | undefined>;
   put<T>(key: string, value: T): Promise<void>;
+  deleteExcept(key: string): Promise<void>;
 };
 
 export function createReviewPersistence(storage: DurableObjectStorage): {
@@ -17,6 +18,9 @@ export function createReviewPersistence(storage: DurableObjectStorage): {
 
   return {
     persistence: {
+      async deleteExcept(key: string): Promise<void> {
+        database.delete(reviewApplicationState).where(ne(reviewApplicationState.key, key)).run();
+      },
       async get<T>(key: string): Promise<T | undefined> {
         const row = database
           .select({ payload: reviewApplicationState.payload })

@@ -1,11 +1,12 @@
 import { env, runInDurableObject, SELF, reset } from 'cloudflare:test';
+import { RpcTarget } from 'cloudflare:workers';
 import type { ThinkSubmissionInspection } from '@cloudflare/think';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import { createReviewPersistence } from '../../src/persistence';
 import { DEFAULT_MODEL } from '../../src/prompt';
-import { MAX_CLONE_ATTEMPTS, type ReviewIsolate } from '../../src/review-isolate';
+import { MAX_CLONE_ATTEMPTS, ReviewIsolate } from '../../src/review-isolate';
 import type { RunState } from '../../src/types';
 
 vi.mock('@kilocode/worker-utils/kilo-token-auth', () => ({
@@ -677,6 +678,50 @@ describe('isolate review routes', () => {
     );
     expect(result).toBeNull();
   });
+
+  it.each([
+    { method: 'getReview' as const, suffix: '' },
+    { method: 'getTranscript' as const, suffix: '/messages' },
+  ])(
+    'disposes native $method RPC results after serializing the HTTP response',
+    async ({ method, suffix }) => {
+      const runId = crypto.randomUUID();
+      const stub = env.REVIEW_ISOLATE.getByName(runId);
+      const disposed = vi.fn();
+      class ResultProbe extends RpcTarget {
+        [Symbol.dispose]() {
+          disposed();
+        }
+      }
+      await runInDurableObject(stub, async (_instance, state) => {
+        await reviewPersistence(state).put('runState', {
+          runId,
+          status: 'completed',
+          input: reviewBody(),
+        } satisfies RunState);
+      });
+      const original = ReviewIsolate.prototype[method];
+      const read = vi
+        .spyOn(ReviewIsolate.prototype, method)
+        .mockImplementation(async function (userId) {
+          const result = await original.call(this, userId);
+          return result ? { ...result, disposalProbe: new ResultProbe() } : null;
+        });
+      try {
+        const response = await SELF.fetch(`https://worker.test/reviews/${runId}${suffix}`, {
+          headers: authHeaders(REVIEW_OWNER_ID),
+        });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ runId });
+        await vi.waitFor(() => expect(disposed).toHaveBeenCalledOnce(), {
+          timeout: 1_000,
+          interval: 10,
+        });
+      } finally {
+        read.mockRestore();
+      }
+    }
+  );
 
   it('returns an empty transcript for a run with no messages', async () => {
     const runId = crypto.randomUUID();

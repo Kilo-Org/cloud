@@ -14,6 +14,8 @@ import { createGithubTools } from '../../src/github';
 import { createKiloGatewayModel, resolveIsolateReviewInferenceFromCatalog } from '../../src/model';
 import type { IsolateReviewInference } from '../../src/types';
 
+vi.mock('../../src/prompt', () => ({ DEFAULT_MODEL: 'fixture/unused-default' }));
+
 type Variant = NonNullable<IsolateReviewInference['variant']>;
 type Provider = IsolateReviewInference['provider'];
 type CatalogFixture = {
@@ -533,11 +535,12 @@ describe('installed SDK protocol fixtures without live model claims', () => {
   it.each(
     [
       { toolName: 'pr_view', input: {} },
+      { toolName: 'pr_view', input: { offset: 0, bodyHash: '' } },
       { toolName: 'pr_file', input: { path: 'src/index.ts', revision: 'head' } },
       { toolName: 'pr_file', input: { path: 'src/index.ts', revision: 'merge-base' } },
     ].flatMap(call => [false, true].map(streaming => ({ ...call, streaming })))
   )(
-    'Responses $toolName with $input round-trips omitted optional arguments (stream=$streaming)',
+    'Responses $toolName with $input round-trips initial retrieval arguments (stream=$streaming)',
     async ({ toolName, input, streaming }) => {
       const snapshot = {
         headSha: 'a'.repeat(40),

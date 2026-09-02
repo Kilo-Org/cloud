@@ -46,7 +46,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
-import { isWorktreeOwner, sessionPlaneForNewOwner } from '../session-plane.js';
+import { isWorktreeOwner, sessionPlaneForNewOwner, type SessionPlane } from '../session-plane.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   createCloudAgentSessionReport,
@@ -79,7 +79,7 @@ type SharedSandboxRouteMetadata = NonNullable<
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
+  plane: SessionPlane,
   options?: { billingOrigin?: string }
 ): void {
   if (
@@ -91,13 +91,7 @@ function assertSupportedSandboxAllocation(
       message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
     });
   }
-  if (
-    input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    sessionPlaneForNewOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.options?.kilocodeOrganizationId,
-    }) === 'control'
-  ) {
+  if (input.runtime?.sandboxAllocation === 'isolated-standard' && plane === 'control') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
@@ -526,15 +520,15 @@ function effectiveSessionRegistrationInput(
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
+  plane: SessionPlane,
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<NewSessionAllocation> {
+  assertSupportedSandboxAllocation(input, plane, options);
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const orgId = input.options?.kilocodeOrganizationId;
-  const cloudAgentSessionId = generateSessionId(
-    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
-  );
+  const cloudAgentSessionId = generateSessionId(plane);
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -970,8 +964,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
-  const allocation = await allocateNewSession(input, ctx, options);
+  const allocation = await allocateNewSession(input, ctx, 'legacy', options);
   const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
   try {
@@ -1116,7 +1109,11 @@ async function allocateSessionForCreate(
   ledger: SessionCreationLedgerHooks | undefined
 ): Promise<NewSessionAllocation> {
   try {
-    return await allocateNewSession(input, ctx, options, ledger);
+    const plane = sessionPlaneForNewOwner(ctx.env, {
+      userId: ctx.userId,
+      orgId: input.options?.kilocodeOrganizationId,
+    });
+    return await allocateNewSession(input, ctx, plane, options, ledger);
   } catch (error) {
     if (ledger && error instanceof SessionAllocationStageError) {
       await ledger.onFailure(error.stage, error.stage);
@@ -1225,7 +1222,6 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1439,7 +1435,14 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  assertSupportedSandboxAllocation(
+    input,
+    sessionPlaneForNewOwner(ctx.env, {
+      userId: ctx.userId,
+      orgId: input.options?.kilocodeOrganizationId,
+    }),
+    { billingOrigin: options.billingOrigin }
+  );
   const db = getPgDb(ctx.env);
   const admission = await admitOperation(db, {
     userId: ctx.userId,

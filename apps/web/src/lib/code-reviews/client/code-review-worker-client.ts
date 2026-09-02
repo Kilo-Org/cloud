@@ -1,213 +1,97 @@
 import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
-import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@/lib/config.server';
-import * as z from 'zod';
+import { getCodeReviewAttemptForReview, getLatestCodeReviewAttempt } from '../db/code-reviews';
+import { legacyCodeReviewWorkerClient } from './legacy-code-review-worker-client';
+import {
+  controlQueuedIsolateReview,
+  getIsolateFenceForAttempt,
+  startQueuedIsolateReview,
+  type QueuedIsolatePayload,
+} from './queued-isolate-review-client';
+import type {
+  DispatchReviewResponse,
+  ReviewStatusResponse,
+} from './legacy-code-review-worker-client';
 
-// Fetch timeout in milliseconds
-const FETCH_TIMEOUT_MS = 10000;
-const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
+export type {
+  DispatchReviewResponse,
+  ReviewStatusResponse,
+  CancelReviewResponse,
+  RetryReviewFreshResponse,
+} from './legacy-code-review-worker-client';
 
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = FETCH_TIMEOUT_MS
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
-    }
-    throw error;
-  }
+async function resolveAttempt(reviewId: string, attemptId?: string) {
+  const attempt = attemptId
+    ? await getCodeReviewAttemptForReview(reviewId, attemptId)
+    : await getLatestCodeReviewAttempt(reviewId);
+  if (attemptId && !attempt) throw new Error('Code review attempt does not belong to review');
+  return attempt;
 }
 
-// Types for API responses
-export type DispatchReviewResponse = {
-  reviewId: string;
-  attemptId?: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
-};
-
-export type CancelReviewResponse = {
-  success: boolean;
-  reviewId: string;
-};
-
-export type RetryReviewFreshResponse = {
-  success: boolean;
-  reviewId: string;
-};
-
-const DispatchReviewResponseSchema = z.object({
-  reviewId: z.string(),
-  attemptId: z.string().optional(),
-  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
-});
-
-const ReviewStatusResponseSchema = z.object({
-  reviewId: z.string(),
-  attemptId: z.string().optional(),
-  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
-  sessionId: z.string().optional(),
-  cliSessionId: z.string().optional(),
-  startedAt: z.string().optional(),
-  completedAt: z.string().optional(),
-  model: z.string().optional(),
-  totalTokensIn: z.number().optional(),
-  totalTokensOut: z.number().optional(),
-  totalCost: z.number().optional(),
-  errorMessage: z.string().optional(),
-  terminalReason: z.string().optional(),
-});
-
-export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
-
-/**
- * Code Review Worker API Client
- * Handles all communication with the Cloudflare Worker for code reviews
- */
-class CodeReviewWorkerClient {
-  private readonly baseUrl: string;
-  private readonly authToken: string;
-
-  constructor() {
-    if (!CODE_REVIEW_WORKER_URL || !CODE_REVIEW_WORKER_AUTH_TOKEN) {
-      throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+export const codeReviewWorkerClient = {
+  async dispatchReview(
+    payload: CodeReviewPayload | QueuedIsolatePayload
+  ): Promise<DispatchReviewResponse> {
+    if ('admission' in payload) {
+      const { identity } = payload.admission;
+      const attempt = await resolveAttempt(identity.reviewId, identity.attemptId);
+      if (attempt?.reviewer_backend !== 'isolate')
+        throw new Error('Isolate attempt affinity required');
+      const status = await startQueuedIsolateReview(payload);
+      return {
+        reviewId: identity.reviewId,
+        attemptId: identity.attemptId,
+        status: status.safety.execution === 'not_started' ? 'queued' : status.safety.execution,
+      };
     }
+    const attempt = await resolveAttempt(payload.reviewId, payload.attemptId);
+    if (attempt?.reviewer_backend !== 'legacy') throw new Error('Legacy attempt affinity required');
+    return legacyCodeReviewWorkerClient.dispatchReview({ ...payload, attemptId: attempt.id });
+  },
 
-    this.baseUrl = CODE_REVIEW_WORKER_URL;
-    this.authToken = CODE_REVIEW_WORKER_AUTH_TOKEN;
-  }
-
-  /**
-   * Get common headers for API requests
-   */
-  private getHeaders(additionalHeaders?: Record<string, string>): HeadersInit {
-    return {
-      Authorization: `Bearer ${this.authToken}`,
-      ...additionalHeaders,
-    };
-  }
-
-  private buildReviewUrl(reviewId: string, suffix: string, attemptId?: string): string {
-    const url = new URL(`${this.baseUrl}/reviews/${reviewId}/${suffix}`);
-    if (attemptId) {
-      url.searchParams.set('attemptId', attemptId);
+  async cancelReview(reviewId: string, reason?: string, attemptId?: string) {
+    const attempt = await resolveAttempt(reviewId, attemptId);
+    if (attempt?.reviewer_backend === 'isolate') {
+      const fence = await getIsolateFenceForAttempt(reviewId, attempt.id);
+      if (fence.released_at) return { success: true, reviewId };
+      const status = await controlQueuedIsolateReview(fence.identity, 'cancel');
+      return { success: status !== null, reviewId };
     }
-    return url.toString();
-  }
-
-  /**
-   * Dispatch a code review to the worker
-   * Creates a CodeReviewOrchestrator Durable Object and starts the review
-   */
-  async dispatchReview(payload: CodeReviewPayload): Promise<DispatchReviewResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/review`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Worker returned ${response.status}: ${errorText}`);
-    }
-
-    const data = DispatchReviewResponseSchema.parse(await response.json());
-    if (data.status !== 'queued' && data.status !== 'running') {
-      throw new Error(
-        `Dispatch returned terminal status '${data.status}' for review ${data.reviewId}`
-      );
-    }
-    return data;
-  }
-
-  /**
-   * Cancel a running or queued code review
-   * Signals the orchestrator to stop processing and marks the review as cancelled
-   */
-  async cancelReview(
-    reviewId: string,
-    reason?: string,
-    attemptId?: string
-  ): Promise<CancelReviewResponse> {
-    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'cancel', attemptId), {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({ reason, attemptId }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Worker returned ${response.status}: ${errorText}`);
-    }
-
-    return response.json() as Promise<CancelReviewResponse>;
-  }
-
-  async retryReviewFresh(
-    reviewId: string,
-    input: {
-      sessionId?: string;
-      reason: string;
-      failedAttemptId?: string;
-      retryAttemptId?: string;
-    }
-  ): Promise<RetryReviewFreshResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Worker returned ${response.status}: ${errorText}`);
-    }
-
-    return response.json() as Promise<RetryReviewFreshResponse>;
-  }
+    if (attempt?.reviewer_backend === 'unselected') return { success: false, reviewId };
+    return legacyCodeReviewWorkerClient.cancelReview(reviewId, reason, attempt?.id);
+  },
 
   async getReviewStatus(
     reviewId: string,
     attemptId?: string
   ): Promise<ReviewStatusResponse | null> {
-    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'status', attemptId), {
-      headers: this.getHeaders(),
+    const attempt = await resolveAttempt(reviewId, attemptId);
+    if (attempt?.reviewer_backend === 'isolate') {
+      const fence = await getIsolateFenceForAttempt(reviewId, attempt.id);
+      const status = await controlQueuedIsolateReview(fence.identity, 'status');
+      return status
+        ? {
+            reviewId,
+            attemptId: attempt.id,
+            status: status.safety.execution === 'not_started' ? 'queued' : status.safety.execution,
+          }
+        : null;
+    }
+    if (attempt?.reviewer_backend === 'unselected') return null;
+    return legacyCodeReviewWorkerClient.getReviewStatus(reviewId, attempt?.id);
+  },
+
+  async retryReviewFresh(
+    reviewId: string,
+    input: Parameters<typeof legacyCodeReviewWorkerClient.retryReviewFresh>[1]
+  ) {
+    const attempt = await resolveAttempt(reviewId, input.failedAttemptId);
+    if (attempt && attempt.reviewer_backend !== 'legacy')
+      throw new Error('Fresh session retries are legacy-only');
+    return legacyCodeReviewWorkerClient.retryReviewFresh(reviewId, {
+      ...input,
+      failedAttemptId: attempt?.id,
     });
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch review status: ${response.status} ${errorText}`);
-    }
-
-    return ReviewStatusResponseSchema.parse(await response.json());
-  }
-}
-
-// Export a singleton instance
-export const codeReviewWorkerClient = new CodeReviewWorkerClient();
+  },
+};

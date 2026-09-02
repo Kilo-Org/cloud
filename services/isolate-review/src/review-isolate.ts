@@ -13,18 +13,21 @@ import {
   type TurnContext,
 } from '@cloudflare/think';
 import { withDORetry } from '@kilocode/worker-utils';
-import { tool, type ToolSet, type UIMessage } from 'ai';
+import { APICallError, tool, type Tool, type ToolSet, type UIMessage } from 'ai';
+import { classifyCodeReviewProviderFailure } from '@kilocode/worker-utils/code-review-provider-failure';
 import { z } from 'zod';
 import {
   createGithubClient,
   createGithubTools,
   GITHUB_TOOL_NAMES,
+  MAX_GITHUB_RESPONSE_BYTES,
   MAX_HISTORY_COMMITS,
   MAX_HISTORY_REQUESTS,
   MAX_PUBLICATION_ATTEMPTS,
   resolveIncrementalComparison,
   type GithubClient,
   type GithubProposalEvent,
+  type GithubPublicationDetails,
 } from './github';
 import {
   admitRepository,
@@ -41,6 +44,20 @@ import {
 } from './model';
 import { REPO_ROOT } from './paths';
 import { createReviewPersistence, type ReviewPersistence } from './persistence';
+import {
+  assertQueuedIdentity,
+  notifyQueuedReview,
+  queuedCallback,
+  QueuedReviewConflictError,
+  QueuedReviewRequestSchema,
+  requestQueuedAuthority,
+  requestQueuedReconciliation,
+  readQueuedJson,
+  readQueuedProviderFailure,
+  updateQueuedSafety,
+  type QueuedReviewRequest,
+  type QueuedReviewState,
+} from './queued-review';
 import {
   buildSystemPrompt,
   buildTaskReviewContext,
@@ -59,6 +76,10 @@ import {
   IsolateReviewSelectionSchema,
   IsolateReviewSummaryContentSchema,
   preparationMatchesIdentity,
+  QueuedIsolateControlRequestSchema,
+  QueuedIsolateIdentitySchema,
+  queuedIdentityKey,
+  type QueuedIsolateIdentity,
   ReviewProposalSchema,
   scrubReviewSecrets,
   StartReviewRequestSchema,
@@ -239,11 +260,211 @@ export class ReviewIsolate extends Think<Env> {
     }
   }
 
-  async startReview(runId: string, input: StartReviewInput): Promise<void> {
+  async startQueuedReview(
+    raw: QueuedReviewRequest,
+    credentials: Pick<StartReviewInput, 'kiloToken' | 'userId' | 'credentialsExpireAt'>
+  ) {
+    const request = QueuedReviewRequestSchema.parse(raw);
+    const { identity, preparationHash, runId } = request.admission;
+    if (credentials.userId !== identity.executionUserId) throw new QueuedReviewConflictError();
     const existing = await this.#loadState();
     if (existing) {
+      this.#assertQueuedAdmission(existing, identity, preparationHash);
+    } else {
+      const queued = await this.#newQueuedState(identity, preparationHash);
+      await this.#initializeReview(runId, { ...request.review, ...credentials }, queued);
+    }
+    await this.#admitQueuedReview(runId);
+    return this.#queuedStatus(identity);
+  }
+
+  async controlQueuedReview(raw: z.infer<typeof QueuedIsolateControlRequestSchema>) {
+    const request = QueuedIsolateControlRequestSchema.parse(raw);
+    const { identity } = request;
+    const existing = await this.#loadState();
+    if (existing) assertQueuedIdentity(existing, identity);
+    if (request.operation === 'status' || (existing && isTerminal(existing)))
+      return existing ? this.#queuedStatus(identity) : null;
+    const queued = existing?.queued ?? (await this.#newQueuedState(identity));
+    const [owner, repo] = identity.target.repoFullName.split('/');
+    if (!owner || !repo) throw new QueuedReviewConflictError();
+    const state = await this.#updateState(current => {
+      if (current) assertQueuedIdentity(current, identity);
+      if (current && isTerminal(current)) return current;
+      const base =
+        current ??
+        ({
+          runId: identity.attemptId,
+          status: 'pending',
+          input: {
+            owner,
+            repo,
+            pullNumber: identity.target.prNumber,
+            organizationId: identity.organizationId,
+            userId: identity.executionUserId,
+            expectedIntegrationId: identity.integrationId,
+            kiloToken: '',
+            dryRun: false,
+          },
+          queued,
+        } satisfies RunState);
+      if (!base.queued) throw new QueuedReviewConflictError();
+      return this.#terminalState(
+        {
+          ...base,
+          queued: { ...base.queued, cancellationRequested: true },
+        },
+        { status: 'error', error: 'Review cancelled', terminationReason: 'cancelled' }
+      );
+    });
+    if (state) await this.#stopExecution(state);
+    return this.#queuedStatus(identity);
+  }
+
+  async #newQueuedState(
+    identity: QueuedIsolateIdentity,
+    preparationHash?: string
+  ): Promise<QueuedReviewState> {
+    QueuedIsolateIdentitySchema.parse(identity);
+    const callback = await queuedCallback(this.env, identity);
+    const schedule = await this.schedule(
+      '*/1 * * * *',
+      'maintainQueuedReview',
+      { runId: identity.attemptId },
+      { idempotent: true }
+    );
+    return {
+      identity,
+      preparationHash,
+      callback,
+      maintenanceScheduleId: schedule.id,
+      admitted: false,
+      cancellationRequested: false,
+      operations: [],
+      acknowledgedSequence: 0,
+      fenceReleased: false,
+      cleaned: false,
+      safety: {
+        sequence: 1,
+        execution: 'not_started',
+        cancellationRequested: false,
+        publication: 'not_started',
+        quiescent: false,
+        observedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  #assertQueuedAdmission(
+    state: RunState,
+    identity: QueuedIsolateIdentity,
+    preparationHash: string
+  ) {
+    assertQueuedIdentity(state, identity);
+    if (
+      state.queued?.preparationHash !== undefined &&
+      state.queued.preparationHash !== preparationHash
+    ) {
+      throw new QueuedReviewConflictError();
+    }
+  }
+
+  async #queuedStatus(identity: QueuedIsolateIdentity) {
+    const state = await this.#loadState();
+    if (!state?.queued) throw new QueuedReviewConflictError();
+    assertQueuedIdentity(state, identity);
+    return { version: 1 as const, identity: state.queued.identity, safety: state.queued.safety };
+  }
+
+  async #admitQueuedReview(runId: string): Promise<void> {
+    let state = await this.#updateActive(runId, current => current);
+    if (!state?.queued) return;
+    if (!state.queued.admitted) {
+      const authorized = await requestQueuedAuthority(state.queued, 'execute', runId);
+      state = await this.#updateActive(runId, current => {
+        if (!current.queued) throw new QueuedReviewConflictError();
+        if (!authorized)
+          return this.#terminalState(current, {
+            status: 'error',
+            error: 'Canonical queued review authority denied admission',
+            terminationReason: 'admission_failed',
+          });
+        return { ...current, queued: { ...current.queued, admitted: true } };
+      });
+    }
+    if (state && !state.submissionId) await this.#scheduleClone(runId);
+  }
+
+  async maintainQueuedReview(payload: { runId: string }): Promise<void> {
+    let state = await this.#loadState();
+    if (!state?.queued || state.runId !== payload.runId) return;
+    try {
+      if (!isTerminal(state)) {
+        await this.#admitQueuedReview(state.runId);
+        await this.getReview(state.queued.identity.executionUserId);
+      } else if (state.queued.operations.some(operation => operation.state === 'sent')) {
+        await this.#reconcileQueuedPublication(state);
+      }
+    } catch {
+      console.error('[queued-review] maintenance deferred', { runId: payload.runId });
+    }
+    state = await this.#loadState();
+    if (!state?.queued) return;
+    try {
+      const acknowledgement = await notifyQueuedReview(state.queued);
+      if (acknowledgement !== undefined) {
+        const { sequence, fenceReleased, usageSettled } = acknowledgement;
+        await this.#updateState(current => {
+          if (!current?.queued || current.queued.pendingNotification?.safety.sequence !== sequence)
+            return current;
+          return {
+            ...current,
+            queued: {
+              ...current.queued,
+              acknowledgedSequence: sequence,
+              fenceReleased,
+              pendingNotification:
+                isTerminal(current) &&
+                sequence === current.queued.safety.sequence &&
+                (!usageSettled || (current.queued.safety.quiescent && !fenceReleased))
+                  ? current.queued.pendingNotification
+                  : undefined,
+            },
+          };
+        });
+      }
+    } catch {
+      console.error('[queued-review] notification deferred', { runId: payload.runId });
+    }
+    const latest = await this.#loadState();
+    if (
+      latest?.queued?.safety.quiescent &&
+      latest.queued.fenceReleased &&
+      !latest.queued.pendingNotification
+    ) {
+      await this.cancelSchedule(latest.queued.maintenanceScheduleId);
+    }
+  }
+
+  async startReview(runId: string, input: StartReviewInput): Promise<void> {
+    if (!allowsDirectGithubToken(this.env.ENVIRONMENT))
+      throw new Error('Direct reviews are development-only');
+    await this.#initializeReview(runId, input);
+  }
+
+  async #initializeReview(
+    runId: string,
+    input: StartReviewInput,
+    queued?: QueuedReviewState
+  ): Promise<void> {
+    const existing = await this.#loadState();
+    if (existing) {
+      if (queued?.preparationHash)
+        this.#assertQueuedAdmission(existing, queued.identity, queued.preparationHash);
+      else if (existing.queued) throw new QueuedReviewConflictError();
       if (existing.runId !== runId) throw new Error('Run already started on this DO');
-      if (!isTerminal(existing) && !existing.submissionId) await this.#scheduleClone(runId);
+      if (!existing.queued && !isTerminal(existing) && !existing.submissionId)
+        await this.#scheduleClone(runId);
       return;
     }
     const { kiloToken, userId, credentialsExpireAt: verifiedExpiry, ...request } = input;
@@ -255,6 +476,17 @@ export class ReviewIsolate extends Think<Env> {
       throw new Error('userId is required for GitHub token resolution');
     if (!preparationMatchesIdentity(parsed, userId ?? '')) {
       throw new Error('Preparation does not match the authenticated execution user');
+    }
+    const publication = parsed.preparation?.queued;
+    if (queued) {
+      if (
+        !publication ||
+        queuedIdentityKey(publication.identity) !== queuedIdentityKey(queued.identity)
+      ) {
+        throw new Error('Queued preparation does not match canonical admission');
+      }
+    } else if (publication) {
+      throw new Error('Canonical publication requires queued admission');
     }
     if (
       parsed.dryRun === false &&
@@ -291,27 +523,38 @@ export class ReviewIsolate extends Think<Env> {
     };
     const admissionDeadlineAt = Math.min(now + ADMISSION_TIMEOUT_MS, credentialsExpireAt);
     const absoluteDeadlineAt = Math.min(now + ABSOLUTE_TIMEOUT_MS, credentialsExpireAt);
-    await this.schedule(
-      Math.ceil((credentialsExpireAt - now) / 1000),
-      'expireCredentials',
-      { runId },
-      { idempotent: true }
-    );
-    await this.schedule(REVIEW_RETENTION_SECONDS, 'cleanupReview', { runId }, { idempotent: true });
-    await this.schedule(
-      new Date(Math.ceil(admissionDeadlineAt / 1000) * 1000),
-      'expireReview',
-      { runId, deadlineAt: admissionDeadlineAt },
-      { idempotent: true }
-    );
-    await this.#updateState(state => {
-      if (state) return state;
+    await this.#updateState(async state => {
+      if (state) {
+        if (queued?.preparationHash)
+          this.#assertQueuedAdmission(state, queued.identity, queued.preparationHash);
+        else if (state.queued) throw new QueuedReviewConflictError();
+        return state;
+      }
+      await this.schedule(
+        Math.ceil((credentialsExpireAt - now) / 1000),
+        'expireCredentials',
+        { runId },
+        { idempotent: true }
+      );
+      await this.schedule(
+        REVIEW_RETENTION_SECONDS,
+        'cleanupReview',
+        { runId },
+        { idempotent: true }
+      );
+      await this.schedule(
+        new Date(Math.ceil(admissionDeadlineAt / 1000) * 1000),
+        'expireReview',
+        { runId, deadlineAt: admissionDeadlineAt },
+        { idempotent: true }
+      );
       if (credentialsExpireAt <= Date.now()) throw new Error(CREDENTIAL_EXPIRATION_ERROR);
       if (admissionDeadlineAt <= Date.now()) throw new Error('Review admission deadline exceeded');
       return {
         runId,
         status: 'pending',
         input: normalizedInput,
+        ...(queued ? { queued, queuedPublication: publication } : {}),
         createdAt: new Date(now).toISOString(),
         credentialsExpireAt,
         admissionDeadlineAt,
@@ -327,7 +570,7 @@ export class ReviewIsolate extends Think<Env> {
         ],
       };
     });
-    await this.#scheduleClone(runId);
+    if (!queued) await this.#scheduleClone(runId);
   }
 
   async runClone(payload?: { runId: string }): Promise<void> {
@@ -341,6 +584,7 @@ export class ReviewIsolate extends Think<Env> {
         !initial ||
         (payload && initial.runId !== payload.runId) ||
         initial.submissionId ||
+        (initial.queued && !initial.queued.admitted) ||
         !['pending', 'cloning'].includes(initial.status)
       )
         return;
@@ -411,15 +655,6 @@ export class ReviewIsolate extends Think<Env> {
         globalThis.fetch,
         this.env.GITHUB_API_URL
       );
-      const { sizeKiB } = await admitRepository(
-        github,
-        state.input.owner,
-        state.input.repo,
-        signal
-      );
-      if (!(await this.#updateActive(runId, current => ({ ...current, githubSizeKiB: sizeKiB }))))
-        return;
-      console.log('[clone] admitted', { runId, githubSizeKiB: sizeKiB });
       const snapshot =
         state.headSha && state.baseTipSha && state.mergeBaseSha
           ? {
@@ -430,6 +665,16 @@ export class ReviewIsolate extends Think<Env> {
           : await resolveReviewSnapshot(github, state.input, signal);
       const pinned = await this.#updateActive(runId, current => ({ ...current, ...snapshot }));
       if (!pinned) return;
+      const { sizeKiB } = await admitRepository(
+        github,
+        state.input.owner,
+        state.input.repo,
+        snapshot.headSha,
+        signal
+      );
+      if (!(await this.#updateActive(runId, current => ({ ...current, githubSizeKiB: sizeKiB }))))
+        return;
+      console.log('[clone] admitted', { runId, githubSizeKiB: sizeKiB });
       const reviewSelection =
         pinned.reviewSelection ?? (await this.#resolveReviewSelection(pinned, github, signal));
       const selected = await this.#updateActive(runId, current => ({
@@ -583,6 +828,38 @@ export class ReviewIsolate extends Think<Env> {
       error: 'Review retention expired',
       terminationReason: 'cleanup',
     });
+    if (state.queued) {
+      if (!this.session) await this.onStart();
+      await this.clearMessages();
+      await this.#persistence.deleteExcept('runState');
+      await this.#updateState(current => {
+        if (!current?.queued) return current;
+        return {
+          ...current,
+          input: {
+            owner: current.input.owner,
+            repo: current.input.repo,
+            pullNumber: current.input.pullNumber,
+            organizationId: current.input.organizationId,
+            userId: current.input.userId,
+            expectedIntegrationId: current.input.expectedIntegrationId,
+            expectedInstallationId: current.input.expectedInstallationId,
+            expectedAppType: current.input.expectedAppType,
+            kiloToken: '',
+            dryRun: false,
+          },
+          summaryContent: undefined,
+          reviewProposal: undefined,
+          summaryProposal: undefined,
+          historyState: undefined,
+          taskSessions: undefined,
+          requestIds: undefined,
+          usageRequestCounts: undefined,
+          queued: { ...current.queued, cleaned: true },
+        };
+      });
+      return;
+    }
     await this.destroy();
     this.#cleanupDestroyed = true;
   }
@@ -597,7 +874,7 @@ export class ReviewIsolate extends Think<Env> {
       if (!isTerminal(state) && state.submissionId) {
         const submission = await this.inspectSubmission(state.submissionId);
         if (submission) await this.#settleSubmission(submission);
-      } else if (!isTerminal(state)) {
+      } else if (!isTerminal(state) && (!state.queued || state.queued.admitted)) {
         await this.#scheduleClone(state.runId);
       }
     }
@@ -648,6 +925,7 @@ export class ReviewIsolate extends Think<Env> {
       reviewProposal: persisted.reviewProposal,
       summaryProposal: persisted.summaryProposal,
       summaryContent: persisted.status === 'completed' ? persisted.summaryContent : undefined,
+      gateResult: persisted.status === 'completed' ? persisted.gateResult : undefined,
       reviewSelection: persisted.reviewSelection,
       cleanupAt: persisted.cleanupAt,
       usageSessions: persisted.usageSessions ?? [persisted.runId],
@@ -668,8 +946,9 @@ export class ReviewIsolate extends Think<Env> {
   }
 
   async getTranscript(userId: string): Promise<ReviewTranscriptResponse | null> {
-    const state = await this.#loadState();
+    const state = await this.#persistence.get<RunState>('runState');
     if (!state || state.input.userId !== userId) return null;
+    await this.__unsafe_ensureInitialized();
     const { messages, toolCalls } = projectReviewTranscript(await this.getMessages());
     return { runId: state.runId, messages, toolCalls };
   }
@@ -704,25 +983,26 @@ export class ReviewIsolate extends Think<Env> {
       model: this.#modelId(),
       inference: state.input.inference,
       gatewayUrl: this.env.KILO_GATEWAY_URL,
-      onRequestId: id => this.#recordRequestId(id),
-      fetchImpl: async (request, init) => {
-        const active = await this.#updateActive(state.runId, current => current);
-        if (!active) throw new Error('Review is terminal; refusing inference');
-        const signal = init?.signal
-          ? AbortSignal.any([init.signal, this.#abortController.signal])
-          : this.#abortController.signal;
-        signal.throwIfAborted();
-        return globalThis.fetch(request, { ...init, signal });
-      },
+      fetchImpl: (request, init) =>
+        this.#fetchInference(state.runId, session.sessionId, request, init),
     });
   }
 
-  override getSystemPrompt(): string {
-    return buildSystemPrompt({
+  #reviewInstructions(): string {
+    const prompt = buildSystemPrompt({
       model: this.#modelId(),
       date: this.#state?.createdAt?.slice(0, 10),
       prepared: Boolean(this.#state?.input.preparation),
     });
+    const queued = this.#state?.queuedPublication;
+    if (!this.#state?.queued || !queued) return prompt;
+    return (
+      prompt.replace(
+        'This isolate has no canonical review ID. Never invent or copy a Cloud fix link.',
+        `This run belongs to canonical review ${queued.identity.reviewId}, attempt ${queued.identity.attemptId}. Never invent a Cloud Agent or CLI session ID or a Cloud fix link.`
+      ) +
+      `\n# QUEUED PUBLICATION POLICY\nThese queued-run rules override the skill's direct experimental previous-run ownership and absent-canonical-review statements. The Worker can authorize the exact server-selected summary, including a legacy summary; a discovered ID alone still grants no authority. History and usage blocks remain code-owned: never author or copy them. The merge-gate threshold is ${queued.gateThreshold}; when not off, upsert_summary requires gateResult pass or fail, evaluated against the threshold in the canonical policy. Missing required output cannot pass.\n`
+    );
   }
 
   override async beforeTurn(ctx: TurnContext): Promise<TurnConfig> {
@@ -756,7 +1036,7 @@ export class ReviewIsolate extends Think<Env> {
       const missing = REVIEW_ACTIVE_TOOLS.filter(name => !names.includes(name));
       console.log('[turn] tools', { names, missing });
     }
-    const instructions = this.getSystemPrompt();
+    const instructions = this.#reviewInstructions();
     const systemPromptHash = createHash('sha256').update(instructions).digest('hex');
     const recorded = await this.#updateActive(state.runId, current => ({
       ...current,
@@ -849,7 +1129,11 @@ export class ReviewIsolate extends Think<Env> {
       onHistoryRequest: () => this.#markHistoryRequest(state.runId),
       onHistoryCommits: shas => this.#markHistoryCommits(state.runId, shas),
       summaryOwnership: state.summaryOwnership,
+      queuedPublication: state.queued ? state.queuedPublication : undefined,
       apiUrl: this.env.GITHUB_API_URL,
+      ...(state.queued
+        ? { fetchImpl: (request, init) => this.#queuedGithubFetch(request, init) }
+        : {}),
       publicationState: {
         ...state,
         contextIncompleteReasons: state.analysisOutcome?.contextIncompleteReasons,
@@ -982,7 +1266,7 @@ export class ReviewIsolate extends Think<Env> {
       throw new Error('Incremental baseline identity could not be proven');
     }
     signal.throwIfAborted();
-    const previous = await this.#getPreviousReview(state);
+    using previous = await this.#getPreviousReview(state);
     signal.throwIfAborted();
     const parsedPreparation = IsolateReviewPreparationSchema.safeParse(previous?.preparation);
     if (
@@ -1066,7 +1350,7 @@ export class ReviewIsolate extends Think<Env> {
     return selection;
   }
 
-  async #getPreviousReview(state: RunState): Promise<ReviewStatusResponse | null> {
+  async #getPreviousReview(state: RunState): Promise<(ReviewStatusResponse & Disposable) | null> {
     const previousRunId = state.input.previousRunId;
     const userId = state.input.userId;
     if (!previousRunId || !userId || previousRunId === state.runId) return null;
@@ -1093,7 +1377,7 @@ export class ReviewIsolate extends Think<Env> {
     ) {
       throw new Error('Previous summary ownership could not be proven');
     }
-    const previous = await this.#getPreviousReview(state);
+    using previous = await this.#getPreviousReview(state);
     if (
       !previous ||
       previous.userId !== state.input.userId ||
@@ -1122,11 +1406,19 @@ export class ReviewIsolate extends Think<Env> {
   }
 
   async #updateState(
-    update: (state: RunState | undefined) => RunState | undefined
+    update: (state: RunState | undefined) => RunState | undefined | Promise<RunState | undefined>
   ): Promise<RunState | undefined> {
     const mutation = this.#stateMutation.then(async () => {
       const state = await this.#persistence.get<RunState>('runState');
-      const next = update(state);
+      const updated = await update(state);
+      const next = updated?.queued
+        ? updateQueuedSafety(
+            updated,
+            isTerminal(updated) && !updated.queued.result
+              ? await this.#lastAssistantText()
+              : undefined
+          )
+        : updated;
       if (next && next !== state) {
         const safe = isTerminal(next)
           ? {
@@ -1224,6 +1516,16 @@ export class ReviewIsolate extends Think<Env> {
         error: 'Required child investigations are incomplete',
         terminationReason: 'child_incomplete',
       };
+    } else if (
+      state.queued &&
+      state.queuedPublication?.gateThreshold !== 'off' &&
+      !z.enum(['pass', 'fail']).safeParse(state.gateResult).success
+    ) {
+      incomplete = {
+        status: 'error',
+        error: 'Required merge-gate result is missing or invalid',
+        terminationReason: 'parent_incomplete',
+      };
     } else if (!state.summaryProposal?.bodyHash) {
       incomplete = {
         status: 'error',
@@ -1313,15 +1615,21 @@ export class ReviewIsolate extends Think<Env> {
           ? this.#terminalState(next, failure)
           : { ...next, status: submission.status };
       }
+      const terminationReason =
+        submission.status === 'completed'
+          ? 'completed'
+          : submission.status === 'aborted'
+            ? 'cancelled'
+            : ((next.queued ? classifyCodeReviewProviderFailure(submission.error) : null) ??
+              'submission_error');
       return this.#terminalState(next, {
         status: submission.status === 'completed' ? 'completed' : 'error',
-        error: submissionError(submission.error),
-        terminationReason:
-          submission.status === 'completed'
-            ? 'completed'
-            : submission.status === 'aborted'
-              ? 'cancelled'
-              : 'submission_error',
+        error: next.queued
+          ? terminationReason === 'completed'
+            ? undefined
+            : `Isolate review: ${terminationReason}`
+          : submissionError(submission.error),
+        terminationReason,
       });
     });
     if (accepted && state && isTerminal(state)) {
@@ -1333,7 +1641,8 @@ export class ReviewIsolate extends Think<Env> {
   }
 
   async #markProposal(event: GithubProposalEvent): Promise<void> {
-    const { kind, summaryContent, ...raw } = event;
+    const { kind, summaryContent, gateResult, ...raw } = event;
+    const gate = z.enum(['pass', 'fail']).optional().parse(gateResult);
     const proposal = ReviewProposalSchema.parse(raw);
     const content = summaryContent
       ? IsolateReviewSummaryContentSchema.parse(summaryContent)
@@ -1351,12 +1660,21 @@ export class ReviewIsolate extends Think<Env> {
       if (current.analysisOutcome?.incompleteTaskIds?.length) {
         throw new Error(INCOMPLETE_TASKS_ERROR);
       }
+      if (
+        current.queued &&
+        kind === 'summary' &&
+        (current.summaryPendingFingerprint || current.summaryFingerprint)
+      ) {
+        return current;
+      }
       const outcome = publicationOutcome(current);
       return {
         ...current,
         ...(kind === 'review'
           ? { reviewProposal: proposal }
-          : { summaryProposal: proposal, summaryContent: content }),
+          : current.queued
+            ? { summaryProposal: proposal }
+            : { summaryProposal: proposal, summaryContent: content, gateResult: gate }),
         publicationOutcome: {
           ...outcome,
           [kind]: ['confirmed', 'pending', 'uncertain'].includes(outcome[kind])
@@ -1486,11 +1804,201 @@ export class ReviewIsolate extends Think<Env> {
     }));
   }
 
+  async #queuedGithubFetch(request: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const url = new URL(
+      typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
+    );
+    const method = init?.method ?? 'GET';
+    if (method === 'GET') {
+      if (!(await this.#updateActive(this.#state?.runId, current => current)))
+        throw new Error('Review is terminal');
+      return globalThis.fetch(request, init);
+    }
+    const body = init?.body;
+    if (typeof body !== 'string' || new TextEncoder().encode(body).byteLength > 263_168) {
+      throw new Error('Invalid queued publication body');
+    }
+    let operationId: string | undefined;
+    const admitted = await this.#updateActive(this.#state?.runId, state => {
+      if (!state.queued?.admitted) throw new Error('Queued review has not been admitted');
+      const pending = state.queued.operations.find(operation => operation.state === 'prepared');
+      if (!pending) throw new Error('Queued publication has no durable authorization');
+      const base = `/repos/${encodeURIComponent(state.input.owner)}/${encodeURIComponent(state.input.repo)}`;
+      const expectedPath =
+        pending.kind === 'review'
+          ? `${base}/pulls/${state.input.pullNumber}/reviews`
+          : pending.commentId === undefined
+            ? `${base}/issues/${state.input.pullNumber}/comments`
+            : `${base}/issues/comments/${pending.commentId}`;
+      if (
+        url.pathname !== expectedPath ||
+        url.search ||
+        method !== (pending.commentId === undefined ? 'POST' : 'PATCH')
+      ) {
+        throw new Error('Queued publication escaped its authorized target');
+      }
+      operationId = pending.id;
+      return {
+        ...state,
+        queued: {
+          ...state.queued,
+          operations: state.queued.operations.map(operation =>
+            operation.id === pending.id
+              ? { ...operation, state: 'sent' as const, requestBody: body }
+              : operation
+          ),
+        },
+      };
+    });
+    if (!admitted || !operationId) throw new Error('Review is terminal; refusing provider write');
+    const response = await globalThis.fetch(request, init);
+    if (response.ok) {
+      try {
+        const result = z
+          .object({ id: z.number().int().positive().safe() })
+          .parse(await readQueuedJson(response.clone(), MAX_GITHUB_RESPONSE_BYTES));
+        await this.#updateState(state => {
+          if (!state?.queued) return state;
+          return {
+            ...state,
+            queued: {
+              ...state.queued,
+              operations: state.queued.operations.map(operation =>
+                operation.id === operationId &&
+                operation.state === 'sent' &&
+                (operation.commentId === undefined || operation.commentId === result.id)
+                  ? { ...operation, responseId: result.id }
+                  : operation
+              ),
+            },
+          };
+        });
+      } catch {
+        console.error('[queued-review] provider response remains unresolved', {
+          runId: admitted.runId,
+        });
+      }
+    }
+    return response;
+  }
+
+  async #reconcileQueuedPublication(state: RunState): Promise<void> {
+    const queued = state.queued;
+    const operation = queued?.operations.find(operation => operation.state === 'sent');
+    if (!queued || !operation?.requestBody) return;
+    if (
+      (operation.kind === 'review' || operation.commentId !== undefined) &&
+      operation.responseId === undefined
+    )
+      return;
+    const key =
+      operation.kind === 'review'
+        ? 'reviewReconciliationAttempts'
+        : 'summaryReconciliationAttempts';
+    if ((state[key] ?? 0) >= MAX_RECONCILIATION_ATTEMPTS) return;
+    const reconciliationUserId = await requestQueuedReconciliation(queued, operation.id);
+    if (!reconciliationUserId) return;
+    const credentials = await resolveGithubCredentials({
+      input: { ...state.input, userId: reconciliationUserId },
+      service: this.env.GIT_TOKEN_SERVICE,
+      allowDirectToken: false,
+    });
+    const signal = AbortSignal.timeout(10_000);
+    const readonlyFetch: typeof globalThis.fetch = (request, init) => {
+      if ((init?.method ?? 'GET') !== 'GET') throw new Error('Reconciliation cannot write');
+      return globalThis.fetch(request, { ...init, signal });
+    };
+    const tools = createGithubTools({
+      runId: state.runId,
+      input: state.input,
+      ...queued.identity.snapshot,
+      token: credentials.token,
+      apiUrl: this.env.GITHUB_API_URL,
+      fetchImpl: readonlyFetch,
+      publicationState: state,
+      queuedPublication: state.queuedPublication,
+      onReconciliationStarted: async () => {
+        await this.#updateState(current => {
+          if (
+            !current?.queued ||
+            !current.queued.operations.some(
+              item => item.id === operation.id && item.state === 'sent'
+            )
+          ) {
+            throw new Error('Publication is no longer unresolved');
+          }
+          if ((current[key] ?? 0) >= MAX_RECONCILIATION_ATTEMPTS)
+            throw new Error('Reconciliation budget exhausted');
+          return { ...current, [key]: (current[key] ?? 0) + 1 };
+        });
+      },
+      onPublicationStarted: async () => {
+        throw new Error('Reconciliation cannot authorize writes');
+      },
+      onPublished: async event => {
+        if (operation.responseId !== undefined && event?.id !== operation.responseId) {
+          throw new Error('Reconciliation did not identify the exact provider operation');
+        }
+        await this.#markPublished(event);
+      },
+    });
+    const body: unknown = JSON.parse(operation.requestBody);
+    if (operation.kind === 'summary') {
+      const payload = {
+        ...z.object({ body: z.string() }).strict().parse(body),
+        gateResult: state.gateResult,
+      };
+      const summary = tools.upsert_summary as Tool<typeof payload>;
+      if (!summary.execute) throw new Error('Summary reconciliation tool unavailable');
+      await summary.execute(payload, {
+        toolCallId: operation.id,
+        messages: [],
+        abortSignal: signal,
+        context: {},
+      });
+    } else {
+      const payload = z
+        .object({
+          commit_id: z.literal(queued.identity.snapshot.headSha),
+          event: z.literal('COMMENT'),
+          body: z.literal(''),
+          comments: z
+            .array(
+              z
+                .object({
+                  path: z.string(),
+                  line: z.number(),
+                  side: z.literal('RIGHT'),
+                  body: z.string(),
+                })
+                .strict()
+            )
+            .max(100),
+        })
+        .strict()
+        .parse(body);
+      const review = tools.submit_review as Tool<Pick<typeof payload, 'comments'>>;
+      if (!review.execute) throw new Error('Review reconciliation tool unavailable');
+      await review.execute(
+        { comments: payload.comments },
+        { toolCallId: operation.id, messages: [], abortSignal: signal, context: {} }
+      );
+    }
+  }
+
   async #markPublicationStarted(
     kind: 'review' | 'summary',
-    details?: { fingerprint: string; commentId?: number; bodyHash?: string }
+    details?: GithubPublicationDetails
   ): Promise<void> {
     if (!details?.fingerprint) throw new Error('Publication fingerprint is required');
+    const operationId = crypto.randomUUID();
+    const initial = await this.#loadState();
+    if (
+      initial?.queued &&
+      !(await requestQueuedAuthority(initial.queued, 'publish', operationId))
+    ) {
+      throw new Error('Canonical queued review authority denied publication');
+    }
     const admitted = await this.#updateActive(this.#state?.runId, state => {
       if (
         !state.executionDeadlineAt ||
@@ -1499,6 +2007,9 @@ export class ReviewIsolate extends Think<Env> {
         !state.githubToken
       ) {
         throw new Error('Review is not authorized to publish');
+      }
+      if (state.queued && (!state.queued.admitted || state.reviewPending || state.summaryPending)) {
+        throw new Error('Queued publication is not admitted or another operation is unresolved');
       }
       if (isDryRun(state.input.dryRun)) throw new Error('Dry-run reviews cannot publish');
       if (state.analysisOutcome?.contextIncompleteReasons?.length) {
@@ -1528,9 +2039,39 @@ export class ReviewIsolate extends Think<Env> {
       ) {
         throw new Error('Publication is already pending or confirmed; refusing another write');
       }
+      let summaryContent = state.summaryContent;
+      let gateResult = state.gateResult;
+      if (state.queued && kind === 'summary') {
+        summaryContent = IsolateReviewSummaryContentSchema.parse(details.summary?.content);
+        gateResult = z.enum(['pass', 'fail']).optional().parse(details.summary?.gateResult);
+        if (
+          createHash('sha256').update(summaryContent.body).digest('hex') !==
+            summaryContent.bodyHash ||
+          (state.queuedPublication?.gateThreshold !== 'off' && gateResult === undefined)
+        )
+          throw new Error('Queued publication requires validated summary content and gate result');
+      }
       return {
         ...state,
         publicationOutcome: { ...publicationOutcome(state), [kind]: 'pending' },
+        ...(state.queued
+          ? {
+              queued: {
+                ...state.queued,
+                operations: [
+                  ...state.queued.operations,
+                  {
+                    id: operationId,
+                    kind,
+                    fingerprint: details.fingerprint,
+                    commentId: details.commentId,
+                    bodyHash: details.bodyHash,
+                    state: 'prepared' as const,
+                  },
+                ],
+              },
+            }
+          : {}),
         ...(kind === 'review'
           ? {
               reviewPending: true,
@@ -1539,6 +2080,8 @@ export class ReviewIsolate extends Think<Env> {
             }
           : {
               summaryPending: true,
+              summaryContent,
+              gateResult,
               summaryPublicationAttempts: attempts + 1,
               summaryPendingFingerprint: details.fingerprint,
               summaryPendingCommentId: details.commentId,
@@ -1550,6 +2093,20 @@ export class ReviewIsolate extends Think<Env> {
   }
 
   async #markReconciliationStarted(kind: 'review' | 'summary'): Promise<void> {
+    const initial = await this.#loadState();
+    if (initial?.queued) {
+      const operation = initial.queued.operations.find(
+        operation => operation.kind === kind && operation.state === 'sent'
+      );
+      if (
+        !operation ||
+        ((kind === 'review' || operation.commentId !== undefined) &&
+          operation.responseId === undefined) ||
+        !(await requestQueuedAuthority(initial.queued, 'reconcile', operation.id))
+      ) {
+        throw new Error('Exact queued publication cannot be reconciled');
+      }
+    }
     const admitted = await this.#updateActive(this.#state?.runId, state => {
       const key =
         kind === 'review' ? 'reviewReconciliationAttempts' : 'summaryReconciliationAttempts';
@@ -1588,6 +2145,18 @@ export class ReviewIsolate extends Think<Env> {
         ? {
             ...state,
             publicationOutcome: { ...publicationOutcome(state), [kind]: 'rejected' },
+            ...(state.queued
+              ? {
+                  queued: {
+                    ...state.queued,
+                    operations: state.queued.operations.map(operation =>
+                      operation.kind === kind && operation.state === 'sent'
+                        ? { ...operation, state: 'rejected' as const, requestBody: undefined }
+                        : operation
+                    ),
+                  },
+                }
+              : {}),
             ...(kind === 'review'
               ? { reviewPending: false, reviewPendingFingerprint: undefined }
               : {
@@ -1623,6 +2192,22 @@ export class ReviewIsolate extends Think<Env> {
       ) {
         throw new Error('Publication acknowledgement does not match the authorized operation');
       }
+      if (state.queued) {
+        const operation = state.queued.operations.find(
+          operation =>
+            operation.kind === event.kind &&
+            operation.fingerprint === fingerprint &&
+            ['sent', 'confirmed'].includes(operation.state)
+        );
+        if (
+          !operation ||
+          (operation.responseId !== undefined && operation.responseId !== event.id) ||
+          ((event.kind === 'review' || operation.commentId !== undefined) &&
+            operation.responseId === undefined)
+        ) {
+          throw new Error('Queued acknowledgement cannot prove the exact authorized operation');
+        }
+      }
       const bodyHash = event.bodyHash ?? state.summaryPendingBodyHash ?? state.summaryBodyHash;
       if (event.kind === 'summary' && !bodyHash)
         throw new Error('Confirmed summary body hash is required');
@@ -1652,23 +2237,107 @@ export class ReviewIsolate extends Think<Env> {
               ? 'rejected'
               : 'confirmed',
         },
+        ...(state.queued
+          ? {
+              queued: {
+                ...state.queued,
+                operations: state.queued.operations.map(operation =>
+                  operation.kind === event.kind &&
+                  operation.fingerprint === fingerprint &&
+                  operation.state === 'sent'
+                    ? { ...operation, state: 'confirmed' as const, requestBody: undefined }
+                    : operation
+                ),
+              },
+            }
+          : {}),
         published: true,
         publishedAt: state.publishedAt ?? new Date().toISOString(),
       };
     });
   }
 
-  async #recordRequestId(id: string): Promise<void> {
+  async #fetchInference(
+    runId: string,
+    sessionId: string,
+    request: RequestInfo | URL,
+    init?: RequestInit
+  ): Promise<Response> {
+    const id = new Headers(init?.headers).get('x-kilo-request');
     if (!id || id.length > 256) throw new Error('Invalid inference request identity');
-    const active = await this.#updateActive(this.#state?.runId, state => {
+    const signal = init?.signal
+      ? AbortSignal.any([init.signal, this.#abortController.signal])
+      : this.#abortController.signal;
+    let sent: Promise<{ response: Response } | { error: unknown }> | undefined;
+    const active = await this.#updateState(async state => {
+      if (!state || state.runId !== runId || isTerminal(state)) return state;
+      const failure = deadlineFailure(state);
+      if (failure) return this.#terminalState(state, failure);
+      signal.throwIfAborted();
       const requestIds = state.requestIds ?? [];
-      if (requestIds.includes(id)) return state;
+      if (requestIds.includes(id)) throw new Error('Inference request identity already used');
       if (requestIds.length >= 1_000) {
         throw new Error('Inference request tracking exhausted; refusing an untracked request');
       }
-      return { ...state, requestIds: [...requestIds, id] };
+      const tracked = state.queued && (state.usageRequestCounts || requestIds.length === 0);
+      const unsent: RunState = {
+        ...state,
+        requestIds: [...requestIds, id],
+        ...(tracked ? { usageRequestCounts: state.usageRequestCounts ?? {} } : {}),
+      };
+      const intent: RunState = {
+        ...unsent,
+        ...(tracked
+          ? {
+              usageRequestCounts: {
+                ...unsent.usageRequestCounts,
+                [sessionId]: (unsent.usageRequestCounts?.[sessionId] ?? 0) + 1,
+              },
+            }
+          : {}),
+      };
+      await this.#persistence.put('runState', intent);
+      const expired = deadlineFailure(unsent);
+      if (expired) return this.#terminalState(unsent, expired);
+      if (signal.aborted) return unsent;
+      sent = globalThis.fetch(request, { ...init, signal }).then(
+        response => ({ response }),
+        (error: unknown) => ({ error })
+      );
+      return intent;
     });
-    if (!active) throw new Error('Review is terminal; refusing inference');
+    if (!sent) {
+      if (active && isTerminal(active)) await this.#stopExecution(active);
+      signal.throwIfAborted();
+      throw new Error('Review is terminal; refusing inference');
+    }
+    const outcome = await sent;
+    if ('error' in outcome) throw outcome.error;
+    const response = outcome.response;
+    if (active?.queued && !response.ok) {
+      const reason = await readQueuedProviderFailure(response);
+      const message = reason
+        ? `Isolate review: ${reason}`
+        : `Isolate inference request failed (${response.status})`;
+      if (reason) {
+        await this.#terminate(runId, {
+          status: 'error',
+          error: message,
+          terminationReason: reason,
+        });
+      }
+      const url = new URL(
+        typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
+      );
+      throw new APICallError({
+        message,
+        url: url.origin,
+        requestBodyValues: undefined,
+        statusCode: response.status,
+        isRetryable: reason ? false : undefined,
+      });
+    }
+    return response;
   }
 
   #safeError(error: string, state: RunState): string {

@@ -1,3 +1,7 @@
+const mockRecoverQueuedIsolateReviews = jest.fn();
+jest.mock('../client/queued-isolate-review-client', () => ({
+  recoverQueuedIsolateReviews: (...args: unknown[]) => mockRecoverQueuedIsolateReviews(...args),
+}));
 const mockTryDispatchPendingReviews = jest.fn();
 const mockEnsureBotUserForOrg = jest.fn();
 
@@ -18,6 +22,7 @@ import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
+  cloud_agent_code_review_attempts,
   kilocode_users,
   organizations,
   type User,
@@ -63,6 +68,7 @@ describe('dispatch pending code review owners', () => {
 
   beforeEach(() => {
     mockTryDispatchPendingReviews.mockReset();
+    mockRecoverQueuedIsolateReviews.mockReset().mockResolvedValue(undefined);
     mockEnsureBotUserForOrg.mockReset();
   });
 
@@ -106,6 +112,40 @@ describe('dispatch pending code review owners', () => {
       started_at: params.startedAt ?? null,
     };
   }
+
+  it('starts ordinary owner dispatch while isolate recovery is waiting', async () => {
+    await db.insert(cloud_agent_code_reviews).values(
+      reviewValues({
+        owner: { type: 'user', id: firstUser.id },
+        status: 'pending',
+        createdAt: minutesAgo(65),
+      })
+    );
+    let release: () => void = () => {};
+    let dispatched: () => void = () => {};
+    const waiting = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const observed = new Promise<void>(resolve => {
+      dispatched = resolve;
+    });
+    mockRecoverQueuedIsolateReviews.mockReturnValue(waiting);
+    mockTryDispatchPendingReviews.mockImplementation(async () => {
+      dispatched();
+      return { dispatched: 1, notDispatched: 0, activeCount: 1 };
+    });
+    const drain = dispatchPendingCodeReviewOwners();
+    try {
+      await observed;
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+      expect(mockRecoverQueuedIsolateReviews).toHaveBeenCalledWith(
+        mockTryDispatchPendingReviews.mock.calls[0][1]
+      );
+    } finally {
+      release();
+    }
+    expect(await drain).toMatchObject({ reviewsDispatched: 1 });
+  });
 
   it('discovers unique eligible owners oldest-first with truncation and capacity prefiltering', async () => {
     const oldestBlockedTimestamp = minutesAgo(40);
@@ -246,6 +286,49 @@ describe('dispatch pending code review owners', () => {
       ],
       hasMore: false,
     });
+  });
+
+  it('does not discover pending owners whose blocker has no publication release evidence', async () => {
+    const [holder] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner: { type: 'org', id: firstOrganizationId },
+          status: 'completed',
+          createdAt: minutesAgo(120),
+        })
+      )
+      .returning();
+    const [attempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({ code_review_id: holder.id, attempt_number: 1, status: 'completed' })
+      .returning();
+    const [blocked] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        ...reviewValues({
+          owner: { type: 'user', id: firstUser.id },
+          status: 'pending',
+          createdAt: minutesAgo(65),
+        }),
+        blocked_by_attempt_id: attempt.id,
+      })
+      .returning();
+
+    expect(await listDispatchableCodeReviewOwnerCandidates()).toEqual({
+      owners: [],
+      hasMore: false,
+    });
+    expect(
+      await listDispatchableCodeReviewOwnerCandidates({
+        pendingCreatedAtWindow: cronPendingCodeReviewCreatedAtWindowSql(),
+      })
+    ).toEqual({ owners: [], hasMore: false });
+    expect(
+      await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, blocked.id),
+      })
+    ).toMatchObject({ status: 'pending', blocked_by_attempt_id: attempt.id });
   });
 
   it('drains Bitbucket owners during cron dispatch', async () => {

@@ -393,6 +393,30 @@ it('completes a full Think review, then reuses its persisted analysis for a chan
       githubRequests.push({ method, url: url.pathname + url.search });
       if (method !== 'GET') throw new Error('GitHub mutations are forbidden in this regression');
       if (url.pathname === REPO_PATH) return Response.json({ id: 123, size: 1 });
+      const treeSha = hash(`tree:${headSha}`).slice(0, 40);
+      if (url.pathname === `${REPO_PATH}/git/commits/${headSha}`)
+        return Response.json({ sha: headSha, tree: { sha: treeSha } });
+      if (url.pathname === `${REPO_PATH}/git/trees/${treeSha}`) {
+        expect(url.searchParams.get('recursive')).toBe('1');
+        const source = headSha === PREVIOUS_SHA ? PREVIOUS_SOURCE : HEAD_SOURCE;
+        return Response.json({
+          sha: treeSha,
+          truncated: false,
+          tree: [
+            { path: 'src', mode: '040000', type: 'tree', sha: hash(`src:${headSha}`).slice(0, 40) },
+            ...[
+              { path: SOURCE_PATH, content: source },
+              { path: RETAINED_PATH, content: RETAINED_SOURCE },
+            ].map(({ path, content }) => ({
+              path,
+              mode: '100644',
+              type: 'blob',
+              sha: hash(content).slice(0, 40),
+              size: new TextEncoder().encode(content).byteLength,
+            })),
+          ],
+        });
+      }
       if (url.pathname === PULL_PATH) {
         return Response.json({
           title: 'Allow requests at the limit',

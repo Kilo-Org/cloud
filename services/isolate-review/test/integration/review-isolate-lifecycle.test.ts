@@ -3838,9 +3838,10 @@ describe('ReviewIsolate lifecycle', () => {
           });
         if (stage === 'clone')
           vi.mocked(cloneRepository).mockImplementationOnce(
-            async (workspace, _input, _sha, options) => {
+            async (workspace, _input, sha, options) => {
               expect(options?.signal).toBeInstanceOf(AbortSignal);
-              expect(options?.signal).toBe(vi.mocked(admitRepository).mock.calls.at(-1)?.[3]);
+              expect(vi.mocked(admitRepository).mock.calls.at(-1)?.[3]).toBe(sha);
+              expect(options?.signal).toBe(vi.mocked(admitRepository).mock.calls.at(-1)?.[4]);
               await delayed();
               expect(options?.signal?.aborted).toBe(true);
               await workspace.mkdir('/workspace', { recursive: true });

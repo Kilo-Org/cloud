@@ -10,18 +10,42 @@
  */
 
 import crypto from 'crypto';
+import { Octokit } from '@octokit/rest';
+import { selectReviewerBackend } from './reviewer-routing';
+import { githubPublicationTarget, QueuedIsolateIdentitySchema } from '../queued-isolate-contract';
+import {
+  acquireIsolatePublicationFence,
+  blockCodeReviewOnPublicationFence,
+} from '../db/publication-fences';
+import {
+  prepareIsolateReviewPayload,
+  fetchIsolateReviewSnapshot,
+} from '../triggers/prepare-isolate-review-payload';
+import {
+  bindQueuedIsolatePreparation,
+  resumeQueuedIsolateFinalization,
+} from '../queued-isolate-lifecycle';
+import {
+  controlQueuedIsolateReview,
+  getIsolateFenceForAttempt,
+} from '../client/queued-isolate-review-client';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
   type CloudAgentCodeReview,
+  type CloudAgentCodeReviewAttempt,
+  type CodeReviewPublicationFence,
 } from '@kilocode/db/schema';
-import { eq, and, count, sql, inArray } from 'drizzle-orm';
+import { eq, and, count, sql, inArray, notInArray } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
-  ensureCurrentCodeReviewAttemptFromReview,
+  getLatestCodeReviewAttempt,
+  admitCodeReviewAttemptForDispatch,
+  pinCodeReviewAttemptReviewer,
+  prepareReservedCodeReviewAttempt,
   failReservedQueuedReview,
   releaseQueuedReviewClaim,
   reviewIsStillQueued,
@@ -40,7 +64,10 @@ import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import {
+  updateCheckRun,
+  generateGitHubInstallationToken,
+} from '@/lib/integrations/platforms/github/adapter';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -85,6 +112,7 @@ export type TryDispatchPendingReviewsOptions = {
 
 type ReservedReview = {
   review: CloudAgentCodeReview;
+  attempt: CloudAgentCodeReviewAttempt;
   dispatchReservationId: string;
 };
 
@@ -92,6 +120,10 @@ type ReviewReservationBatch = {
   activeCount: number;
   reservations: ReservedReview[];
 };
+
+type ReservedReviewDispatchOutcome = 'dispatched' | 'not-dispatched' | 'blocked';
+
+const MAX_DISPATCH_BATCHES = 2;
 
 class CodeReviewActionRequiredDispatchError extends Error {
   readonly reason: CodeReviewActionRequiredReason;
@@ -128,6 +160,7 @@ async function finalizeActionRequiredGateCheck(
   reason: CodeReviewActionRequiredReason
 ): Promise<void> {
   if (!shouldPublishCodeReviewToProvider(review)) return;
+  if ((await getLatestCodeReviewAttempt(review.id))?.reviewer_backend === 'isolate') return;
   const platform = parseCodeReviewPlatform(review.platform);
   if (platform !== PLATFORM.GITHUB || !review.check_run_id || !review.platform_integration_id)
     return;
@@ -189,7 +222,8 @@ function ownerReviewCondition(owner: Owner) {
 
 async function reservePendingReviewsForDispatch(
   owner: Owner,
-  options: TryDispatchPendingReviewsOptions = {}
+  options: TryDispatchPendingReviewsOptions,
+  excludedReviewIds: string[]
 ): Promise<ReviewReservationBatch> {
   return await db.transaction(async tx => {
     await tx.execute(
@@ -229,7 +263,10 @@ async function reservePendingReviewsForDispatch(
       .where(
         and(
           ownerCondition,
-          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)
+          reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow),
+          excludedReviewIds.length
+            ? notInArray(cloud_agent_code_reviews.id, excludedReviewIds)
+            : undefined
         )
       )
       .orderBy(
@@ -268,10 +305,20 @@ async function reservePendingReviewsForDispatch(
       .returning();
 
     const reservedReviewsById = new Map(reservedReviews.map(review => [review.id, review]));
-    const reservations = candidates.flatMap(candidate => {
+    const reservations: ReservedReview[] = [];
+    for (const candidate of candidates) {
       const review = reservedReviewsById.get(candidate.id);
-      return review ? [{ review, dispatchReservationId }] : [];
-    });
+      if (!review) continue;
+      const attempt = await admitCodeReviewAttemptForDispatch(
+        {
+          codeReviewId: review.id,
+          dispatchReservationId,
+          previousStatus: candidate.status === 'pending' ? 'pending' : 'queued',
+        },
+        tx
+      );
+      reservations.push({ review, attempt, dispatchReservationId });
+    }
 
     return { activeCount, reservations };
   });
@@ -293,162 +340,177 @@ export async function tryDispatchPendingReviews(
   try {
     logExceptInTest('[tryDispatchPendingReviews] Starting dispatch check', { owner });
 
-    const { activeCount, reservations } = await reservePendingReviewsForDispatch(owner, options);
-
-    if (reservations.length === 0) {
-      logExceptInTest('[tryDispatchPendingReviews] No reviews reserved', { owner, activeCount });
-      return { dispatched: 0, notDispatched: 0, activeCount };
-    }
-
-    const results = await Promise.allSettled(
-      reservations.map(reservation => dispatchReservedReview(reservation, owner))
-    );
-
     let dispatched = 0;
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      if (result.status === 'fulfilled') {
-        if (result.value) {
-          dispatched++;
-        }
-      } else {
-        const reservation = reservations[i];
-        const error = result.reason;
-        const errorMessage = getErrorMessage(error);
-        const actionRequiredReason = getActionRequiredReasonFromError(error);
-        const actionRequiredStateAlreadyPresent =
-          error instanceof CodeReviewActionRequiredDispatchError;
-        const manualConfig = getManualCodeReviewConfig(reservation.review);
-        const isManualReview = manualConfig !== null;
+    let notDispatched = 0;
+    let activeCount = 0;
+    const attemptedReviewIds: string[] = [];
+    for (let batch = 0; batch < MAX_DISPATCH_BATCHES; batch++) {
+      const reservationBatch = await reservePendingReviewsForDispatch(
+        owner,
+        options,
+        attemptedReviewIds
+      );
+      const { reservations } = reservationBatch;
+      activeCount = reservationBatch.activeCount;
+      if (reservations.length === 0) {
+        logExceptInTest('[tryDispatchPendingReviews] No reviews reserved', { owner, activeCount });
+        break;
+      }
+      attemptedReviewIds.push(...reservations.map(reservation => reservation.review.id));
+      const results = await Promise.allSettled(
+        reservations.map(reservation => dispatchReservedReview(reservation, owner, options))
+      );
 
-        if (actionRequiredReason) {
-          if (!actionRequiredStateAlreadyPresent && !isManualReview) {
-            logExceptInTest(
-              '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
-              {
-                reviewId: reservation.review.id,
-                owner,
-                reason: actionRequiredReason,
-              }
-            );
+      let batchDispatched = 0;
+      let hasBlockedReview = false;
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.status === 'fulfilled') {
+          if (result.value === 'dispatched') batchDispatched++;
+          else if (result.value === 'blocked') hasBlockedReview = true;
+        } else {
+          const reservation = reservations[i];
+          const error = result.reason;
+          const errorMessage = getErrorMessage(error);
+          const actionRequiredReason = getActionRequiredReasonFromError(error);
+          const actionRequiredStateAlreadyPresent =
+            error instanceof CodeReviewActionRequiredDispatchError;
+          const manualConfig = getManualCodeReviewConfig(reservation.review);
+          const isManualReview = manualConfig !== null;
 
-            try {
-              await disableCodeReviewForActionRequiredFailure({
-                owner,
-                platform: parseCodeReviewPlatform(reservation.review.platform),
-                reviewId: reservation.review.id,
-                reason: actionRequiredReason,
-                errorMessage,
-              });
-            } catch (disableError) {
-              errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
-                reviewId: reservation.review.id,
-                owner,
-                reason: actionRequiredReason,
-                disableError,
-              });
-              captureException(disableError, {
-                tags: { operation: 'disable-code-review-action-required' },
-                extra: { reviewId: reservation.review.id, owner, reason: actionRequiredReason },
-              });
-            }
-          }
-
-          try {
-            await failReservedQueuedReview(
-              reservation.review.id,
-              reservation.dispatchReservationId,
-              `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
-              actionRequiredReason
-            );
-          } catch (updateError) {
-            errorExceptInTest(
-              '[tryDispatchPendingReviews] Failed to mark review as action-required',
-              {
-                reviewId: reservation.review.id,
-                updateError,
-              }
-            );
-            try {
-              const released = await releaseQueuedReviewClaim(
-                reservation.review.id,
-                reservation.dispatchReservationId
-              );
+          if (actionRequiredReason) {
+            if (!actionRequiredStateAlreadyPresent && !isManualReview) {
               logExceptInTest(
-                '[tryDispatchPendingReviews] Released action-required review reservation',
+                '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
                 {
                   reviewId: reservation.review.id,
-                  released,
+                  owner,
+                  reason: actionRequiredReason,
                 }
               );
-            } catch (releaseError) {
-              errorExceptInTest(
-                '[tryDispatchPendingReviews] Failed to release action-required review reservation',
-                {
-                  reviewId: reservation.review.id,
-                  releaseError,
-                }
-              );
-              captureException(releaseError, {
-                tags: { operation: 'release-action-required-review-reservation' },
-                extra: { reviewId: reservation.review.id, owner },
-              });
-            }
-            continue;
-          }
 
-          if (!isManualReview) {
+              try {
+                await disableCodeReviewForActionRequiredFailure({
+                  owner,
+                  platform: parseCodeReviewPlatform(reservation.review.platform),
+                  reviewId: reservation.review.id,
+                  reason: actionRequiredReason,
+                  errorMessage,
+                });
+              } catch (disableError) {
+                errorExceptInTest('[tryDispatchPendingReviews] Failed to disable Code Reviewer', {
+                  reviewId: reservation.review.id,
+                  owner,
+                  reason: actionRequiredReason,
+                  disableError,
+                });
+                captureException(disableError, {
+                  tags: { operation: 'disable-code-review-action-required' },
+                  extra: { reviewId: reservation.review.id, owner, reason: actionRequiredReason },
+                });
+              }
+            }
+
             try {
-              await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+              await failReservedQueuedReview(
+                reservation.review.id,
+                reservation.dispatchReservationId,
+                `Dispatch failed: ${getCodeReviewActionRequiredCopy(actionRequiredReason).description}`,
+                actionRequiredReason,
+                reservation.attempt.id
+              );
             } catch (updateError) {
               errorExceptInTest(
-                '[tryDispatchPendingReviews] Failed to finalize action-required check run',
+                '[tryDispatchPendingReviews] Failed to mark review as action-required',
                 {
                   reviewId: reservation.review.id,
                   updateError,
                 }
               );
+              try {
+                const released = await releaseQueuedReviewClaim(
+                  reservation.review.id,
+                  reservation.dispatchReservationId
+                );
+                logExceptInTest(
+                  '[tryDispatchPendingReviews] Released action-required review reservation',
+                  {
+                    reviewId: reservation.review.id,
+                    released,
+                  }
+                );
+              } catch (releaseError) {
+                errorExceptInTest(
+                  '[tryDispatchPendingReviews] Failed to release action-required review reservation',
+                  {
+                    reviewId: reservation.review.id,
+                    releaseError,
+                  }
+                );
+                captureException(releaseError, {
+                  tags: { operation: 'release-action-required-review-reservation' },
+                  extra: { reviewId: reservation.review.id, owner },
+                });
+              }
+              continue;
             }
+
+            if (!isManualReview) {
+              try {
+                await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+              } catch (updateError) {
+                errorExceptInTest(
+                  '[tryDispatchPendingReviews] Failed to finalize action-required check run',
+                  {
+                    reviewId: reservation.review.id,
+                    updateError,
+                  }
+                );
+              }
+            }
+
+            continue;
           }
 
-          continue;
-        }
-
-        errorExceptInTest('[tryDispatchPendingReviews] Failed to dispatch review', {
-          reviewId: reservation.review.id,
-          error,
-        });
-        captureException(error, {
-          tags: { operation: 'dispatch-pending-review' },
-          extra: { reviewId: reservation.review.id, owner },
-        });
-
-        try {
-          await failReservedQueuedReview(
-            reservation.review.id,
-            reservation.dispatchReservationId,
-            `Dispatch failed: ${errorMessage}`
-          );
-        } catch (updateError) {
-          errorExceptInTest('[tryDispatchPendingReviews] Failed to mark review as failed', {
+          errorExceptInTest('[tryDispatchPendingReviews] Failed to dispatch review', {
             reviewId: reservation.review.id,
-            updateError,
+            error,
           });
+          captureException(error, {
+            tags: { operation: 'dispatch-pending-review' },
+            extra: { reviewId: reservation.review.id, owner },
+          });
+
+          try {
+            await failReservedQueuedReview(
+              reservation.review.id,
+              reservation.dispatchReservationId,
+              `Dispatch failed: ${errorMessage}`,
+              undefined,
+              reservation.attempt.id
+            );
+          } catch (updateError) {
+            errorExceptInTest('[tryDispatchPendingReviews] Failed to mark review as failed', {
+              reviewId: reservation.review.id,
+              updateError,
+            });
+          }
         }
       }
+
+      dispatched += batchDispatched;
+      notDispatched += reservations.length - batchDispatched;
+      activeCount += batchDispatched;
+      if (!hasBlockedReview) break;
     }
 
     logExceptInTest('[tryDispatchPendingReviews] Dispatch complete', {
       owner,
       dispatched,
-      total: reservations.length,
+      total: dispatched + notDispatched,
     });
 
-    return {
-      dispatched,
-      notDispatched: reservations.length - dispatched,
-      activeCount: activeCount + dispatched,
-    };
+    return { dispatched, notDispatched, activeCount };
   } catch (error) {
     errorExceptInTest('[tryDispatchPendingReviews] Error during dispatch', { owner, error });
     captureException(error, {
@@ -459,7 +521,11 @@ export async function tryDispatchPendingReviews(
   }
 }
 
-async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
+async function dispatchReservedReview(
+  reservation: ReservedReview,
+  owner: Owner,
+  options: TryDispatchPendingReviewsOptions
+): Promise<ReservedReviewDispatchOutcome> {
   const { review, dispatchReservationId } = reservation;
   const platform = parseCodeReviewPlatform(review.platform);
   const manualConfig = getManualCodeReviewConfig(review);
@@ -474,7 +540,30 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     logExceptInTest('[dispatchReview] Review reservation changed before preparation', {
       reviewId: review.id,
     });
-    return false;
+    return 'not-dispatched';
+  }
+
+  const target =
+    platform === 'github' && shouldPublishCodeReviewToProvider(review)
+      ? githubPublicationTarget(review.repo_full_name, review.pr_number)
+      : null;
+  if (
+    target &&
+    (await db.transaction(tx =>
+      blockCodeReviewOnPublicationFence(tx, {
+        reviewId: review.id,
+        attemptId: reservation.attempt.id,
+        dispatchReservationId,
+        target,
+      })
+    ))
+  )
+    return 'blocked';
+
+  if (reservation.attempt.reviewer_backend === 'isolate') {
+    const fence = await getIsolateFenceForAttempt(review.id, reservation.attempt.id);
+    if (fence.preparation || fence.safety || fence.released_at)
+      return recoverIsolateDispatch(fence, options);
   }
 
   let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
@@ -530,6 +619,46 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     }
   }
 
+  let backend =
+    reservation.attempt.reviewer_backend === 'unselected'
+      ? await selectReviewerBackend({
+          platform,
+          organizationId: review.owned_by_organization_id,
+          reviewType: review.review_type,
+          outputMode: manualConfig?.outputMode ?? 'provider',
+        })
+      : reservation.attempt.reviewer_backend;
+  if (
+    backend === 'isolate' &&
+    reservation.attempt.reviewer_backend === 'unselected' &&
+    review.platform_integration_id
+  ) {
+    const integration = await getIntegrationById(review.platform_integration_id);
+    if (integration?.github_app_type === 'lite') backend = 'legacy';
+  }
+  if (backend === 'isolate') return dispatchIsolateReview(reservation, owner, agentConfig, options);
+
+  const pinned = await db.transaction(async tx => {
+    if (
+      target &&
+      (await blockCodeReviewOnPublicationFence(tx, {
+        reviewId: review.id,
+        attemptId: reservation.attempt.id,
+        dispatchReservationId,
+        target,
+      }))
+    )
+      return 'blocked' as const;
+    return pinCodeReviewAttemptReviewer(tx, {
+      codeReviewId: review.id,
+      attemptId: reservation.attempt.id,
+      dispatchReservationId,
+      backend: 'legacy',
+    });
+  });
+  if (pinned === 'blocked') return 'blocked';
+  if (pinned.attempt.reviewer_backend !== 'legacy') return 'not-dispatched';
+
   const payload = await prepareReviewPayload({
     reviewId: review.id,
     owner,
@@ -551,10 +680,16 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     logExceptInTest('[dispatchReview] Review reservation changed after preparation', {
       reviewId: review.id,
     });
-    return false;
+    return 'not-dispatched';
   }
 
-  const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
+  const attempt = await prepareReservedCodeReviewAttempt({
+    codeReviewId: review.id,
+    attemptId: reservation.attempt.id,
+    dispatchReservationId,
+    analyticsEnabled: shouldEnrollAnalytics,
+  });
+  if (!attempt) return 'not-dispatched';
   const analyticsEnabledAtDispatch =
     owner.type === 'org' &&
     platform !== PLATFORM.BITBUCKET &&
@@ -598,8 +733,21 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
         attemptId: attempt.id,
       });
     }
-    return false;
+    return 'not-dispatched';
   }
+
+  if (
+    target &&
+    (await db.transaction(tx =>
+      blockCodeReviewOnPublicationFence(tx, {
+        reviewId: review.id,
+        attemptId: attempt.id,
+        dispatchReservationId,
+        target,
+      })
+    ))
+  )
+    return 'blocked';
 
   logExceptInTest('[dispatchReview] Worker dispatch prompt diagnostics', {
     reviewId: review.id,
@@ -630,7 +778,9 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       tags: { operation: 'dispatch-review-worker-call' },
       extra: { reviewId: review.id, owner },
     });
-    return handleAmbiguousDispatchFailure(review, owner, attempt.id, dispatchReservationId);
+    return (await handleAmbiguousDispatchFailure(review, owner, attempt.id, dispatchReservationId))
+      ? 'dispatched'
+      : 'not-dispatched';
   }
 
   try {
@@ -659,7 +809,128 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     platform,
   });
 
-  return true;
+  return 'dispatched';
+}
+
+async function recoverIsolateDispatch(
+  fence: CodeReviewPublicationFence,
+  options: TryDispatchPendingReviewsOptions
+): Promise<ReservedReviewDispatchOutcome> {
+  try {
+    if (fence.released_at) {
+      await resumeQueuedIsolateFinalization(fence.identity, options);
+      return 'not-dispatched';
+    }
+    const status = await controlQueuedIsolateReview(fence.identity, 'status');
+    if (!status) {
+      await controlQueuedIsolateReview(fence.identity, 'cancel');
+      return 'not-dispatched';
+    }
+    await resumeQueuedIsolateFinalization(fence.identity, options);
+    return status.safety.execution === 'not_started' || status.safety.execution === 'running'
+      ? 'dispatched'
+      : 'not-dispatched';
+  } catch {
+    return 'not-dispatched';
+  }
+}
+
+async function dispatchIsolateReview(
+  reservation: ReservedReview,
+  owner: Owner,
+  agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'],
+  options: TryDispatchPendingReviewsOptions
+): Promise<ReservedReviewDispatchOutcome> {
+  const { review, attempt, dispatchReservationId } = reservation;
+  let fence: CodeReviewPublicationFence | undefined;
+  try {
+    if (attempt.reviewer_backend === 'isolate') {
+      fence = await getIsolateFenceForAttempt(review.id, attempt.id);
+    } else {
+      if (owner.type !== 'org' || !review.platform_integration_id)
+        throw new Error('Isolate requires organization integration context');
+      const integration = await getIntegrationById(review.platform_integration_id, owner.id);
+      if (
+        !integration?.platform_installation_id ||
+        integration.platform !== 'github' ||
+        integration.owned_by_organization_id !== owner.id ||
+        integration.owned_by_user_id ||
+        integration.integration_status !== 'active' ||
+        integration.auth_invalid_at ||
+        (integration.github_app_type ?? 'standard') !== 'standard'
+      )
+        throw new Error('Isolate requires an active organization GitHub integration');
+      const target = githubPublicationTarget(review.repo_full_name, review.pr_number);
+      const [repoOwner, repo] = target.repoFullName.split('/');
+      const { token } = await generateGitHubInstallationToken(
+        integration.platform_installation_id,
+        'standard'
+      );
+      const snapshot = await fetchIsolateReviewSnapshot({
+        octokit: new Octokit({ auth: token, request: { timeout: 10_000 } }),
+        owner: repoOwner,
+        repo,
+        pullNumber: review.pr_number,
+        expectedHeadSha: review.head_sha,
+      });
+      const identity = QueuedIsolateIdentitySchema.parse({
+        reviewId: review.id,
+        attemptId: attempt.id,
+        generation: crypto.randomUUID(),
+        organizationId: owner.id,
+        executionUserId: owner.userId,
+        integrationId: integration.id,
+        target,
+        snapshot,
+      });
+      const acquisition = await acquireIsolatePublicationFence({ identity, dispatchReservationId });
+      if (acquisition.outcome === 'blocked') return 'blocked';
+      if (acquisition.outcome === 'legacy') return 'not-dispatched';
+      fence = acquisition.fence;
+    }
+    if (fence.preparation || fence.safety || fence.released_at)
+      return recoverIsolateDispatch(fence, options);
+    if (
+      !(await prepareReservedCodeReviewAttempt({
+        codeReviewId: review.id,
+        attemptId: attempt.id,
+        dispatchReservationId,
+        analyticsEnabled: getReviewAnalyticsEnabledFromConfig(agentConfig.config),
+      }))
+    )
+      return 'not-dispatched';
+    const payload = await prepareIsolateReviewPayload({
+      identity: fence.identity,
+      owner: {
+        type: 'org',
+        id: fence.identity.organizationId,
+        userId: fence.identity.executionUserId,
+      },
+      dispatchReservationId,
+      agentConfig,
+    });
+    await bindQueuedIsolatePreparation(fence.identity, payload.review);
+    if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
+      await controlQueuedIsolateReview(fence.identity, 'cancel');
+      return 'not-dispatched';
+    }
+    try {
+      const response = await codeReviewWorkerClient.dispatchReview(payload);
+      return response.status === 'queued' || response.status === 'running'
+        ? 'dispatched'
+        : 'not-dispatched';
+    } catch {
+      return recoverIsolateDispatch(
+        await getIsolateFenceForAttempt(review.id, attempt.id),
+        options
+      );
+    }
+  } catch (error) {
+    if (!fence) throw error;
+    const current = await getIsolateFenceForAttempt(review.id, attempt.id);
+    if (current.preparation) return recoverIsolateDispatch(current, options);
+    throw error;
+  }
 }
 
 async function handleAmbiguousDispatchFailure(

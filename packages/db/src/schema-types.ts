@@ -1723,6 +1723,96 @@ export const ManualCodeReviewConfigSchema = z
 
 export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
 
+export type CodeReviewReviewerBackend = 'legacy' | 'isolate';
+export type CodeReviewReviewerAffinity = 'unselected' | CodeReviewReviewerBackend;
+
+export type QueuedIsolateIdentity = {
+  reviewId: string;
+  attemptId: string;
+  generation: string;
+  organizationId: string;
+  integrationId: string;
+  executionUserId: string;
+  target: { host: 'github.com'; repoFullName: string; prNumber: number };
+  snapshot: { headSha: string; baseTipSha: string; mergeBaseSha: string };
+};
+
+export type QueuedIsolateSafety = {
+  sequence: number;
+  execution: 'not_started' | 'running' | 'completed' | 'failed' | 'cancelled';
+  cancellationRequested: boolean;
+  publication: 'not_started' | 'pending' | 'uncertain' | 'settled';
+  quiescent: boolean;
+  observedAt: string;
+};
+
+export type IsolateWebFinalization = 'pending' | 'uncertain' | 'settled' | 'suppressed';
+
+export type QueuedIsolateResult = {
+  reason: string;
+  completedAt: string;
+  sessions: { sessionId: string; parentSessionId: string | null; requestCount?: number }[];
+  summary: { commentId: number; bodyHash: string } | null;
+  gateResult: 'pass' | 'fail' | null;
+  analytics: { marker: string | null; omitted: boolean };
+};
+
+export type QueuedIsolateUsageSettlement = {
+  unavailableReason?: 'billing_incomplete';
+  totals: {
+    tokensIn: number;
+    tokensOut: number;
+    cacheHit: number;
+    cacheWrite: number;
+    cost: number;
+  } | null;
+};
+
+export type QueuedIsolatePreparationBinding = {
+  hash: string;
+  preparedAt: string;
+  installationId: string;
+  model: string;
+  gateThreshold: 'off' | 'all' | 'warning' | 'critical';
+  reviewGuidance: { used: boolean; ref: string | null; truncated: boolean };
+};
+
+export const QueuedIsolateGateAuthorizationSchema = z
+  .object({
+    installationId: z.string().min(1).max(256),
+    checkRunId: z.number().int().positive().safe(),
+  })
+  .strict();
+
+export type QueuedIsolateGateAuthorization = z.infer<typeof QueuedIsolateGateAuthorizationSchema>;
+
+export type IsolateWebPublication = {
+  id: string;
+  kind: 'gate' | 'footer';
+  targetId: number;
+  state: 'prepared' | 'sent' | 'confirmed' | 'rejected' | 'suppressed';
+  body?: string;
+  previousBodyHash?: string;
+  conclusion?: 'success' | 'failure' | 'cancelled' | 'action_required';
+};
+
+export type CodeReviewPublicationState = {
+  identity: QueuedIsolateIdentity;
+  safety: QueuedIsolateSafety | null;
+  preparation: QueuedIsolatePreparationBinding | null;
+  gate_authorization: QueuedIsolateGateAuthorization | null;
+  terminal_result: QueuedIsolateResult | null;
+  usage_settlement: QueuedIsolateUsageSettlement | null;
+  web_publications: IsolateWebPublication[];
+  authorized_operation_ids: string[];
+  identity_digest: string | null;
+  identity_cleanup_requested: boolean;
+  canonical_settled_at: string | null;
+  queue_wakeup_at: string | null;
+  web_finalization: IsolateWebFinalization;
+  released_at: string | null;
+};
+
 // --- Security types ---
 
 export const DependabotAlertState = {

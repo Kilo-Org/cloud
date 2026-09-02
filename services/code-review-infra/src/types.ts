@@ -127,12 +127,31 @@ const InternalStatusTerminalReasonSchema = z
 export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
-  currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  currentStatus: z
+    .enum(['pending', 'queued', 'running', 'completed', 'failed', 'cancelled'])
+    .optional()
+    .catch(undefined),
+  attemptId: z.string().optional(),
   terminalReason: InternalStatusTerminalReasonSchema,
   error: z.string().optional(),
 });
 
 export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema>;
+
+export const CanonicalStatusResponseSchema = z.object({
+  success: z.literal(true),
+  reviewId: z.string(),
+  attemptId: z.string().nullable(),
+  reviewerBackend: z.literal('legacy'),
+  status: z.enum(['pending', 'queued', 'running', 'completed', 'failed', 'cancelled']),
+  sessionId: z.string().nullable(),
+  cliSessionId: z.string().nullable(),
+  terminalReason: InternalStatusTerminalReasonSchema,
+  errorMessage: z.string().nullable(),
+  completedAt: z.iso.datetime().nullable(),
+});
+
+export type CanonicalStatusResponse = z.infer<typeof CanonicalStatusResponseSchema>;
 
 export interface CodeReviewRequest {
   reviewId: string;

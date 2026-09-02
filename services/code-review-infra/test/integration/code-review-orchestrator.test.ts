@@ -2,6 +2,7 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
+import { doNameForAttempt } from '../../src/do-name';
 import {
   buildGitHubCloudReviewSkillCue,
   GITHUB_CLOUD_REVIEW_SKILL_NAME,
@@ -10,7 +11,7 @@ import {
   BITBUCKET_CLOUD_REVIEW_SKILL_NAME,
   buildBitbucketCloudReviewSkillCue,
 } from '../../src/bitbucket-cloud-review-skill';
-import type { CodeReview, Owner, SessionInput } from '../../src/types';
+import type { CanonicalStatusResponse, CodeReview, Owner, SessionInput } from '../../src/types';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 
 function getReviewStub(name = `review-${crypto.randomUUID()}`) {
@@ -81,6 +82,25 @@ function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
     },
     status: 'queued',
     updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function canonicalStatus(
+  review: CodeReview,
+  overrides: Partial<CanonicalStatusResponse> = {}
+): CanonicalStatusResponse {
+  return {
+    success: true,
+    reviewId: review.reviewId,
+    attemptId: review.attemptId ?? null,
+    reviewerBackend: 'legacy',
+    status: review.status,
+    sessionId: review.sessionId ?? null,
+    cliSessionId: review.cliSessionId ?? null,
+    terminalReason: review.terminalReason ?? null,
+    errorMessage: review.errorMessage ?? null,
+    completedAt: review.completedAt ?? null,
     ...overrides,
   };
 }
@@ -174,7 +194,9 @@ function getFetchCall(fetchMock: ReturnType<typeof vi.fn>, path: string) {
 }
 
 function lastStatusUpdateBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
-  const statusCalls = fetchCalls(fetchMock, '/api/internal/code-review-status/');
+  const statusCalls = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
+    ([, init]) => (init as RequestInit | undefined)?.method === 'POST'
+  );
   const lastCall = statusCalls.at(-1);
   expect(lastCall).toBeDefined();
 
@@ -294,6 +316,33 @@ describe('CodeReviewOrchestrator recovery', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('does not load local development credentials or endpoints into the Worker tests', () => {
+    expect(env.API_URL === 'https://api.example.test').toBe(true);
+    expect(env.CLOUD_AGENT_NEXT_URL === 'https://cloud-agent-next.example.test').toBe(true);
+    expect(env.BACKEND_AUTH_TOKEN === 'test-backend-token').toBe(true);
+    expect(env.CALLBACK_TOKEN_SECRET === 'test-callback-token-secret').toBe(true);
+  });
+
+  it.each([null, false, 7, 'not-an-object', []].map(body => ({ body })))(
+    'rejects non-object JSON bodies before review operations: $body',
+    async ({ body }) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const reviewId = crypto.randomUUID();
+      for (const path of [
+        '/review',
+        `/reviews/${reviewId}/cancel`,
+        `/reviews/${reviewId}/retry-fresh`,
+      ]) {
+        const response = await SELF.fetch(`https://worker.test${path}`, {
+          method: 'POST',
+          headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        expect(response.status).toBe(400);
+      }
+    }
+  );
+
   it('start arms a fallback alarm for a queued review', async () => {
     const stub = getReviewStub();
 
@@ -342,6 +391,501 @@ describe('CodeReviewOrchestrator recovery', () => {
     await expect(response.json()).resolves.toMatchObject({
       reviewId,
       status: expect.stringMatching(/queued|running/),
+    });
+  });
+
+  it.each(['completed', 'failed'] as const)(
+    'reconciles canonical %s status without replaying a callback',
+    async status => {
+      const stub = getReviewStub();
+      const reviewId = crypto.randomUUID();
+      const attemptId = crypto.randomUUID();
+      const completedAt = '2026-09-02T18:00:00.000Z';
+      const terminalReason = status === 'failed' ? 'wrapper_failed' : null;
+      const initialState = codeReview({
+        reviewId,
+        attemptId,
+        status: 'running',
+        sessionId: 'agent-current',
+        cliSessionId: 'ses_current',
+        errorMessage: 'stale failure detail',
+      });
+      const fetchMock = vi.fn(async () =>
+        Response.json(
+          canonicalStatus(initialState, { status, terminalReason, completedAt, errorMessage: null })
+        )
+      );
+      globalThis.fetch = fetchMock;
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', initialState);
+      });
+
+      await expect(stub.getStatus()).resolves.toMatchObject({
+        reviewId,
+        attemptId,
+        status,
+        completedAt,
+        sessionId: 'agent-current',
+        terminalReason: terminalReason ?? undefined,
+        errorMessage: undefined,
+      });
+      await expect(storedReview(stub)).resolves.toMatchObject({ status, completedAt });
+      const cleanupAlarm = await storedAlarm(stub);
+      expect(cleanupAlarm).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+      await expect(stub.getStatus()).resolves.toMatchObject({ status, completedAt });
+      expect(await storedAlarm(stub)).toBe(cleanupAlarm);
+
+      const url = new URL(`/api/internal/code-review-status/${reviewId}`, env.API_URL);
+      url.searchParams.set('attemptId', attemptId);
+      const token = await deriveCallbackToken({
+        secret: env.CALLBACK_TOKEN_SECRET,
+        scope: 'code-review-status-callback',
+        resourceParts: [reviewId, attemptId],
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        url.toString(),
+        expect.objectContaining({
+          method: 'GET',
+          headers: { 'X-Callback-Token': token },
+          redirect: 'manual',
+        })
+      );
+    }
+  );
+
+  it('reconciles canonical completion from the running alarm and preserves cleanup storage', async () => {
+    const stub = getReviewStub();
+    const completedAt = '2026-09-02T18:00:00.000Z';
+    const initialState = codeReview({ status: 'running' });
+    const fetchMock = vi.fn(async () =>
+      Response.json(canonicalStatus(initialState, { status: 'completed', completedAt }))
+    );
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'completed', completedAt });
+    expect(await storedAlarm(stub)).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('rearms running reconciliation without writing a synthetic heartbeat', async () => {
+    const stub = getReviewStub();
+    const initialState = codeReview({ status: 'running' });
+    const fetchMock = vi.fn(async () => Response.json(canonicalStatus(initialState)));
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await expect(storedReview(stub)).resolves.toEqual(initialState);
+    expect(await storedAlarm(stub)).toBeGreaterThan(Date.now());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it.each([
+    { name: 'not found', response: () => new Response(null, { status: 404 }) },
+    { name: 'unavailable', response: () => new Response(null, { status: 503 }) },
+    {
+      name: 'redirect',
+      response: () =>
+        new Response(null, { status: 302, headers: { Location: 'https://other.test' } }),
+    },
+    { name: 'invalid JSON', response: () => new Response('{') },
+    {
+      name: 'invalid status',
+      response: (state: CodeReview) =>
+        Response.json({ ...canonicalStatus(state), status: 'unknown' }),
+    },
+    {
+      name: 'unsuccessful response',
+      response: (state: CodeReview) =>
+        Response.json({ ...canonicalStatus(state), success: false, status: 'completed' }),
+    },
+  ])('retains running state and rechecks after canonical status is $name', async ({ response }) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stub = getReviewStub();
+    const initialState = codeReview({ status: 'running' });
+    globalThis.fetch = vi.fn(async () => response(initialState));
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await expect(storedReview(stub)).resolves.toEqual(initialState);
+    expect(await storedAlarm(stub)).toBeGreaterThan(Date.now());
+  });
+
+  it.each([
+    ['reviewId', 'another-review'],
+    ['attemptId', 'another-attempt'],
+    ['reviewerBackend', 'isolate'],
+    ['sessionId', 'agent-another'],
+    ['cliSessionId', 'ses_another'],
+    ['completedAt', '2026-09-02 18:00:00+00'],
+  ])('ignores canonical terminal state with mismatched or invalid %s', async (field, value) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stub = getReviewStub();
+    const initialState = codeReview({
+      status: 'running',
+      attemptId: crypto.randomUUID(),
+      sessionId: 'agent-current',
+      cliSessionId: 'ses_current',
+    });
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({ ...canonicalStatus(initialState, { status: 'completed' }), [field]: value })
+    );
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+    });
+
+    await expect(stub.getStatus()).resolves.toMatchObject({ status: 'running' });
+    await expect(storedReview(stub)).resolves.toEqual(initialState);
+    expect(await storedAlarm(stub)).toBeGreaterThan(Date.now());
+  });
+
+  it('does not retarget attempt-less local state to a canonical attempt', async () => {
+    const stub = getReviewStub();
+    const initialState = codeReview({ status: 'running' });
+    globalThis.fetch = vi.fn(async () =>
+      Response.json(
+        canonicalStatus(initialState, { status: 'completed', attemptId: crypto.randomUUID() })
+      )
+    );
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+    });
+
+    await expect(stub.getStatus()).resolves.toMatchObject({ status: 'running' });
+    await expect(storedReview(stub)).resolves.toEqual(initialState);
+  });
+
+  it('does not cancel or interrupt a canonically completed review', async () => {
+    const stub = getReviewStub();
+    const initialState = codeReview({ status: 'running', sessionId: 'agent-completed' });
+    const fetchMock = vi.fn(async () =>
+      Response.json(canonicalStatus(initialState, { status: 'completed' }))
+    );
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', initialState);
+    });
+
+    expect(await stub.cancel('too late')).toBe(false);
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'completed' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it.each(['direct', 'after-status-poll'])(
+    'still interrupts a session after canonical cancellation: %s',
+    async mode => {
+      const stub = getReviewStub();
+      const initialState = codeReview({
+        status: 'running',
+        attemptId: crypto.randomUUID(),
+        sessionId: 'agent-superseded',
+      });
+      const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(request);
+        if (url.includes('/api/internal/code-review-status/')) {
+          if (init?.method === 'GET') {
+            return Response.json(
+              canonicalStatus(initialState, { status: 'cancelled', terminalReason: 'superseded' })
+            );
+          }
+          return Response.json({
+            success: true,
+            message: 'Review already in terminal state',
+            currentStatus: 'cancelled',
+            terminalReason: 'superseded',
+          });
+        }
+        if (url.includes('/trpc/interruptSession')) return trpcSuccess({ success: true });
+        throw new Error('Unexpected outbound request');
+      });
+      globalThis.fetch = fetchMock;
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', initialState);
+      });
+
+      if (mode === 'after-status-poll') {
+        await expect(stub.getStatus()).resolves.toMatchObject({ status: 'running' });
+      }
+      expect(await stub.cancel('Superseded by new push')).toBe(true);
+      await expect(storedReview(stub)).resolves.toMatchObject({
+        status: 'cancelled',
+        terminalReason: 'superseded',
+      });
+      expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+      expect(await stub.cancel('Repeated cancellation')).toBe(false);
+      expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+    }
+  );
+
+  it('does not overwrite cancellation with a delayed canonical status response', async () => {
+    const stub = getReviewStub();
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      const initialState = codeReview({ status: 'running' });
+      let releaseResponse: (response: Response) => void = () => {};
+      const pendingResponse = new Promise<Response>(resolve => {
+        releaseResponse = resolve;
+      });
+      let notifyRequest: () => void = () => {};
+      const requestStarted = new Promise<void>(resolve => {
+        notifyRequest = resolve;
+      });
+      let getRequests = 0;
+      const fetchMock = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'GET') {
+          getRequests++;
+          if (getRequests === 1) {
+            notifyRequest();
+            return pendingResponse;
+          }
+          return Response.json(canonicalStatus(initialState));
+        }
+        return Response.json({ success: true });
+      });
+      globalThis.fetch = fetchMock;
+      await state.storage.put('state', initialState);
+
+      const pendingStatus = instance.getStatus();
+      await requestStarted;
+      const cancelled = await instance.cancel('cancel while reading');
+      const cleanupAlarm = await state.storage.getAlarm();
+      releaseResponse(Response.json(canonicalStatus(initialState, { status: 'completed' })));
+
+      expect(cancelled).toBe(true);
+      await expect(pendingStatus).resolves.toMatchObject({ status: 'cancelled' });
+      await expect(state.storage.get<CodeReview>('state')).resolves.toMatchObject({
+        status: 'cancelled',
+      });
+      expect(await state.storage.getAlarm()).toBe(cleanupAlarm);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it.each(['fresh', 'followup'] as const)(
+    'does not initiate a %s session after the metadata callback observes canonical completion',
+    async mode => {
+      const stub = getReviewStub();
+      let updates = 0;
+      const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(request);
+        if (url.includes('/api/internal/code-review-status/') && init?.method === 'POST') {
+          updates++;
+          return Response.json(
+            updates === 1
+              ? { success: true }
+              : {
+                  success: true,
+                  message: 'Review already in terminal state',
+                  currentStatus: 'completed',
+                  terminalReason: null,
+                }
+          );
+        }
+        if (url.includes('/trpc/prepareSession')) {
+          return trpcSuccess({ cloudAgentSessionId: 'agent-new', kiloSessionId: 'ses_new' });
+        }
+        if (url.includes('/trpc/getSessionHealth')) {
+          return trpcSuccess({ sandboxStatus: 'healthy', executionHealth: 'none' });
+        }
+        throw new Error('Unexpected execution or status request');
+      });
+      globalThis.fetch = fetchMock;
+      await stub.start({
+        reviewId: crypto.randomUUID(),
+        attemptId: crypto.randomUUID(),
+        authToken: 'test-auth-token',
+        sessionInput: sessionInput(),
+        owner: personalOwner(),
+        previousCloudAgentSessionId: mode === 'followup' ? 'agent-previous' : undefined,
+      });
+
+      await stub.runReview();
+
+      await expect(storedReview(stub)).resolves.toMatchObject({ status: 'completed' });
+      expect(updates).toBe(2);
+      expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+      expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
+      expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
+      expect(await storedAlarm(stub)).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    }
+  );
+
+  it.each([
+    {
+      name: 'backend authority rejection',
+      response: () => Response.json({ error: 'Isolate attempt' }, { status: 409 }),
+      expectedStatus: 'running',
+    },
+    {
+      name: 'superseded attempt with its own terminal status',
+      response: (attemptId: string) =>
+        Response.json({
+          success: true,
+          message: 'Stale callback from superseded attempt',
+          attemptId,
+          currentStatus: 'failed',
+          terminalReason: 'sandbox_error',
+        }),
+      expectedStatus: 'failed',
+    },
+    {
+      name: 'superseded attempt while the parent is still running',
+      response: () =>
+        Response.json({
+          success: true,
+          message: 'Stale callback from superseded attempt',
+          currentStatus: 'running',
+        }),
+      expectedStatus: 'running',
+    },
+    {
+      name: 'superseded attempt with another attempt terminal status',
+      response: () =>
+        Response.json({
+          success: true,
+          message: 'Stale callback from superseded attempt',
+          attemptId: 'another-attempt',
+          currentStatus: 'completed',
+        }),
+      expectedStatus: 'running',
+    },
+    {
+      name: 'terminal authority without terminal metadata',
+      response: () => Response.json({ success: true, message: 'Review already in terminal state' }),
+      expectedStatus: 'running',
+    },
+    {
+      name: 'terminal authority with unknown terminal metadata',
+      response: () =>
+        Response.json({
+          success: true,
+          message: 'Review already in terminal state',
+          currentStatus: 'unknown',
+        }),
+      expectedStatus: 'running',
+    },
+  ])('does not start execution after $name', async ({ response, expectedStatus }) => {
+    const stub = getReviewStub();
+    const attemptId = crypto.randomUUID();
+    const fetchMock = vi.fn(async () => response(attemptId));
+    globalThis.fetch = fetchMock;
+    await stub.start({
+      reviewId: crypto.randomUUID(),
+      attemptId,
+      authToken: 'test-auth-token',
+      sessionInput: sessionInput(),
+      owner: personalOwner(),
+    });
+
+    await stub.runReview();
+
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: expectedStatus });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toBe(false);
+  });
+
+  it.each(['superseded', 'backend-conflict'])(
+    'does not interrupt a session when cancellation is %s',
+    async rejection => {
+      const stub = getReviewStub();
+      const initialState = codeReview({
+        status: 'running',
+        attemptId: crypto.randomUUID(),
+        sessionId: 'agent-shared',
+      });
+      const fetchMock = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'GET') {
+          return Response.json(canonicalStatus(initialState));
+        }
+        return rejection === 'backend-conflict'
+          ? Response.json({ error: 'Isolate attempt' }, { status: 409 })
+          : Response.json({
+              success: true,
+              message: 'Stale callback from superseded attempt',
+              attemptId: initialState.attemptId,
+              currentStatus: 'failed',
+            });
+      });
+      globalThis.fetch = fetchMock;
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', initialState);
+      });
+
+      expect(await stub.cancel('obsolete cancellation')).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(hasFetchCall(fetchMock, '/trpc/interruptSession')).toBe(false);
+    }
+  );
+
+  it.each(['completed', 'cancelled'] as const)(
+    'does not create a retry after the source is %s',
+    async status => {
+      const reviewId = crypto.randomUUID();
+      const attemptId = crypto.randomUUID();
+      const retryAttemptId = crypto.randomUUID();
+      const stub = getReviewStub(doNameForAttempt(reviewId, attemptId));
+      const retryStub = getReviewStub(doNameForAttempt(reviewId, retryAttemptId));
+      const initialState = codeReview({ reviewId, attemptId, status });
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', initialState);
+      });
+
+      expect(
+        await stub.retryFreshAfterInfraFailure({
+          reason: 'late infrastructure failure',
+          retryAttemptId,
+        })
+      ).toBe(false);
+      await expect(storedReview(stub)).resolves.toEqual(initialState);
+      await expect(retryStub.getStatus()).resolves.toBeNull();
+    }
+  );
+
+  it('allows an allocated infrastructure retry after the source attempt failed', async () => {
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+    const retryAttemptId = crypto.randomUUID();
+    const stub = getReviewStub(doNameForAttempt(reviewId, attemptId));
+    const retryStub = getReviewStub(doNameForAttempt(reviewId, retryAttemptId));
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview({ reviewId, attemptId, status: 'failed' }));
+    });
+
+    expect(
+      await stub.retryFreshAfterInfraFailure({ reason: 'infrastructure failure', retryAttemptId })
+    ).toBe(true);
+    await expect(retryStub.getStatus()).resolves.toMatchObject({
+      reviewId,
+      attemptId: retryAttemptId,
+      status: 'queued',
     });
   });
 
@@ -1462,6 +2006,41 @@ describe('CodeReviewOrchestrator recovery', () => {
       errorMessage: 'Review cancelled: superseded',
     });
     expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+  });
+
+  it('returns cancellation success after interruption failure without proving quiescence', async () => {
+    const stub = getReviewStub();
+    const events: string[] = [];
+    const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        const body = JSON.parse(String(init?.body)) as { status: string };
+        events.push(`callback:${body.status}`);
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        events.push('interruption-failed');
+        return trpcError(500, 'Injected interruption failure');
+      }
+      throw new Error('Unexpected external request');
+    });
+    globalThis.fetch = fetchMock;
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ status: 'running', sessionId: 'agent-still-running' })
+      );
+    });
+
+    await expect(stub.cancel('superseded')).resolves.toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      sessionId: 'agent-still-running',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(events).toEqual(['callback:cancelled', 'interruption-failed']);
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+    expect(lastStatusUpdateBody(fetchMock)).not.toHaveProperty('quiescent');
   });
 
   it('does not retry billing failures from prepareSession', async () => {

@@ -77,9 +77,9 @@ export async function resolveGithubCredentials(options: {
         'Personal prepared reviews require installation and app identity'
       );
     }
-    let rawResult: unknown;
+    let parsed: ReturnType<typeof tokenResultSchema.safeParse>;
     try {
-      rawResult = await options.service.getTokenForRepo({
+      const rawResult: unknown = await options.service.getTokenForRepo({
         githubRepo: `${input.owner}/${input.repo}`,
         userId,
         ...(orgId ? { orgId } : {}),
@@ -87,11 +87,18 @@ export async function resolveGithubCredentials(options: {
           ? { expectedIntegrationId: input.expectedIntegrationId }
           : {}),
       });
+      try {
+        parsed = tokenResultSchema.safeParse(rawResult);
+      } finally {
+        if (typeof rawResult === 'object' && rawResult !== null && Symbol.dispose in rawResult) {
+          const dispose = rawResult[Symbol.dispose];
+          if (typeof dispose === 'function') dispose.call(rawResult);
+        }
+      }
     } catch {
       throw new GithubTokenResolutionError('git-token-service RPC failed');
     }
 
-    const parsed = tokenResultSchema.safeParse(rawResult);
     if (!parsed.success) {
       throw new GithubTokenResolutionError(
         'git-token-service returned invalid credentials or identity'

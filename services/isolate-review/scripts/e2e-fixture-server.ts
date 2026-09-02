@@ -15,6 +15,7 @@ type FixtureMeta = {
 };
 
 const DEFAULT_PORT = 8877;
+const MAX_GIT_METADATA_BYTES = 2 * 1024 * 1024;
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(scriptsDir, 'fixtures');
 const githubDir = join(fixturesDir, 'github');
@@ -35,6 +36,38 @@ function loadMeta(): FixtureMeta {
 
 function git(args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+}
+
+function readGitTree(bareRepo: string, treeSha: string) {
+  const output = execFileSync('git', ['-C', bareRepo, 'ls-tree', '-r', '-t', '-l', '-z', treeSha], {
+    maxBuffer: MAX_GIT_METADATA_BYTES,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return new TextDecoder('utf-8', { fatal: true })
+    .decode(output)
+    .split('\0')
+    .filter(Boolean)
+    .map(record => {
+      const match = /^([0-7]{6}) (blob|tree|commit) ([0-9a-f]{40}) +(-|\d+)\t(.+)$/s.exec(record);
+      if (!match) throw new Error('Invalid fixture Git tree entry');
+      const [, mode, type, sha, rawSize, path] = match;
+      const size = rawSize === '-' ? undefined : Number(rawSize);
+      if (
+        (type === 'blob' && size === undefined) ||
+        (size !== undefined && (!Number.isSafeInteger(size) || size < 0))
+      ) {
+        throw new Error('Invalid fixture Git blob size');
+      }
+      return { path, mode, type, sha, ...(size === undefined ? {} : { size }) };
+    });
+}
+
+function serializeGitMetadata(value: unknown): string {
+  const body = `${JSON.stringify(value)}\n`;
+  if (Buffer.byteLength(body) > MAX_GIT_METADATA_BYTES) {
+    throw new Error('Fixture Git metadata exceeds the 2 MiB response budget');
+  }
+  return body;
 }
 
 function bareRepoPath(meta: FixtureMeta): string {
@@ -215,11 +248,23 @@ export async function startFixture(options?: { port?: number }): Promise<{
   stop: () => Promise<void>;
 }> {
   const meta = loadMeta();
-  unpackBundle(meta);
+  const bareRepo = unpackBundle(meta);
+  const commits = new Map<string, string>();
+  const trees = new Map<string, string>();
+  for (const sha of new Set([meta.headSha.toLowerCase(), meta.baseSha.toLowerCase()])) {
+    const treeSha = git(['-C', bareRepo, 'rev-parse', `${sha}^{tree}`]);
+    commits.set(sha, serializeGitMetadata({ sha, tree: { sha: treeSha } }));
+    trees.set(
+      treeSha,
+      serializeGitMetadata({ sha: treeSha, truncated: false, tree: readGitTree(bareRepo, treeSha) })
+    );
+  }
   const writeLog: FixtureWrite[] = [];
   const gitPrefix = `/${meta.owner}/${meta.repo}.git`;
   const repoApi = `/repos/${meta.owner}/${meta.repo}`;
   const pullApi = `${repoApi}/pulls/${meta.pullNumber}`;
+  const commitPrefix = `${repoApi}/git/commits/`;
+  const treePrefix = `${repoApi}/git/trees/`;
 
   const server = createServer((req, res) => {
     void (async () => {
@@ -262,6 +307,20 @@ export async function startFixture(options?: { port?: number }): Promise<{
         return;
       }
 
+      if (pathname.startsWith(commitPrefix)) {
+        const commit = commits.get(pathname.slice(commitPrefix.length).toLowerCase());
+        if (commit !== undefined) {
+          sendText(res, 200, commit, 'application/json');
+          return;
+        }
+      }
+      if (pathname.startsWith(treePrefix) && url.searchParams.has('recursive')) {
+        const tree = trees.get(pathname.slice(treePrefix.length).toLowerCase());
+        if (tree !== undefined) {
+          sendText(res, 200, tree, 'application/json');
+          return;
+        }
+      }
       if (pathname === repoApi) {
         sendFile(res, join(githubDir, 'repo.json'), 'application/json');
         return;

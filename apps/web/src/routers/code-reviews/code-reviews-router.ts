@@ -22,10 +22,8 @@ import {
   resetCodeReviewForRetry,
   updateCheckRunId,
   listCodeReviewAttempts,
-  getCodeReviewAttemptForReview,
-  ensureCurrentCodeReviewAttemptFromReview,
-  createCodeReviewAttempt,
-  getLatestCodeReviewAttempt,
+  getCodeReviewAttemptMetadataForReview,
+  prepareCodeReviewCancellation,
   getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -52,6 +50,7 @@ import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
+import { legacyCodeReviewWorkerClient } from '@/lib/code-reviews/client/legacy-code-review-worker-client';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -71,7 +70,6 @@ import {
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
-import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 
 /**
  * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
@@ -429,10 +427,11 @@ export const codeReviewRouter = createTRPCRouter({
 
       // Role-gated DTO: raw ledger/transaction identifiers are admin+ only,
       // matching listForOrganization. Non-owner/non-admin org members get nulls.
+      const { blocked_by_attempt_id: _blockedByAttemptId, ...publicReview } = review;
       const visibleReview = canSeeRawIds
-        ? review
+        ? publicReview
         : {
-            ...review,
+            ...publicReview,
             session_id: null,
             cli_session_id: null,
             dispatch_reservation_id: null,
@@ -445,6 +444,7 @@ export const codeReviewRouter = createTRPCRouter({
             session_id: null,
             cli_session_id: null,
             execution_id: null,
+            reviewer_execution_id: null,
           }));
 
       return successResult({
@@ -472,7 +472,7 @@ export const codeReviewRouter = createTRPCRouter({
    */
   cancel: baseProcedure.input(CancelCodeReviewInputSchema).mutation(async ({ input, ctx }) => {
     try {
-      const review = await getCodeReviewById(input.reviewId);
+      let review = await getCodeReviewById(input.reviewId);
 
       if (!review) {
         throw new TRPCError({
@@ -516,80 +516,65 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      // For running or queued reviews, call the worker to trigger full interrupt chain
-      // This will: stop stream processing, update DB, and interrupt cloud agent session (kill processes)
-      if (['running', 'queued'].includes(review.status)) {
+      const cancellation = await prepareCodeReviewCancellation(input.reviewId);
+      if (!cancellation) return failureResult('Code review attempt changed before cancellation');
+      review = cancellation.review;
+      if (cancellation.backend === 'isolate') {
         try {
-          const latestAttempt = await getLatestCodeReviewAttempt(input.reviewId);
-          const cancelResult = await codeReviewWorkerClient.cancelReview(
+          await codeReviewWorkerClient.cancelReview(
             input.reviewId,
             'Cancelled by user',
-            latestAttempt?.id
+            cancellation.attemptId
           );
-          if (!cancelResult.success && review.status === 'queued' && !review.session_id) {
-            logExceptInTest(
-              '[cancel] Worker cancel returned false, cancelling queued review locally',
-              {
-                reviewId: input.reviewId,
-                status: review.status,
-              }
-            );
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
-            }
-            return successResult({ message: 'Code review cancelled successfully' });
-          }
-          if (!cancelResult.success) {
-            return failureResult('Worker could not cancel code review');
-          }
-          // Worker updates DB status and interrupts cloud agent session when cancellation succeeds.
-          return successResult({ message: 'Code review cancelled successfully' });
+        } catch {
+          return successResult({
+            message: 'Code review cancelled; execution cancellation pending',
+          });
+        }
+        return successResult({ message: 'Code review cancelled successfully' });
+      }
+
+      if (cancellation.backend === 'local') {
+        try {
+          await cancelPRGateCheck(review, credentialActor);
+        } catch (gateError) {
+          logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+        }
+        return successResult({ message: 'Code review cancelled successfully' });
+      }
+
+      // For running or queued reviews, call the worker to trigger full interrupt chain
+      // This will: stop stream processing, update DB, and interrupt cloud agent session (kill processes)
+      let message = 'Code review cancelled successfully';
+      if (['running', 'queued'].includes(review.status)) {
+        try {
+          const cancelResult = await legacyCodeReviewWorkerClient.cancelReview(
+            input.reviewId,
+            'Cancelled by user',
+            cancellation.attemptId
+          );
+          if (cancelResult.success) return successResult({ message });
         } catch (workerError) {
-          if (review.status === 'queued' && !review.session_id) {
-            console.error('Worker cancel failed, updating DB directly:', workerError);
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
-            }
-            return successResult({ message: 'Code review cancelled (worker unreachable)' });
-          }
           console.error('Worker cancel failed:', workerError);
+          message = 'Code review cancelled (worker unreachable)';
+        }
+        if (review.status !== 'queued' || review.session_id) {
           return failureResult('Worker could not cancel code review');
         }
       }
 
-      // For pending reviews (not yet dispatched to worker), update DB and finalize gate
-      await cancelCodeReview(input.reviewId);
-      await settleCodeReviewLedgerRow({
-        reviewId: input.reviewId,
-        status: 'cancelled',
-        terminalReason: review.terminal_reason,
-        triggerSource: review.trigger_source,
+      const cancelled = await cancelCodeReview(input.reviewId, {
+        attemptId: cancellation.attemptId ?? null,
+        updatedAt: review.updated_at,
       });
+      if (!cancelled) return failureResult('Code review attempt changed before cancellation');
       try {
         await cancelPRGateCheck(review, credentialActor);
       } catch (gateError) {
         logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
       }
 
-      return successResult({ message: 'Code review cancelled successfully' });
+      return successResult({ message });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;
@@ -686,25 +671,18 @@ export const codeReviewRouter = createTRPCRouter({
           }
         }
 
-        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
-
         // Reset the review for retry. The reset is a status CAS: it only matches reviews
         // still in a retriggable terminal state. A concurrent retrigger that already flipped
         // the row to 'pending' yields zero rows, so we reject the duplicate without dispatching.
-        const resetCount = await resetCodeReviewForRetry(input.reviewId);
+        const resetCount = await resetCodeReviewForRetry(input.reviewId, {
+          updatedAt: review.updated_at,
+        });
         if (resetCount === 0) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'This code review is already being retried.',
           });
         }
-
-        await createCodeReviewAttempt({
-          codeReviewId: input.reviewId,
-          retryOfAttemptId: currentAttempt.id,
-          retryReason: 'manual_retrigger',
-          status: 'pending',
-        });
 
         // Re-create PR gate check so status callbacks can update it.
         try {
@@ -776,7 +754,7 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         const attempt = input.attemptId
-          ? await getCodeReviewAttemptForReview(input.reviewId, input.attemptId)
+          ? await getCodeReviewAttemptMetadataForReview(input.reviewId, input.attemptId)
           : null;
         if (input.attemptId && !attempt) {
           throw new TRPCError({
@@ -837,7 +815,7 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         const attempt = input.attemptId
-          ? await getCodeReviewAttemptForReview(input.reviewId, input.attemptId)
+          ? await getCodeReviewAttemptMetadataForReview(input.reviewId, input.attemptId)
           : null;
         if (input.attemptId && !attempt) {
           throw new TRPCError({

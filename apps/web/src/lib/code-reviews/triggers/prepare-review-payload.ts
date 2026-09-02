@@ -913,10 +913,13 @@ export async function prepareGitHubReviewContext(params: {
   repoName: string;
   prNumber: number;
   appType: GitHubAppType;
+  findSummaryComment?: () => Promise<ExistingReviewState['summaryComment']>;
 }): Promise<ExistingReviewState> {
   const { installationId, repoOwner, repoName, prNumber, appType } = params;
   const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
-    findKiloReviewComment(installationId, repoOwner, repoName, prNumber, appType),
+    params.findSummaryComment
+      ? params.findSummaryComment()
+      : findKiloReviewComment(installationId, repoOwner, repoName, prNumber, appType),
     fetchPRInlineComments(installationId, repoOwner, repoName, prNumber, appType),
     getPRHeadCommit(installationId, repoOwner, repoName, prNumber, appType),
   ]);

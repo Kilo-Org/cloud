@@ -3,6 +3,7 @@ import type * as SandboxIdModule from './sandbox-id.js';
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
+import { generateSessionId } from './session-plane.js';
 
 const {
   generateSessionIdMock,
@@ -22,7 +23,9 @@ const {
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
 } = vi.hoisted(() => ({
-  generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
+  generateSessionIdMock: vi.fn<typeof generateSessionId>(
+    () => 'agent_12345678-1234-1234-1234-123456789abc'
+  ),
   generateSandboxRoutingTargetMock: vi
     .fn()
     .mockResolvedValue({ kind: 'isolated', sandboxId: 'sb-test-123' }),
@@ -95,7 +98,7 @@ vi.mock('./model-validation.js', () => ({
 }));
 
 vi.mock('./session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
+  generateSessionId: generateSessionIdMock,
   fetchSessionMetadata: vi.fn(),
   determineBranchName: vi.fn(
     (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
@@ -216,6 +219,10 @@ function createInternalApiContext(options: {
         idFromName: vi.fn((id: string) => ({ id })),
         get: vi.fn(() => doStub),
       } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+      SANDBOX_SESSION: {
+        idFromName: vi.fn((id: string) => ({ id })),
+        get: vi.fn(() => doStub),
+      } as unknown as TRPCContext['env']['SANDBOX_SESSION'],
       SESSION_INGEST: {
         fetch: vi.fn(),
         createSessionForCloudAgent: vi.fn().mockResolvedValue({ created: true }),
@@ -462,13 +469,16 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('registers full lazy-prep metadata in one DO call', async () => {
+  it('registers full lazy-prep metadata in one legacy DO call under CONTROL_PLANE_IDS=*', async () => {
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({
       kind: 'isolated',
       sandboxId: 'crv-abcdef',
     });
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    const context = createInternalApiContext({ doStub });
+    context.env.CONTROL_PLANE_IDS = '*';
+    const sandboxSessionGet = vi.spyOn(context.env.SANDBOX_SESSION, 'get');
+    const caller = appRouter.createCaller(context);
 
     const result = await caller.prepareSession({
       prompt: 'Test prompt',
@@ -565,41 +575,172 @@ describe('prepareSession endpoint', () => {
       })
     );
     expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+    expect(generateSessionIdMock).toHaveBeenCalledExactlyOnceWith('legacy');
+    expect(sandboxSessionGet).not.toHaveBeenCalled();
   });
 
-  it('rejects organization attribution when the internal caller user is not a member', async () => {
-    organizationMembershipLimitMock.mockResolvedValueOnce([]);
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+  it.each([undefined, false, true] as const)(
+    'rejects non-member organization attribution under CONTROL_PLANE_IDS=* with autoInitiate=%s',
+    async autoInitiate => {
+      organizationMembershipLimitMock.mockResolvedValueOnce([]);
+      const doStub = createMockDOStub();
+      const context = createInternalApiContext({ doStub, skipBalanceCheck: true });
+      context.env.CONTROL_PLANE_IDS = '*';
+      const caller = appRouter.createCaller(context);
 
-    await expect(
-      caller.prepareSession({
-        prompt: 'Attempt unrelated organization attribution',
+      await expect(
+        caller.prepareSession({
+          prompt: 'Attempt unrelated organization attribution',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+          createdOnPlatform: 'cloud-agent-web',
+          autoInitiate,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
+  describe.each([undefined, false] as const)('prepare-only with autoInitiate=%s', autoInitiate => {
+    it.each([
+      'code-review',
+      'autofix',
+      'auto-triage',
+      'security-agent',
+      'webhook',
+      'scheduled',
+      'app-builder',
+      'slack',
+      undefined,
+    ])('keeps %s on legacy registration under CONTROL_PLANE_IDS=*', async createdOnPlatform => {
+      generateSessionIdMock.mockImplementation(generateSessionId);
+      const doStub = createMockDOStub();
+      const context = createInternalApiContext({ doStub });
+      context.env.CONTROL_PLANE_IDS = '*';
+      const cloudAgentSessionIdFromName = vi.spyOn(context.env.CLOUD_AGENT_SESSION, 'idFromName');
+      const sandboxSessionGet = vi.spyOn(context.env.SANDBOX_SESSION, 'get');
+      const caller = appRouter.createCaller(context);
+
+      const result = await caller.prepareSession({
+        prompt: 'Prepare without initiation',
         mode: 'code',
         model: 'claude-3',
         githubRepo: 'acme/repo',
-        kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    expect(doStub.registerSession).not.toHaveBeenCalled();
-  });
+        autoInitiate,
+        createdOnPlatform,
+        operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      });
 
-  it('retains split legacy preparation as registration-only', async () => {
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
-
-    await caller.prepareSession({
-      prompt: 'Prepare without initiation',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      autoInitiate: false,
+      expect(result.cloudAgentSessionId).toMatch(/^agent_/);
+      expect(generateSessionIdMock).toHaveBeenCalledExactlyOnceWith('legacy');
+      expect(cloudAgentSessionIdFromName).toHaveBeenCalledWith(
+        `test-user-123:${result.cloudAgentSessionId}`
+      );
+      expect(sandboxSessionGet).not.toHaveBeenCalled();
+      expect(doStub.registerSession).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({
+            sessionId: result.cloudAgentSessionId,
+            createdOnPlatform,
+          }),
+          message: expect.objectContaining({
+            turn: expect.objectContaining({ type: 'prompt', prompt: 'Prepare without initiation' }),
+          }),
+        })
+      );
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+      expect(context.env.CONTROL_PLANE_IDS).toBe('*');
     });
-
-    expect(doStub.registerSession).toHaveBeenCalledOnce();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { controlPlaneIds: '*', createdOnPlatform: 'cloud-agent-web', plane: 'control' },
+    { controlPlaneIds: '*', createdOnPlatform: 'code-review', plane: 'control' },
+    { controlPlaneIds: '', createdOnPlatform: 'cloud-agent-web', plane: 'legacy' },
+  ] as const)(
+    'autoInitiate keeps $createdOnPlatform on $plane with CONTROL_PLANE_IDS=$controlPlaneIds',
+    async ({ controlPlaneIds, createdOnPlatform, plane }) => {
+      generateSessionIdMock.mockImplementation(generateSessionId);
+      const doStub = createMockDOStub();
+      const context = createInternalApiContext({ doStub });
+      context.env.CONTROL_PLANE_IDS = controlPlaneIds;
+      const caller = appRouter.createCaller(context);
+
+      const result = await caller.prepareSession({
+        prompt: 'Admit immediately',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        createdOnPlatform,
+      });
+
+      expect(generateSessionIdMock).toHaveBeenCalledExactlyOnceWith(plane);
+      expect(result.cloudAgentSessionId).toMatch(plane === 'control' ? /^workspace_/ : /^agent_/);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: result.cloudAgentSessionId }),
+          message: {
+            initialTurn: expect.objectContaining({ type: 'prompt', prompt: 'Admit immediately' }),
+          },
+        })
+      );
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(context.env.CONTROL_PLANE_IDS).toBe(controlPlaneIds);
+    }
+  );
+
+  it.each([undefined, false, true] as const)(
+    'validates isolated Standard allocation against the effective plane with autoInitiate=%s',
+    async autoInitiate => {
+      generateSessionIdMock.mockImplementation(generateSessionId);
+      const sandboxId = `istd-${'a'.repeat(48)}`;
+      generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+      const doStub = createMockDOStub();
+      const context = createInternalApiContext({ doStub });
+      context.env.CONTROL_PLANE_IDS = '*';
+      const caller = appRouter.createCaller(context);
+      const result = caller.prepareSession({
+        prompt: 'Use isolated Standard allocation',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform: 'webhook',
+        sandboxAllocation: 'isolated-standard',
+        autoInitiate,
+      });
+
+      if (autoInitiate) {
+        await expect(result).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: 'Isolated Standard allocation is not supported for control-plane sessions',
+        });
+        expect(generateSessionIdMock).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+      } else {
+        await expect(result).resolves.toMatchObject({
+          cloudAgentSessionId: expect.stringMatching(/^agent_/),
+        });
+        expect(doStub.registerSession).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            workspace: expect.objectContaining({
+              sandboxId,
+              sandboxProvider: 'cloudflare',
+              sandboxAllocation: 'isolated-standard',
+            }),
+          })
+        );
+      }
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
 
   it('registers GitLab repository metadata without caller gitToken', async () => {
     const doStub = createMockDOStub();
@@ -1326,6 +1467,43 @@ describe('start endpoint', () => {
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { controlPlaneIds: '*', plane: 'control' },
+    { controlPlaneIds: '', plane: 'legacy' },
+  ] as const)(
+    'grouped start keeps $plane selection with CONTROL_PLANE_IDS=$controlPlaneIds',
+    async ({ controlPlaneIds, plane }) => {
+      generateSessionIdMock.mockImplementation(generateSessionId);
+      const doStub = createMockDOStub();
+      const context = createInternalApiContext({ doStub });
+      context.env.CONTROL_PLANE_IDS = controlPlaneIds;
+      const caller = appRouter.createCaller(context);
+
+      const result = await caller.start({
+        message: { prompt: 'Start a grouped session' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+        options: { createdOnPlatform: 'cloud-agent-web' },
+      });
+
+      expect(generateSessionIdMock).toHaveBeenCalledExactlyOnceWith(plane);
+      expect(result.cloudAgentSessionId).toMatch(plane === 'control' ? /^workspace_/ : /^agent_/);
+      expect(result.delivery).toBe('queued');
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: result.cloudAgentSessionId }),
+          message: {
+            initialTurn: expect.objectContaining({
+              messageId: expect.any(String),
+              prompt: 'Start a grouped session',
+            }),
+          },
+        })
+      );
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+    }
+  );
 
   it('persists default containment for standard GitHub grouped starts', async () => {
     const doStub = createMockDOStub();

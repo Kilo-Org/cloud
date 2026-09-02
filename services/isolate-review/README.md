@@ -15,6 +15,74 @@ pnpm --filter kilo-isolate-review-worker lint
 pnpm --filter kilo-isolate-review-worker test
 ```
 
+## Organization-allowlisted queued rollout
+
+Normal webhook, manual provider-output, retrigger, completion-drain and cron paths
+share `dispatchReservedReview`. New attempts use isolate only for standard GitHub
+App reviews belonging to an organization exactly listed in PostHog flag
+`code-review-isolate-organizations`: the flag must be boolean `true` and its entire
+payload must validate as `{organizationIds: string[]}` containing UUIDs. Missing,
+false, nonboolean, malformed or unavailable data selects legacy. GitLab, Bitbucket,
+personal/missing-organization contexts, council, GitHub Lite and local dashboard
+output remain legacy. Unsupported contexts do not need flag evaluation.
+
+Selection is persisted per attempt before outbound execution. An active attempt
+never migrates when the flag changes. Queued isolate uses `runId = attemptId` and a
+separate Durable Object namespace prefix. Admission requires backend authentication,
+a one-hour purpose-bound execution bearer and canonical authority for the exact
+organization/integration, snapshot and fence generation. Status/cancel use separate
+operation-scoped authentication, not refreshed inference credentials. An ambiguous
+admission never falls back to legacy or creates another logical execution.
+
+Both backends use the same `cloud_agent_code_reviews` queue. Publication state is
+stored on the existing attempt in `publication_state`; a pending review's
+`blocked_by_attempt_id` records its dependency. There are no separate publication
+or blocked-successor tables, and internal publication state is not returned by
+public attempt listings.
+
+An isolate-owned fence protects the normalized GitHub repository/PR across review
+rows and backend changes. Cancellation, canonical terminal status, timeouts and
+reservation expiry cannot release unresolved provider writes. Release requires
+Worker quiescence plus completion or definitive suppression of candidate-owned web
+publication. Exact-target summary/history/guidance/usage work shares that barrier;
+canonical authorization permits reuse of a validated legacy summary without
+weakening direct experimental ownership rules. Queued analysis is full, not an
+automatically selected incremental continuation.
+
+Blocked successors release their queue reservation and retain a persisted blocker.
+Release wakes them; bounded cron recovery also finds them beyond the ordinary
+pending window. Unrelated PRs can proceed. Tombstones, notification retries and
+unresolved operations survive eviction and transcript/credential cleanup. Released
+fences and historical legacy reviews never permanently assign a backend to a PR.
+
+**Scoped guarantee:** these barriers cover new isolate-owned work, not physical
+quiescence of existing legacy publishers. Legacy cancellation can report success
+when interruption fails; legacy completion can dispatch the next review before its
+summary update finishes. Those pre-existing races are deferred and are not treated
+as isolate safety evidence. No historical-review clearance or global drain is
+required, and no legacy execution/provider instrumentation is added.
+
+Local proof is application integration with real PostgreSQL, selector, dispatcher,
+preparation and authenticated callbacks, plus separate local Worker/DO contract
+tests. Provider/model/transport boundaries are faked and unexpected fetches rejected;
+this is not deployed E2E or live review-quality evidence. Focused checks include:
+
+```sh
+USE_PRODUCTION_DB=false pnpm --filter web test --runInBand --runTestsByPath src/lib/code-reviews/queued-isolate-entrypoints.test.ts src/lib/code-reviews/queued-isolate-lifecycle.test.ts
+pnpm --filter kilo-isolate-review-worker test
+pnpm --filter kilo-code-review-worker test
+pnpm --filter web lint
+pnpm --filter web typecheck
+```
+
+Use only a human-confirmed disposable PostgreSQL project. Preserve its pinned
+container through `--no-recreate` startup and subsequent checks. Fresh-bootstrap
+verification sends SQL with explicit `psql -X -A -t -v ON_ERROR_STOP=1 -c` arguments,
+asserts database absence before creation, presence before/after migration, and
+absence after cleanup on that same container. Do not rerun `pnpm test:db` or
+`pnpm drizzle:verify-bootstrap` after pinning: those wrappers can resynchronize or
+recreate infrastructure. No deployment or live flag change is implied by local proof.
+
 ## Local development
 
 This worker is not part of core. Start it with the local stack so inference
@@ -412,7 +480,9 @@ or `organizations.reviewAgent.createManualReviewJob` with `organizationId`.
 It needs the existing code-review-infra and Cloud Agent/container stack; isolate-only
 setup does not provide that. Reuse suitable services and prefer named selections
 when needed: the broad `code-review` group also starts an optional public Bitbucket
-tunnel. The candidate never changes production dispatch or starts that stack.
+tunnel. The direct experimental candidate never starts that stack. Eligible
+organization provider-output jobs now follow the queued rollout above; do not
+assume this API always selects the legacy control.
 
 Use the same Kilo bearer against the reported Next.js port. These are non-batched
 tRPC requests with plain JSON, not a `json` or `0` envelope:
@@ -444,9 +514,11 @@ curl --fail-with-body -sS --get \
   --data-urlencode "input={\"reviewId\":\"$CURRENT_REVIEW_ID\"}"
 ```
 
-Status is `.result.data.review.status`; model usage is correlated with
-`.result.data.review.cli_session_id`, not the review UUID. The current API selects
-the head itself; verify `.result.data.review.head_sha` matches the isolate request.
+Status is `.result.data.review.status`. Legacy model usage is correlated with
+`.result.data.review.cli_session_id`; queued isolate leaves Cloud Agent/CLI session
+IDs null and settles validated root/child usage within its execution identity and
+time bounds. The API selects the head itself; verify
+`.result.data.review.head_sha` matches the intended request.
 
 **The current API does not accept a dry-run switch.** With nonempty
 `DEBUG_SHOW_DEV_UI`, non-production `NODE_ENV`, and empty `VERCEL_ENV`, it uses
@@ -460,7 +532,8 @@ model. Preserve the initial PR comment state: earlier live comments affect
 duplicate suppression. Use isolate dry runs for repeat output comparisons.
 Matching an auto-routing alias does not guarantee the same resolved model; inspect
 usage evidence or pin a concrete model for a controlled quality comparison.
-There is no production dispatch integration or automatic A/B assignment.
+The organization allowlist is an explicit queued rollout, not random A/B assignment.
+Direct experimental requests remain independent of it.
 
 ### Isolate publication safety
 
@@ -473,7 +546,8 @@ but no extra narrative review comment is created.
 Live publication requires explicit `dryRun: false`, an open, explicitly non-draft
 PR, matching head/base snapshot and complete required evidence. Summary ownership
 is checked before any inline write. Discovery and a shared bot/summary marker are
-read context, not adoption authority. `previousRunId` must identify a same-execution-
+read context, not adoption authority. For direct experimental requests,
+`previousRunId` must identify a same-execution-
 user, organization, repository, PR, installation and app run with a **confirmed**
 summary ID/body hash; current bot/marker/PR ownership and unchanged body are rechecked.
 An arbitrary `existingSummaryCommentId`, expired/legacy proof, another summary or
@@ -484,7 +558,9 @@ for run-specific reconciliation; that marker alone never grants reuse authority.
 Persisted operation fingerprints/body hashes fence replay. Writes and reconciliation
 have bounded attempts; ambiguous writes are reconciled by reads, not blindly
 reposted. A late confirmation can retain an ID without permitting another write.
-Each creation POST still creates a separate run: never retry an uncertain creation.
+Each direct experimental creation POST still creates a separate run: never retry
+an uncertain direct creation. Queued admission instead retains the canonical
+attempt identity and preparation across retries.
 
 Dry-run performs snapshot, context, inline-target and ownership checks too. A
 publication-only restriction can yield a blocked proposal; stale or unavailable
@@ -498,5 +574,7 @@ adapter fixtures establish offline behavior, not new paired real evaluations or
 live protocol equivalence. Private-fork acquisition and peak isolate heap remain
 live-unverified; REST discussion data does not prove thread resolution. Live cohorts
 and native-model trials require separate authorization and spend limits.
-This service remains experimental and excluded from production deployment; its
-gateway default is `https://api.kilo.ai/api/openrouter`.
+Direct/manual experimental entrypoints remain development-only. The sole production
+exception is authenticated organization-allowlisted queued GitHub work described
+above, not general deployment approval. The gateway default is
+`https://api.kilo.ai/api/openrouter`.

@@ -7,11 +7,152 @@ import { parseSessionMetadata } from '../../../src/persistence/session-metadata.
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import { getSessionMessageState } from '../../../src/session/session-message-state.js';
 import * as sessionReports from '../../../src/telemetry/session-reports.js';
+import * as pg from '../../../src/db/pg.js';
+import { resolveSessionStub } from '../../../src/sandbox-session/session-stub.js';
+import {
+  admitLegacyPreparedInitialMessage,
+  replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
+} from '../../../src/session/legacy-prepared-admission.js';
+import { registerNewSession } from '../../../src/session/session-registration.js';
+import type { Env } from '../../../src/types.js';
 import {
   groupedRegisterSessionInput,
   queueUserMessageInput,
   registerReadySession,
 } from '../../helpers/session-setup.js';
+
+describe('legacy prepare-only compatibility', () => {
+  beforeEach(() => {
+    vi.spyOn(pg, 'getPgDb').mockImplementation(() => {
+      throw new Error('Unexpected PostgreSQL access');
+    });
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'));
+    vi.spyOn(sessionReports, 'createCloudAgentSessionReport').mockResolvedValue(undefined);
+    vi.spyOn(sessionReports, 'recordCloudAgentSandboxIdentity').mockResolvedValue(undefined);
+    vi.spyOn(sessionReports, 'recordCloudAgentSessionFailure').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('queues the registered code-review turn once under CONTROL_PLANE_IDS=*', async () => {
+    const userId = 'user_legacy_review_registration';
+    const orgId = '123e4567-e89b-12d3-a456-426614174000';
+    const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    const prompt = 'Review the pull request';
+    const callbackTarget = { url: 'https://example.com/review-callback' };
+    const createSessionForCloudAgent = vi.fn().mockResolvedValue({ created: true });
+    const context = {
+      userId,
+      authToken: 'test-review-token',
+      env: {
+        CLOUD_AGENT_SESSION: env.CLOUD_AGENT_SESSION,
+        SANDBOX_SESSION: env.SANDBOX_SESSION,
+        CONTROL_PLANE_IDS: '*',
+        NEXTAUTH_SECRET: 'test-secret',
+        SESSION_INGEST: { createSessionForCloudAgent } as unknown as Env['SESSION_INGEST'],
+      } as Env,
+    };
+    const registration = await registerNewSession(
+      {
+        initialTurn: { type: 'prompt', id: messageId, prompt },
+        agent: { mode: 'code', model: 'test-model', variant: 'high' },
+        repository: { type: 'github', repo: 'acme/repo', branch: 'refs/pull/42/head' },
+        profile: {
+          overrides: { appendSystemPrompt: 'Review only' },
+          resolved: { setupCommands: ['true'] },
+        },
+        finalization: { autoCommit: false, condenseOnComplete: true, gateThreshold: 'warning' },
+        options: {
+          kilocodeOrganizationId: orgId,
+          createdOnPlatform: 'code-review',
+          callbackTarget,
+          shallow: true,
+        },
+      },
+      context,
+      { billingOrigin: 'code-review' }
+    );
+
+    expect(registration.cloudAgentSessionId).toMatch(/^agent_/);
+    expect(registration.sandboxId).toMatch(/^crv-[a-f0-9]{48}$/);
+    expect(registration.sandboxProvider).toBe('cloudflare');
+    expect(createSessionForCloudAgent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        sessionId: registration.kiloSessionId,
+        cloudAgentSessionId: registration.cloudAgentSessionId,
+        kiloUserId: userId,
+        organizationId: orgId,
+        createdOnPlatform: 'code-review',
+      })
+    );
+
+    const stub = resolveSessionStub(context.env, userId, registration.cloudAgentSessionId);
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await listPendingSessionMessages(state.storage)).toEqual([]);
+      const metadata = await instance.getMetadata();
+      expect(metadata).toMatchObject({
+        metadataSchemaVersion: 2,
+        identity: { userId, orgId, createdOnPlatform: 'code-review', billingOrigin: 'code-review' },
+        initialMessage: { id: messageId, prompt },
+        agent: {
+          mode: 'code',
+          model: 'test-model',
+          variant: 'high',
+          appendSystemPrompt: 'Review only',
+        },
+        repository: { type: 'github', repo: 'acme/repo', upstreamBranch: 'refs/pull/42/head' },
+        profile: { setupCommands: ['true'] },
+        finalization: { autoCommit: false, condenseOnComplete: true, gateThreshold: 'warning' },
+        callback: { target: callbackTarget },
+        workspace: { sandboxId: registration.sandboxId, shallow: true },
+      });
+      expect(metadata?.lifecycle.preparedAt).toBeUndefined();
+      vi.spyOn(state.storage, 'setAlarm').mockResolvedValue(undefined);
+    });
+
+    const admissionInput = { cloudAgentSessionId: registration.cloudAgentSessionId };
+    expect(
+      await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(admissionInput, context)
+    ).toBeUndefined();
+    const admission = await admitLegacyPreparedInitialMessage(admissionInput, context);
+    expect(admission).toMatchObject({
+      cloudAgentSessionId: registration.cloudAgentSessionId,
+      messageId,
+      delivery: 'queued',
+      status: 'started',
+    });
+    expect(
+      await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(admissionInput, context)
+    ).toEqual(admission);
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const pending = await listPendingSessionMessages(state.storage);
+      expect(pending).toHaveLength(1);
+      expect(pending[0]).toMatchObject({
+        messageId,
+        content: prompt,
+        intent: {
+          turn: { type: 'prompt', messageId, prompt },
+          agent: { mode: 'code', model: 'test-model', variant: 'high' },
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        },
+        callbackSnapshot: { required: true, target: callbackTarget },
+      });
+      expect(await getSessionMessageState(state.storage, messageId)).toMatchObject({
+        messageId,
+        status: 'queued',
+      });
+      expect(
+        instance['eventQueries'].findByFilters({ eventTypes: ['cloud.message.queued'] })
+      ).toHaveLength(1);
+    });
+    expect(pg.getPgDb).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(context.env.CONTROL_PLANE_IDS).toBe('*');
+  });
+});
 
 describe('partial admission callback snapshot recovery', () => {
   it('retains the admission-time callback target when delivery accepts before state repair', async () => {

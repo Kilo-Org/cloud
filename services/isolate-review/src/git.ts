@@ -6,9 +6,40 @@ import { isGitPath, REPO_ROOT } from './paths';
 import type { StartReviewInput } from './types';
 
 export const MAX_REPO_SIZE_KIB = 32 * 1024;
+export const MAX_REPO_BLOB_BYTES = 2 * 1024 * 1024;
+export const MAX_REPO_TOTAL_BLOB_BYTES = 8 * 1024 * 1024;
+export const MAX_REPO_TREE_ENTRIES = 4_096;
+export const MAX_REPO_PATH_BYTES = 1_024;
+export const MAX_REPO_TOTAL_PATH_BYTES = 256 * 1024;
 const DEFAULT_CLONE_URL_TEMPLATE = 'https://github.com/{owner}/{repo}.git';
 const GITHUB_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
 const GIT_SHA_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+const shaSchema = z
+  .string()
+  .regex(GIT_SHA_PATTERN)
+  .transform(sha => sha.toLowerCase());
+const gitCommitSchema = z.object({
+  sha: shaSchema,
+  tree: z.object({ sha: shaSchema }),
+});
+const gitTreeSchema = z.object({
+  sha: shaSchema,
+  truncated: z.literal(false),
+  tree: z.unknown(),
+});
+const gitTreeEntrySchema = z
+  .object({
+    path: z.string().min(1),
+    sha: shaSchema,
+    mode: z.enum(['100644', '100755', '040000', '120000', '160000']),
+    type: z.enum(['blob', 'tree', 'commit']),
+    size: z.number().int().nonnegative().safe().optional(),
+  })
+  .refine(
+    entry =>
+      entry.type ===
+      (entry.mode === '040000' ? 'tree' : entry.mode === '160000' ? 'commit' : 'blob')
+  );
 
 export function resolveCloneUrl(owner: string, repo: string, template?: string): string {
   const resolved = template?.trim() || DEFAULT_CLONE_URL_TEMPLATE;
@@ -24,8 +55,8 @@ export function validateHeadSha(sha: string): void {
 export class RepoTooLargeError extends Error {
   readonly sizeKiB: number;
 
-  constructor(sizeKiB: number) {
-    super(`Repository is ${sizeKiB} KiB, over the ${MAX_REPO_SIZE_KIB} KiB cap`);
+  constructor(sizeKiB: number, message?: string) {
+    super(message ?? `Repository is ${sizeKiB} KiB, over the ${MAX_REPO_SIZE_KIB} KiB cap`);
     this.name = 'RepoTooLargeError';
     this.sizeKiB = sizeKiB;
   }
@@ -41,22 +72,101 @@ export async function admitRepository(
   github: GithubClient,
   owner: string,
   repo: string,
+  headSha: string,
   signal?: AbortSignal
 ): Promise<{ sizeKiB: number }> {
   validateRepositoryName(owner, repo);
+  validateHeadSha(headSha);
+  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
   signal?.throwIfAborted();
-  const raw = await github.get<unknown>(
-    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
-    undefined,
-    signal
-  );
+  const raw = await github.get<unknown>(repoPath, undefined, signal);
   signal?.throwIfAborted();
   const meta = z.object({ size: z.number().int().nonnegative().safe() }).safeParse(raw);
   if (!meta.success) {
     throw new Error('GitHub repository metadata did not contain a valid size');
   }
-  if (meta.data.size > MAX_REPO_SIZE_KIB) throw new RepoTooLargeError(meta.data.size);
-  return { sizeKiB: meta.data.size };
+  const sizeKiB = meta.data.size;
+  if (sizeKiB > MAX_REPO_SIZE_KIB) throw new RepoTooLargeError(sizeKiB);
+  const rawCommit = await github.get<unknown>(
+    `${repoPath}/git/commits/${headSha.toLowerCase()}`,
+    undefined,
+    signal
+  );
+  signal?.throwIfAborted();
+  const commit = gitCommitSchema.safeParse(rawCommit);
+  if (!commit.success || commit.data.sha !== headSha.toLowerCase()) {
+    throw new Error('GitHub commit metadata is missing or mismatches the captured head SHA');
+  }
+  const rawTree = await github.get<unknown>(
+    `${repoPath}/git/trees/${commit.data.tree.sha}?recursive=1`,
+    undefined,
+    signal
+  );
+  signal?.throwIfAborted();
+  const tree = gitTreeSchema.safeParse(rawTree);
+  if (!tree.success || tree.data.sha !== commit.data.tree.sha || !Array.isArray(tree.data.tree)) {
+    throw new Error('GitHub captured tree is incomplete, truncated, or mismatches its root SHA');
+  }
+  if (tree.data.tree.length > MAX_REPO_TREE_ENTRIES) {
+    throw new RepoTooLargeError(
+      sizeKiB,
+      `Captured tree exceeds the ${MAX_REPO_TREE_ENTRIES}-entry clone budget`
+    );
+  }
+  const paths = new Map<string, 'blob' | 'tree' | 'commit'>();
+  let totalBlobBytes = 0;
+  let totalPathBytes = 0;
+  for (const rawEntry of tree.data.tree) {
+    signal?.throwIfAborted();
+    const parsed = gitTreeEntrySchema.safeParse(rawEntry);
+    if (!parsed.success) throw new Error('GitHub captured tree contains an invalid entry');
+    const entry = parsed.data;
+    const pathBytes = Buffer.byteLength(entry.path, 'utf8');
+    totalPathBytes += pathBytes;
+    if (pathBytes > MAX_REPO_PATH_BYTES || totalPathBytes > MAX_REPO_TOTAL_PATH_BYTES) {
+      throw new RepoTooLargeError(
+        sizeKiB,
+        `Captured tree exceeds the ${MAX_REPO_PATH_BYTES}-byte path or ${MAX_REPO_TOTAL_PATH_BYTES}-byte total path clone budget`
+      );
+    }
+    if (
+      entry.path.includes('\0') ||
+      entry.path.includes('\\') ||
+      entry.path
+        .split('/')
+        .some(part => !part || part === '.' || part === '..' || part.toLowerCase() === '.git')
+    ) {
+      throw new Error('GitHub captured tree contains an unsupported path');
+    }
+    if (paths.has(entry.path)) throw new Error('GitHub captured tree contains duplicate paths');
+    paths.set(entry.path, entry.type);
+    if (entry.type === 'blob') {
+      if (entry.size === undefined) {
+        throw new Error('GitHub captured tree blob is missing its uncompressed size');
+      }
+      if (entry.size > MAX_REPO_BLOB_BYTES) {
+        throw new RepoTooLargeError(
+          sizeKiB,
+          `Captured tree blob exceeds the ${MAX_REPO_BLOB_BYTES}-byte uncompressed clone budget`
+        );
+      }
+      totalBlobBytes += entry.size;
+      if (totalBlobBytes > MAX_REPO_TOTAL_BLOB_BYTES) {
+        throw new RepoTooLargeError(
+          sizeKiB,
+          `Captured tree exceeds the ${MAX_REPO_TOTAL_BLOB_BYTES}-byte total uncompressed clone budget`
+        );
+      }
+    }
+  }
+  for (const path of paths.keys()) {
+    const separator = path.lastIndexOf('/');
+    if (separator !== -1 && paths.get(path.slice(0, separator)) !== 'tree') {
+      throw new Error('GitHub captured tree is incomplete or contains a non-directory parent');
+    }
+  }
+  signal?.throwIfAborted();
+  return { sizeKiB };
 }
 
 export type ReviewSnapshot = {
@@ -65,10 +175,6 @@ export type ReviewSnapshot = {
   mergeBaseSha: string;
 };
 
-const shaSchema = z
-  .string()
-  .regex(GIT_SHA_PATTERN)
-  .transform(sha => sha.toLowerCase());
 const snapshotPullSchema = z.object({
   head: z.object({ sha: shaSchema }),
   base: z.object({ sha: shaSchema }),

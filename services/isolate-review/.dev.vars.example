@@ -6,6 +6,9 @@ NEXTAUTH_SECRET=your-nextauth-secret-here
 # @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-internal-api-secret-here
 
+# @url nextjs
+KILOCODE_BACKEND_BASE_URL=http://localhost:3000
+
 # Local Next.js OpenRouter proxy. Production omits this and uses api.kilo.ai.
 # @url nextjs/api/openrouter
 KILO_GATEWAY_URL=http://localhost:3000/api/openrouter

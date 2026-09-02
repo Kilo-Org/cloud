@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import {
+  buildPreviousReviewSummaryHistory,
   stripReviewSummaryFooter,
   stripReviewSummaryHistory,
 } from '@kilocode/worker-utils/review-summary-cleaning';
@@ -14,6 +15,8 @@ import {
 import { REPO_ROOT, toRepoRelativePath } from './paths';
 import {
   isDryRun,
+  QueuedIsolatePublicationSchema,
+  type IsolateReviewPreparation,
   type GithubHistoryState,
   type IsolateReviewSelection,
   type StartReviewInput,
@@ -59,6 +62,7 @@ const MAX_HISTORY_PAGES = 5;
 const MAX_CATEGORY_OUTPUT_BYTES = 128 * 1024;
 const MAX_PATCH_CACHE_BYTES = 2 * 1024 * 1024;
 const MAX_WRITE_BODY_BYTES = 64 * 1024;
+const QUEUED_SUMMARY_FOOTER_BYTES = 2 * 1024;
 const MAX_REVIEW_COMMENTS = 100;
 const PAGE_SIZE = 100;
 const encoder = new TextEncoder();
@@ -88,6 +92,10 @@ export class GithubApiError extends Error {
     super(`GitHub API returned ${status}: ${body}`);
     this.name = 'GithubApiError';
   }
+}
+
+function isDefinitivePublicationRejection(error: unknown): error is GithubApiError {
+  return error instanceof GithubApiError && [400, 401, 403, 404, 422].includes(error.status);
 }
 
 export class GithubContextError extends Error {
@@ -354,7 +362,13 @@ const shaSchema = z
   .string()
   .regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i)
   .transform(sha => sha.toLowerCase());
-const userSchema = z.object({ login: z.string().min(1).max(100) }).nullable();
+const userSchema = z
+  .object({
+    login: z.string().min(1).max(100),
+    id: githubIdSchema.optional(),
+    type: z.string().optional(),
+  })
+  .nullable();
 const bodySchema = z.string().max(262_144);
 const pathSchema = z.string().min(1).max(4_096);
 const pullSchema = z.object({
@@ -442,7 +456,10 @@ const commentSchema = z.object({
   updated_at: z.string().max(100).optional(),
   html_url: z.string().max(2_048).optional(),
 });
-const issueCommentSchema = commentSchema.extend({ issue_url: z.string().max(2_048) });
+const issueCommentSchema = commentSchema.extend({
+  issue_url: z.string().max(2_048),
+  performed_via_github_app: z.object({ id: githubIdSchema }).nullable().optional(),
+});
 const inlineCommentSchema = commentSchema
   .extend({
     path: pathSchema,
@@ -842,6 +859,7 @@ export type GithubPublicationDetails = {
   fingerprint: string;
   commentId?: number;
   bodyHash?: string;
+  summary?: { content: SummaryContent; gateResult?: 'pass' | 'fail' };
 };
 export type GithubPublishedEvent = {
   kind: 'review' | 'summary';
@@ -854,6 +872,7 @@ export type GithubProposalEvent = {
   fingerprint: string;
   bodyHash?: string;
   summaryContent?: SummaryContent;
+  gateResult?: 'pass' | 'fail';
   publishable: boolean;
   blockedReason?: string;
 };
@@ -869,6 +888,7 @@ export function createGithubTools(options: {
   onHistoryRequest?: () => Promise<void>;
   onHistoryCommits?: (shas: string[]) => Promise<void>;
   summaryOwnership?: { previousRunId: string; commentId: number; bodyHash: string };
+  queuedPublication?: IsolateReviewPreparation['queued'];
   token?: string;
   client?: GithubClient;
   fetchImpl?: typeof globalThis.fetch;
@@ -886,6 +906,22 @@ export function createGithubTools(options: {
   tools?: readonly GithubToolName[];
 }): ToolSet {
   const { input, runId } = options;
+  const queuedPublication = options.queuedPublication
+    ? QueuedIsolatePublicationSchema.parse(options.queuedPublication)
+    : undefined;
+  const summaryOwnership = queuedPublication?.summaryTarget ?? options.summaryOwnership;
+  if (
+    queuedPublication &&
+    (queuedPublication.identity.attemptId !== runId ||
+      queuedPublication.identity.target.repoFullName !==
+        `${input.owner}/${input.repo}`.toLowerCase() ||
+      queuedPublication.identity.target.prNumber !== input.pullNumber ||
+      queuedPublication.identity.snapshot.headSha !== options.headSha ||
+      queuedPublication.identity.organizationId !== input.organizationId ||
+      queuedPublication.identity.integrationId !== input.expectedIntegrationId ||
+      queuedPublication.identity.executionUserId !== input.userId)
+  )
+    throw new Error('Canonical summary authority does not match this review');
   if (runId !== undefined && (!runId.trim() || runId.length > 256)) {
     throw new Error('Trusted review run identity is invalid');
   }
@@ -1558,7 +1594,10 @@ export function createGithubTools(options: {
         ids.add(comment.id);
         const projected = projectComment(comment, 'issue');
         const bytes = byteLength(JSON.stringify(projected));
-        if (comment.body.includes(SUMMARY_MARKER)) {
+        if (
+          comment.body.includes(SUMMARY_MARKER) &&
+          (!queuedPublication || (comment.user?.type === 'Bot' && isKiloBotUser(comment.user)))
+        ) {
           markedIds.push(comment.id);
           if (summaries.length < 20 && summaryBytes + bytes <= MAX_CATEGORY_OUTPUT_BYTES) {
             summaries.push(projected);
@@ -1585,12 +1624,14 @@ export function createGithubTools(options: {
   ): Promise<{ commentId?: number; blockedReason?: string }> {
     const issues = await scanIssues(signal);
     const publicationRestriction = eligibility(await currentPull(signal));
-    const parsed = ownershipSchema.safeParse(options.summaryOwnership);
+    const parsed = queuedPublication
+      ? QueuedIsolatePublicationSchema.shape.summaryTarget.unwrap().safeParse(summaryOwnership)
+      : ownershipSchema.safeParse(summaryOwnership);
     if (!parsed.success) {
       if (
         issues.markedIds.length ||
         input.existingSummaryCommentId !== undefined ||
-        options.summaryOwnership !== undefined
+        summaryOwnership !== undefined
       ) {
         return {
           blockedReason:
@@ -1601,7 +1642,8 @@ export function createGithubTools(options: {
     }
     const proof = parsed.data;
     if (
-      (input.previousRunId !== undefined && input.previousRunId !== proof.previousRunId) ||
+      (input.previousRunId !== undefined &&
+        (!('previousRunId' in proof) || input.previousRunId !== proof.previousRunId)) ||
       (input.existingSummaryCommentId !== undefined &&
         input.existingSummaryCommentId !== proof.commentId)
     ) {
@@ -1633,7 +1675,15 @@ export function createGithubTools(options: {
         blockedReason: 'Summary target failed bot, marker, or pull-request ownership validation',
       };
     }
-    if (SERVER_BLOCK_PATTERN.test(existing.body))
+    if (
+      'appId' in proof &&
+      (existing.user?.id !== proof.authorId ||
+        existing.user.type !== 'Bot' ||
+        existing.user.login !== proof.authorLogin ||
+        existing.performed_via_github_app?.id !== proof.appId)
+    )
+      return { blockedReason: 'Canonical summary app or author changed' };
+    if (!queuedPublication && SERVER_BLOCK_PATTERN.test(existing.body))
       return { blockedReason: 'Summary contains server-owned history, usage, or guidance blocks' };
     const bodyHash = await hashText(existing.body);
     signal?.throwIfAborted();
@@ -1881,14 +1931,15 @@ export function createGithubTools(options: {
 
   const allTools: ToolSet = {
     pr_view: tool({
-      description: 'View current PR metadata, verifying the captured head and base snapshot.',
+      description:
+        'View current PR metadata, verifying the captured head and base snapshot. Omit bodyHash on the first page; when continuing, pass the exact returned offset and bodyHash.',
       inputSchema: z.object({ offset: z.number().optional(), bodyHash: z.string().optional() }),
       execute: async ({ offset = 0, bodyHash }, { abortSignal }) =>
         required(async () => {
           const pull = await currentPull(abortSignal);
           const body = pull.body ?? '';
           const hash = await hashText(body);
-          if ((offset > 0 && !bodyHash) || (bodyHash !== undefined && bodyHash !== hash))
+          if ((offset > 0 && !bodyHash) || (bodyHash && bodyHash !== hash))
             throw new GithubContextError(
               'PR description changed or continuation lacks its body hash'
             );
@@ -2378,7 +2429,7 @@ export function createGithubTools(options: {
     }),
     pr_comment: tool({
       description:
-        'Retrieve full issue/inline/review comment context in 32 KiB chunks, scoped to this PR. Supply bodyHash when continuing to detect intervening edits.',
+        'Retrieve full issue/inline/review comment context in 32 KiB chunks, scoped to this PR. Omit bodyHash on the first page; when continuing, pass the exact returned offset and bodyHash to detect intervening edits.',
       inputSchema: z.object({
         category: z.enum(['inline', 'issue', 'reviews']),
         id: z.number(),
@@ -2409,7 +2460,7 @@ export function createGithubTools(options: {
           if (comment.id !== id)
             throw new GithubContextError('GitHub returned a different comment ID');
           const hash = await hashText(comment.body);
-          if ((offset > 0 && !bodyHash) || (bodyHash !== undefined && bodyHash !== hash))
+          if ((offset > 0 && !bodyHash) || (bodyHash && bodyHash !== hash))
             throw new GithubContextError(
               'Comment body changed or continuation lacks a body hash; restart retrieval'
             );
@@ -2550,10 +2601,10 @@ export function createGithubTools(options: {
         try {
           result = await github.post<unknown>(reviewPath, payload, abortSignal);
         } catch (error) {
-          if (error instanceof GithubApiError && error.status === 422) {
+          if (isDefinitivePublicationRejection(error)) {
             rejected = 'review';
             await clearRejected('review');
-            return { error: error.body, status: 422, publicationOutcome: 'rejected' };
+            return { error: error.body, status: error.status, publicationOutcome: 'rejected' };
           }
           throw error;
         }
@@ -2564,48 +2615,85 @@ export function createGithubTools(options: {
       },
     }),
     upsert_summary: tool({
-      description:
-        'Propose one marked summary, or publish it once after complete ownership preflight. Only lifecycle-proven unchanged candidate summaries may be patched.',
-      inputSchema: z.object({ body: z.string() }),
-      execute: async ({ body }, { abortSignal }) => {
+      description: queuedPublication
+        ? 'Publish one canonical summary after exact app, author, body hash, snapshot and current authority checks. History is added by code. Supply gateResult when the canonical threshold is not off.'
+        : 'Propose one marked summary, or publish it once after complete ownership preflight. Only lifecycle-proven unchanged candidate summaries may be patched.',
+      inputSchema: z.object({ body: z.string(), gateResult: z.enum(['pass', 'fail']).optional() }),
+      execute: async ({ body, gateResult }, { abortSignal }) => {
         abortSignal?.throwIfAborted();
+        const gate = z.enum(['pass', 'fail']).optional().safeParse(gateResult);
+        if (
+          !gate.success ||
+          (queuedPublication && queuedPublication.gateThreshold !== 'off' && !gate.data)
+        ) {
+          return blocked('A valid gateResult is required by the canonical merge-gate policy');
+        }
+        if (!dryRun && rejected === 'summary') await clearRejected('summary');
         const authoredBody = body.replace(SUMMARY_OPERATION_MARKER_PATTERN, '');
         const bodyWithoutMarker = authoredBody.startsWith(SUMMARY_MARKER)
           ? authoredBody.slice(SUMMARY_MARKER.length)
           : authoredBody;
-        if (!bodyWithoutMarker.trim() || SERVER_BLOCK_PATTERN.test(authoredBody))
+        if (
+          !bodyWithoutMarker.trim() ||
+          (!(queuedPublication && state.summaryPending) && SERVER_BLOCK_PATTERN.test(authoredBody))
+        )
           return {
             error:
               'Summary must be nonempty and must not contain server-owned history, usage, or guidance blocks',
           };
-        const unmarkedPayload = {
-          body: authoredBody.startsWith(SUMMARY_MARKER)
-            ? authoredBody
-            : `${SUMMARY_MARKER}\n${authoredBody}`,
-        };
+        const analysisBody = authoredBody.startsWith(SUMMARY_MARKER)
+          ? authoredBody
+          : `${SUMMARY_MARKER}\n${authoredBody}`;
         const operationMarker = runId
           ? `<!-- kilo-isolate-review-summary:${await hashText(runId)} -->`
           : undefined;
+        const patchOperation = state.summaryPending
+          ? state.summaryPendingCommentId !== undefined
+          : summaryOwnership !== undefined;
+        const replayingHistory =
+          queuedPublication && state.summaryPending && SERVER_BLOCK_PATTERN.test(analysisBody);
+        let history = replayingHistory ? '' : queuedPublication?.summaryHistory;
+        if (history) {
+          const availableHistoryBytes = Math.max(
+            0,
+            MAX_WRITE_BODY_BYTES -
+              QUEUED_SUMMARY_FOOTER_BYTES -
+              byteLength(analysisBody) -
+              2 -
+              (!patchOperation && operationMarker ? byteLength(`\n${operationMarker}`) : 0)
+          );
+          if (byteLength(history) > availableHistoryBytes)
+            history = buildPreviousReviewSummaryHistory(history, {
+              maxBytes: availableHistoryBytes,
+            });
+        }
+        const unmarkedPayload = {
+          body: history ? `${analysisBody}\n\n${history}` : analysisBody,
+        };
         const createPayload = {
           body: operationMarker
             ? `${unmarkedPayload.body}\n${operationMarker}`
             : unmarkedPayload.body,
         };
-        const patchOperation = state.summaryPending
-          ? state.summaryPendingCommentId !== undefined
-          : options.summaryOwnership !== undefined;
         const payload = patchOperation ? unmarkedPayload : createPayload;
-        if (byteLength(payload.body) > MAX_WRITE_BODY_BYTES)
-          return { error: 'Summary exceeds the 64 KiB body budget' };
+        const maxBodyBytes =
+          queuedPublication && !state.summaryPending
+            ? MAX_WRITE_BODY_BYTES - QUEUED_SUMMARY_FOOTER_BYTES
+            : MAX_WRITE_BODY_BYTES;
+        if (byteLength(payload.body) > maxBodyBytes)
+          return {
+            error: queuedPublication
+              ? 'Summary exceeds the 64 KiB body budget including the backend footer'
+              : 'Summary exceeds the 64 KiB body budget',
+          };
         const bodyHash = await hashText(payload.body);
         abortSignal?.throwIfAborted();
-        if (!dryRun && rejected === 'summary') await clearRejected('summary');
         if (!dryRun && state.summaryPending) {
           if (
             state.summaryPendingCommentId !== undefined &&
             [
               state.summaryCommentId,
-              options.summaryOwnership?.commentId,
+              summaryOwnership?.commentId,
               input.existingSummaryCommentId,
             ].some(id => id !== undefined && id !== state.summaryPendingCommentId)
           )
@@ -2658,9 +2746,9 @@ export function createGithubTools(options: {
           return blocked('Review publication is pending; no new write is authorized');
         if (contextFailure) return blocked(contextFailure);
         const targetPath =
-          options.summaryOwnership === undefined
+          summaryOwnership === undefined
             ? createSummaryPath
-            : `${basePath}/issues/comments/${options.summaryOwnership.commentId}`;
+            : `${basePath}/issues/comments/${summaryOwnership.commentId}`;
         const fingerprint = await publicationFingerprint('summary', headSha, targetPath, payload);
         const preflight = await required(async () => {
           await currentPull(abortSignal);
@@ -2679,15 +2767,14 @@ export function createGithubTools(options: {
         }, abortSignal);
         if (contextFailure) return blocked(contextFailure);
         const { commentId, blockedReason } = preflight;
+        const summaryContent = { body: analysisBody, bodyHash: await hashText(analysisBody) };
         await proposal(
           {
             kind: 'summary',
             fingerprint,
             bodyHash,
-            summaryContent: {
-              body: unmarkedPayload.body,
-              bodyHash: await hashText(unmarkedPayload.body),
-            },
+            summaryContent,
+            ...(queuedPublication && gate.data ? { gateResult: gate.data } : {}),
             publishable: !blockedReason,
             ...(blockedReason ? { blockedReason } : {}),
           },
@@ -2720,9 +2807,24 @@ export function createGithubTools(options: {
         }
         await authorize(
           'summary',
-          { fingerprint, bodyHash, ...(commentId === undefined ? {} : { commentId }) },
+          {
+            fingerprint,
+            bodyHash,
+            ...(commentId === undefined ? {} : { commentId }),
+            ...(queuedPublication
+              ? { summary: { content: summaryContent, gateResult: gate.data } }
+              : {}),
+          },
           abortSignal
         );
+        if (queuedPublication) {
+          const fresh = await summaryPreflight(abortSignal);
+          if (fresh.blockedReason || fresh.commentId !== commentId) {
+            throw new Error(
+              fresh.blockedReason ?? 'Canonical summary target changed before publication'
+            );
+          }
+        }
         abortSignal?.throwIfAborted();
         let result: unknown;
         try {
@@ -2731,10 +2833,10 @@ export function createGithubTools(options: {
               ? await github.post<unknown>(targetPath, payload, abortSignal)
               : await github.patch<unknown>(targetPath, payload, abortSignal);
         } catch (error) {
-          if (error instanceof GithubApiError && error.status === 422) {
+          if (isDefinitivePublicationRejection(error)) {
             rejected = 'summary';
             await clearRejected('summary');
-            return { error: error.body, status: 422, publicationOutcome: 'rejected' };
+            return { error: error.body, status: error.status, publicationOutcome: 'rejected' };
           }
           throw error;
         }

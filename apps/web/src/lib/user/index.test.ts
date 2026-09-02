@@ -84,6 +84,8 @@ import {
   github_branch_pull_requests,
   github_install_states,
   code_review_feedback_events,
+  cloud_agent_code_reviews,
+  cloud_agent_code_review_attempts,
   code_review_memory_proposals,
   user_github_app_tokens,
   platform_oauth_credentials,
@@ -147,6 +149,16 @@ import {
   getCrossAccountEmailConflicts,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { admitCodeReviewAttemptForDispatch } from '@/lib/code-reviews/db/code-reviews';
+import {
+  acquireIsolatePublicationFence,
+  recordIsolatePublicationSafety,
+  releaseIsolatePublicationFence,
+  setIsolateWebFinalization,
+  publicationFromAttempt,
+  updateIsolatePublicationOn,
+} from '@/lib/code-reviews/db/publication-fences';
+import type { QueuedIsolateIdentity } from '@/lib/code-reviews/queued-isolate-contract';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
@@ -304,6 +316,7 @@ describe('User', () => {
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
     await db.delete(code_review_feedback_events);
+    await db.delete(cloud_agent_code_reviews);
     await db.delete(user_github_app_tokens);
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
@@ -1538,6 +1551,233 @@ describe('User', () => {
         .from(cloud_agent_worktrees)
         .where(eq(cloud_agent_worktrees.kilo_user_id, otherUser.id));
       expect(otherWorktree.name).toBe('Keep this name');
+    });
+
+    it('scrubs released isolate identities and completes deferred cleanup without deleting organization resources', async () => {
+      const user = await insertTestUser({
+        id: `oauth/github/human-${randomUUID()}`,
+        is_bot: false,
+      });
+      const other = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Isolate privacy' })
+        .returning();
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: organization.id, kilo_user_id: user.id, role: 'member' });
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: randomUUID(),
+          platform_account_id: randomUUID(),
+          platform_account_login: 'privacy',
+          repository_access: 'all',
+          integration_status: 'active',
+        })
+        .returning();
+      async function holder(executionUserId: string, prNumber: number) {
+        const reservation = randomUUID();
+        const [review] = await db
+          .insert(cloud_agent_code_reviews)
+          .values({
+            owned_by_organization_id: organization.id,
+            platform_integration_id: integration.id,
+            repo_full_name: 'privacy/repo',
+            pr_number: prNumber,
+            pr_url: `https://github.com/privacy/repo/pull/${prNumber}`,
+            pr_title: 'Privacy',
+            pr_author: 'author',
+            base_ref: 'main',
+            head_ref: 'feature',
+            head_sha: 'a'.repeat(40),
+            status: 'queued',
+            dispatch_reservation_id: reservation,
+          })
+          .returning();
+        const attempt = await admitCodeReviewAttemptForDispatch({
+          codeReviewId: review.id,
+          dispatchReservationId: reservation,
+          previousStatus: 'pending',
+        });
+        const identity: QueuedIsolateIdentity = {
+          reviewId: review.id,
+          attemptId: attempt.id,
+          generation: randomUUID(),
+          organizationId: organization.id,
+          integrationId: integration.id,
+          executionUserId,
+          target: { host: 'github.com', repoFullName: 'privacy/repo', prNumber },
+          snapshot: {
+            headSha: 'a'.repeat(40),
+            baseTipSha: 'b'.repeat(40),
+            mergeBaseSha: 'c'.repeat(40),
+          },
+        };
+        await acquireIsolatePublicationFence({ identity, dispatchReservationId: reservation });
+        await db.transaction(tx =>
+          updateIsolatePublicationOn(tx, identity, {
+            usage_settlement: {
+              totals: { tokensIn: 100, tokensOut: 10, cacheHit: 0, cacheWrite: 0, cost: 100 },
+            },
+            web_publications: [
+              {
+                id: randomUUID(),
+                kind: 'footer',
+                targetId: prNumber,
+                state: 'confirmed',
+                body: `Private publication for ${executionUserId}`,
+              },
+            ],
+          })
+        );
+        return identity;
+      }
+      const released = await holder(user.id, 1);
+      const unresolved = await holder(user.id, 2);
+      const unaffected = await holder(other.id, 3);
+      const [personalReview] = await db
+        .insert(cloud_agent_code_reviews)
+        .values({
+          owned_by_user_id: user.id,
+          repo_full_name: 'privacy/repo',
+          pr_number: 2,
+          pr_url: 'https://github.com/privacy/repo/pull/2',
+          pr_title: 'Personal blocked review',
+          pr_author: 'author',
+          base_ref: 'main',
+          head_ref: 'feature',
+          head_sha: 'd'.repeat(40),
+          status: 'pending',
+          blocked_by_attempt_id: unresolved.attemptId,
+        })
+        .returning();
+      await db.insert(cloud_agent_code_review_attempts).values({
+        code_review_id: personalReview.id,
+        attempt_number: 1,
+        status: 'pending',
+        reviewer_backend: 'unselected',
+      });
+      const safety = {
+        sequence: 1,
+        execution: 'cancelled' as const,
+        cancellationRequested: true,
+        publication: 'settled' as const,
+        quiescent: true,
+        observedAt: new Date().toISOString(),
+      };
+      await recordIsolatePublicationSafety({ identity: released, safety });
+      await setIsolateWebFinalization({
+        identity: released,
+        expected: 'pending',
+        state: 'suppressed',
+      });
+      await releaseIsolatePublicationFence(released);
+      await recordIsolatePublicationSafety({
+        identity: unresolved,
+        safety: { ...safety, publication: 'uncertain', quiescent: false },
+      });
+      await softDeleteUser(user.id);
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+      const rows = (
+        await db
+          .select()
+          .from(cloud_agent_code_review_attempts)
+          .where(
+            inArray(cloud_agent_code_review_attempts.id, [
+              released.attemptId,
+              unresolved.attemptId,
+              unaffected.attemptId,
+            ])
+          )
+      ).map(attempt => {
+        const publication = publicationFromAttempt(attempt);
+        if (!publication) throw new Error('Missing retained isolate publication');
+        return publication;
+      });
+      expect(rows.find(row => row.generation === released.generation)).toMatchObject({
+        identity: { executionUserId: 'deleted' },
+        identity_cleanup_requested: true,
+        identity_digest: expect.any(String),
+        terminal_result: null,
+        usage_settlement: null,
+      });
+      expect(rows.find(row => row.generation === unresolved.generation)).toMatchObject({
+        identity: unresolved,
+        identity_cleanup_requested: true,
+        released_at: null,
+        safety: { publication: 'uncertain', quiescent: false },
+        web_publications: [{ body: `Private publication for ${user.id}` }],
+      });
+      expect(
+        rows.find(row => row.generation === released.generation)?.web_publications[0]
+      ).not.toHaveProperty('body');
+      expect(rows.find(row => row.generation === unaffected.generation)).toMatchObject({
+        identity: unaffected,
+        identity_cleanup_requested: false,
+        usage_settlement: { totals: { cost: 100 } },
+      });
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, integration.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_code_reviews)
+          .where(eq(cloud_agent_code_reviews.owned_by_organization_id, organization.id))
+      ).toHaveLength(3);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_code_reviews)
+          .where(eq(cloud_agent_code_reviews.id, personalReview.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_code_review_attempts)
+          .where(eq(cloud_agent_code_review_attempts.code_review_id, personalReview.id))
+      ).toHaveLength(0);
+      expect(await findUserById(user.id)).toMatchObject({
+        id: user.id,
+        google_user_name: 'Deleted User',
+        is_bot: false,
+      });
+      expect(await releaseIsolatePublicationFence(unresolved)).toBe(false);
+      await expect(
+        releaseIsolatePublicationFence({ ...unresolved, generation: randomUUID() })
+      ).rejects.toThrow();
+      const safe = { ...safety, sequence: 2 };
+      await recordIsolatePublicationSafety({ identity: unresolved, safety: safe });
+      await setIsolateWebFinalization({
+        identity: unresolved,
+        expected: 'pending',
+        state: 'suppressed',
+      });
+      expect(await releaseIsolatePublicationFence(unresolved)).toBe(true);
+      expect(await recordIsolatePublicationSafety({ identity: unresolved, safety: safe })).toBe(
+        'duplicate'
+      );
+      expect(await recordIsolatePublicationSafety({ identity: unresolved, safety })).toBe('stale');
+      const [cleanedAttempt] = await db
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.id, unresolved.attemptId));
+      const cleaned = publicationFromAttempt(cleanedAttempt);
+      if (!cleaned) throw new Error('Missing retained isolate publication');
+      expect(cleaned.identity.executionUserId).toBe('deleted');
+      expect(cleaned.usage_settlement).toBeNull();
+      expect(cleaned.web_publications[0]).not.toHaveProperty('body');
+      expect(JSON.stringify(cleaned)).not.toContain(user.id);
+      expect(JSON.stringify(cleanedAttempt)).not.toContain(user.id);
+      expect(await releaseIsolatePublicationFence(unresolved)).toBe(true);
+      await expect(holder(user.id, 4)).rejects.toThrow('unavailable');
     });
 
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {

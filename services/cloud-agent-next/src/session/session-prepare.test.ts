@@ -33,6 +33,7 @@ import {
   type SessionRegistrationContext,
 } from './session-registration.js';
 import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
+import { generateSessionId } from '../session-plane.js';
 
 const {
   admitOperationMock,
@@ -56,7 +57,7 @@ const {
   getPgDbMock: vi.fn(),
   createCliSessionMock: vi.fn().mockResolvedValue(undefined),
   deleteCliSessionMock: vi.fn().mockResolvedValue(undefined),
-  generateSessionIdMock: vi.fn(),
+  generateSessionIdMock: vi.fn<typeof generateSessionId>(),
   generateKiloSessionIdMock: vi.fn(),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
@@ -81,7 +82,7 @@ vi.mock('../utils/do-retry.js', () => ({
 }));
 
 vi.mock('../session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
+  generateSessionId: generateSessionIdMock,
   SessionService: class SessionService {
     createCliSessionViaSessionIngest = createCliSessionMock;
     deleteCliSessionViaSessionIngest = deleteCliSessionMock;
@@ -384,6 +385,46 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it.each([
+    { controlPlaneIds: '*', plane: 'control' },
+    { controlPlaneIds: '', plane: 'legacy' },
+  ] as const)(
+    'ledger-backed auto-initiation keeps $plane selection with CONTROL_PLANE_IDS=$controlPlaneIds',
+    async ({ controlPlaneIds, plane }) => {
+      generateSessionIdMock.mockImplementation(generateSessionId);
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.CONTROL_PLANE_IDS = controlPlaneIds;
+
+      const result = await runCreate(ctx);
+
+      expect(generateSessionIdMock).toHaveBeenCalledExactlyOnceWith(plane);
+      expect(result.cloudAgentSessionId).toMatch(plane === 'control' ? /^workspace_/ : /^agent_/);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: result.cloudAgentSessionId }),
+          message: {
+            initialTurn: expect.objectContaining({
+              messageId: INITIAL_MESSAGE_ID,
+              prompt: 'Build the feature',
+            }),
+          },
+        })
+      );
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(settleOperationMock).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          status: 'completed',
+          canonicalResult: {
+            cloudAgentSessionId: result.cloudAgentSessionId,
+            kiloSessionId: result.kiloSessionId,
+          },
+        })
+      );
+    }
+  );
+
   describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
     'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
     flag => {
@@ -497,7 +538,7 @@ describe('createSessionWithLedger admission ladder', () => {
       sessionId: CLOUD_AGENT_SESSION_ID,
       expected: { github: false, gitlab: false, bitbucket: false, kilocode: false },
     },
-  ])(
+  ] as const)(
     'excludes devcontainers from toggle containment for $sessionId',
     async ({ sessionId, expected }) => {
       generateSessionIdMock.mockReturnValue(sessionId);

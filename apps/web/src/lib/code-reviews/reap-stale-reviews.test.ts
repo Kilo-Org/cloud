@@ -109,6 +109,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     cli_session_id: null,
     status: 'running',
     dispatch_reservation_id: null,
+    blocked_by_attempt_id: null,
     error_message: null,
     terminal_reason: null,
     agent_version: 'v2',

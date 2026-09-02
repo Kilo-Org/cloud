@@ -53,14 +53,16 @@ Authenticated human
 
 The raw routes above remain diagnostic entry points. Prepared personal and
 organization tRPC procedures and settings precedence are specified in
-[README](README.md#prepared-development-apis). The candidate creates no canonical
-review row, analytics attempt or fake Cloud fix link and never changes production
-routing. Execution uses GitHub HTTP/Git, `GIT_TOKEN_SERVICE`, the Kilo gateway and
+[README](README.md#prepared-development-apis). Direct experimental requests create no
+canonical review row, analytics attempt or fake Cloud fix link. The separately
+authenticated queued path below consumes existing canonical attempts. Execution
+uses GitHub HTTP/Git, `GIT_TOKEN_SERVICE`, the Kilo gateway and
 Hyperdrive-backed token verification, not Cloud Agent/container/session-ingest.
 
-`runId` is a fresh Worker UUID/DO name and Think admission idempotency key, distinct
-from Think's `submissionId`. This makes same-DO admission repeatable, **not** the
-external creation POST idempotent. Never retry an ambiguous creation POST.
+For direct experimental creation, `runId` is a fresh Worker UUID/DO name and Think
+admission idempotency key, distinct from Think's `submissionId`. This makes same-DO
+admission repeatable, **not** the external creation POST idempotent. Never retry an
+ambiguous direct creation POST.
 
 `startReview` persists state and schedules `runClone`; token/catalog/snapshot/clone
 work happens asynchronously within the admission budget. There are at most three
@@ -69,6 +71,78 @@ settle the run and scrub credentials. Status polling also checks deadlines and m
 reconcile submission state or reschedule unstarted admission; it is not a new run.
 
 ---
+
+### Queued organization rollout
+
+```
+webhook / manual provider job / retrigger / callback drain / cron
+  → shared reservation and dispatch boundary
+    → strict organization allowlist + supported GitHub mode
+      → atomically pinned attempt with PR publication state
+        → authenticated POST /queued-reviews (runId = attemptId)
+          → queued ReviewIsolate → authenticated canonical authority / notifications
+```
+
+The selector requires boolean `true` for `code-review-isolate-organizations` and a
+fully valid `{organizationIds: string[]}` UUID payload with exact membership.
+Unavailable or malformed data stays legacy. GitLab, Bitbucket, personal/missing
+organization, council, local dashboard output and GitHub Lite do not opt in.
+Existing concurrency, configuration, authorization and accounting gates remain.
+Only new attempts are selected; persisted affinity owns status, cancellation and
+recovery even after flag removal. Historical reviews do not pin a PR to a backend.
+
+Queued admission uses a separate DO name prefix, purpose-bound one-hour execution
+credentials, backend authentication and canonical authority bound to review,
+attempt, organization/integration, execution user, snapshot and fence generation.
+Preparation binds full analysis, saved/manual policy, REVIEW.md, model/effort,
+analytics and gate thresholds to the attempt. There is no automatic incremental
+baseline, fresh Cloud Agent session retry or legacy fallback after an ambiguous
+isolate admission. Status/cancel use separate scoped capabilities after execution
+credentials expire.
+
+There is one review queue. The existing attempt's nullable `publication_state`
+holds publication evidence, and the existing review's `blocked_by_attempt_id`
+records a dependency on an earlier attempt. No separate scheduling or publication
+tables are required. Internal publication state is excluded from public attempt
+listings.
+
+One isolate-owned fence, represented by that attempt state, protects a normalized
+`github.com` repository/PR, including successors with another review ID, head,
+integration record or selected backend. Provider send intent and uncertain outcomes
+survive Worker eviction and cleanup.
+Quiescence means no future mutations can begin and all authorized writes are
+resolved; cancellation, timeout, absent read evidence and exhausted retry budgets
+are not proof. Web summary/footer/check mutations also persist intent and exact
+outcome. A notification acknowledgement is not necessarily fence release.
+
+Sequenced authenticated notifications settle only the matching attempt. Duplicate,
+old and superseded-holder evidence cannot revive canonical state or alter a
+successor. Safety and usage settlement are independent: validated root/child usage
+is bounded by execution user, organization and time without fake Cloud Agent/CLI
+rows. Pending anonymization denies new authority and removes copied identity at
+safe release while retaining the unresolved barrier and reconciliation capability.
+
+Blocked reviews relinquish reservations and keep their blocker reference until
+advancement. Safe release and bounded cron recovery can wake them beyond the
+ordinary pending window without broadening unrelated legacy scheduling; there is
+no separate next-check schedule. A released or
+historical fence does not prevent later routing decisions. Canonical summary reuse
+requires exact app/author, marker, comment ID/body hash, PR/head and current
+candidate authority; direct experimental previous-run proof is unchanged.
+
+This is **not a global legacy-to-isolate quiescence protocol**. Existing legacy
+`cancel()` can return success after interruption fails; legacy terminal callbacks
+can start successor dispatch before their summary update completes. Those races
+remain deferred, not fixed or certified by this rollout. Executing legacy attempts
+are never migrated, and historical legacy use requires no human clearance.
+
+Verification combines real PostgreSQL, selectors, dispatchers, preparation and
+authenticated application handlers with external boundary fakes, plus separate
+actual Worker/DO tests for eviction, cleanup, lost acknowledgements and publication
+uncertainty. It does not establish live model quality or deployed-service readiness.
+Fresh database bootstrap must demonstrate absent → present → migrated → absent
+using explicit `psql -c` SQL on one pinned, human-confirmed disposable container;
+no Compose startup/recreation belongs in that bootstrap check.
 
 ## 3. Locked decisions
 
@@ -112,7 +186,7 @@ new `last-e2e/<uuid>/` directories rather than replacing old results.
 | Skills | Think `getSkills()` + `activate_skill`. One skill: `github-cloud-review`. No Kilo-named `skill` tool, no skill scripts. |
 | Sub-agents | In-process `generateText` inside a `task` tool, same DO, same Workspace. Think's `subAgent`/`agentTool` are **forbidden** (§5.5). |
 | Publishing | `dryRun: true` by default (`dryRun !== false`). Live publish is explicit per request. |
-| Start path | Prepared web API or raw `POST /reviews`; no production queue, engine selector or webhook dispatch. |
+| Start path | Dev-only prepared/raw `POST /reviews`, or organization-allowlisted canonical `POST /queued-reviews`; separate identity and authority. |
 | Live stream | None. Poll `GET /reviews/:runId`. |
 | Platforms | GitHub only. |
 
@@ -377,10 +451,16 @@ HTTP transport or abort signal; wrapper checks cannot imply physical cancellatio
 ## 8. Admission and clone
 
 `MAX_REPO_SIZE_KIB = 32 * 1024` admits at most **32 MiB of GitHub-reported repository
-size**, not tip size or measured peak heap. Keep `githubSizeKiB`, `tipFileCount`,
-`tipTotalBytes` and `vfsTotalBytes` separate: VFS includes Git metadata. Missing
-diagnostics are not zero. Peak use of the 128-MB isolate has not been profiled;
-a missing response alone does not establish OOM.
+size**. Before cloning, admission also validates the captured commit's complete
+recursive tree: at most **2 MiB per blob, 8 MiB of blobs in total, 4,096 entries,
+1,024 UTF-8 bytes per path and 256 KiB of paths in total**. Repeated blobs and
+symlinks count per checkout path; submodules are not cloned recursively. Truncated
+trees, missing blob sizes and invalid ancestry fail closed.
+
+Keep `githubSizeKiB`, `tipFileCount`, `tipTotalBytes` and `vfsTotalBytes` separate:
+VFS includes Git metadata. Missing diagnostics are not zero. These conservative
+preflight limits leave room for pack inflation and VFS allocations but are not a
+measured peak-heap guarantee; a missing response alone does not establish OOM.
 
 Admission captures and validates distinct `headSha`, `baseTipSha` and `mergeBaseSha`,
 checking current head/base around exact-SHA comparison. Checkout tries the captured
@@ -562,7 +642,7 @@ and context-exhaustion metadata; unfinished children block parent completion.
 
 | Risk | Handling and remaining limit |
 |---|---|
-| 128-MB isolate/pack inflation | 32-MiB admission gate and bounded reads; no live peak-heap proof (§8) |
+| 128-MB isolate/pack inflation | Metadata and captured-tree/blob admission bounds, plus bounded reads; no live peak-heap proof (§8) |
 | Unintended execution or policy drift | Explicit instructions/tool allowlist, denied mutations, canonical/raw distinction (§5, §9) |
 | Mixed or incomplete GitHub context | Pinned SHAs, bounded retrieval and sticky incomplete outcomes, never assumed empty (§10) |
 | Wrong summary/late publication | Confirmed prior-run/body proof and serialized terminal/write fence; issued writes may still acknowledge (§4, §10) |
@@ -575,12 +655,14 @@ and context-exhaustion metadata; unfinished children block parent completion.
 
 ## 12. Deferred and evaluation gates
 
-Production routing/queues, canonical review rows/dashboard/checks, summary history/
-usage/guidance finalization, real Cloud fix links, public cancel/retry/list APIs,
-automatic baseline discovery, GitLab/Bitbucket and council are not implemented.
-Explicit prepared incremental review and bounded on-demand history are implemented (§10).
-Server-side purpose tokens, child checkpoints and usage correlation **are** present;
-fully attributed settled billing and infrastructure measurement are not.
+General production routing, real Cloud fix links, automatic baseline discovery,
+GitLab/Bitbucket and council execution remain outside this service. The narrow
+queued rollout (§2) integrates existing review rows, controls, checks, summary
+history/guidance finalization and bounded root/child usage settlement. Legacy
+cancellation/finalization races remain deferred. Explicit direct prepared incremental
+review and bounded on-demand history are implemented (§10).
+Server-side purpose tokens, child checkpoints and usage correlation are present;
+local fixtures do not prove live billing completeness or infrastructure measurement.
 
 No full-history clone, LFS materialization, symlink/submodule support, automatic
 rules/profile-memory/MCP loading, recursive publishing children or higher resource

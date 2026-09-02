@@ -114,6 +114,35 @@ describe('reapStaleCodeReviews against the database', () => {
     expect(attempts[0].terminal_reason).toBe('abandoned');
   });
 
+  it('does not reap or count a review with a retained blocker reference', async () => {
+    const holderId = await insertReview({ status: 'completed', hoursOld: 72 });
+    const [holder] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({ code_review_id: holderId, attempt_number: 1, status: 'completed' })
+      .returning();
+    const blockedId = await insertReview({ status: 'pending', hoursOld: 72 });
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        blocked_by_attempt_id: holder.id,
+        updated_at: sql`now() - interval '72 hours'`,
+      })
+      .where(eq(cloud_agent_code_reviews.id, blockedId));
+
+    const summary = await reapStaleCodeReviews(500);
+
+    expect(
+      await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, blockedId),
+      })
+    ).toMatchObject({
+      status: 'pending',
+      blocked_by_attempt_id: holder.id,
+      completed_at: null,
+    });
+    expect(summary.remaining).toBe(0);
+  });
+
   it('does not reselect rows it already terminalized', async () => {
     const reviewId = await insertReview({ status: 'queued', hoursOld: 72 });
 

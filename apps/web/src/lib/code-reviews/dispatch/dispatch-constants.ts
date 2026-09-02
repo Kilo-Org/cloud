@@ -1,4 +1,4 @@
-import { cloud_agent_code_reviews } from '@kilocode/db/schema';
+import { cloud_agent_code_reviews, cloud_agent_code_review_attempts } from '@kilocode/db/schema';
 import { sql, type SQL } from 'drizzle-orm';
 
 export const MAX_CONCURRENT_CODE_REVIEWS_PER_ORG = 20;
@@ -55,7 +55,13 @@ export function reconsiderableCodeReviewWorkCondition(
     : sql`${cloud_agent_code_reviews.status} = 'pending'`;
 
   return sql`(
-    ${pendingClause}
+    (${pendingClause} AND ${cloud_agent_code_reviews.blocked_by_attempt_id} IS NULL)
+    OR (${cloud_agent_code_reviews.status} = 'pending' AND EXISTS (
+      SELECT 1 FROM ${cloud_agent_code_review_attempts}
+      WHERE ${cloud_agent_code_review_attempts.id} = ${cloud_agent_code_reviews.blocked_by_attempt_id}
+        AND ${cloud_agent_code_review_attempts.publication_state} IS NOT NULL
+        AND ${cloud_agent_code_review_attempts.publication_state}->>'released_at' IS NOT NULL
+    ))
     OR (
       ${cloud_agent_code_reviews.status} = 'queued'
       AND ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCutoff}

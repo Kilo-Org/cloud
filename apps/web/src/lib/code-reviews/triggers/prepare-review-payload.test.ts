@@ -1030,6 +1030,33 @@ describe('read-only review preparation', () => {
     expect(mockFindPreviousCompletedReview).not.toHaveBeenCalled();
   });
 
+  it('uses the queued summary selector without changing the default lookup', async () => {
+    const summaryComment = { commentId: 88, body: '<!-- kilo-review -->\nNo Issues Found' };
+    const findSummaryComment = jest.fn().mockResolvedValue(summaryComment);
+    expect(await prepareGitHubReviewContext({ ...params, findSummaryComment })).toMatchObject({
+      summaryComment,
+      previousStatus: 'no-issues',
+    });
+    expect(findSummaryComment).toHaveBeenCalledTimes(1);
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+    await prepareGitHubReviewContext(params);
+    expect(mockFindKiloReviewComment).toHaveBeenCalledWith(
+      params.installationId,
+      params.repoOwner,
+      params.repoName,
+      params.prNumber,
+      params.appType
+    );
+  });
+
+  it('does not fall back to the legacy lookup after a queued summary read fails', async () => {
+    const findSummaryComment = jest.fn().mockRejectedValue(new Error('Queued lookup failed'));
+    await expect(prepareGitHubReviewContext({ ...params, findSummaryComment })).rejects.toThrow(
+      'Queued lookup failed'
+    );
+    expect(mockFindKiloReviewComment).not.toHaveBeenCalled();
+  });
+
   it.each(['summary', 'inline', 'head'] as const)(
     'fails a required %s read rather than returning empty context',
     async read => {

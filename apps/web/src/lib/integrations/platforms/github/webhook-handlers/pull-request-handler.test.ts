@@ -1,3 +1,5 @@
+const mockGetLatestCodeReviewAttempt = jest.fn();
+const mockGetCodeReviewAttemptForReview = jest.fn();
 const mockGetBotUserId = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockCreateCheckRun = jest.fn();
@@ -29,6 +31,8 @@ jest.mock('@/lib/code-reviews/core/council-entitlement', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
+  getLatestCodeReviewAttempt: (...args: unknown[]) => mockGetLatestCodeReviewAttempt(...args),
+  getCodeReviewAttemptForReview: (...args: unknown[]) => mockGetCodeReviewAttemptForReview(...args),
   createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
@@ -113,7 +117,9 @@ beforeEach(() => {
   mockCancelSupersededReviewsForPR.mockResolvedValue([]);
   mockFindExistingReview.mockResolvedValue(null);
   mockFindActiveReviewsForPR.mockResolvedValue([]);
-  mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(undefined);
+  mockGetLatestCodeReviewAttempt.mockResolvedValue(null);
+  mockGetCodeReviewAttemptForReview.mockResolvedValue(null);
+  mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(true);
   mockTryDispatchPendingReviews.mockResolvedValue({
     dispatched: 0,
     notDispatched: 1,
@@ -653,6 +659,62 @@ describe('handlePullRequest', () => {
       })
     );
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+  });
+
+  it('supersedes an isolate snapshot on merge commits without repointing it or publishing legacy cleanup', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockFindActiveReviewsForPR.mockResolvedValue(['isolate-review']);
+    mockGetLatestCodeReviewAttempt.mockResolvedValue({ reviewer_backend: 'isolate' });
+    mockGetCodeReviewAttemptForReview.mockResolvedValue({ reviewer_backend: 'isolate' });
+    mockIsMergeCommit.mockResolvedValue(true);
+    mockCancelSupersededReviewsForPR.mockResolvedValue([
+      {
+        id: 'isolate-review',
+        prevStatus: 'pending',
+        latestActiveAttemptId: 'isolate-attempt',
+        checkRunId: 101,
+        platform: 'github',
+      },
+    ]);
+    mockCancelReview.mockRejectedValue(new Error('Cancellation unavailable'));
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+    expect(response.status).toBe(202);
+    expect(mockUpdateReviewHeadShaAndCheckRun).not.toHaveBeenCalled();
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      'isolate-review',
+      'Superseded by new push',
+      'isolate-attempt'
+    );
+    expect(mockUpdateCheckRun).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      101,
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls through to supersession when isolate selection wins the merge snapshot race', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
+    mockIsMergeCommit.mockResolvedValue(true);
+    mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(false);
+    await handlePullRequest(pullRequestPayload(), platformIntegration());
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      98765,
+      { status: 'completed', conclusion: 'cancelled' },
+      'standard'
+    );
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledTimes(1);
+    expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
   });
 
   it('skips supersession cancel on merge-commit synchronize events', async () => {

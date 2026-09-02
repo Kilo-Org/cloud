@@ -157,6 +157,7 @@ import {
 } from '@/lib/impact/referral-utils';
 import { redactStoreAccountLinkedJson } from '@/lib/kilo-pass/store-payload-redaction';
 import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
+import { requestIsolateIdentityCleanup } from '@/lib/code-reviews/db/publication-fences';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -1106,6 +1107,7 @@ export async function anonymizeCloudUserData(
 
   // ── Gateway cleanup ───────────────────────────────────────────────────
   await revokeGatewayStateForUser(tx, userId);
+  await requestIsolateIdentityCleanup(tx, userId);
 
   // Remove recipient-addressed Security Agent notifications before user
   // anonymization and org membership removal. Org-owned findings can remain.

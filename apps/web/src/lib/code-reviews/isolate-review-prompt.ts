@@ -49,6 +49,7 @@ export type IsolateReviewPromptInput = {
   previousRunId?: string;
   existingSummaryCommentId?: number;
   dryRun: boolean;
+  queued?: IsolateReviewPreparation['queued'];
 };
 
 export function hashIsolateReviewText(value: string): string {
@@ -104,6 +105,16 @@ export async function renderIsolateReviewPrompt(input: IsolateReviewPromptInput)
         ),
       }
     : null;
+  const runtimeAdapter = input.queued
+    ? ISOLATE_RUNTIME_ADAPTER.replace(
+        "Only the separately proved previous-run target may be reused, subject to the Worker's fresh ownership and publication checks.",
+        "Only the server-authorized canonical summary target may be reused, subject to the Worker's fresh app, author, body hash, head, and generation authority checks."
+      ).replace(
+        "No canonical review row or review ID exists for this run. Do not invent a Cloud fix link or copy a previous review's fix link into the new summary.",
+        `This run belongs to canonical review ${input.queued.identity.reviewId}, attempt ${input.queued.identity.attemptId}. No Cloud Agent or CLI session exists. Do not invent session IDs or a Cloud fix link. Summary history and usage footers are managed by code, not the model.`
+      ) +
+      `\n# MERGE GATE\n\nThe required threshold is ${input.queued.gateThreshold}. When it is not off, supply gateResult ("pass" or "fail") to upsert_summary. Fail for any finding at threshold all, warnings or critical findings at warning, and critical findings at critical. Missing or invalid required output cannot pass the gate.\n`
+    : ISOLATE_RUNTIME_ADAPTER;
   const trustedContext = {
     repository: input.repoFullName,
     pullNumber: input.prNumber,
@@ -111,12 +122,13 @@ export async function renderIsolateReviewPrompt(input: IsolateReviewPromptInput)
     reviewSelection: selection,
     dryRun: input.dryRun,
     summaryMutationTarget:
-      input.previousRunId && input.existingSummaryCommentId
+      input.queued?.summaryTarget ??
+      (input.previousRunId && input.existingSummaryCommentId
         ? { previousRunId: input.previousRunId, commentId: input.existingSummaryCommentId }
-        : null,
+        : null),
   };
   const userPrompt = [
-    ISOLATE_RUNTIME_ADAPTER,
+    runtimeAdapter,
     canonicalPrompt,
     '# TRUSTED REVIEW SNAPSHOT\n\n' + JSON.stringify(trustedContext),
     '# CURRENT SUMMARY: READ-ONLY CONTEXT\n\n' +
@@ -144,6 +156,6 @@ export async function renderIsolateReviewPrompt(input: IsolateReviewPromptInput)
     previousSummaryBody,
     policyVersion: generated.version,
     adapterVersion: ISOLATE_REVIEW_ADAPTER_VERSION,
-    runtimeAdapterHash: hashIsolateReviewText(ISOLATE_RUNTIME_ADAPTER),
+    runtimeAdapterHash: hashIsolateReviewText(runtimeAdapter),
   };
 }

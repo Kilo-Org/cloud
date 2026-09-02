@@ -20,17 +20,21 @@ import type { NextRequest } from 'next/server';
 import { NextResponse, after } from 'next/server';
 import * as z from 'zod';
 import {
-  updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
+  getCodeReviewAttemptForReview,
   getLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
+import {
+  handleQueuedIsolateCallback,
+  isQueuedIsolateCallbackTarget,
+} from '@/lib/code-reviews/queued-isolate-lifecycle';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
@@ -1083,23 +1087,82 @@ async function updatePRGateCheck(
   }
 }
 
+async function hasValidStatusCallbackToken(
+  req: NextRequest,
+  reviewId: string,
+  attemptId: string
+): Promise<boolean> {
+  return (
+    !!CALLBACK_TOKEN_SECRET &&
+    (await verifyCallbackToken({
+      token: req.headers.get('X-Callback-Token'),
+      secret: CALLBACK_TOKEN_SECRET,
+      scope: 'code-review-status-callback',
+      resourceParts: [reviewId, attemptId],
+    }))
+  );
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ reviewId: string }> }) {
+  try {
+    const { reviewId } = await params;
+    const attemptId = req.nextUrl.searchParams.get('attemptId') ?? '';
+    if (!(await hasValidStatusCallbackToken(req, reviewId, attemptId))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const attempt = attemptId
+      ? await getCodeReviewAttemptForReview(reviewId, attemptId)
+      : await getLatestCodeReviewAttempt(reviewId);
+    if (
+      attemptId &&
+      (!attempt || attempt.code_review_id !== reviewId || attempt.id !== attemptId)
+    ) {
+      return NextResponse.json({ error: 'Review attempt not found' }, { status: 404 });
+    }
+    if (!attemptId && attempt) {
+      return NextResponse.json({ error: 'Attempt ID required' }, { status: 409 });
+    }
+    if (attempt && attempt.reviewer_backend !== 'legacy') {
+      return NextResponse.json({ error: 'Legacy review attempt required' }, { status: 409 });
+    }
+    const source = attempt ?? (await getCodeReviewById(reviewId));
+    if (!source) {
+      return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        reviewId: attempt?.code_review_id ?? source.id,
+        attemptId: attempt?.id ?? null,
+        reviewerBackend: 'legacy',
+        status: source.status,
+        sessionId: source.session_id,
+        cliSessionId: source.cli_session_id,
+        terminalReason: source.terminal_reason,
+        errorMessage: source.error_message,
+        completedAt: source.completed_at ? new Date(source.completed_at).toISOString() : null,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch (error) {
+    errorExceptInTest('[code-review-status] Error reading status:', error);
+    captureException(error, { tags: { source: 'code-review-status-api' } });
+    return NextResponse.json({ error: 'Failed to read review status' }, { status: 500 });
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
     const { reviewId } = await params;
+    if (req.nextUrl.searchParams.get('backend') === 'isolate')
+      return handleQueuedIsolateCallback(req, reviewId);
     const callbackAttemptId = req.nextUrl.searchParams.get('attemptId') ?? '';
-    const callbackToken = req.headers.get('X-Callback-Token');
-    const validCallbackToken =
-      !!CALLBACK_TOKEN_SECRET &&
-      (await verifyCallbackToken({
-        token: callbackToken,
-        secret: CALLBACK_TOKEN_SECRET,
-        scope: 'code-review-status-callback',
-        resourceParts: [reviewId, callbackAttemptId],
-      }));
-    if (!validCallbackToken) {
+    if (!(await hasValidStatusCallbackToken(req, reviewId, callbackAttemptId))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -1109,6 +1172,11 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 });
     }
 
+    if (await isQueuedIsolateCallbackTarget(reviewId, callbackAttemptId))
+      return NextResponse.json(
+        { error: 'Isolate attempts require their scoped callback' },
+        { status: 409 }
+      );
     const rawPayload = parsedPayload.data;
     const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
@@ -1254,9 +1322,16 @@ export async function POST(
             requestedStatus: status,
           }
         );
+        const terminalAttempt =
+          attempt.status === 'completed' ||
+          attempt.status === 'failed' ||
+          attempt.status === 'cancelled';
         return NextResponse.json({
           success: true,
           message: 'Stale callback from superseded attempt',
+          attemptId: attempt.id,
+          currentStatus: terminalAttempt ? attempt.status : undefined,
+          terminalReason: terminalAttempt ? attempt.terminal_reason : undefined,
         });
       }
     }
@@ -1287,6 +1362,30 @@ export async function POST(
         message: 'Review already in terminal state',
         currentStatus: review.status,
         terminalReason: review.terminal_reason,
+      });
+    }
+
+    if (
+      !analyticsCompletionApplied &&
+      attempt.status !== status &&
+      (attempt.status === 'completed' ||
+        attempt.status === 'failed' ||
+        attempt.status === 'cancelled')
+    ) {
+      const currentReview = await getCodeReviewById(reviewId);
+      if (currentReview) {
+        await settleCodeReviewLedgerRow({
+          reviewId,
+          status: currentReview.status,
+          terminalReason: currentReview.terminal_reason,
+          triggerSource: currentReview.trigger_source,
+        });
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Review already in terminal state',
+        currentStatus: attempt.status,
+        terminalReason: attempt.terminal_reason,
       });
     }
 
@@ -1331,6 +1430,7 @@ export async function POST(
       return terminalOwnerResolution;
     };
 
+    let parentUpdateAttemptId = attempt.id;
     if (shouldAutoRetryCodeReviewFailure(status, terminalReason, errorMessage)) {
       const retryableReview = await getCodeReviewById(reviewId);
       if (!retryableReview || isSupersededReview(retryableReview)) {
@@ -1368,6 +1468,7 @@ export async function POST(
 
           if (retryAttemptResult.outcome === 'created') {
             const retryAttempt = retryAttemptResult.attempt;
+            parentUpdateAttemptId = retryAttempt.id;
 
             try {
               const latestReview = await getCodeReviewById(reviewId);
@@ -1387,6 +1488,31 @@ export async function POST(
                   terminalReason: latestReview?.terminal_reason,
                 });
                 return NextResponse.json({ success: true, retried: false, skipped: 'superseded' });
+              }
+
+              if (
+                latestReview.status === 'completed' ||
+                latestReview.status === 'failed' ||
+                latestReview.status === 'cancelled'
+              ) {
+                await updateCodeReviewAttemptForCallback({
+                  codeReviewId: reviewId,
+                  attemptId: retryAttempt.id,
+                  status: 'cancelled',
+                  terminalReason:
+                    latestReview.terminal_reason === 'user_cancelled'
+                      ? 'user_cancelled'
+                      : 'superseded',
+                  errorMessage: 'Review became terminal before retry startup',
+                  completedAt: new Date(),
+                });
+                await settleCodeReviewLedgerRow({
+                  reviewId,
+                  status: latestReview.status,
+                  terminalReason: latestReview.terminal_reason,
+                  triggerSource: latestReview.trigger_source,
+                });
+                return NextResponse.json({ success: true, retried: false, skipped: 'inactive' });
               }
 
               const retryResult = await codeReviewWorkerClient.retryReviewFresh(reviewId, {
@@ -1501,44 +1627,56 @@ export async function POST(
       });
     }
 
-    if (analyticsCompletionApplied) {
-      // Parent and accepted attempt completion were claimed with analytics in one transaction.
-    } else if (isModelNotFoundCancellation) {
-      const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
+    if (!analyticsCompletionApplied) {
+      const claimedUpdate = await updateCodeReviewStatusIfNonTerminal(
         reviewId,
         status,
-        parentStatusUpdates
+        parentStatusUpdates,
+        undefined,
+        parentUpdateAttemptId
       );
-      if (!claimedTerminalUpdate) {
-        logExceptInTest(
-          '[code-review-status] Model unavailable cancellation was already persisted, skipping summary upsert',
-          { reviewId }
-        );
+      if (!claimedUpdate) {
+        const currentReview = await getCodeReviewById(reviewId);
+        if (!currentReview) {
+          return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+        }
+        if (
+          currentReview.status === 'completed' ||
+          currentReview.status === 'failed' ||
+          currentReview.status === 'cancelled'
+        ) {
+          await settleCodeReviewLedgerRow({
+            reviewId,
+            status: currentReview.status,
+            terminalReason: currentReview.terminal_reason,
+            triggerSource: currentReview.trigger_source,
+          });
+          return NextResponse.json({
+            success: true,
+            message: 'Review already in terminal state',
+            currentStatus: currentReview.status,
+            terminalReason: currentReview.terminal_reason,
+          });
+        }
+        const terminalAttempt =
+          attempt.status === 'completed' ||
+          attempt.status === 'failed' ||
+          attempt.status === 'cancelled';
         return NextResponse.json({
           success: true,
-          message: 'Review already in terminal state',
+          message: 'Stale callback from superseded attempt',
+          attemptId: attempt.id,
+          currentStatus: terminalAttempt ? attempt.status : undefined,
+          terminalReason: terminalAttempt ? attempt.terminal_reason : undefined,
         });
       }
-      if (modelNotFoundRuntimeDiagnostics) {
+      if (isModelNotFoundCancellation && modelNotFoundRuntimeDiagnostics) {
         captureRuntimeModelNotFoundDiagnostics({
           reviewId,
           sessionId,
           diagnostics: modelNotFoundRuntimeDiagnostics,
         });
       }
-      // The terminal claim committed, so settle the ledger row once.
-      await settleCodeReviewLedgerRow({
-        reviewId,
-        status,
-        terminalReason: terminalReason ?? null,
-        triggerSource: review.trigger_source,
-      });
-    } else {
-      await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
-      // Settle idempotently: a cross-request redelivery of this terminal
-      // callback settles through the terminal short-circuit above, where the
-      // compare-and-set and the deterministic event uuid make the repeat a
-      // no-op. Non-terminal statuses (running) are a no-op.
       await settleCodeReviewLedgerRow({
         reviewId,
         status,

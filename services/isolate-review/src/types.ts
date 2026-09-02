@@ -1,6 +1,8 @@
 import type { ReviewIsolate } from './review-isolate';
 import type { TaskSession } from './task';
+import type { QueuedReviewState } from './queued-review';
 import { z } from 'zod';
+import { CodeReviewProviderFailureReasonSchema } from '@kilocode/worker-utils/code-review-provider-failure';
 
 export type SecretBinding = string | { get(): Promise<string> };
 
@@ -39,6 +41,7 @@ export type Env = {
   NEXTAUTH_SECRET: SecretBinding;
   INTERNAL_API_SECRET: SecretBinding;
   ENVIRONMENT: string;
+  KILOCODE_BACKEND_BASE_URL?: string;
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** OpenRouter-compatible gateway. Defaults to production `api.kilo.ai`. */
   KILO_GATEWAY_URL?: string;
@@ -47,6 +50,199 @@ export type Env = {
   /** Clone URL template. Substitutes `{owner}` and `{repo}`. Blank or omitted uses GitHub HTTPS. */
   GIT_CLONE_URL_TEMPLATE?: string;
 };
+
+export const GithubPublicationTargetSchema = z
+  .object({
+    host: z.literal('github.com'),
+    repoFullName: z
+      .string()
+      .max(201)
+      .regex(/^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9_.-]{1,100}$/),
+    prNumber: z.number().int().positive().max(2_147_483_647),
+  })
+  .strict();
+
+export const QueuedIsolateIdentitySchema = z
+  .object({
+    reviewId: z.uuid(),
+    attemptId: z.uuid(),
+    generation: z.uuid(),
+    organizationId: z.uuid(),
+    integrationId: z.uuid(),
+    executionUserId: z.string().min(1).max(256),
+    target: GithubPublicationTargetSchema,
+    snapshot: z
+      .object({
+        headSha: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+        baseTipSha: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+        mergeBaseSha: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+      })
+      .strict(),
+  })
+  .strict();
+export type QueuedIsolateIdentity = z.infer<typeof QueuedIsolateIdentitySchema>;
+
+export function queuedIdentityKey(identity: QueuedIsolateIdentity): string {
+  return JSON.stringify(QueuedIsolateIdentitySchema.parse(identity));
+}
+
+export const QueuedIsolateSafetySchema = z
+  .object({
+    sequence: z.number().int().positive().safe(),
+    execution: z.enum(['not_started', 'running', 'completed', 'failed', 'cancelled']),
+    cancellationRequested: z.boolean(),
+    publication: z.enum(['not_started', 'pending', 'uncertain', 'settled']),
+    quiescent: z.boolean(),
+    observedAt: z.iso.datetime(),
+  })
+  .strict()
+  .refine(
+    state =>
+      !state.quiescent ||
+      ((state.execution === 'completed' ||
+        state.execution === 'failed' ||
+        state.execution === 'cancelled') &&
+        (state.publication === 'not_started' || state.publication === 'settled')),
+    'Quiescence requires terminal execution and no unresolved publication'
+  );
+export type QueuedIsolateSafety = z.infer<typeof QueuedIsolateSafetySchema>;
+
+export const QueuedIsolateAdmissionSchema = z
+  .object({
+    version: z.literal(1),
+    runId: z.uuid(),
+    identity: QueuedIsolateIdentitySchema,
+    preparationHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict()
+  .refine(request => request.runId === request.identity.attemptId, 'Run must match attempt');
+
+export const QueuedIsolateAuthorityRequestSchema = z
+  .object({
+    version: z.literal(1),
+    identity: QueuedIsolateIdentitySchema,
+    operation: z.enum(['execute', 'publish', 'reconcile']),
+    operationId: z.uuid(),
+    preparationHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
+export const QueuedIsolateAuthorityResponseSchema = QueuedIsolateAuthorityRequestSchema.extend({
+  authorized: z.boolean(),
+  reconciliationUserId: z.string().min(1).max(256).optional(),
+}).refine(
+  response =>
+    (response.authorized && response.operation === 'reconcile') ===
+    Boolean(response.reconciliationUserId)
+);
+
+export const QueuedIsolateControlRequestSchema = z
+  .object({
+    version: z.literal(1),
+    identity: QueuedIsolateIdentitySchema,
+    operation: z.enum(['status', 'cancel']),
+  })
+  .strict();
+
+export const QueuedIsolateResultSchema = z
+  .object({
+    reason: z.enum([
+      'completed',
+      'cancelled',
+      'credentials_expired',
+      'admission_deadline',
+      'execution_deadline',
+      'absolute_deadline',
+      'step_limit',
+      'parent_incomplete',
+      'missing_summary',
+      'required_context_incomplete',
+      'child_incomplete',
+      'publication_incomplete',
+      'admission_failed',
+      'submission_error',
+      ...CodeReviewProviderFailureReasonSchema.options,
+      'cleanup',
+    ]),
+    completedAt: z.iso.datetime(),
+    sessions: z
+      .array(
+        z
+          .object({
+            sessionId: z.uuid(),
+            parentSessionId: z.uuid().nullable(),
+            requestCount: z.number().int().nonnegative().max(1_000).optional(),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(100),
+    summary: z
+      .object({
+        commentId: z.number().int().positive().safe(),
+        bodyHash: z.string().regex(/^[0-9a-f]{64}$/),
+      })
+      .strict()
+      .nullable(),
+    gateResult: z.enum(['pass', 'fail']).nullable(),
+    analytics: z
+      .object({
+        marker: z
+          .string()
+          .max(17_000)
+          .refine(value => new TextEncoder().encode(value).byteLength <= 17_000)
+          .nullable(),
+        omitted: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const QueuedIsolateNotificationSchema = z
+  .object({
+    version: z.literal(1),
+    identity: QueuedIsolateIdentitySchema,
+    safety: QueuedIsolateSafetySchema,
+    result: QueuedIsolateResultSchema.optional(),
+  })
+  .strict()
+  .superRefine((notification, ctx) => {
+    const terminal = ['completed', 'failed', 'cancelled'].includes(notification.safety.execution);
+    if (terminal !== Boolean(notification.result))
+      ctx.addIssue({ code: 'custom', message: 'Terminal notifications require a result' });
+    if (notification.result) {
+      const { sessions, reason } = notification.result;
+      const root = notification.identity.attemptId;
+      const seen = new Set<string>();
+      for (const session of sessions) {
+        if (
+          seen.has(session.sessionId) ||
+          (session.sessionId === root
+            ? session.parentSessionId !== null
+            : !session.parentSessionId || !seen.has(session.parentSessionId))
+        )
+          ctx.addIssue({ code: 'custom', message: 'Invalid execution session tree' });
+        seen.add(session.sessionId);
+      }
+      if (
+        sessions[0]?.sessionId !== root ||
+        (notification.safety.execution === 'completed') !== (reason === 'completed') ||
+        (notification.safety.execution === 'cancelled') !== (reason === 'cancelled')
+      )
+        ctx.addIssue({ code: 'custom', message: 'Result does not match execution' });
+    }
+  });
+
+export const QueuedIsolateAcknowledgementSchema = z
+  .object({
+    version: z.literal(1),
+    identity: QueuedIsolateIdentitySchema,
+    sequence: z.number().int().positive().safe(),
+    notificationRecorded: z.literal(true),
+    fenceReleased: z.boolean(),
+    usageSettled: z.boolean().default(false),
+  })
+  .strict();
 
 export const MAX_REVIEW_PROMPT_CHARACTERS = 64_000;
 
@@ -154,10 +350,29 @@ export const IsolateReviewInferenceSchema = z
 
 export type IsolateReviewInference = z.infer<typeof IsolateReviewInferenceSchema>;
 
+export const QueuedIsolatePublicationSchema = z
+  .object({
+    identity: QueuedIsolateIdentitySchema,
+    gateThreshold: z.enum(['off', 'all', 'warning', 'critical']),
+    summaryTarget: z
+      .object({
+        commentId: z.number().int().positive().safe(),
+        bodyHash: HashSchema,
+        authorId: z.number().int().positive().safe(),
+        authorLogin: z.string().min(1).max(100),
+        appId: z.number().int().positive().safe(),
+      })
+      .strict()
+      .optional(),
+    summaryHistory: z.string().max(24_000),
+  })
+  .strict();
+
 export const IsolateReviewPreparationSchema = z
   .object({
     version: z.literal(1),
     preparedAt: z.iso.datetime(),
+    queued: QueuedIsolatePublicationSchema.optional(),
     requestingUserId: IdentifierSchema,
     executionUserId: IdentifierSchema,
     organizationId: IdentifierSchema.optional(),
@@ -417,6 +632,7 @@ export const TerminationReasonSchema = z.enum([
   'publication_incomplete',
   'admission_failed',
   'submission_error',
+  ...CodeReviewProviderFailureReasonSchema.options,
   'cleanup',
 ]);
 export type TerminationReason = z.infer<typeof TerminationReasonSchema>;
@@ -425,6 +641,8 @@ export type SummaryOwnership = { previousRunId: string; commentId: number; bodyH
 
 export type RunState = {
   runId: string;
+  queued?: QueuedReviewState;
+  queuedPublication?: IsolateReviewPreparation['queued'];
   status: RunStatus;
   input: StartReviewInput;
   createdAt?: string;
@@ -444,6 +662,7 @@ export type RunState = {
   reviewProposal?: ReviewProposal;
   summaryProposal?: ReviewProposal;
   summaryContent?: SummaryContent;
+  gateResult?: 'pass' | 'fail';
   reviewSelection?: IsolateReviewSelection;
   historyState?: GithubHistoryState;
   summaryOwnership?: SummaryOwnership;
@@ -456,6 +675,7 @@ export type RunState = {
   systemPromptHash?: string;
   systemPromptVersion?: string;
   requestIds?: string[];
+  usageRequestCounts?: Record<string, number>;
   limitations?: string[];
   /** Repository-scoped GitHub token minted by GIT_TOKEN_SERVICE. Never logged. */
   githubToken?: string;
@@ -513,6 +733,7 @@ export type ReviewStatusResponse = {
   reviewProposal?: ReviewProposal;
   summaryProposal?: ReviewProposal;
   summaryContent?: SummaryContent;
+  gateResult?: 'pass' | 'fail';
   reviewSelection?: IsolateReviewSelection;
   cleanupAt?: number;
   usageSessions?: string[];

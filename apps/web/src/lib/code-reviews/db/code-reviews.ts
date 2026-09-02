@@ -35,7 +35,11 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { sanitizePostgresString } from '@/lib/sanitize-jsonb';
 import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
-import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
+import {
+  codeReviewLedgerIntent,
+  settleCodeReviewLedgerRow,
+  settleCodeReviewLedgerRowOn,
+} from '../code-review-ledger';
 import type {
   CodeReviewPlatform,
   CreateReviewParams,
@@ -44,7 +48,11 @@ import type {
   Owner,
 } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type { CodeReviewCouncilResult, CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import type {
+  CodeReviewCouncilResult,
+  CodeReviewTerminalReason,
+  CodeReviewReviewerBackend,
+} from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -467,12 +475,18 @@ export async function listDispatchableCodeReviewOwnerCandidates(
   }
 }
 
+export type CodeReviewAttemptListRow = Omit<CloudAgentCodeReviewAttempt, 'publication_state'>;
+
+const { publication_state: _publicationState, ...codeReviewAttemptListColumns } = getTableColumns(
+  cloud_agent_code_review_attempts
+);
+
 export async function listCodeReviewAttempts(
   codeReviewId: string
-): Promise<CloudAgentCodeReviewAttempt[]> {
+): Promise<CodeReviewAttemptListRow[]> {
   try {
     return await db
-      .select()
+      .select(codeReviewAttemptListColumns)
       .from(cloud_agent_code_review_attempts)
       .where(eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId))
       .orderBy(asc(cloud_agent_code_review_attempts.attempt_number));
@@ -480,6 +494,32 @@ export async function listCodeReviewAttempts(
     captureException(error, {
       tags: { operation: 'listCodeReviewAttempts' },
       extra: { codeReviewId },
+    });
+    throw error;
+  }
+}
+
+export async function getCodeReviewAttemptMetadataForReview(
+  codeReviewId: string,
+  attemptId: string
+): Promise<CodeReviewAttemptListRow | null> {
+  try {
+    const [attempt] = await db
+      .select(codeReviewAttemptListColumns)
+      .from(cloud_agent_code_review_attempts)
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.code_review_id, codeReviewId),
+          eq(cloud_agent_code_review_attempts.id, attemptId)
+        )
+      )
+      .limit(1);
+
+    return attempt ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'getCodeReviewAttemptMetadataForReview' },
+      extra: { codeReviewId, attemptId },
     });
     throw error;
   }
@@ -530,6 +570,132 @@ export async function getCodeReviewAttemptForReview(
     });
     throw error;
   }
+}
+
+export async function admitCodeReviewAttemptForDispatch(
+  params: {
+    codeReviewId: string;
+    dispatchReservationId: string;
+    previousStatus: CodeReviewStatus;
+  },
+  transaction?: DrizzleTransaction
+): Promise<CloudAgentCodeReviewAttempt> {
+  const admit = async (tx: DrizzleTransaction) => {
+    const [review] = await tx
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+      .for('update');
+    if (
+      !review ||
+      review.status !== 'queued' ||
+      review.dispatch_reservation_id !== params.dispatchReservationId
+    ) {
+      throw new Error('Code review dispatch reservation changed');
+    }
+
+    const [existing] = await tx
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+      .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+      .limit(1);
+    if (existing) return existing;
+
+    const newlyAdmitted =
+      params.previousStatus === 'pending' &&
+      !review.session_id &&
+      !review.cli_session_id &&
+      !review.started_at &&
+      !review.completed_at;
+    const [attempt] = await tx
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: params.previousStatus,
+        reviewer_backend: newlyAdmitted ? 'unselected' : 'legacy',
+        session_id: review.session_id,
+        cli_session_id: review.cli_session_id,
+        started_at: review.started_at,
+        completed_at: review.completed_at,
+        error_message: review.error_message,
+        terminal_reason: review.terminal_reason,
+      })
+      .returning();
+    if (!attempt) throw new Error('Failed to admit code review attempt');
+    return attempt;
+  };
+  return transaction ? admit(transaction) : db.transaction(admit);
+}
+
+export async function pinCodeReviewAttemptReviewer(
+  tx: DrizzleTransaction,
+  params: {
+    codeReviewId: string;
+    attemptId: string;
+    dispatchReservationId: string;
+    backend: CodeReviewReviewerBackend;
+  }
+): Promise<{ selected: boolean; attempt: CloudAgentCodeReviewAttempt }> {
+  const [review] = await tx
+    .select()
+    .from(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+    .for('update');
+  if (
+    !review ||
+    review.status !== 'queued' ||
+    review.dispatch_reservation_id !== params.dispatchReservationId
+  ) {
+    throw new Error('Code review dispatch reservation changed');
+  }
+  const [attempt] = await tx
+    .select()
+    .from(cloud_agent_code_review_attempts)
+    .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id))
+    .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+    .limit(1)
+    .for('update');
+  if (!attempt || attempt.id !== params.attemptId) {
+    throw new Error('Code review attempt is not current');
+  }
+  if (attempt.reviewer_backend !== 'unselected') return { selected: false, attempt };
+  if (
+    params.backend === 'isolate' &&
+    (review.platform !== 'github' ||
+      !review.owned_by_organization_id ||
+      !review.platform_integration_id ||
+      review.review_type !== 'standard' ||
+      (review.manual_config && review.manual_config.outputMode !== 'provider'))
+  ) {
+    throw new Error('Review is not eligible for isolate execution');
+  }
+  if (
+    attempt.status !== 'pending' ||
+    attempt.session_id ||
+    attempt.cli_session_id ||
+    attempt.execution_id ||
+    attempt.started_at ||
+    attempt.completed_at ||
+    review.session_id ||
+    review.cli_session_id ||
+    review.started_at ||
+    review.completed_at
+  ) {
+    throw new Error('Cannot select a reviewer for an executing or terminal attempt');
+  }
+  const [selected] = await tx
+    .update(cloud_agent_code_review_attempts)
+    .set({
+      reviewer_backend: params.backend,
+      reviewer_execution_id: attempt.id,
+      reviewer_selected_at: new Date().toISOString(),
+    })
+    .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+    .returning();
+  if (!selected) throw new Error('Failed to pin code review reviewer');
+  return { selected: true, attempt: selected };
 }
 
 export async function createCodeReviewAttempt(params: {
@@ -655,6 +821,9 @@ export async function createInfraRetryAttemptIfMissing(params: {
           `Code review attempt ${params.retryOfAttemptId} not found for review ${params.codeReviewId}`
         );
       }
+      if (sourceAttempt.reviewer_backend !== 'legacy') {
+        throw new Error('Infrastructure retries require legacy attempt affinity');
+      }
 
       const [existingForAttempt] = await tx
         .select()
@@ -696,13 +865,18 @@ export async function createInfraRetryAttemptIfMissing(params: {
         .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
         .limit(1);
 
+      const attemptId = crypto.randomUUID();
       const [attempt] = await tx
         .insert(cloud_agent_code_review_attempts)
         .values({
+          id: attemptId,
           code_review_id: params.codeReviewId,
           attempt_number: (latest?.attempt_number ?? 0) + 1,
           retry_of_attempt_id: params.retryOfAttemptId,
           retry_reason: 'infra_failure',
+          reviewer_backend: 'legacy',
+          reviewer_execution_id: attemptId,
+          reviewer_selected_at: new Date().toISOString(),
           analytics_enabled_at_dispatch: sourceAttempt.analytics_enabled_at_dispatch,
           status: 'pending',
         })
@@ -721,6 +895,63 @@ export async function createInfraRetryAttemptIfMissing(params: {
     });
     throw error;
   }
+}
+
+async function applyCodeReviewAttemptCallback(
+  params: AttemptCallbackFields & { attemptId: string }
+): Promise<CloudAgentCodeReviewAttempt> {
+  return db.transaction(async tx => {
+    const [attempt] = await tx
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
+          eq(cloud_agent_code_review_attempts.id, params.attemptId)
+        )
+      )
+      .for('update');
+    if (!attempt) {
+      throw new Error(
+        `Code review attempt ${params.attemptId} not found for review ${params.codeReviewId}`
+      );
+    }
+
+    let updateData: Partial<typeof cloud_agent_code_review_attempts.$inferInsert>;
+    if (['pending', 'queued', 'running'].includes(attempt.status)) {
+      updateData = buildAttemptUpdateData(params);
+    } else {
+      if (
+        (params.sessionId !== undefined &&
+          attempt.session_id !== null &&
+          params.sessionId !== attempt.session_id) ||
+        (params.cliSessionId !== undefined &&
+          attempt.cli_session_id !== null &&
+          params.cliSessionId !== attempt.cli_session_id) ||
+        (params.executionId !== undefined &&
+          attempt.execution_id !== null &&
+          params.executionId !== attempt.execution_id)
+      )
+        return attempt;
+      updateData = {};
+      if (attempt.session_id === null && params.sessionId !== undefined)
+        updateData.session_id = params.sessionId;
+      if (attempt.cli_session_id === null && params.cliSessionId !== undefined)
+        updateData.cli_session_id = params.cliSessionId;
+      if (attempt.execution_id === null && params.executionId !== undefined)
+        updateData.execution_id = params.executionId;
+      if (Object.keys(updateData).length === 0) return attempt;
+      updateData.updated_at = new Date().toISOString();
+    }
+
+    const [updated] = await tx
+      .update(cloud_agent_code_review_attempts)
+      .set(updateData)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+      .returning();
+    if (!updated) throw new Error('Failed to update code review attempt');
+    return updated;
+  });
 }
 
 export async function ensureCodeReviewAttemptForRunningCallback(params: {
@@ -755,20 +986,14 @@ export async function ensureCodeReviewAttemptForRunningCallback(params: {
             !isTerminalCodeReviewStatus(latestAttempt.status))));
 
     if (shouldUpdateLatestPending) {
-      const [updated] = await db
-        .update(cloud_agent_code_review_attempts)
-        .set(
-          buildAttemptUpdateData({
-            status: 'running',
-            sessionId: params.sessionId,
-            cliSessionId: params.cliSessionId,
-            executionId: params.executionId,
-          })
-        )
-        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
-        .returning();
-
-      if (updated) return updated;
+      return await applyCodeReviewAttemptCallback({
+        codeReviewId: params.codeReviewId,
+        attemptId: latestAttempt.id,
+        status: 'running',
+        sessionId: params.sessionId,
+        cliSessionId: params.cliSessionId,
+        executionId: params.executionId,
+      });
     }
 
     return latestAttempt;
@@ -786,38 +1011,7 @@ export async function updateCodeReviewAttemptForCallback(
 ): Promise<CloudAgentCodeReviewAttempt> {
   try {
     if (params.attemptId) {
-      const explicitAttempt = await getCodeReviewAttemptForReview(
-        params.codeReviewId,
-        params.attemptId
-      );
-      if (!explicitAttempt) {
-        throw new Error(
-          `Code review attempt ${params.attemptId} not found for review ${params.codeReviewId}`
-        );
-      }
-
-      const [updated] = await db
-        .update(cloud_agent_code_review_attempts)
-        .set(
-          buildAttemptUpdateData({
-            status: params.status,
-            sessionId: params.sessionId,
-            cliSessionId: params.cliSessionId,
-            executionId: params.executionId,
-            errorMessage: params.errorMessage,
-            terminalReason: params.terminalReason,
-            startedAt: params.startedAt,
-            completedAt: params.completedAt,
-          })
-        )
-        .where(eq(cloud_agent_code_review_attempts.id, explicitAttempt.id))
-        .returning();
-
-      if (!updated) {
-        throw new Error('Failed to update code review attempt');
-      }
-
-      return updated;
+      return await applyCodeReviewAttemptCallback({ ...params, attemptId: params.attemptId });
     }
 
     if (params.status === 'running') {
@@ -879,28 +1073,7 @@ export async function updateCodeReviewAttemptForCallback(
       });
     }
 
-    const [updated] = await db
-      .update(cloud_agent_code_review_attempts)
-      .set(
-        buildAttemptUpdateData({
-          status: params.status,
-          sessionId: params.sessionId,
-          cliSessionId: params.cliSessionId,
-          executionId: params.executionId,
-          errorMessage: params.errorMessage,
-          terminalReason: params.terminalReason,
-          startedAt: params.startedAt,
-          completedAt: params.completedAt,
-        })
-      )
-      .where(eq(cloud_agent_code_review_attempts.id, targetAttempt.id))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to update code review attempt');
-    }
-
-    return updated;
+    return await applyCodeReviewAttemptCallback({ ...params, attemptId: targetAttempt.id });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateCodeReviewAttemptForCallback' },
@@ -931,6 +1104,57 @@ export async function hasInfraRetryAttempt(codeReviewId: string): Promise<boolea
     });
     throw error;
   }
+}
+
+export async function prepareReservedCodeReviewAttempt(params: {
+  codeReviewId: string;
+  attemptId: string;
+  dispatchReservationId: string;
+  analyticsEnabled: boolean;
+}): Promise<CloudAgentCodeReviewAttempt | null> {
+  return db.transaction(async tx => {
+    const [review] = await tx
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, params.codeReviewId))
+      .for('update');
+    const [attempt] = await tx
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
+      .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+      .limit(1)
+      .for('update');
+    if (
+      !review ||
+      review.status !== 'queued' ||
+      review.dispatch_reservation_id !== params.dispatchReservationId ||
+      attempt?.id !== params.attemptId ||
+      attempt.reviewer_backend === 'unselected' ||
+      !['pending', 'queued', 'running'].includes(attempt.status)
+    )
+      return null;
+    const [updated] = await tx
+      .update(cloud_agent_code_review_attempts)
+      .set({
+        ...(attempt.status === 'pending'
+          ? buildAttemptUpdateData({
+              status: 'queued',
+              sessionId: review.session_id ?? undefined,
+              cliSessionId: review.cli_session_id ?? undefined,
+              errorMessage: review.error_message ?? undefined,
+              terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+              startedAt: review.started_at ? new Date(review.started_at) : undefined,
+              completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+            })
+          : {}),
+        analytics_enabled_at_dispatch:
+          attempt.analytics_enabled_at_dispatch ?? params.analyticsEnabled,
+      })
+      .where(eq(cloud_agent_code_review_attempts.id, params.attemptId))
+      .returning();
+    return updated;
+  });
 }
 
 export async function ensureCurrentCodeReviewAttemptFromReview(
@@ -1117,7 +1341,8 @@ export async function updateCodeReviewStatusIfNonTerminal(
     totalTokensOut?: number;
     totalCostMusd?: number;
   } = {},
-  dispatchReservationId?: string
+  dispatchReservationId?: string,
+  expectedAttemptId?: string
 ): Promise<boolean> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
@@ -1149,21 +1374,40 @@ export async function updateCodeReviewStatusIfNonTerminal(
       updateData.completed_at = new Date().toISOString();
     }
 
-    const updated = await db
-      .update(cloud_agent_code_reviews)
-      .set(updateData)
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
-          dispatchReservationId
-            ? eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
-            : undefined
+    const apply = async (database: CodeReviewDatabase) => {
+      const updated = await database
+        .update(cloud_agent_code_reviews)
+        .set(updateData)
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, reviewId),
+            inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
+            dispatchReservationId
+              ? eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
+              : undefined
+          )
         )
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
+        .returning({ id: cloud_agent_code_reviews.id });
+      return updated.length > 0;
+    };
 
-    return updated.length > 0;
+    if (expectedAttemptId === undefined) return await apply(db);
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId))
+        .for('update');
+      if (!review) return false;
+      const [latest] = await tx
+        .select({ id: cloud_agent_code_review_attempts.id })
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+      if (latest?.id !== expectedAttemptId) return false;
+      return await apply(tx);
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateCodeReviewStatusIfNonTerminal' },
@@ -1209,7 +1453,8 @@ export async function failReservedQueuedReview(
   reviewId: string,
   dispatchReservationId: string,
   errorMessage: string,
-  terminalReason?: CodeReviewTerminalReason
+  terminalReason?: CodeReviewTerminalReason,
+  attemptId?: string
 ): Promise<boolean> {
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
@@ -1223,19 +1468,59 @@ export async function failReservedQueuedReview(
       updateData.terminal_reason = terminalReason;
     }
 
-    const failed = await db
-      .update(cloud_agent_code_reviews)
-      .set(updateData)
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.id, reviewId),
-          eq(cloud_agent_code_reviews.status, 'queued'),
-          eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
-        )
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select()
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId))
+        .for('update');
+      if (
+        !review ||
+        review.status !== 'queued' ||
+        review.dispatch_reservation_id !== dispatchReservationId ||
+        review.session_id ||
+        review.cli_session_id ||
+        review.started_at ||
+        review.completed_at
       )
-      .returning({ id: cloud_agent_code_reviews.id });
+        return false;
+      const [attempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1)
+        .for('update');
+      if (attemptId !== undefined && attempt?.id !== attemptId) return false;
+      if (
+        attempt &&
+        (!['pending', 'queued'].includes(attempt.status) ||
+          attempt.session_id ||
+          attempt.cli_session_id ||
+          attempt.execution_id ||
+          attempt.started_at ||
+          attempt.completed_at)
+      )
+        return false;
 
-    return failed.length > 0;
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set(updateData)
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+      if (attempt) {
+        await tx
+          .update(cloud_agent_code_review_attempts)
+          .set({
+            status: 'failed',
+            error_message: errorMessage,
+            terminal_reason: terminalReason ?? null,
+            completed_at: updateData.completed_at,
+            updated_at: updateData.updated_at,
+          })
+          .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+      }
+      return true;
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'failReservedQueuedReview' },
@@ -1419,7 +1704,7 @@ export async function updateRepositoryReviewInstructionsMetadata(
  */
 export type CodeReviewListRow = Omit<
   CloudAgentCodeReview,
-  'council_result' | 'manual_config' | 'previous_summary_body'
+  'council_result' | 'manual_config' | 'previous_summary_body' | 'blocked_by_attempt_id'
 >;
 
 export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListRow[]> {
@@ -1465,6 +1750,7 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      blocked_by_attempt_id: _blockedByAttemptId,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     const reviews = await db
@@ -1626,10 +1912,57 @@ export async function createCodeReviewIfAbsentInTransaction(
  * Cancels a code review
  * Sets status to 'cancelled' and records completion time
  */
-export async function cancelCodeReview(reviewId: string): Promise<void> {
+export async function cancelCodeReview(
+  reviewId: string,
+  expected?: string | { attemptId: string | null; updatedAt: string }
+): Promise<boolean> {
   try {
-    await updateCodeReviewStatus(reviewId, 'cancelled', {
-      completedAt: new Date(),
+    if (typeof expected === 'string')
+      return (await prepareCodeReviewCancellation(reviewId, expected))?.backend === 'isolate';
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select()
+        .from(cloud_agent_code_reviews)
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, reviewId),
+            expected ? eq(cloud_agent_code_reviews.updated_at, expected.updatedAt) : undefined
+          )
+        )
+        .for('update');
+      if (
+        !review ||
+        !['pending', 'queued'].includes(review.status) ||
+        review.session_id ||
+        review.cli_session_id ||
+        review.started_at ||
+        review.completed_at ||
+        (review.total_tokens_in ?? 0) > 0 ||
+        (review.total_tokens_out ?? 0) > 0 ||
+        (review.total_cost_musd ?? 0) > 0
+      )
+        return false;
+      const [attempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1)
+        .for('update');
+      if (expected && (attempt?.id ?? null) !== expected.attemptId) return false;
+      if (
+        attempt &&
+        (attempt.reviewer_backend === 'isolate' ||
+          !['pending', 'queued'].includes(attempt.status) ||
+          attempt.session_id ||
+          attempt.cli_session_id ||
+          attempt.execution_id ||
+          attempt.started_at ||
+          attempt.completed_at)
+      )
+        return false;
+      await settleCodeReviewCancellationOn(tx, review, attempt);
+      return true;
     });
   } catch (error) {
     captureException(error, {
@@ -1640,45 +1973,187 @@ export async function cancelCodeReview(reviewId: string): Promise<void> {
   }
 }
 
+async function settleCodeReviewCancellationOn(
+  tx: DrizzleTransaction,
+  review: CloudAgentCodeReview,
+  attempt: CloudAgentCodeReviewAttempt | undefined
+): Promise<void> {
+  const terminalReason =
+    attempt?.reviewer_backend === 'isolate' ? 'user_cancelled' : review.terminal_reason;
+  const completedAt = new Date().toISOString();
+  const terminalFields = {
+    status: 'cancelled',
+    terminal_reason: terminalReason,
+    completed_at: completedAt,
+    updated_at: completedAt,
+  };
+  await tx
+    .update(cloud_agent_code_reviews)
+    .set({ ...terminalFields, dispatch_reservation_id: null })
+    .where(eq(cloud_agent_code_reviews.id, review.id));
+  if (attempt)
+    await tx
+      .update(cloud_agent_code_review_attempts)
+      .set(terminalFields)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+  await settleCodeReviewLedgerRowOn(tx, {
+    reviewId: review.id,
+    status: 'cancelled',
+    terminalReason,
+    triggerSource: review.trigger_source,
+  });
+}
+
+export async function prepareCodeReviewCancellation(
+  reviewId: string,
+  expectedIsolateAttemptId?: string
+): Promise<
+  | ({ review: CloudAgentCodeReview } & (
+      | { backend: 'legacy'; attemptId: string | undefined }
+      | { backend: 'isolate'; attemptId: string }
+      | { backend: 'local' }
+    ))
+  | null
+> {
+  return db.transaction(async tx => {
+    const [review] = await tx
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .for('update');
+    const [attempt] = await tx
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+      .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+      .limit(1)
+      .for('update');
+    if (
+      !review ||
+      !['pending', 'queued', 'running'].includes(review.status) ||
+      (attempt && !['pending', 'queued', 'running'].includes(attempt.status))
+    )
+      return null;
+    if (
+      expectedIsolateAttemptId &&
+      (attempt?.id !== expectedIsolateAttemptId || attempt.reviewer_backend !== 'isolate')
+    )
+      return null;
+    if (attempt?.reviewer_backend === 'legacy' || (!attempt && review.status !== 'pending'))
+      return { backend: 'legacy', review, attemptId: attempt?.id };
+    await settleCodeReviewCancellationOn(tx, review, attempt);
+    return attempt?.reviewer_backend === 'isolate'
+      ? { backend: 'isolate', review, attemptId: attempt.id }
+      : { backend: 'local', review };
+  });
+}
+
 /**
  * Resets a failed code review for retry
  * Clears status back to 'pending' and removes error/session data
  */
-export async function resetCodeReviewForRetry(reviewId: string): Promise<number> {
+export async function resetCodeReviewForRetry(
+  reviewId: string,
+  expected: { attemptId?: string; updatedAt?: string } = {}
+): Promise<number> {
   try {
     // Status CAS: only reset reviews still in a retriggable terminal state. A concurrent
     // retrigger that already flipped the row to 'pending' (or any other state) matches zero
     // rows, so the caller can reject the duplicate without dispatching twice.
-    const reset = await db
-      .update(cloud_agent_code_reviews)
-      .set({
-        status: 'pending',
-        dispatch_reservation_id: null,
-        session_id: null,
-        cli_session_id: null,
-        error_message: null,
-        terminal_reason: null,
-        check_run_id: null,
-        started_at: null,
-        completed_at: null,
-        // Clear the prior attempt's council outcome so a retry doesn't show stale
-        // specialist votes/findings as current (the finalizer re-populates it on completion).
-        council_result: null,
-        model: null,
-        total_tokens_in: null,
-        total_tokens_out: null,
-        total_cost_musd: null,
-        updated_at: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted'])
+    return await db.transaction(async tx => {
+      const [review] = await tx
+        .select()
+        .from(cloud_agent_code_reviews)
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, reviewId),
+            expected.updatedAt
+              ? eq(cloud_agent_code_reviews.updated_at, expected.updatedAt)
+              : undefined
+          )
         )
+        .for('update');
+      if (
+        !review ||
+        (review.status !== 'failed' &&
+          review.status !== 'cancelled' &&
+          review.status !== 'interrupted')
       )
-      .returning({ id: cloud_agent_code_reviews.id });
+        return 0;
+      let [source] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1)
+        .for('update');
+      if (expected.attemptId && source?.id !== expected.attemptId) return 0;
+      const sourceFields = buildAttemptUpdateData({
+        status: review.status,
+        sessionId: review.session_id ?? undefined,
+        cliSessionId: review.cli_session_id ?? undefined,
+        startedAt: review.started_at ? new Date(review.started_at) : undefined,
+        completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+        errorMessage: review.error_message ?? undefined,
+        terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+      });
+      if (!source) {
+        [source] = await tx
+          .insert(cloud_agent_code_review_attempts)
+          .values({
+            code_review_id: reviewId,
+            attempt_number: 1,
+            ...sourceFields,
+          })
+          .returning();
+      } else if (['pending', 'queued', 'running'].includes(source.status)) {
+        await tx
+          .update(cloud_agent_code_review_attempts)
+          .set(sourceFields)
+          .where(eq(cloud_agent_code_review_attempts.id, source.id));
+      }
+      if (!source) throw new Error('Failed to reconstruct terminal code review attempt');
+      const reset = await tx
+        .update(cloud_agent_code_reviews)
+        .set({
+          status: 'pending',
+          dispatch_reservation_id: null,
+          session_id: null,
+          cli_session_id: null,
+          error_message: null,
+          terminal_reason: null,
+          check_run_id: null,
+          started_at: null,
+          completed_at: null,
+          // Clear the prior attempt's council outcome so a retry doesn't show stale
+          // specialist votes/findings as current (the finalizer re-populates it on completion).
+          council_result: null,
+          model: null,
+          total_tokens_in: null,
+          total_tokens_out: null,
+          total_cost_musd: null,
+          updated_at: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(cloud_agent_code_reviews.id, reviewId),
+            inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted'])
+          )
+        )
+        .returning({ id: cloud_agent_code_reviews.id });
 
-    return reset.length;
+      if (reset.length) {
+        await tx.insert(cloud_agent_code_review_attempts).values({
+          code_review_id: reviewId,
+          attempt_number: source.attempt_number + 1,
+          retry_of_attempt_id: source.id,
+          retry_reason: 'manual_retrigger',
+          status: 'pending',
+          reviewer_backend: 'unselected',
+        });
+      }
+      return reset.length;
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'resetCodeReviewForRetry' },
@@ -2207,16 +2682,27 @@ export async function updateReviewHeadShaAndCheckRun(
   reviewId: string,
   headSha: string,
   checkRunId: number | null
-): Promise<void> {
+): Promise<boolean> {
   try {
-    await db
-      .update(cloud_agent_code_reviews)
-      .set({
-        head_sha: headSha,
-        check_run_id: checkRunId,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    return await db.transaction(async tx => {
+      await tx
+        .select({ id: cloud_agent_code_reviews.id })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId))
+        .for('update');
+      const [attempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(eq(cloud_agent_code_review_attempts.code_review_id, reviewId))
+        .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
+        .limit(1);
+      if (attempt?.reviewer_backend === 'isolate') return false;
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set({ head_sha: headSha, check_run_id: checkRunId, updated_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+      return true;
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateReviewHeadShaAndCheckRun' },

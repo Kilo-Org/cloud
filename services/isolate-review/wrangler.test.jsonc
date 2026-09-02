@@ -4,15 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-07-14",
   "compatibility_flags": ["nodejs_compat"],
-  "rules": [{ "type": "Text", "globs": ["**/*.txt", "**/*.md"], "fallthrough": true }],
+  "rules": [{ "type": "Text", "globs": ["**/*.txt", "**/*.md", "**/*.sql"], "fallthrough": true }],
   "observability": { "enabled": true },
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "624ec80650dd414199349f4e217ddb10",
-      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
-    },
-  ],
   "durable_objects": {
     "bindings": [
       {
@@ -24,7 +17,10 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReviewIsolate"] }],
   "vars": {
     "ENVIRONMENT": "test",
+    "HYPERDRIVE": { "connectionString": "postgresql://[disabled-test-database" },
     "NEXTAUTH_SECRET": "test-nextauth-secret",
     "INTERNAL_API_SECRET": "test-internal-secret",
+    "KILOCODE_BACKEND_BASE_URL": "https://app.kilo.ai",
+    "KILO_GATEWAY_URL": "https://api.kilo.ai/api/openrouter",
   },
 }

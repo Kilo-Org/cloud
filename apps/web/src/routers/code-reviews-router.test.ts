@@ -1,4 +1,7 @@
 const mockCancelReview = jest.fn();
+jest.mock('@/lib/code-reviews/client/legacy-code-review-worker-client', () => ({
+  legacyCodeReviewWorkerClient: { cancelReview: (...args: unknown[]) => mockCancelReview(...args) },
+}));
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
@@ -107,6 +110,16 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 import { db } from '@/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
+import {
+  admitCodeReviewLedgerRow,
+  cancelCodeReview,
+  createCodeReviewAttempt,
+  getLatestCodeReviewAttempt,
+  listCodeReviewAttempts,
+  updateCodeReviewAttemptForCallback,
+  updateCodeReviewStatus,
+} from '@/lib/code-reviews/db/code-reviews';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import type { SuccessResult } from '@/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
@@ -125,6 +138,7 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
+  operation_ledgers,
   organization_audit_logs,
   organization_memberships,
   organizations,
@@ -247,7 +261,7 @@ describe('codeReviewRouter.cancel', () => {
   let testUser: User;
 
   beforeAll(async () => {
-    testUser = await insertTestUser();
+    testUser = await insertTestUser({ id: `oauth/github/router-cancel-${crypto.randomUUID()}` });
   });
 
   beforeEach(() => {
@@ -332,6 +346,149 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
   });
+
+  async function cancellationState(reviewId: string) {
+    const review = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    const attempts = await listCodeReviewAttempts(reviewId);
+    const ledger = await db.query.operation_ledgers.findFirst({
+      where: eq(operation_ledgers.operation_key, `review:${reviewId}`),
+    });
+    return { review, attempts, ledger };
+  }
+
+  it.each(['declined', 'unreachable'] as const)(
+    'settles a queued manual review, its legacy attempt, and ledger when the Worker is %s',
+    async outcome => {
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values(
+          reviewValues(testUser.id, 'queued', {
+            dispatch_reservation_id: crypto.randomUUID(),
+            trigger_source: 'manual',
+            manual_config: {
+              outputMode: 'kilo',
+              instructions: null,
+              agentConfig: { model_slug: 'test-model', review_style: 'balanced', focus_areas: [] },
+            },
+            updated_at: '2026-04-29 01:16:12.945+00',
+          })
+        )
+        .returning();
+      await admitCodeReviewLedgerRow({
+        reviewId: review.id,
+        userId: testUser.id,
+        triggerSource: 'manual',
+      });
+      const attemptId = crypto.randomUUID();
+      await db.insert(cloud_agent_code_review_attempts).values({
+        id: attemptId,
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'queued',
+        reviewer_backend: 'legacy',
+        reviewer_execution_id: attemptId,
+        reviewer_selected_at: '2026-04-29 01:16:12.945+00',
+      });
+      if (outcome === 'unreachable')
+        mockCancelReview.mockRejectedValue(new Error('Worker unavailable'));
+      else mockCancelReview.mockResolvedValue({ success: false, reviewId: review.id });
+      const caller = await createCallerForUser(testUser.id);
+
+      expect(await caller.codeReviews.cancel({ reviewId: review.id })).toMatchObject({
+        success: true,
+      });
+
+      const stored = await cancellationState(review.id);
+      expect(stored.review).toMatchObject({
+        status: 'cancelled',
+        dispatch_reservation_id: null,
+        completed_at: expect.any(String),
+      });
+      expect(stored.attempts).toEqual([
+        expect.objectContaining({
+          id: attemptId,
+          status: 'cancelled',
+          reviewer_backend: 'legacy',
+          reviewer_execution_id: attemptId,
+          session_id: null,
+          cli_session_id: null,
+          completed_at: stored.review?.completed_at,
+        }),
+      ]);
+      expect(stored.ledger).toMatchObject({ status: 'no_op', kilo_user_id: testUser.id });
+      expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', attemptId);
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['declined', 'completed'],
+    ['unreachable', 'completed'],
+    ['declined', 'successor'],
+    ['unreachable', 'successor'],
+    ['declined', 'started'],
+    ['unreachable', 'started'],
+  ] as const)(
+    'does not claim cancellation or finalize the gate when a %s Worker races with %s work',
+    async (outcome, change) => {
+      const integration = await insertGitHubIntegration(testUser.id, 'standard');
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values(
+          reviewValues(testUser.id, 'queued', {
+            dispatch_reservation_id: crypto.randomUUID(),
+            platform_integration_id: integration.id,
+            check_run_id: 12345,
+          })
+        )
+        .returning();
+      await admitCodeReviewLedgerRow({
+        reviewId: review.id,
+        userId: testUser.id,
+        triggerSource: null,
+      });
+      const attempt = await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+      let changedState: Awaited<ReturnType<typeof cancellationState>> | undefined;
+      mockCancelReview.mockImplementationOnce(async () => {
+        if (change === 'completed') {
+          await updateCodeReviewAttemptForCallback({
+            codeReviewId: review.id,
+            attemptId: attempt.id,
+            status: 'completed',
+          });
+          await updateCodeReviewStatus(review.id, 'completed');
+          await settleCodeReviewLedgerRow({
+            reviewId: review.id,
+            status: 'completed',
+            terminalReason: null,
+            triggerSource: null,
+          });
+        } else if (change === 'successor') {
+          await createCodeReviewAttempt({ codeReviewId: review.id, status: 'queued' });
+        } else {
+          await db
+            .update(cloud_agent_code_review_attempts)
+            .set({ execution_id: 'exec-started' })
+            .where(eq(cloud_agent_code_review_attempts.id, attempt.id));
+        }
+        changedState = await cancellationState(review.id);
+        if (outcome === 'unreachable') throw new Error('Worker unavailable');
+        return { success: false, reviewId: review.id };
+      });
+      const caller = await createCallerForUser(testUser.id);
+
+      expect(await caller.codeReviews.cancel({ reviewId: review.id })).toEqual({
+        success: false,
+        error: 'Code review attempt changed before cancellation',
+      });
+
+      expect(changedState).toBeDefined();
+      expect(await cancellationState(review.id)).toEqual(changedState);
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not claim success for queued reviews with a session when the Worker returns false', async () => {
     const [review] = await db
@@ -1986,6 +2143,91 @@ describe('codeReviewRouter attempts', () => {
       created_by: testUser.id,
     });
   }
+
+  it.each(['pending', 'queued', 'running'] as const)(
+    'cancels a pinned isolate %s attempt locally when delivery is unavailable',
+    async status => {
+      const [review] = await db
+        .insert(cloud_agent_code_reviews)
+        .values(
+          reviewValues(testUser.id, status, {
+            owned_by_user_id: null,
+            owned_by_organization_id: organization.id,
+            check_run_id: 111,
+          })
+        )
+        .returning();
+      const attemptId = crypto.randomUUID();
+      await db.insert(cloud_agent_code_review_attempts).values({
+        id: attemptId,
+        code_review_id: review.id,
+        attempt_number: 1,
+        status,
+        reviewer_backend: 'isolate',
+        reviewer_execution_id: attemptId,
+        reviewer_selected_at: new Date().toISOString(),
+      });
+      mockUpdateCheckRun.mockClear();
+      mockCancelReview.mockRejectedValue(new Error('Unavailable'));
+      const caller = await createCallerForUser(testUser.id);
+      expect(await caller.codeReviews.cancel({ reviewId: review.id })).toMatchObject({
+        success: true,
+      });
+      expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', attemptId);
+      expect(await getLatestCodeReviewAttempt(review.id)).toMatchObject({
+        status: 'cancelled',
+        reviewer_backend: 'isolate',
+      });
+      expect(
+        (
+          await db
+            .select()
+            .from(cloud_agent_code_reviews)
+            .where(eq(cloud_agent_code_reviews.id, review.id))
+        )[0]
+      ).toMatchObject({ status: 'cancelled', terminal_reason: 'user_cancelled' });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+    }
+  );
+
+  it('creates an unselected retrigger atomically and rejects cancellation by an old isolate attempt', async () => {
+    await insertEnabledAgentConfig();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'failed'))
+      .returning();
+    const attemptId = crypto.randomUUID();
+    await db.insert(cloud_agent_code_review_attempts).values({
+      id: attemptId,
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'failed',
+      reviewer_backend: 'isolate',
+      reviewer_execution_id: attemptId,
+      reviewer_selected_at: new Date().toISOString(),
+    });
+    mockTryDispatchPendingReviews.mockImplementation(async () => {
+      expect(await getLatestCodeReviewAttempt(review.id)).toMatchObject({
+        reviewer_backend: 'unselected',
+        retry_of_attempt_id: attemptId,
+        status: 'pending',
+      });
+      return { dispatched: 0, notDispatched: 0, activeCount: 0 };
+    });
+    const caller = await createCallerForUser(testUser.id);
+    expect(await caller.codeReviews.retrigger({ reviewId: review.id })).toMatchObject({
+      success: true,
+    });
+    expect(await cancelCodeReview(review.id, attemptId)).toBe(false);
+    expect(
+      (
+        await db
+          .select()
+          .from(cloud_agent_code_reviews)
+          .where(eq(cloud_agent_code_reviews.id, review.id))
+      )[0].status
+    ).toBe('pending');
+  });
 
   it('returns attempts from get and preserves history during retrigger', async () => {
     await insertEnabledAgentConfig();

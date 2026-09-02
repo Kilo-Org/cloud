@@ -1,10 +1,38 @@
 'use server';
 
 import PostHogClient from '@/lib/posthog';
+import { z } from 'zod';
 
 import { captureException, startSpan } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
+
+const IsolateReviewOrganizationsSchema = z
+  .object({ organizationIds: z.array(z.uuid()).max(10_000) })
+  .strict();
+
+export async function isOrganizationAllowlistedForIsolateReviews(
+  organizationId: string
+): Promise<boolean> {
+  if (!z.uuid().safeParse(organizationId).success) return false;
+
+  const flagName = 'code-review-isolate-organizations';
+  try {
+    return await startSpan({ name: flagName, op: 'posthog-feature-flag-boolean' }, async () => {
+      if ((await posthogClient.getFeatureFlag(flagName, organizationId)) !== true) return false;
+      const payload = IsolateReviewOrganizationsSchema.safeParse(
+        await posthogClient.getFeatureFlagPayload(flagName, organizationId, true)
+      );
+      return payload.success && payload.data.organizationIds.includes(organizationId);
+    });
+  } catch {
+    captureException(new Error('Isolate review rollout lookup failed'), {
+      tags: { source: 'posthog_feature_flag_boolean_enabled' },
+      extra: { flagName },
+    });
+    return false;
+  }
+}
 
 /**
  * Generic server action to check if a PostHog feature flag is enabled (boolean flags)

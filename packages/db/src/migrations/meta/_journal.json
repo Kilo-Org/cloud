@@ -1646,6 +1646,20 @@
       "when": 1788031699722,
       "tag": "0234_amused_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 235,
+      "version": "7",
+      "when": 1788344279956,
+      "tag": "0235_isolate_review_attempt_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 236,
+      "version": "7",
+      "when": 1788344309850,
+      "tag": "0236_validate_isolate_review_attempt_state",
+      "breakpoints": true
     }
   ]
 }

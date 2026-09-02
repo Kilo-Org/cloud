@@ -24,8 +24,10 @@ import { codeReviewTerminalOutcome } from '../code-review-ledger';
 import { db } from '@/lib/drizzle';
 import {
   agent_configs,
+  cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  operation_ledgers,
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
@@ -34,7 +36,9 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   cancelActiveCodeReviewsById,
+  cancelCodeReview,
   createCodeReview,
+  createCodeReviewAttempt,
   disableBitbucketCodeReviewerForIntegration,
   updateCodeReviewStatus,
 } from './code-reviews';
@@ -108,7 +112,7 @@ describe('codeReviewTerminalOutcome', () => {
   });
 });
 
-describe('cancel settle is best-effort', () => {
+describe('cancellation ledger settlement', () => {
   let testUser: User;
   let organizationId: string;
   let githubIntegrationId: string;
@@ -187,6 +191,54 @@ describe('cancel settle is best-effort', () => {
     };
     mockAdmitOperation.mockImplementation(actual.admitOperation);
     mockSettleOperation.mockRejectedValue(new Error('ledger unavailable'));
+  });
+
+  it('rolls back local cancellation and reservation release when ledger settlement fails', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: githubIntegrationId,
+      repoFullName: `${REPO}-atomic-cancel`,
+      prNumber: 1,
+      prUrl: `https://github.com/${REPO}-atomic-cancel/pull/1`,
+      prTitle: 'Atomic local cancellation',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/atomic-cancel',
+      headSha: 'atomic-cancel-head-sha',
+      platform: 'github',
+      triggerSource: 'manual',
+    });
+    createdReviewIds.push(reviewId);
+    const [review] = await db
+      .update(cloud_agent_code_reviews)
+      .set({ status: 'queued', dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, reviewId))
+      .returning();
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    const ledger = await db.query.operation_ledgers.findFirst({
+      where: eq(operation_ledgers.operation_key, `review:${reviewId}`),
+    });
+
+    await expect(
+      cancelCodeReview(reviewId, { attemptId: attempt.id, updatedAt: review.updated_at })
+    ).rejects.toThrow('ledger unavailable');
+
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
+    expect(
+      await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, reviewId),
+      })
+    ).toEqual(review);
+    expect(
+      await db.query.cloud_agent_code_review_attempts.findFirst({
+        where: eq(cloud_agent_code_review_attempts.id, attempt.id),
+      })
+    ).toEqual(attempt);
+    expect(
+      await db.query.operation_ledgers.findFirst({
+        where: eq(operation_ledgers.operation_key, `review:${reviewId}`),
+      })
+    ).toEqual(ledger);
   });
 
   it('still cancels reviews when the ledger settle fails (cancelActiveCodeReviewsById)', async () => {

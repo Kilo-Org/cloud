@@ -417,7 +417,7 @@ describe('androidSink widget publish and end', () => {
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('cancels both deadlines immediately for %s', async (status, copy) => {
     androidSink.publish(MIXED);

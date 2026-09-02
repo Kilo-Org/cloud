@@ -189,7 +189,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('preserves the %s blank even after expiry', async (status, copy) => {
     const stored = snapshotFor([], status);
@@ -239,7 +239,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('reads a native %s blank instead of stale legacy storage', async (status, copy) => {
     const old = snapshotFor();

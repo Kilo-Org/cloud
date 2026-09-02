@@ -3219,7 +3219,7 @@
     "stale": "暂时无法更新",
     "expired": "状态已过期",
     "signedOut": "请登录以查看代理",
-    "privacy": "代理已隐藏",
+    "privacy": "打开 Kilo 以查看代理",
     "openAgents": "打开代理",
     "running": "工作中",
     "needsInput": "需要输入",

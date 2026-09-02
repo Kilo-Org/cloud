@@ -3219,7 +3219,7 @@
     "stale": "Can't update now",
     "expired": "Status expired",
     "signedOut": "Sign in to see agents",
-    "privacy": "Agents hidden",
+    "privacy": "Open Kilo to see agents",
     "openAgents": "Open agents",
     "running": "Working",
     "needsInput": "Needs input",

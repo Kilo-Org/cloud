@@ -22,7 +22,7 @@ const COPY: Record<string, string> = {
   'glanceable.stale': 'Updates delayed',
   'glanceable.expired': 'Status expired',
   'glanceable.signedOut': 'Sign in to see agents',
-  'glanceable.privacy': 'Agents hidden',
+  'glanceable.privacy': 'Open Kilo to see agents',
   'glanceable.openAgents': 'Open agents',
 };
 const translate = (key: string): string => COPY[key] ?? key;
@@ -87,7 +87,7 @@ describe('buildAndroidWidgetProps', () => {
       ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
-      ['privacy', [], 'Agents hidden', 0, false],
+      ['privacy', [], 'Open Kilo to see agents', 0, false],
     ];
     for (const [status, sessions, statusLine, counts, showOpenAgents] of cases) {
       const props = buildAndroidWidgetProps(snapshotFor(sessions, 0, status), {}, translate);
@@ -142,7 +142,7 @@ describe('current widget deadline rendering', () => {
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
     ['empty', 'No work in progress'],
     ['waiting', 'Waiting for agents'],
@@ -210,7 +210,7 @@ describe('status precedence and count hiding', () => {
     ['empty', 'No work in progress'],
     ['expired', 'Status expired'],
     ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
   ] as const)('hides counts on every Android surface for %s', (status, expected) => {
     const snapshot = { ...MIXED, status };
     const props = buildAndroidWidgetProps(snapshot, {}, translate);
@@ -225,7 +225,7 @@ describe('status precedence and count hiding', () => {
 
   it.each([
     [{ signedOut: true, orgInvalid: true }, 'Sign in to see agents'],
-    [{ orgInvalid: true }, 'Agents hidden'],
+    [{ orgInvalid: true }, 'Open Kilo to see agents'],
   ] as const)('honors auth overrides before stale counts: %j', (flags, expected) => {
     const snapshot = { ...MIXED, status: 'stale' as const };
     const props = buildAndroidWidgetProps(snapshot, flags, translate);

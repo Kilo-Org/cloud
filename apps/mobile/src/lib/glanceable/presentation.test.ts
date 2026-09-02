@@ -170,7 +170,7 @@ describe('numeric spoken label', () => {
     'glanceable.stale': 'Updates delayed',
     'glanceable.expired': 'Status expired',
     'glanceable.signedOut': 'Sign in to see agents',
-    'glanceable.privacy': 'Agents hidden',
+    'glanceable.privacy': 'Open Kilo to see agents',
     'glanceable.openAgents': 'Open agents',
   };
   const translate = (key: string): string => copy[key] ?? key;
@@ -204,7 +204,7 @@ describe('numeric spoken label', () => {
     ['empty', 'No work in progress, Open agents'],
     ['expired', 'Status expired, Open agents'],
     ['signed_out', 'Sign in to see agents, Open agents'],
-    ['privacy', 'Agents hidden, Open agents'],
+    ['privacy', 'Open Kilo to see agents, Open agents'],
   ] as const)('hides numeric counts when the status is %s', (status, expected) => {
     expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate)).toBe(expected);
   });
@@ -215,7 +215,7 @@ describe('numeric spoken label', () => {
       'Sign in to see agents, Open agents'
     );
     expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate)).toBe(
-      'Agents hidden, Open agents'
+      'Open Kilo to see agents, Open agents'
     );
   });
 });

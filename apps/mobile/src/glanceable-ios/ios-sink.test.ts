@@ -726,7 +726,7 @@ describe('iosSink widget publish', () => {
 
   it.each([
     ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
   ] as const)('keeps %s copy after a previous active timeline expires', (status, statusLine) => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -777,7 +777,7 @@ describe('iosSink widget publish', () => {
       ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
-      ['privacy', [], 'Agents hidden', 0, false],
+      ['privacy', [], 'Open Kilo to see agents', 0, false],
     ];
     for (const [status, sessions, statusLine, counts, hasPrimary] of cases) {
       iosSink.publish(snapshotFor(sessions, 0, status));

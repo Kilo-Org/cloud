@@ -50,6 +50,13 @@ describe('withGlanceableCopy', () => {
     expect(JSON.parse(JSON.parse(literal) as string)).toEqual(glanceableLayoutCopy());
   });
 
+  it('bakes the locale in the form the SwiftUI modifier accepts', () => {
+    // `@expo/ui` applies the locale only when `Locale.availableIdentifiers`
+    // contains the value, and that list writes `zh_Hans`, not `zh-Hans`. A
+    // hyphen there silently left the wait in the device language.
+    expect(glanceableLayoutCopy().locale).not.toContain('-');
+  });
+
   it('covers every status the layouts render, plus the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
       'empty',

@@ -31,6 +31,16 @@ const COPY_PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
  * language. The layouts feed the tag to SwiftUI's `locale` environment value
  * so the whole surface speaks one language.
  *
+ * The tag is the underscore form, because `@expo/ui`'s `locale` modifier
+ * applies the value only when `Locale.availableIdentifiers` contains it, and
+ * that list spells a script or region subtag with an underscore. `zh-Hans`,
+ * `zh-Hant` and `pt-BR` failed the check and silently left the wait in the
+ * device language, which is the one thing this tag exists to prevent. A
+ * numbering-system extension (`ar-u-nu-latn`) fails the same check, so the
+ * counts stay in Western digits beside an Arabic-Indic wait; formatting the
+ * wait in JS instead would freeze it, because a pushed content state carries
+ * only the timestamp.
+ *
  * The slot names are the layouts' own field names, and the status slots match
  * `GlanceableAgentsSnapshot['status']` so a layout can index this by status.
  */
@@ -46,7 +56,7 @@ export function glanceableLayoutCopy() {
     running: i18n.t('glanceable.running'),
     idle: i18n.t('glanceable.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
-    locale: i18n.language,
+    locale: i18n.language.replace('-', '_'),
   };
 }
 

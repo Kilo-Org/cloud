@@ -415,7 +415,7 @@ export function ChatInput({
     showToolbar && onModeChange && onModelChange && (modelOptions.length > 0 || pinnedModelOption);
 
   return (
-    <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
+    <div className="px-[max(1rem,calc(50%_-_27rem))] py-2">
       <div
         className={cn(
           'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
@@ -476,7 +476,7 @@ export function ChatInput({
               placeholder={placeholder}
               disabled={disabled}
               maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
+              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
               rows={1}
               role="combobox"
               aria-expanded={showAutocomplete}

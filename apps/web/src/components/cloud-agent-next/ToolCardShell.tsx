@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { ChevronDown, Loader2, XCircle } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
 type ToolCardShellProps = {
@@ -25,42 +26,64 @@ export function ToolCardShell({
   children,
 }: ToolCardShellProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false);
-
-  function renderStatusIcon() {
-    switch (status) {
-      case 'pending':
-      case 'running':
-        return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />;
-      case 'completed':
-        return <Icon className="text-muted-foreground h-4 w-4 shrink-0" />;
-      case 'error':
-        return <XCircle className="h-4 w-4 shrink-0 text-red-500" />;
-    }
-  }
+  const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
   return (
-    <div className="border-muted bg-muted/30 rounded-md border">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        {renderStatusIcon()}
-        {subtitle ? (
-          <code className="min-w-0 flex-1 truncate text-sm">{subtitle}</code>
-        ) : (
-          <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">{title}</span>
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} data-tool-card>
+      <CollapsibleTrigger
+        onPointerDown={event => {
+          pointerDown.current = { x: event.clientX, y: event.clientY };
+        }}
+        onPointerCancel={() => {
+          pointerDown.current = null;
+        }}
+        onClick={event => {
+          const start = pointerDown.current;
+          pointerDown.current = null;
+          if (event.detail === 0 || !start) return;
+          const selection = event.currentTarget.ownerDocument.getSelection();
+          if (!selection || selection.isCollapsed) return;
+          const dragged =
+            Math.abs(event.clientX - start.x) > 2 || Math.abs(event.clientY - start.y) > 2;
+          if (!dragged && event.detail === 1 && !event.shiftKey) return;
+          for (let index = 0; index < selection.rangeCount; index++) {
+            if (selection.getRangeAt(index).intersectsNode(event.currentTarget)) {
+              event.preventDefault();
+              return;
+            }
+          }
+        }}
+        className={cn(
+          'text-muted-foreground hover:bg-muted/40 hover:text-foreground focus-visible:ring-ring flex min-h-6 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs select-text focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11',
+          status === 'error' && 'text-destructive'
         )}
+      >
+        {status === 'pending' || status === 'running' ? (
+          <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+        ) : status === 'error' ? (
+          <XCircle className="size-3.5 shrink-0" />
+        ) : (
+          <Icon className="size-3.5 shrink-0" />
+        )}
+        <span className={cn('min-w-0 truncate', subtitle && 'max-w-[45%] shrink-0')} title={title}>
+          {title}
+        </span>
+        {subtitle && (
+          <>
+            <span aria-hidden="true" className="text-muted-foreground/60">
+              ·
+            </span>
+            <code className="min-w-0 cursor-text truncate text-xs">{subtitle}</code>
+          </>
+        )}
+        <span className="flex-1" />
+        {status === 'error' && <span className="text-destructive">Failed</span>}
         {badge}
-        <ChevronDown
-          className={cn(
-            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
-
-      {isExpanded && <div className="border-muted space-y-2 border-t px-3 py-2">{children}</div>}
-    </div>
+        <ChevronRight className={cn('size-3.5 shrink-0', isExpanded && 'rotate-90')} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="border-border/60 mt-1 ml-3 space-y-2 border-l px-3 py-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

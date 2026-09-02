@@ -28,31 +28,115 @@ function makeTextPart(text: string): TextPart {
   };
 }
 
+const encryptedMetadata = [
+  {
+    name: 'OpenAI encrypted content',
+    metadata: { openai: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+  },
+  {
+    name: 'Copilot encrypted content',
+    metadata: { copilot: { reasoningEncryptedContent: 'encrypted-reasoning' } },
+  },
+  {
+    name: 'OpenRouter encrypted-only details',
+    metadata: {
+      openrouter: {
+        reasoning_details: [{ type: 'reasoning.encrypted', data: 'encrypted-reasoning' }],
+      },
+    },
+  },
+  {
+    name: 'Anthropic redacted data',
+    metadata: { anthropic: { redactedData: 'redacted-reasoning' } },
+  },
+] satisfies { name: string; metadata: ReasoningPart['metadata'] }[];
+
 describe('shouldRenderReasoningPart', () => {
-  it('does not render a completed reasoning part with empty text', () => {
-    expect(shouldRenderReasoningPart(makeReasoningPart('', true))).toBe(false);
+  it.each([
+    { name: 'empty', text: '' },
+    { name: 'whitespace-only', text: '   \n\t  ' },
+    { name: 'redacted-only', text: '[REDACTED]' },
+    { name: 'adjacent repeated redactions', text: '[REDACTED][REDACTED]' },
+    { name: 'redactions separated by whitespace', text: ' \n[REDACTED]\t[REDACTED]  ' },
+    { name: 'empty HTML comment', text: '<!-- -->' },
+    { name: 'HTML comment placeholder', text: '<!-- reasoning unavailable -->' },
+    { name: 'multiline HTML comments', text: ' <!-- first\nplaceholder -->\n<!-- second --> ' },
+    { name: 'streaming comment opener', text: ' \n<!--\t ' },
+    { name: 'comments mixed with redactions', text: '[REDACTED]<!-- placeholder -->[REDACTED]' },
+  ])('hides $name reasoning whether completed or streaming', ({ text }) => {
+    for (const ended of [true, false]) {
+      const part = makeReasoningPart(text, ended);
+      expect(isPartStreaming(part)).toBe(!ended);
+      expect(shouldRenderReasoningPart(part)).toBe(false);
+    }
   });
 
-  it('does not render a completed reasoning part with whitespace-only text', () => {
-    expect(shouldRenderReasoningPart(makeReasoningPart('   \n\t  ', true))).toBe(false);
+  it.each([
+    'thinking through the steps',
+    'Check [REDACTED] before continuing.',
+    '[REDACTED]The answer depends on the input.[REDACTED]',
+    '<!-- placeholder -->Check the input.<!-- another placeholder -->',
+    '<!--\nThe next step is still streaming.',
+    '## Inspect the parser\n\n<!-- -->',
+  ])('renders meaningful text %j whether completed or streaming', text => {
+    for (const ended of [true, false]) {
+      const part = makeReasoningPart(text, ended);
+      expect(shouldRenderReasoningPart(part)).toBe(true);
+      expect(part.text).toBe(text);
+    }
   });
 
-  it('renders a completed reasoning part with meaningful text', () => {
-    expect(shouldRenderReasoningPart(makeReasoningPart('thinking through the steps', true))).toBe(
-      true
-    );
+  it.each(encryptedMetadata)('hides blank reasoning with $name metadata', ({ metadata }) => {
+    for (const text of ['', ' \n\t ', '[REDACTED]', '<!-- placeholder -->', '<!--']) {
+      expect(shouldRenderReasoningPart({ ...makeReasoningPart(text), metadata })).toBe(false);
+    }
   });
 
-  it('does not render a reasoning part that is empty while streaming', () => {
-    const part = makeReasoningPart('', false);
-    expect(isPartStreaming(part)).toBe(true);
-    expect(shouldRenderReasoningPart(part)).toBe(false);
+  it.each([
+    ...encryptedMetadata,
+    {
+      name: 'OpenRouter encrypted and text details',
+      metadata: {
+        openrouter: {
+          reasoning_details: [
+            { type: 'reasoning.encrypted', data: 'encrypted-reasoning' },
+            { type: 'reasoning.text', text: 'Provider reasoning text' },
+          ],
+        },
+      },
+    },
+    {
+      name: 'OpenRouter encrypted and summary details',
+      metadata: {
+        openrouter: {
+          reasoning_details: [
+            { type: 'reasoning.encrypted', data: 'encrypted-reasoning' },
+            { type: 'reasoning.summary', summary: 'Provider reasoning summary' },
+          ],
+        },
+      },
+    },
+    {
+      name: 'Anthropic signature',
+      metadata: { anthropic: { signature: 'reasoning-signature' } },
+    },
+  ])('renders readable text alongside $name metadata', ({ metadata }) => {
+    const part = { ...makeReasoningPart('thinking through the steps'), metadata };
+    expect(shouldRenderReasoningPart(part)).toBe(true);
   });
 
-  it('does not render a whitespace-only unfinished reasoning part', () => {
-    const part = makeReasoningPart('   \n\t  ', false);
-    expect(isPartStreaming(part)).toBe(true);
-    expect(shouldRenderReasoningPart(part)).toBe(false);
+  it('does not mutate frozen reasoning text or provider metadata when ignoring placeholders', () => {
+    const part = {
+      ...makeReasoningPart('<!-- placeholder -->Check [REDACTED] before continuing.'),
+      metadata: { anthropic: { signature: 'reasoning-signature' } },
+    };
+    const original = structuredClone(part);
+    Object.freeze(part.metadata.anthropic);
+    Object.freeze(part.metadata);
+    Object.freeze(part);
+
+    expect(shouldRenderReasoningPart(part)).toBe(true);
+    expect(part).toEqual(original);
   });
 
   it('does not render a non-reasoning part', () => {

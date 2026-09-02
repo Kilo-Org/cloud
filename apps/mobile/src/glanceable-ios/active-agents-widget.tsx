@@ -58,6 +58,20 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // somehow missing it, which is what the widget process would have used anyway.
   const locale = COPY.locale ?? 'en';
 
+  // The counts are stringified here, not formatted: a pushed content state
+  // carries raw numbers and this process has no formatter. `COPY.digits` is the
+  // language's own ten, empty when it writes them the way `String` already
+  // does, so an Arabic count reads "١" beside the "٢٦ د" SwiftUI formats.
+  const digits = COPY.digits ?? '';
+  const count = (value: number) =>
+    digits.length === 10
+      ? // eslint-disable-next-line unicorn/prefer-spread -- `replaceAll` and a spread both failed in the widget process; this form is the one verified on device
+        String(value)
+          .split('')
+          .map(character => digits[Number(character)] ?? character)
+          .join('')
+      : String(value);
+
   const family = widgetEnvironment.widgetFamily;
   const counts = props.countLines ?? [];
   const primaryLabel = props.primaryLabel ?? null;
@@ -135,7 +149,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
             primaryForeground,
           ]}
         >
-          {String(line.count)}
+          {count(line.count)}
         </Text>
         <Text
           modifiers={[
@@ -185,7 +199,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
             ...a11y,
           ]}
         >
-          {hasCounts ? String(primaryCount) : '—'}
+          {hasCounts ? count(primaryCount) : '—'}
         </Text>
       </VStack>
     );
@@ -193,7 +207,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
 
   if (family === 'accessoryInline') {
     const label = hasCounts
-      ? `${primaryCount}${primaryLabel !== null ? ` ${primaryLabel}` : ''}`
+      ? `${count(primaryCount)}${primaryLabel !== null ? ` ${primaryLabel}` : ''}`
       : (statusLine ?? '');
     return (
       <HStack

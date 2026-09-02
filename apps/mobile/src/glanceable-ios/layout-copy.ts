@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { GLANCEABLE_STATUS_COPY_KEY } from '@/lib/glanceable/presentation';
+import { numberFormat } from '@/lib/intl-cache';
 
 /**
  * Translated copy for the stringified `'widget'` layouts.
@@ -57,6 +58,7 @@ export function glanceableLayoutCopy() {
     idle: i18n.t('glanceable.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
     locale: i18n.language.replace('-', '_'),
+    digits: glanceableDigits(),
   };
 }
 
@@ -71,6 +73,21 @@ export function glanceableLayoutCopy() {
  * quotes, so `JSON.stringify` produces a correctly escaped source literal for
  * copy that contains an apostrophe.
  */
+/**
+ * The active language's ten digits, or an empty string when it writes them the
+ * way the layout already does.
+ *
+ * The layout stringifies its counts itself, because a pushed content state
+ * carries raw numbers and the widget process has no formatter, so an Arabic
+ * row drew "1" beside a wait SwiftUI had formatted as "٢٦ د". Baking the digits
+ * lets the layout map its own — one table, every surface, push included.
+ */
+function glanceableDigits(): string {
+  const formatter = numberFormat(i18n.language, { useGrouping: false });
+  const digits = Array.from({ length: 10 }, (_, digit) => formatter.format(digit)).join('');
+  return digits === '0123456789' ? '' : digits;
+}
+
 export function withGlanceableCopy<T>(layout: T): T {
   // eslint-disable-next-line anti-slop/no-runtime-typeof -- the two representations are the contract; see above
   if (typeof layout !== 'string') {

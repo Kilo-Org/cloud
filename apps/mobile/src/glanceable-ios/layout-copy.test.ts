@@ -50,6 +50,12 @@ describe('withGlanceableCopy', () => {
     expect(JSON.parse(JSON.parse(literal) as string)).toEqual(glanceableLayoutCopy());
   });
 
+  it('bakes no digit table for a language that writes the plain ten', () => {
+    // English is `latn`, so the layout's own `String` is already right and the
+    // empty table tells it to skip the mapping.
+    expect(glanceableLayoutCopy().digits).toBe('');
+  });
+
   it('bakes the locale in the form the SwiftUI modifier accepts', () => {
     // `@expo/ui` applies the locale only when `Locale.availableIdentifiers`
     // contains the value, and that list writes `zh_Hans`, not `zh-Hans`. A
@@ -59,6 +65,7 @@ describe('withGlanceableCopy', () => {
 
   it('covers every status the layouts render, plus the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
+      'digits',
       'empty',
       'expired',
       'idle',

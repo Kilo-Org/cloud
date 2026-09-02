@@ -56,6 +56,20 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // somehow missing it, which is what the widget process would have used anyway.
   const locale = COPY.locale ?? 'en';
 
+  // The counts are stringified here, not formatted: a pushed content state
+  // carries raw numbers and this process has no formatter. `COPY.digits` is the
+  // language's own ten, empty when it writes them the way `String` already
+  // does, so an Arabic count reads "١" beside the "٢٦ د" SwiftUI formats.
+  const digits = COPY.digits ?? '';
+  const count = (value: number) =>
+    digits.length === 10
+      ? // eslint-disable-next-line unicorn/prefer-spread -- `replaceAll` and a spread both failed in the widget process; this form is the one verified on device
+        String(value)
+          .split('')
+          .map(character => digits[Number(character)] ?? character)
+          .join('')
+      : String(value);
+
   const status = props.status ?? 'empty';
   const statusLine = status === 'happy' ? null : COPY[status];
 
@@ -93,7 +107,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // number worth showing.
   const primary = countLines.find(line => line.count > 0) ?? null;
   const hasCounts = primary !== null;
-  const primaryCount = String(primary === null ? 0 : primary.count);
+  const primaryCount = count(primary === null ? 0 : primary.count);
   // Only the needs-input row carries a duration, and only the oldest wait: a
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
@@ -148,7 +162,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
           primaryForeground,
         ]}
       >
-        {String(line.count)}
+        {count(line.count)}
       </Text>
       <Text
         modifiers={[

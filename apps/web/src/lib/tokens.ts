@@ -7,11 +7,15 @@ import {
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  KILO_API_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  buildModernKiloTokenPayload,
+  isKiloResourceAudienceAllowed,
+} from '@kilocode/worker-utils/kilo-token-policy';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
@@ -203,7 +207,10 @@ function tryJwtVerify(token: string) {
   }
 }
 
-export function validateAuthorizationHeader(headers: Headers) {
+export function validateAuthorizationHeader(
+  headers: Headers,
+  options?: { expectedAudience?: string }
+) {
   const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
@@ -215,6 +222,16 @@ export function validateAuthorizationHeader(headers: Headers) {
   const payload = tryJwtVerify(token);
 
   if (!payload) {
+    warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+    return { error: `Invalid token (${traceability_logging_id})` };
+  }
+
+  if (
+    !isKiloResourceAudienceAllowed(payload.aud, {
+      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    })
+  ) {
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return { error: `Invalid token (${traceability_logging_id})` };
   }

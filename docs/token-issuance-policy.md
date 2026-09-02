@@ -125,6 +125,21 @@ Excluded from the credential-exchange compatibility class or treated as separate
 
 KiloClaw's five-minute control tokens (one-hour setup token), 24-hour access cookies, and 30-day runtime keys are distinct. Gastown runtime credentials also last 30 days; organization tokens last 15 minutes and benchmark tokens six hours. None qualifies for the five-year exchange compatibility class.
 
+## Phase 4: web and HTML-deployment readers
+
+The earlier sections describe the Phase 1 contracts. The web/deployment reader integration adds audience-only checks without changing token issuance or adopting the stricter credential-exchange schema for ordinary requests:
+
+- General web/API bearer authentication expects `kilo-api` by default. `validateAuthorizationHeader` checks the audience after signature verification; `getUserFromAuth` passes an optional, server-owned `expectedAudience` override. Cookie-session authentication and existing account/pepper checks are unchanged. A rejected bearer does not fall back to a browser session.
+- Model gateway operations explicitly expect `kilo-gateway`: chat/completions, Responses, Messages, embeddings, transcription, FIM, edit completions, model catalogs/validation, and the billed Exa proxy. Re-exported gateway/v1 handlers inherit the implementation's expectation; request headers and URL paths do not select the audience policy.
+- Existing public catalogs and anonymous/free-model behavior remain available after authentication rejection where already supported. Such requests must remain anonymous, without the rejected token's user, organization, BYOK, bot, source, or billing identity.
+- HTML deployment expects the dedicated `deploy-builder:html-deploy` audience before rate limiting or deployment work. This does not change the builder's separate backend-secret `/deploy` interface.
+
+All three resource boundaries retain supported audience-less legacy tokens. Explicit audiences require exact matching, or membership in a valid audience array; null, empty, malformed, duplicate, and mismatched audiences are rejected. These changes do not add an environment check to ordinary web authentication, alter its historical timestamp handling, or migrate any signers.
+
+The Gastown Git-credentials callback uses the general `kilo-api` boundary. Its current audience-less runtime token remains accepted, but a future gateway-only token must not retrieve Git credentials. Split those runtime credentials or explicitly authorize the necessary resource set before migrating that issuer. This callback still has its existing integration-ownership checks, not newly added general account/pepper checks.
+
+Do not treat every legacy-only verifier as a resource-migration target. Cloud Agent wrapper fallback must remain audience-less-only; REST `cloud-agent-next` tokens are not wrapper-dispatch capabilities. Existing deletion/export/Git operation audiences stay mandatory. Git user-authorization disconnect currently has a legacy-only contract and needs a dedicated operation-contract decision before its producer adopts an audience; do not widen it with the general API or gateway audience. Stored-token renewal and runtime reuse checks are separate issuer-migration work.
+
 ## Migration preconditions
 
 Before moving any resource from `allow-legacy` to `required`:

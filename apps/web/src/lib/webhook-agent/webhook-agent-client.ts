@@ -1,6 +1,7 @@
 import 'server-only';
 import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@/lib/config.server';
 import { encodeUserIdForPath } from './user-id-encoding';
+import * as z from 'zod';
 
 /**
  * Response type for trigger config from the worker.
@@ -17,6 +18,8 @@ export type TriggerConfigResponse = {
   githubRepo: string | null;
   mode: string | null;
   model: string | null;
+  variant?: string | null;
+  sandboxAllocation?: 'isolated-standard';
   promptTemplate: string;
   profileId?: string | null;
   autoCommit?: boolean;
@@ -40,6 +43,8 @@ export type CreateTriggerInput = {
   githubRepo?: string;
   mode?: string;
   model?: string;
+  variant?: string;
+  sandboxAllocation?: 'isolated-standard';
   promptTemplate: string;
   profileId?: string;
   autoCommit?: boolean;
@@ -61,6 +66,8 @@ export type CreateTriggerInput = {
 export type UpdateTriggerInput = {
   mode?: string;
   model?: string;
+  variant?: string | null;
+  sandboxAllocation?: 'isolated-standard' | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string;
@@ -106,6 +113,13 @@ export type EnrichedCapturedRequest = CapturedRequest & {
 type WorkerResponse<T> =
   | { success: true; data: T; status: number }
   | { success: false; error: string; status: number };
+
+const scheduledTriggerInvokeResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    requestId: z.string().uuid(),
+  }),
+});
 
 function buildNamespace(userId?: string, organizationId?: string): string {
   if (organizationId) {
@@ -282,6 +296,45 @@ export async function deleteWorkerTrigger(
   }
 
   return { success: true };
+}
+
+export async function invokeWorkerScheduledTrigger(
+  userId: string | undefined,
+  organizationId: string | undefined,
+  triggerId: string
+): Promise<
+  { success: true; requestId: string } | { success: false; error: string; status: number }
+> {
+  const namespace = buildNamespace(userId, organizationId);
+  const path = `${buildTriggerPath(namespace, triggerId)}/invoke`;
+
+  try {
+    const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (response.status !== 202) {
+      return {
+        success: false,
+        error: 'Scheduled trigger invocation failed',
+        status: response.status,
+      };
+    }
+
+    const body: unknown = await response.json();
+    const parsed = scheduledTriggerInvokeResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      return { success: false, error: 'Scheduled trigger invocation failed', status: 502 };
+    }
+
+    return { success: true, requestId: parsed.data.data.requestId };
+  } catch {
+    return { success: false, error: 'Scheduled trigger invocation failed', status: 502 };
+  }
 }
 
 export async function listWorkerRequests(

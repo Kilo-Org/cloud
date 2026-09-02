@@ -152,7 +152,11 @@
     "appearanceDark": "深色",
     "account": "帳戶",
     "prReviewAttribution": "在 PR 審查中加入應用程式歸因",
-    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。"
+    "prReviewAttributionSubtitle": "提交審查時，附加「Reviewed via Kilo」頁尾。",
+    "returnSendsMessage": "換行鍵傳送訊息",
+    "returnSendsMessageSubtitle": "關閉時，換行鍵會在代理撰寫器中插入換行。",
+    "biometricUnlock": "使用生物辨識解鎖",
+    "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。"
   },
   "notifications": {
     "title": "通知",
@@ -211,7 +215,8 @@
     "profile": "個人資料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}，標籤頁，{{total}} 中的第 {{position}} 個"
+    "position": "{{name}}，標籤頁，{{total}} 中的第 {{position}} 個",
+    "chat": "聊天"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "網路錯誤",
       "uploadFailed": "上傳失敗",
       "failedToUploadFile": "上傳檔案失敗：{{reason}}",
-      "nothingToPaste": "沒有可貼上的內容"
+      "nothingToPaste": "沒有可貼上的內容",
+      "metadataStripFailed": "無法移除相片中繼資料。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -898,7 +904,23 @@
       "title": "審查",
       "tokens": "Token",
       "tokensInOut": "{{input}} 輸入 / {{output}} 輸出",
-      "pullRequest": "拉取請求"
+      "pullRequest": "拉取請求",
+      "transcriptWaiting": "正在等待審閱逐字稿。",
+      "transcriptEmpty": "此審閱沒有逐字稿。",
+      "transcriptRetry": "無法載入審閱逐字稿。",
+      "transcriptLive": "即時",
+      "agentIdle": "代理閒置",
+      "agentWorking": "代理工作中…",
+      "anErrorOccurred": "發生錯誤",
+      "errorWithMessage": "錯誤：{{message}}",
+      "executionStarted": "執行已開始",
+      "reviewCompleted": "審查已完成",
+      "reviewInterrupted": "審查已中斷",
+      "sessionError": "工作階段錯誤：{{error}}",
+      "statusWithValue": "狀態：{{status}}",
+      "toolName": "工具：{{name}}",
+      "toolNameError": "工具：{{name}} — 錯誤",
+      "unknownError": "未知錯誤"
     },
     "reviewList": {
       "configureProvider": "設定供應商",
@@ -1579,7 +1601,6 @@
     }
   },
   "agents": {
-    "activeNow": "目前使用中",
     "search": {
       "searching": "搜尋中",
       "searchSessions": "搜尋工作階段",
@@ -1590,16 +1611,15 @@
     "sessionList": {
       "couldNotLoad": "無法載入工作階段",
       "couldNotLoadActive": "無法載入使用中的工作階段",
-      "noSessionsYet": "尚無工作階段",
       "noSessionsYetDescription": "從手機開始程式設計任務。您的工作階段將顯示在這裡。",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
       "tryAdjustFilters": "請嘗試調整或清除您的篩選條件。",
       "couldNotSearch": "無法搜尋工作階段",
-      "allActive": "所有工作階段皆在使用中",
       "completedWillAppear": "已完成的工作階段將顯示在這裡。",
       "noPastSessions": "沒有過去的工作階段",
-      "live": "即時"
+      "live": "即時",
+      "updating": "更新中"
     },
     "sessionRow": {
       "deleteTitle": "刪除工作階段？",
@@ -1643,7 +1663,9 @@
     "sessionExited": "工作階段已結束",
     "remoteSpawnRetryable": "無法連線到該執行個體 — 它可能已斷線。",
     "remoteSpawnNonRetryable": "該執行個體無法啟動工作階段 — 請檢查機器或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "選取的執行個體已斷線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。"
+    "remoteSpawnInstanceDisconnected": "選取的執行個體已斷線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。",
+    "liveCount_one": "{{count}} 即時",
+    "liveCount_other": "{{count}} 即時"
   },
   "agentChat": {
     "session": {
@@ -1665,18 +1687,19 @@
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
-      "connectRepository": "連線存放庫",
       "cloningSession": "正在複製工作階段",
       "continue": "繼續",
       "couldNotLoadThisSession": "無法載入此工作階段",
-      "cloneFailed": "無法複製此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請重試。",
-      "connectRepositoryToContinue": "連接一個存放庫以繼續。",
       "notEnoughCredits": "執行 Cloud Agent 的額度不足。請新增額度後重試。",
       "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
       "serviceUnavailable": "服務目前無法使用。請重試。",
       "connectionTrouble": "連線發生問題。請稍後重試。",
-      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。"
+      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。",
+      "cancelQueuedFailed": "無法取消訊息。",
+      "cancelQueuedRestoreAvailable": "訊息已取消。請點按「還原」將其放回撰寫器。",
+      "cancelQueuedRestored": "訊息已取消。提示已放回撰寫器。",
+      "cancelQueuedUpgradeRequired": "取消已排入佇列的訊息需要更新的 Kilo CLI。請更新 Kilo CLI 並重新連接。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",
@@ -1744,7 +1767,12 @@
       "noRepositoriesVisibleGitlab": "沒有可見的儲存庫。檢查 GitLab 的儲存庫存取權限，然後重新整理。",
       "openBitbucket": "開啟 Bitbucket",
       "openGitlab": "開啟 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在繼續 {{title}}",
+      "importingSession": "正在匯入工作階段",
+      "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
+      "importFailed": "無法匯入此工作階段。",
+      "discardWithUploadsMessage": "您的提示和任何未附加至已傳送訊息的上傳檔案將遭刪除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案",
@@ -1802,7 +1830,9 @@
       "noCliInstancesDescription": "在您電腦上的專案中執行 `kilo remote`，或如果已有 Kilo CLI 在執行，請更新它。",
       "instanceOnProject": "{{project}} 上的 {{name}}",
       "instanceOnProjectSuffix": "{{project}} 上的 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "在雲端代理上執行"
+      "runOnCloudAgent": "在雲端代理上執行",
+      "terminals": "終端機",
+      "remotes": "遠端執行個體"
     },
     "modePicker": {
       "title": "選取模式",
@@ -1992,7 +2022,11 @@
       "queuedAccessibility": "訊息已排入佇列",
       "userMessage": "使用者訊息",
       "assistantMessage": "助理訊息",
-      "longPressHint": "長按以檢視訊息詳細資料"
+      "longPressHint": "長按以檢視訊息詳細資料",
+      "cancelQueued": "取消訊息",
+      "cancelQueuedAccessibility": "取消已排入佇列的訊息",
+      "restoreQueued": "還原",
+      "restoreQueuedAccessibility": "將已取消的訊息還原至撰寫器"
     },
     "olderMessages": {
       "arrived": "已載入較早的訊息",
@@ -2008,6 +2042,8 @@
       "viewTable": "檢視表格",
       "title": "表格",
       "close": "關閉表格",
+      "loading": "正在載入表格",
+      "empty": "此表格沒有任何列。",
       "columnCount_one": "欄",
       "columnCount": "欄",
       "columnCount_other": "欄",
@@ -2018,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "篩選工作階段",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最後更新",
-      "sortCreated": "建立時間",
       "platform": "平台",
       "platformCloud": "雲端",
       "platformExtension": "擴充功能",
@@ -2029,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "其他",
-      "project": "專案",
-      "removeProjectFilter": "移除 {{label}} 專案篩選條件",
-      "removePlatformFilter": "移除 {{label}} 平台篩選條件"
+      "project": "專案"
     },
     "suggestion": {
       "title": "建議",
@@ -2074,7 +2105,9 @@
       "uploading": "正在上傳…",
       "uploaded": "已上傳",
       "uploadFailedRetry": "上傳失敗。點按重試。",
-      "uploadFailedTerminal": "此檔案無法上傳。"
+      "uploadFailedTerminal": "此檔案無法上傳。",
+      "moveLeft": "將 {{filename}} 向左移動",
+      "moveRight": "將 {{filename}} 向右移動"
     },
     "attachmentPasteHint": {
       "accessibility": "從剪貼簿貼上圖片",
@@ -2104,7 +2137,11 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "訊息...",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
-      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。"
+      "couldNotAttachFiles": "無法附加檔案。點選傳送以重試。",
+      "discardAttachmentsMessage": "未附加至已傳送訊息的上傳檔案將遭刪除。",
+      "discardAttachmentsTitle": "捨棄附件？",
+      "charactersRemaining": "剩餘 {{count}} 個字元",
+      "insertNewline": "插入換行"
     },
     "chatLink": {
       "linkCopied": "連結已複製",
@@ -2196,6 +2233,17 @@
       "hostConfirmMessage": "此連結會在瀏覽器中開啟 {{host}}。",
       "open": "開啟",
       "trustThisHost": "信任此主機"
+    },
+    "folderPicker": {
+      "accessibility": "資料夾：{{label}}",
+      "emptyDescription": "「完成」會使用此資料夾。",
+      "emptyTitle": "裡面沒有資料夾",
+      "fieldLabel": "資料夾",
+      "retryableDescription": "請檢查您的連線並重試。「完成」仍會確認此資料夾。",
+      "retryableTitle": "無法列出資料夾",
+      "tapToListHint": "點選資料夾以列出其中的內容",
+      "unsupportedDescription": "此 CLI 無法列出資料夾。「完成」會保留啟動資料夾，「開始工作階段」會從該處開始。",
+      "unsupportedTitle": "無法列出資料夾"
     }
   },
   "bootstrap": {
@@ -2248,7 +2296,7 @@
     "newCodingTask": "新程式設計任務",
     "explore": "探索",
     "seeAll": "查看全部",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "目前沒有正在執行的內容"
   },
   "imageViewer": {
     "close": "關閉 {{filename}}",
@@ -2312,7 +2360,8 @@
     "busy": "語音輸入忙碌中。請再試一次。",
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
-    "unavailableLanguage": "此裝置語言無法使用語音輸入。"
+    "unavailableLanguage": "此裝置語言無法使用語音輸入。",
+    "listeningStopped": "已停止聆聽。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "當您信任連結的主機時，它會直接開啟，不再詢問。",
     "revoke": "撤銷 {{host}}",
     "backToPreferences": "返回偏好設定"
+  },
+  "quickChat": {
+    "title": "聊天",
+    "composer": {
+      "placeholder": "訊息"
+    },
+    "empty": {
+      "title": "開始聊天",
+      "description": "傳送訊息以與模型對話。"
+    },
+    "working": "處理中",
+    "historyRetry": "無法載入聊天記錄。",
+    "catalogRetry": "無法載入模型",
+    "sendError": "無法傳送訊息。請再試一次。"
   }
 }

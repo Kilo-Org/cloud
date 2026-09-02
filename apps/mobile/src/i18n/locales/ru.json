@@ -152,7 +152,11 @@
     "appearanceDark": "Темная",
     "account": "Аккаунт",
     "prReviewAttribution": "Добавить атрибуцию приложения в проверки PR",
-    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки."
+    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки.",
+    "returnSendsMessage": "Клавиша ввода отправляет сообщение",
+    "returnSendsMessageSubtitle": "Если выключено, клавиша ввода вставляет новую строку в полях ввода сообщений агентам.",
+    "biometricUnlock": "Разблокировать с помощью биометрии",
+    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме."
   },
   "notifications": {
     "title": "Уведомления",
@@ -211,7 +215,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} из {{total}}"
+    "position": "{{name}}, вкладка, {{position}} из {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -247,7 +252,7 @@
       "leaveFailed": "Не удалось покинуть беседу"
     },
     "reactions": {
-      "title": "реакций",
+      "title": "Реакций",
       "close": "Закрыть реакции",
       "recent": "Недавние",
       "common": "Обычные",
@@ -295,7 +300,8 @@
       "networkError": "Ошибка сети",
       "uploadFailed": "Загрузка не удалась",
       "failedToUploadFile": "Не удалось загрузить файл: {{reason}}",
-      "nothingToPaste": "Нечего вставлять"
+      "nothingToPaste": "Нечего вставлять",
+      "metadataStripFailed": "Не удалось удалить метаданные фотографии."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -724,7 +730,7 @@
       "destroying": "УНИЧТОЖЕНИЕ",
       "provisioned": "ПОДГОТОВЛЕН",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "Выполняется",
+      "running": "ВЫПОЛНЯЕТСЯ",
       "shuttingDown": "ЗАВЕРШЕНИЕ РАБОТЫ",
       "starting": "ЗАПУСК",
       "stopped": "ОСТАНОВЛЕН",
@@ -902,7 +908,23 @@
       "title": "Проверка",
       "tokens": "Токены",
       "tokensInOut": "{{input}} вх. / {{output}} исх.",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ожидание протокола проверки.",
+      "transcriptEmpty": "Для этой проверки нет протокола.",
+      "transcriptRetry": "Не удалось загрузить протокол проверки.",
+      "transcriptLive": "Live",
+      "agentIdle": "Агент простаивает",
+      "agentWorking": "Агент работает...",
+      "anErrorOccurred": "Произошла ошибка",
+      "errorWithMessage": "Ошибка: {{message}}",
+      "executionStarted": "Выполнение начато",
+      "reviewCompleted": "Проверка завершена",
+      "reviewInterrupted": "Проверка прервана",
+      "sessionError": "Ошибка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — ошибка",
+      "unknownError": "Неизвестная ошибка"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",
@@ -1591,7 +1613,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сейчас",
     "search": {
       "searching": "Поиск",
       "searchSessions": "Поиск сеансов",
@@ -1602,16 +1623,15 @@
     "sessionList": {
       "couldNotLoad": "Не удалось загрузить сеансы",
       "couldNotLoadActive": "Не удалось загрузить активные сеансы",
-      "noSessionsYet": "Сеансов пока нет",
       "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или очистить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов",
-      "allActive": "Все сеансы активны",
       "completedWillAppear": "Завершенные сеансы появятся здесь.",
       "noPastSessions": "Нет прошлых сеансов",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Обновление"
     },
     "sessionRow": {
       "deleteTitle": "Удалить сеанс?",
@@ -1659,7 +1679,11 @@
     "sessionExited": "Сеанс завершён",
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
     "remoteSpawnNonRetryable": "Экземпляр не смог запустить сеанс — проверьте машину или обновите CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр."
+    "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE",
+    "liveCount_many": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1681,18 +1705,19 @@
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сессию: {{title}}",
-      "connectRepository": "Подключить репозиторий",
       "cloningSession": "Клонирование сессии",
       "continue": "Продолжить",
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
-      "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
       "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
       "connectionTrouble": "Проблемы с подключением. Повторите через мгновение.",
-      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова."
+      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова.",
+      "cancelQueuedFailed": "Не удалось отменить сообщение.",
+      "cancelQueuedRestoreAvailable": "Сообщение отменено. Нажмите «Восстановить», чтобы вернуть его в поле ввода.",
+      "cancelQueuedRestored": "Сообщение отменено. Запрос снова в поле ввода.",
+      "cancelQueuedUpgradeRequired": "Для отмены сообщений в очереди требуется более новая версия Kilo CLI. Обновите Kilo CLI и подключитесь заново."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
@@ -1760,7 +1785,12 @@
       "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab, затем обновите.",
       "openBitbucket": "Открыть Bitbucket",
       "openGitlab": "Открыть GitLab",
-      "recentlyUsed": "Недавно использованные"
+      "recentlyUsed": "Недавно использованные",
+      "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
+      "continueFrom": "Продолжение {{title}}",
+      "importFailed": "Не удалось импортировать этот сеанс.",
+      "importingSession": "Импорт сеанса",
+      "discardWithUploadsMessage": "Ваш запрос и все загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -1782,7 +1812,7 @@
       "contentTruncated": "Содержимое обрезано",
       "truncated": "Обрезано",
       "toolRead": "читать",
-      "toolEdit": "Редактировать",
+      "toolEdit": "редактировать",
       "toolWrite": "записать",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -1820,7 +1850,9 @@
       "noCliInstancesDescription": "Выполните `kilo remote` в проекте на своем компьютере или обновите Kilo CLI, если она уже запущена.",
       "instanceOnProject": "{{name}} на {{project}}",
       "instanceOnProjectSuffix": "{{name}} на {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Запустить на облачном агенте"
+      "runOnCloudAgent": "Запустить на облачном агенте",
+      "terminals": "Терминалы",
+      "remotes": "Удаленные экземпляры"
     },
     "modePicker": {
       "title": "Выбрать режим",
@@ -2010,7 +2042,11 @@
       "queuedAccessibility": "Сообщение в очереди",
       "userMessage": "Сообщение пользователя",
       "assistantMessage": "Сообщение ассистента",
-      "longPressHint": "Долгое нажатие для сведений о сообщении"
+      "longPressHint": "Долгое нажатие для сведений о сообщении",
+      "cancelQueued": "Отменить сообщение",
+      "cancelQueuedAccessibility": "Отменить сообщение в очереди",
+      "restoreQueued": "Восстановить",
+      "restoreQueuedAccessibility": "Восстановить отмененное сообщение в поле ввода"
     },
     "olderMessages": {
       "arrived": "Более ранние сообщения загружены",
@@ -2028,6 +2064,8 @@
       "viewTable": "Просмотреть таблицу",
       "title": "Таблица",
       "close": "Закрыть таблицу",
+      "loading": "Загружаем таблицу",
+      "empty": "В этой таблице нет строк.",
       "columnCount_one": "столбец",
       "columnCount": "столбцы",
       "columnCount_other": "столбцы",
@@ -2042,9 +2080,6 @@
     },
     "sessionFilter": {
       "title": "Фильтровать сеансы",
-      "sortBy": "Сортировать по",
-      "sortLastUpdated": "Последнее обновление",
-      "sortCreated": "Создано",
       "platform": "Платформа",
       "platformCloud": "Облако",
       "platformExtension": "Расширение",
@@ -2053,9 +2088,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Другое",
-      "project": "Проект",
-      "removeProjectFilter": "Убрать фильтр проекта {{label}}",
-      "removePlatformFilter": "Убрать фильтр платформы {{label}}"
+      "project": "Проект"
     },
     "suggestion": {
       "title": "Предложение",
@@ -2098,7 +2131,9 @@
       "uploading": "Загрузка…",
       "uploaded": "Загружено",
       "uploadFailedRetry": "Загрузка не удалась. Нажмите, чтобы повторить.",
-      "uploadFailedTerminal": "Этот файл нельзя загрузить."
+      "uploadFailedTerminal": "Этот файл нельзя загрузить.",
+      "moveLeft": "Переместить {{filename}} влево",
+      "moveRight": "Переместить {{filename}} вправо"
     },
     "attachmentPasteHint": {
       "accessibility": "Вставить изображение из буфера обмена",
@@ -2128,7 +2163,11 @@
       "finalizingPlaceholder": "Завершение...",
       "messagePlaceholder": "Сообщение...",
       "cannotReceiveFiles": "Эта сессия не может получать файлы. Удалите вложения, чтобы отправить сообщение.",
-      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить."
+      "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
+      "discardAttachmentsMessage": "Загруженные файлы, не прикрепленные к отправленным сообщениям, будут удалены.",
+      "discardAttachmentsTitle": "Удалить вложения?",
+      "charactersRemaining": "Осталось символов: {{count}}",
+      "insertNewline": "Вставить новую строку"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",
@@ -2222,6 +2261,17 @@
       "hostConfirmMessage": "Эта ссылка откроет {{host}} в вашем браузере.",
       "open": "Открыть",
       "trustThisHost": "Доверять этому хосту"
+    },
+    "folderPicker": {
+      "accessibility": "Папка: {{label}}",
+      "emptyDescription": "Готово использует эту папку.",
+      "emptyTitle": "Внутри нет папок",
+      "fieldLabel": "Папка",
+      "retryableDescription": "Проверьте подключение и повторите. Готово по-прежнему подтверждает эту папку.",
+      "retryableTitle": "Не удалось получить список папок",
+      "tapToListHint": "Коснитесь папки, чтобы просмотреть её содержимое",
+      "unsupportedDescription": "Этот CLI не может получить список папок. Готово сохраняет папку запуска, а «Начать сеанс» запустится там.",
+      "unsupportedTitle": "Не удаётся получить список папок"
     }
   },
   "bootstrap": {
@@ -2274,7 +2324,7 @@
     "newCodingTask": "Новая задача кодирования",
     "explore": "Исследовать",
     "seeAll": "Смотреть все",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Сейчас ничего не запущено"
   },
   "imageViewer": {
     "close": "Закрыть {{filename}}",
@@ -2319,7 +2369,7 @@
     "optionsExpiredDescription": "Вернитесь и снова откройте этот выбор с предыдущего экрана."
   },
   "sessionRow": {
-    "needsInput": "требует ввода"
+    "needsInput": "ТРЕБУЕТ ВВОДА"
   },
   "voiceInput": {
     "listening": "Слушаю...",
@@ -2338,7 +2388,8 @@
     "busy": "Голосовой ввод занят. Попробуйте снова.",
     "stopped": "Голосовой ввод остановлен. Нажмите на микрофон, чтобы попробовать снова.",
     "unavailableDevice": "Голосовой ввод недоступен на этом устройстве.",
-    "unavailableLanguage": "Голосовой ввод недоступен для языка этого устройства."
+    "unavailableLanguage": "Голосовой ввод недоступен для языка этого устройства.",
+    "listeningStopped": "Прослушивание остановлено."
   },
   "share": {
     "title": "Поделиться в Kilo",
@@ -2625,7 +2676,7 @@
       "reaction": "реакций",
       "reaction_other": "реакций",
       "reaction_one": "реакция",
-      "reactionsTitle": "реакций",
+      "reactionsTitle": "Реакций",
       "reply": "Ответить",
       "replyBadRequest": "Этот ответ нельзя отправить. Возможно, ветка изменилась.",
       "replyBody": "Текст ответа",
@@ -3202,5 +3253,19 @@
     "emptyDescription": "Когда вы доверяете хосту ссылки, он открывается без повторного запроса.",
     "revoke": "Отозвать {{host}}",
     "backToPreferences": "Назад к настройкам"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Сообщение"
+    },
+    "empty": {
+      "title": "Начать чат",
+      "description": "Отправьте сообщение, чтобы поговорить с моделью."
+    },
+    "working": "Работаю...",
+    "historyRetry": "Не удалось загрузить историю чата.",
+    "catalogRetry": "Не удалось загрузить модели",
+    "sendError": "Не удалось отправить сообщение. Попробуйте еще раз."
   }
 }

@@ -152,7 +152,11 @@
     "appearanceDark": "E errët",
     "account": "Llogaria",
     "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
-    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim."
+    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim.",
+    "returnSendsMessage": "Tasti i kthimit dërgon mesazhin",
+    "returnSendsMessageSubtitle": "Kur çaktivizohet, tasti i kthimit shton një rresht të ri në fushat e mesazheve të agjentëve.",
+    "biometricUnlock": "Zhbllokimi me biometri",
+    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur nisni aplikacionin dhe pasi ai qëndron pesë minuta në sfond."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -665,7 +669,8 @@
     "profile": "Profili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skedë, {{position}} nga {{total}}"
+    "position": "{{name}}, skedë, {{position}} nga {{total}}",
+    "chat": "Bisedë"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Gabim rrjeti",
       "uploadFailed": "Ngarkimi dështoi",
       "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}",
-      "nothingToPaste": "Asgjë për të ngjitur"
+      "nothingToPaste": "Asgjë për të ngjitur",
+      "metadataStripFailed": "Metadatat e fotos nuk mund të hiqeshin."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1129,7 +1135,7 @@
       "destroying": "DUKE SHKATËRRUAR",
       "provisioned": "I SIGURUAR",
       "restarting": "DUKE RINISUR",
-      "running": "Në ekzekutim",
+      "running": "NË EKZEKUTIM",
       "shuttingDown": "DUKE U MBYLLUR",
       "starting": "DUKE FILLUAR",
       "stopped": "I NDALUAR",
@@ -1299,7 +1305,23 @@
       "checkRun": "Ekzekutimi i kontrollit",
       "status": "Statusi",
       "threshold": "Pragu",
-      "pullRequest": "kërkesë për tërheqje"
+      "pullRequest": "kërkesë për tërheqje",
+      "transcriptWaiting": "Duke pritur transkriptin e shqyrtimit.",
+      "transcriptEmpty": "Asnjë transkript për këtë shqyrtim.",
+      "transcriptRetry": "Nuk u arrit të ngarkohej transkripti i shqyrtimit.",
+      "transcriptLive": "Drejtpërdrejt",
+      "agentIdle": "Agjenti i papunë",
+      "agentWorking": "Agjenti duke punuar...",
+      "anErrorOccurred": "Ndodhi një gabim",
+      "errorWithMessage": "Gabim: {{message}}",
+      "executionStarted": "Ekzekutimi filloi",
+      "reviewCompleted": "Rishikimi u përfundua",
+      "reviewInterrupted": "Rishikimi u ndërpre",
+      "sessionError": "Gabim sesioni: {{error}}",
+      "statusWithValue": "Statusi: {{status}}",
+      "toolName": "Mjeti: {{name}}",
+      "toolNameError": "Mjeti: {{name}} — gabim",
+      "unknownError": "Gabim i panjohur"
     },
     "reviewMemory": {
       "title": "Kujtesa e shqyrtimit",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv tani",
     "search": {
       "searching": "Kërkim në vazhdim",
       "searchSessions": "Kërko seancat",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Nuk u ngarkuan seancat",
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive",
-      "noSessionsYet": "Ende pa seanca",
       "noSessionsYetDescription": "Filloni një detyrë kodimi nga telefoni juaj. Seancat tuaja do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "tryAdjustFilters": "Provoni t'i rregulloni ose pastroni filtrat tuaj.",
       "couldNotSearch": "Nuk u kërkuan seancat",
-      "allActive": "Të gjitha seancat janë aktive",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
-      "live": "DREJTPËRDREJT"
+      "live": "DREJTPËRDREJT",
+      "updating": "Duke u përditësuar"
     },
     "sessionRow": {
       "deleteTitle": "Ta fshijmë seancën?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Seanca u mbyll",
     "remoteSpawnRetryable": "Nuk mund të arrihej instanca — mund të jetë shkëputur.",
     "remoteSpawnNonRetryable": "Instanca nuk arriti të nisë sesionin — kontrolloni makinën ose përditësoni CLI-në.",
-    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nisni një sesion në Cloud Agent ose zgjidhni një instancë tjetër."
+    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nisni një sesion në Cloud Agent ose zgjidhni një instancë tjetër.",
+    "liveCount_one": "{{count}} DREJTPËRDREJT",
+    "liveCount_other": "{{count}} DREJTPËRDREJT"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende pa mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",
-      "connectRepository": "Lidh depon",
       "cloningSession": "Duke klonuar seancën",
       "continue": "Vazhdo",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë",
-      "cloneFailed": "Nuk u klonua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provoni përsëri.",
-      "connectRepositoryToContinue": "Lidhni një depo për të vazhduar.",
       "notEnoughCredits": "Kredi të pamjaftueshme për të ekzekutuar Cloud Agent. Shtoni kredi dhe provoni përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
       "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti.",
-      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri."
+      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri.",
+      "cancelQueuedFailed": "Mesazhi nuk mund të anulohej.",
+      "cancelQueuedRestoreAvailable": "Mesazhi u anulua. Prekni Rivendosni për ta kthyer në fushën e mesazhit.",
+      "cancelQueuedRestored": "Mesazhi u anulua. Kërkesa është sërish në fushën e mesazhit.",
+      "cancelQueuedUpgradeRequired": "Anulimi i mesazheve në pritje kërkon një Kilo CLI më të ri. Përditësoni Kilo CLI dhe rilidhuni."
     },
     "remoteSession": {
       "failedToCreate": "Dështoi krijimi i seancës në distancë",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për GitLab, pastaj rifresko.",
       "openBitbucket": "Hap Bitbucket",
       "openGitlab": "Hap GitLab",
-      "recentlyUsed": "Të përdorura së fundmi"
+      "recentlyUsed": "Të përdorura së fundmi",
+      "continueFrom": "Duke vazhduar {{title}}",
+      "importingSession": "Duke importuar seancë",
+      "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidhni Cloud Agent ose një CLI tjetër.",
+      "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "discardWithUploadsMessage": "Kërkesa juaj dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2218,7 +2246,7 @@
       "contentTruncated": "Përmbajtja u shkurtua",
       "truncated": "I shkurtuar",
       "toolRead": "lexo",
-      "toolEdit": "Redakto",
+      "toolEdit": "redakto",
       "toolWrite": "shkruaj",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Ekzekutoni `kilo remote` në një projekt në kompjuterin tuaj, ose përditësoni Kilo CLI nëse tashmë po ekzekutohet një.",
       "instanceOnProject": "{{name}} në {{project}}",
       "instanceOnProjectSuffix": "{{name}} në {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ekzekuto në Cloud Agent"
+      "runOnCloudAgent": "Ekzekuto në Cloud Agent",
+      "terminals": "Terminalet",
+      "remotes": "Instancat në distancë"
     },
     "modePicker": {
       "title": "Zgjidhni mënyrën",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Mesazhi në radhë",
       "userMessage": "Mesazh përdoruesi",
       "assistantMessage": "Mesazh asistenti",
-      "longPressHint": "Shtypni gjatë për detaje të mesazhit"
+      "longPressHint": "Shtypni gjatë për detaje të mesazhit",
+      "cancelQueued": "Anuloni mesazhin",
+      "cancelQueuedAccessibility": "Anuloni mesazhin në pritje",
+      "restoreQueued": "Rivendosni",
+      "restoreQueuedAccessibility": "Rivendosni mesazhin e anuluar në fushën e mesazhit"
     },
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",
@@ -2462,6 +2496,8 @@
       "viewTable": "Shiko tabelën",
       "title": "Tabela",
       "close": "Mbyll tabelën",
+      "loading": "Duke ngarkuar tabelën",
+      "empty": "Kjo tabelë nuk ka rreshta.",
       "columnCount_one": "kolona",
       "columnCount": "kolonat",
       "columnCount_other": "kolonat",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtro seancat",
-      "sortBy": "Rendit sipas",
-      "sortLastUpdated": "Përditësuar së fundi",
-      "sortCreated": "Krijuar",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Zgjerimi",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Tjetër",
-      "project": "Projekti",
-      "removeProjectFilter": "Hiq filtrin e projektit {{label}}",
-      "removePlatformFilter": "Hiq filtrin e platformës {{label}}"
+      "project": "Projekti"
     },
     "suggestion": {
       "title": "Sugjerim",
@@ -2528,7 +2559,9 @@
       "uploading": "Duke u ngarkuar…",
       "uploaded": "U ngarkua",
       "uploadFailedRetry": "Ngarkimi dështoi. Prekni për të riprovuar.",
-      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet."
+      "uploadFailedTerminal": "Ky skedar nuk mund të ngarkohet.",
+      "moveLeft": "Zhvendosni {{filename}} majtas",
+      "moveRight": "Zhvendosni {{filename}} djathtas"
     },
     "attachmentPasteHint": {
       "accessibility": "Ngjit imazhin nga clipboard",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Duke përfunduar...",
       "messagePlaceholder": "Mesazh",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiqni bashkëngjitjet për të dërguar mesazhin tuaj.",
-      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar."
+      "couldNotAttachFiles": "Skedarët nuk u bashkëngjitën. Prekni Dërgo për të riprovuar.",
+      "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
+      "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?",
+      "charactersRemaining": "Mbeten {{count}} karaktere",
+      "insertNewline": "Shtoni një rresht të ri"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",
@@ -2634,7 +2671,7 @@
       "open": "pull request i hapur",
       "closed": "pull request i mbyllur",
       "merged": "pull request i shkrirë",
-      "draft": "Kërkesë tërheqjeje draft",
+      "draft": "kërkesë tërheqjeje draft",
       "updating": "Duke u përditësuar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "kërkesë për tërheqje"
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tuaj.",
       "open": "Hap",
       "trustThisHost": "Beso këtë host"
+    },
+    "folderPicker": {
+      "accessibility": "Dosja: {{label}}",
+      "emptyDescription": "U krye përdor këtë dosje.",
+      "emptyTitle": "Asnjë dosje brenda",
+      "fieldLabel": "Dosja",
+      "retryableDescription": "Kontrolloni lidhjen tuaj dhe Riprovo. U krye ende e konfirmon këtë dosje.",
+      "retryableTitle": "Nuk u arrit të listoheshin dosjet",
+      "tapToListHint": "Prekni një dosje për të listuar përmbajtjen e saj",
+      "unsupportedDescription": "Ky CLI nuk mund të listojë dosje. U krye ruan dosjen e nisjes dhe Filloni seancën fillon atje.",
+      "unsupportedTitle": "Nuk mund të listohen dosjet"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Detyrë e re kodimi",
     "explore": "Eksploro",
     "seeAll": "Shiko të gjitha",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Asgjë nuk po ekzekutohet tani"
   },
   "imageViewer": {
     "close": "Mbyll {{filename}}",
@@ -2766,7 +2814,8 @@
     "busy": "Futja me zë është e zënë. Provo përsëri.",
     "stopped": "Futja me zë u ndal. Prekni mikrofonin për të provuar përsëri.",
     "unavailableDevice": "Futja me zë nuk është e disponueshme në këtë pajisje.",
-    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje."
+    "unavailableLanguage": "Futja me zë nuk është e disponueshme për gjuhën e kësaj pajisjeje.",
+    "listeningStopped": "Dëgjimi u ndal."
   },
   "share": {
     "title": "Ndaj te Kilo",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "Kur i beson hostit të një lidhjeje, ajo hapet pa pyetur përsëri.",
     "revoke": "Heq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
+  },
+  "quickChat": {
+    "title": "Bisedë",
+    "composer": {
+      "placeholder": "Mesazh"
+    },
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "working": "Duke punuar",
+    "historyRetry": "Nuk u arrit të ngarkohej historia e bisedës.",
+    "catalogRetry": "Nuk u ngarkuan modelet",
+    "sendError": "Mesazhi nuk u dërgua. Provoni përsëri."
   }
 }

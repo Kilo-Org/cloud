@@ -152,7 +152,11 @@
     "appearanceDark": "Donker",
     "account": "Account",
     "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
-    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient."
+    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient.",
+    "returnSendsMessage": "Return-toets verzendt bericht",
+    "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel in de berichtinvoervelden van agents in.",
+    "biometricUnlock": "Ontgrendelen met biometrie",
+    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan."
   },
   "notifications": {
     "channel": {
@@ -211,7 +215,8 @@
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tabblad, {{position}} van {{total}}"
+    "position": "{{name}}, tabblad, {{position}} van {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "Netwerkfout",
       "uploadFailed": "Uploaden mislukt",
       "failedToUploadFile": "Bestand uploaden mislukt: {{reason}}",
-      "nothingToPaste": "Niets om te plakken"
+      "nothingToPaste": "Niets om te plakken",
+      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -720,7 +726,7 @@
       "destroying": "VERNIETIGEN",
       "provisioned": "INGERICHT",
       "restarting": "HERSTARTEN",
-      "running": "Bezig",
+      "running": "BEZIG",
       "shuttingDown": "AFSLUITEN",
       "starting": "STARTEN",
       "stopped": "GESTOPT",
@@ -898,7 +904,23 @@
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} uit",
-      "pullRequest": "pull-aanvraag"
+      "pullRequest": "pull-aanvraag",
+      "transcriptWaiting": "Wachten op het reviewtranscript.",
+      "transcriptEmpty": "Geen transcript voor deze review.",
+      "transcriptRetry": "Het reviewtranscript kon niet worden geladen.",
+      "transcriptLive": "Live",
+      "agentIdle": "Agent inactief",
+      "agentWorking": "Agent bezig...",
+      "anErrorOccurred": "Er is een fout opgetreden",
+      "errorWithMessage": "Fout: {{message}}",
+      "executionStarted": "Uitvoering gestart",
+      "reviewCompleted": "Review voltooid",
+      "reviewInterrupted": "Review onderbroken",
+      "sessionError": "Sessiefout: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — fout",
+      "unknownError": "Onbekende fout"
     },
     "reviewList": {
       "configureProvider": "Provider configureren",
@@ -1579,7 +1601,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nu actief",
     "search": {
       "searching": "Zoeken",
       "searchSessions": "Sessies zoeken",
@@ -1590,16 +1611,15 @@
     "sessionList": {
       "couldNotLoad": "Kon sessies niet laden",
       "couldNotLoadActive": "Kon actieve sessies niet laden",
-      "noSessionsYet": "Nog geen sessies",
       "noSessionsYetDescription": "Start een codeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies komen overeen",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Probeer je filters aan te passen of te wissen.",
       "couldNotSearch": "Kon sessies niet doorzoeken",
-      "allActive": "Alle sessies zijn actief",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Bijwerken"
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",
@@ -1643,7 +1663,9 @@
     "sessionExited": "Sessie beëindigd",
     "remoteSpawnRetryable": "De instantie is niet bereikbaar — deze is mogelijk verbroken.",
     "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
-    "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie."
+    "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1665,18 +1687,19 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
-      "connectRepository": "Repository verbinden",
       "cloningSession": "Sessie klonen",
       "continue": "Doorgaan",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
-      "cloneFailed": "Deze sessie kon niet worden gekloond.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
-      "connectRepositoryToContinue": "Verbind een repository om door te gaan.",
       "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
       "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw.",
-      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw."
+      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw.",
+      "cancelQueuedFailed": "Bericht kon niet worden geannuleerd.",
+      "cancelQueuedRestoreAvailable": "Bericht geannuleerd. Tik op Herstellen om het terug te zetten in het berichtinvoerveld.",
+      "cancelQueuedRestored": "Bericht geannuleerd. De prompt staat weer in het berichtinvoerveld.",
+      "cancelQueuedUpgradeRequired": "Berichten in de wachtrij annuleren vereist een nieuwere Kilo CLI. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",
@@ -1744,7 +1767,12 @@
       "noRepositoriesVisibleGitlab": "Geen repositories zichtbaar. Controleer de repositorytoegang voor GitLab en vernieuw daarna.",
       "openBitbucket": "Bitbucket openen",
       "openGitlab": "GitLab openen",
-      "recentlyUsed": "Recent gebruikt"
+      "recentlyUsed": "Recent gebruikt",
+      "continueFrom": "Doorgaan met {{title}}",
+      "importingSession": "Sessie importeren",
+      "cliCannotContinue": "Deze CLI kan een sessie niet voortzetten. Kies Cloud Agent of een andere CLI.",
+      "importFailed": "Deze sessie kan niet worden geïmporteerd.",
+      "discardWithUploadsMessage": "Je prompt en alle geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",
@@ -1802,7 +1830,9 @@
       "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Uitvoeren op Cloudagent"
+      "runOnCloudAgent": "Uitvoeren op Cloudagent",
+      "terminals": "Terminals",
+      "remotes": "Externe instanties"
     },
     "modePicker": {
       "title": "Selecteer modus",
@@ -1992,7 +2022,11 @@
       "queuedAccessibility": "Bericht in wachtrij",
       "userMessage": "Gebruikersbericht",
       "assistantMessage": "Assistentbericht",
-      "longPressHint": "Lang indrukken voor berichtdetails"
+      "longPressHint": "Lang indrukken voor berichtdetails",
+      "cancelQueued": "Bericht annuleren",
+      "cancelQueuedAccessibility": "Bericht in de wachtrij annuleren",
+      "restoreQueued": "Herstellen",
+      "restoreQueuedAccessibility": "Geannuleerd bericht herstellen naar het berichtinvoerveld"
     },
     "olderMessages": {
       "arrived": "Eerdere berichten geladen",
@@ -2008,6 +2042,8 @@
       "viewTable": "Tabel bekijken",
       "title": "Tabel",
       "close": "Tabel sluiten",
+      "loading": "Tabel laden",
+      "empty": "Deze tabel bevat geen rijen.",
       "columnCount_one": "kolom",
       "columnCount": "kolommen",
       "columnCount_other": "kolommen",
@@ -2018,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "Sessies filteren",
-      "sortBy": "Sorteren op",
-      "sortLastUpdated": "Laatst bijgewerkt",
-      "sortCreated": "Aangemaakt",
       "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",
@@ -2029,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Overig",
-      "project": "Project",
-      "removeProjectFilter": "Projectfilter {{label}} verwijderen",
-      "removePlatformFilter": "Platformfilter {{label}} verwijderen"
+      "project": "Project"
     },
     "suggestion": {
       "title": "Suggestie",
@@ -2074,7 +2105,9 @@
       "uploading": "Uploaden…",
       "uploaded": "Geüpload",
       "uploadFailedRetry": "Uploaden mislukt. Tik om opnieuw te proberen.",
-      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload."
+      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload.",
+      "moveLeft": "{{filename}} naar links verplaatsen",
+      "moveRight": "{{filename}} naar rechts verplaatsen"
     },
     "attachmentPasteHint": {
       "accessibility": "Afbeelding plakken vanaf klembord",
@@ -2104,7 +2137,11 @@
       "finalizingPlaceholder": "Afronden...",
       "messagePlaceholder": "Bericht...",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
-      "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen."
+      "couldNotAttachFiles": "Bestanden konden niet worden bijgevoegd. Tik op Verzenden om opnieuw te proberen.",
+      "discardAttachmentsMessage": "Geüploade bestanden die niet aan verzonden berichten zijn bijgevoegd, worden verwijderd.",
+      "discardAttachmentsTitle": "Bijlagen weggooien?",
+      "charactersRemaining": "{{count}} tekens resterend",
+      "insertNewline": "Nieuwe regel invoegen"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",
@@ -2196,6 +2233,17 @@
       "hostConfirmMessage": "Deze link opent {{host}} in uw browser.",
       "open": "Openen",
       "trustThisHost": "Deze host vertrouwen"
+    },
+    "folderPicker": {
+      "accessibility": "Map: {{label}}",
+      "emptyDescription": "Klaar gebruikt deze map.",
+      "emptyTitle": "Geen mappen erin",
+      "fieldLabel": "Map",
+      "retryableDescription": "Controleer je verbinding en kies Opnieuw proberen. Klaar bevestigt deze map nog steeds.",
+      "retryableTitle": "Kon mappen niet weergeven",
+      "tapToListHint": "Tik op een map om de inhoud weer te geven",
+      "unsupportedDescription": "Deze CLI kan mappen niet weergeven. Klaar houdt de startmap aan en Sessie starten start daar.",
+      "unsupportedTitle": "Kan mappen niet weergeven"
     }
   },
   "bootstrap": {
@@ -2248,7 +2296,7 @@
     "newCodingTask": "Nieuwe codeertaak",
     "explore": "Verkennen",
     "seeAll": "Alles bekijken",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Er draait momenteel niets"
   },
   "imageViewer": {
     "close": "{{filename}} sluiten",
@@ -2293,7 +2341,7 @@
     "optionsExpiredDescription": "Ga terug en open deze kiezer opnieuw vanaf het vorige scherm."
   },
   "sessionRow": {
-    "needsInput": "heeft invoer nodig"
+    "needsInput": "HEEFT INVOER NODIG"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2312,7 +2360,8 @@
     "busy": "Spraakinvoer is bezet. Probeer het opnieuw.",
     "stopped": "Spraakinvoer gestopt. Tik op de microfoon om opnieuw te proberen.",
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
-    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat."
+    "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
+    "listeningStopped": "Luisteren gestopt."
   },
   "share": {
     "title": "Delen naar Kilo",
@@ -2512,7 +2561,7 @@
       "skipped": "{{displayCount}} overgeslagen",
       "title": "Checks",
       "viewOnGitHub": "PR op GitHub bekijken",
-      "checkDetails": "Checkdetails",
+      "checkDetails": "checkdetails",
       "pullRequest": "pull-aanvraag"
     },
     "composer": {
@@ -3160,5 +3209,19 @@
     "emptyDescription": "Wanneer u de host van een link vertrouwt, wordt deze zonder opnieuw te vragen geopend.",
     "revoke": "{{host}} intrekken",
     "backToPreferences": "Terug naar voorkeuren"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Bericht"
+    },
+    "empty": {
+      "title": "Start een chat",
+      "description": "Stuur een bericht om met een model te praten."
+    },
+    "working": "Bezig",
+    "historyRetry": "Kon de chatgeschiedenis niet laden.",
+    "catalogRetry": "Kon modellen niet laden",
+    "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
   }
 }

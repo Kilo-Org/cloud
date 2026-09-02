@@ -152,7 +152,11 @@
     "appearanceDark": "Qaranlıq",
     "account": "Hesab",
     "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
-    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et."
+    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et.",
+    "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
+    "returnSendsMessageSubtitle": "Söndürüldükdə sətirsonu düyməsi agent kompozitorlarında yeni sətir daxil edir.",
+    "biometricUnlock": "Biometrika ilə kilidi açın",
+    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -665,7 +669,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, nişan, {{total}}-dən {{position}}"
+    "position": "{{name}}, nişan, {{total}}-dən {{position}}",
+    "chat": "Söhbət"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Şəbəkə xətası",
       "uploadFailed": "Yükləmə uğursuz oldu",
       "failedToUploadFile": "Fayl yüklənə bilmədi: {{reason}}",
-      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur"
+      "nothingToPaste": "Yapışdırılacaq heç nə yoxdur",
+      "metadataStripFailed": "Foto metadata silinə bilmədi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1131,7 +1137,7 @@
       "restarting": "YENİDƏN BAŞLADILIR",
       "running": "İŞLƏYİR",
       "shuttingDown": "SÖNDÜRÜLÜR",
-      "starting": "Başladılır",
+      "starting": "BAŞLADILIR",
       "stopped": "DAYANDIRILIB",
       "stopping": "DAYANDIRILIR",
       "unknown": "NAMƏLUM",
@@ -1299,7 +1305,23 @@
       "checkRun": "Yoxlama işi",
       "status": "Status",
       "threshold": "Hədd",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "İcmal transkripti gözlənilir.",
+      "transcriptEmpty": "Bu icmal üçün transkript yoxdur.",
+      "transcriptRetry": "İcmal transkripti yüklənə bilmədi.",
+      "transcriptLive": "Canlı",
+      "agentIdle": "Agent boşda",
+      "agentWorking": "Agent işləyir...",
+      "anErrorOccurred": "Xəta baş verdi",
+      "errorWithMessage": "Xəta: {{message}}",
+      "executionStarted": "İcra başladı",
+      "reviewCompleted": "Nəzərdən keçirmə tamamlandı",
+      "reviewInterrupted": "Nəzərdən keçirmə kəsildi",
+      "sessionError": "Sessiya xətası: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alət: {{name}}",
+      "toolNameError": "Alət: {{name}} — xəta",
+      "unknownError": "Naməlum xəta"
     },
     "reviewMemory": {
       "title": "Nəzərdən keçirmə yaddaşı",
@@ -1415,7 +1437,7 @@
     "status": {
       "pending": "Gözlənilir",
       "queued": "Növbəyə alınıb",
-      "running": "İŞLƏYİR",
+      "running": "İşləyir",
       "completed": "Tamamlanıb",
       "failed": "Uğursuz",
       "cancelled": "Ləğv edildi",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hal-hazırda aktiv",
     "search": {
       "searching": "Axtarılır",
       "searchSessions": "Sessiyaları axtarın",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalar yüklənə bilmədi",
       "couldNotLoadActive": "Aktiv sessiyalar yüklənə bilmədi",
-      "noSessionsYet": "Hələ sessiya yoxdur",
       "noSessionsYetDescription": "Telefonunuzdan kodlaşdırma tapşırığı başladın. Sessiyalarınız burada görünəcək.",
       "noMatches": "Heç bir sessiya uyğun gəlmir",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "tryAdjustFilters": "Filtrlərinizi tənzimləyin və ya təmizləyin.",
       "couldNotSearch": "Sessiyalar axtarıla bilmədi",
-      "allActive": "Bütün sessiyalar aktivdir",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
-      "live": "CANLI"
+      "live": "CANLI",
+      "updating": "Yenilənir"
     },
     "sessionRow": {
       "deleteTitle": "Sessiyanı silsin?",
@@ -2067,7 +2087,7 @@
       "couldNotCopyId": "Sessiya ID kopyalana bilmədi",
       "untitled": "Adsız sessiya",
       "sessionDeleted": "Sessiya silindi",
-      "needsInput": "GİRİŞ TƏLƏB OLUNUR",
+      "needsInput": "giriş tələb olunur",
       "fromPlatform": "{{platform}} platformasından",
       "cent_one": "sent",
       "cent": "sent",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Sessiya başa çatdı",
     "remoteSpawnRetryable": "İnstansa çatmaq mümkün olmadı — o, əlaqəsi kəsilmiş ola bilər.",
     "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — maşını yoxlayın və ya CLI-ni yeniləyin.",
-    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın əlaqəsi kəsildi. Cloud Agent-də sessiya başladın və ya başqa instans seçin."
+    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın əlaqəsi kəsildi. Cloud Agent-də sessiya başladın və ya başqa instans seçin.",
+    "liveCount_one": "{{count}} CANLI",
+    "liveCount_other": "{{count}} CANLI"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Aşağı sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyişin: {{title}}",
-      "connectRepository": "Repozitoriyaya qoşul",
       "cloningSession": "Sessiya klonlanır",
       "continue": "Davam et",
       "couldNotLoadThisSession": "Bu sessiya yüklənə bilmədi",
-      "cloneFailed": "Bu sessiya klonlana bilmədi.",
       "cloneFailedRetry": "Bu sessiya klonlana bilmədi. Yenidən cəhd edin.",
-      "connectRepositoryToContinue": "Davam etmək üçün repozitoriyaya qoşulun.",
       "notEnoughCredits": "Cloud Agent işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
       "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin.",
-      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin."
+      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin.",
+      "cancelQueuedFailed": "Mesaj ləğv edilə bilmədi.",
+      "cancelQueuedRestoreAvailable": "Mesaj ləğv edildi. Onu kompozitora qaytarmaq üçün «Bərpa edin» düyməsinə toxunun.",
+      "cancelQueuedRestored": "Mesaj ləğv edildi. İstək kompozitora qaytarıldı.",
+      "cancelQueuedUpgradeRequired": "Növbəyə alınmış mesajları ləğv etmək üçün daha yeni Kilo CLI tələb olunur. Kilo CLI-ni yeniləyin və yenidən qoşulun."
     },
     "remoteSession": {
       "failedToCreate": "Uzaq sessiya yaradıla bilmədi",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
       "openBitbucket": "Bitbucket-ı aç",
       "openGitlab": "GitLab-ı aç",
-      "recentlyUsed": "Son istifadə olunanlar"
+      "recentlyUsed": "Son istifadə olunanlar",
+      "continueFrom": "{{title}} davam etdirilir",
+      "importingSession": "Sessiya idxal edilir",
+      "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seçin.",
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
+      "discardWithUploadsMessage": "İstəyiniz və göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2242,7 +2270,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
-      "errorPrefix": "xəta: {{error}}"
+      "errorPrefix": "Xəta: {{error}}"
     },
     "instancePicker": {
       "runOn": "İşə salın",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Kompüterinizdəki layihədə `kilo remote` işə salın və ya artıq işləyirsə Kilo CLI-ni yeniləyin.",
       "instanceOnProject": "{{project}} üzərində {{name}}",
       "instanceOnProjectSuffix": "{{project}} üzərində {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent-də işə salın"
+      "runOnCloudAgent": "Cloud Agent-də işə salın",
+      "terminals": "Terminallar",
+      "remotes": "Uzaq instansiyalar"
     },
     "modePicker": {
       "title": "Rejim seçin",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Mesaj növbəyə alınıb",
       "userMessage": "İstifadəçi mesajı",
       "assistantMessage": "Köməkçi mesajı",
-      "longPressHint": "Mesaj detalları üçün uzun basın"
+      "longPressHint": "Mesaj detalları üçün uzun basın",
+      "cancelQueued": "Mesajı ləğv edin",
+      "cancelQueuedAccessibility": "Növbəyə alınmış mesajı ləğv edin",
+      "restoreQueued": "Bərpa edin",
+      "restoreQueuedAccessibility": "Ləğv edilmiş mesajı kompozitora bərpa edin"
     },
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",
@@ -2462,6 +2496,8 @@
       "viewTable": "Cədvələ bax",
       "title": "Cədvəl",
       "close": "Cədvəli bağla",
+      "loading": "Cədvəl yüklənir",
+      "empty": "Bu cədvəldə sətir yoxdur.",
       "columnCount_one": "sütun",
       "columnCount": "sütun",
       "columnCount_other": "sütun",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Sessiyaları filtrlə",
-      "sortBy": "Sırala",
-      "sortLastUpdated": "Son yenilənmə",
-      "sortCreated": "Yaradılıb",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Uzantı",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Digər",
-      "project": "Layihə",
-      "removeProjectFilter": "{{label}} layihə filtrini sil",
-      "removePlatformFilter": "{{label}} platforma filtrini sil"
+      "project": "Layihə"
     },
     "suggestion": {
       "title": "Təklif",
@@ -2528,7 +2559,9 @@
       "uploading": "Yüklənir…",
       "uploaded": "Yükləndi",
       "uploadFailedRetry": "Yükləmə uğursuz oldu. Yenidən cəhd etmək üçün toxunun.",
-      "uploadFailedTerminal": "Bu fayl yüklənə bilməz."
+      "uploadFailedTerminal": "Bu fayl yüklənə bilməz.",
+      "moveLeft": "{{filename}} faylını sola köçürün",
+      "moveRight": "{{filename}} faylını sağa köçürün"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan şəkil yapışdır",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Tamamlanır...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajınızı göndərmək üçün əlavələri silin.",
-      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun."
+      "couldNotAttachFiles": "Fayllar əlavə edilə bilmədi. Yenidən cəhd etmək üçün göndər düyməsinə toxunun.",
+      "discardAttachmentsMessage": "Göndərilmiş mesajlara əlavə edilməmiş yükləmələr silinəcək.",
+      "discardAttachmentsTitle": "Əlavələr ləğv edilsin?",
+      "charactersRemaining": "{{count}} simvol qalıb",
+      "insertNewline": "Yeni sətir daxil edin"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Bu link {{host}} səhifəsini brauzerinizdə açır.",
       "open": "Aç",
       "trustThisHost": "Bu hosta etibar et"
+    },
+    "folderPicker": {
+      "fieldLabel": "Qovluq",
+      "accessibility": "Qovluq: {{label}}",
+      "tapToListHint": "Məzmununu sadalamaq üçün qovluğa toxunun",
+      "emptyTitle": "İçəridə qovluq yoxdur",
+      "emptyDescription": "Hazırdır bu qovluqdan istifadə edir.",
+      "retryableTitle": "Qovluqları sadalamaq mümkün olmadı",
+      "retryableDescription": "Bağlantınızı yoxlayın və Yenidən cəhd edin. Hazırdır yenə də bu qovluğu təsdiqləyir.",
+      "unsupportedTitle": "Qovluqları sadalamaq mümkün deyil",
+      "unsupportedDescription": "Bu CLI qovluqları sadalaya bilmir. Hazırdır işəsalma qovluğunu saxlayır və Sessiyanı başlat oradan başlayır."
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "explore": "Kəşf et",
     "seeAll": "Hamısına bax",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hazırda heç nə işləmir"
   },
   "imageViewer": {
     "close": "{{filename}} bağla",
@@ -2766,7 +2814,8 @@
     "busy": "Səs girişi məşğuldur. Yenidən cəhd edin.",
     "stopped": "Səs girişi dayandı. Yenidən cəhd etmək üçün mikrofona toxunun.",
     "unavailableDevice": "Səs girişi bu cihazda mövcud deyil.",
-    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil."
+    "unavailableLanguage": "Səs girişi bu cihaz dili üçün mövcud deyil.",
+    "listeningStopped": "Dinləmə dayandı."
   },
   "share": {
     "title": "Kilo-ya paylaş",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "Bir linkin hostuna etibar etdikdə, link yenidən sorğusuz açılır.",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "backToPreferences": "Tənzimləmələrə qayıt"
+  },
+  "quickChat": {
+    "title": "Söhbət",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Söhbətə başlayın",
+      "description": "Bir modellə danışmaq üçün mesaj göndərin."
+    },
+    "working": "İşlənir",
+    "historyRetry": "Söhbət tarixçəsi yüklənə bilmədi.",
+    "catalogRetry": "Modellər yüklənə bilmədi",
+    "sendError": "Mesaj göndərilə bilmədi. Yenidən cəhd edin."
   }
 }

@@ -28,6 +28,7 @@ export type RestoreResult =
       step: 'download' | 'import' | 'diffs';
       subtype?: WorkspaceFailureSubtype;
       detail?: string;
+      emptySnapshot?: true;
     };
 
 type SnapshotDiff = {
@@ -38,12 +39,15 @@ type SnapshotDiff = {
 };
 
 export type RestoreSessionOptions = {
+  env?: NodeJS.ProcessEnv;
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
   signal?: AbortSignal;
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const EMPTY_SESSION_INGEST_EXPORT = '{"info":{},"messages":[],"sessionDiff":[]}';
+const MAX_EMPTY_SNAPSHOT_BYTES = 1_024;
 const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
   'walk(if type == "object" and ((.tokens? | type) == "object") then .tokens |= walk(if type == "number" and . < 0 then 0 else . end) else . end)';
 // Drop leftover CLI UI progress parts (metadata.kilocode.lifecycle == "transient").
@@ -75,7 +79,7 @@ function fail(
   step: Extract<RestoreResult, { ok: false }>['step'],
   subtype?: WorkspaceFailureSubtype,
   detail?: string
-): RestoreResult {
+): Extract<RestoreResult, { ok: false }> {
   return {
     ok: false,
     error,
@@ -95,17 +99,62 @@ function tryUnlink(filePath: string): void {
   }
 }
 
-function resolveKilocodeToken(): string | undefined {
-  if (process.env.KILOCODE_TOKEN) {
-    return process.env.KILOCODE_TOKEN;
+function resolveKilocodeToken(env: NodeJS.ProcessEnv): string | undefined {
+  if (env.KILOCODE_TOKEN) {
+    return env.KILOCODE_TOKEN;
   }
 
-  const tokenFile = process.env.KILOCODE_TOKEN_FILE;
+  const tokenFile = env.KILOCODE_TOKEN_FILE;
   if (!tokenFile) {
     return undefined;
   }
 
   return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+}
+
+export async function seedSessionIngestRegistration(
+  kiloSessionId: string,
+  env: NodeJS.ProcessEnv,
+  signal?: AbortSignal
+): Promise<void> {
+  signal?.throwIfAborted();
+  if (
+    kiloSessionId.length === 0 ||
+    kiloSessionId.length > 128 ||
+    /[^A-Za-z0-9_-]/.test(kiloSessionId)
+  ) {
+    throw new Error('Invalid Kilo session ID for ingest registration');
+  }
+  const dataHome = env.XDG_DATA_HOME;
+  if (
+    !dataHome ||
+    !path.isAbsolute(dataHome) ||
+    ['\0', '\r', '\n'].some(char => dataHome.includes(char))
+  ) {
+    throw new Error('Ingest registration requires an explicit absolute XDG_DATA_HOME');
+  }
+
+  const directory = path.join(dataHome, 'kilo', 'storage', 'session_share');
+  await fs.promises.mkdir(directory, { recursive: true, mode: 0o700 });
+  signal?.throwIfAborted();
+  const temporaryPath = path.join(directory, `.${kiloSessionId}.${crypto.randomUUID()}.tmp`);
+  const file = await fs.promises.open(temporaryPath, 'wx', 0o600);
+  try {
+    try {
+      signal?.throwIfAborted();
+      await fs.promises.writeFile(
+        file,
+        JSON.stringify({ id: kiloSessionId, ingestPath: `/api/session/${kiloSessionId}/ingest` }),
+        { encoding: 'utf8', signal }
+      );
+    } finally {
+      await file.close();
+    }
+    signal?.throwIfAborted();
+    await fs.promises.rename(temporaryPath, path.join(directory, `${kiloSessionId}.json`));
+  } finally {
+    await fs.promises.rm(temporaryPath, { force: true });
+  }
 }
 
 type SnapshotInfoValidation = 'valid' | 'empty' | 'missing' | 'invalid';
@@ -337,6 +386,7 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
 
 async function validateSnapshotInfoId(
   snapshotPath: string,
+  bytesWritten: number,
   signal?: AbortSignal
 ): Promise<SnapshotInfoValidationResult> {
   const reader = createJsonCharReader(snapshotPath, signal);
@@ -347,6 +397,7 @@ async function validateSnapshotInfoId(
     let infoIsEmpty = false;
     let messagesIsEmpty = false;
     let sessionDiffIsEmpty = false;
+    let subagentsAreEmpty = true;
     let sawInfo = false;
     let sawMessages = false;
     let sawSessionDiff = false;
@@ -382,7 +433,7 @@ async function validateSnapshotInfoId(
             infoId = undefined;
             infoIsEmpty = false;
           }
-        } else if (key === 'messages' || key === 'sessionDiff') {
+        } else if (key === 'messages' || key === 'sessionDiff' || key === 'subagents') {
           const valueStart = await nextNonWhitespace(reader);
           if (valueStart === null) return { validation: 'invalid' };
           let valueIsEmpty = false;
@@ -398,9 +449,11 @@ async function validateSnapshotInfoId(
           if (key === 'messages') {
             sawMessages = true;
             messagesIsEmpty = valueIsEmpty;
-          } else {
+          } else if (key === 'sessionDiff') {
             sawSessionDiff = true;
             sessionDiffIsEmpty = valueIsEmpty;
+          } else {
+            subagentsAreEmpty = valueIsEmpty;
           }
         } else if (!(await skipJsonValue(reader))) {
           return { validation: 'invalid' };
@@ -420,6 +473,7 @@ async function validateSnapshotInfoId(
 
     if ((await nextNonWhitespace(reader)) !== null) return { validation: 'invalid' };
     if (
+      bytesWritten <= MAX_EMPTY_SNAPSHOT_BYTES &&
       infoId === undefined &&
       sawInfo &&
       sawMessages &&
@@ -427,6 +481,7 @@ async function validateSnapshotInfoId(
       infoIsEmpty &&
       messagesIsEmpty &&
       sessionDiffIsEmpty &&
+      subagentsAreEmpty &&
       !hasUnexpectedTopLevelField
     ) {
       return { validation: 'empty' };
@@ -448,7 +503,8 @@ async function sanitizeSnapshotWithJq(
   snapshotPath: string,
   filter: string,
   logLabel: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   const tempPath = tokenSanitizationTempPath(snapshotPath);
   try {
@@ -457,6 +513,7 @@ async function sanitizeSnapshotWithJq(
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
+      env,
     });
     const writeOutput = proc.stdout.pipeTo(Writable.toWeb(fs.createWriteStream(tempPath)));
     const exitCode = await proc.exited;
@@ -477,9 +534,19 @@ async function sanitizeSnapshotWithJq(
   }
 }
 
-async function sanitizeSnapshot(snapshotPath: string, signal?: AbortSignal): Promise<void> {
+async function sanitizeSnapshot(
+  snapshotPath: string,
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
+): Promise<void> {
   if (
-    await sanitizeSnapshotWithJq(snapshotPath, JQ_SANITIZE_SNAPSHOT_FILTER, 'sanitization', signal)
+    await sanitizeSnapshotWithJq(
+      snapshotPath,
+      JQ_SANITIZE_SNAPSHOT_FILTER,
+      'sanitization',
+      signal,
+      env
+    )
   ) {
     log('snapshot sanitized');
     return;
@@ -504,7 +571,8 @@ const JQ_EXTRACT_DIFFS_FILTER =
  */
 export async function extractDiffs(
   snapshotPath: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<SnapshotDiff[] | null> {
   signal?.throwIfAborted();
   try {
@@ -512,6 +580,7 @@ export async function extractDiffs(
       stdout: 'pipe',
       stderr: 'ignore',
       signal,
+      env,
     });
     const exitCode = await proc.exited;
     signal?.throwIfAborted();
@@ -581,13 +650,15 @@ async function runGitApply(
   workspacePath: string,
   patchFile: string,
   extraArgs: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<{ exitCode: number; stderr: string }> {
   const proc = Bun.spawn(['git', 'apply', ...extraArgs, '--whitespace=nowarn', patchFile], {
     cwd: workspacePath,
     stdout: 'pipe',
     stderr: 'pipe',
     signal,
+    env,
   });
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
@@ -597,7 +668,8 @@ async function runGitApply(
 async function applyPatch(
   workspacePath: string,
   diff: SnapshotDiff,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv
 ): Promise<boolean> {
   if (!diff.patch) return false;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
@@ -605,7 +677,7 @@ async function applyPatch(
   try {
     signal?.throwIfAborted();
     fs.writeFileSync(file, diff.patch);
-    const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal);
+    const threeWay = await runGitApply(workspacePath, file, ['--3way'], signal, env);
     signal?.throwIfAborted();
     if (threeWay.exitCode === 0) return true;
     log(
@@ -619,6 +691,7 @@ async function applyPatch(
       stdout: 'pipe',
       stderr: 'pipe',
       signal,
+      env,
     });
     const resetStderr = await new Response(reset.stderr).text();
     const resetExitCode = await reset.exited;
@@ -630,7 +703,7 @@ async function applyPatch(
       return false;
     }
 
-    const plain = await runGitApply(workspacePath, file, [], signal);
+    const plain = await runGitApply(workspacePath, file, [], signal, env);
     signal?.throwIfAborted();
     if (plain.exitCode === 0) {
       log(`git apply fallback succeeded file=${diff.file}`);
@@ -687,109 +760,132 @@ export async function restoreSession(
   filePath?: string,
   options: RestoreSessionOptions = {}
 ): Promise<RestoreResult> {
-  const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
+  let tmpPath = filePath;
+  let tempDir: string | undefined;
+  if (!tmpPath) {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-export-'));
+    tmpPath = path.join(tempDir, 'snapshot.json');
+  }
   const downloaded = !filePath;
   const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
-
-  log(
-    `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
-  );
-
-  if (!filePath) {
-    const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
-    let token: string | undefined;
-    try {
-      token = resolveKilocodeToken();
-    } catch {
-      return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
-    }
-
-    if (!ingestUrl || !token) {
-      const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
-        .filter(Boolean)
-        .join(', ');
-      return fail(`missing env vars: ${missing}`, null, 'download');
-    }
-
-    log(`ingestUrl=${ingestUrl}`);
-
-    // ---- Step 1: Download snapshot (stream directly to disk) ----
-    log('downloading snapshot');
-    try {
-      const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
-      const downloadTimeoutSignal = AbortSignal.timeout(300_000);
-      const downloadSignal = options.signal
-        ? AbortSignal.any([options.signal, downloadTimeoutSignal])
-        : downloadTimeoutSignal;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: downloadSignal,
-      });
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          log('snapshot not found (404)');
-          return fail('snapshot not found (404)', 404, 'download');
-        }
-        log(`download failed status=${res.status}`);
-        return fail(`download failed status=${res.status}`, 502, 'download');
-      }
-
-      const bytesWritten = await Bun.write(tmpPath, res);
-      log(`snapshot downloaded bytes=${bytesWritten}`);
-
-      // Validate before handing off to `kilo import`: an upstream error
-      // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
-      // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
-      // and exit 1. Stream only the top-level metadata guardrail instead of
-      // materializing the full export in the wrapper heap.
-      const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
-      log(
-        `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
-      );
-      if (snapshotInfoValidation.validation === 'invalid') {
-        log('snapshot is not valid JSON before info.id metadata');
-        return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
-      }
-      if (snapshotInfoValidation.validation === 'empty') {
-        log('snapshot is an empty session export; treating it as not found');
-        return fail('snapshot not found (empty export)', 404, 'download');
-      }
-      if (snapshotInfoValidation.validation === 'missing') {
-        log('snapshot missing info.id — likely an error response');
-        return fail(
-          `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
-          null,
-          'download'
-        );
-      }
-    } catch {
-      tryUnlink(tmpPath);
-      return fail('snapshot download failed', null, 'download');
-    }
-  } else {
-    log(`using provided file=${filePath}`);
-    try {
-      const providedInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
-      log(
-        `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
-      );
-    } catch {
-      options.signal?.throwIfAborted();
-      log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
-    }
-  }
+  const env = options.env ?? process.env;
 
   try {
-    await sanitizeSnapshot(tmpPath, options.signal);
+    log(
+      `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${env.HOME ?? '(unset)'}`
+    );
+
+    if (!filePath) {
+      const ingestUrl = env.KILO_SESSION_INGEST_URL;
+      let token: string | undefined;
+      try {
+        token = resolveKilocodeToken(env);
+      } catch {
+        return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
+      }
+
+      if (!ingestUrl || !token) {
+        const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
+          .filter(Boolean)
+          .join(', ');
+        return fail(`missing env vars: ${missing}`, null, 'download');
+      }
+
+      log(`ingestUrl=${ingestUrl}`);
+
+      // ---- Step 1: Download snapshot (stream directly to disk) ----
+      log('downloading snapshot');
+      try {
+        const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
+        const downloadTimeoutSignal = AbortSignal.timeout(300_000);
+        const downloadSignal = options.signal
+          ? AbortSignal.any([options.signal, downloadTimeoutSignal])
+          : downloadTimeoutSignal;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: downloadSignal,
+        });
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            log('snapshot not found (404)');
+            return fail('snapshot not found (404)', 404, 'download');
+          }
+          log(`download failed status=${res.status}`);
+          return fail(`download failed status=${res.status}`, 502, 'download');
+        }
+
+        const bytesWritten = await Bun.write(tmpPath, res);
+        log(`snapshot downloaded bytes=${bytesWritten}`);
+
+        // Validate before handing off to `kilo import`: an upstream error
+        // surface (e.g. a JSON `{"detail":"..."}` body served as 200) crashes
+        // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
+        // and exit 1. Stream only the top-level metadata guardrail instead of
+        // materializing the full export in the wrapper heap.
+        const snapshotInfoValidation = await validateSnapshotInfoId(
+          tmpPath,
+          bytesWritten,
+          options.signal
+        );
+        log(
+          `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
+        );
+        if (snapshotInfoValidation.validation === 'invalid') {
+          log('snapshot is not valid JSON before info.id metadata');
+          return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
+        }
+        if (snapshotInfoValidation.validation === 'empty') {
+          log('snapshot is an empty session export; treating it as not found');
+          return fail('snapshot not found (404)', 404, 'download');
+        }
+        if (snapshotInfoValidation.validation === 'missing') {
+          const result = fail(
+            `snapshot missing info.id (${bytesWritten} bytes); session-ingest may have returned an error body`,
+            null,
+            'download'
+          );
+          if (
+            bytesWritten === EMPTY_SESSION_INGEST_EXPORT.length &&
+            (await Bun.file(tmpPath).text()) === EMPTY_SESSION_INGEST_EXPORT
+          ) {
+            log('snapshot contains no session metadata or history');
+            return { ...result, emptySnapshot: true };
+          }
+          log('snapshot missing info.id — likely an error response');
+          return result;
+        }
+      } catch {
+        return fail('snapshot download failed', null, 'download');
+      }
+    } else {
+      log(`using provided file=${filePath}`);
+      try {
+        const providedInfoValidation = await validateSnapshotInfoId(
+          tmpPath,
+          fs.statSync(tmpPath).size,
+          options.signal
+        );
+        log(
+          `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
+        );
+      } catch {
+        options.signal?.throwIfAborted();
+        log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
+      }
+    }
+
+    await sanitizeSnapshot(tmpPath, options.signal, env);
 
     // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(
-      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
+      `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
     const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
+      env,
+      inheritEnv: false,
       timeoutMs: importTimeoutMs,
       signal: options.signal,
       terminationGraceMs: options.importTerminationGraceMs,
@@ -798,7 +894,7 @@ export async function restoreSession(
 
     if (isTimeoutTermination(importResult)) {
       log(
-        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
+        `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
       return fail(
         `kilo import timed out after ${importTimeoutMs}ms`,
@@ -811,7 +907,7 @@ export async function restoreSession(
 
     if (importResult.exitCode !== 0) {
       log(
-        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+        `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
       return fail(
         `kilo import failed exitCode=${importResult.exitCode}`,
@@ -822,13 +918,13 @@ export async function restoreSession(
       );
     }
     log(
-      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
+      `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
-    const uniqueDiffs = await extractDiffs(tmpPath, options.signal);
+    const uniqueDiffs = await extractDiffs(tmpPath, options.signal, env);
     if (uniqueDiffs === null) {
       return fail('failed to parse snapshot JSON', null, 'diffs');
     }
@@ -854,7 +950,7 @@ export async function restoreSession(
       options.signal?.throwIfAborted();
       if (diff.patch) {
         try {
-          if (await applyPatch(workspacePath, diff, options.signal)) {
+          if (await applyPatch(workspacePath, diff, options.signal, env)) {
             applied++;
           } else {
             skipped++;
@@ -905,7 +1001,11 @@ export async function restoreSession(
 
     return { ok: true, downloaded, imported: true, diffs: { applied, skipped, total } };
   } finally {
-    tryUnlink(tmpPath);
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } else {
+      tryUnlink(tmpPath);
+    }
   }
 }
 

@@ -152,7 +152,11 @@
     "appearanceDark": "Fosc",
     "account": "Compte",
     "prReviewAttribution": "Afegiu l'atribució de l'aplicació a les revisions de PR",
-    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió."
+    "prReviewAttributionSubtitle": "Afegiu un peu de pàgina «Reviewed via Kilo» quan envieu una revisió.",
+    "returnSendsMessage": "La tecla de retorn envia el missatge",
+    "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
+    "biometricUnlock": "Desbloqueja amb biometria",
+    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -197,7 +201,7 @@
       "diffTooLarge": "Diff massa gran per mostrar",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre el diff d'aquest fitxer a GitHub",
-      "githubDiff": "diff de GitHub"
+      "githubDiff": "Diff de GitHub"
     },
     "floatingActions": {
       "clearSelection": "Esborra la selecció",
@@ -246,7 +250,7 @@
       "oldNew": "Antic: {{old}} | Nou: {{new}}",
       "oldOnly": "Només antic: {{text}}",
       "newOnly": "Només nou: {{text}}",
-      "emptyDiffRow": "fila de diff buida"
+      "emptyDiffRow": "Fila de diff buida"
     },
     "connectionExpired": "La connexió de GitHub ha caducat.",
     "merge": {
@@ -672,7 +676,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, pestanya, {{position}} de {{total}}"
+    "position": "{{name}}, pestanya, {{position}} de {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -756,7 +761,8 @@
       "networkError": "Error de xarxa",
       "uploadFailed": "La pujada ha fallat",
       "failedToUploadFile": "No s'ha pogut pujar el fitxer: {{reason}}",
-      "nothingToPaste": "Res per enganxar"
+      "nothingToPaste": "Res per enganxar",
+      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1308,7 +1314,23 @@
       "checkRun": "Execució de comprovació",
       "status": "Estat",
       "threshold": "Llindar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "S'espera la transcripció de la revisió.",
+      "transcriptEmpty": "No hi ha transcripció per a aquesta revisió.",
+      "transcriptRetry": "No s'ha pogut carregar la transcripció de la revisió.",
+      "transcriptLive": "En directe",
+      "agentIdle": "Agent inactiu",
+      "agentWorking": "Agent treballant...",
+      "anErrorOccurred": "S'ha produït un error",
+      "errorWithMessage": "Error: {{message}}",
+      "executionStarted": "S'ha iniciat l'execució",
+      "reviewCompleted": "Revisió completada",
+      "reviewInterrupted": "Revisió interrompuda",
+      "sessionError": "Error de sessió: {{error}}",
+      "statusWithValue": "Estat: {{status}}",
+      "toolName": "Eina: {{name}}",
+      "toolNameError": "Eina: {{name}} — error",
+      "unknownError": "Error desconegut"
     },
     "reviewMemory": {
       "title": "Memòria de revisió",
@@ -2046,7 +2068,6 @@
     }
   },
   "agents": {
-    "activeNow": "Actius ara",
     "search": {
       "searching": "Cercant",
       "searchSessions": "Cercar sessions",
@@ -2057,16 +2078,15 @@
     "sessionList": {
       "couldNotLoad": "No s'han pogut carregar les sessions",
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives",
-      "noSessionsYet": "Encara no hi ha sessions",
       "noSessionsYetDescription": "Inicia una tasca de codificació des del telèfon. Les sessions apareixeran aquí.",
       "noMatches": "Cap sessió no coincideix",
       "tryDifferentSearch": "Prova amb un altre terme de cerca.",
       "tryAdjustFilters": "Prova d'ajustar o esborrar els filtres.",
       "couldNotSearch": "No s'han pogut cercar les sessions",
-      "allActive": "Totes les sessions estan actives",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
-      "live": "EN DIRECTE"
+      "live": "EN DIRECTE",
+      "updating": "Actualitzant"
     },
     "sessionRow": {
       "deleteTitle": "Eliminar la sessió?",
@@ -2112,7 +2132,10 @@
     "sessionExited": "La sessió ha finalitzat",
     "remoteSpawnRetryable": "No s'ha pogut arribar a la instància: potser s'ha desconnectat.",
     "remoteSpawnNonRetryable": "La instància no ha pogut iniciar la sessió: comproveu la màquina o actualitzeu la CLI.",
-    "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicieu una sessió a Cloud Agent o trieu una altra instància."
+    "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicieu una sessió a Cloud Agent o trieu una altra instància.",
+    "liveCount_one": "{{count}} EN DIRECTE",
+    "liveCount_other": "{{count}} EN DIRECTE",
+    "liveCount_many": "{{count}} EN DIRECTE"
   },
   "agentChat": {
     "session": {
@@ -2134,18 +2157,19 @@
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
-      "connectRepository": "Connecta un repositori",
       "cloningSession": "Clonant la sessió",
       "continue": "Continua",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió",
-      "cloneFailed": "No s'ha pogut clonar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "connectRepositoryToContinue": "Connecta un repositori per continuar.",
       "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Problema de connexió. Torna-ho a provar d'aquí a un moment.",
-      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar."
+      "modelUnavailable": "Aquest model no està disponible per a Cloud Agent. Tria un altre model i torna-ho a provar.",
+      "cancelQueuedFailed": "No s'ha pogut cancel·lar el missatge.",
+      "cancelQueuedRestoreAvailable": "Missatge cancel·lat. Toca Restaura per tornar-lo al camp de missatge.",
+      "cancelQueuedRestored": "Missatge cancel·lat. El missatge torna a ser al camp de missatge.",
+      "cancelQueuedUpgradeRequired": "Per cancel·lar missatges en cua cal una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "remoteSession": {
       "failedToCreate": "No s'ha pogut crear la sessió remota",
@@ -2213,7 +2237,12 @@
       "noRepositoriesVisibleGitlab": "No hi ha repositoris visibles. Comprova l'accés als repositoris de GitLab i actualitza.",
       "openBitbucket": "Obre Bitbucket",
       "openGitlab": "Obre GitLab",
-      "recentlyUsed": "Utilitzats recentment"
+      "recentlyUsed": "Utilitzats recentment",
+      "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Trieu Cloud Agent o un altre CLI.",
+      "continueFrom": "Continuant {{title}}",
+      "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "importingSession": "Important la sessió",
+      "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2272,7 +2301,9 @@
       "noCliInstancesDescription": "Executa `kilo remote` en un projecte del teu ordinador, o actualitza el CLI de Kilo si ja n'hi ha un en execució.",
       "instanceOnProject": "{{name}} a {{project}}",
       "instanceOnProjectSuffix": "{{name}} a {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Executa al Cloud Agent"
+      "runOnCloudAgent": "Executa al Cloud Agent",
+      "terminals": "Terminals",
+      "remotes": "Instàncies remotes"
     },
     "modePicker": {
       "title": "Selecciona un mode",
@@ -2462,7 +2493,11 @@
       "queuedAccessibility": "Missatge en cua",
       "userMessage": "Missatge de l'usuari",
       "assistantMessage": "Missatge de l'assistent",
-      "longPressHint": "Manteniu premut per veure els detalls del missatge"
+      "longPressHint": "Manteniu premut per veure els detalls del missatge",
+      "cancelQueued": "Cancel·la el missatge",
+      "cancelQueuedAccessibility": "Cancel·la el missatge en cua",
+      "restoreQueued": "Restaura",
+      "restoreQueuedAccessibility": "Restaura el missatge cancel·lat al camp de missatge"
     },
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",
@@ -2479,6 +2514,8 @@
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
+      "loading": "Carregant la taula",
+      "empty": "Aquesta taula no té cap fila.",
       "columnCount_one": "columna",
       "columnCount": "columnes",
       "columnCount_other": "columnes",
@@ -2491,9 +2528,6 @@
     },
     "sessionFilter": {
       "title": "Filtra les sessions",
-      "sortBy": "Ordena per",
-      "sortLastUpdated": "Última actualització",
-      "sortCreated": "Creat",
       "platform": "Plataforma",
       "platformCloud": "Cloud",
       "platformExtension": "Extensió",
@@ -2502,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Altres",
-      "project": "Projecte",
-      "removeProjectFilter": "Treu el filtre de projecte {{label}}",
-      "removePlatformFilter": "Treu el filtre de plataforma {{label}}"
+      "project": "Projecte"
     },
     "suggestion": {
       "title": "Suggeriment",
@@ -2547,7 +2579,9 @@
       "uploading": "Penjant…",
       "uploaded": "Penjat",
       "uploadFailedRetry": "La pujada ha fallat. Toqueu per tornar-ho a provar.",
-      "uploadFailedTerminal": "Aquest fitxer no es pot penjar."
+      "uploadFailedTerminal": "Aquest fitxer no es pot penjar.",
+      "moveLeft": "Mou {{filename}} a l'esquerra",
+      "moveRight": "Mou {{filename}} a la dreta"
     },
     "attachmentPasteHint": {
       "accessibility": "Enganxa la imatge del portapapers",
@@ -2577,7 +2611,11 @@
       "finalizingPlaceholder": "Tancant...",
       "messagePlaceholder": "Missatge...",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
-      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar."
+      "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toqueu Envia per tornar-ho a provar.",
+      "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
+      "discardAttachmentsTitle": "Descartar els adjunts?",
+      "charactersRemaining": "Queden {{count}} caràcters",
+      "insertNewline": "Insereix un salt de línia"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",
@@ -2670,6 +2708,17 @@
       "hostConfirmMessage": "Aquest enllaç obre {{host}} al navegador.",
       "open": "Obrir",
       "trustThisHost": "Confia en aquest host"
+    },
+    "folderPicker": {
+      "accessibility": "Carpeta: {{label}}",
+      "emptyDescription": "Fet utilitza aquesta carpeta.",
+      "emptyTitle": "No hi ha cap carpeta",
+      "fieldLabel": "Carpeta",
+      "retryableDescription": "Comprova la connexió i torna-ho a provar. Fet encara confirma aquesta carpeta.",
+      "retryableTitle": "No s'han pogut llistar les carpetes",
+      "tapToListHint": "Toca una carpeta per llistar-ne el contingut",
+      "unsupportedDescription": "Aquesta CLI no pot llistar carpetes. Fet manté la carpeta d'inici i Inicia la sessió comença allà.",
+      "unsupportedTitle": "No es poden llistar les carpetes"
     }
   },
   "bootstrap": {
@@ -2722,7 +2771,7 @@
     "newCodingTask": "Nova tasca de programació",
     "explore": "Explora",
     "seeAll": "Veure-ho tot",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Ara mateix no hi ha res en execució"
   },
   "imageViewer": {
     "close": "Tanca {{filename}}",
@@ -2767,7 +2816,7 @@
     "optionsExpiredDescription": "Torna enrere i reobre aquest selector des de la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "requereix entrada"
+    "needsInput": "REQUEREIX ENTRADA"
   },
   "voiceInput": {
     "listening": "Escoltant...",
@@ -2786,7 +2835,8 @@
     "busy": "L'entrada de veu està ocupada. Torna-ho a provar.",
     "stopped": "L'entrada de veu s'ha aturat. Toca el micròfon per tornar-ho a provar.",
     "unavailableDevice": "L'entrada de veu no està disponible en aquest dispositiu.",
-    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu."
+    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu.",
+    "listeningStopped": "S'ha aturat l'escolta."
   },
   "share": {
     "title": "Comparteix a Kilo",
@@ -3181,5 +3231,19 @@
     "emptyDescription": "Quan confies en el host d'un enllaç, s'obre sense tornar a preguntar.",
     "revoke": "Revoca {{host}}",
     "backToPreferences": "Torna a les preferències"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Missatge"
+    },
+    "empty": {
+      "title": "Comença un xat",
+      "description": "Envia un missatge per parlar amb un model."
+    },
+    "working": "Treballant",
+    "historyRetry": "No s'ha pogut carregar l'historial del xat.",
+    "catalogRetry": "No s'han pogut carregar els models",
+    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
   }
 }

@@ -24,6 +24,7 @@
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jest": "29.7.0",
+    "ts-jest": "29.4.9",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   },

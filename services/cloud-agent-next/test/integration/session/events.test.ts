@@ -13,7 +13,9 @@ import { describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import * as z from 'zod';
 import { createEventQueries } from '../../../src/session/queries/events.js';
-import type { EventId } from '../../../src/types/ids.js';
+import type { EventId, SessionId } from '../../../src/types/ids.js';
+import { createStreamHandler } from '../../../src/websocket/stream.js';
+import { persistSandboxControlSessionEvent } from '../../../src/sandbox-session/sandbox-control-event.js';
 
 const messageUpdatedPayloadSchema = z.object({
   properties: z.object({
@@ -280,6 +282,154 @@ describe('Event Storage', () => {
     expect(messageUpdatedPayloadSchema.parse(payload).properties.info.text).toBe('hello world');
     // Timestamp should be updated
     expect(result.allEvents[0].stream_event_type).toBe('kilocode');
+  });
+
+  it('repairs offline entity mutations below the replay cursor without replaying old execution state', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.getByName('user_1:sess_materialized');
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const events = createEventQueries(drizzle(state.storage), state.storage.sql);
+      const sessionId = 'sess_materialized' as SessionId;
+      const now = Date.now();
+      const text = (value: string) => ({
+        executionId: '',
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: now,
+        entityId: 'part/assistant/text',
+        payload: JSON.stringify({
+          event: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'text',
+              messageID: 'assistant',
+              sessionID: 'ses_root',
+              type: 'text',
+              text: value,
+            },
+          },
+        }),
+      });
+      const tool = (status: string) => ({
+        executionId: '',
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: now,
+        entityId: 'part/assistant/tool',
+        payload: JSON.stringify({
+          event: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'tool',
+              messageID: 'assistant',
+              sessionID: 'ses_root',
+              type: 'tool',
+              state: { status },
+            },
+          },
+        }),
+      });
+      const textId = events.upsert(text('Partial'));
+      const toolId = events.upsert(tool('running'));
+      const fromId = events.insert({
+        executionId: '',
+        sessionId,
+        streamEventType: 'cloud.message.sent',
+        timestamp: now,
+        payload: JSON.stringify({ messageId: 'user', delivery: 'sent' }),
+      });
+      const finalTextId = events.upsert(text('Complete answer'));
+      const finalToolId = events.upsert(tool('completed'));
+      for (const payload of [
+        { type: 'message.removed', properties: { sessionID: 'ses_root', messageID: 'removed' } },
+        {
+          type: 'message.part.removed',
+          properties: { sessionID: 'ses_root', messageID: 'assistant', partID: 'old-tool' },
+        },
+        { type: 'session.turn.close', properties: { sessionID: 'ses_root', reason: 'completed' } },
+        {
+          type: 'autocommit_completed',
+          properties: {
+            messageId: 'user',
+            success: true,
+            commitHash: 'abc123',
+            message: 'Committed',
+          },
+        },
+      ]) {
+        persistSandboxControlSessionEvent({
+          sessionId,
+          payload,
+          eventQueries: events,
+          broadcast: () => {},
+        });
+      }
+      events.insert({
+        executionId: '',
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: now,
+        payload: JSON.stringify({
+          event: 'message.part.delta',
+          properties: {
+            messageID: 'assistant',
+            partID: 'text',
+            field: 'text',
+            delta: 'already materialized',
+          },
+        }),
+      });
+      events.insert({
+        executionId: '',
+        sessionId,
+        streamEventType: 'cloud.message.completed',
+        timestamp: now,
+        payload: JSON.stringify({
+          messageId: 'user',
+          status: 'completed',
+          delivery: 'sent',
+          accepted: true,
+        }),
+      });
+      const sent: string[] = [];
+      const socket = {
+        readyState: WebSocket.OPEN,
+        send: (message: string) => sent.push(message),
+      } as WebSocket;
+      const handler = createStreamHandler(state, events, sessionId, {
+        reconcileMaterializedEvents: true,
+      });
+      await handler.replayEvents(socket, { sessionId, fromId });
+      await handler.replayEvents(socket, { sessionId, fromId }, 'updates');
+      await handler.replayEvents(socket, { sessionId, fromId }, 'removals');
+      return {
+        textId,
+        toolId,
+        finalTextId,
+        finalToolId,
+        incrementalIds: events.findByFilters({ fromId }).map(event => event.id),
+        sent,
+      };
+    });
+
+    expect(result.finalTextId).toBe(result.textId);
+    expect(result.finalToolId).toBe(result.toolId);
+    expect(result.incrementalIds).not.toContain(result.textId);
+    expect(result.incrementalIds).not.toContain(result.toolId);
+    const frames = result.sent.map(message => JSON.parse(message));
+    expect(frames.filter(frame => frame.eventId > 0).map(frame => frame.streamEventType)).toEqual([
+      'cloud.message.completed',
+    ]);
+    const snapshots = frames.filter(frame => frame.eventId === 0);
+    expect(snapshots.map(frame => frame.data.event)).toEqual([
+      'message.part.updated',
+      'message.part.updated',
+      'autocommit_completed',
+      'message.removed',
+      'message.part.removed',
+    ]);
+    expect(snapshots[0].data.properties.part.text).toBe('Complete answer');
+    expect(snapshots[1].data.properties.part.state.status).toBe('completed');
+    expect(snapshots[2].data.properties.commitHash).toBe('abc123');
   });
 
   it('should upsert: different entityIds create separate rows', async () => {

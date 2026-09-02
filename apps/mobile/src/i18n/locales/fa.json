@@ -152,7 +152,11 @@
     "appearanceDark": "تیره",
     "account": "حساب",
     "prReviewAttribution": "افزودن انتساب برنامه به مرورهای PR",
-    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید."
+    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید.",
+    "returnSendsMessage": "کلید بازگشت پیام را ارسال می‌کند",
+    "returnSendsMessageSubtitle": "وقتی خاموش است، کلید بازگشت در کادرهای ورودی پیام عامل یک خط جدید درج می‌کند.",
+    "biometricUnlock": "باز کردن قفل با احراز هویت زیست‌سنجی",
+    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -665,7 +669,8 @@
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تب، {{position}} از {{total}}"
+    "position": "{{name}}، تب، {{position}} از {{total}}",
+    "chat": "پیام‌های گفتگو"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "خطای شبکه",
       "uploadFailed": "بارگذاری ناموفق بود",
       "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}",
-      "nothingToPaste": "چیزی برای جای‌گذاری نیست"
+      "nothingToPaste": "چیزی برای جای‌گذاری نیست",
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "اجرای بررسی",
       "status": "وضعیت",
       "threshold": "آستانه",
-      "pullRequest": "درخواست pull"
+      "pullRequest": "درخواست pull",
+      "transcriptWaiting": "در انتظار متن گفتوگوی بازبینی.",
+      "transcriptEmpty": "متن گفتوگویی برای این بازبینی وجود ندارد.",
+      "transcriptRetry": "بارگذاری متن گفتوگوی بازبینی ممکن نشد.",
+      "transcriptLive": "زنده",
+      "agentIdle": "عامل بیکار",
+      "agentWorking": "عامل در حال کار...",
+      "anErrorOccurred": "خطایی رخ داد",
+      "errorWithMessage": "خطا: {{message}}",
+      "executionStarted": "اجرا شروع شد",
+      "reviewCompleted": "بررسی تکمیل شد",
+      "reviewInterrupted": "بررسی قطع شد",
+      "sessionError": "خطای جلسه: {{error}}",
+      "statusWithValue": "وضعیت: {{status}}",
+      "toolName": "ابزار: {{name}}",
+      "toolNameError": "ابزار: {{name}} — خطا",
+      "unknownError": "خطای ناشناخته"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "اکنون فعال",
     "search": {
       "searching": "در حال جستجو",
       "searchSessions": "جستجوی نشستها",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "جلسات بارگذاری نشدند",
       "couldNotLoadActive": "بارگذاری نشستهای فعال ممکن نشد",
-      "noSessionsYet": "هنوز نشستی وجود ندارد",
       "noSessionsYetDescription": "از تلفن خود یک کار کدنویسی شروع کنید. نشستهای شما اینجا ظاهر میشوند.",
       "noMatches": "هیچ نشستی مطابقت ندارد",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "tryAdjustFilters": "فیلترهای خود را تنظیم یا پاک کنید.",
       "couldNotSearch": "جستجوی نشستها ممکن نشد",
-      "allActive": "همه نشستها فعال هستند",
       "completedWillAppear": "نشستهای تکمیلشده اینجا ظاهر میشوند.",
       "noPastSessions": "هیچ نشست گذشته وجود ندارد",
-      "live": "زنده"
+      "live": "زنده",
+      "updating": "در حال به‌روزرسانی"
     },
     "sessionRow": {
       "deleteTitle": "نشست حذف شود؟",
@@ -2097,7 +2117,9 @@
     "sessionExited": "جلسه خاتمه یافت",
     "remoteSpawnRetryable": "امکان دسترسی به نمونه وجود نداشت — شاید قطع شده باشد.",
     "remoteSpawnNonRetryable": "نمونه نتوانست جلسه را شروع کند — دستگاه را بررسی کنید یا CLI را بهروزرسانی کنید.",
-    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید."
+    "remoteSpawnInstanceDisconnected": "نمونه انتخابی قطع شد. یک جلسه در Cloud Agent شروع کنید یا نمونه دیگری انتخاب کنید.",
+    "liveCount_one": "{{count}} زنده",
+    "liveCount_other": "{{count}} زنده"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
-      "connectRepository": "اتصال مخزن",
       "cloningSession": "در حال شبیهسازی نشست",
       "continue": "ادامه",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
-      "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
       "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
       "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید.",
-      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید."
+      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید.",
+      "cancelQueuedFailed": "لغو پیام ممکن نشد.",
+      "cancelQueuedRestoreAvailable": "پیام لغو شد. برای بازگرداندن آن به کادر ورودی پیام، روی بازیابی ضربه بزنید.",
+      "cancelQueuedRestored": "پیام لغو شد. پرسش به کادر ورودی پیام بازگشت.",
+      "cancelQueuedUpgradeRequired": "لغو پیام‌های در صف به نسخه جدیدتری از Kilo CLI نیاز دارد. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
       "openBitbucket": "باز کردن Bitbucket",
       "openGitlab": "باز کردن GitLab",
-      "recentlyUsed": "اخیراً استفاده‌شده"
+      "recentlyUsed": "اخیراً استفاده‌شده",
+      "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
+      "continueFrom": "در حال ادامهٔ {{title}}",
+      "importFailed": "وارد کردن این نشست ممکن نشد.",
+      "importingSession": "در حال وارد کردن نشست",
+      "discardWithUploadsMessage": "پرسش شما و فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "در یک پروژه روی رایانه خود `kilo remote` را اجرا کنید، یا اگر CLI کیلا در حال اجرا است آن را بهروزرسانی کنید.",
       "instanceOnProject": "{{name}} در {{project}}",
       "instanceOnProjectSuffix": "{{name}} در {{project}} ({{suffix}})",
-      "runOnCloudAgent": "اجرا بر روی Cloud Agent"
+      "runOnCloudAgent": "اجرا بر روی Cloud Agent",
+      "terminals": "پایانه‌ها",
+      "remotes": "نمونه‌های راه دور"
     },
     "modePicker": {
       "title": "انتخاب حالت",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "پیام در صف قرار گرفت",
       "userMessage": "پیام کاربر",
       "assistantMessage": "پیام دستیار",
-      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید"
+      "longPressHint": "برای جزئیات پیام، لمس طولانی کنید",
+      "cancelQueued": "لغو پیام",
+      "cancelQueuedAccessibility": "لغو پیام در صف",
+      "restoreQueued": "بازیابی",
+      "restoreQueuedAccessibility": "بازیابی پیام لغوشده در کادر ورودی پیام"
     },
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
@@ -2462,6 +2496,8 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
+      "loading": "در حال بارگذاری جدول",
+      "empty": "این جدول هیچ ردیفی ندارد.",
       "columnCount_one": "ستون",
       "columnCount": "ستون‌ها",
       "columnCount_other": "ستون‌ها",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "فیلتر جلسات",
-      "sortBy": "مرتب‌سازی بر اساس",
-      "sortLastUpdated": "آخرین به‌روزرسانی",
-      "sortCreated": "ایجاد شده",
       "platform": "پلتفرم",
       "platformCloud": "ابر",
       "platformExtension": "افزونه",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "سایر",
-      "project": "پروژه",
-      "removeProjectFilter": "حذف فیلتر پروژه {{label}}",
-      "removePlatformFilter": "حذف فیلتر پلتفرم {{label}}"
+      "project": "پروژه"
     },
     "suggestion": {
       "title": "پیشنهاد",
@@ -2528,7 +2559,9 @@
       "uploading": "در حال بارگذاری…",
       "uploaded": "بارگذاری شد",
       "uploadFailedRetry": "بارگذاری ناموفق بود. برای تلاش مجدد لمس کنید.",
-      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست."
+      "uploadFailedTerminal": "این فایل قابل بارگذاری نیست.",
+      "moveLeft": "انتقال {{filename}} به چپ",
+      "moveRight": "انتقال {{filename}} به راست"
     },
     "attachmentPasteHint": {
       "accessibility": "چسباندن تصویر از کلیپ‌بورد",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "در حال تکمیل...",
       "messagePlaceholder": "پیام...",
       "cannotReceiveFiles": "این جلسه نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
-      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید."
+      "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش مجدد، ارسال را لمس کنید.",
+      "discardAttachmentsMessage": "فایل‌های بارگذاری‌شده‌ای که به پیام‌های ارسال‌شده پیوست نشده‌اند حذف خواهند شد.",
+      "discardAttachmentsTitle": "پیوست‌ها دور انداخته شوند؟",
+      "charactersRemaining": "{{count}} نویسه باقی مانده",
+      "insertNewline": "درج خط جدید"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "این پیوند {{host}} را در مرورگر شما باز میکند.",
       "open": "باز کردن",
       "trustThisHost": "اعتماد به این میزبان"
+    },
+    "folderPicker": {
+      "fieldLabel": "پوشه",
+      "accessibility": "پوشه: {{label}}",
+      "tapToListHint": "برای فهرست کردن محتویات یک پوشه، روی آن ضربه بزنید",
+      "emptyTitle": "در داخل پوشهای نیست",
+      "emptyDescription": "انجام شد از این پوشه استفاده میکند.",
+      "retryableTitle": "فهرست کردن پوشهها ممکن نشد",
+      "retryableDescription": "اتصال خود را بررسی کنید و تلاش مجدد کنید. انجام شد همچنان این پوشه را تأیید میکند.",
+      "unsupportedTitle": "فهرست کردن پوشهها ممکن نیست",
+      "unsupportedDescription": "این CLI نمیتواند پوشهها را فهرست کند. انجام شد پوشه راهاندازی را حفظ میکند و شروع نشست از آنجا آغاز میشود."
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "در حال حاضر چیزی در حال اجرا نیست"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",
@@ -2766,7 +2814,8 @@
     "busy": "ورودی صوتی مشغول است. دوباره تلاش کنید.",
     "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
     "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
-    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست."
+    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست.",
+    "listeningStopped": "گوش دادن متوقف شد."
   },
   "share": {
     "title": "اشتراک در Kilo",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "وقتی به میزبان یک پیوند اعتماد کنید، بدون پرسیدن دوباره باز میشود.",
     "revoke": "بازگرداندن {{host}}",
     "backToPreferences": "بازگشت به تنظیمات"
+  },
+  "quickChat": {
+    "title": "پیام‌های گفتگو",
+    "composer": {
+      "placeholder": "پیام"
+    },
+    "empty": {
+      "title": "شروع گفتگو",
+      "description": "برای گفتگو با یک مدل، یک پیام ارسال کنید."
+    },
+    "working": "در حال کار",
+    "historyRetry": "تاریخچه گفتگو بارگذاری نشد.",
+    "catalogRetry": "بارگذاری مدل‌ها ناموفق بود",
+    "sendError": "ارسال پیام ممکن نشد. دوباره تلاش کنید."
   }
 }

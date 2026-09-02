@@ -152,7 +152,11 @@
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
     "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
-    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి.",
+    "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
+    "returnSendsMessageSubtitle": "ఆఫ్లో ఉన్నప్పుడు, రిటర్న్ ఏజెంట్ సందేశ ఇన్పుట్లలో కొత్త పంక్తిని చేర్చుతుంది.",
+    "biometricUnlock": "బయోమెట్రిక్స్తో అన్లాక్ చేయండి",
+    "biometricUnlockSubtitle": "యాప్ను ప్రారంభించినప్పుడు, అలాగే నేపథ్యంగా ఐదు నిమిషాలు ఉన్న తర్వాత అన్లాక్ చేయాలి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -665,7 +669,8 @@
     "profile": "ప్రొఫైల్",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}"
+    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}",
+    "chat": "చాట్"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "నెట్‌వర్క్ లోపం",
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది",
       "failedToUploadFile": "ఫైల్ అప్‌లోడ్ చేయడంలో విఫలమైంది: {{reason}}",
-      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు"
+      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు",
+      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "చెక్ రన్",
       "status": "స్థితి",
       "threshold": "థ్రెషోల్డ్",
-      "pullRequest": "పుల్ రిక్వెస్ట్"
+      "pullRequest": "పుల్ రిక్వెస్ట్",
+      "transcriptWaiting": "సమీక్ష ట్రాన్స్క్రిప్షన్ కోసం వేచి ఉంది.",
+      "transcriptEmpty": "ఈ సమీక్షకు ట్రాన్స్క్రిప్షన్ లేదు.",
+      "transcriptRetry": "సమీక్ష ట్రాన్స్క్రిప్షన్ను లోడ్ చేయలేకపోయాము.",
+      "transcriptLive": "ప్రత్యక్ష",
+      "agentIdle": "ఏజెంట్ నిష్క్రియంగా ఉంది",
+      "agentWorking": "ఏజెంట్ పని చేస్తోంది...",
+      "anErrorOccurred": "లోపం సంభవించింది",
+      "errorWithMessage": "లోపం: {{message}}",
+      "executionStarted": "అమలు ప్రారంభించబడింది",
+      "reviewCompleted": "సమీక్ష పూర్తయింది",
+      "reviewInterrupted": "సమీక్ష అంతరాయం కలిగింది",
+      "sessionError": "సెషన్ లోపం: {{error}}",
+      "statusWithValue": "స్టేటస్: {{status}}",
+      "toolName": "టూల్: {{name}}",
+      "toolNameError": "టూల్: {{name}} — లోపం",
+      "unknownError": "తెలియని లోపం"
     },
     "reviewMemory": {
       "title": "సమీక్ష మెమరీ",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "ఇప్పుడు చురుకుగా ఉంది",
     "search": {
       "searching": "వెతుకుతోంది",
       "searchSessions": "సెషన్‌లను శోధించండి",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "సెషన్‌లను లోడ్ చేయలేకపోయింది",
       "couldNotLoadActive": "చురుకైన సెషన్‌లను లోడ్ చేయలేకపోయింది",
-      "noSessionsYet": "ఇంకా సెషన్‌లు లేవు",
       "noSessionsYetDescription": "మీ ఫోన్ నుండి కోడింగ్ టాస్క్ ప్రారంభించండి. మీ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noMatches": "ఏ సెషన్‌లు సరిపోలలేదు",
       "tryDifferentSearch": "వేరే శోధన పదాన్ని ప్రయత్నించండి.",
       "tryAdjustFilters": "మీ ఫిల్టర్‌లను సర్దుబాటు చేయండి లేదా క్లియర్ చేయండి.",
       "couldNotSearch": "సెషన్‌లను శోధించలేకపోయింది",
-      "allActive": "అన్ని సెషన్‌లు చురుకుగా ఉన్నాయి",
       "completedWillAppear": "పూర్తయిన సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noPastSessions": "గత సెషన్‌లు లేవు",
-      "live": "ప్రత్యక్ష"
+      "live": "ప్రత్యక్ష",
+      "updating": "నవీకరిస్తోంది"
     },
     "sessionRow": {
       "deleteTitle": "సెషన్‌ను తొలగించాలా?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "సెషన్ నిష్క్రమించింది",
     "remoteSpawnRetryable": "ఇన్స్టాన్స్ను చేరుకోలేకపోయాం — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
     "remoteSpawnNonRetryable": "ఇన్స్టాన్స్ సెషన్ను ప్రారంభించడంలో విఫలమైంది — యంత్రాన్ని తనిఖీ చేయండి లేదా CLIని నవీకరించండి.",
-    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి."
+    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్ను ప్రారంభించండి లేదా మరొక ఇన్స్టాన్స్ను ఎంచుకోండి.",
+    "liveCount_one": "{{count}} ప్రత్యక్ష",
+    "liveCount_other": "{{count}} ప్రత్యక్ష"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "క్రిందికి స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "renameAccessibility": "సెషన్‌ను పేరు మార్చండి: {{title}}",
-      "connectRepository": "రిపోజిటరీని కనెక్ట్ చేయండి",
       "cloningSession": "సెషన్ క్లోన్ చేస్తోంది",
       "continue": "కొనసాగించండి",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయింది",
-      "cloneFailed": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది.",
       "cloneFailedRetry": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది. మళ్ళీ ప్రయత్నించండి.",
-      "connectRepositoryToContinue": "కొనసాగించడానికి రిపోజిటరీని కనెక్ట్ చేయండి.",
       "notEnoughCredits": "Cloud Agentను అమలు చేయడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి.",
       "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తవుతోంది. దయచేసి కాసేపు వేచి ఉండండి.",
       "serviceUnavailable": "సేవ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "connectionTrouble": "కనెక్షన్ సమస్య. దయచేసి కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
-      "modelUnavailable": "ఈ మోడల్ Cloud Agent కోసం అందుబాటులో లేదు. మరొక మోడల్ని ఎంచుకుని మళ్లీ ప్రయత్నించండి."
+      "modelUnavailable": "ఈ మోడల్ Cloud Agent కోసం అందుబాటులో లేదు. మరొక మోడల్ని ఎంచుకుని మళ్లీ ప్రయత్నించండి.",
+      "cancelQueuedFailed": "సందేశాన్ని రద్దు చేయలేకపోయాము.",
+      "cancelQueuedRestoreAvailable": "సందేశం రద్దు చేయబడింది. దాన్ని సందేశ ఇన్పుట్లోకి తిరిగి తీసుకురావడానికి పునరుద్ధరించండి నొక్కండి.",
+      "cancelQueuedRestored": "సందేశం రద్దు చేయబడింది. ప్రాంప్ట్ తిరిగి సందేశ ఇన్పుట్లో ఉంది.",
+      "cancelQueuedUpgradeRequired": "వరుసలో ఉన్న సందేశాలను రద్దు చేయడానికి కొత్త Kilo CLI సంస్కరణ అవసరం. Kilo CLIను నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "remoteSession": {
       "failedToCreate": "రిమోట్ సెషన్‌ను సృష్టించడంలో విఫలమైంది",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "openBitbucket": "బిట్‌బకెట్ తెరవండి",
       "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
-      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
+      "continueFrom": "{{title}}ను కొనసాగిస్తోంది",
+      "importingSession": "సెషన్ను దిగుమతి చేస్తోంది",
+      "cliCannotContinue": "ఈ CLI సెషన్ను కొనసాగించదు. Cloud Agent లేదా మరొక CLIని ఎంచుకోండి.",
+      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం.",
+      "discardWithUploadsMessage": "మీ ప్రాంప్ట్ మరియు పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "మీ కంప్యూటర్‌లో ఒక ప్రాజెక్ట్‌లో `kilo remote` అమలు చేయండి, లేదా ఒకటి ఇప్పటికే నడుస్తుంటే Kilo CLIను నవీకరించండి.",
       "instanceOnProject": "{{project}}లో {{name}}",
       "instanceOnProjectSuffix": "{{project}}లో {{name}} ({{suffix}})",
-      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి"
+      "runOnCloudAgent": "క్లౌడ్ ఏజెంట్‌లో అమలు చేయండి",
+      "terminals": "టెర్మినల్‌లు",
+      "remotes": "రిమోట్ ఇన్‌స్టాన్స్‌లు"
     },
     "modePicker": {
       "title": "మోడ్ ఎంచుకోండి",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "సందేశం క్యూలో ఉంది",
       "userMessage": "వినియోగదారు సందేశం",
       "assistantMessage": "సహాయక సందేశం",
-      "longPressHint": "సందేశ వివరాల కోసం ఎక్కువసేపు నొక్కండి"
+      "longPressHint": "సందేశ వివరాల కోసం ఎక్కువసేపు నొక్కండి",
+      "cancelQueued": "సందేశాన్ని రద్దు చేయండి",
+      "cancelQueuedAccessibility": "వరుసలో ఉన్న సందేశాన్ని రద్దు చేయండి",
+      "restoreQueued": "పునరుద్ధరించండి",
+      "restoreQueuedAccessibility": "రద్దు చేసిన సందేశాన్ని సందేశ ఇన్పుట్లో పునరుద్ధరించండి"
     },
     "olderMessages": {
       "arrived": "మునుపటి సందేశాలు లోడ్ అయ్యాయి",
@@ -2462,6 +2496,8 @@
       "viewTable": "పట్టికను వీక్షించండి",
       "title": "పట్టిక",
       "close": "పట్టికను మూసివేయండి",
+      "loading": "పట్టిక లోడ్ అవుతోంది",
+      "empty": "ఈ పట్టికలో వరుసలు లేవు.",
       "columnCount_one": "నిలువు వరుస",
       "columnCount": "నిలువు వరుసలు",
       "columnCount_other": "నిలువు వరుసలు",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "సెషన్లను ఫిల్టర్ చేయండి",
-      "sortBy": "దీని ప్రకారం క్రమబద్ధీకరించండి",
-      "sortLastUpdated": "చివరిగా నవీకరించబడింది",
-      "sortCreated": "సృష్టించబడింది",
       "platform": "ప్లాట్ఫారమ్",
       "platformCloud": "క్లౌడ్",
       "platformExtension": "ఎక్స్టెన్షన్",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ఇతర",
-      "project": "ప్రాజెక్ట్",
-      "removeProjectFilter": "{{label}} ప్రాజెక్ట్ ఫిల్టర్ను తీసివేయండి",
-      "removePlatformFilter": "{{label}} ప్లాట్ఫారమ్ ఫిల్టర్ను తీసివేయండి"
+      "project": "ప్రాజెక్ట్"
     },
     "suggestion": {
       "title": "సూచన",
@@ -2528,7 +2559,9 @@
       "uploading": "అప్లోడ్ చేస్తోంది…",
       "uploaded": "అప్లోడ్ చేయబడింది",
       "uploadFailedRetry": "అప్లోడ్ విఫలమైంది. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
-      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము."
+      "uploadFailedTerminal": "ఈ ఫైల్ను అప్లోడ్ చేయలేము.",
+      "moveLeft": "{{filename}}ను ఎడమకు తరలించండి",
+      "moveRight": "{{filename}}ను కుడికి తరలించండి"
     },
     "attachmentPasteHint": {
       "accessibility": "క్లిప్బోర్డ్ నుండి చిత్రాన్ని అతికించండి",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "ముగిస్తోంది...",
       "messagePlaceholder": "సందేశం...",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైల్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి అటాచ్మెంట్లను తీసివేయండి.",
-      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి."
+      "couldNotAttachFiles": "ఫైల్లను అటాచ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపు నొక్కండి.",
+      "discardAttachmentsMessage": "పంపిన సందేశాలకు జోడించని అప్లోడ్ చేసిన ఫైల్లు తొలగించబడతాయి.",
+      "discardAttachmentsTitle": "జోడింపులను విస్మరించాలా?",
+      "charactersRemaining": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి",
+      "insertNewline": "కొత్త పంక్తిని చేర్చండి"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "ఈ లింక్ మీ బ్రౌజర్లో {{host}}ని తెరుస్తుంది.",
       "open": "తెరువు",
       "trustThisHost": "ఈ హోస్ట్ను విశ్వసించండి"
+    },
+    "folderPicker": {
+      "accessibility": "ఫోల్డర్: {{label}}",
+      "emptyDescription": "పూర్తయింది ఈ ఫోల్డర్ను ఉపయోగిస్తుంది.",
+      "emptyTitle": "లోపల ఫోల్డర్లు లేవు",
+      "fieldLabel": "ఫోల్డర్",
+      "retryableDescription": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి. పూర్తయింది ఇప్పటికీ ఈ ఫోల్డర్ను నిర్ధారిస్తుంది.",
+      "retryableTitle": "ఫోల్డర్లను జాబితా చేయలేకపోయాము",
+      "tapToListHint": "దాని విషయాలను జాబితా చేయడానికి ఫోల్డర్ను నొక్కండి",
+      "unsupportedDescription": "ఈ CLI ఫోల్డర్లను జాబితా చేయలేదు. పూర్తయింది లాంచ్ ఫోల్డర్ను ఉంచుతుంది మరియు సెషన్ ప్రారంభించండి అక్కడ ప్రారంభమవుతుంది.",
+      "unsupportedTitle": "ఫోల్డర్లను జాబితా చేయలేము"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ప్రస్తుతం ఏదీ అమలులో లేదు"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",
@@ -2766,7 +2814,8 @@
     "busy": "వాయిస్ ఇన్పుట్ బిజీగా ఉంది. మళ్లీ ప్రయత్నించండి.",
     "stopped": "వాయిస్ ఇన్పుట్ ఆగిపోయింది. మళ్లీ ప్రయత్నించడానికి మైక్రోఫోన్ను తాప్ చేయండి.",
     "unavailableDevice": "ఈ పరికరంలో వాయిస్ ఇన్పుట్ అందుబాటులో లేదు.",
-    "unavailableLanguage": "ఈ పరికర భాషకు వాయిస్ ఇన్పుట్ అందుబాటులో లేదు."
+    "unavailableLanguage": "ఈ పరికర భాషకు వాయిస్ ఇన్పుట్ అందుబాటులో లేదు.",
+    "listeningStopped": "వినడం ఆగిపోయింది."
   },
   "share": {
     "title": "Kiloకి భాగస్వామ్యం చేయండి",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "మీరు లింక్ యొక్క హోస్ట్ను విశ్వసించినప్పుడు, అది మళ్లీ అడగకుండా తెరుచుకుంటుంది.",
     "revoke": "{{host}}ను రద్దు చేయండి",
     "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
+  },
+  "quickChat": {
+    "title": "చాట్",
+    "composer": {
+      "placeholder": "సందేశం"
+    },
+    "empty": {
+      "title": "చాట్ ప్రారంభించండి",
+      "description": "మోడల్తో మాట్లాడటానికి సందేశం పంపండి."
+    },
+    "working": "పని జరుగుతోంది",
+    "historyRetry": "చాట్ చరిత్రను లోడ్ చేయలేకపోయాము.",
+    "catalogRetry": "మోడళ్లను లోడ్ చేయలేకపోయాము",
+    "sendError": "సందేశం పంపలేకపోయాము. మళ్ళీ ప్రయత్నించండి."
   }
 }

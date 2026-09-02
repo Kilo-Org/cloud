@@ -152,7 +152,11 @@
     "appearanceDark": "ഡാർക്ക്",
     "account": "അക്കൗണ്ട്",
     "prReviewAttribution": "PR അവലോകനങ്ങളിലേക്ക് ആപ്പ് ആട്രിബ്യൂഷൻ ചേർക്കുക",
-    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക."
+    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക.",
+    "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
+    "returnSendsMessageSubtitle": "ഓഫായിരിക്കുമ്പോൾ, റിട്ടേൺ ഏജന്റ് സന്ദേശ ഇൻപുട്ടുകളിൽ പുതിയ വരി ചേർക്കുന്നു.",
+    "biometricUnlock": "ബയോമെട്രിക്സ് ഉപയോഗിച്ച് അൺലോക്ക് ചെയ്യുക",
+    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -665,7 +669,8 @@
     "profile": "പ്രൊഫൈൽ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}"
+    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}",
+    "chat": "ചാറ്റ്"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "നെറ്റ്വർക്ക് പിശക്",
       "uploadFailed": "അപ്ലോഡ് പരാജയപ്പെട്ടു",
       "failedToUploadFile": "ഫയൽ അപ്ലോഡ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു: {{reason}}",
-      "nothingToPaste": "ഒട്ടിക്കാൻ ഒന്നുമില്ല"
+      "nothingToPaste": "ഒട്ടിക്കാൻ ഒന്നുമില്ല",
+      "metadataStripFailed": "ഫോട്ടോയുടെ മെറ്റാഡാറ്റ നീക്കം ചെയ്യാൻ കഴിഞ്ഞില്ല."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "ചെക്ക് റൺ",
       "status": "നില",
       "threshold": "പരിധി",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ്"
+      "pullRequest": "പുൾ റിക്വസ്റ്റ്",
+      "transcriptWaiting": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റിനായി കാത്തിരിക്കുന്നു.",
+      "transcriptEmpty": "ഈ അവലോകനത്തിന് ട്രാൻസ്ക്രിപ്റ്റ് ഇല്ല.",
+      "transcriptRetry": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+      "transcriptLive": "Live",
+      "agentIdle": "ഏജന്റ് നിഷ്ക്രിയം",
+      "agentWorking": "ഏജന്റ് പ്രവർത്തിക്കുന്നു...",
+      "anErrorOccurred": "ഒരു പിശക് സംഭവിച്ചു",
+      "errorWithMessage": "പിശക്: {{message}}",
+      "executionStarted": "എക്സിക്യൂഷൻ ആരംഭിച്ചു",
+      "reviewCompleted": "അവലോകനം പൂർത്തിയായി",
+      "reviewInterrupted": "അവലോകനം തടസ്സപ്പെട്ടു",
+      "sessionError": "സെഷൻ പിശക്: {{error}}",
+      "statusWithValue": "നില: {{status}}",
+      "toolName": "ടൂൾ: {{name}}",
+      "toolNameError": "ടൂൾ: {{name}} — പിശക്",
+      "unknownError": "അജ്ഞാത പിശക്"
     },
     "reviewMemory": {
       "title": "അവലോകന മെമ്മറി",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "ഇപ്പോൾ സജീവം",
     "search": {
       "searching": "തിരയുന്നു",
       "searchSessions": "സെഷനുകൾ തിരയുക",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "noSessionsYet": "ഇതുവരെ സെഷനുകളൊന്നുമില്ല",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
       "tryDifferentSearch": "മറ്റൊരു തിരയൽ പദം ശ്രമിക്കുക.",
       "tryAdjustFilters": "നിങ്ങളുടെ ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
       "couldNotSearch": "സെഷനുകൾ തിരയാൻ കഴിഞ്ഞില്ല",
-      "allActive": "എല്ലാ സെഷനുകളും സജീവമാണ്",
       "completedWillAppear": "പൂർത്തിയായ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noPastSessions": "മുൻകാല സെഷനുകളൊന്നുമില്ല",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു"
     },
     "sessionRow": {
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "സെഷൻ പുറത്തുകടന്നു",
     "remoteSpawnRetryable": "ഇൻസ്റ്റൻസിൽ എത്താൻ കഴിഞ്ഞില്ല — ഇത് വിച്ഛേദിക്കപ്പെട്ടിരിക്കാം.",
     "remoteSpawnNonRetryable": "സെഷൻ ആരംഭിക്കുന്നതിൽ ഇൻസ്റ്റൻസ് പരാജയപ്പെട്ടു — മെഷീൻ പരിശോധിക്കുക അല്ലെങ്കിൽ CLI അപ്ഡേറ്റ് ചെയ്യുക.",
-    "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക."
+    "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "ചുവടെയേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
       "renameAccessibility": "സെഷൻ പുനർനാമകരണം ചെയ്യുക: {{title}}",
-      "connectRepository": "റിപ്പോസിറ്ററി കണക്റ്റ് ചെയ്യുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "continue": "തുടരുക",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാനായില്ല",
-      "cloneFailed": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല.",
       "cloneFailedRetry": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "connectRepositoryToContinue": "തുടരാൻ ഒരു റിപ്പോസിറ്ററി കണക്റ്റ് ചെയ്യുക.",
       "notEnoughCredits": "Cloud Agent പ്രവർത്തിപ്പിക്കാൻ ക്രെഡിറ്റുകൾ മതിയാകുന്നില്ല. ക്രെഡിറ്റുകൾ ചേർത്ത് വീണ്ടും ശ്രമിക്കുക.",
       "previousTaskFinishing": "മുൻ ജോലി ഇപ്പോഴും പൂർത്തിയാകുന്നു. ഒരു നിമിഷം കാത്തിരിക്കുക.",
       "serviceUnavailable": "സേവനം ഇപ്പോൾ ലഭ്യമല്ല. വീണ്ടും ശ്രമിക്കുക.",
       "connectionTrouble": "കണക്ഷൻ പ്രശ്നം. ഒരു നിമിഷത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.",
-      "modelUnavailable": "ഈ മോഡൽ Cloud Agent-ന് ലഭ്യമല്ല. മറ്റൊരു മോഡൽ തിരഞ്ഞെടുത്ത് വീണ്ടും ശ്രമിക്കുക."
+      "modelUnavailable": "ഈ മോഡൽ Cloud Agent-ന് ലഭ്യമല്ല. മറ്റൊരു മോഡൽ തിരഞ്ഞെടുത്ത് വീണ്ടും ശ്രമിക്കുക.",
+      "cancelQueuedFailed": "സന്ദേശം റദ്ദാക്കാൻ കഴിഞ്ഞില്ല.",
+      "cancelQueuedRestoreAvailable": "സന്ദേശം റദ്ദാക്കി. സന്ദേശ ഇൻപുട്ടിലേക്ക് തിരികെ കൊണ്ടുവരാൻ പുനഃസ്ഥാപിക്കുക എന്നതിൽ ടാപ്പ് ചെയ്യുക.",
+      "cancelQueuedRestored": "സന്ദേശം റദ്ദാക്കി. പ്രോംപ്റ്റ് സന്ദേശ ഇൻപുട്ടിൽ തിരിച്ചെത്തി.",
+      "cancelQueuedUpgradeRequired": "ക്യൂവിലുള്ള സന്ദേശങ്ങൾ റദ്ദാക്കാൻ Kilo CLI-യുടെ പുതിയ പതിപ്പ് ആവശ്യമാണ്. Kilo CLI അപ്ഡേറ്റ് ചെയ്ത് വീണ്ടും കണക്റ്റ് ചെയ്യുക."
     },
     "remoteSession": {
       "failedToCreate": "വിദൂര സെഷൻ സൃഷ്ടിക്കാൻ പരാജയപ്പെട്ടു",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "റിപ്പോസിറ്ററികൾ ദൃശ്യമല്ല. GitLab-നുള്ള റിപ്പോസിറ്ററി ആക്സസ് പരിശോധിക്കുക, തുടർന്ന് റിഫ്രഷ് ചെയ്യുക.",
       "openBitbucket": "Bitbucket തുറക്കുക",
       "openGitlab": "GitLab തുറക്കുക",
-      "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ"
+      "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ",
+      "continueFrom": "{{title}} തുടരുന്നു",
+      "importingSession": "സെഷൻ ഇറക്കുമതി ചെയ്യുന്നു",
+      "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
+      "importFailed": "ഈ സെഷൻ ഇറക്കുമതി ചെയ്യാനായില്ല.",
+      "discardWithUploadsMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റും അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകളും ഇല്ലാതാക്കും."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിലെ ഒരു പ്രോജക്ടിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക, അല്ലെങ്കിൽ ഒരെണ്ണം ഇതിനകം പ്രവർത്തിക്കുന്നുണ്ടെങ്കിൽ Kilo CLI അപ്ഡേറ്റ് ചെയ്യുക.",
       "instanceOnProject": "{{project}}-ലെ {{name}}",
       "instanceOnProjectSuffix": "{{project}}-ലെ {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent-ൽ പ്രവർത്തിപ്പിക്കുക"
+      "runOnCloudAgent": "Cloud Agent-ൽ പ്രവർത്തിപ്പിക്കുക",
+      "terminals": "ടെർമിനലുകൾ",
+      "remotes": "റിമോട്ട് ഇൻസ്റ്റൻസുകൾ"
     },
     "modePicker": {
       "title": "മോഡ് തിരഞ്ഞെടുക്കുക",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "സന്ദേശം ക്യൂവിൽ",
       "userMessage": "ഉപയോക്തൃ സന്ദേശം",
       "assistantMessage": "സഹായി സന്ദേശം",
-      "longPressHint": "സന്ദേശ വിശദാംശങ്ങൾക്കായി ദീർഘനേരം അമർത്തുക"
+      "longPressHint": "സന്ദേശ വിശദാംശങ്ങൾക്കായി ദീർഘനേരം അമർത്തുക",
+      "cancelQueued": "സന്ദേശം റദ്ദാക്കുക",
+      "cancelQueuedAccessibility": "ക്യൂവിലുള്ള സന്ദേശം റദ്ദാക്കുക",
+      "restoreQueued": "പുനഃസ്ഥാപിക്കുക",
+      "restoreQueuedAccessibility": "റദ്ദാക്കിയ സന്ദേശം സന്ദേശ ഇൻപുട്ടിൽ പുനഃസ്ഥാപിക്കുക"
     },
     "olderMessages": {
       "arrived": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്തു",
@@ -2462,6 +2496,8 @@
       "viewTable": "പട്ടിക കാണുക",
       "title": "പട്ടിക",
       "close": "പട്ടിക അടയ്ക്കുക",
+      "loading": "പട്ടിക ലോഡുചെയ്യുന്നു",
+      "empty": "ഈ പട്ടികയിൽ വരികളൊന്നുമില്ല.",
       "columnCount_one": "നിര",
       "columnCount": "നിരകൾ",
       "columnCount_other": "നിരകൾ",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
-      "sortBy": "അടുക്കുക",
-      "sortLastUpdated": "അവസാനം അപ്ഡേറ്റ് ചെയ്തത്",
-      "sortCreated": "സൃഷ്ടിച്ചു",
       "platform": "പ്ലാറ്റ്ഫോം",
       "platformCloud": "ക്ലൗഡ്",
       "platformExtension": "എക്സ്റ്റൻഷൻ",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "മറ്റുള്ളവ",
-      "project": "പ്രോജക്റ്റ്",
-      "removeProjectFilter": "{{label}} പ്രോജക്റ്റ് ഫിൽട്ടർ നീക്കം ചെയ്യുക",
-      "removePlatformFilter": "{{label}} പ്ലാറ്റ്ഫോം ഫിൽട്ടർ നീക്കം ചെയ്യുക"
+      "project": "പ്രോജക്റ്റ്"
     },
     "suggestion": {
       "title": "നിർദ്ദേശം",
@@ -2528,7 +2559,9 @@
       "uploading": "അപ്ലോഡ് ചെയ്യുന്നു…",
       "uploaded": "അപ്ലോഡ് ചെയ്തു",
       "uploadFailedRetry": "അപ്ലോഡ് പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക.",
-      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല."
+      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
+      "moveLeft": "{{filename}} ഇടത്തേക്ക് നീക്കുക",
+      "moveRight": "{{filename}} വലത്തേക്ക് നീക്കുക"
     },
     "attachmentPasteHint": {
       "accessibility": "ക്ലിപ്പ്ബോർഡിൽ നിന്ന് ചിത്രം ഒട്ടിക്കുക",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "പൂർത്തിയാക്കുന്നു...",
       "messagePlaceholder": "സന്ദേശം...",
       "cannotReceiveFiles": "ഈ സെഷന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല. നിങ്ങളുടെ സന്ദേശം അയയ്ക്കാൻ അറ്റാച്ച്മെന്റുകൾ നീക്കം ചെയ്യുക.",
-      "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ അയയ്ക്കുക ടാപ്പ് ചെയ്യുക."
+      "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ അയയ്ക്കുക ടാപ്പ് ചെയ്യുക.",
+      "discardAttachmentsMessage": "അയച്ച സന്ദേശങ്ങളിൽ അറ്റാച്ച് ചെയ്യാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
+      "discardAttachmentsTitle": "അറ്റാച്ച്മെന്റുകൾ ഉപേക്ഷിക്കണോ?",
+      "charactersRemaining": "{{count}} അക്ഷരങ്ങൾ ശേഷിക്കുന്നു",
+      "insertNewline": "പുതിയ വരി ചേർക്കുക"
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "ഈ ലിങ്ക് {{host}} നിങ്ങളുടെ ബ്രൗസറിൽ തുറക്കുന്നു.",
       "open": "തുറക്കുക",
       "trustThisHost": "ഈ ഹോസ്റ്റിനെ വിശ്വസിക്കുക"
+    },
+    "folderPicker": {
+      "fieldLabel": "ഫോൾഡർ",
+      "accessibility": "ഫോൾഡർ: {{label}}",
+      "tapToListHint": "അതിന്റെ ഉള്ളടക്കങ്ങൾ പട്ടികപ്പെടുത്താൻ ഒരു ഫോൾഡറിൽ ടാപ്പ് ചെയ്യുക",
+      "emptyTitle": "അകത്ത് ഫോൾഡറുകളൊന്നുമില്ല",
+      "emptyDescription": "ഈ ഫോൾഡറാണ് പൂർത്തിയായി ഉപയോഗിക്കുന്നത്.",
+      "retryableTitle": "ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താനായില്ല",
+      "retryableDescription": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക. പൂർത്തിയായി ഈ ഫോൾഡർ ഇപ്പോഴും സ്ഥിരീകരിക്കുന്നു.",
+      "unsupportedTitle": "ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല",
+      "unsupportedDescription": "ഈ CLI-ക്ക് ഫോൾഡറുകൾ പട്ടികപ്പെടുത്താൻ കഴിയില്ല. പൂർത്തിയായി ലോഞ്ച് ഫോൾഡർ നിലനിർത്തുന്നു, സെഷൻ ആരംഭിക്കുക അവിടെ ആരംഭിക്കുന്നു."
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "പുതിയ കോഡിംഗ് ടാസ്ക്",
     "explore": "പര്യവേക്ഷണം ചെയ്യുക",
     "seeAll": "എല്ലാം കാണുക",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ഇപ്പോൾ ഒന്നും പ്രവർത്തിക്കുന്നില്ല"
   },
   "imageViewer": {
     "close": "{{filename}} അടയ്ക്കുക",
@@ -2766,7 +2814,8 @@
     "busy": "ശബ്ദ ഇൻപുട്ട് തിരക്കിലാണ്. വീണ്ടും ശ്രമിക്കുക.",
     "stopped": "ശബ്ദ ഇൻപുട്ട് നിർത്തി. വീണ്ടും ശ്രമിക്കാൻ മൈക്രോഫോണിൽ ടാപ്പ് ചെയ്യുക.",
     "unavailableDevice": "ഈ ഉപകരണത്തിൽ ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
-    "unavailableLanguage": "ഈ ഉപകരണ ഭാഷയ്ക്ക് ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല."
+    "unavailableLanguage": "ഈ ഉപകരണ ഭാഷയ്ക്ക് ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
+    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി."
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "നിങ്ങൾ ഒരു ലിങ്കിന്റെ ഹോസ്റ്റിനെ വിശ്വസിച്ചാൽ, അത് വീണ്ടും ചോദിക്കാതെ തുറക്കും.",
     "revoke": "{{host}} പിൻവലിക്കുക",
     "backToPreferences": "മുൻഗണനകളിലേക്ക് മടങ്ങുക"
+  },
+  "quickChat": {
+    "title": "ചാറ്റ്",
+    "composer": {
+      "placeholder": "സന്ദേശം"
+    },
+    "empty": {
+      "title": "ഒരു ചാറ്റ് ആരംഭിക്കുക",
+      "description": "ഒരു മോഡലുമായി സംസാരിക്കാൻ സന്ദേശം അയയ്ക്കുക."
+    },
+    "working": "പ്രവർത്തിക്കുന്നു",
+    "historyRetry": "ചാറ്റ് ചരിത്രം ലോഡ് ചെയ്യാനായില്ല.",
+    "catalogRetry": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "sendError": "സന്ദേശം അയയ്ക്കാൻ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക."
   }
 }

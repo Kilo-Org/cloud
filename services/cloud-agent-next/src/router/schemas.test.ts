@@ -102,6 +102,15 @@ describe('grouped unified session input contracts', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects client provenance on the public grouped start endpoint', () => {
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        options: { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser' },
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts document attachments on grouped start and send messages', () => {
     expect(
       StartSessionInput.parse({
@@ -263,6 +272,33 @@ describe('legacy live attachment input compatibility', () => {
         ...input,
         gitUrl: 'https://gitlab.com/acme/repo.git',
         platform: 'gitlab',
+      }).success
+    ).toBe(false);
+  });
+
+  it.each(['browser', 'mobile'] as const)(
+    'retains trusted %s provenance on prepareSession input',
+    clientProvenance => {
+      const result = PrepareSessionInput.parse({
+        prompt: 'Create a session',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        clientProvenance,
+      });
+
+      expect(result.clientProvenance).toBe(clientProvenance);
+    }
+  );
+
+  it('rejects unrecognized prepareSession client provenance', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Create a session',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        clientProvenance: 'automation',
       }).success
     ).toBe(false);
   });

@@ -51,8 +51,15 @@ const shareDestinationListProps = vi.hoisted(() => ({
     instanceRowsDisabled: boolean;
   } | null,
 }));
-const instanceRows = vi.hoisted(() => [
-  { connectionId: 'conn-1', name: 'laptop', projectName: 'kilo' },
+const instanceRows = vi.hoisted((): ShareCliSpawnRow[] => [
+  {
+    connectionId: 'conn-1',
+    name: 'laptop',
+    projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
+  },
 ]);
 
 vi.mock('react-native', () => ({
@@ -190,6 +197,9 @@ const INSTANCE: ShareCliSpawnRow = {
   connectionId: 'conn-1',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 function retryableOutcome() {

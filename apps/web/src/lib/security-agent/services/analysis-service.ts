@@ -290,7 +290,7 @@ export async function startSecurityAnalysis(params: {
   const analysisStartTime = Date.now();
 
   try {
-    const authToken = generateApiToken(user);
+    const authToken = generateApiToken(user, { tokenSource: 'security-agent' });
 
     let triage: SecurityFindingTriage;
 

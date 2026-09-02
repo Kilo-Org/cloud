@@ -152,7 +152,11 @@
     "appearanceDark": "ダーク",
     "account": "アカウント",
     "prReviewAttribution": "PRレビューにアプリの帰属を追加",
-    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。"
+    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。",
+    "returnSendsMessage": "リターンキーでメッセージを送信",
+    "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
+    "biometricUnlock": "生体認証でロック解除",
+    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。"
   },
   "notifications": {
     "title": "通知",
@@ -211,7 +215,8 @@
     "profile": "プロフィール",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}、タブ、{{total}}中{{position}}"
+    "position": "{{name}}、タブ、{{total}}中{{position}}",
+    "chat": "チャット"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "ネットワークエラー",
       "uploadFailed": "アップロードに失敗しました",
       "failedToUploadFile": "ファイルのアップロードに失敗しました: {{reason}}",
-      "nothingToPaste": "貼り付けるものはありません"
+      "nothingToPaste": "貼り付けるものはありません",
+      "metadataStripFailed": "写真のメタデータを削除できませんでした。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -898,7 +904,23 @@
       "title": "れびゅー",
       "tokens": "トークン",
       "tokensInOut": "{{input}}入力 / {{output}}出力",
-      "pullRequest": "プルリクエスト"
+      "pullRequest": "プルリクエスト",
+      "transcriptWaiting": "レビューのトランスクリプトを待っています。",
+      "transcriptEmpty": "このレビューのトランスクリプトはありません。",
+      "transcriptRetry": "レビューのトランスクリプトを読み込めませんでした。",
+      "transcriptLive": "ライブ",
+      "agentIdle": "エージェント待機中",
+      "agentWorking": "エージェント作業中…",
+      "anErrorOccurred": "エラーが発生しました",
+      "errorWithMessage": "エラー: {{message}}",
+      "executionStarted": "実行を開始しました",
+      "reviewCompleted": "レビューが完了しました",
+      "reviewInterrupted": "レビューが中断されました",
+      "sessionError": "セッションエラー: {{error}}",
+      "statusWithValue": "ステータス: {{status}}",
+      "toolName": "ツール: {{name}}",
+      "toolNameError": "ツール: {{name}} — エラー",
+      "unknownError": "不明なエラー"
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
@@ -1579,7 +1601,6 @@
     }
   },
   "agents": {
-    "activeNow": "現在アクティブ",
     "search": {
       "searching": "検索中",
       "searchSessions": "セッションを検索",
@@ -1590,16 +1611,15 @@
     "sessionList": {
       "couldNotLoad": "セッションを読み込めませんでした",
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした",
-      "noSessionsYet": "まだセッションはありません",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
       "tryAdjustFilters": "フィルターを調整またはクリアしてお試しください。",
       "couldNotSearch": "セッションを検索できませんでした",
-      "allActive": "すべてのセッションがアクティブです",
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
-      "live": "ライブ"
+      "live": "ライブ",
+      "updating": "更新中"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
@@ -1643,7 +1663,9 @@
     "sessionExited": "セッションが終了しました",
     "remoteSpawnRetryable": "インスタンスに到達できませんでした。接続が切断された可能性があります。",
     "remoteSpawnNonRetryable": "インスタンスがセッションの開始に失敗しました。マシンを確認するか、CLI を更新してください。",
-    "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。"
+    "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。",
+    "liveCount_one": "{{count}} ライブ",
+    "liveCount_other": "{{count}} ライブ"
   },
   "agentChat": {
     "session": {
@@ -1665,18 +1687,19 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション名を変更: {{title}}",
-      "connectRepository": "リポジトリを接続",
       "cloningSession": "セッションをクローン中",
       "continue": "続行",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした",
-      "cloneFailed": "このセッションを複製できませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。",
       "notEnoughCredits": "Cloud Agentを実行するクレジットが不足しています。クレジットを追加して再試行してください。",
       "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから再試行してください。",
-      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。"
+      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。",
+      "cancelQueuedFailed": "メッセージをキャンセルできませんでした。",
+      "cancelQueuedRestoreAvailable": "メッセージをキャンセルしました。「復元」をタップすると、メッセージ入力欄に戻せます。",
+      "cancelQueuedRestored": "メッセージをキャンセルしました。プロンプトがメッセージ入力欄に戻りました。",
+      "cancelQueuedUpgradeRequired": "送信待ちのメッセージをキャンセルするには、新しいKilo CLIが必要です。Kilo CLIを更新して再接続してください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
@@ -1744,7 +1767,12 @@
       "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLab のリポジトリへのアクセスを確認し、更新してください。",
       "openBitbucket": "Bitbucket を開く",
       "openGitlab": "GitLab を開く",
-      "recentlyUsed": "最近使用した項目"
+      "recentlyUsed": "最近使用した項目",
+      "cliCannotContinue": "このCLIはセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
+      "continueFrom": "{{title}}を続行しています",
+      "importFailed": "このセッションをインポートできませんでした。",
+      "importingSession": "セッションをインポートしています",
+      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -1802,7 +1830,9 @@
       "noCliInstancesDescription": "コンピューター上のプロジェクトで`kilo remote`を実行するか、すでに実行中の場合はKilo CLIを更新してください。",
       "instanceOnProject": "{{project}} の {{name}}",
       "instanceOnProjectSuffix": "{{project}} の {{name}} ({{suffix}})",
-      "runOnCloudAgent": "クラウドエージェントで実行"
+      "runOnCloudAgent": "クラウドエージェントで実行",
+      "terminals": "ターミナル",
+      "remotes": "リモートインスタンス"
     },
     "modePicker": {
       "title": "モードを選択",
@@ -1992,7 +2022,11 @@
       "queuedAccessibility": "メッセージがキューに追加されました",
       "userMessage": "ユーザーメッセージ",
       "assistantMessage": "アシスタントメッセージ",
-      "longPressHint": "メッセージの詳細は長押し"
+      "longPressHint": "メッセージの詳細は長押し",
+      "cancelQueued": "メッセージをキャンセル",
+      "cancelQueuedAccessibility": "送信待ちのメッセージをキャンセル",
+      "restoreQueued": "復元",
+      "restoreQueuedAccessibility": "キャンセルしたメッセージをメッセージ入力欄に復元"
     },
     "olderMessages": {
       "arrived": "以前のメッセージを読み込みました",
@@ -2008,6 +2042,8 @@
       "viewTable": "テーブルを表示",
       "title": "テーブル",
       "close": "テーブルを閉じる",
+      "loading": "テーブルを読み込み中",
+      "empty": "このテーブルには行がありません。",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",
@@ -2018,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "セッションをフィルター",
-      "sortBy": "並べ替え",
-      "sortLastUpdated": "最終更新",
-      "sortCreated": "作成日時",
       "platform": "プラットフォーム",
       "platformCloud": "クラウド",
       "platformExtension": "拡張機能",
@@ -2029,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "その他",
-      "project": "プロジェクト",
-      "removeProjectFilter": "{{label}}プロジェクトフィルターを削除",
-      "removePlatformFilter": "{{label}}プラットフォームフィルターを削除"
+      "project": "プロジェクト"
     },
     "suggestion": {
       "title": "提案",
@@ -2074,7 +2105,9 @@
       "uploading": "アップロード中…",
       "uploaded": "アップロード済み",
       "uploadFailedRetry": "アップロードに失敗しました。タップして再試行してください。",
-      "uploadFailedTerminal": "このファイルはアップロードできません。"
+      "uploadFailedTerminal": "このファイルはアップロードできません。",
+      "moveLeft": "{{filename}}を左に移動",
+      "moveRight": "{{filename}}を右に移動"
     },
     "attachmentPasteHint": {
       "accessibility": "クリップボードから画像を貼り付け",
@@ -2104,7 +2137,11 @@
       "finalizingPlaceholder": "終了処理中...",
       "messagePlaceholder": "メッセージ...",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
-      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。"
+      "couldNotAttachFiles": "ファイルを添付できませんでした。再試行するには送信をタップしてください。",
+      "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
+      "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
+      "charactersRemaining": "残り{{count}}文字",
+      "insertNewline": "改行を挿入"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",
@@ -2196,6 +2233,17 @@
       "hostConfirmMessage": "このリンクはブラウザで {{host}} を開きます。",
       "open": "開く",
       "trustThisHost": "このホストを信頼する"
+    },
+    "folderPicker": {
+      "accessibility": "フォルダ: {{label}}",
+      "emptyDescription": "完了はこのフォルダを使用します。",
+      "emptyTitle": "フォルダはありません",
+      "fieldLabel": "フォルダ",
+      "retryableDescription": "接続を確認して再試行してください。完了はこのフォルダを確認します。",
+      "retryableTitle": "フォルダを一覧表示できませんでした",
+      "tapToListHint": "フォルダをタップして中身を一覧表示します",
+      "unsupportedDescription": "このCLIはフォルダを一覧表示できません。完了は起動フォルダを維持し、セッションを開始はそこで開始します。",
+      "unsupportedTitle": "フォルダを一覧表示できません"
     }
   },
   "bootstrap": {
@@ -2248,7 +2296,7 @@
     "newCodingTask": "新しいコーディングタスク",
     "explore": "探索",
     "seeAll": "すべて表示",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "現在実行中のものはありません"
   },
   "imageViewer": {
     "close": "{{filename}}を閉じる",
@@ -2312,7 +2360,8 @@
     "busy": "音声入力は処理中です。もう一度お試しください。",
     "stopped": "音声入力が停止しました。マイクをタップして、もう一度お試しください。",
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
-    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。"
+    "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
+    "listeningStopped": "聞き取りを停止しました。"
   },
   "share": {
     "title": "Kiloに共有",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "リンクのホストを信頼すると、再度確認せずに開きます。",
     "revoke": "{{host}} を失効",
     "backToPreferences": "設定に戻る"
+  },
+  "quickChat": {
+    "title": "チャット",
+    "composer": {
+      "placeholder": "メッセージ"
+    },
+    "empty": {
+      "title": "チャットを開始",
+      "description": "モデルと話すにはメッセージを送信してください。"
+    },
+    "working": "作業中",
+    "historyRetry": "チャット履歴を読み込めませんでした。",
+    "catalogRetry": "モデルを読み込めませんでした",
+    "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
   }
 }

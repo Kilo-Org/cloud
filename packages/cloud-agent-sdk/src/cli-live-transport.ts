@@ -46,12 +46,18 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
   agent?: string;
   model?: { providerID: string; modelID: string; variant?: string };
   orgId?: string;
+  directory?: string;
+  cloneFromKiloSessionId?: string;
 } {
   return {
     protocolVersion: 1,
     ...(input?.agent !== undefined ? { agent: input.agent } : {}),
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
+    ...(input?.cloneFromKiloSessionId !== undefined
+      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      : {}),
   };
 }
 
@@ -881,14 +887,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const hasExtendedFields =
           wireData.agent !== undefined ||
           wireData.model !== undefined ||
-          wireData.orgId !== undefined;
+          wireData.orgId !== undefined ||
+          wireData.directory !== undefined;
+        const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
           result = await sendCommand('create_session', wireData, mutationId);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
+          // Old form is one bare protocolVersion 1 retry for extended fields;
+          // a clone id must never use that fallback because it would create a
+          // fresh session.
           if (
+            !hasCloneField &&
             hasExtendedFields &&
             error instanceof CommandDeliveredError &&
             error.message === INVALID_CREATE_SESSION_COMMAND
@@ -978,6 +990,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts,
+          // Old form is `send_message` without `messageID`; include it once the
+          // client assigns an id so the CLI can correlate the queued turn.
+          // Remove the omission when every client sends it.
+          ...(input.messageId ? { messageID: input.messageId } : {}),
           ...(payload.mode ? { agent: payload.mode } : {}),
           ...(remoteModel.kind === 'none'
             ? {}
@@ -988,6 +1004,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       },
       interrupt: () => sendCommand('interrupt', {}),
+      dropQueuedMessage: async messageId => {
+        // The kilocode handler ACKs success only when the queue actually
+        // dropped it (it throws "message not queued" otherwise), so a resolved
+        // `drop_queued_message` command means the queued message was dropped.
+        await sendCommand('drop_queued_message', { protocolVersion: 1, messageID: messageId });
+        return { dropped: true };
+      },
       answer: payload =>
         sendCommand('question_reply', {
           requestID: payload.requestId,

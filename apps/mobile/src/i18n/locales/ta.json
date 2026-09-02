@@ -152,7 +152,11 @@
     "appearanceDark": "இருள்",
     "account": "கணக்கு",
     "prReviewAttribution": "PR மதிப்பாய்வுகளில் பயன்பாட்டு பங்களிப்பைச் சேர்க்கவும்",
-    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்"
+    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்",
+    "returnSendsMessage": "திரும்பு விசை செய்தியை அனுப்பும்",
+    "returnSendsMessageSubtitle": "முடக்கப்பட்டால், திரும்பு விசை முகவர்களின் செய்தி உள்ளீடுகளில் புதிய வரியைச் செருகும்.",
+    "biometricUnlock": "உயிரளவியல் மூலம் பூட்டைத் திறக்கவும்",
+    "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்."
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -665,7 +669,8 @@
     "profile": "சுயவிவரம்",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}"
+    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}",
+    "chat": "அரட்டை"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "நெட்வொர்க் பிழை",
       "uploadFailed": "பதிவேற்றம் தோல்வியடைந்தது",
       "failedToUploadFile": "கோப்பை பதிவேற்ற முடியவில்லை: {{reason}}",
-      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை"
+      "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை",
+      "metadataStripFailed": "புகைப்பட மெட்டாடேட்டாவை அகற்ற முடியவில்லை."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "சரிபார்ப்பு இயக்கம்",
       "status": "நிலை",
       "threshold": "வரம்பு",
-      "pullRequest": "இழுப்பு கோரிக்கை"
+      "pullRequest": "இழுப்பு கோரிக்கை",
+      "transcriptWaiting": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டுக்காக காத்திருக்கிறது",
+      "transcriptEmpty": "இந்த மதிப்பாய்வுக்கு டிரான்ஸ்கிரிப்ட் இல்லை",
+      "transcriptRetry": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டை ஏற்ற முடியவில்லை",
+      "transcriptLive": "நேரலை",
+      "agentIdle": "முகவர் செயலற்றது",
+      "agentWorking": "முகவர் வேலை செய்கிறார்...",
+      "anErrorOccurred": "பிழை ஏற்பட்டது",
+      "errorWithMessage": "பிழை: {{message}}",
+      "executionStarted": "செயல்படுத்தல் தொடங்கியது",
+      "reviewCompleted": "மதிப்பாய்வு முடிந்தது",
+      "reviewInterrupted": "மதிப்பாய்வு இடையூறு செய்யப்பட்டது",
+      "sessionError": "அமர்வு பிழை: {{error}}",
+      "statusWithValue": "நிலை: {{status}}",
+      "toolName": "கருவி: {{name}}",
+      "toolNameError": "கருவி: {{name}} — பிழை",
+      "unknownError": "தெரியாத பிழை"
     },
     "reviewMemory": {
       "title": "மதிப்பாய்வு நினைவகம்",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "இப்போது செயலில் உள்ளது",
     "search": {
       "searching": "தேடுகிறது",
       "searchSessions": "அமர்வுகளைத் தேடு",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "அமர்வுகளை ஏற்ற முடியவில்லை",
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை",
-      "noSessionsYet": "இன்னும் அமர்வுகள் இல்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலில் இருந்து ஒரு குறியீட்டு பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே தோன்றும்.",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
       "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "tryAdjustFilters": "உங்கள் வடிகட்டிகளை சரிசெய்யவும் அல்லது அழிக்கவும்.",
       "couldNotSearch": "அமர்வுகளைத் தேட முடியவில்லை",
-      "allActive": "அனைத்து அமர்வுகளும் செயலில் உள்ளன",
       "completedWillAppear": "நிறைவடைந்த அமர்வுகள் இங்கே தோன்றும்.",
       "noPastSessions": "கடந்த அமர்வுகள் இல்லை",
-      "live": "நேரலை"
+      "live": "நேரலை",
+      "updating": "புதுப்பிக்கிறது"
     },
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "அமர்வு வெளியேறியது",
     "remoteSpawnRetryable": "இன்ஸ்டன்ஸை அணுக முடியவில்லை — அது துண்டிக்கப்பட்டிருக்கலாம்.",
     "remoteSpawnNonRetryable": "இன்ஸ்டன்ஸால் அமர்வைத் தொடங்க முடியவில்லை — கணினியைச் சரிபார்க்கவும் அல்லது CLI-ஐப் புதுப்பிக்கவும்.",
-    "remoteSpawnInstanceDisconnected": "தேர்ந்தெடுத்த இன்ஸ்டன்ஸ் துண்டிக்கப்பட்டது. Cloud Agent-ல் அமர்வைத் தொடங்கவும் அல்லது வேறு இன்ஸ்டன்ஸைத் தேர்ந்தெடுக்கவும்."
+    "remoteSpawnInstanceDisconnected": "தேர்ந்தெடுத்த இன்ஸ்டன்ஸ் துண்டிக்கப்பட்டது. Cloud Agent-ல் அமர்வைத் தொடங்கவும் அல்லது வேறு இன்ஸ்டன்ஸைத் தேர்ந்தெடுக்கவும்.",
+    "liveCount_one": "{{count}} நேரலை",
+    "liveCount_other": "{{count}} நேரலை"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "கீழே உருட்டு",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "renameAccessibility": "அமர்வை மறுபெயரிடு: {{title}}",
-      "connectRepository": "களஞ்சியத்தை இணை",
       "cloningSession": "அமர்வை குளோன் செய்கிறது",
       "continue": "தொடரவும்",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை",
-      "cloneFailed": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை.",
       "cloneFailedRetry": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "connectRepositoryToContinue": "தொடர ஒரு களஞ்சியத்தை இணைக்கவும்.",
       "notEnoughCredits": "Cloud Agent ஐ இயக்க போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
       "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடைந்து கொண்டிருக்கிறது. சிறிது காத்திருக்கவும்.",
       "serviceUnavailable": "சேவை இப்போது கிடைக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "connectionTrouble": "இணைப்பில் சிக்கல். சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.",
-      "modelUnavailable": "இந்த மாதிரி Cloud Agent-க்குக் கிடைக்கவில்லை. வேறு மாதிரியைத் தேர்ந்தெடுத்து மீண்டும் முயற்சிக்கவும்."
+      "modelUnavailable": "இந்த மாதிரி Cloud Agent-க்குக் கிடைக்கவில்லை. வேறு மாதிரியைத் தேர்ந்தெடுத்து மீண்டும் முயற்சிக்கவும்.",
+      "cancelQueuedFailed": "செய்தியை ரத்து செய்ய முடியவில்லை.",
+      "cancelQueuedRestoreAvailable": "செய்தி ரத்து செய்யப்பட்டது. அதைச் செய்தி உள்ளீட்டிற்குத் திருப்ப, “மீட்டமைக்கவும்” என்பதைத் தட்டவும்.",
+      "cancelQueuedRestored": "செய்தி ரத்து செய்யப்பட்டது. வினவல் மீண்டும் செய்தி உள்ளீட்டில் உள்ளது.",
+      "cancelQueuedUpgradeRequired": "வரிசையில் உள்ள செய்திகளை ரத்து செய்ய Kilo CLI இன் புதிய பதிப்பு தேவை. Kilo CLI ஐ புதுப்பித்து மீண்டும் இணைக்கவும்."
     },
     "remoteSession": {
       "failedToCreate": "தொலை அமர்வை உருவாக்க முடியவில்லை",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. GitLab-க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "openBitbucket": "பிட்பக்கெட்டைத் திறக்கவும்",
       "openGitlab": "GitLab-ஐத் திறக்கவும்",
-      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை"
+      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை",
+      "cliCannotContinue": "இந்த CLI ஒரு அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது மற்றொரு CLIஐ தேர்ந்தெடுக்கவும்.",
+      "continueFrom": "{{title}} தொடர்கிறது",
+      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
+      "importingSession": "அமர்வை இறக்குமதி செய்கிறது",
+      "discardWithUploadsMessage": "உங்கள் வினவலும் அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்களும் நீக்கப்படும்."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "உங்கள் கணினியில் ஒரு திட்டத்தில் `kilo remote` ஐ இயக்கவும், அல்லது ஒன்று ஏற்கனவே இயங்கினால் Kilo CLI ஐ புதுப்பிக்கவும்.",
       "instanceOnProject": "{{project}} இல் {{name}}",
       "instanceOnProjectSuffix": "{{project}} இல் {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent இல் இயக்கு"
+      "runOnCloudAgent": "Cloud Agent இல் இயக்கு",
+      "terminals": "முனையங்கள்",
+      "remotes": "தொலைநிலை நிகழ்வுகள்"
     },
     "modePicker": {
       "title": "முறையைத் தேர்ந்தெடு",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "செய்தி வரிசையில் உள்ளது",
       "userMessage": "பயனர் செய்தி",
       "assistantMessage": "உதவியாளர் செய்தி",
-      "longPressHint": "செய்தி விவரங்களுக்கு நீண்ட அழுத்தவும்"
+      "longPressHint": "செய்தி விவரங்களுக்கு நீண்ட அழுத்தவும்",
+      "cancelQueued": "செய்தியை ரத்து செய்யவும்",
+      "cancelQueuedAccessibility": "வரிசையில் உள்ள செய்தியை ரத்து செய்யவும்",
+      "restoreQueued": "மீட்டமைக்கவும்",
+      "restoreQueuedAccessibility": "ரத்து செய்த செய்தியைச் செய்தி உள்ளீட்டில் மீட்டமைக்கவும்"
     },
     "olderMessages": {
       "arrived": "முந்தைய செய்திகள் ஏற்றப்பட்டன",
@@ -2462,6 +2496,8 @@
       "viewTable": "அட்டவணையைப் பார்க்கவும்",
       "title": "அட்டவணை",
       "close": "அட்டவணையை மூடு",
+      "loading": "அட்டவணை ஏற்றப்படுகிறது",
+      "empty": "இந்த அட்டவணையில் வரிசைகள் இல்லை.",
       "columnCount_one": "நெடுவரிசை",
       "columnCount": "நெடுவரிசைகள்",
       "columnCount_other": "நெடுவரிசைகள்",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "அமர்வுகளை வடிகட்டு",
-      "sortBy": "வரிசைப்படுத்து",
-      "sortLastUpdated": "கடைசியாக புதுப்பிக்கப்பட்டது",
-      "sortCreated": "உருவாக்கப்பட்டது",
       "platform": "தளம்",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "மற்றவை",
-      "project": "திட்டம்",
-      "removeProjectFilter": "{{label}} திட்ட வடிகட்டியை அகற்று",
-      "removePlatformFilter": "{{label}} தள வடிகட்டியை அகற்று"
+      "project": "திட்டம்"
     },
     "suggestion": {
       "title": "பரிந்துரை",
@@ -2528,7 +2559,9 @@
       "uploading": "பதிவேற்றுகிறது…",
       "uploaded": "பதிவேற்றப்பட்டது",
       "uploadFailedRetry": "பதிவேற்றம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்க தட்டவும்.",
-      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது."
+      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது.",
+      "moveLeft": "{{filename}} ஐ இடப்புறம் நகர்த்தவும்",
+      "moveRight": "{{filename}} ஐ வலப்புறம் நகர்த்தவும்"
     },
     "attachmentPasteHint": {
       "accessibility": "கிளிப்போர்டிலிருந்து படத்தை ஒட்டவும்",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "முடிக்கிறது...",
       "messagePlaceholder": "செய்தி...",
       "cannotReceiveFiles": "இந்த அமர்வு கோப்புகளைப் பெற முடியாது. உங்கள் செய்தியை அனுப்ப இணைப்புகளை அகற்றவும்.",
-      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்."
+      "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பு என்பதைத் தட்டவும்.",
+      "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
+      "discardAttachmentsTitle": "இணைப்புகளை நிராகரிக்கவா?",
+      "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
+      "insertNewline": "புதிய வரியைச் செருகவும்"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "இந்த இணைப்பு உங்கள் உலாவியில் {{host}} ஐத் திறக்கும்.",
       "open": "திறக்கவும்",
       "trustThisHost": "இந்த ஹோஸ்டை நம்பு"
+    },
+    "folderPicker": {
+      "fieldLabel": "கோப்புறை",
+      "accessibility": "கோப்புறை: {{label}}",
+      "tapToListHint": "அதன் உள்ளடக்கங்களை பட்டியலிட கோப்புறையைத் தட்டவும்",
+      "emptyTitle": "உள்ளே கோப்புறைகள் இல்லை",
+      "emptyDescription": "முடிந்தது இந்த கோப்புறையைப் பயன்படுத்துகிறது.",
+      "retryableTitle": "கோப்புறைகளை பட்டியலிட முடியவில்லை",
+      "retryableDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும். முடிந்தது இன்னும் இந்த கோப்புறையை உறுதிப்படுத்துகிறது.",
+      "unsupportedTitle": "கோப்புறைகளை பட்டியலிட முடியாது",
+      "unsupportedDescription": "இந்த CLI கோப்புறைகளை பட்டியலிட முடியாது. முடிந்தது தொடக்க கோப்புறையை வைத்திருக்கிறது மற்றும் அமர்வைத் தொடங்கு அங்கே தொடங்குகிறது."
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "புதிய குறியீட்டு பணி",
     "explore": "ஆராய்க",
     "seeAll": "அனைத்தையும் காண்க",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "இப்போது எதுவும் இயங்கவில்லை"
   },
   "imageViewer": {
     "close": "{{filename}} மூடு",
@@ -2766,7 +2814,8 @@
     "busy": "குரல் உள்ளீடு பரபரப்பாக உள்ளது. மீண்டும் முயற்சிக்கவும்.",
     "stopped": "குரல் உள்ளீடு நிறுத்தப்பட்டது. மீண்டும் முயற்சிக்க மைக்ரோஃபோனைத் தட்டவும்.",
     "unavailableDevice": "இந்த சாதனத்தில் குரல் உள்ளீடு கிடைக்கவில்லை.",
-    "unavailableLanguage": "இந்த சாதன மொழிக்கு குரல் உள்ளீடு கிடைக்கவில்லை."
+    "unavailableLanguage": "இந்த சாதன மொழிக்கு குரல் உள்ளீடு கிடைக்கவில்லை.",
+    "listeningStopped": "கேட்பது நிறுத்தப்பட்டது."
   },
   "share": {
     "title": "Kiloவுக்கு பகிர்",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "ஒரு இணைப்பின் ஹோஸ்டை நீங்கள் நம்பும்போது, அது மீண்டும் கேட்காமல் திறக்கும்.",
     "revoke": "{{host}} ஐ திரும்பப் பெறு",
     "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
+  },
+  "quickChat": {
+    "title": "அரட்டை",
+    "composer": {
+      "placeholder": "செய்தி"
+    },
+    "empty": {
+      "title": "அரட்டையைத் தொடங்கு",
+      "description": "ஒரு மாதிரியுடன் பேசுவதற்கு ஒரு செய்தியை அனுப்பவும்."
+    },
+    "working": "வேலை செய்கிறது",
+    "historyRetry": "அரட்டை வரலாற்றை ஏற்ற முடியவில்லை.",
+    "catalogRetry": "மாதிரிகளை ஏற்ற முடியவில்லை",
+    "sendError": "செய்தியை அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
   }
 }

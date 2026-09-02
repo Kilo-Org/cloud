@@ -61,9 +61,18 @@ vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
 }));
 
+vi.mock('@/components/agents/folder-selector', () => ({
+  LaunchFolderField: 'LaunchFolderField',
+}));
+
+vi.mock('@/components/agents/new-session-start-button', () => ({
+  NewSessionStartButton: 'NewSessionStartButton',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
+vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
@@ -128,6 +137,9 @@ const INSTANCE: InstancePickerInstance = {
   connectionId: 'conn-abc',
   name: 'laptop',
   projectName: 'kilo',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 function defaultProps() {
@@ -150,6 +162,8 @@ function defaultProps() {
     onAddAttachment: vi.fn(),
     onRemoveAttachment: vi.fn(),
     onRetryAttachment: vi.fn(),
+    onMoveAttachment: vi.fn(),
+    onReorderAttachments: vi.fn(),
     onRefetchModels: vi.fn(),
     onPrefillAttachments: vi.fn(),
     shareId: undefined as string | undefined,
@@ -158,8 +172,12 @@ function defaultProps() {
     runOnInstance: null as InstancePickerInstance | null,
     instanceList: [] as InstancePickerInstance[],
     isLoadingInstances: false,
+    isFetchingInstances: false,
+    onRefreshInstances: vi.fn(),
     onChangeRunOnInstance: vi.fn(),
     showInstanceDisconnectedNote: false,
+    folderPath: '',
+    onChangeFolderPath: vi.fn(),
     groups: [] as RepositoryGroup[],
     isRetrying: false,
     onChangeRepo: vi.fn(),
@@ -188,6 +206,44 @@ function defaultProps() {
 }
 
 describe('NewSessionConfigureForm', () => {
+  it.each([false, true])(
+    'refreshes targets while fetching=%s without changing the selection',
+    async isFetchingInstances => {
+      const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+      const props = {
+        ...defaultProps(),
+        showRunOnSelector: true,
+        runOnInstance: INSTANCE,
+        isFetchingInstances,
+      };
+      const element = renderForm(props);
+      const button = findElementByType(element, 'Button');
+      expect(button).toMatchObject({
+        accessibilityLabel: 'Refresh',
+        size: 'icon',
+        disabled: isFetchingInstances,
+        loading: isFetchingInstances,
+        onPress: props.onRefreshInstances,
+      });
+      const selector = findElementByType(element, 'InstanceSelector');
+      expect(selector?.value).toBe(INSTANCE);
+      if (!button) {
+        throw new Error('Missing target refresh button');
+      }
+      if (!isFetchingInstances) {
+        (button.onPress as () => void)();
+        expect(props.onRefreshInstances).toHaveBeenCalledOnce();
+        expect(props.onChangeRunOnInstance).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('disables target refresh during session creation', async () => {
+    const { NewSessionConfigureForm: renderForm } = await import('./new-session-configure-form');
+    const element = renderForm({ ...defaultProps(), showRunOnSelector: true, isCreating: true });
+    expect(findElementByType(element, 'Button')?.disabled).toBe(true);
+  });
+
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and "Run on" label when cloud target with selector shown', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -354,7 +410,8 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('shows spinner for cloud session creation', async () => {
@@ -367,7 +424,8 @@ describe('NewSessionConfigureForm', () => {
       isCreating: true,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).not.toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(true);
   });
 
   it('does not show spinner when neither flag is set', async () => {
@@ -381,7 +439,8 @@ describe('NewSessionConfigureForm', () => {
       isSpawningRemote: false,
     }) as Node;
 
-    expect(findElementByType(element, 'ActivityIndicator')).toBeNull();
+    const startButton = findElementByType(element, 'NewSessionStartButton');
+    expect(startButton?.isStarting).toBe(false);
   });
 
   // ── Case 7: remote target keeps its context in the selector value ──
@@ -598,5 +657,26 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+  });
+
+  // ── Case 13: reorder wiring lock ──
+  it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const onMoveAttachment = vi.fn<(id: string, direction: 'left' | 'right') => void>();
+    const onReorderAttachments = vi.fn<(fromIndex: number, toIndex: number) => void>();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      onMoveAttachment,
+      onReorderAttachments,
+    }) as Node;
+
+    const prompt = findElementByType(element, 'NewSessionPrompt');
+    expect(prompt).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
   });
 });

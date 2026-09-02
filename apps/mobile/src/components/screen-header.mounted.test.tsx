@@ -6,13 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScreenHeader } from './screen-header';
 
 const routerState = vi.hoisted(() => ({
+  routes: ['previous-screen', 'session-detail'],
   back: vi.fn(),
+  replace: vi.fn<(href: string) => void>(),
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerState.back, canGoBack: routerState.canGoBack }),
+  useRouter: () => routerState,
 }));
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
@@ -46,12 +48,7 @@ function isBackPressable(node: TestInstance): boolean {
 }
 
 function findBackPressable(root: TestInstance): TestInstance {
-  const nodes = root.findAll(isBackPressable);
-  const node = nodes[0];
-  if (!node) {
-    throw new Error('back pressable not found');
-  }
-  return node;
+  return root.find(node => isBackPressable(node));
 }
 
 function backPressableCount(root: TestInstance): number {
@@ -59,18 +56,13 @@ function backPressableCount(root: TestInstance): number {
 }
 
 function findTitlePressable(root: TestInstance): TestInstance {
-  const nodes = root.findAll(
+  return root.find(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel !== 'Go back' &&
       node.props.accessibilityLabel !== 'Close'
   );
-  const node = nodes[0];
-  if (!node) {
-    throw new Error('title pressable not found');
-  }
-  return node;
 }
 
 function findIcon(back: TestInstance, type: string): TestInstance {
@@ -107,9 +99,14 @@ function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer 
 
 describe('ScreenHeader mounted', () => {
   beforeEach(() => {
-    routerState.back.mockClear();
-    routerState.canGoBack.mockClear();
-    routerState.canGoBack.mockReturnValue(true);
+    routerState.routes = ['previous-screen', 'session-detail'];
+    routerState.back.mockReset().mockImplementation(() => {
+      routerState.routes.pop();
+    });
+    routerState.replace.mockReset().mockImplementation(href => {
+      routerState.routes.splice(-1, 1, href);
+    });
+    routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
   });
 
@@ -147,6 +144,9 @@ describe('ScreenHeader mounted', () => {
     }
     expect(headerRight.props.className).toContain('mr-3');
     expect(headerRight.props.className).not.toContain('ml-3');
+    expect(headerRight.props.className).toContain('max-w-[50%]');
+    expect(headerRight.props.className).toContain('shrink');
+    expect(headerRight.props.className).not.toContain('shrink-0');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
@@ -182,42 +182,66 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
-  it('calls router.back() by default and onBack when provided', () => {
+  it('returns to the previous screen by default', () => {
     const renderer = renderHeader({ title: 'Sessions' });
-    const back = findBackPressable(renderer.root);
     act(() => {
-      (back.props.onPress as () => void)();
+      (findBackPressable(renderer.root).props.onPress as () => void)();
     });
-    expect(routerState.back).toHaveBeenCalledTimes(1);
-
-    const onBack = vi.fn(() => undefined);
-    const customRenderer = renderHeader({ title: 'Sessions', onBack });
-    const customBack = findBackPressable(customRenderer.root);
-    act(() => {
-      (customBack.props.onPress as () => void)();
-    });
-    expect(onBack).toHaveBeenCalledTimes(1);
-    expect(routerState.back).toHaveBeenCalledTimes(1);
+    expect(routerState.routes).toEqual(['previous-screen']);
   });
 
-  it('runs only the pressed control action', () => {
-    const onTitlePress = vi.fn(() => undefined);
-    const renderer = renderHeader({ title: 'Sessions', onTitlePress });
+  it.each([
+    { history: ['previous-screen', 'session-detail'], destination: 'previous-screen' },
+    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)' },
+  ])(
+    'returns from $history without retaining the session or opening its title',
+    ({ history, destination }) => {
+      routerState.routes = [...history];
+      let titleOpened = false;
+      const renderer = renderHeader({
+        title: 'Session',
+        backFallback: '/(app)/(tabs)/(2_agents)',
+        onTitlePress: () => {
+          titleOpened = true;
+        },
+      });
+      act(() => {
+        (findBackPressable(renderer.root).props.onPress as () => void)();
+      });
+      expect(routerState.routes).toEqual([destination]);
+      expect(titleOpened).toBe(false);
+      act(() => {
+        (findTitlePressable(renderer.root).props.onPress as () => void)();
+      });
+      expect(titleOpened).toBe(true);
+      expect(routerState.routes).toEqual([destination]);
+    }
+  );
 
-    const back = findBackPressable(renderer.root);
-    act(() => {
-      (back.props.onPress as () => void)();
-    });
-    expect(onTitlePress).not.toHaveBeenCalled();
-    expect(routerState.back).toHaveBeenCalledTimes(1);
-
-    const title = findTitlePressable(renderer.root);
-    act(() => {
-      (title.props.onPress as () => void)();
-    });
-    expect(onTitlePress).toHaveBeenCalledTimes(1);
-    expect(routerState.back).toHaveBeenCalledTimes(1);
-  });
+  it.each([
+    { history: true, backFallback: undefined },
+    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' },
+    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' },
+  ] as const)(
+    'preserves custom onBack precedence for history=$history, fallback=$backFallback',
+    ({ history, backFallback }) => {
+      routerState.routes = history ? ['previous-screen', 'session-detail'] : ['session-detail'];
+      const initialRoutes = [...routerState.routes];
+      let dismissed = false;
+      const renderer = renderHeader({
+        title: 'Session',
+        backFallback,
+        onBack: () => {
+          dismissed = true;
+        },
+      });
+      act(() => {
+        (findBackPressable(renderer.root).props.onPress as () => void)();
+      });
+      expect(dismissed).toBe(true);
+      expect(routerState.routes).toEqual(initialRoutes);
+    }
+  );
 
   it('labels the title with the override or the default open-menu label', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
@@ -263,7 +287,11 @@ describe('ScreenHeader mounted', () => {
     const forced = renderHeader({ title: 'Sessions', showBackButton: true });
     expect(backPressableCount(forced.root)).toBe(1);
 
-    const explicitlyHidden = renderHeader({ title: 'Sessions', showBackButton: false });
+    const explicitlyHidden = renderHeader({
+      title: 'Sessions',
+      showBackButton: false,
+      backFallback: '/(app)/(tabs)/(2_agents)',
+    });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
 
@@ -276,13 +304,18 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.hitSlop).toBeUndefined();
   });
 
-  it('renders every layout variant without error and keeps the back classes', () => {
+  it('preserves title line limits and back controls across layout variants', () => {
+    const longTitle = 'A long session name that must stay on one row. '.repeat(4);
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
-      { title: 'Sessions', size: 'large' },
+      { title: 'Agents', size: 'large' },
+      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
+      { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
       { title: 'Sessions', headerRight: 'RIGHT' },
+      { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
+      { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
     ];
 
     for (const props of variants) {
@@ -291,6 +324,18 @@ describe('ScreenHeader mounted', () => {
       expect(back.props.className).toContain('h-11 w-11');
       expect(back.props.className).toContain('items-center');
       expect(back.props.className).toContain('justify-center');
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
+      expect(title.props.ellipsizeMode).toBe('tail');
+      expect(title.children).toEqual([props.title]);
+      if (props.context) {
+        expect(title.parent?.children).toEqual([title, props.context]);
+      }
+      if (props.modal || props.centerTitle) {
+        expect(title.props.className).toContain('text-center');
+        expect(title.parent?.parent).not.toBe(back.parent);
+        expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
+      }
     }
   });
 });

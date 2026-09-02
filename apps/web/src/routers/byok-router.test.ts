@@ -12,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 
 const VERTEX_CREDENTIALS = JSON.stringify({
@@ -23,6 +23,17 @@ const VERTEX_CREDENTIALS = JSON.stringify({
     clientEmail: 'gateway@example-project.iam.gserviceaccount.com',
   },
 });
+
+const BEDROCK_IAM_CREDENTIALS = {
+  accessKeyId: 'AKIAEXAMPLE',
+  secretAccessKey: 'bedrock-test-secret',
+  region: 'us-east-1',
+};
+
+const BEDROCK_API_KEY_CREDENTIALS = {
+  apiKey: 'bedrock-test-api-key',
+  region: 'us-west-2',
+};
 
 describe('BYOK Router', () => {
   let ownerUser: User;
@@ -523,6 +534,164 @@ describe('BYOK Router', () => {
       const keys = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, keyA.id));
 
       expect(keys).toHaveLength(1);
+    });
+  });
+
+  describe('Bedrock credentials', () => {
+    test.each(['user', 'organization'] as const)(
+      'encrypts a %s API key credential and returns only metadata from create and list',
+      async owner => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const scope = owner === 'organization' ? { organizationId: organizationA.id } : {};
+        const credential = JSON.stringify(BEDROCK_API_KEY_CREDENTIALS);
+
+        const created = await caller.byok.create({
+          ...scope,
+          provider_id: 'bedrock',
+          api_key: credential,
+        });
+
+        expect(created).toEqual({
+          id: expect.any(String),
+          provider_id: 'bedrock',
+          provider_name: 'bedrock',
+          management_source: 'user',
+          is_enabled: true,
+          created_by: ownerUser.id,
+          created_at: expect.any(String),
+          updated_at: expect.any(String),
+        });
+        await expect(caller.byok.list(scope)).resolves.toEqual([created]);
+
+        const [stored] = await db
+          .select()
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.id, created.id));
+        expect(stored.organization_id).toBe(owner === 'organization' ? organizationA.id : null);
+        expect(stored.kilo_user_id).toBe(owner === 'user' ? ownerUser.id : null);
+        expect(stored.encrypted_api_key).toEqual({
+          iv: expect.any(String),
+          data: expect.any(String),
+          authTag: expect.any(String),
+        });
+        expect(JSON.stringify(stored.encrypted_api_key)).not.toContain(
+          BEDROCK_API_KEY_CREDENTIALS.apiKey
+        );
+        expect(decryptApiKey(stored.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(credential);
+      }
+    );
+
+    test.each([
+      {
+        owner: 'user',
+        from: 'IAM',
+        to: 'API key',
+        initial: BEDROCK_IAM_CREDENTIALS,
+        replacement: BEDROCK_API_KEY_CREDENTIALS,
+      },
+      {
+        owner: 'organization',
+        from: 'API key',
+        to: 'IAM',
+        initial: BEDROCK_API_KEY_CREDENTIALS,
+        replacement: BEDROCK_IAM_CREDENTIALS,
+      },
+    ])(
+      'replaces a $owner credential from $from to $to',
+      async ({ owner, initial, replacement }) => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const scope = owner === 'organization' ? { organizationId: organizationA.id } : {};
+        const created = await caller.byok.create({
+          ...scope,
+          provider_id: 'bedrock',
+          api_key: JSON.stringify(initial),
+        });
+        const [before] = await db
+          .select()
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.id, created.id));
+        expect(decryptApiKey(before.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+          JSON.stringify(initial)
+        );
+
+        const updated = await caller.byok.update({
+          ...scope,
+          id: created.id,
+          api_key: JSON.stringify(replacement),
+        });
+
+        expect(updated).toEqual({ ...created, updated_at: expect.any(String) });
+        await expect(caller.byok.list(scope)).resolves.toEqual([updated]);
+        const [after] = await db
+          .select()
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.id, created.id));
+        expect(after.organization_id).toBe(before.organization_id);
+        expect(after.kilo_user_id).toBe(before.kilo_user_id);
+        expect(after.encrypted_api_key).not.toEqual(before.encrypted_api_key);
+        expect(decryptApiKey(after.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+          JSON.stringify(replacement)
+        );
+      }
+    );
+
+    test.each([
+      { name: 'missing API key', credentials: { region: 'us-east-1' } },
+      { name: 'empty API key', credentials: { apiKey: '', region: 'us-east-1' } },
+      { name: 'missing region', credentials: { apiKey: 'bedrock-test-api-key' } },
+      { name: 'empty region', credentials: { apiKey: 'bedrock-test-api-key', region: '' } },
+      {
+        name: 'mixed IAM and API key',
+        credentials: { ...BEDROCK_IAM_CREDENTIALS, apiKey: 'bedrock-test-api-key' },
+      },
+    ])('rejects $name credentials before create or update writes', async ({ credentials }) => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const scope = { organizationId: organizationA.id };
+      const created = await caller.byok.create({
+        ...scope,
+        provider_id: 'bedrock',
+        api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+      });
+      const keysBefore = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id));
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      const api_key = JSON.stringify(credentials);
+
+      await expect(
+        caller.byok.create({ ...scope, provider_id: 'bedrock', api_key })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Invalid credentials for provider: bedrock',
+      });
+      const keysAfterCreate = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id));
+      expect(keysAfterCreate).toEqual(keysBefore);
+
+      await expect(caller.byok.update({ ...scope, id: created.id, api_key })).rejects.toMatchObject(
+        {
+          code: 'BAD_REQUEST',
+          message: 'Invalid credentials for provider: bedrock',
+        }
+      );
+      const keysAfterUpdate = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id));
+      expect(keysAfterUpdate).toEqual(keysBefore);
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
     });
   });
 

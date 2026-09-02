@@ -152,7 +152,11 @@
     "appearanceDark": "Qorong'i",
     "account": "Hisob",
     "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
-    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing."
+    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing.",
+    "returnSendsMessage": "Qaytarish tugmasi xabar yuboradi",
+    "returnSendsMessageSubtitle": "O'chirilganda, Qaytarish tugmasi agentlarning xabar kiritish maydonlarida yangi qator kiritadi.",
+    "biometricUnlock": "Biometriya yordamida qulfni ochish",
+    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -665,7 +669,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, yorliq, {{total}} tadan {{position}}"
+    "position": "{{name}}, yorliq, {{total}} tadan {{position}}",
+    "chat": "Suhbat"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Tarmoq xatosi",
       "uploadFailed": "Yuklash amalga oshmadi",
       "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}",
-      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q"
+      "nothingToPaste": "Joylashtirish uchun hech narsa yo'q",
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1129,9 +1135,9 @@
       "destroying": "YO'Q QILINMOQDA",
       "provisioned": "TAYYORLANGAN",
       "restarting": "QAYTA ISHGA TUSHIRILMOQDA",
-      "running": "Ishlamoqda",
+      "running": "ISHLAMOQDA",
       "shuttingDown": "O'CHIRILMOQDA",
-      "starting": "Boshlanmoqda",
+      "starting": "BOSHLANMOQDA",
       "stopped": "TO'XTATILGAN",
       "stopping": "TO'XTATILMOQDA",
       "unknown": "NOMA'LUM",
@@ -1299,7 +1305,23 @@
       "checkRun": "Tekshiruv ishlovi",
       "status": "Holat",
       "threshold": "Chegara",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ko'rib chiqish transkripti kutilmoqda.",
+      "transcriptEmpty": "Bu ko'rib chiqish uchun transkript yo'q.",
+      "transcriptRetry": "Ko'rib chiqish transkriptini yuklab bo'lmadi.",
+      "transcriptLive": "Jo'n",
+      "agentIdle": "Agent bo'sh",
+      "agentWorking": "Agent ishlamoqda...",
+      "anErrorOccurred": "Xatolik yuz berdi",
+      "errorWithMessage": "Xato: {{message}}",
+      "executionStarted": "Bajarish boshlandi",
+      "reviewCompleted": "Ko'rib chiqish yakunlandi",
+      "reviewInterrupted": "Ko'rib chiqish to'xtatildi",
+      "sessionError": "Sessiya xatosi: {{error}}",
+      "statusWithValue": "Holat: {{status}}",
+      "toolName": "Asbob: {{name}}",
+      "toolNameError": "Asbob: {{name}} — xato",
+      "unknownError": "Noma'lum xato"
     },
     "reviewMemory": {
       "title": "Ko'rib chiqish xotirasi",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hozir faol",
     "search": {
       "searching": "Qidirilmoqda",
       "searchSessions": "Sessiyalarni qidirish",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalarni yuklab bo'lmadi",
       "couldNotLoadActive": "Faol sessiyalar yuklab olinmadi",
-      "noSessionsYet": "Hali sessiyalar yo'q",
       "noSessionsYetDescription": "Telefoningizdan kodlash vazifasini boshlang. Sessiyalaringiz shu yerda paydo bo'ladi.",
       "noMatches": "Sessiyalar mos kelmadi",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "tryAdjustFilters": "Filtrlaringizni sozlab yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi",
-      "allActive": "Barcha sessiyalar faol",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "O'tgan sessiyalar yo'q",
-      "live": "JO'N"
+      "live": "JO'N",
+      "updating": "Yangilanmoqda"
     },
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Sessiya tugadi",
     "remoteSpawnRetryable": "Ishlab chiquvchi muhitga yetib bo‘lmadi — u uzilgan bo‘lishi mumkin.",
     "remoteSpawnNonRetryable": "Ishlab chiquvchi muhit sessiyani ishga tushira olmadi — mashinani tekshiring yoki CLI versiyasini yangilang.",
-    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang."
+    "remoteSpawnInstanceDisconnected": "Tanlangan ishlab chiquvchi muhit uzildi. Cloud Agent-da sessiya boshlang yoki boshqa muhitni tanlang.",
+    "liveCount_one": "{{count}} JO'N",
+    "liveCount_other": "{{count}} JO'N"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Pastga aylantirish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiyani qayta nomlash: {{title}}",
-      "connectRepository": "Repozitoriyaga ulanish",
       "cloningSession": "Sessiya klonlanmoqda",
       "continue": "Davom etish",
       "couldNotLoadThisSession": "Ushbu sessiyani yuklab bo'lmadi",
-      "cloneFailed": "Ushbu sessiyani klonlab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning.",
       "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
       "connectionTrouble": "Ulanish muammosi. Iltimos, bir ozdan keyin qayta urinib ko'ring.",
-      "modelUnavailable": "Bu model Cloud Agent uchun mavjud emas. Boshqa modelni tanlab, qayta urinib ko'ring."
+      "modelUnavailable": "Bu model Cloud Agent uchun mavjud emas. Boshqa modelni tanlab, qayta urinib ko'ring.",
+      "cancelQueuedFailed": "Xabarni bekor qilib bo'lmadi.",
+      "cancelQueuedRestoreAvailable": "Xabar bekor qilindi. Uni xabar kiritish maydoniga qaytarish uchun Tiklash tugmasini bosing.",
+      "cancelQueuedRestored": "Xabar bekor qilindi. Prompt xabar kiritish maydoniga qaytdi.",
+      "cancelQueuedUpgradeRequired": "Navbatdagi xabarlarni bekor qilish yangiroq Kilo CLI'ni talab qiladi. Kilo CLI'ni yangilang va qayta ulaning."
     },
     "remoteSession": {
       "failedToCreate": "Masofaviy sessiya yaratilmadi",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
       "openBitbucket": "Bitbucket'ni ochish",
       "openGitlab": "GitLab'ni ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan"
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "continueFrom": "{{title}} ni davom ettirish",
+      "importingSession": "Sessiyani import qilish",
+      "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
+      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "discardWithUploadsMessage": "Promptingiz va yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Kompyuteringizdagi loyihada `kilo remote` ni ishga tushiring yoki allaqachon ishlayotgan bo'lsa Kilo CLI'ni yangilang.",
       "instanceOnProject": "{{project}} ustida {{name}}",
       "instanceOnProjectSuffix": "{{project}} ustida {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Cloud Agent'da yurgizish"
+      "runOnCloudAgent": "Cloud Agent'da yurgizish",
+      "terminals": "Terminallar",
+      "remotes": "Masofaviy missallar"
     },
     "modePicker": {
       "title": "Rejimni tanlash",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Xabar navbatga qo'yildi",
       "userMessage": "Foydalanuvchi xabari",
       "assistantMessage": "Yordamchi xabari",
-      "longPressHint": "Xabar tafsilotlari uchun uzoq bosing"
+      "longPressHint": "Xabar tafsilotlari uchun uzoq bosing",
+      "cancelQueued": "Xabarni bekor qilish",
+      "cancelQueuedAccessibility": "Navbatdagi xabarni bekor qilish",
+      "restoreQueued": "Tiklash",
+      "restoreQueuedAccessibility": "Bekor qilingan xabarni xabar kiritish maydoniga tiklash"
     },
     "olderMessages": {
       "arrived": "Oldingi xabarlar yuklandi",
@@ -2462,6 +2496,8 @@
       "viewTable": "Jadvalni ko'rish",
       "title": "Jadval",
       "close": "Jadvalni yopish",
+      "loading": "Jadval yuklanmoqda",
+      "empty": "Bu jadvalda qatorlar yo'q.",
       "columnCount_one": "ustun",
       "columnCount": "ustunlar",
       "columnCount_other": "ustunlar",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
-      "sortBy": "Saralash",
-      "sortLastUpdated": "Oxirgi yangilangan",
-      "sortCreated": "Yaratilgan",
       "platform": "Platforma",
       "platformCloud": "Bulut",
       "platformExtension": "Kengaytma",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Boshqa",
-      "project": "Loyiha",
-      "removeProjectFilter": "{{label}} loyiha filtrini olib tashlash",
-      "removePlatformFilter": "{{label}} platforma filtrini olib tashlash"
+      "project": "Loyiha"
     },
     "suggestion": {
       "title": "Taklif",
@@ -2528,7 +2559,9 @@
       "uploading": "Yuklanmoqda…",
       "uploaded": "Yuklandi",
       "uploadFailedRetry": "Yuklash amalga oshmadi. Qayta urinish uchun bosing.",
-      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi."
+      "uploadFailedTerminal": "Bu faylni yuklab bo'lmaydi.",
+      "moveLeft": "{{filename}} faylini chapga surish",
+      "moveRight": "{{filename}} faylini o'ngga surish"
     },
     "attachmentPasteHint": {
       "accessibility": "Almashinuv buferidan rasm qo'yish",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Yakunlanmoqda...",
       "messagePlaceholder": "Xabar...",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirishlarni olib tashlang.",
-      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing."
+      "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborishga bosing.",
+      "discardAttachmentsMessage": "Yuborilgan xabarlarga biriktirilmagan yuklangan fayllar o'chiriladi.",
+      "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
+      "charactersRemaining": "{{count}} ta belgi qoldi",
+      "insertNewline": "Yangi qator kiritish"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Bu havola {{host}} sahifasini brauzeringizda ochadi.",
       "open": "Ochish",
       "trustThisHost": "Bu xostga ishonish"
+    },
+    "folderPicker": {
+      "accessibility": "Jild: {{label}}",
+      "emptyDescription": "Tayyor bu jilddan foydalanadi.",
+      "emptyTitle": "Ichida jildlar yo'q",
+      "fieldLabel": "Jild",
+      "retryableDescription": "Ulanishni tekshiring va qayta urinish. Tayyor baribir bu jildni tasdiqlaydi.",
+      "retryableTitle": "Jildlarni ro'yxatlab bo'lmadi",
+      "tapToListHint": "Tarkibini ko'rish uchun jildga teging",
+      "unsupportedDescription": "Bu CLI jildlarni ro'yxatlay olmaydi. Tayyor ishga tushirish jildini saqlaydi va Sessiyani boshlash o'sha yerda boshlanadi.",
+      "unsupportedTitle": "Jildlarni ro'yxatlab bo'lmaydi"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Yangi kodlash vazifasi",
     "explore": "O'rganish",
     "seeAll": "Barchasini ko'rish",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Hozir hech narsa ishlamayapti"
   },
   "imageViewer": {
     "close": "{{filename}} ni yopish",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Orqaga qayting va bu tanlagichni oldingi ekrandan qayta oching."
   },
   "sessionRow": {
-    "needsInput": "kiritish kerak"
+    "needsInput": "KIRITISH KERAK"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
@@ -2766,7 +2814,8 @@
     "busy": "Ovozli kiritish band. Qayta urinib ko'ring.",
     "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
-    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas."
+    "unavailableLanguage": "Ovozli kiritish bu qurilma tili uchun mavjud emas.",
+    "listeningStopped": "Tinglash to'xtatildi."
   },
   "share": {
     "title": "Kiloga ulashish",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "Havolaning xostiga ishonsangiz, u yana so'rovsiz ochiladi.",
     "revoke": "{{host}} ruxsatini bekor qilish",
     "backToPreferences": "Sozlamalarga qaytish"
+  },
+  "quickChat": {
+    "title": "Suhbat",
+    "composer": {
+      "placeholder": "Xabar"
+    },
+    "empty": {
+      "title": "Suhbatni boshlang",
+      "description": "Model bilan gaplashish uchun xabar yuboring."
+    },
+    "working": "Ishlamoqda",
+    "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
+    "catalogRetry": "Modellarni yuklab bo'lmadi",
+    "sendError": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
   }
 }

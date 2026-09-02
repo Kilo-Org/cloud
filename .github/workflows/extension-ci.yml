@@ -3,20 +3,7 @@ name: extension CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/extension/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.nvmrc'
-      - '.github/workflows/extension-ci.yml'
   pull_request:
-    branches: [main]
-    paths:
-      - 'apps/extension/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.nvmrc'
-      - '.github/workflows/extension-ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -27,9 +14,59 @@ permissions:
   pull-requests: read
 
 jobs:
+  changes:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      extension: ${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install root dependencies
+        run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
+
+      - name: Detect explicit changes
+        id: filter
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+        with:
+          filters: |
+            extension:
+              - 'apps/extension/**'
+              - '.github/workflows/extension-ci.yml'
+              - 'scripts/changed-workspaces.sh'
+              - 'scripts/changed-dependencies.mjs'
+              - 'scripts/changed-dependencies.test.mjs'
+              - 'package.json'
+              - '.nvmrc'
+              - '.npmrc'
+              - '.pnpmfile.cjs'
+              - '.oxlintrc.json'
+              - '.oxfmtrc.json'
+              - '.prettierignore'
+              - 'tools/oxlint/**'
+              - 'apps/web/src/**'
+
+      - name: Detect affected workspaces
+        id: workspaces
+        run: |
+          matrix=$(scripts/changed-workspaces.sh)
+          echo "extension=$(jq -r 'any(.[]; .dir == "apps/extension")' <<< "$matrix")" >> "$GITHUB_OUTPUT"
+
   # Compiler, linter, formatting and unit tests, via the extension's own `verify`
   # script so the extension's stricter (type-aware) oxlint config is what runs.
   verify:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -54,6 +91,8 @@ jobs:
 
   # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
   build-firefox:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -80,7 +119,8 @@ jobs:
   # also covers the Chrome build. Firefox Selenium e2e (`e2e:firefox`) is intentionally
   # not run here: it relies on geckodriver tab detection that is unreliable headless.
   e2e-chrome:
-    needs: verify
+    needs: [changes, verify]
+    if: needs.changes.outputs.extension == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 20
     env:

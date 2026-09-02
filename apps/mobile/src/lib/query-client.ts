@@ -1,8 +1,132 @@
-import { MutationCache, type Query, QueryCache, QueryClient } from '@tanstack/react-query';
+import {
+  CancelledError,
+  MutationCache,
+  type Query,
+  QueryCache,
+  QueryClient,
+  type QueryFunction,
+  type QueryKey,
+} from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
+import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
+
+export type ActiveSessionsQueryMetadata = Readonly<{
+  acceptedRevision: number;
+  terminalError: Readonly<{
+    error: unknown;
+    kind: 'retryable' | 'non-retryable';
+  }> | null;
+}>;
+
+// Old/manual-only cache entries have no server provenance. They cannot establish
+// empty success; keep this fallback while those entries can occur.
+const EMPTY_ACTIVE_SESSIONS_METADATA: ActiveSessionsQueryMetadata = {
+  acceptedRevision: 0,
+  terminalError: null,
+};
+const activeSessionsMetadata = new WeakMap<Query, ActiveSessionsQueryMetadata>();
+const activeSessionsListeners = new WeakMap<Query, Set<() => void>>();
+const activeSessionsQueryKeySchema = z.tuple([
+  z.tuple([z.literal('activeSessions'), z.literal('list')]),
+  z.object({ type: z.literal('query'), input: z.unknown().optional() }),
+]);
+
+export function getActiveSessionsQueryMetadata(
+  query: Query | undefined
+): ActiveSessionsQueryMetadata {
+  return (query && activeSessionsMetadata.get(query)) ?? EMPTY_ACTIVE_SESSIONS_METADATA;
+}
+
+export function subscribeActiveSessionsQueryMetadata(
+  query: Query | undefined,
+  listener: () => void
+): () => void {
+  if (!query) {
+    return () => undefined;
+  }
+  const listeners = activeSessionsListeners.get(query) ?? new Set<() => void>();
+  activeSessionsListeners.set(query, listeners);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function captureActiveSessionsQueryRefresh(client: QueryClient, queryKey: QueryKey) {
+  const query = client.getQueryCache().build(client, { queryKey });
+  const revision = getActiveSessionsQueryMetadata(query).acceptedRevision;
+  const isCurrent = () => client.getQueryCache().get(query.queryHash) === query;
+  return {
+    isCurrent,
+    hasAcceptedResult: () =>
+      isCurrent() && getActiveSessionsQueryMetadata(query).acceptedRevision > revision,
+  };
+}
+
+/** Keep canceled account/attachment work out of Query's success reducer. */
+export function fenceActiveSessionsQuery<TData, TKey extends QueryKey>(
+  queryFn: QueryFunction<TData, TKey>,
+  isCurrent: () => boolean
+): QueryFunction<TData, TKey> {
+  return async context => {
+    if (!isCurrent()) {
+      throw new CancelledError({ revert: true });
+    }
+    const result = await queryFn(context);
+    if (!isCurrent()) {
+      throw new CancelledError({ revert: true });
+    }
+    return result;
+  };
+}
+
+function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
+  // This client-lifetime subscription survives QueryClient.clear().
+  queryCache.subscribe(event => {
+    const query: Query = event.query;
+    if (!activeSessionsQueryKeySchema.safeParse(query.queryKey).success) {
+      return;
+    }
+    const previous = getActiveSessionsQueryMetadata(query);
+    if (event.type === 'removed') {
+      activeSessionsMetadata.delete(query);
+    } else if (
+      event.type === 'updated' &&
+      event.action.type === 'success' &&
+      !event.action.manual
+    ) {
+      activeSessionsMetadata.set(query, {
+        acceptedRevision: previous.acceptedRevision + 1,
+        terminalError: null,
+      });
+    } else if (
+      event.type === 'updated' &&
+      event.action.type === 'error' &&
+      !(event.action.error instanceof CancelledError)
+    ) {
+      if (previous.terminalError?.error === event.action.error) {
+        return;
+      }
+      activeSessionsMetadata.set(query, {
+        ...previous,
+        terminalError: {
+          error: event.action.error,
+          kind: isTerminalTrpcCode(readTrpcErrorField(event.action.error, 'code'))
+            ? 'non-retryable'
+            : 'retryable',
+        },
+      });
+    } else {
+      return;
+    }
+    for (const listener of activeSessionsListeners.get(query) ?? []) {
+      listener();
+    }
+  });
+}
 
 // tRPC error codes that retrying can never fix — surface these immediately
 // instead of sitting on a skeleton through the default retry backoff.
@@ -129,6 +253,7 @@ export function createKiloAppQueryClient(): QueryClient {
       },
     }),
   });
+  observeActiveSessionsQueryOutcomes(queryClient.getQueryCache());
   return queryClient;
 }
 

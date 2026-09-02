@@ -152,7 +152,11 @@
     "appearanceDark": "Mörkt",
     "account": "Konto",
     "prReviewAttribution": "Lägg till appattribution i PR-granskningar",
-    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning."
+    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning.",
+    "returnSendsMessage": "Returtangenten skickar meddelanden",
+    "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
+    "biometricUnlock": "Lås upp med biometri",
+    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -665,7 +669,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flik, {{position}} av {{total}}"
+    "position": "{{name}}, flik, {{position}} av {{total}}",
+    "chat": "Chatt"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Nätverksfel",
       "uploadFailed": "Uppladdningen misslyckades",
       "failedToUploadFile": "Det gick inte att ladda upp filen: {{reason}}",
-      "nothingToPaste": "Ingenting att klistra in"
+      "nothingToPaste": "Ingenting att klistra in",
+      "metadataStripFailed": "Fotots metadata kunde inte tas bort."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1299,7 +1305,23 @@
       "checkRun": "Kontrollkörning",
       "status": "Status",
       "threshold": "Tröskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Väntar på granskningstranskriptet.",
+      "transcriptEmpty": "Inget transkript för denna granskning.",
+      "transcriptRetry": "Det gick inte att läsa in granskningstranskriptet.",
+      "transcriptLive": "Live",
+      "agentIdle": "Agenten är inaktiv",
+      "agentWorking": "Agenten arbetar...",
+      "anErrorOccurred": "Ett fel uppstod",
+      "errorWithMessage": "Fel: {{message}}",
+      "executionStarted": "Körningen startades",
+      "reviewCompleted": "Granskningen slutfördes",
+      "reviewInterrupted": "Granskningen avbröts",
+      "sessionError": "Sessionsfel: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Verktyg: {{name}}",
+      "toolNameError": "Verktyg: {{name}} — fel",
+      "unknownError": "Okänt fel"
     },
     "reviewMemory": {
       "title": "Granskningsminne",
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nu",
     "search": {
       "searching": "Söker",
       "searchSessions": "Sök sessioner",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Det gick inte att läsa in sessioner",
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
-      "noSessionsYet": "Inga sessioner ännu",
       "noSessionsYetDescription": "Starta en kodningsuppgift från din telefon. Dina sessioner visas här.",
       "noMatches": "Inga sessioner matchar",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Försök att justera eller rensa dina filter.",
       "couldNotSearch": "Kunde inte söka i sessioner",
-      "allActive": "Alla sessioner är aktiva",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Uppdaterar"
     },
     "sessionRow": {
       "deleteTitle": "Ta bort session?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Session avslutad",
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen – kontrollera maskinen eller uppdatera CLI:n.",
-    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session på Cloud Agent eller välj en annan instans."
+    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session på Cloud Agent eller välj en annan instans.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Rulla till botten",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på session: {{title}}",
-      "connectRepository": "Anslut arkiv",
       "cloningSession": "Klonar session",
       "continue": "Fortsätt",
       "couldNotLoadThisSession": "Kunde inte läsa in den här sessionen",
-      "cloneFailed": "Kunde inte klona den här sessionen.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta.",
       "notEnoughCredits": "Inte tillräckligt med krediter för att köra Cloud Agent. Lägg till krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Anslutningsproblem. Försök igen om en liten stund.",
-      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen."
+      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen.",
+      "cancelQueuedFailed": "Kunde inte avbryta meddelandet.",
+      "cancelQueuedRestoreAvailable": "Meddelandet avbröts. Tryck på Återställ för att återföra det till meddelandefältet.",
+      "cancelQueuedRestored": "Meddelandet avbröts. Prompten finns åter i meddelandefältet.",
+      "cancelQueuedUpgradeRequired": "Att avbryta köade meddelanden kräver en nyare Kilo CLI. Uppdatera Kilo CLI och återanslut."
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsession",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Inga arkiv visas. Kontrollera arkivåtkomsten för GitLab och uppdatera sedan.",
       "openBitbucket": "Öppna Bitbucket",
       "openGitlab": "Öppna GitLab",
-      "recentlyUsed": "Nyligen använda"
+      "recentlyUsed": "Nyligen använda",
+      "cliCannotContinue": "Denna CLI kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI.",
+      "continueFrom": "Fortsätter {{title}}",
+      "importFailed": "Det gick inte att importera denna session.",
+      "importingSession": "Importerar session",
+      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Kör `kilo remote` i ett projekt på din dator, eller uppdatera Kilo CLI om en redan körs.",
       "instanceOnProject": "{{name}} på {{project}}",
       "instanceOnProjectSuffix": "{{name}} på {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Kör på Cloud Agent"
+      "runOnCloudAgent": "Kör på Cloud Agent",
+      "terminals": "Terminaler",
+      "remotes": "Fjärrinstanser"
     },
     "modePicker": {
       "title": "Välj läge",
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Meddelandet är i kö",
       "userMessage": "Användarmeddelande",
       "assistantMessage": "Assistentmeddelande",
-      "longPressHint": "Tryck länge för meddelandedetaljer"
+      "longPressHint": "Tryck länge för meddelandedetaljer",
+      "cancelQueued": "Avbryt meddelande",
+      "cancelQueuedAccessibility": "Avbryt köat meddelande",
+      "restoreQueued": "Återställ",
+      "restoreQueuedAccessibility": "Återställ avbrutet meddelande till meddelandefältet"
     },
     "olderMessages": {
       "arrived": "Tidigare meddelanden lästes in",
@@ -2462,6 +2496,8 @@
       "viewTable": "Visa tabell",
       "title": "Tabell",
       "close": "Stäng tabell",
+      "loading": "Laddar tabell",
+      "empty": "Den här tabellen har inga rader.",
       "columnCount_one": "kolumn",
       "columnCount": "kolumner",
       "columnCount_other": "kolumner",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtrera sessioner",
-      "sortBy": "Sortera efter",
-      "sortLastUpdated": "Senast uppdaterad",
-      "sortCreated": "Skapad",
       "platform": "Plattform",
       "platformCloud": "Cloud",
       "platformExtension": "Tillägg",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Annat",
-      "project": "Projekt",
-      "removeProjectFilter": "Ta bort {{label}} projektfilter",
-      "removePlatformFilter": "Ta bort {{label}} plattformsfilter"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Förslag",
@@ -2528,7 +2559,9 @@
       "uploading": "Laddar upp…",
       "uploaded": "Uppladdad",
       "uploadFailedRetry": "Uppladdningen misslyckades. Tryck för att försöka igen.",
-      "uploadFailedTerminal": "Den här filen kan inte laddas upp."
+      "uploadFailedTerminal": "Den här filen kan inte laddas upp.",
+      "moveLeft": "Flytta {{filename}} åt vänster",
+      "moveRight": "Flytta {{filename}} åt höger"
     },
     "attachmentPasteHint": {
       "accessibility": "Klistra in bild från urklipp",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Avslutar...",
       "messagePlaceholder": "Meddelande...",
       "cannotReceiveFiles": "Denna session kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
-      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen."
+      "couldNotAttachFiles": "Det gick inte att bifoga filer. Tryck på skicka för att försöka igen.",
+      "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
+      "discardAttachmentsTitle": "Kassera bilagor?",
+      "charactersRemaining": "{{count}} tecken kvar",
+      "insertNewline": "Infoga radbrytning"
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Den här länken öppnar {{host}} i din webbläsare.",
       "open": "Öppna",
       "trustThisHost": "Lita på den här värden"
+    },
+    "folderPicker": {
+      "accessibility": "Mapp: {{label}}",
+      "emptyDescription": "Klar använder den här mappen.",
+      "emptyTitle": "Inga mappar inuti",
+      "fieldLabel": "Mapp",
+      "retryableDescription": "Kontrollera anslutningen och försök igen. Klar bekräftar fortfarande den här mappen.",
+      "retryableTitle": "Det gick inte att lista mappar",
+      "tapToListHint": "Tryck på en mapp för att lista dess innehåll",
+      "unsupportedDescription": "Den här CLI:n kan inte lista mappar. Klar behåller startmappen och Starta session startar där.",
+      "unsupportedTitle": "Kan inte lista mappar"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Ny kodningsuppgift",
     "explore": "Utforska",
     "seeAll": "Visa alla",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Inget körs just nu"
   },
   "imageViewer": {
     "close": "Stäng {{filename}}",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna denna väljare igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "kräver indata"
+    "needsInput": "KRÄVER INDATA"
   },
   "voiceInput": {
     "listening": "Lyssnar...",
@@ -2766,7 +2814,8 @@
     "busy": "Röstinmatningen är upptagen. Försök igen.",
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
-    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk."
+    "unavailableLanguage": "Röstinmatning är inte tillgänglig för den här enhetens språk.",
+    "listeningStopped": "Lyssningen stoppades."
   },
   "share": {
     "title": "Dela till Kilo",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "När du litar på en länks värd öppnas den utan att fråga igen.",
     "revoke": "Återkalla {{host}}",
     "backToPreferences": "Tillbaka till inställningar"
+  },
+  "quickChat": {
+    "title": "Chatt",
+    "composer": {
+      "placeholder": "Meddelande"
+    },
+    "empty": {
+      "title": "Starta en chatt",
+      "description": "Skicka ett meddelande för att prata med en modell."
+    },
+    "working": "Arbetar",
+    "historyRetry": "Det gick inte att läsa in chatthistoriken.",
+    "catalogRetry": "Kunde inte läsa in modeller",
+    "sendError": "Kunde inte skicka meddelandet. Försök igen."
   }
 }

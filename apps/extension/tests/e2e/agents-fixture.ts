@@ -1,5 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import type { BrowserContext, Page } from '@playwright/test';
+import type { inferRouterOutputs, RootRouter } from '@kilocode/trpc';
 
 // ---------------------------------------------------------------------------
 // Default fixture data
@@ -67,16 +68,19 @@ export interface HistorySessionSeed {
   updatedAt: string;
 }
 
-export interface ConnectedInstanceSeed {
-  connectionId: string;
-  name: string;
-  projectName: string;
-}
+type ConnectedInstance =
+  inferRouterOutputs<RootRouter>['activeSessions']['listInstances']['instances'][number];
 
-export const DEFAULT_INSTANCE: ConnectedInstanceSeed = {
+export type ConnectedInstanceSeed = Omit<ConnectedInstance, 'kind' | 'startedAt' | 'gitBranch'> &
+  Partial<Pick<ConnectedInstance, 'kind' | 'startedAt' | 'gitBranch'>>;
+
+export const DEFAULT_INSTANCE: ConnectedInstance = {
   connectionId: 'cli-connection-42',
+  gitBranch: null,
+  kind: 'cli',
   name: 'dev-laptop',
   projectName: 'checkout-service',
+  startedAt: null,
 };
 
 export const SPAWNED_SESSION_ID = 'ses_spawnedcli0000000000000001';
@@ -321,7 +325,16 @@ export const mockAgentsApi = async (
       }
 
       if (proc === 'activeSessions.listInstances') {
-        return { result: { data: { instances: options.instances ?? [] } } };
+        // eslint-disable-next-line oxc/no-map-spread -- Keep caller-owned seeds immutable and preserve every router field.
+        const instances = (options.instances ?? []).map(
+          (instance): ConnectedInstance => ({
+            ...instance,
+            gitBranch: instance.gitBranch ?? null,
+            kind: instance.kind ?? 'cli',
+            startedAt: instance.startedAt ?? null,
+          })
+        );
+        return { result: { data: { instances } } };
       }
 
       if (proc === 'cliSessionsV2.list') {

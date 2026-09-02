@@ -6,7 +6,17 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { Text as renderText } from '@/components/ui/text';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type ChatComposer } from './chat-composer';
+
+const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const TEXT_DIRECTIONS = [
+  { direction: 'LTR', isRTL: false, style: undefined },
+  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+];
+
+vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
 // The composer's uncontrolled input is covered by Appium E2E; this suite pins
 // the draft-restore contract that a native E2E cannot easily prove: a restored
@@ -23,12 +33,24 @@ const onSendMock = vi.fn(async () => undefined);
 // re-render (`rerender`) with the refs — the composer's live text and its
 // applied-draft flag — intact, and start a fresh instance with `mount`.
 const refSlots = vi.hoisted(() => ({ slots: [] as { current: unknown }[], cursor: 0 }));
+// `useState` is stateful per call-order slot (mirroring `refSlots`) so the
+// starter/`hasText` gating can be observed across a re-render, not just the
+// mount-time initial value.
+const stateSlots = vi.hoisted(() => ({ slots: [] as { value: unknown }[], cursor: 0 }));
+const returnSendsPref = vi.hoisted(() => ({ returnSendsMessage: false }));
+const reducedMotionOn = vi.hoisted(() => ({ value: false }));
+
+// The strip wire-lock test asserts the composer forwards the upload hook's
+// move/reorder callbacks by identity, so both mocks must be hoisted and shared.
+const uploadMoveAttachmentMock = vi.hoisted(() => vi.fn());
+const uploadReorderAttachmentsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useContext: vi.fn(() => undefined),
     useEffect: vi.fn((fn: React.EffectCallback) => {
       fn();
     }),
@@ -40,7 +62,18 @@ vi.mock('react', async () => {
       refSlots.slots[index] ??= { current: initial };
       return refSlots.slots[index] as React.RefObject<T>;
     }),
-    useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
+    useState: vi.fn(<T>(initial: T) => {
+      const index = stateSlots.cursor;
+      stateSlots.cursor += 1;
+      const slot = (stateSlots.slots[index] ??= { value: initial as unknown });
+      return [
+        slot.value as T,
+        (next: T | ((prev: T) => T)) => {
+          slot.value =
+            typeof next === 'function' ? (next as (prev: T) => T)(slot.value as T) : next;
+        },
+      ] as [T, (value: T | ((prev: T) => T)) => void];
+    }),
   };
 });
 
@@ -49,9 +82,20 @@ vi.mock('react-native', () => ({
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    dismiss: vi.fn(),
+  },
+  I18nManager: layoutDirection,
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -71,10 +115,23 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: () => null,
 }));
 
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ dispatch: vi.fn() }),
+}));
+
+vi.mock('@/lib/navigation/prevent-remove', () => ({
+  usePreventRemove: vi.fn(),
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
+  useReducedMotion: () => reducedMotionOn.value,
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -91,20 +148,26 @@ vi.mock('sonner-native', () => ({
 }));
 
 // ── sub-components (presentation only; the composer logic is under test) ───
+const MockAttachmentPreviewStrip = () => null;
+
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
-  AttachmentPreviewStrip: () => null,
+  AttachmentPreviewStrip: MockAttachmentPreviewStrip,
 }));
 
 vi.mock('@/components/agents/attachment-paste-hint', () => ({
   AttachmentPasteHint: () => null,
 }));
 
-vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
-}));
+const MockChatToolbar = () => null;
+vi.mock('@/components/agents/chat-toolbar', () => ({ ChatToolbar: MockChatToolbar }));
 
 vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
+}));
+
+const MockSuggestionCard = () => null;
+vi.mock('@/components/agents/suggestion-card', () => ({
+  SuggestionCard: MockSuggestionCard,
 }));
 
 // Marked so the test can locate the input-row element in the returned tree
@@ -180,7 +243,10 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     addCandidates: vi.fn(async () => undefined),
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
+    moveAttachment: uploadMoveAttachmentMock,
+    reorderAttachments: uploadReorderAttachmentsMock,
     reset: vi.fn(() => undefined),
+    commitSent: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
     uploadPending: vi.fn(async () => ({
@@ -239,6 +305,14 @@ vi.mock('@/lib/voice-input/voice-input-draft', () => ({
   applyVoiceDraftToInput: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: returnSendsPref.returnSendsMessage,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
+  }),
+}));
+
 type ComposerProps = Parameters<typeof ChatComposer>[0];
 
 function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
@@ -279,6 +353,24 @@ function findInputRowProps(node: Node): Record<string, unknown> | null {
   return null;
 }
 
+function findStripProps(node: Node): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const type = (node as { type?: unknown }).type;
+  if (type === MockAttachmentPreviewStrip) {
+    return (node as { props?: Record<string, unknown> }).props ?? {};
+  }
+  const children = (node as { props?: { children?: unknown } }).props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findStripProps(child as Node);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function requireInputRowOnSubmit(render: React.ReactElement): () => void {
   const rowProps = findInputRowProps(render);
   const onSubmit = rowProps?.onSubmit as (() => void) | undefined;
@@ -297,13 +389,43 @@ function requireInputRowOnChangeText(render: React.ReactElement): (text: string)
   return onChangeText;
 }
 
+function findNode(
+  node: Node,
+  predicate: (type: unknown, props: Record<string, unknown>) => boolean
+): { type: unknown; props: Record<string, unknown>; key?: React.Key | null } | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const { type, props, key } = node as {
+    type?: unknown;
+    props?: Record<string, unknown>;
+    key?: React.Key | null;
+  };
+  if (props !== undefined && predicate(type, props)) {
+    return { type, props, key };
+  }
+  if (type === renderText && props !== undefined) {
+    return findNode(renderText(props as React.ComponentProps<typeof renderText>), predicate);
+  }
+  const children = props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findNode(child as Node, predicate);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 async function mount(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.slots.length = 0;
+  stateSlots.slots.length = 0;
   return rerender(props);
 }
 
 async function rerender(props: ComposerProps): Promise<React.ReactElement> {
   refSlots.cursor = 0;
+  stateSlots.cursor = 0;
   const { ChatComposer } = await import('./chat-composer');
   return ChatComposer(props);
 }
@@ -318,6 +440,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   refSlots.slots.length = 0;
   refSlots.cursor = 0;
+  stateSlots.slots.length = 0;
+  stateSlots.cursor = 0;
+  returnSendsPref.returnSendsMessage = false;
+  reducedMotionOn.value = false;
+  layoutDirection.isRTL = false;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -354,7 +481,11 @@ describe('ChatComposer draft restore', () => {
       return;
     }
     expect(onSendMock).toHaveBeenCalledTimes(1);
-    expect(onSendMock).toHaveBeenCalledWith(sent, undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith(sent, {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   // The host mounts the composer before identity (`user.getMe`) and the draft
@@ -369,7 +500,11 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', undefined, undefined);
+    expect(onSendMock).toHaveBeenCalledWith('Restored draft text', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
   });
 
   it('keeps text typed before the draft settles instead of restoring over it', async () => {
@@ -384,10 +519,134 @@ describe('ChatComposer draft restore', () => {
     requireInputRowOnSubmit(settled)();
     await settle();
 
-    expect(onSendMock).toHaveBeenCalledWith(
-      'typed while identity was loading',
-      undefined,
-      undefined
+    expect(onSendMock).toHaveBeenCalledWith('typed while identity was loading', {
+      attachments: undefined,
+      submission: undefined,
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+});
+describe('ChatComposer return-sends wiring', () => {
+  it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const withReturnSend = findInputRowProps(await mount(makeProps({})));
+    expect(withReturnSend?.returnSendsMessage).toBe(true);
+    expect(typeof withReturnSend?.onInsertNewline).toBe('function');
+
+    returnSendsPref.returnSendsMessage = false;
+    const withNewline = findInputRowProps(await mount(makeProps({})));
+    expect(withNewline?.returnSendsMessage).toBe(false);
+  });
+
+  it('inserts a newline into the draft without submitting', async () => {
+    returnSendsPref.returnSendsMessage = true;
+    const render = await mount(makeProps({}));
+    const rowProps = findInputRowProps(render);
+    const onInsertNewline = rowProps?.onInsertNewline as (() => void) | undefined;
+    if (onInsertNewline === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onInsertNewline handler');
+    }
+
+    onInsertNewline();
+
+    expect(refSlots.slots[0]?.current).toBe('\n');
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatComposer CLI suggestion', () => {
+  it('renders the suggestion in the composer and wires both actions', async () => {
+    const onAcceptSuggestion = vi.fn(async () => undefined);
+    const onDismissSuggestion = vi.fn(async () => undefined);
+    const render = await mount(
+      makeProps({
+        suggestion: {
+          requestId: 'sug-1',
+          callId: 'call-1',
+          text: 'Review the completed work?',
+          actions: [{ label: 'Review', prompt: '/review branch' }],
+        },
+        onAcceptSuggestion,
+        onDismissSuggestion,
+      })
     );
+
+    const suggestion = findNode(render, type => type === MockSuggestionCard);
+    expect(findNode(render, type => type === MockChatToolbar)).toBeNull();
+    expect(suggestion?.key).toBe('sug-1');
+    expect(suggestion?.props).toMatchObject({
+      text: 'Review the completed work?',
+      actions: [{ label: 'Review', prompt: '/review branch' }],
+    });
+    if (!suggestion) {
+      throw new Error('suggestion not found');
+    }
+
+    await (suggestion.props.onAccept as (index: number) => Promise<void>)(0);
+    await (suggestion.props.onDismiss as () => Promise<void>)();
+
+    expect(onAcceptSuggestion).toHaveBeenCalledWith('sug-1', 0);
+    expect(onDismissSuggestion).toHaveBeenCalledWith('sug-1');
+  });
+});
+
+describe('ChatComposer counter', () => {
+  it.each(TEXT_DIRECTIONS)(
+    'shows the remaining-character counter only once the draft nears the limit in $direction',
+    async ({ isRTL, style }) => {
+      layoutDirection.isRTL = isRTL;
+      const render = await mount(makeProps({}));
+      expect(
+        findNode(render, (type, props) => type === 'Text' && typeof props.children === 'number')
+      ).toBeNull();
+
+      requireInputRowOnChangeText(render)('hello');
+      await settle();
+      expect(
+        findNode(
+          await rerender(makeProps({})),
+          (type, props) => type === 'Text' && typeof props.children === 'number'
+        )
+      ).toBeNull();
+
+      requireInputRowOnChangeText(render)('x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH - 5));
+      await settle();
+
+      const rerendered = await rerender(makeProps({}));
+      const counter = findNode(
+        rerendered,
+        (type, props) => type === 'Text' && props.children === 5
+      );
+      expect(counter).not.toBeNull();
+      expect(counter?.props).toMatchObject({
+        accessibilityLabel: '5 characters remaining',
+        className: 'text-xs font-normal text-muted-foreground',
+        style,
+      });
+    }
+  );
+});
+
+describe('ChatComposer reduced motion', () => {
+  it('drops the toolbar entrance animation under reduced motion', async () => {
+    reducedMotionOn.value = true;
+    const render = await mount(makeProps({}));
+
+    const toolbarView = findNode(render, type => type === 'Animated.View');
+    expect(toolbarView).not.toBeNull();
+    expect(toolbarView?.props.entering).toBeUndefined();
+  });
+});
+
+describe('ChatComposer attachment strip wiring', () => {
+  it('wires onMove and onReorder from the upload hook into the attachment strip', async () => {
+    const render = await mount(makeProps({}));
+
+    const stripProps = findStripProps(render);
+    if (stripProps === null) {
+      throw new Error('AttachmentPreviewStrip element not found');
+    }
+    expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
+    expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
   });
 });

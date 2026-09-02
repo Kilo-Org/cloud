@@ -195,7 +195,8 @@
     "profile": "Profilo",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, scheda, {{position}} di {{total}}"
+    "position": "{{name}}, scheda, {{position}} di {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -279,7 +280,8 @@
       "networkError": "Errore di rete",
       "uploadFailed": "Caricamento non riuscito",
       "failedToUploadFile": "Caricamento del file non riuscito: {{reason}}",
-      "nothingToPaste": "Niente da incollare"
+      "nothingToPaste": "Niente da incollare",
+      "metadataStripFailed": "Impossibile rimuovere i metadati della foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -884,7 +886,23 @@
       "title": "Revisione",
       "tokens": "Token",
       "tokensInOut": "{{input}} in / {{output}} out",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "In attesa della trascrizione della revisione.",
+      "transcriptEmpty": "Nessuna trascrizione per questa revisione.",
+      "transcriptRetry": "Impossibile caricare la trascrizione della revisione.",
+      "transcriptLive": "Live",
+      "agentIdle": "Agente inattivo",
+      "agentWorking": "Agente al lavoro...",
+      "anErrorOccurred": "Si è verificato un errore",
+      "errorWithMessage": "Errore: {{message}}",
+      "executionStarted": "Esecuzione avviata",
+      "reviewCompleted": "Revisione completata",
+      "reviewInterrupted": "Revisione interrotta",
+      "sessionError": "Errore di sessione: {{error}}",
+      "statusWithValue": "Stato: {{status}}",
+      "toolName": "Strumento: {{name}}",
+      "toolNameError": "Strumento: {{name}} — errore",
+      "unknownError": "Errore sconosciuto"
     },
     "reviewList": {
       "configureProvider": "Configura provider",
@@ -1569,7 +1587,6 @@
     }
   },
   "agents": {
-    "activeNow": "Attivo ora",
     "search": {
       "searching": "Ricerca",
       "searchSessions": "Cerca sessioni",
@@ -1580,16 +1597,15 @@
     "sessionList": {
       "couldNotLoad": "Impossibile caricare le sessioni",
       "couldNotLoadActive": "Impossibile caricare le sessioni attive",
-      "noSessionsYet": "Ancora nessuna sessione",
       "noSessionsYetDescription": "Avvia un'attività di codifica dal telefono. Le tue sessioni appariranno qui.",
       "noMatches": "Nessuna sessione corrisponde",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
       "tryAdjustFilters": "Prova a modificare o cancellare i filtri.",
       "couldNotSearch": "Impossibile cercare le sessioni",
-      "allActive": "Tutte le sessioni sono attive",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione passata",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Aggiornamento"
     },
     "sessionRow": {
       "deleteTitle": "Eliminare la sessione?",
@@ -1635,7 +1651,10 @@
     "sessionExited": "Sessione terminata",
     "remoteSpawnRetryable": "Impossibile raggiungere l'istanza: potrebbe essersi disconnessa.",
     "remoteSpawnNonRetryable": "L'istanza non è riuscita ad avviare la sessione: controlla la macchina o aggiorna la CLI.",
-    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza."
+    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_many": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1657,18 +1676,19 @@
       "scrollToBottom": "Scorri in basso",
       "emptyTitle": "Nessun messaggio",
       "renameAccessibility": "Rinomina sessione: {{title}}",
-      "connectRepository": "Collega repository",
       "cloningSession": "Clonazione sessione",
       "continue": "Continua",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione",
-      "cloneFailed": "Impossibile clonare questa sessione.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
-      "connectRepositoryToContinue": "Collega un repository per continuare.",
       "notEnoughCredits": "Crediti insufficienti per eseguire Cloud Agent. Aggiungi crediti e riprova.",
       "previousTaskFinishing": "L'attività precedente sta ancora terminando. Attendere un momento.",
       "serviceUnavailable": "Il servizio non è disponibile al momento. Riprova.",
       "connectionTrouble": "Problemi di connessione. Riprova tra un momento.",
-      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova."
+      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova.",
+      "cancelQueuedFailed": "Impossibile annullare il messaggio.",
+      "cancelQueuedRestoreAvailable": "Messaggio annullato. Tocca Ripristina per riportarlo nel campo di inserimento del messaggio.",
+      "cancelQueuedRestored": "Messaggio annullato. Il prompt è di nuovo nel campo di inserimento del messaggio.",
+      "cancelQueuedUpgradeRequired": "Per annullare i messaggi in coda è necessaria una versione più recente di Kilo CLI. Aggiorna Kilo CLI e riconnettiti."
     },
     "remoteSession": {
       "failedToCreate": "Impossibile creare la sessione remota",
@@ -1736,7 +1756,12 @@
       "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla l'accesso ai repository per GitLab, poi aggiorna.",
       "openBitbucket": "Apri Bitbucket",
       "openGitlab": "Apri GitLab",
-      "recentlyUsed": "Usati di recente"
+      "recentlyUsed": "Usati di recente",
+      "continueFrom": "Continuazione di {{title}}",
+      "importingSession": "Importazione della sessione",
+      "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
+      "importFailed": "Impossibile importare questa sessione.",
+      "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -1795,7 +1820,9 @@
       "noCliInstancesDescription": "Esegui `kilo remote` in un progetto sul tuo computer, oppure aggiorna la CLI di Kilo se è già in esecuzione.",
       "instanceOnProject": "{{name}} su {{project}}",
       "instanceOnProjectSuffix": "{{name}} su {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Esegui su Agente cloud"
+      "runOnCloudAgent": "Esegui su Agente cloud",
+      "terminals": "Terminali",
+      "remotes": "Istanze remote"
     },
     "modePicker": {
       "title": "Seleziona modalità",
@@ -1985,7 +2012,11 @@
       "queuedAccessibility": "Messaggio in coda",
       "userMessage": "Messaggio utente",
       "assistantMessage": "Messaggio assistente",
-      "longPressHint": "Tieni premuto per i dettagli del messaggio"
+      "longPressHint": "Tieni premuto per i dettagli del messaggio",
+      "cancelQueued": "Annulla messaggio",
+      "cancelQueuedAccessibility": "Annulla messaggio in coda",
+      "restoreQueued": "Ripristina",
+      "restoreQueuedAccessibility": "Ripristina il messaggio annullato nel campo di inserimento del messaggio"
     },
     "olderMessages": {
       "arrived": "Messaggi precedenti caricati",
@@ -2002,6 +2033,8 @@
       "viewTable": "Visualizza tabella",
       "title": "Tabella",
       "close": "Chiudi tabella",
+      "loading": "Caricamento tabella",
+      "empty": "Questa tabella non ha righe.",
       "columnCount_one": "colonna",
       "columnCount": "colonne",
       "columnCount_other": "colonne",
@@ -2014,9 +2047,6 @@
     },
     "sessionFilter": {
       "title": "Filtra sessioni",
-      "sortBy": "Ordina per",
-      "sortLastUpdated": "Ultimo aggiornamento",
-      "sortCreated": "Creato",
       "platform": "Piattaforma",
       "platformCloud": "Cloud",
       "platformExtension": "Estensione",
@@ -2025,9 +2055,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Altro",
-      "project": "Progetto",
-      "removeProjectFilter": "Rimuovi il filtro progetto {{label}}",
-      "removePlatformFilter": "Rimuovi il filtro piattaforma {{label}}"
+      "project": "Progetto"
     },
     "suggestion": {
       "title": "Suggerimento",
@@ -2070,7 +2098,9 @@
       "uploading": "Caricamento…",
       "uploaded": "Caricato",
       "uploadFailedRetry": "Caricamento non riuscito. Tocca per riprovare.",
-      "uploadFailedTerminal": "Questo file non può essere caricato."
+      "uploadFailedTerminal": "Questo file non può essere caricato.",
+      "moveLeft": "Sposta {{filename}} a sinistra",
+      "moveRight": "Sposta {{filename}} a destra"
     },
     "attachmentPasteHint": {
       "accessibility": "Incolla immagine dagli appunti",
@@ -2100,7 +2130,11 @@
       "finalizingPlaceholder": "Finalizzazione...",
       "messagePlaceholder": "Messaggio...",
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
-      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare."
+      "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
+      "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
+      "discardAttachmentsTitle": "Scartare gli allegati?",
+      "charactersRemaining": "{{count}} caratteri rimanenti",
+      "insertNewline": "Inserisci un'interruzione di riga"
     },
     "chatLink": {
       "linkCopied": "Link copiato",
@@ -2193,6 +2227,17 @@
       "hostConfirmMessage": "Questo link apre {{host}} nel tuo browser.",
       "open": "Apri",
       "trustThisHost": "Considera attendibile questo host"
+    },
+    "folderPicker": {
+      "accessibility": "Cartella: {{label}}",
+      "emptyDescription": "Fatto usa questa cartella.",
+      "emptyTitle": "Nessuna cartella all'interno",
+      "fieldLabel": "Cartella",
+      "retryableDescription": "Controlla la connessione e Riprova. Fatto conferma comunque questa cartella.",
+      "retryableTitle": "Impossibile elencare le cartelle",
+      "tapToListHint": "Tocca una cartella per elencarne i contenuti",
+      "unsupportedDescription": "Questa CLI non può elencare le cartelle. Fatto mantiene la cartella di avvio e Avvia sessione inizia lì.",
+      "unsupportedTitle": "Impossibile elencare le cartelle"
     }
   },
   "bootstrap": {
@@ -2219,7 +2264,11 @@
     "appearanceDark": "Scuro",
     "account": "Account",
     "prReviewAttribution": "Aggiungi l'attribuzione dell'app alle revisioni PR",
-    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione."
+    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione.",
+    "returnSendsMessage": "Il tasto Invio invia il messaggio",
+    "returnSendsMessageSubtitle": "Se disattivato, Invio inserisce un'interruzione di riga nei campi di inserimento dei messaggi degli agenti.",
+    "biometricUnlock": "Sblocca con l'autenticazione biometrica",
+    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2261,7 +2310,7 @@
     "newCodingTask": "Nuova attività di codifica",
     "explore": "Esplora",
     "seeAll": "Vedi tutto",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Niente in esecuzione al momento"
   },
   "imageViewer": {
     "close": "Chiudi {{filename}}",
@@ -2325,7 +2374,8 @@
     "busy": "L'input vocale è occupato. Riprova.",
     "stopped": "L'input vocale si è interrotto. Tocca il microfono per riprovare.",
     "unavailableDevice": "L'input vocale non è disponibile su questo dispositivo.",
-    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo."
+    "unavailableLanguage": "L'input vocale non è disponibile per la lingua del dispositivo.",
+    "listeningStopped": "Ascolto interrotto."
   },
   "share": {
     "title": "Condividi su Kilo",
@@ -3181,5 +3231,19 @@
     "emptyDescription": "Quando consideri attendibile l'host di un link, esso si apre senza chiedere di nuovo.",
     "revoke": "Revoca {{host}}",
     "backToPreferences": "Torna alle preferenze"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Messaggio"
+    },
+    "empty": {
+      "title": "Avvia una chat",
+      "description": "Invia un messaggio per parlare con un modello."
+    },
+    "working": "In corso",
+    "historyRetry": "Impossibile caricare la cronologia della chat.",
+    "catalogRetry": "Impossibile caricare i modelli",
+    "sendError": "Impossibile inviare il messaggio. Riprova."
   }
 }

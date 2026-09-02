@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -369,6 +370,8 @@ async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
 
 export class SessionIngestDO extends DurableObject<Env> {
   private db: DrizzleSqliteDODatabase;
+  private readonly activeR2Writes = new Set<Promise<unknown>>();
+  private cleanupOperation: Promise<void> | undefined;
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -554,6 +557,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (ingestVersion >= 1) {
       // v1 clients send explicit open/close pairs. Only those events drive alarms.
       for (const event of lifecycleEvents) {
+        if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
         if (event.type === 'session_open') {
           // New turn starting — clear prior emission so metrics are re-computed.
           this.db
@@ -578,6 +582,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Read before the write loop below persists incoming values: whether this session had ever
     // reported a status. The first-ever status write also registers as a change, and a
     // full-history backfill of an already-idle session must not push about an old turn.
+    if (this.isDeleted()) return { accepted: false, reason: 'deleted', changes: [] };
     const hadPriorStatus = hasIngestMeta(this.db, 'status');
 
     const changes: Changes = [];
@@ -665,6 +670,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         (async () => {
           try {
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
+            if (this.isDeleted()) return;
             // Max-merge post-await so out-of-order concurrent ingests cannot regress throttle meta.
             if (activityValueMs !== undefined) {
               const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
@@ -1074,6 +1080,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       });
     }
 
+    if (this.isDeleted()) return false;
     await this.env.O11Y.ingestSessionMetrics({
       kiloUserId,
       sessionId,
@@ -1082,6 +1089,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       ...metrics,
     });
 
+    if (this.isDeleted()) return false;
     // Mark metrics as emitted to prevent duplicates
     this.db
       .insert(ingestMeta)
@@ -1158,25 +1166,142 @@ export class SessionIngestDO extends DurableObject<Env> {
     return true;
   }
 
+  isDeleted(): boolean {
+    return (
+      this.db
+        .select({ value: ingestMeta.value })
+        .from(ingestMeta)
+        .where(eq(ingestMeta.key, 'deleted'))
+        .get()?.value === 'true'
+    );
+  }
+
+  async stageR2Object(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown>
+  ): Promise<boolean> {
+    sessionIdSchema.parse(params.sessionId);
+    const doKey = `${params.kiloUserId}/${params.sessionId}`;
+    if (
+      (this.ctx.id.name && this.ctx.id.name !== doKey) ||
+      !['ingest', 'items'].some(prefix => params.key.startsWith(`${prefix}/${doKey}/`))
+    ) {
+      throw new Error('Session R2 identity conflict');
+    }
+    if (this.isDeleted()) {
+      await body.cancel();
+      return false;
+    }
+    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
+    writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: params.sessionId });
+    const key = `pendingR2/${params.key}`;
+    this.db
+      .insert(ingestMeta)
+      .values({ key, value: params.key })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
+      .run();
+    const operation = (async () => {
+      const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
+        onlyIf: new Headers({ 'If-None-Match': '*' }),
+      });
+      const etag = reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
+      if (this.isDeleted()) {
+        await body.cancel();
+        await this.env.SESSION_INGEST_R2.delete(params.key);
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+        return false;
+      }
+      if (!etag) throw new Error('Session R2 reservation disappeared');
+      const written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+        onlyIf: { etagMatches: etag },
+      });
+      const deleted = this.isDeleted();
+      if (!written && !deleted) throw new Error('Session R2 reservation changed');
+      if (deleted) await this.env.SESSION_INGEST_R2.delete(params.key);
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+      return !deleted;
+    })();
+    this.activeR2Writes.add(operation);
+    return operation.finally(() => this.activeR2Writes.delete(operation));
+  }
+
+  async clearForWorktree(kiloUserId: string, sessionId: string): Promise<void> {
+    sessionIdSchema.parse(sessionId);
+    const doKey = `${kiloUserId}/${sessionId}`;
+    if (this.ctx.id.name && this.ctx.id.name !== doKey)
+      throw new Error('Session identity conflict');
+    await this.clearSessionData({ kiloUserId, sessionId });
+  }
+
   async clear(): Promise<void> {
-    await this.wipeStorage();
+    const meta = this.db
+      .select()
+      .from(ingestMeta)
+      .where(inArray(ingestMeta.key, ['kiloUserId', 'sessionId']))
+      .all();
+    const kiloUserId = meta.find(row => row.key === 'kiloUserId')?.value;
+    const sessionId = meta.find(row => row.key === 'sessionId')?.value;
+    await this.clearSessionData(kiloUserId && sessionId ? { kiloUserId, sessionId } : undefined);
+  }
+
+  private async clearSessionData(identity?: {
+    kiloUserId: string;
+    sessionId: string;
+  }): Promise<void> {
     this.db
       .insert(ingestMeta)
       .values({ key: 'deleted', value: 'true' })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
       .run();
+    if (!this.cleanupOperation) {
+      this.cleanupOperation = this.clearFencedSessionData(identity).finally(() => {
+        this.cleanupOperation = undefined;
+      });
+    }
+    await this.cleanupOperation;
   }
 
-  /**
-   * Cancel the alarm, wipe SQLite, then delete the captured R2-backed item blobs.
-   * Shared by `clear()` and `resetCloneStage()`; `clear()` additionally marks the
-   * DO deleted.
-   *
-   * The R2 delete is best-effort: the SQLite wipe has already committed when it
-   * runs, so a transient R2 failure must not throw. A throw would leave `clear()`
-   * wiped but unmarked, and would turn a typed `rejected` clone result into an
-   * uncaught exception at the RPC boundary.
-   */
+  private async clearFencedSessionData(identity?: {
+    kiloUserId: string;
+    sessionId: string;
+  }): Promise<void> {
+    await this.ctx.storage.deleteAlarm();
+    await Promise.allSettled([...this.activeR2Writes]);
+    const keys = new Set(
+      this.db
+        .select({ item_data_r2_key: ingestItems.item_data_r2_key })
+        .from(ingestItems)
+        .where(isNotNull(ingestItems.item_data_r2_key))
+        .all()
+        .flatMap(row => (row.item_data_r2_key ? [row.item_data_r2_key] : []))
+    );
+    for (const row of this.db.select().from(ingestMeta).all()) {
+      if (row.key.startsWith('pendingR2/') && row.value) keys.add(row.value);
+    }
+    const knownKeys = [...keys];
+    for (let offset = 0; offset < knownKeys.length; offset += 1000) {
+      await this.env.SESSION_INGEST_R2.delete(knownKeys.slice(offset, offset + 1000));
+    }
+    if (identity) {
+      for (const namespace of ['ingest', 'items']) {
+        const prefix = `${namespace}/${identity.kiloUserId}/${identity.sessionId}/`;
+        let cursor: string | undefined;
+        do {
+          const page = await this.env.SESSION_INGEST_R2.list({ prefix, cursor, limit: 1000 });
+          if (page.objects.length > 0)
+            await this.env.SESSION_INGEST_R2.delete(page.objects.map(object => object.key));
+          cursor = page.truncated ? page.cursor : undefined;
+        } while (cursor);
+      }
+    }
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(ingestItems).run();
+      this.db.delete(agentNotificationDispatch).run();
+      this.db.delete(ingestMeta).where(ne(ingestMeta.key, 'deleted')).run();
+    });
+    await this.ctx.storage.deleteAlarm();
+  }
+
   private async wipeStorage(): Promise<void> {
     // Capture the R2 keys first (synchronous SQLite). The SQLite wipe below must
     // never be separated from this key read by an R2 await: an R2 await opens the
@@ -1190,8 +1315,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     const r2Keys = r2Rows.map(r => r.item_data_r2_key).filter((k): k is string => k !== null);
 
     await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-    await migrate(this.db, migrations);
+    if (this.isDeleted()) throw new Error('Session deleted');
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(ingestItems).run();
+      this.db.delete(agentNotificationDispatch).run();
+      this.db.delete(ingestMeta).run();
+    });
 
     // Delete the captured R2 objects last, after the SQLite wipe is complete.
     if (r2Keys.length > 0) {
@@ -1293,6 +1422,7 @@ export class SessionIngestDO extends DurableObject<Env> {
    * is rejected without mutation.
    */
   stageCloneBatch(params: StageCloneBatchParams): StageCloneBatchResult {
+    if (this.isDeleted()) throw new Error('Session deleted');
     const stage = this.readCloneStage();
 
     if (stage.kind === 'complete') {
@@ -1451,6 +1581,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Delete every staged row, any R2 objects the stage wrote, and the clone state markers. */
   async resetCloneStage(): Promise<void> {
+    if (this.isDeleted()) throw new Error('Session deleted');
     await this.wipeStorage();
   }
 }

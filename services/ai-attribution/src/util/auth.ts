@@ -1,5 +1,7 @@
 import { createMiddleware } from 'hono/factory';
-import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { AI_ATTRIBUTION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 import { OrganizationJWTPayload } from '../schemas';
@@ -23,7 +25,10 @@ export async function validateKiloToken(
   }
 
   try {
-    const raw = await verifyKiloToken(token, secret);
+    const raw = await verifyKiloTokenForResource(token, secret, {
+      audience: AI_ATTRIBUTION_AUDIENCE,
+      mode: 'allow-legacy',
+    });
     const payload = OrganizationJWTPayload.parse(raw);
 
     return {

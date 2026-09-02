@@ -4,14 +4,10 @@ type SkillToolCardProps = {
   toolPart: ToolPart;
 };
 
-type SkillInput = {
-  name: string;
-};
-
 export function SkillToolCard({ toolPart }: SkillToolCardProps) {
   const state = toolPart.state;
-  const input = state.input as SkillInput;
-  const skillName = input.name ?? 'skill';
+  const name = state.input.name || ('metadata' in state && state.metadata?.name);
+  const skillName = typeof name === 'string' && name ? name : 'skill';
   const skillLabel = `Skill "${skillName}"`;
   const isLoading = state.status === 'pending' || state.status === 'running';
 

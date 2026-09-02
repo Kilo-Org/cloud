@@ -1,6 +1,117 @@
 import { z } from 'zod';
+import { cloudAgentChildSessionLineageSchema } from './cloud-agent-session-scope';
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
+export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
+export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
+
+export const cloudAgentWorktreeLocationSchema = z
+  .object({
+    sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
+    provider: z.enum(['cloudflare', 'vercel']),
+  })
+  .strict();
+export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
+export const WORKTREE_RUNTIME_HISTORY_UNAVAILABLE = 'worktree_runtime_history_unavailable';
+
+export const cloudAgentWorktreeDeletionManifestSchema = z
+  .object({
+    version: z.literal(1),
+    sessions: z.array(
+      z
+        .object({
+          sessionId: sessionIdSchema,
+          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]).nullable(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+export type CloudAgentWorktreeDeletionManifest = z.infer<
+  typeof cloudAgentWorktreeDeletionManifestSchema
+>;
+
+export const cloudAgentWorktreeDeletionSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema,
+    kiloUserId: z.string().min(1),
+    organizationId: z.uuid().optional(),
+  })
+  .strict();
+export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
+
+export const cloudAgentWorktreeDeletionStateSchema = z
+  .object({
+    completed: z.boolean(),
+    manifest: cloudAgentWorktreeDeletionManifestSchema,
+    runtimeLocations: z.array(cloudAgentWorktreeLocationSchema),
+  })
+  .strict();
+export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeDeletionStateSchema>;
+
+export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
+    runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
+    directory: z.string().min(1).max(4096).optional(),
+    sessionIds: z.array(sessionIdSchema).optional(),
+    childSessions: z
+      .array(
+        cloudAgentChildSessionLineageSchema.extend({
+          cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+        })
+      )
+      .optional(),
+  })
+  .strict();
+export type RecordCloudAgentWorktreeCleanupParams = z.infer<
+  typeof recordCloudAgentWorktreeCleanupSchema
+>;
+
+export const canDestroyCloudAgentWorktreeSandboxSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
+    location: cloudAgentWorktreeLocationSchema,
+    releasedWorktreeIds: z.array(cloudAgentWorktreeIdSchema).optional(),
+  })
+  .strict();
+export type CanDestroyCloudAgentWorktreeSandboxParams = z.infer<
+  typeof canDestroyCloudAgentWorktreeSandboxSchema
+>;
+
+export const unresolvedCloudAgentSandboxOwnerSchema = z
+  .object({
+    worktreeId: cloudAgentWorktreeIdSchema.nullable(),
+    organizationId: z.uuid().nullable(),
+    allocationLocation: cloudAgentWorktreeLocationSchema.optional(),
+    sessions: z
+      .array(
+        z
+          .object({
+            sessionId: sessionIdSchema.nullable(),
+            cloudAgentSessionId: z.string().min(1),
+          })
+          .strict()
+      )
+      .min(1),
+  })
+  .strict();
+export type UnresolvedCloudAgentSandboxOwner = z.infer<
+  typeof unresolvedCloudAgentSandboxOwnerSchema
+>;
+
+export const canDestroyCloudAgentWorktreeSandboxResultSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exclusive') }).strict(),
+  z.object({ kind: z.literal('shared') }).strict(),
+  z
+    .object({
+      kind: z.literal('unresolved'),
+      owners: z.array(unresolvedCloudAgentSandboxOwnerSchema).min(1),
+    })
+    .strict(),
+]);
+export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
+  typeof canDestroyCloudAgentWorktreeSandboxResultSchema
+>;
+
 export const messageIdSchema = z
   .string()
   .startsWith('msg')
@@ -19,6 +130,8 @@ export const createSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
   cloudAgentSessionId: z.string().min(1),
+  cloudAgentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
+  cloudAgentWorktreeLocation: cloudAgentWorktreeLocationSchema.optional(),
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
@@ -733,6 +846,18 @@ export type AuthorizedSessionMessages = {
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
+  beginCloudAgentWorktreeDeletion: (
+    params: CloudAgentWorktreeDeletionParams
+  ) => Promise<CloudAgentWorktreeDeletionState>;
+  recordCloudAgentWorktreeCleanup: (
+    params: RecordCloudAgentWorktreeCleanupParams
+  ) => Promise<CloudAgentWorktreeDeletionState>;
+  completeCloudAgentWorktreeDeletion: (
+    params: CloudAgentWorktreeDeletionParams
+  ) => Promise<{ success: true; deletedSessionIds: string[] }>;
+  canDestroyCloudAgentWorktreeSandbox: (
+    params: CanDestroyCloudAgentWorktreeSandboxParams
+  ) => Promise<CanDestroyCloudAgentWorktreeSandboxResult>;
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;

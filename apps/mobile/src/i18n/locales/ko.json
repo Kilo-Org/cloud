@@ -152,7 +152,11 @@
     "appearanceDark": "어두움",
     "account": "계정",
     "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
-    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다."
+    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다.",
+    "returnSendsMessage": "리턴 키로 메시지 보내기",
+    "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다.",
+    "biometricUnlock": "생체 인증으로 잠금 해제",
+    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다."
   },
   "notifications": {
     "title": "알림",
@@ -211,7 +215,8 @@
     "profile": "프로필",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, 탭, {{total}} 중 {{position}}"
+    "position": "{{name}}, 탭, {{total}} 중 {{position}}",
+    "chat": "채팅"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "네트워크 오류",
       "uploadFailed": "업로드 실패",
       "failedToUploadFile": "파일을 업로드하지 못했습니다: {{reason}}",
-      "nothingToPaste": "붙여넣을 내용이 없습니다"
+      "nothingToPaste": "붙여넣을 내용이 없습니다",
+      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -898,7 +904,23 @@
       "title": "리뷰",
       "tokens": "토큰",
       "tokensInOut": "{{input}} 입력 / {{output}} 출력",
-      "pullRequest": "풀 리퀘스트"
+      "pullRequest": "풀 리퀘스트",
+      "transcriptWaiting": "리뷰 대화록을 기다리는 중입니다.",
+      "transcriptEmpty": "이 리뷰에 대한 대화록이 없습니다.",
+      "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
+      "transcriptLive": "Live",
+      "agentIdle": "에이전트 대기 중",
+      "agentWorking": "에이전트 작업 중...",
+      "anErrorOccurred": "오류가 발생했습니다",
+      "errorWithMessage": "오류: {{message}}",
+      "executionStarted": "실행 시작됨",
+      "reviewCompleted": "리뷰 완료됨",
+      "reviewInterrupted": "리뷰 중단됨",
+      "sessionError": "세션 오류: {{error}}",
+      "statusWithValue": "상태: {{status}}",
+      "toolName": "도구: {{name}}",
+      "toolNameError": "도구: {{name}} — 오류",
+      "unknownError": "알 수 없는 오류"
     },
     "reviewList": {
       "configureProvider": "제공업체 구성",
@@ -1579,7 +1601,6 @@
     }
   },
   "agents": {
-    "activeNow": "지금 활성 중",
     "search": {
       "searching": "검색 중",
       "searchSessions": "세션 검색",
@@ -1590,16 +1611,15 @@
     "sessionList": {
       "couldNotLoad": "세션을 불러올 수 없습니다",
       "couldNotLoadActive": "활성 세션을 불러올 수 없습니다",
-      "noSessionsYet": "아직 세션 없음",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
       "noMatches": "일치하는 세션이 없습니다",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "tryAdjustFilters": "필터를 조정하거나 지워 보세요.",
       "couldNotSearch": "세션을 검색할 수 없습니다",
-      "allActive": "모든 세션이 활성 상태입니다",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "업데이트 중"
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제하시겠습니까?",
@@ -1623,7 +1643,7 @@
       "dollar_other": "달러",
       "costSpoken": "비용 {{cost}}",
       "costSpokenWithTime": "비용 {{cost}}, {{time}}",
-      "pullRequest": "Pull request {{number}}"
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작할 수 없습니다. 다시 시도하세요.",
@@ -1643,7 +1663,9 @@
     "sessionExited": "세션이 종료되었습니다",
     "remoteSpawnRetryable": "인스턴스에 연결할 수 없습니다. 연결이 끊어졌을 수 있습니다.",
     "remoteSpawnNonRetryable": "인스턴스가 세션을 시작하지 못했습니다. 머신을 확인하거나 CLI를 업데이트하세요.",
-    "remoteSpawnInstanceDisconnected": "선택한 인스턴스가 연결이 끊어졌습니다. Cloud Agent에서 세션을 시작하거나 다른 인스턴스를 선택하세요."
+    "remoteSpawnInstanceDisconnected": "선택한 인스턴스가 연결이 끊어졌습니다. Cloud Agent에서 세션을 시작하거나 다른 인스턴스를 선택하세요.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -1665,18 +1687,19 @@
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "renameAccessibility": "세션 이름 바꾸기: {{title}}",
-      "connectRepository": "저장소 연결",
       "cloningSession": "세션 복제 중",
       "continue": "계속",
       "couldNotLoadThisSession": "이 세션을 로드하지 못했습니다",
-      "cloneFailed": "이 세션을 복제하지 못했습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
-      "connectRepositoryToContinue": "계속하려면 저장소를 연결하세요.",
       "notEnoughCredits": "Cloud Agent를 실행할 크레딧이 부족합니다. 크레딧을 추가하고 다시 시도하세요.",
       "previousTaskFinishing": "이전 작업이 아직 끝나지 않았습니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "지금 서비스를 사용할 수 없습니다. 다시 시도하세요.",
       "connectionTrouble": "연결 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
-      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요."
+      "modelUnavailable": "이 모델은 Cloud Agent에서 사용할 수 없습니다. 다른 모델을 선택하고 다시 시도하세요.",
+      "cancelQueuedFailed": "메시지를 취소하지 못했습니다.",
+      "cancelQueuedRestoreAvailable": "메시지가 취소되었습니다. 복원을 탭하여 메시지 입력란으로 되돌리세요.",
+      "cancelQueuedRestored": "메시지가 취소되었습니다. 프롬프트가 메시지 입력란으로 돌아왔습니다.",
+      "cancelQueuedUpgradeRequired": "대기 중인 메시지를 취소하려면 최신 Kilo CLI가 필요합니다. Kilo CLI를 업데이트하고 다시 연결하세요."
     },
     "remoteSession": {
       "failedToCreate": "원격 세션을 만들지 못했습니다",
@@ -1744,7 +1767,12 @@
       "noRepositoriesVisibleGitlab": "표시된 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "openBitbucket": "Bitbucket 열기",
       "openGitlab": "GitLab 열기",
-      "recentlyUsed": "최근 사용"
+      "recentlyUsed": "최근 사용",
+      "continueFrom": "{{title}} 계속하는 중",
+      "importingSession": "세션 가져오는 중",
+      "cliCannotContinue": "이 CLI는 세션을 계속할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
+      "importFailed": "이 세션을 가져올 수 없습니다.",
+      "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -1802,7 +1830,9 @@
       "noCliInstancesDescription": "컴퓨터의 프로젝트에서 `kilo remote`를 실행하거나, 이미 실행 중이라면 Kilo CLI를 업데이트하세요.",
       "instanceOnProject": "{{project}}의 {{name}}",
       "instanceOnProjectSuffix": "{{project}}의 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "클라우드 에이전트에서 실행"
+      "runOnCloudAgent": "클라우드 에이전트에서 실행",
+      "terminals": "터미널",
+      "remotes": "원격 인스턴스"
     },
     "modePicker": {
       "title": "모드 선택",
@@ -1992,7 +2022,11 @@
       "queuedAccessibility": "메시지 대기 중",
       "userMessage": "사용자 메시지",
       "assistantMessage": "어시스턴트 메시지",
-      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요"
+      "longPressHint": "메시지 세부 정보를 보려면 길게 누르세요",
+      "cancelQueued": "메시지 취소",
+      "cancelQueuedAccessibility": "대기 중인 메시지 취소",
+      "restoreQueued": "복원",
+      "restoreQueuedAccessibility": "취소된 메시지를 메시지 입력란으로 복원"
     },
     "olderMessages": {
       "arrived": "이전 메시지 로드됨",
@@ -2008,6 +2042,8 @@
       "viewTable": "표 보기",
       "title": "표",
       "close": "표 닫기",
+      "loading": "표 불러오는 중",
+      "empty": "이 표에는 행이 없습니다.",
       "columnCount_one": "열",
       "columnCount": "열",
       "columnCount_other": "열",
@@ -2018,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "세션 필터링",
-      "sortBy": "정렬 기준",
-      "sortLastUpdated": "마지막 업데이트",
-      "sortCreated": "생성됨",
       "platform": "플랫폼",
       "platformCloud": "클라우드",
       "platformExtension": "확장 프로그램",
@@ -2029,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "기타",
-      "project": "프로젝트",
-      "removeProjectFilter": "{{label}} 프로젝트 필터 제거",
-      "removePlatformFilter": "{{label}} 플랫폼 필터 제거"
+      "project": "프로젝트"
     },
     "suggestion": {
       "title": "제안",
@@ -2074,7 +2105,9 @@
       "uploading": "업로드 중…",
       "uploaded": "업로드됨",
       "uploadFailedRetry": "업로드에 실패했습니다. 탭하여 다시 시도하세요.",
-      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다."
+      "uploadFailedTerminal": "이 파일은 업로드할 수 없습니다.",
+      "moveLeft": "{{filename}} 왼쪽으로 이동",
+      "moveRight": "{{filename}} 오른쪽으로 이동"
     },
     "attachmentPasteHint": {
       "accessibility": "클립보드에서 이미지 붙여넣기",
@@ -2104,7 +2137,11 @@
       "finalizingPlaceholder": "마무리 중...",
       "messagePlaceholder": "메시지...",
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
-      "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 다시 시도하려면 보내기를 탭하세요."
+      "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 다시 시도하려면 보내기를 탭하세요.",
+      "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
+      "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
+      "charactersRemaining": "{{count}}자 남음",
+      "insertNewline": "줄바꿈 삽입"
     },
     "chatLink": {
       "linkCopied": "링크 복사됨",
@@ -2196,6 +2233,17 @@
       "hostConfirmMessage": "이 링크는 브라우저에서 {{host}}를 엽니다.",
       "open": "열기",
       "trustThisHost": "이 호스트 신뢰"
+    },
+    "folderPicker": {
+      "accessibility": "폴더: {{label}}",
+      "emptyDescription": "완료는 이 폴더를 사용합니다.",
+      "emptyTitle": "내부에 폴더가 없습니다",
+      "fieldLabel": "폴더",
+      "retryableDescription": "연결을 확인하고 다시 시도하세요. 완료는 여전히 이 폴더를 확인합니다.",
+      "retryableTitle": "폴더를 표시할 수 없습니다",
+      "tapToListHint": "폴더를 탭하여 내용을 표시하세요",
+      "unsupportedDescription": "이 CLI는 폴더를 표시할 수 없습니다. 완료는 시작 폴더를 유지하고 세션 시작은 거기서 시작됩니다.",
+      "unsupportedTitle": "폴더를 표시할 수 없습니다"
     }
   },
   "bootstrap": {
@@ -2248,7 +2296,7 @@
     "newCodingTask": "새 코딩 작업",
     "explore": "탐색",
     "seeAll": "모두 보기",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "현재 실행 중인 항목이 없습니다"
   },
   "imageViewer": {
     "close": "{{filename}} 닫기",
@@ -2312,7 +2360,8 @@
     "busy": "음성 입력이 사용 중입니다. 다시 시도하세요.",
     "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
     "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
-    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다."
+    "unavailableLanguage": "이 기기 언어에서는 음성 입력을 사용할 수 없습니다.",
+    "listeningStopped": "듣기가 중지되었습니다."
   },
   "share": {
     "title": "Kilo로 공유",
@@ -3160,5 +3209,19 @@
     "emptyDescription": "링크의 호스트를 신뢰하면 다시 묻지 않고 열립니다.",
     "revoke": "{{host}} 신뢰 해제",
     "backToPreferences": "기본 설정으로 돌아가기"
+  },
+  "quickChat": {
+    "title": "채팅",
+    "composer": {
+      "placeholder": "메시지"
+    },
+    "empty": {
+      "title": "채팅 시작하기",
+      "description": "모델과 대화하려면 메시지를 보내세요."
+    },
+    "working": "작업 중",
+    "historyRetry": "채팅 기록을 불러올 수 없습니다.",
+    "catalogRetry": "모델을 불러올 수 없습니다",
+    "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
   }
 }

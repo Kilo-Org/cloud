@@ -1,5 +1,9 @@
 import * as z from 'zod';
 import {
+  cloudAgentWorktreeIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
+import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
   CLOUD_AGENT_ATTACHMENT_EXTENSION_REGEX,
@@ -477,6 +481,22 @@ export const basePrepareSessionNextOutputSchema = z.object({
   replayed: z.boolean().optional(),
 });
 
+export const baseCreateWorktreeChatNextSchema = z
+  .object({
+    sourceKiloSessionId: kiloSessionIdSchema,
+    operationKey: z.uuid(),
+  })
+  .strict();
+
+export const baseCreateWorktreeChatNextOutputSchema = z
+  .object({
+    kiloSessionId: kiloSessionIdSchema,
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+    worktreeId: cloudAgentWorktreeIdSchema,
+    replayed: z.boolean().optional(),
+  })
+  .strict();
+
 // Schema for initiating from a prepared session
 export const baseInitiateFromPreparedSessionNextSchema = z
   .object({
@@ -515,6 +535,12 @@ export const baseSendMessageNextSchema = z
 // Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({
   sessionId: z.string(),
+});
+
+// Schema for canceling one queued (not yet accepted) message by id.
+export const baseCancelQueuedMessageNextSchema = z.object({
+  sessionId: z.string(),
+  messageId: messageIdNextSchema,
 });
 
 // Schema for getting session state

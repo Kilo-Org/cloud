@@ -94,11 +94,12 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
 
 type FilePartRendererProps = {
   part: FilePart;
+  onLongPress?: () => void;
 };
 
 type PreviewMode = 'markdown' | 'text';
 
-export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
+export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendererProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -109,6 +110,16 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // Reset a prior image error in render when the URL changes. A successful
+  // renew writes a NEW signed URL; the reset must land in the same commit so
+  // the refreshed image, not the retry chip, renders (and no open viewer is
+  // unmounted). A failed renew keeps the same URL, so `imageFailed` survives
+  // and the retry chip stays until a new URL lands.
+  const [previousUrl, setPreviousUrl] = useState(url);
+  if (url !== previousUrl) {
+    setPreviousUrl(url);
+    setImageFailed(false);
+  }
   const [preview, setPreview] = useState<PreviewMode | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -225,9 +236,15 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
 
   if (kind === 'image') {
     if (url) {
-      if (imageFailed) {
+      // Show the retry chip while the image is failed and the viewer is closed.
+      // A renew must not hide the chip: `imageFailed` stays set until a NEW URL
+      // lands (the render-phase reset above), so the failed UI persists through
+      // a retry tap or a 30s sweep and clears atomically on success. An open
+      // viewer must stay mounted.
+      if (imageFailed && !viewerVisible) {
         return (
           <Pressable
+            onLongPress={onLongPress}
             onPress={() => {
               if (!resolved.attachmentRef) {
                 setImageFailed(false);
@@ -254,6 +271,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
       return (
         <>
           <Pressable
+            onLongPress={onLongPress}
             onPress={openViewer}
             className="my-1 overflow-hidden rounded-lg active:opacity-80"
             accessibilityRole="button"
@@ -262,6 +280,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
             <Image
               source={{ uri: url }}
               cachePolicy="memory"
+              transition={0}
               className="aspect-video w-full"
               contentFit="contain"
               accessible
@@ -272,6 +291,9 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
                   : t('agentChat.filePart.imageOutput')
               }
               onError={() => {
+                // Record the failure: `imageFailed` stays set until the URL
+                // changes, so the retry chip persists through a renew and
+                // clears atomically when a fresh signed URL lands.
                 setImageFailed(true);
               }}
             />
@@ -311,6 +333,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
     if (resolved.status === 'error') {
       return (
         <Pressable
+          onLongPress={onLongPress}
           onPress={() => {
             resolved.retry?.();
           }}
@@ -334,6 +357,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
   return (
     <>
       <Pressable
+        onLongPress={onLongPress}
         onPress={handleChipTap}
         disabled={sharing}
         accessibilityState={{ busy: sharing || resolved.status === 'resolving' }}
@@ -479,6 +503,7 @@ function FilePreviewModal({
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader
         title={part.filename ?? t('agentChat.filePart.defaultName')}
+        titleEllipsis="middle"
         onDone={onClose}
         doneLabel={t('common.done')}
         onShare={onShare}

@@ -277,7 +277,14 @@ export type RuntimeAcceptanceResult = {
   wrapperRunId: string;
 };
 
-export type SessionMessageAdmissionResult = DurableAdmissionAck | AdmissionFailure;
+export type ModelValidationAdmissionFailure = Omit<AdmissionFailure, 'code'> & {
+  code: 'FORBIDDEN' | 'MODEL_VALIDATION_UNAVAILABLE';
+};
+
+export type SessionMessageAdmissionResult =
+  | DurableAdmissionAck
+  | AdmissionFailure
+  | ModelValidationAdmissionFailure;
 export type MessageDeliveryResult =
   | RuntimeAcceptanceResult
   | AdmissionFailure

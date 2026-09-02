@@ -1,4 +1,4 @@
-import { describe, expect, it, type Mock } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   ActiveSessionsLiveSync,
@@ -88,7 +88,7 @@ describe('ActiveSessionsLiveSync — session.status.updated', () => {
     qc.__setCached({
       sessions: [makeCached({ id: 'ses-1', status: 'question' })],
     });
-    const setQueryDataCalls = qc.setQueryData as Mock;
+    const setQueryDataCalls = vi.spyOn(qc, 'setQueryData');
     setQueryDataCalls.mockClear();
     const sync = new ActiveSessionsLiveSync({
       connection: conn,

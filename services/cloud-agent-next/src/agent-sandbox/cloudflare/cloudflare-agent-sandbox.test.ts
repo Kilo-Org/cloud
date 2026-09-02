@@ -339,14 +339,14 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
-  it('passes TOOL_CGROUP_* env through when the org is in TOOL_CGROUP_ORG_IDS', async () => {
+  it('passes TOOL_CGROUP_* env through without organization gating', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);
     const ensureBootstrapWrapper = vi
       .spyOn(WrapperClient, 'ensureBootstrapWrapper')
       .mockResolvedValueOnce({ client: {} as WrapperClient });
     const sandbox = new CloudflareAgentSandbox(
-      { TOOL_CGROUP_ORG_IDS: '*', TOOL_CGROUP_MODE: 'enforce' } as unknown as Env,
+      { TOOL_CGROUP_RESERVE_MB: '2048' } as unknown as Env,
       metadata(),
       {
         resolveSandbox: () =>
@@ -363,28 +363,24 @@ describe('CloudflareAgentSandbox', () => {
     expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
       agentSessionId: 'agent_cloudflare',
       userId: 'user_cloudflare',
-      toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce' },
+      toolCgroupEnv: { TOOL_CGROUP_RESERVE_MB: '2048' },
     });
     ensureBootstrapWrapper.mockRestore();
   });
 
-  it('omits toolCgroupEnv when the org is not in TOOL_CGROUP_ORG_IDS', async () => {
+  it('omits toolCgroupEnv when no TOOL_CGROUP_* values are configured', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);
     const ensureBootstrapWrapper = vi
       .spyOn(WrapperClient, 'ensureBootstrapWrapper')
       .mockResolvedValueOnce({ client: {} as WrapperClient });
-    const sandbox = new CloudflareAgentSandbox(
-      { TOOL_CGROUP_ORG_IDS: 'other-org', TOOL_CGROUP_MODE: 'enforce' } as unknown as Env,
-      metadata(),
-      {
-        resolveSandbox: () =>
-          ({
-            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
-            createSession,
-          }) as unknown as SandboxInstance,
-      }
-    );
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
+          createSession,
+        }) as unknown as SandboxInstance,
+    });
 
     await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
       status: 'wrapper-running',

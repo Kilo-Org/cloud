@@ -88,9 +88,9 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # Locate the chunk by CONTENT, never by filename: OpenClaw ships more than one
 # `channel-target-*.js` (a `channel-target-prefix-*.js` appeared in 2026.6.9),
 # so a name glob plus `head -1` depends on directory read order and silently
-# patched the wrong file on 2026.7.1. Patch every file carrying the pattern and
+# patched the wrong file on 2026.8.2. Patch every file carrying the pattern and
 # assert positively afterwards, so a no-op can never pass as applied.
-RUN npm install -g pnpm openclaw@2026.7.1 @openclaw/kilocode-provider@2026.7.1 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.8.2 @openclaw/kilocode-provider@2026.8.2 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
     && PM_FILE="$KP_DIST/provider-models.js" \
@@ -126,7 +126,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.7.1's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.8.2's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -293,8 +293,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-07-24-v74-openclaw-2026.7.1-kilocode-provider
-RUN echo "19"
+# Build cache bust: 2026-09-02-v75-openclaw-2026.8.2-kilocode-provider
+RUN echo "20"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

@@ -152,7 +152,11 @@
     "appearanceDark": "Gelap",
     "account": "Akaun",
     "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
-    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan."
+    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan.",
+    "returnSendsMessage": "Kekunci Kembali menghantar mesej",
+    "returnSendsMessageSubtitle": "Apabila dimatikan, kekunci Kembali menyisipkan baris baharu dalam komposer ejen.",
+    "biometricUnlock": "Buka kunci dengan biometrik",
+    "biometricUnlockSubtitle": "Buka kunci apabila aplikasi dilancarkan dan selepas lima minit di latar belakang."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -197,7 +201,7 @@
       "diffTooLarge": "Diff terlalu besar untuk dipaparkan",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka diff fail ini di GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Kosongkan pilihan",
@@ -665,7 +669,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} daripada {{total}}"
+    "position": "{{name}}, tab, {{position}} daripada {{total}}",
+    "chat": "Sembang"
   },
   "chat": {
     "instancePicker": {
@@ -749,7 +754,8 @@
       "networkError": "Ralat rangkaian",
       "uploadFailed": "Muat naik gagal",
       "failedToUploadFile": "Gagal memuat naik fail: {{reason}}",
-      "nothingToPaste": "Tiada apa untuk ditampal"
+      "nothingToPaste": "Tiada apa untuk ditampal",
+      "metadataStripFailed": "Metadata foto tidak dapat dibuang."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -780,7 +786,7 @@
       "retrySend": "Cuba hantar semula",
       "moreReactions": "Lebih banyak reaksi",
       "reply": "Balas",
-      "edit": "sunting",
+      "edit": "Sunting",
       "sendFailed": "Gagal menghantar mesej",
       "retrySendFailed": "Gagal mencuba hantar semula",
       "editFailed": "Gagal mengedit mesej",
@@ -1129,9 +1135,9 @@
       "destroying": "MEMUSNAHKAN",
       "provisioned": "DISEDIAKAN",
       "restarting": "MEMULAKAN SEMULA",
-      "running": "Sedang berjalan",
+      "running": "SEDANG BERJALAN",
       "shuttingDown": "MENUTUP",
-      "starting": "Sedang dimulakan",
+      "starting": "SEDANG DIMULAKAN",
       "stopped": "DIHENTIKAN",
       "stopping": "MENGHENTIKAN",
       "unknown": "TIDAK DIKETAHUI",
@@ -1299,7 +1305,23 @@
       "checkRun": "Jalankan semakan",
       "status": "Status",
       "threshold": "Ambang",
-      "pullRequest": "permintaan tarik"
+      "pullRequest": "permintaan tarik",
+      "transcriptWaiting": "Menunggu transkrip semakan.",
+      "transcriptEmpty": "Tiada transkrip untuk semakan ini.",
+      "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
+      "transcriptLive": "Langsung",
+      "agentIdle": "Ejen melahu",
+      "agentWorking": "Ejen bekerja...",
+      "anErrorOccurred": "Ralat berlaku",
+      "errorWithMessage": "Ralat: {{message}}",
+      "executionStarted": "Pelaksanaan dimulakan",
+      "reviewCompleted": "Semakan selesai",
+      "reviewInterrupted": "Semakan terganggu",
+      "sessionError": "Ralat sesi: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — ralat",
+      "unknownError": "Ralat tidak diketahui"
     },
     "reviewMemory": {
       "title": "Memori semakan",
@@ -1679,11 +1701,11 @@
       "statusFixed": "Diperbaiki",
       "statusOpen": "Terbuka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Pembetulan telah dimulakan",
-      "reasonNoBandwidth": "Tiada kapasiti yang tersedia",
-      "reasonTolerableRisk": "Risiko boleh diterima",
-      "reasonInaccurate": "Penemuan itu tidak tepat",
-      "reasonNotUsed": "Kod terdedah tidak digunakan",
+      "reasonFixStarted": "pembetulan telah dimulakan",
+      "reasonNoBandwidth": "tiada kapasiti yang tersedia",
+      "reasonTolerableRisk": "risiko boleh diterima",
+      "reasonInaccurate": "penemuan itu tidak tepat",
+      "reasonNotUsed": "kod terdedah tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {
@@ -2033,7 +2055,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif sekarang",
     "search": {
       "searching": "Mencari",
       "searchSessions": "Cari sesi",
@@ -2044,16 +2065,15 @@
     "sessionList": {
       "couldNotLoad": "Tidak dapat memuatkan sesi",
       "couldNotLoadActive": "Tidak dapat memuatkan sesi aktif",
-      "noSessionsYet": "Belum ada sesi",
       "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda. Sesi anda akan muncul di sini.",
       "noMatches": "Tiada sesi sepadan",
       "tryDifferentSearch": "Cuba istilah carian yang berbeza.",
       "tryAdjustFilters": "Cuba laraskan atau kosongkan penapis anda.",
       "couldNotSearch": "Tidak dapat mencari sesi",
-      "allActive": "Semua sesi aktif",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tiada sesi lalu",
-      "live": "LANGSUNG"
+      "live": "LANGSUNG",
+      "updating": "Mengemas kini"
     },
     "sessionRow": {
       "deleteTitle": "Padam sesi?",
@@ -2097,7 +2117,9 @@
     "sessionExited": "Sesi ditamatkan",
     "remoteSpawnRetryable": "Tidak dapat mencapai instance — ia mungkin telah terputus sambungan.",
     "remoteSpawnNonRetryable": "Instance gagal memulakan sesi — semak mesin atau kemas kini CLI.",
-    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain."
+    "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain.",
+    "liveCount_one": "{{count}} LANGSUNG",
+    "liveCount_other": "{{count}} LANGSUNG"
   },
   "agentChat": {
     "session": {
@@ -2119,18 +2141,19 @@
       "scrollToBottom": "Skrol ke bawah",
       "emptyTitle": "Belum ada mesej",
       "renameAccessibility": "Nama semula sesi: {{title}}",
-      "connectRepository": "Sambungkan repositori",
       "cloningSession": "Mengklon sesi",
       "continue": "Teruskan",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini",
-      "cloneFailed": "Tidak dapat mengklon sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba lagi.",
-      "connectRepositoryToContinue": "Sambungkan repositori untuk meneruskan.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi.",
-      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula."
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula.",
+      "cancelQueuedFailed": "Tidak dapat membatalkan mesej.",
+      "cancelQueuedRestoreAvailable": "Mesej dibatalkan. Ketik Pulihkan untuk mengembalikannya ke komposer.",
+      "cancelQueuedRestored": "Mesej dibatalkan. Gesaan kembali dalam komposer.",
+      "cancelQueuedUpgradeRequired": "Pembatalan mesej dalam baris gilir memerlukan Kilo CLI yang lebih baharu. Kemas kini Kilo CLI dan sambung semula."
     },
     "remoteSession": {
       "failedToCreate": "Gagal mencipta sesi jauh",
@@ -2198,7 +2221,12 @@
       "noRepositoriesVisibleGitlab": "Tiada repositori kelihatan. Semak akses repositori untuk GitLab, kemudian muat semula.",
       "openBitbucket": "Buka Bitbucket",
       "openGitlab": "Buka GitLab",
-      "recentlyUsed": "Baru digunakan"
+      "recentlyUsed": "Baru digunakan",
+      "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Ejen Awan atau CLI lain.",
+      "continueFrom": "Meneruskan {{title}}",
+      "importFailed": "Tidak dapat mengimport sesi ini.",
+      "importingSession": "Mengimport sesi",
+      "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2256,7 +2284,9 @@
       "noCliInstancesDescription": "Jalankan `kilo remote` dalam projek pada komputer anda, atau kemas kini Kilo CLI jika ia sudah berjalan.",
       "instanceOnProject": "{{name}} pada {{project}}",
       "instanceOnProjectSuffix": "{{name}} pada {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Jalankan pada Cloud Agent"
+      "runOnCloudAgent": "Jalankan pada Cloud Agent",
+      "terminals": "Terminal",
+      "remotes": "Contoh jauh"
     },
     "modePicker": {
       "title": "Pilih mod",
@@ -2427,7 +2457,7 @@
       "modelAccessibility": "Model: {{modelLabel}}",
       "openHint": "Buka sesi subejen",
       "subagent": "Subejen",
-      "task": "tugasan",
+      "task": "Tugasan",
       "waitingForActivity": "Menunggu aktiviti"
     },
     "childSessionSheet": {
@@ -2446,7 +2476,11 @@
       "queuedAccessibility": "Mesej dalam baris gilir",
       "userMessage": "Mesej pengguna",
       "assistantMessage": "Mesej pembantu",
-      "longPressHint": "Tekan lama untuk butiran mesej"
+      "longPressHint": "Tekan lama untuk butiran mesej",
+      "cancelQueued": "Batalkan mesej",
+      "cancelQueuedAccessibility": "Batalkan mesej dalam baris gilir",
+      "restoreQueued": "Pulihkan",
+      "restoreQueuedAccessibility": "Pulihkan mesej yang dibatalkan ke komposer"
     },
     "olderMessages": {
       "arrived": "Mesej awal dimuatkan",
@@ -2462,6 +2496,8 @@
       "viewTable": "Lihat jadual",
       "title": "Jadual",
       "close": "Tutup jadual",
+      "loading": "Memuat jadual",
+      "empty": "Jadual ini tiada baris.",
       "columnCount_one": "lajur",
       "columnCount": "lajur",
       "columnCount_other": "lajur",
@@ -2472,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Tapis sesi",
-      "sortBy": "Susun mengikut",
-      "sortLastUpdated": "Kemas kini terakhir",
-      "sortCreated": "Dicipta",
       "platform": "Platform",
       "platformCloud": "Awan",
       "platformExtension": "Penyambung",
@@ -2483,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Lain-lain",
-      "project": "Projek",
-      "removeProjectFilter": "Buang penapis projek {{label}}",
-      "removePlatformFilter": "Buang penapis platform {{label}}"
+      "project": "Projek"
     },
     "suggestion": {
       "title": "Cadangan",
@@ -2528,7 +2559,9 @@
       "uploading": "Memuat naik…",
       "uploaded": "Dimuat naik",
       "uploadFailedRetry": "Muat naik gagal. Ketik untuk mencuba semula.",
-      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik."
+      "uploadFailedTerminal": "Fail ini tidak boleh dimuat naik.",
+      "moveLeft": "Alihkan {{filename}} ke kiri",
+      "moveRight": "Alihkan {{filename}} ke kanan"
     },
     "attachmentPasteHint": {
       "accessibility": "Tampal imej daripada papan keratan",
@@ -2558,7 +2591,11 @@
       "finalizingPlaceholder": "Menyiapkan...",
       "messagePlaceholder": "Mesej...",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
-      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula."
+      "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
+      "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
+      "discardAttachmentsTitle": "Buang lampiran?",
+      "charactersRemaining": "{{count}} aksara berbaki",
+      "insertNewline": "Sisipkan baris baharu"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",
@@ -2650,6 +2687,17 @@
       "hostConfirmMessage": "Pautan ini membuka {{host}} dalam pelayar anda.",
       "open": "Buka",
       "trustThisHost": "Percayai hos ini"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Selesai menggunakan folder ini.",
+      "emptyTitle": "Tiada folder di dalam",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Semak sambungan anda dan Cuba lagi. Selesai masih mengesahkan folder ini.",
+      "retryableTitle": "Tidak dapat menyenaraikan folder",
+      "tapToListHint": "Ketuk folder untuk menyenaraikan kandungannya",
+      "unsupportedDescription": "CLI ini tidak dapat menyenaraikan folder. Selesai mengekalkan folder pelancaran dan Mulakan sesi bermula di situ.",
+      "unsupportedTitle": "Tidak dapat menyenaraikan folder"
     }
   },
   "bootstrap": {
@@ -2702,7 +2750,7 @@
     "newCodingTask": "Tugas pengekodan baharu",
     "explore": "Teroka",
     "seeAll": "Lihat semua",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Tiada apa-apa yang sedang berjalan sekarang"
   },
   "imageViewer": {
     "close": "Tutup {{filename}}",
@@ -2747,7 +2795,7 @@
     "optionsExpiredDescription": "Kembali dan buka semula pemilih ini daripada skrin sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "perlu input"
+    "needsInput": "PERLU INPUT"
   },
   "voiceInput": {
     "listening": "Mendengar...",
@@ -2766,7 +2814,8 @@
     "busy": "Input suara sibuk. Cuba lagi.",
     "stopped": "Input suara dihentikan. Ketik mikrofon untuk mencuba lagi.",
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
-    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini."
+    "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
+    "listeningStopped": "Pendengaran dihentikan."
   },
   "share": {
     "title": "Kongsi ke Kilo",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "Apabila anda mempercayai hos pautan, ia dibuka tanpa bertanya lagi.",
     "revoke": "Tarik balik {{host}}",
     "backToPreferences": "Kembali ke keutamaan"
+  },
+  "quickChat": {
+    "title": "Sembang",
+    "composer": {
+      "placeholder": "Mesej"
+    },
+    "empty": {
+      "title": "Mulakan sembang",
+      "description": "Hantar mesej untuk bercakap dengan model."
+    },
+    "working": "Memproses…",
+    "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
+    "catalogRetry": "Tidak dapat memuatkan model",
+    "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
   }
 }

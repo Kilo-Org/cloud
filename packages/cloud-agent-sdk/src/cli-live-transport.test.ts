@@ -1062,6 +1062,76 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('includes messageID on send_message when the client assigns a message id', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(connection.sendCommand).mockClear();
+
+    await transport.send?.({
+      payload: { type: 'prompt', prompt: 'hello' },
+      messageId: 'msg-queued-1',
+    });
+
+    expect(connection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_message',
+      {
+        sessionID: KILO_SESSION_ID,
+        parts: [{ type: 'text', text: 'hello' }],
+        messageID: 'msg-queued-1',
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('relays drop_queued_message with messageID without sending interrupt', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(connection.sendCommand).mockClear();
+
+    await expect(transport.dropQueuedMessage?.('msg-drop-1')).resolves.toEqual({
+      dropped: true,
+    });
+
+    expect(connection.sendCommand).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'drop_queued_message',
+      { protocolVersion: 1, messageID: 'msg-drop-1' },
+      'owner'
+    );
+    expect(connection.sendCommand).not.toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'interrupt',
+      expect.anything(),
+      'owner'
+    );
+    transport.destroy();
+  });
+
   it.each([
     ['Kilo', { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' }],
     ['non-Kilo', { providerID: 'anthropic', modelID: 'claude-sonnet-4' }],
@@ -2554,6 +2624,33 @@ describe('CliLiveTransport createSession', () => {
     transport.destroy();
   });
 
+  it('sends directory in create_session wire data and bare-retries it for an old CLI', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+
+    const result = await transport.createSession?.({ directory: 'child' });
+    expect(result).toBe(NEW_KILO_SESSION_ID);
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(2);
+    expect(createCalls[0]?.[2]).toEqual({ protocolVersion: 1, directory: 'child' });
+    expect(createCalls[1]?.[2]).toEqual({ protocolVersion: 1 });
+    transport.destroy();
+  });
+
   it('retries once with bare protocolVersion on exact invalid create_session command', async () => {
     const connection = createConnection();
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
@@ -2602,6 +2699,67 @@ describe('CliLiveTransport createSession', () => {
       .mock.calls.filter(([, command]) => command === 'create_session');
     expect(createCalls).toHaveLength(1);
     expect(createCalls[0]?.[2]).toEqual({ protocolVersion: 1 });
+    transport.destroy();
+  });
+
+  it('sends cloneFromKiloSessionId on create_session wire data', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    const result = await transport.createSession?.({
+      cloneFromKiloSessionId: 'ses_clone_123456789012345678901',
+    });
+    expect(result).toBe(NEW_KILO_SESSION_ID);
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'create_session',
+      { protocolVersion: 1, cloneFromKiloSessionId: 'ses_clone_123456789012345678901' },
+      'owner',
+      expect.any(String) as string
+    );
+    transport.destroy();
+  });
+
+  it('does not bare-retry an invalid create_session command when a clone id is present', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValue(new CommandDeliveredError('invalid create_session command'));
+
+    await expect(
+      transport.createSession?.({
+        cloneFromKiloSessionId: 'ses_clone_123456789012345678901',
+        agent: 'code',
+      })
+    ).rejects.toBeInstanceOf(CommandDeliveredError);
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]?.[2]).toEqual({
+      protocolVersion: 1,
+      agent: 'code',
+      cloneFromKiloSessionId: 'ses_clone_123456789012345678901',
+    });
     transport.destroy();
   });
 

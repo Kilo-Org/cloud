@@ -14,6 +14,7 @@ import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -141,6 +142,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(503);
@@ -151,12 +153,32 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     });
   });
 
+  test.each(['high', 'medium', 'low', 'none', null])(
+    'omits effort advice for effort %s',
+    async reasoningEffort => {
+      const result = await rewrite({
+        response: failingResponse('application/json', 'TimeoutError'),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort,
+      });
+
+      expect(await result.json()).toEqual({
+        error: 'The upstream provider timed out while sending the response.',
+        error_type: 'timeout',
+        message: 'The upstream provider timed out while sending the response.',
+      });
+    }
+  );
+
   test('includes the vercel request id only in the JSON read error message', async () => {
     const result = await rewrite({
       response: failingResponse('application/json', 'ResponseAborted'),
       removeCost: true,
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(503);
@@ -175,6 +197,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
+      reasoningEffort: null,
     });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
@@ -193,6 +216,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const events = dataObjects(await readOutputStream(result)) as {
       error: { message: string };
@@ -201,6 +225,91 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     expect(events[0].error.message).toBe(
       'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
+  });
+});
+
+const timeoutEffortRequests = [
+  {
+    name: 'Chat Completions nested effort',
+    request: {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], reasoning: { effort: 'xhigh' } },
+    },
+    effort: 'xhigh',
+  },
+  {
+    name: 'Chat Completions top-level effort',
+    request: {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [], reasoning_effort: 'max' },
+    },
+    effort: 'max',
+  },
+  {
+    name: 'Responses',
+    request: {
+      kind: 'responses',
+      body: { model: 'test-model', input: 'Hello', reasoning: { effort: 'xhigh' } },
+    },
+    effort: 'xhigh',
+  },
+  {
+    name: 'Messages',
+    request: {
+      kind: 'messages',
+      body: {
+        model: 'test-model',
+        messages: [],
+        max_tokens: 1024,
+        output_config: { effort: 'max' },
+      },
+    },
+    effort: 'max',
+  },
+] satisfies { name: string; request: GatewayRequest; effort: string }[];
+
+describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request, effort }) => {
+  test.each([
+    ['application/json', 'TimeoutError', 'timeout'],
+    ['application/json', 'ResponseAborted', 'upstream_disconnect'],
+    ['text/event-stream', 'TimeoutError', 'timeout'],
+    ['text/event-stream', 'ResponseAborted', 'upstream_disconnect'],
+  ])('suggests lowering effort for %s %s', async (contentType, errorName, errorType) => {
+    const result = await rewriteModelResponse({
+      response: failingResponse(contentType, errorName),
+      model: request.body.model ?? 'test-model',
+      providerId: 'openrouter',
+      kind: request.kind,
+      logging: {
+        user: null,
+        organization_id: null,
+        session_id: null,
+        vercel_request_id: 'fra1::request-id',
+        request,
+      },
+      responseTransforms: null,
+    });
+    const expectedMessage =
+      (errorName === 'TimeoutError'
+        ? 'The upstream provider timed out while sending the response.'
+        : 'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.') +
+      ` Try lowering the reasoning effort from "${effort}" to "high" or lower to reduce the chance of timeouts. (request id: fra1::request-id)`;
+
+    if (contentType === 'application/json') {
+      expect(result.status).toBe(503);
+      expect(await result.json()).toEqual({
+        error: expectedMessage,
+        error_type: errorType,
+        message: expectedMessage,
+      });
+    } else {
+      expect(result.status).toBe(200);
+      expect(dataObjects(await readOutputStream(result))).toEqual([
+        expect.objectContaining({
+          error: expect.objectContaining({ message: expectedMessage }),
+        }),
+      ]);
+    }
   });
 });
 
@@ -225,6 +334,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -254,6 +364,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -273,6 +384,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
 
@@ -298,6 +410,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
@@ -333,6 +446,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
@@ -360,6 +474,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const json = await result.json();
@@ -395,6 +510,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           removeCost: true,
           capture: null,
           vercelRequestId: null,
+          reasoningEffort: null,
           responseTransforms: null,
         });
         const reader = result.body?.getReader();
@@ -426,6 +542,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -448,6 +565,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -473,6 +591,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.GeminiThought,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -522,6 +641,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.GeminiThought,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -552,6 +672,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
@@ -583,6 +704,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -604,6 +726,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture,
         vercelRequestId: 'iad1::terminal-request',
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -634,6 +757,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -664,6 +788,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
       const sse = await readOutputStream(result);
@@ -682,6 +807,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
+        reasoningEffort: null,
         responseTransforms: null,
       });
 
@@ -704,6 +830,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -746,6 +873,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const json = await result.json();
 
@@ -767,6 +895,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(500);
@@ -785,6 +914,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
     const events = dataObjects(sse) as Array<{
@@ -819,6 +949,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -837,6 +968,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -868,6 +1000,7 @@ describe('rewriteModelResponse_Messages', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -893,6 +1026,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
 
@@ -935,6 +1069,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const json = await result.json();
 
@@ -956,6 +1091,7 @@ describe('rewriteModelResponse_Responses', () => {
       removeCost: true,
       capture: null,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     const sse = await readOutputStream(result);
     const [event] = dataObjects(sse) as Array<{
@@ -992,6 +1128,7 @@ describe('rewriteModelResponse_Responses', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       const sse = await readOutputStream(result);
 
@@ -1050,6 +1187,7 @@ describe.each([
         removeCost: true,
         capture,
         vercelRequestId: 'iad1::error-request',
+        reasoningEffort: null,
       });
       const sse = await readOutputStream(result);
 
@@ -1100,6 +1238,7 @@ describe('sanitizeApiRequestLogRequest', () => {
                   secretAccessKey: 'bedrock-secret',
                   region: 'us-east-1',
                 },
+                { apiKey: 'bedrock-api-key', region: 'us-west-2' },
               ],
             },
           },
@@ -1116,7 +1255,7 @@ describe('sanitizeApiRequestLogRequest', () => {
           order: ['friendli', 'novita'],
           byok: {
             friendli: [{ apiKey: '[redacted]' }],
-            bedrock: [{ apiKey: '[redacted]' }],
+            bedrock: [{ apiKey: '[redacted]' }, { apiKey: '[redacted]' }],
           },
         },
         anthropic: { effort: 'high' },
@@ -1128,6 +1267,10 @@ describe('sanitizeApiRequestLogRequest', () => {
     expect(request.body.providerOptions.gateway.byok.bedrock[0]).toMatchObject({
       accessKeyId: 'AKIAEXAMPLE',
       secretAccessKey: 'bedrock-secret',
+    });
+    expect(request.body.providerOptions.gateway.byok.bedrock[1]).toEqual({
+      apiKey: 'bedrock-api-key',
+      region: 'us-west-2',
     });
   });
 });
@@ -1315,6 +1458,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
 
     expect(result.status).toBe(200);
@@ -1333,6 +1477,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
     });
     await readOutputStream(result);
 
@@ -1351,6 +1496,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1370,6 +1516,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1389,6 +1536,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       await readOutputStream(result);
 
@@ -1408,6 +1556,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
 
       expect(result.status).toBe(503);
@@ -1427,6 +1576,7 @@ describe('request log capture', () => {
       removeCost: true,
       capture,
       vercelRequestId: null,
+      reasoningEffort: null,
       responseTransforms: null,
     });
     const reader = result.body?.getReader();
@@ -1448,6 +1598,7 @@ describe('request log capture', () => {
         removeCost: true,
         capture,
         vercelRequestId: null,
+        reasoningEffort: null,
       });
       const reader = result.body?.getReader();
       await reader?.read();

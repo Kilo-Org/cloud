@@ -14,14 +14,16 @@ import type {
   SubmittedSessionMessageRequest,
   RetryableResultCode,
 } from '../execution/types.js';
-import type { SessionId, UserId } from '../types/ids.js';
+import type { SessionId } from '../types/ids.js';
 import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { sessionPlaneFromId } from '../session-plane.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
+import { createMessageId } from './message-id.js';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -44,6 +46,8 @@ type TRPCCodeName = ConstructorParameters<typeof TRPCError>[0]['code'];
 const ADMISSION_CODE_TO_TRPC: Record<NonTransientExecutionCode, TRPCCodeName> = {
   NOT_FOUND: 'NOT_FOUND',
   BAD_REQUEST: 'BAD_REQUEST',
+  FORBIDDEN: 'FORBIDDEN',
+  MODEL_VALIDATION_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   PAYMENT_REQUIRED: 'PAYMENT_REQUIRED',
   COMPUTE_STOPPING: 'CONFLICT',
   BILLING_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
@@ -57,7 +61,8 @@ function isAdmissionFailureRetryable(code: AdmissionFailureCode): boolean {
     code === 'PENDING_QUEUE_FULL' ||
     code === 'INTERNAL' ||
     code === 'COMPUTE_STOPPING' ||
-    code === 'BILLING_UNAVAILABLE'
+    code === 'BILLING_UNAVAILABLE' ||
+    code === 'MODEL_VALIDATION_UNAVAILABLE'
   );
 }
 
@@ -127,6 +132,7 @@ export async function preflightAndAdmitPromptMessage<T>(
   procedure: string,
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
+  if (sessionPlaneFromId(input.cloudAgentSessionId) === 'control') return admit(input, ctx);
   if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
 
   await preflightExistingPromptModel({
@@ -154,11 +160,11 @@ export async function queueMessage(
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: SubmittedSessionMessageRequest = {
-    userId: ctx.userId as UserId,
+    userId: ctx.userId,
     botId: ctx.botId,
     turn: {
       ...input.turn,
-      id: input.turn.id ?? undefined,
+      id: input.turn.id ?? createMessageId(),
     },
     agent: input.agent,
     finalization: input.finalization,

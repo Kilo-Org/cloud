@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReactI18next from 'react-i18next';
 
 import { ToolPartDetailBody } from './tool-part-detail-body';
+import { SuggestToolCardBody } from './suggest-tool-card';
 import {
   BashToolCardBody,
   EditToolCardBody,
@@ -21,6 +22,7 @@ import {
 import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool-card';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('./suggest-tool-card', () => ({ SuggestToolCardBody: 'SuggestToolCardBody' }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
@@ -200,6 +202,7 @@ const routingTable: [string, ToolBody][] = [
   ['todoread', TodoToolCardBody],
   ['todowrite', TodoToolCardBody],
   ['task', TaskToolCardBody],
+  ['suggest', SuggestToolCardBody],
 ];
 
 describe('ToolPartDetailBody routing', () => {
@@ -218,26 +221,6 @@ describe('ToolPartDetailBody routing', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartDetailBody({ part: makeToolPart('some-new-tool', completedState) });
     expect(findByType(root, GenericToolCardBody)).toHaveLength(1);
-  });
-
-  it('renders no body for suggest parts', () => {
-    const allBodies = [
-      BashToolCardBody,
-      EditToolCardBody,
-      GenericToolCardBody,
-      GlobToolCardBody,
-      GrepToolCardBody,
-      ListToolCardBody,
-      PatchToolCardBody,
-      ReadToolCardBody,
-      TaskToolCardBody,
-      TodoToolCardBody,
-      WebSearchToolCardBody,
-      WriteToolCardBody,
-    ];
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartDetailBody({ part: makeToolPart('suggest', completedState) });
-    expect(allBodies.flatMap(body => findByType(root, body))).toHaveLength(0);
   });
 
   it('renders attachments above the body when present', () => {

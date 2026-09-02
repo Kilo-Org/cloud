@@ -10,11 +10,13 @@
     "@sentry/cli"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
-  "ignore": ["src/components/ui/**"],
   "postcss": {
     "config": ["postcss.config.mjs"]
   },
   "babel": {
     "config": ["babel.config.js"]
+  },
+  "rules": {
+    "catalogReferences": "off"
   }
 }

@@ -5,7 +5,10 @@ import {
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
-import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
+import {
+  assistantFailureMessage,
+  workspaceFailureMessage,
+} from '../session/safe-failure-projection.js';
 import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
 import {
   classifyCloudAgentFailure,
@@ -40,7 +43,7 @@ const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   model_missing: 'No model is available for this run',
   delivery_failure_unknown: 'Message delivery outcome is unknown',
   wrapper_disconnected: 'Wrapper disconnected before completion',
-  wrapper_no_output: 'Wrapper produced no output before timeout',
+  wrapper_no_output: 'Wrapper made no execution progress during the watchdog window',
   wrapper_ping_timeout: 'Wrapper health check timed out',
   wrapper_error_before_activity: 'Wrapper failed before agent activity',
   assistant_error: 'Assistant request failed',
@@ -84,8 +87,8 @@ function diagnosticForFailedRun(
       : 'Workspace setup failed';
   } else if (isKnownInsufficientCreditFailure(state)) {
     errorMessageRedacted = 'Model request failed: insufficient credits';
-  } else if (state.assistantFailureReason === 'rate_limited') {
-    errorMessageRedacted = 'Assistant request was rate limited';
+  } else if (state.failureCode === 'assistant_error') {
+    errorMessageRedacted = assistantFailureMessage(state.assistantFailureReason ?? 'unknown');
   }
   if (errorMessageRedacted === undefined) return undefined;
 

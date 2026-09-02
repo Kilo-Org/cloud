@@ -1,8 +1,12 @@
 import * as z from 'zod';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
+import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { type AgentSandboxProvider, type SandboxId } from '../types.js';
@@ -235,6 +239,7 @@ const MetadataWorkspaceSchema = z
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
+    worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
@@ -315,6 +320,7 @@ const MetadataLifecycleSchema = z
 const MetadataCloneSchema = z
   .object({
     cloneFromKiloSessionId: kiloSessionIdSchema,
+    reportingCreatedAt: z.string().datetime({ offset: true }).optional(),
   })
   .strip();
 
@@ -345,12 +351,31 @@ export const CurrentSessionMetadataSchema = z
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
 
+export function getControlPlaneCredentialContainment(
+  sessionId: string,
+  repository: SessionMetadata['repository'],
+  enabled = true
+): CredentialContainment | undefined {
+  if (sessionPlaneFromId(sessionId) !== 'control') return undefined;
+  return {
+    github: enabled && repository?.type === 'github',
+    gitlab: enabled && repository?.type === 'gitlab',
+    bitbucket: enabled && repository?.type === 'bitbucket',
+    kilocode: enabled,
+  };
+}
+
 export function getEffectiveCredentialContainment(
   metadata: SessionMetadata
 ): CredentialContainment {
   if (metadata.workspace?.credentialContainment) {
     return metadata.workspace.credentialContainment;
   }
+  const controlPlaneContainment = getControlPlaneCredentialContainment(
+    metadata.identity.sessionId,
+    metadata.repository
+  );
+  if (controlPlaneContainment) return controlPlaneContainment;
   const legacyContainment = metadata.workspace?.managedScmContainment === true;
   return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
 }

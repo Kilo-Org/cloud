@@ -63,6 +63,66 @@ describe('CLIOutboundMessageSchema', () => {
     }
   });
 
+  it.each(['cli', 'remote'])('preserves full %s metadata and both capabilities', kind => {
+    const msg = {
+      type: 'heartbeat',
+      protocolVersion: '1',
+      capabilities: { attachments: true, sessionClone: true },
+      instance: {
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.2',
+        kind,
+        startedAt: '2026-08-28T12:34:56.789Z',
+        gitBranch: 'feature/identity',
+      },
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Remote session', platform: 'darwin' }],
+    };
+    expect(CLIOutboundMessageSchema.parse(msg)).toEqual(msg);
+  });
+
+  it.each([
+    ['kind', 'terminal'],
+    ['kind', null],
+    ['startedAt', '2026-08-28T12:34:56Z'],
+    ['startedAt', '2026-08-28T12:34:56.78Z'],
+    ['startedAt', '2026-08-28T12:34:56.7890Z'],
+    ['startedAt', '2026-08-28T12:34:56.789+00:00'],
+    ['startedAt', '2026-02-30T12:34:56.789Z'],
+    ['startedAt', null],
+    ['gitBranch', null],
+  ])('rejects invalid instance %s: %s', (field, value) => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [],
+        instance: { name: 'host', projectName: 'project', [field]: value },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    ['ASCII', 'a'.repeat(24), 'a'.repeat(25)],
+    ['escaped characters', '\\"'.repeat(12), '\\"'.repeat(12) + '\\'],
+    ['CJK', '界'.repeat(24), '界'.repeat(25)],
+    ['surrogate pairs', '\u{10400}'.repeat(12), '\u{10400}'.repeat(12) + 'a'],
+  ])('bounds %s branches by UTF-16 units, not JSON bytes', (_label, valid, invalid) => {
+    const heartbeat = {
+      type: 'heartbeat',
+      sessions: [],
+      instance: { name: 'host', projectName: 'project', gitBranch: valid },
+    };
+    expect(CLIOutboundMessageSchema.parse(JSON.parse(JSON.stringify(heartbeat)))).toEqual(
+      heartbeat
+    );
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        ...heartbeat,
+        instance: { ...heartbeat.instance, gitBranch: invalid },
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects instance with empty name', () => {
     const msg = {
       type: 'heartbeat',
@@ -257,6 +317,32 @@ describe('CLIOutboundMessageSchema capabilities', () => {
     };
     const result = CLIOutboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
+  });
+
+  it('accepts capabilities.sessionClone: true on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { sessionClone: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ sessionClone: true });
+    }
+  });
+
+  it('accepts an absent sessionClone flag (legacy CLI)', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: true });
+    }
   });
 });
 
@@ -567,6 +653,53 @@ describe('SessionEventPayloadSchema', () => {
     for (const event of events) {
       expect(SessionEventPayloadSchema.safeParse(event).success).toBe(true);
     }
+  });
+
+  it.each(['session.created', 'session.updated'] as const)(
+    'preserves a worktree ID in %s events',
+    type => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const result = SessionEventPayloadSchema.parse({
+        type,
+        data: {
+          source: 'v2',
+          session: { ...session, worktreeId },
+          changedAt: session.updatedAt,
+        },
+      });
+
+      expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+    }
+  );
+
+  it('preserves a worktree ID in full-row status events', () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, worktreeId },
+        previousStatus: null,
+        status: 'idle',
+        statusUpdatedAt: null,
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+  });
+
+  it.each([null, undefined])('accepts legacy sessions with worktree ID %s', worktreeId => {
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, ...(worktreeId === undefined ? {} : { worktreeId }) },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect('session' in result.data ? result.data.session.worktreeId : undefined).toBe(worktreeId);
   });
 
   it('parses lightweight status update payloads during rollout compatibility', () => {

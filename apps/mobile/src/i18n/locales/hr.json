@@ -152,7 +152,11 @@
     "appearanceDark": "Tamno",
     "account": "Račun",
     "prReviewAttribution": "Dodaj atribuciju aplikacije u preglede PR-a",
-    "prReviewAttributionSubtitle": "Dodajte potpis „Reviewed via Kilo\" kada podnesete pregled."
+    "prReviewAttributionSubtitle": "Dodajte potpis „Reviewed via Kilo\" kada podnesete pregled.",
+    "returnSendsMessage": "Tipka za novi redak šalje poruku",
+    "returnSendsMessageSubtitle": "Kad je isključeno, tipka za novi redak umeće novi redak u polja za unos poruke agentima.",
+    "biometricUnlock": "Otključavanje biometrijom",
+    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -303,7 +307,7 @@
         "failingChecksDetail": "Potrebne provjere statusa ne uspijevaju.",
         "unstableTitle": "Neke provjere ne uspijevaju",
         "unstableDetail": "Neobavezne provjere ne uspijevaju. One neće blokirati spajanje.",
-        "draftTitle": "nacrt pull requesta",
+        "draftTitle": "Nacrt pull requesta",
         "draftDetail": "Označite pull request kao spreman za recenziju prije spajanja.",
         "behindTitle": "Grana je zastarjela",
         "behindDetailUpdatable": "Ažurirajte granu s osnovne ili je rebase-ajte prije spajanja.",
@@ -672,7 +676,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kartica, {{position}} od {{total}}"
+    "position": "{{name}}, kartica, {{position}} od {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -756,7 +761,8 @@
       "networkError": "Greška mreže",
       "uploadFailed": "Učitavanje nije uspjelo",
       "failedToUploadFile": "Nije moguće učitati datoteku: {{reason}}",
-      "nothingToPaste": "Nema što zalijepiti"
+      "nothingToPaste": "Nema što zalijepiti",
+      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1308,7 +1314,23 @@
       "checkRun": "Pokretanje provjere",
       "status": "Status",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čekanje na transkript pregleda.",
+      "transcriptEmpty": "Nema transkripta za ovaj pregled.",
+      "transcriptRetry": "Učitavanje transkripta pregleda nije uspjelo.",
+      "transcriptLive": "Uživo",
+      "agentIdle": "Agent ne radi",
+      "agentWorking": "Agent radi...",
+      "anErrorOccurred": "Došlo je do pogreške",
+      "errorWithMessage": "Greška: {{message}}",
+      "executionStarted": "Izvršavanje pokrenuto",
+      "reviewCompleted": "Pregled dovršen",
+      "reviewInterrupted": "Pregled prekinut",
+      "sessionError": "Greška sesije: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — greška",
+      "unknownError": "Nepoznata pogreška"
     },
     "reviewMemory": {
       "title": "Memorija pregleda",
@@ -1424,7 +1446,7 @@
     "status": {
       "pending": "Na čekanju",
       "queued": "U redu čekanja",
-      "running": "RADI",
+      "running": "Radi",
       "completed": "Dovršeno",
       "failed": "Nije uspjelo",
       "cancelled": "Otkazano",
@@ -1989,7 +2011,7 @@
       "cancellationRequested": "Zatraženo otkazivanje",
       "notStarted": "Nije započeto",
       "queued": "U redu čekanja",
-      "starting": "POKRETANJE",
+      "starting": "Pokretanje",
       "inProgress": "U tijeku",
       "draftPrOpened": "Otvoren nacrt PR-a",
       "prOpened": "PR otvoren",
@@ -2046,7 +2068,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktivno sada",
     "search": {
       "searching": "Tražim",
       "searchSessions": "Pretraži sesije",
@@ -2057,16 +2078,15 @@
     "sessionList": {
       "couldNotLoad": "Nije moguće učitati sesije",
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije",
-      "noSessionsYet": "Još nema sesija",
       "noSessionsYetDescription": "Započnite zadatak kodiranja s telefona. Vaše sesije pojavit će se ovdje.",
       "noMatches": "Nijedna sesija ne odgovara",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "tryAdjustFilters": "Pokušajte prilagoditi ili ukloniti svoje filtre.",
       "couldNotSearch": "Nije moguće pretražiti sesije",
-      "allActive": "Sve sesije su aktivne",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prošlih sesija",
-      "live": "UŽIVO"
+      "live": "UŽIVO",
+      "updating": "Ažuriranje"
     },
     "sessionRow": {
       "deleteTitle": "Izbrisati sesiju?",
@@ -2090,8 +2110,8 @@
       "dollar_other": "dolara",
       "cent_few": "centa",
       "dollar_few": "dolara",
-      "costSpoken": "Trošak {{cost}}",
-      "costSpokenWithTime": "Trošak {{cost}}, {{time}}",
+      "costSpoken": "trošak {{cost}}",
+      "costSpokenWithTime": "trošak {{cost}}, {{time}}",
       "pullRequest": "zahtjev za povlačenje {{number}}"
     },
     "githubInstall": {
@@ -2112,7 +2132,10 @@
     "sessionExited": "Sesija je završena",
     "remoteSpawnRetryable": "Nije moguće doći do instance — možda se prekinula veza.",
     "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjerite stroj ili ažurirajte CLI.",
-    "remoteSpawnInstanceDisconnected": "Odabrana instanca se prekinula. Pokrenite sesiju na Cloud Agent ili odaberite drugu instancu."
+    "remoteSpawnInstanceDisconnected": "Odabrana instanca se prekinula. Pokrenite sesiju na Cloud Agent ili odaberite drugu instancu.",
+    "liveCount_one": "{{count}} UŽIVO",
+    "liveCount_other": "{{count}} UŽIVO",
+    "liveCount_few": "{{count}} UŽIVO"
   },
   "agentChat": {
     "session": {
@@ -2134,18 +2157,19 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
-      "connectRepository": "Poveži repozitorij",
       "cloningSession": "Kloniram sesiju",
       "continue": "Nastavi",
       "couldNotLoadThisSession": "Nije bilo moguće učitati ovu sesiju",
-      "cloneFailed": "Nije bilo moguće klonirati ovu sesiju.",
       "cloneFailedRetry": "Nije bilo moguće klonirati ovu sesiju. Pokušajte ponovno.",
-      "connectRepositoryToContinue": "Povežite repozitorij za nastavak.",
       "notEnoughCredits": "Nema dovoljno kredita za pokretanje Cloud Agenta. Dodajte kredite i pokušajte ponovno.",
       "previousTaskFinishing": "Prethodni zadatak još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutačno nije dostupna. Pokušajte ponovno.",
       "connectionTrouble": "Problem s vezom. Pokušajte ponovno za trenutak.",
-      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovno."
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Odaberite drugi model i pokušajte ponovno.",
+      "cancelQueuedFailed": "Nije moguće otkazati poruku.",
+      "cancelQueuedRestoreAvailable": "Poruka je otkazana. Dodirnite „Vratite” da biste je vratili u polje za unos poruke.",
+      "cancelQueuedRestored": "Poruka je otkazana. Upit je ponovno u polju za unos poruke.",
+      "cancelQueuedUpgradeRequired": "Otkazivanje poruka na čekanju zahtijeva noviju verziju Kilo CLI-ja. Ažurirajte Kilo CLI i ponovno se povežite."
     },
     "remoteSession": {
       "failedToCreate": "Stvaranje udaljene sesije nije uspjelo",
@@ -2213,7 +2237,12 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima za GitLab, a zatim osvježi.",
       "openBitbucket": "Otvori Bitbucket",
       "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno"
+      "recentlyUsed": "Nedavno korišteno",
+      "continueFrom": "Nastavljanje {{title}}",
+      "importingSession": "Uvoz sesije",
+      "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
+      "importFailed": "Uvoz ove sesije nije uspio.",
+      "discardWithUploadsMessage": "Vaš upit i sve učitane datoteke koje nisu priložene poslanim porukama bit će obrisani."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
@@ -2258,7 +2287,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[unserializabilni unos]",
-      "errorPrefix": "greška: {{error}}"
+      "errorPrefix": "Greška: {{error}}"
     },
     "instancePicker": {
       "runOn": "Pokreni na",
@@ -2272,7 +2301,9 @@
       "noCliInstancesDescription": "Pokrenite `kilo remote` u projektu na računalu ili ažurirajte Kilo CLI ako već radi.",
       "instanceOnProject": "{{name}} na {{project}}",
       "instanceOnProjectSuffix": "{{name}} na {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Pokreni na Cloud Agent"
+      "runOnCloudAgent": "Pokreni na Cloud Agent",
+      "terminals": "Terminali",
+      "remotes": "Udaljene instance"
     },
     "modePicker": {
       "title": "Odaberi način rada",
@@ -2462,7 +2493,11 @@
       "queuedAccessibility": "Poruka u redu čekanja",
       "userMessage": "Korisnička poruka",
       "assistantMessage": "Poruka asistenta",
-      "longPressHint": "Dugo pritisnite za pojedinosti poruke"
+      "longPressHint": "Dugo pritisnite za pojedinosti poruke",
+      "cancelQueued": "Otkažite poruku",
+      "cancelQueuedAccessibility": "Otkažite poruku na čekanju",
+      "restoreQueued": "Vratite",
+      "restoreQueuedAccessibility": "Vratite otkazanu poruku u polje za unos poruke"
     },
     "olderMessages": {
       "arrived": "Ranije poruke učitane",
@@ -2479,6 +2514,8 @@
       "viewTable": "Prikaži tablicu",
       "title": "Tablica",
       "close": "Zatvori tablicu",
+      "loading": "Učitavanje tablice",
+      "empty": "Ova tablica nema redaka.",
       "columnCount_one": "stupac",
       "columnCount": "stupci",
       "columnCount_other": "stupci",
@@ -2491,9 +2528,6 @@
     },
     "sessionFilter": {
       "title": "Filtriraj sesije",
-      "sortBy": "Sortiraj po",
-      "sortLastUpdated": "Zadnje ažurirano",
-      "sortCreated": "Stvoreno",
       "platform": "Platforma",
       "platformCloud": "Cloud",
       "platformExtension": "Proširenje",
@@ -2502,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ostalo",
-      "project": "Projekt",
-      "removeProjectFilter": "Ukloni {{label}} filtar projekta",
-      "removePlatformFilter": "Ukloni {{label}} filtar platforme"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Prijedlog",
@@ -2547,7 +2579,9 @@
       "uploading": "Učitavanje…",
       "uploaded": "Učitano",
       "uploadFailedRetry": "Učitavanje nije uspjelo. Dodirnite za ponovni pokušaj.",
-      "uploadFailedTerminal": "Ova datoteka ne može se učitati."
+      "uploadFailedTerminal": "Ova datoteka ne može se učitati.",
+      "moveLeft": "Pomaknite {{filename}} ulijevo",
+      "moveRight": "Pomaknite {{filename}} udesno"
     },
     "attachmentPasteHint": {
       "accessibility": "Zalijepi sliku iz međuspremnika",
@@ -2577,7 +2611,11 @@
       "finalizingPlaceholder": "Dovršavanje...",
       "messagePlaceholder": "Poruka...",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Uklonite privitke da biste poslali poruku.",
-      "couldNotAttachFiles": "Nije moguće priviti datoteke. Dodirnite Pošalji za ponovni pokušaj."
+      "couldNotAttachFiles": "Nije moguće priviti datoteke. Dodirnite Pošalji za ponovni pokušaj.",
+      "discardAttachmentsMessage": "Učitane datoteke koje nisu priložene poslanim porukama bit će obrisane.",
+      "discardAttachmentsTitle": "Odbaciti privitke?",
+      "charactersRemaining": "Preostalo znakova: {{count}}",
+      "insertNewline": "Umetnite novi redak"
     },
     "chatLink": {
       "linkCopied": "Poveznica kopirana",
@@ -2670,6 +2708,17 @@
       "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledniku.",
       "open": "Otvori",
       "trustThisHost": "Vjeruj ovom poslužitelju"
+    },
+    "folderPicker": {
+      "accessibility": "Mapa: {{label}}",
+      "emptyDescription": "Gotovo koristi ovu mapu.",
+      "emptyTitle": "Unutra nema mapa",
+      "fieldLabel": "Mapa",
+      "retryableDescription": "Provjerite vezu i pokušajte ponovno. Gotovo i dalje potvrđuje ovu mapu.",
+      "retryableTitle": "Nije moguće prikazati mape",
+      "tapToListHint": "Dodirnite mapu za prikaz njezinog sadržaja",
+      "unsupportedDescription": "Ovaj CLI ne može prikazati mape. Gotovo zadržava mapu pokretanja, a Započni sesiju tamo započinje.",
+      "unsupportedTitle": "Nije moguće prikazati mape"
     }
   },
   "bootstrap": {
@@ -2722,7 +2771,7 @@
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Trenutačno ništa nije pokrenuto"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",
@@ -2786,7 +2835,8 @@
     "busy": "Glasovni unos je zauzet. Pokušajte ponovno.",
     "stopped": "Glasovni unos je zaustavljen. Dodirnite mikrofon za ponovni pokušaj.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
-    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja."
+    "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {
     "title": "Podijeli u Kilo",
@@ -3170,5 +3220,19 @@
     "emptyDescription": "Kada vjerujete poslužitelju veze, otvara se bez ponovnog pitanja.",
     "revoke": "Opozovi {{host}}",
     "backToPreferences": "Natrag na postavke"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Poruka"
+    },
+    "empty": {
+      "title": "Započnite chat",
+      "description": "Pošaljite poruku za razgovor s modelom."
+    },
+    "working": "Radim",
+    "historyRetry": "Nije moguće učitati povijest razgovora.",
+    "catalogRetry": "Učitavanje modela nije uspjelo",
+    "sendError": "Nije moguće poslati poruku. Pokušajte ponovno."
   }
 }

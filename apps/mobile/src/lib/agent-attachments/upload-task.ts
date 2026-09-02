@@ -33,7 +33,9 @@ type UploadOutcome = { key: string };
 
 /**
  * Presign + PUT a single local file. Progress is reported via `onProgress`
- * (`null` when the server omits Content-Length).
+ * (`null` when the server omits Content-Length). `onAdmitted` fires once the
+ * presign admits the object key into the pending-upload ledger, before the PUT
+ * starts, so a later remove/leave can release the row even when the PUT fails.
  */
 export async function uploadOne(args: {
   organizationId?: string;
@@ -45,6 +47,7 @@ export async function uploadOne(args: {
   localUri: string;
   onProgress: (progress: number | null) => void;
   onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+  onAdmitted?: (key: string) => void;
   isCancelled?: () => boolean;
 }): Promise<UploadOutcome> {
   const {
@@ -56,6 +59,7 @@ export async function uploadOne(args: {
     localUri,
     onProgress,
     onTask,
+    onAdmitted,
     isCancelled,
   } = args;
   const baseInput = {
@@ -75,6 +79,9 @@ export async function uploadOne(args: {
   if (isCancelled?.()) {
     throw new Error('Upload cancelled');
   }
+  // Admit the key before the PUT: the presign already created the pending
+  // ledger row, so a remove/leave that races the PUT must still release it.
+  onAdmitted?.(result.key);
 
   // Per-chip determinate progress via `createUploadTask` (the
   // main-module `createUploadTask` throws at runtime in SDK 55, so we
@@ -109,4 +116,28 @@ export async function uploadOne(args: {
 /** Chip/toast copy for terminal (non-retryable) upload failures. */
 export function describeTerminalReason(_reason: string): string {
   return i18n.t('chat.attachment.cantUpload');
+}
+
+/**
+ * Release abandoned composer files' pending-ledger rows so they stop consuming
+ * the per-message quota before the 24-hour reaper would clear them. Mirrors
+ * `getAttachmentUploadUrl`'s personal/organization split: the organization
+ * mutation adds `organizationId` and gates membership.
+ */
+export async function releasePendingUploads(args: {
+  organizationId?: string;
+  objectKeys: string[];
+}): Promise<void> {
+  const { organizationId, objectKeys } = args;
+  if (objectKeys.length === 0) {
+    return;
+  }
+  if (organizationId) {
+    await trpcClient.organizations.cloudAgentNext.releasePendingUploads.mutate({
+      objectKeys,
+      organizationId,
+    });
+    return;
+  }
+  await trpcClient.cloudAgentNext.releasePendingUploads.mutate({ objectKeys });
 }

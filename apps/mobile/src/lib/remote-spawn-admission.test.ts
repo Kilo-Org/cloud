@@ -12,6 +12,9 @@ const instance: InstancePickerInstance = {
   connectionId: 'conn-1',
   name: 'CLI',
   projectName: 'project',
+  kind: 'cli',
+  startedAt: null,
+  gitBranch: null,
 };
 
 const filesPayload: SharePayload = {

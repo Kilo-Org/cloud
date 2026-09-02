@@ -11,7 +11,8 @@ export function sessionPlaneFromId(sessionId: string): SessionPlane {
 }
 
 export function sessionSupportsTerminal(sessionId: string): boolean {
-  return sessionPlaneFromId(sessionId) !== 'control';
+  const plane = sessionPlaneFromId(sessionId);
+  return plane === 'legacy' || plane === 'control';
 }
 
 export function generateSessionId(plane: SessionPlane = 'legacy'): SessionId {
@@ -26,6 +27,16 @@ export function isControlPlaneOwner(
   return (
     ownerIdInList(env.CONTROL_PLANE_IDS, owner.userId) ||
     ownerIdInList(env.CONTROL_PLANE_IDS, owner.orgId)
+  );
+}
+
+export function isWorktreeOwner(
+  env: { WORKTREE_CREATION_ENABLED_IDS?: string },
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.userId) ||
+    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.orgId)
   );
 }
 

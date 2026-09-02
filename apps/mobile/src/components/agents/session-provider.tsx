@@ -3,6 +3,11 @@ import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type SessionManager } from '@kilocode/cloud-agent-sdk';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  getAuthenticatedOwner,
+  isAuthenticatedOwner,
+  subscribeAuthenticatedOwner,
+} from '@/lib/context-scope';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 
@@ -24,12 +29,21 @@ export function AgentSessionProvider({
     organizationId,
   });
 
+  const owner = useRef(getAuthenticatedOwner()).current;
   useEffect(() => {
     const manager = managerRef.current;
+    const retire = () => {
+      if (!isAuthenticatedOwner(owner)) {
+        manager?.destroy();
+      }
+    };
+    const unsubscribe = subscribeAuthenticatedOwner(retire);
+    retire();
     return () => {
+      unsubscribe();
       manager?.destroy();
     };
-  }, []);
+  }, [owner]);
 
   return (
     <JotaiProvider store={storeRef.current}>

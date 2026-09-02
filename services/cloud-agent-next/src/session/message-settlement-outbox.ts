@@ -468,7 +468,7 @@ export function createMessageSettlementOutbox(
               error: failure?.message ?? legacyErrorMessage,
             }),
           }),
-      lastSeenBranch: metadata?.repository?.upstreamBranch,
+      lastSeenBranch: metadata?.repository?.upstreamBranch ?? metadata?.workspace?.branchName,
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,

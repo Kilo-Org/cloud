@@ -31,7 +31,6 @@
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.15",
     "@ai-sdk/gateway": "4.0.21",
-    "@ai-sdk/mistral": "4.0.12",
     "@ai-sdk/openai-compatible": "3.0.11",
     "@anthropic-ai/sdk": "0.104.1",
     "@apple/app-store-server-library": "3.1.0",
@@ -108,7 +107,6 @@
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "catalog:",
     "@types/archiver": "7.0.0",
-    "@types/js-cookie": "3.0.6",
     "@types/js-yaml": "4.0.9",
     "@types/mdx": "2.0.13",
     "@upstash/redis": "^1.38.0",
@@ -143,7 +141,6 @@
     "google-auth-library": "10.6.2",
     "jotai": "2.18.1",
     "jotai-minidb": "0.0.8",
-    "js-cookie": "3.0.8",
     "js-yaml": "4.3.0",
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.2",

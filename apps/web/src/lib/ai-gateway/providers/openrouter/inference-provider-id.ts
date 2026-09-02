@@ -293,7 +293,17 @@ export const AwsCredentialsSchema = z.object({
   region: z.string(),
 });
 
-export type AwsCredentials = z.infer<typeof AwsCredentialsSchema>;
+export const BedrockCredentialsSchema = z.union([
+  AwsCredentialsSchema.extend({ apiKey: z.never().optional() }),
+  z.object({
+    apiKey: z.string().trim().min(1),
+    region: z.string().trim().min(1),
+    accessKeyId: z.never().optional(),
+    secretAccessKey: z.never().optional(),
+  }),
+]);
+
+export type BedrockCredentials = z.infer<typeof BedrockCredentialsSchema>;
 
 export const VertexCredentialsSchema = z.object({
   project: z.string().min(1),

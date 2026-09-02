@@ -1,4 +1,35 @@
-import { deletionAttentionHint } from '@/lib/user/deletion-queue/deletion-hints';
+import {
+  deletionAttentionHint,
+  deletionManualSearchHref,
+} from '@/lib/user/deletion-queue/deletion-hints';
+
+describe('deletionManualSearchHref', () => {
+  it('preserves exact opaque user IDs in PostHog search links', () => {
+    expect(
+      deletionManualSearchHref({
+        stepKey: 'posthog',
+        userId: 'oauth/GitHub/Opaque ID+42',
+        email: 'ignored@example.com',
+      })
+    ).toEqual({
+      href: 'https://us.posthog.com/persons?search=oauth%2FGitHub%2FOpaque%20ID%2B42',
+      label: 'Open PostHog persons',
+    });
+  });
+
+  it.each([
+    ['posthog', 'https://us.posthog.com/persons?search=customer%40example.com'],
+    ['substack', 'https://kilocode.substack.com/publish/subscribers?s=customer%40example.com'],
+  ])('retains email normalization for ordinary %s searches', (stepKey, href) => {
+    expect(deletionManualSearchHref({ stepKey, email: ' Customer@Example.com ' })?.href).toBe(href);
+  });
+
+  it('leaves the PostHog search unfiltered when a user ID was scrubbed', () => {
+    expect(deletionManualSearchHref({ stepKey: 'posthog', userId: null })?.href).toBe(
+      'https://us.posthog.com/persons'
+    );
+  });
+});
 
 describe('deletionAttentionHint', () => {
   it('returns operator copy for known codes', () => {

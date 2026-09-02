@@ -103,8 +103,6 @@ function toDisplayEventFromKilocode(
     }
 
     if (partType === 'text') {
-      const status = partStateStatus(part.state);
-      if (!isCompletedStatus(status)) return null;
       const text = typeof part.text === 'string' ? part.text : undefined;
       if (text && text.trim()) {
         const truncated = text.length > 200 ? `${text.slice(0, 200)}...` : text;

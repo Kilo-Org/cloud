@@ -162,6 +162,7 @@ export type ServiceEvent =
       type: 'connected';
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
+      activeMessageId?: string | null | undefined;
     }
   | { type: 'commands.available'; commands: SlashCommandInfo[] }
   | {
@@ -169,6 +170,11 @@ export type ServiceEvent =
       messageId: string;
       executionId?: string | undefined;
       content?: string | undefined;
+    }
+  | {
+      type: 'cloud.message.canceled';
+      messageId: string;
+      executionId?: string | undefined;
     }
   | {
       type: 'cloud.message.sent';
@@ -184,6 +190,8 @@ export type ServiceEvent =
       type: 'cloud.message.failed';
       messageId: string;
       executionId?: string | undefined;
+      delivery?: 'queued' | 'sent' | undefined;
+      accepted?: boolean | undefined;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -205,10 +213,6 @@ const CHAT_EVENT_TYPES = new Set([
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
   return CHAT_EVENT_TYPES.has(event.type);
-}
-
-export function isServiceEvent(event: NormalizedEvent): event is ServiceEvent {
-  return !CHAT_EVENT_TYPES.has(event.type);
 }
 
 /** Best-effort error message extraction from a loosely-typed error field. */
@@ -233,6 +237,18 @@ const sessionModelSchema = z.object({
   id: z.string(),
   variant: z.string().optional(),
 });
+
+const connectedServiceDataSchema = connectedDataSchema.extend({
+  activeMessageId: z.string().nullable().optional().catch(undefined),
+});
+
+// `cloud.message.canceled` mirrors the queued payload minus the content field.
+const cloudMessageCanceledDataSchema = z
+  .object({
+    messageId: z.string(),
+    executionId: z.string().optional(),
+  })
+  .passthrough();
 
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
   const model = sessionModelSchema.safeParse(rawInfo['model']);
@@ -496,12 +512,13 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     }
 
     case 'connected': {
-      const r = connectedDataSchema.safeParse(data);
+      const r = connectedServiceDataSchema.safeParse(data);
       if (!r.success) return null;
       return {
         type: 'connected',
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
+        ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
 
@@ -519,6 +536,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         messageId: r.data.messageId,
         executionId: r.data.executionId,
         content: r.data.content,
+      };
+    }
+
+    case 'cloud.message.canceled': {
+      const r = cloudMessageCanceledDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'cloud.message.canceled',
+        messageId: r.data.messageId,
+        executionId: r.data.executionId,
       };
     }
 
@@ -558,6 +585,8 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'cloud.message.failed',
         messageId,
         executionId,
+        ...(r.data.delivery !== undefined && { delivery: r.data.delivery }),
+        ...(typeof r.data['accepted'] === 'boolean' && { accepted: r.data['accepted'] }),
         error,
         reason,
         attempts,

@@ -32,7 +32,9 @@ import {
 import type { AgentMode } from './types';
 import {
   acceptedSubmissionAttachmentIdsToRemove,
+  getChatInputPresentationCommands,
   hasSubmissionAttachmentPayload,
+  isWorktreeNewChatCommand,
   shouldRejectAttachedSlashCommand,
 } from './chat-input-attachments';
 
@@ -49,6 +51,7 @@ type ChatInputProps = {
     args: string,
     attachments?: CloudAgentAttachments
   ) => Promise<boolean>;
+  onNewChat?: () => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -97,6 +100,7 @@ type ChatInputProps = {
 export function ChatInput({
   onSend,
   onSendCommand,
+  onNewChat,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -189,6 +193,8 @@ export function ChatInput({
       if (attachmentSubmissionPendingRef.current) return false;
       if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
 
+      const createsWorktreeChat = isWorktreeNewChatCommand(trimmed, onNewChat !== undefined);
+
       // Re-match against the trimmed value at submit time, and reject a slash
       // command carrying files BEFORE finalizing the attachment ledger: a
       // client-rejected send must leave its rows pending so the reaper can
@@ -206,7 +212,8 @@ export function ChatInput({
         shouldRejectAttachedSlashCommand(
           trimmed,
           slashCommands,
-          attachmentsEnabled && attachmentUpload.attachments.length > 0
+          attachmentsEnabled && attachmentUpload.attachments.length > 0,
+          createsWorktreeChat
         )
       ) {
         toast.error('Files cannot be attached to slash commands', {
@@ -244,7 +251,9 @@ export function ChatInput({
       }
 
       try {
-        if (slashCommand && onSendCommand) {
+        if (createsWorktreeChat && onNewChat) {
+          accepted = await onNewChat();
+        } else if (slashCommand && onSendCommand) {
           accepted = await onSendCommand(slashCommand.command, slashCommand.args, attachmentsData);
         } else {
           accepted = await onSend(trimmed, attachmentsData);
@@ -272,6 +281,7 @@ export function ChatInput({
       disabled,
       onSend,
       onSendCommand,
+      onNewChat,
       setAttachmentSubmissionPending,
       setInputValue,
       slashCommands,
@@ -308,6 +318,11 @@ export function ChatInput({
     [sendMessage, setInputValue]
   );
 
+  const presentationSlashCommands = useMemo(
+    () => getChatInputPresentationCommands(slashCommands, onNewChat !== undefined),
+    [slashCommands, onNewChat]
+  );
+
   const {
     showAutocomplete,
     selectedIndex,
@@ -317,13 +332,23 @@ export function ChatInput({
     setShowAutocomplete,
   } = useSlashCommandAutocomplete({
     value,
-    slashCommands,
+    slashCommands: presentationSlashCommands,
     onSelect: handleSelectCommand,
     listRef: commandListRef,
   });
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      isWorktreeNewChatCommand(valueRef.current, onNewChat !== undefined)
+    ) {
+      e.preventDefault();
+      handleSend();
+      return;
+    }
 
     if (handleAutocompleteKeyDown(e)) return;
 
@@ -390,7 +415,7 @@ export function ChatInput({
     showToolbar && onModeChange && onModelChange && (modelOptions.length > 0 || pinnedModelOption);
 
   return (
-    <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
+    <div className="px-[max(1rem,calc(50%_-_27rem))] py-2">
       <div
         className={cn(
           'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
@@ -451,7 +476,7 @@ export function ChatInput({
               placeholder={placeholder}
               disabled={disabled}
               maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
+              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
               rows={1}
               role="combobox"
               aria-expanded={showAutocomplete}
@@ -610,9 +635,9 @@ export function ChatInput({
               </div>
             </>
           )}
-          {slashCommands.length > 0 && (
+          {presentationSlashCommands.length > 0 && (
             <div className="hidden xl:block">
-              <BrowseCommandsDialog commands={slashCommands} />
+              <BrowseCommandsDialog commands={presentationSlashCommands} />
             </div>
           )}
           <div className="flex-1" />

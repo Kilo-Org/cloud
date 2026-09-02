@@ -19,6 +19,7 @@ vi.mock('react-native-reanimated', () => ({
   withSequence: (...values: unknown[]) => values.at(-1),
   makeMutable: (v: unknown) => ({ value: v }),
   Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
+  useFrameCallback: () => ({ setActive: () => undefined }),
   // Reduced motion keeps animation callbacks out of the test.
   useReducedMotion: () => true,
 }));
@@ -30,6 +31,8 @@ vi.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: vi.fn(),
 }));
 vi.mock('@sentry/react-native', () => ({ TimeToFullDisplay: () => null }));
+// String host so findByType can assert the splash status bar override.
+vi.mock('expo-status-bar', () => ({ StatusBar: 'StatusBar' }));
 // String host so findByType works and props.onLoad stays callable.
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 // No Vitest project transforms .png.
@@ -78,6 +81,11 @@ describe('AnimatedSplashOverlay mounted', () => {
     expect(logoImages).toHaveLength(1);
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
 
+    // The yellow frame forces dark status bar icons in either theme.
+    const statusBars = findByType(renderer.root, 'StatusBar');
+    expect(statusBars).toHaveLength(1);
+    expect(statusBars[0]?.props.style).toBe('dark');
+
     const logoImage = logoImages[0];
     if (!logoImage) {
       throw new Error('expected one Image host');
@@ -100,6 +108,7 @@ describe('AnimatedSplashOverlay mounted', () => {
 
     expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(findByType(renderer.root, 'StatusBar')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

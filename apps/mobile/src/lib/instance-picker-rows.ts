@@ -1,48 +1,58 @@
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { parseTimestamp } from '@/lib/utils';
 
 export type LabeledInstance = InstancePickerInstance & {
-  /**
-   * Short, `connectionId`-derived suffix appended to the row's visible label
-   * when its `(name, projectName)` pair is not unique in the list. The base
-   * (name + project) label is always shown first; the suffix only appears for
-   * duplicates. For unique rows this is `null` and the renderer omits it.
-   */
+  /** Native row identifier, independent of displayed facts and input order. */
+  testID: string;
+  /** Exact branch/start text rendered without further truncation by the picker. */
+  displayFacts: string;
+  /** Stable connection hash, only when the displayed identity still has a peer. */
   dedupSuffix: string | null;
 };
 
-/**
- * Pure: given a list of instances, return the same list with a `dedupSuffix`
- * on every row that shares its `(name, projectName)` pair with at least one
- * other row in the input. The suffix is a 6-character hex string derived
- * from a deterministic, non-cryptographic hash of the `connectionId` (see
- * `shortConnectionIdHash` below) — short, stable for the lifetime of the
- * connection, and visually distinguishable without being a long UUID.
- *
- * Order is preserved. Rows are not grouped or de-duplicated; the picker
- * renders one entry per live `connectionId` (an already-disconnected CLI
- * that briefly left a duplicate in the poll before the worker cleans it up
- * must remain visible, not silently collapsed).
- */
-export function dedupeInstanceLabels(instances: InstancePickerInstance[]): LabeledInstance[] {
-  if (instances.length === 0) {
-    return [];
-  }
-
-  // Count occurrences of (name, projectName) so we only stamp a suffix on
-  // rows that actually have a peer. O(n) with a Map keyed by the joined pair.
-  const pairCounts = new Map<string, number>();
-  for (const instance of instances) {
-    const key = `${instance.name}\u0000${instance.projectName}`;
-    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
-  }
-
+/** Preserve every connection and its order; disambiguate displayed identities, not raw metadata. */
+export function dedupeInstanceLabels(
+  instances: InstancePickerInstance[],
+  locale = i18n.language
+): LabeledInstance[] {
+  const labels = new Map<string, LabeledInstance>();
   return instances.map(instance => {
-    const key = `${instance.name}\u0000${instance.projectName}`;
-    const isDuplicate = (pairCounts.get(key) ?? 0) > 1;
-    return {
+    // eslint-disable-next-line typescript-eslint/no-misused-spread -- Preserve the existing code-point shortening boundary without splitting surrogate pairs.
+    const branch = [...(instance.gitBranch ?? '')];
+    const displayBranch = branch.length > 20 ? `${branch.slice(0, 20).join('')}…` : branch.join('');
+    const started =
+      instance.startedAt === null
+        ? ''
+        : `${i18n.t('codeReviewer.reviewDetail.started', { lng: locale })} ${formatDate(
+            parseTimestamp(instance.startedAt),
+            locale,
+            { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+          )}`;
+    const displayFacts = [displayBranch, started].filter(Boolean).join(' · ');
+    // Kind already has its own group. Compare only the facts the user can see,
+    // including shortened branches and start times displayed to the minute.
+    const labelKey = JSON.stringify([
+      instance.kind,
+      instance.name,
+      instance.projectName,
+      displayFacts,
+    ]);
+    const row: LabeledInstance = {
       ...instance,
-      dedupSuffix: isDuplicate ? shortConnectionIdHash(instance.connectionId) : null,
+      testID: `instance-picker-row-${shortConnectionIdHash(instance.connectionId)}`,
+      displayFacts,
+      dedupSuffix: null,
     };
+    const peer = labels.get(labelKey);
+    if (peer) {
+      peer.dedupSuffix = shortConnectionIdHash(peer.connectionId);
+      row.dedupSuffix = shortConnectionIdHash(row.connectionId);
+    } else {
+      labels.set(labelKey, row);
+    }
+    return row;
   });
 }
 

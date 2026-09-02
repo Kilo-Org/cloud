@@ -1,3 +1,4 @@
+import { projectPrivateWorktreePaths } from '@kilocode/session-ingest-contracts';
 import type {
   CloudAgentRootSessionSummary,
   KiloSdkAssistantMessage,
@@ -171,9 +172,14 @@ export function projectPublicStoredMessage(
   message: KiloSdkStoredMessage,
   kiloSessionId: string
 ): KiloSdkStoredMessage {
+  const sanitized = projectPrivateWorktreePaths(
+    message,
+    [message.info],
+    publicCloudAgentDirectory(kiloSessionId)
+  );
   return {
-    info: projectPublicMessageInfo(message.info, kiloSessionId),
-    parts: message.parts.map(part => projectPublicPart(part, kiloSessionId)),
+    info: projectPublicMessageInfo(sanitized.info, kiloSessionId),
+    parts: sanitized.parts.map(part => projectPublicPart(part, kiloSessionId)),
   };
 }
 

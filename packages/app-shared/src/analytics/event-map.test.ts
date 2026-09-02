@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
 import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 
 import {
   ACCESS_REQUIRED_SHOWN_EVENT,
@@ -11,6 +12,7 @@ import {
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
   CODE_REVIEW_SETTLED_EVENT,
   COMPLETION_REACHED_EVENT,
+  CONSENT_OUTCOME_EVENT,
   CONVERSATION_CREATED_EVENT,
   FEEDBACK_SUBMITTED_EVENT,
   INSTANCE_ACTION_EVENT,
@@ -19,9 +21,13 @@ import {
   KILO_PASS_PURCHASE_STARTED_EVENT,
   LEGACY_EVENT_NAMES,
   LOGIN_EVENT,
+  LOGOUT_EVENT,
   MESSAGE_SENT_EVENT,
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
   ONBOARDING_ENTERED_EVENT,
   ORGANIZATION_MEMBER_INVITED_EVENT,
+  ORGANIZATION_MEMBER_JOINED_EVENT,
   PERMISSION_RESPONDED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   PROVISION_FAILED_EVENT,
@@ -64,6 +70,11 @@ const ALL_EVENT_CONSTANTS = [
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
   LOGIN_EVENT,
+  LOGOUT_EVENT,
+  CONSENT_OUTCOME_EVENT,
+  NOTIFICATION_PERMISSION_RESPONDED_EVENT,
+  NOTIFICATION_TOKEN_UPDATED_EVENT,
+  ORGANIZATION_MEMBER_JOINED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
@@ -246,6 +257,73 @@ describe('organization_member_invited role schema', () => {
 
   it('rejects an unknown role payload', () => {
     expect(invitedSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
+  });
+});
+
+describe('new accepted-phase privacy-minimal schemas', () => {
+  it('accepts the logout empty payload and rejects unknown or privacy keys', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[LOGOUT_EVENT];
+    expect(schema.safeParse({}).success).toBe(true);
+    expect(schema.safeParse({ unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ token: 'tok' }).success).toBe(false);
+  });
+
+  it('accepts consent_outcome payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[CONSENT_OUTCOME_EVENT];
+    expect(schema.safeParse({ action: 'accepted', optional: true }).success).toBe(true);
+    expect(schema.safeParse({ action: 'optional_changed', optional: false }).success).toBe(true);
+    expect(schema.safeParse({ action: 'revoked', optional: true }).success).toBe(true);
+    expect(
+      schema.safeParse({ action: 'accepted', optional: true, unexpected_key: 'x' }).success
+    ).toBe(false);
+    expect(schema.safeParse({ action: 'accepted', optional: true, email: 'a@b.co' }).success).toBe(
+      false
+    );
+    expect(schema.safeParse({ action: 'accepted', optional: true, token: 'tok' }).success).toBe(
+      false
+    );
+    expect(schema.safeParse({ action: 'bogus', optional: true }).success).toBe(false);
+  });
+
+  it('accepts notification_permission_responded payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[NOTIFICATION_PERMISSION_RESPONDED_EVENT];
+    expect(schema.safeParse({ outcome: 'granted' }).success).toBe(true);
+    expect(schema.safeParse({ outcome: 'denied' }).success).toBe(true);
+    expect(schema.safeParse({ outcome: 'granted', unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'granted', email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'granted', token: 'tok' }).success).toBe(false);
+    expect(schema.safeParse({ outcome: 'bogus' }).success).toBe(false);
+  });
+
+  it('accepts notification_token_updated payloads and rejects privacy keys and unknown enums', () => {
+    const schema = ANALYTICS_EVENT_SCHEMAS[NOTIFICATION_TOKEN_UPDATED_EVENT];
+    expect(schema.safeParse({ action: 'registered' }).success).toBe(true);
+    expect(schema.safeParse({ action: 'unregistered' }).success).toBe(true);
+    expect(schema.safeParse({ action: 'registered', unexpected_key: 'x' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'registered', email: 'a@b.co' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'registered', token: 'tok' }).success).toBe(false);
+    expect(schema.safeParse({ action: 'bogus' }).success).toBe(false);
+  });
+});
+
+describe('organization_member_joined role schema', () => {
+  const joinedSchema = ANALYTICS_EVENT_SCHEMAS[ORGANIZATION_MEMBER_JOINED_EVENT];
+
+  it('parses { role } for every organization role', () => {
+    for (const role of ORGANIZATION_ROLES) {
+      expect(joinedSchema.safeParse({ role }).success, `role=${role}`).toBe(true);
+    }
+  });
+
+  it('rejects an unknown role payload', () => {
+    expect(joinedSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
+  });
+
+  it('rejects privacy keys on the role payload', () => {
+    expect(joinedSchema.safeParse({ role: 'member', email: 'a@b.co' }).success).toBe(false);
+    expect(joinedSchema.safeParse({ role: 'member', token: 'tok' }).success).toBe(false);
+    expect(joinedSchema.safeParse({ role: 'member', unexpected_key: 'x' }).success).toBe(false);
   });
 });
 

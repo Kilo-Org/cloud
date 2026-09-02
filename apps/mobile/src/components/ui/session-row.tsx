@@ -86,9 +86,6 @@ export function SessionRow({
     hasPlatformIcon: platformIcon != null,
   });
 
-  // Build the branch content EXACTLY as before (no icon wrapper yet).
-  // When platformIcon is unset the rendered structure stays bit-for-bit
-  // identical to today — no new wrapper around bare Text/StatusDot/null.
   let branchContent: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
     branchContent = (
@@ -101,9 +98,14 @@ export function SessionRow({
     );
   } else if (eyebrowDecision.kind === 'live-and-meta') {
     branchContent = (
-      <View className="flex-row items-center gap-1.5">
+      <View className="min-w-0 shrink flex-row items-center gap-1.5">
         <StatusDot tone="good" />
-        <Text variant="mono" className="shrink text-xs text-ink2">
+        <Text
+          variant="mono"
+          className="shrink text-xs text-ink2"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {meta}
         </Text>
       </View>
@@ -112,7 +114,12 @@ export function SessionRow({
     branchContent = <StatusDot tone="good" />;
   } else if (eyebrowDecision.kind === 'meta' && meta) {
     branchContent = (
-      <Text variant="mono" className="shrink text-xs text-ink2">
+      <Text
+        variant="mono"
+        className="shrink text-xs text-ink2"
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {meta}
       </Text>
     );

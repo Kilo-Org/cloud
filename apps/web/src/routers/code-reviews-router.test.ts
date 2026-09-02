@@ -3,6 +3,7 @@ const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
 const mockGetBlobContent = jest.fn();
+const mockFetchSessionSnapshot = jest.fn();
 const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
 const mockDeleteBitbucketCodeReviewWorkspaceWebhooksBestEffort = jest.fn();
 const mockEnsureBotUserForOrg = jest.fn();
@@ -66,6 +67,16 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
   getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
 }));
 
+// The router only calls `fetchSessionSnapshot` from the session-ingest client;
+// the rest of the module keeps its real implementation via `requireActual`.
+jest.mock('@/lib/session-ingest-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/session-ingest-client');
+  return {
+    ...actual,
+    fetchSessionSnapshot: (...args: unknown[]) => mockFetchSessionSnapshot(...args),
+  };
+});
+
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: jest.fn(),
   updateCheckRun: jest.fn(),
@@ -76,6 +87,8 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 }));
 
 import { db } from '@/lib/drizzle';
+import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { SuccessResult } from '@/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
@@ -90,6 +103,7 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   cliSessions,
+  cli_sessions_v2,
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -2312,7 +2326,7 @@ describe('codeReviewRouter attempts', () => {
     expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
   });
 
-  it('rejects stream info attempts from another review', async () => {
+  it('rejects stream info and transcript attempts from another review', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(reviewValues(testUser.id, 'running', { session_id: 'agent-review' }))
@@ -2338,9 +2352,15 @@ describe('codeReviewRouter attempts', () => {
         attemptId: otherAttempt.id,
       })
     ).rejects.toThrow('Code review attempt not found');
+    await expect(
+      caller.codeReviews.getSessionMessages({
+        reviewId: review.id,
+        attemptId: otherAttempt.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Code review attempt not found' });
   });
 
-  it('loads a historical V1 review from PostgreSQL and R2 without a worker request', async () => {
+  it('loads historical V1 session messages before and after a V2 retry', async () => {
     const cliSessionId = crypto.randomUUID();
     await db.insert(cliSessions).values({
       session_id: cliSessionId,
@@ -2378,9 +2398,389 @@ describe('codeReviewRouter attempts', () => {
       });
       expect(mockGetBlobContent).toHaveBeenCalledWith(`sessions/${cliSessionId}/ui_messages.json`);
       expect(fetchSpy).not.toHaveBeenCalled();
+
+      const [attempt] = await db
+        .insert(cloud_agent_code_review_attempts)
+        .values({
+          code_review_id: review.id,
+          attempt_number: 1,
+          status: 'completed',
+          cli_session_id: cliSessionId,
+        })
+        .returning();
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ agent_version: 'v2', status: 'running', cli_session_id: null })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+
+      await expect(
+        caller.codeReviews.getSessionMessages({ reviewId: review.id, attemptId: attempt.id })
+      ).resolves.toEqual(result);
+      expect(fetchSpy).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe('codeReviewRouter.getSessionMessages V2 authorization', () => {
+  let ownerUser: User;
+  let memberUser: User;
+  let outsiderUser: User;
+  let botUser: User;
+  let organization: Organization;
+  let otherOrganization: Organization;
+  const repo = `${REPO}-transcript`;
+
+  beforeAll(async () => {
+    ownerUser = await insertTestUser();
+    memberUser = await insertTestUser();
+    outsiderUser = await insertTestUser();
+    organization = await createTestOrganization(
+      'Review Transcript Org',
+      ownerUser.id,
+      0,
+      {},
+      false
+    );
+    otherOrganization = await createTestOrganization(
+      'Other Review Transcript Org',
+      ownerUser.id,
+      0,
+      {},
+      false
+    );
+    botUser = await insertTestUser({
+      id: generateBotUserId(organization.id, 'code-review'),
+      is_bot: true,
+    });
+  });
+
+  beforeEach(async () => {
+    await db
+      .insert(organization_memberships)
+      .values([
+        { organization_id: organization.id, kilo_user_id: memberUser.id, role: 'member' },
+        { organization_id: organization.id, kilo_user_id: botUser.id, role: 'member' },
+      ])
+      .onConflictDoNothing();
+    mockFetchSessionSnapshot.mockResolvedValue({
+      info: {},
+      messages: [
+        {
+          info: { id: 'msg_review_progress', role: 'assistant', time: { created: 1 } },
+          parts: [{ id: 'prt_review_progress', type: 'text', text: 'Review in progress' }],
+        },
+      ],
+    } satisfies SessionSnapshot);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+    await db
+      .delete(cli_sessions_v2)
+      .where(
+        inArray(cli_sessions_v2.kilo_user_id, [
+          ownerUser.id,
+          memberUser.id,
+          outsiderUser.id,
+          botUser.id,
+        ])
+      );
+    mockFetchSessionSnapshot.mockReset();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(organization_memberships)
+      .where(
+        inArray(organization_memberships.organization_id, [organization.id, otherOrganization.id])
+      );
+    await db
+      .delete(organizations)
+      .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
+    await db
+      .delete(kilocode_users)
+      .where(
+        inArray(kilocode_users.id, [ownerUser.id, memberUser.id, outsiderUser.id, botUser.id])
+      );
+  });
+
+  async function insertReviewWithSession(
+    reviewOverrides: Partial<CodeReviewInsert> = {},
+    sessionOverrides: Partial<typeof cli_sessions_v2.$inferInsert> = {}
+  ) {
+    const cloudAgentSessionId = `agent_review_transcript_${crypto.randomUUID()}`;
+    const [session] = await db
+      .insert(cli_sessions_v2)
+      .values({
+        session_id: `ses_review_transcript_${crypto.randomUUID()}`,
+        cloud_agent_session_id: cloudAgentSessionId,
+        kilo_user_id: botUser.id,
+        organization_id: organization.id,
+        ...sessionOverrides,
+      })
+      .returning();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(ownerUser.id, 'running', {
+          repo_full_name: repo,
+          owned_by_user_id: null,
+          owned_by_organization_id: organization.id,
+          session_id: cloudAgentSessionId,
+          cli_session_id: session.session_id,
+          ...reviewOverrides,
+        })
+      )
+      .returning();
+    return { review, session, cloudAgentSessionId };
+  }
+
+  it('reads a running bot-owned org transcript without granting generic session access', async () => {
+    const { review, session, cloudAgentSessionId } = await insertReviewWithSession();
+    const caller = await createCallerForUser(memberUser.id);
+
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toMatchObject({
+      success: true,
+      entries: [{ eventType: 'text', message: 'Review in progress' }],
+    });
+    expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(session.session_id, botUser.id);
+    await expect(
+      verifyOrgOwnsSessionV2ByCloudAgentId(db, organization.id, memberUser.id, cloudAgentSessionId)
+    ).resolves.toBeNull();
+  });
+
+  it('denies outsiders and rechecks viewer membership on every transcript read', async () => {
+    const { review } = await insertReviewWithSession();
+    const memberCaller = await createCallerForUser(memberUser.id);
+    const outsiderCaller = await createCallerForUser(outsiderUser.id);
+    await expect(
+      memberCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).resolves.toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+    mockFetchSessionSnapshot.mockClear();
+
+    await expect(
+      outsiderCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await db
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organization.id),
+          eq(organization_memberships.kilo_user_id, memberUser.id)
+        )
+      );
+
+    await expect(
+      memberCaller.codeReviews.getSessionMessages({ reviewId: review.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('resolves a selected runtime-only continuation to its original session and owner', async () => {
+    const original = await insertReviewWithSession(
+      { status: 'completed' },
+      { kilo_user_id: ownerUser.id }
+    );
+    const { review } = await insertReviewWithSession();
+    const [attempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: review.id,
+        attempt_number: 1,
+        status: 'running',
+        session_id: original.cloudAgentSessionId,
+      })
+      .returning();
+    const caller = await createCallerForUser(memberUser.id);
+
+    const result = await caller.codeReviews.getSessionMessages({
+      reviewId: review.id,
+      attemptId: attempt.id,
+    });
+
+    expect(result).toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+    expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(
+      original.session.session_id,
+      ownerUser.id
+    );
+  });
+
+  it('does not fall back to the review when a selected attempt has no session IDs', async () => {
+    const { review } = await insertReviewWithSession();
+    const [attempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({ code_review_id: review.id, attempt_number: 1, status: 'pending' })
+      .returning();
+    const caller = await createCallerForUser(memberUser.id);
+
+    await expect(
+      caller.codeReviews.getSessionMessages({ reviewId: review.id, attemptId: attempt.id })
+    ).resolves.toEqual({ success: true, entries: [] });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'for a different CLI session'] as const)(
+    'returns no transcript when the runtime mapping is %s',
+    async mapping => {
+      const { review } = await insertReviewWithSession();
+      const cloudAgentSessionId =
+        mapping === 'missing'
+          ? `agent_unmapped_${crypto.randomUUID()}`
+          : (await insertReviewWithSession()).cloudAgentSessionId;
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ session_id: cloudAgentSessionId })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['another organization', 'personal scope'] as const)(
+    'does not fetch an organization review session mapped to %s',
+    async scope => {
+      const { review } = await insertReviewWithSession(
+        {},
+        {
+          kilo_user_id: ownerUser.id,
+          organization_id: scope === 'personal scope' ? null : otherOrganization.id,
+        }
+      );
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['another user', 'an organization'] as const)(
+    'does not fetch a personal review session owned by %s',
+    async owner => {
+      const { review } = await insertReviewWithSession(
+        { owned_by_user_id: ownerUser.id, owned_by_organization_id: null },
+        {
+          kilo_user_id: owner === 'another user' ? outsiderUser.id : ownerUser.id,
+          organization_id: owner === 'an organization' ? organization.id : null,
+        }
+      );
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual(
+        { success: true, entries: [] }
+      );
+      expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['organization', 'personal'] as const)(
+    'reads scoped %s CLI-only history despite another owner having the same CLI ID',
+    async scope => {
+      const cliSessionId = `ses_history_${crypto.randomUUID()}`;
+      await db.insert(cli_sessions_v2).values({
+        session_id: cliSessionId,
+        kilo_user_id: outsiderUser.id,
+        organization_id: scope === 'organization' ? otherOrganization.id : null,
+      });
+      const { review, session } = await insertReviewWithSession(
+        {
+          status: 'completed',
+          agent_version: null,
+          session_id: null,
+          owned_by_user_id: scope === 'personal' ? ownerUser.id : null,
+          owned_by_organization_id: scope === 'organization' ? organization.id : null,
+        },
+        {
+          session_id: cliSessionId,
+          kilo_user_id: scope === 'personal' ? ownerUser.id : botUser.id,
+          organization_id: scope === 'organization' ? organization.id : null,
+        }
+      );
+      const caller = await createCallerForUser(scope === 'personal' ? ownerUser.id : memberUser.id);
+
+      const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+      expect(result).toMatchObject({ success: true, entries: [{ message: 'Review in progress' }] });
+      expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(cliSessionId, session.kilo_user_id);
+    }
+  );
+
+  it('returns no transcript for ambiguous organization CLI-only history', async () => {
+    const { review, session } = await insertReviewWithSession({ session_id: null });
+    await db.insert(cli_sessions_v2).values({
+      session_id: session.session_id,
+      kilo_user_id: ownerUser.id,
+      organization_id: organization.id,
+    });
+    const caller = await createCallerForUser(memberUser.id);
+
+    await expect(caller.codeReviews.getSessionMessages({ reviewId: review.id })).resolves.toEqual({
+      success: true,
+      entries: [],
+    });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+});
+
+describe('codeReviewRouter.getSessionMessages session-source edge cases', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, testUser.id));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
+    mockFetchSessionSnapshot.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns empty entries when both cli ids are missing', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed'))
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: true, entries: [] });
+    expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('returns success false when the snapshot fetch throws', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'completed', { cli_session_id: 'ses_snapshot_throw' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cli_sessions_v2).values({
+      session_id: 'ses_snapshot_throw',
+      kilo_user_id: testUser.id,
+    });
+    mockFetchSessionSnapshot.mockRejectedValue(new Error('Snapshot worker down'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+    expect(result).toEqual({ success: false, error: 'Snapshot worker down' });
   });
 });
 

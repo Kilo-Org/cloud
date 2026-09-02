@@ -61,6 +61,19 @@ import { computeSessionMetadataUpdates } from './ingest/metadata';
 
 const encoder = new TextEncoder();
 
+function mockIngestWithR2(ingest: ReturnType<typeof vi.fn>) {
+  vi.mocked(getSessionIngestDO).mockImplementation(
+    env =>
+      ({
+        ingest,
+        stageR2Object: async (params: { key: string }, body: ReadableStream<Uint8Array>) => {
+          await env.SESSION_INGEST_R2.put(params.key, body);
+          return true;
+        },
+      }) as never
+  );
+}
+
 function feedAll(extractor: ReturnType<typeof createItemExtractor>, json: string) {
   extractor.tokenizer.write(encoder.encode(json));
   extractor.tokenizer.end();
@@ -215,7 +228,7 @@ describe('queue', () => {
 
   it('passes a slim oversized message and its R2 reference into ingest', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_compacted' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -227,7 +240,7 @@ describe('queue', () => {
       content: 'x'.repeat(150),
     };
     const body = JSON.stringify({ data: [{ type: 'message', data }] });
-    const put = vi.fn(async () => undefined);
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -262,7 +275,8 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(data));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(ReadableStream));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
     expect(ingest).toHaveBeenCalledWith(
       [{ type: 'message', data: { id: 'msg_compacted' } }],
       'usr_compacted',
@@ -278,7 +292,7 @@ describe('queue', () => {
 
   it('splits duplicate item identities so inline updates do not reuse prior R2 refs', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_duplicate' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -289,7 +303,7 @@ describe('queue', () => {
     const oversizedItem = { type: 'message', data: oversizedData };
     const inlineItem = { type: 'message', data: inlineData };
     const body = JSON.stringify({ data: [oversizedItem, inlineItem] });
-    const put = vi.fn(async () => undefined);
+    const put = vi.fn(async (_key: string, _body: ReadableStream<Uint8Array>) => undefined);
     const deleteObject = vi.fn(async () => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
@@ -323,7 +337,8 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_duplicate/ses_duplicate/message/msg_same/1';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, JSON.stringify(oversizedData));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(ReadableStream));
+    expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(oversizedData));
     expect(ingest).toHaveBeenCalledTimes(2);
     expect(ingest).toHaveBeenNthCalledWith(
       1,
@@ -350,7 +365,7 @@ describe('queue', () => {
 
   it('batches all items in a message into a single DO ingest call', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_batch' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -405,7 +420,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -462,7 +477,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned_tail' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -515,7 +530,7 @@ describe('queue', () => {
     const ingest = vi.fn(
       async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned_duplicate' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -568,7 +583,7 @@ describe('queue', () => {
         ? { changes: [{ name: 'title', value: 'Hello' }] }
         : { changes: [{ name: 'gitBranch', value: 'main' }] }
     );
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_split' }]);
@@ -643,7 +658,7 @@ describe('queue', () => {
     const ingest = vi.fn(async () => {
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const limit = vi.fn(async () => [{ session_id: 'ses_overload' }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
@@ -691,7 +706,7 @@ describe('queue', () => {
     const ingest = vi.fn(async () => {
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const limit = vi.fn(async () => [{ session_id: 'ses_cancel' }]);
     const where = vi.fn(() => ({ limit }));
@@ -749,7 +764,7 @@ describe('queue', () => {
 
   it('does not flush buffered items when malformed JSON forces a retry', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_malformed' }]);
@@ -809,7 +824,7 @@ describe('queue', () => {
       if (ingestCalls === 1) return { changes: [{ name: 'title', value: 'Hello' }] };
       throw new Error('Durable Object is overloaded.');
     });
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     // db.select powers the session-exists guard; db.transaction is the metadata flush.
     const transaction = vi.fn(async () => null);
@@ -934,7 +949,7 @@ describe('queue session_pr_link', () => {
     ingestChanges: Array<{ name: string; value: string | null }>;
   }) {
     const ingest = vi.fn(async () => ({ changes: params.ingestChanges }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
     const transaction = vi.fn(async () => null);
     const limit = vi.fn(async () => [{ session_id: 'ses_prlink' }]);
     const where = vi.fn(() => ({ limit }));
@@ -1252,7 +1267,7 @@ describe('remote session attention notifications', () => {
   }) {
     const ingest =
       params.ingest ?? vi.fn(async () => ({ changes: [], attentionSignals: [attentionSignal] }));
-    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    mockIngestWithR2(ingest);
 
     // A single session lookup serves both the deleted-session guard and push eligibility.
     const limit = vi.fn(async () => [{ session_id: 'ses_remote', ...params.sessionRow }]);

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 
@@ -5,6 +6,18 @@ import { defineConfig } from 'vitest/config';
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.
 export default defineConfig({
   plugins: [
+    {
+      name: 'fix-pg-cjs-dependencies',
+      enforce: 'pre',
+      resolveId(source: string, importer?: string) {
+        if (importer === undefined) return undefined;
+        if (source === 'pg-protocol') {
+          return createRequire(importer).resolve('pg-protocol/dist/index.js');
+        }
+        if (source === 'pg-pool') return createRequire(importer).resolve(source);
+        return undefined;
+      },
+    },
     cloudflareTest({
       wrangler: {
         // Use test-specific wrangler config that excludes Sandbox DO

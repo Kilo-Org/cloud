@@ -1,33 +1,103 @@
-import { useEffect, useMemo } from 'react';
-import { type QueryFunction, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from 'react';
+import { type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
+import { ActiveSessionsLiveSync, refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
 } from '@/lib/active-sessions-live';
+import { useAuth } from '@/lib/auth/auth-context';
+import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { type UseAgentSessionsOptions } from '@/lib/hooks/use-agent-sessions';
+import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 import { useOrganization } from '@/lib/organization-context';
+import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
 
-/**
- * React entry point for the active-sessions live-sync owner. Holds a standing
- * socket lease for the mount lifetime and recreates the per-context owner when
- * the selected personal/org context changes.
- */
+/** Shared active query for the live-only and combined hooks. */
+export function useActiveSessions(options?: UseAgentSessionsOptions) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { token, isLoading, isSigningOut, authEpoch } = useAuth();
+  const { isLoaded } = useOrganization();
+  const canRead =
+    Boolean(token) &&
+    !isLoading &&
+    !isSigningOut &&
+    isLoaded &&
+    options?.enabled !== false &&
+    !isSignOutActive();
+  const wsConnected = useUserWebConnectionState();
+  const input = useMemo(
+    () => buildActiveSessionsTrayInput(options?.organizationId),
+    [options?.organizationId]
+  );
+  const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
+  const queryOptions = trpc.activeSessions.list.queryOptions(input, {
+    // Cloud rows need a floor poll; socket writes remain the instant CLI path.
+    refetchInterval: wsConnected ? 30_000 : 10_000,
+    staleTime: 5000,
+    enabled: canRead,
+  });
+  const queryFn = queryOptions.queryFn;
+  const active = useQuery({
+    ...queryOptions,
+    queryFn:
+      queryFn &&
+      fenceActiveSessionsQuery(queryFn, () => isCurrentAuthEpoch(authEpoch) && !isSignOutActive()),
+  });
+  const scope = useMemo(() => ({ queryKey, canRead, authEpoch }), [queryKey, canRead, authEpoch]);
+  const currentScope = useRef<typeof scope | null>(scope);
+  currentScope.current = scope;
+  useEffect(() => {
+    currentScope.current = scope;
+    return () => {
+      currentScope.current = null;
+    };
+  }, [scope]);
+
+  const refetch = async (): Promise<boolean> => {
+    const isCurrentScope = () =>
+      canRead &&
+      currentScope.current === scope &&
+      isCurrentAuthEpoch(authEpoch) &&
+      !isSignOutActive();
+    if (!isCurrentScope()) {
+      return false;
+    }
+    const refresh = captureActiveSessionsQueryRefresh(queryClient, queryKey);
+    const handled = await refreshActiveSessionsNow(queryKey);
+    if (!isCurrentScope() || !refresh.isCurrent()) {
+      return false;
+    }
+    if (handled === false) {
+      await active.refetch();
+    }
+    return (
+      isCurrentScope() && (handled === false || handled.accepted) && refresh.hasAcceptedResult()
+    );
+  };
+  return { ...active, queryKey, canRead, refetch };
+}
+
+/** Holds the socket lease across personal/organization context changes. */
 function useActiveSessionsLiveSync(): void {
   const connection = useUserWebConnection();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { organizationId, isLoaded } = useOrganization();
+  const { token, isLoading, isSigningOut, authEpoch } = useAuth();
+  const enabled = Boolean(token) && !isLoading && !isSigningOut && isLoaded;
 
-  // The per-context owner below is recreated on every context switch, and its
-  // detach()/attach() pair would drop the retain count to zero in between —
-  // which stops the shared user-web socket. This lease spans the mount's whole
-  // lifetime, so a context switch swaps owners without ever closing the socket,
-  // and the socket still comes up before the organization context has loaded,
-  // exactly as it does today. `retain()` returns its own release function.
-  useEffect(() => connection.retain(), [connection]);
+  // Each per-context owner also owns and releases its own lease.
+  useEffect(() => {
+    if (enabled && !isSignOutActive()) {
+      return connection.retain();
+    }
+    return undefined;
+  }, [connection, enabled, authEpoch]);
 
   const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
@@ -37,25 +107,16 @@ function useActiveSessionsLiveSync(): void {
         .queryFn as QueryFunction<CachedActiveSessionsData>,
     [trpc, input]
   );
-
-  // One owner per context: the tray cache key varies with the selected
-  // personal/org context, so switching context has to retarget the WS writes. A
-  // fresh instance per key is simpler than mutating a live owner's key, and
-  // `attach()`'s cleanup releases the previous retain and listeners. Gated on
-  // `isLoaded` so the pre-load default (personal) never claims the socket for a
-  // context the user has not actually selected.
+  // An unresolved selection must never attach the default personal context.
   useEffect(() => {
-    if (!isLoaded) {
+    if (!enabled || isSignOutActive()) {
       return undefined;
     }
     const sync = new ActiveSessionsLiveSync({ connection, queryClient, queryKey, queryFn });
     return sync.attach();
-  }, [connection, isLoaded, queryClient, queryFn, queryKey]);
+  }, [connection, enabled, authEpoch, queryClient, queryFn, queryKey]);
 }
 
-/**
- * Component form for the layout wiring. Renders `null`.
- */
 export function ActiveSessionsLiveSyncMount(): null {
   useActiveSessionsLiveSync();
   return null;

@@ -152,7 +152,11 @@
     "appearanceDark": "深色",
     "account": "账户",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
-    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。"
+    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。",
+    "returnSendsMessage": "回车键发送消息",
+    "returnSendsMessageSubtitle": "关闭后，回车键会在代理编辑器中插入换行。",
+    "biometricUnlock": "使用生物识别解锁",
+    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。"
   },
   "notifications": {
     "title": "通知",
@@ -211,7 +215,8 @@
     "profile": "个人资料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}，标签页，{{total}} 中的第 {{position}} 个"
+    "position": "{{name}}，标签页，{{total}} 中的第 {{position}} 个",
+    "chat": "聊天"
   },
   "chat": {
     "instancePicker": {
@@ -295,7 +300,8 @@
       "networkError": "网络错误",
       "uploadFailed": "上传失败",
       "failedToUploadFile": "上传文件失败：{{reason}}",
-      "nothingToPaste": "没有可粘贴的内容"
+      "nothingToPaste": "没有可粘贴的内容",
+      "metadataStripFailed": "无法移除照片元数据。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -898,7 +904,23 @@
       "title": "审查",
       "tokens": "令牌",
       "tokensInOut": "输入 {{input}} / 输出 {{output}}",
-      "pullRequest": "拉取请求"
+      "pullRequest": "拉取请求",
+      "transcriptWaiting": "正在等待审查转录。",
+      "transcriptEmpty": "此审查没有转录。",
+      "transcriptRetry": "无法加载审查转录。",
+      "transcriptLive": "实时",
+      "agentIdle": "代理空闲",
+      "agentWorking": "代理工作中...",
+      "anErrorOccurred": "发生错误",
+      "errorWithMessage": "错误：{{message}}",
+      "executionStarted": "执行已开始",
+      "reviewCompleted": "审查已完成",
+      "reviewInterrupted": "审查已中断",
+      "sessionError": "会话错误：{{error}}",
+      "statusWithValue": "状态：{{status}}",
+      "toolName": "工具：{{name}}",
+      "toolNameError": "工具：{{name}} — 错误",
+      "unknownError": "未知错误"
     },
     "reviewList": {
       "configureProvider": "配置提供商",
@@ -1579,7 +1601,6 @@
     }
   },
   "agents": {
-    "activeNow": "当前活跃",
     "search": {
       "searching": "正在搜索",
       "searchSessions": "搜索会话",
@@ -1590,16 +1611,15 @@
     "sessionList": {
       "couldNotLoad": "无法加载会话",
       "couldNotLoadActive": "无法加载活动会话",
-      "noSessionsYet": "暂无会话",
       "noSessionsYetDescription": "从您的手机开始编程任务。您的会话将显示在这里。",
       "noMatches": "没有匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除您的筛选条件。",
       "couldNotSearch": "无法搜索会话",
-      "allActive": "所有会话均处于活动状态",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "没有过去的会话",
-      "live": "实时"
+      "live": "实时",
+      "updating": "正在更新"
     },
     "sessionRow": {
       "deleteTitle": "删除会话？",
@@ -1643,7 +1663,9 @@
     "sessionExited": "会话已退出",
     "remoteSpawnRetryable": "无法连接到实例——它可能已断开。",
     "remoteSpawnNonRetryable": "实例未能启动会话——请检查机器或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "所选实例已断开。请在 Cloud Agent 上启动会话，或选择其他实例。"
+    "remoteSpawnInstanceDisconnected": "所选实例已断开。请在 Cloud Agent 上启动会话，或选择其他实例。",
+    "liveCount_one": "{{count}} 实时",
+    "liveCount_other": "{{count}} 实时"
   },
   "agentChat": {
     "session": {
@@ -1665,18 +1687,19 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
-      "connectRepository": "连接仓库",
       "cloningSession": "正在克隆会话",
       "continue": "继续",
       "couldNotLoadThisSession": "无法加载此会话",
-      "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。",
       "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
       "connectionTrouble": "连接出现问题。请稍后重试。",
-      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。"
+      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。",
+      "cancelQueuedFailed": "无法取消消息。",
+      "cancelQueuedRestoreAvailable": "消息已取消。点击“恢复”将其放回编辑器。",
+      "cancelQueuedRestored": "消息已取消。提示词已放回编辑器。",
+      "cancelQueuedUpgradeRequired": "取消已排队的消息需要更新的 Kilo CLI。请更新 Kilo CLI 并重新连接。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",
@@ -1744,7 +1767,12 @@
       "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
       "openBitbucket": "打开 Bitbucket",
       "openGitlab": "打开 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在继续 {{title}}",
+      "importingSession": "正在导入会话",
+      "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
+      "importFailed": "无法导入此会话。",
+      "discardWithUploadsMessage": "您的提示词和未附加到已发送消息的上传文件将被删除。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -1802,7 +1830,9 @@
       "noCliInstancesDescription": "在您电脑上的项目中运行 `kilo remote`，或如果已有 Kilo CLI 在运行，请更新它。",
       "instanceOnProject": "{{project}} 上的 {{name}}",
       "instanceOnProjectSuffix": "{{project}} 上的 {{name}} ({{suffix}})",
-      "runOnCloudAgent": "在云端代理上运行"
+      "runOnCloudAgent": "在云端代理上运行",
+      "terminals": "终端",
+      "remotes": "远程实例"
     },
     "modePicker": {
       "title": "选择模式",
@@ -1992,7 +2022,11 @@
       "queuedAccessibility": "消息已排队",
       "userMessage": "用户消息",
       "assistantMessage": "助手消息",
-      "longPressHint": "长按查看消息详情"
+      "longPressHint": "长按查看消息详情",
+      "cancelQueued": "取消消息",
+      "cancelQueuedAccessibility": "取消已排队的消息",
+      "restoreQueued": "恢复",
+      "restoreQueuedAccessibility": "将已取消的消息恢复到编辑器"
     },
     "olderMessages": {
       "arrived": "已加载较早的消息",
@@ -2008,6 +2042,8 @@
       "viewTable": "查看表格",
       "title": "表格",
       "close": "关闭表格",
+      "loading": "正在加载表格",
+      "empty": "此表格没有任何行。",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",
@@ -2018,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "筛选会话",
-      "sortBy": "排序方式",
-      "sortLastUpdated": "最近更新",
-      "sortCreated": "创建时间",
       "platform": "平台",
       "platformCloud": "云端",
       "platformExtension": "扩展",
@@ -2029,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "其他",
-      "project": "项目",
-      "removeProjectFilter": "移除 {{label}} 项目筛选",
-      "removePlatformFilter": "移除 {{label}} 平台筛选"
+      "project": "项目"
     },
     "suggestion": {
       "title": "建议",
@@ -2074,7 +2105,9 @@
       "uploading": "正在上传…",
       "uploaded": "已上传",
       "uploadFailedRetry": "上传失败。点击重试。",
-      "uploadFailedTerminal": "无法上传此文件。"
+      "uploadFailedTerminal": "无法上传此文件。",
+      "moveLeft": "将 {{filename}} 向左移动",
+      "moveRight": "将 {{filename}} 向右移动"
     },
     "attachmentPasteHint": {
       "accessibility": "从剪贴板粘贴图片",
@@ -2104,7 +2137,11 @@
       "finalizingPlaceholder": "正在收尾...",
       "messagePlaceholder": "消息...",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
-      "couldNotAttachFiles": "无法附加文件。点击发送以重试。"
+      "couldNotAttachFiles": "无法附加文件。点击发送以重试。",
+      "discardAttachmentsMessage": "未附加到已发送消息的上传文件将被删除。",
+      "discardAttachmentsTitle": "丢弃附件？",
+      "charactersRemaining": "还可输入 {{count}} 个字符",
+      "insertNewline": "插入换行"
     },
     "chatLink": {
       "linkCopied": "链接已复制",
@@ -2196,6 +2233,17 @@
       "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
       "open": "打开",
       "trustThisHost": "信任此主机"
+    },
+    "folderPicker": {
+      "accessibility": "文件夹：{{label}}",
+      "emptyDescription": "完成将使用此文件夹。",
+      "emptyTitle": "里面没有文件夹",
+      "fieldLabel": "文件夹",
+      "retryableDescription": "检查连接并重试。完成仍将确认此文件夹。",
+      "retryableTitle": "无法列出文件夹",
+      "tapToListHint": "点击文件夹以列出其内容",
+      "unsupportedDescription": "此 CLI 无法列出文件夹。完成将保留启动文件夹，开始会话将从那里启动。",
+      "unsupportedTitle": "无法列出文件夹"
     }
   },
   "bootstrap": {
@@ -2248,7 +2296,7 @@
     "newCodingTask": "新编程任务",
     "explore": "探索",
     "seeAll": "查看全部",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "目前没有正在运行的内容"
   },
   "imageViewer": {
     "close": "关闭 {{filename}}",
@@ -2312,7 +2360,8 @@
     "busy": "语音输入正忙。请重试。",
     "stopped": "语音输入已停止。点击麦克风重试。",
     "unavailableDevice": "此设备不支持语音输入。",
-    "unavailableLanguage": "语音输入不支持此设备的语言。"
+    "unavailableLanguage": "语音输入不支持此设备的语言。",
+    "listeningStopped": "已停止聆听。"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -3149,5 +3198,19 @@
     "emptyDescription": "当你信任某个链接的主机后，它将无需再次询问即可打开。",
     "revoke": "撤销 {{host}}",
     "backToPreferences": "返回偏好设置"
+  },
+  "quickChat": {
+    "title": "聊天",
+    "composer": {
+      "placeholder": "消息"
+    },
+    "empty": {
+      "title": "开始聊天",
+      "description": "发送消息以与模型对话。"
+    },
+    "working": "工作中",
+    "historyRetry": "无法加载聊天历史。",
+    "catalogRetry": "无法加载模型",
+    "sendError": "无法发送消息。请重试。"
   }
 }

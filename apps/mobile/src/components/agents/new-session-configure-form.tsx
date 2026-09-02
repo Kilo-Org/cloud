@@ -1,8 +1,10 @@
 import { type ReactNode, type RefObject } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { LaunchFolderField } from '@/components/agents/folder-selector';
+import { renderProfileRow } from '@/components/agents/new-session-profile-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import {
@@ -10,19 +12,22 @@ import {
   type RepositoryGroup,
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
+import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { Button } from '@/components/ui/button';
+import { RefreshCw } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
 import {
   type AgentAttachment,
   type AgentAttachmentCandidate,
+  type AttachmentMoveDirection,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
@@ -49,6 +54,8 @@ type NewSessionConfigureFormProps = {
   onAddAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onRetryAttachment: (id: string) => void;
+  onMoveAttachment: (id: string, direction: AttachmentMoveDirection) => void;
+  onReorderAttachments: (fromIndex: number, toIndex: number) => void;
   onRefetchModels: () => void;
   onPrefillAttachments: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
   shareId: string | undefined;
@@ -59,8 +66,17 @@ type NewSessionConfigureFormProps = {
   runOnInstance: InstancePickerInstance | null;
   instanceList: InstancePickerInstance[];
   isLoadingInstances: boolean;
+  isFetchingInstances: boolean;
+  onRefreshInstances: () => void;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
+  // Launch folder (remote CLI only). `""` means the launch directory.
+  folderPath: string;
+  onChangeFolderPath: (path: string) => void;
+  /** Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or a failed clone/import). */
+  runOnInlineNote?: string | null;
+  /** True for the Continue clone entry: hides Changes and Environment. */
+  isCloneEntry?: boolean;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
@@ -110,6 +126,8 @@ export function NewSessionConfigureForm({
   onAddAttachment,
   onRemoveAttachment,
   onRetryAttachment,
+  onMoveAttachment,
+  onReorderAttachments,
   onRefetchModels,
   onPrefillAttachments,
   shareId,
@@ -119,8 +137,14 @@ export function NewSessionConfigureForm({
   runOnInstance,
   instanceList,
   isLoadingInstances,
+  isFetchingInstances,
+  onRefreshInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
+  folderPath,
+  onChangeFolderPath,
+  runOnInlineNote,
+  isCloneEntry = false,
   groups,
   isRetrying,
   onChangeRepo,
@@ -139,10 +163,13 @@ export function NewSessionConfigureForm({
   isStartDisabled,
   onStartSession,
 }: Readonly<NewSessionConfigureFormProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
+  const runOnNote =
+    runOnInlineNote ??
+    (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
   const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   let runTargetBlock: ReactNode = null;
   if (showRunOnSelector) {
@@ -151,13 +178,27 @@ export function NewSessionConfigureForm({
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.instancePicker.runOn')}
         </Text>
-        <InstanceSelector
-          value={runOnInstance}
-          instances={instanceList}
-          isLoading={isLoadingInstances}
-          onChange={onChangeRunOnInstance}
-          disabled={isStarting}
-        />
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1">
+            <InstanceSelector
+              value={runOnInstance}
+              instances={instanceList}
+              isLoading={isLoadingInstances}
+              onChange={onChangeRunOnInstance}
+              disabled={isStarting}
+            />
+          </View>
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={onRefreshInstances}
+            disabled={isStarting || isFetchingInstances}
+            loading={isFetchingInstances}
+            accessibilityLabel={t('common.refresh')}
+          >
+            {!isFetchingInstances ? <RefreshCw size={18} color={colors.foreground} /> : null}
+          </Button>
+        </View>
       </View>
     );
   } else if (targetLabel) {
@@ -166,60 +207,6 @@ export function NewSessionConfigureForm({
         <Text className="text-sm text-muted-foreground">
           {t('agentChat.newSession.runOnWithTarget', { target: targetLabel })}
         </Text>
-      </View>
-    );
-  }
-
-  // Read-only effective-profile row. Hidden while the profile query loads so a
-  // resolved name never flashes a "Default environment" placeholder first.
-  function renderProfileRow(): ReactNode {
-    if (isProfileLoading) {
-      return null;
-    }
-    if (isProfileError) {
-      return (
-        <View className="mt-5">
-          <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('agentChat.newSession.environment')}
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <Text className="text-sm text-destructive">
-              {t('agentChat.newSession.couldNotLoadEnvironment')}
-            </Text>
-            <Button
-              variant="link"
-              size="sm"
-              onPress={onRetryProfile}
-              accessibilityLabel={t('agentChat.newSession.retryLoadingEnvironment')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.newSession.environment')}
-        </Text>
-        {profile ? (
-          <View className="gap-1">
-            <Text className="text-sm font-semibold text-foreground">{profile.name}</Text>
-            <Text className="text-sm text-muted-foreground">
-              {t('agentChat.newSession.environmentSummary', {
-                commands: profile.commandCount,
-                mcp: profile.mcpServerCount,
-                skills: profile.skillCount,
-                agents: profile.agentCount,
-              })}
-            </Text>
-          </View>
-        ) : (
-          <Text className="text-sm text-foreground">
-            {t('agentChat.newSession.defaultEnvironment')}
-          </Text>
-        )}
       </View>
     );
   }
@@ -250,24 +237,33 @@ export function NewSessionConfigureForm({
         onAddAttachment={onAddAttachment}
         onRemoveAttachment={onRemoveAttachment}
         onRetryAttachment={onRetryAttachment}
+        onMoveAttachment={onMoveAttachment}
+        onReorderAttachments={onReorderAttachments}
         onRefetchModels={onRefetchModels}
         onPrefillAttachments={onPrefillAttachments}
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
         initialPrompt={initialPrompt}
+        onStartSession={isStartDisabled ? undefined : onStartSession}
+        isCloneEntry={isCloneEntry}
       />
 
       {runTargetBlock}
+
+      {isRemote ? (
+        <LaunchFolderField
+          folderPath={folderPath}
+          runOnInstance={runOnInstance}
+          onChangeFolderPath={onChangeFolderPath}
+          disabled={isStarting}
+        />
+      ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
         {t('agentChat.newSession.remoteHint')}
       </Text>
 
-      {showInstanceDisconnectedNote ? (
-        <Text className="mt-2 text-sm text-muted-foreground">
-          {remoteSpawnInstanceDisconnectedNote()}
-        </Text>
-      ) : null}
+      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
@@ -283,7 +279,7 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {!isRemote ? (
+      {!isRemote && !isCloneEntry ? (
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('agentChat.newSession.changes')}
@@ -302,15 +298,17 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote ? renderProfileRow() : null}
+      {!isRemote && !isCloneEntry
+        ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
+        : null}
 
-      <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-        {isStarting ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Text>{t('agentChat.newSession.startSession')}</Text>
-        )}
-      </Button>
+      <NewSessionStartButton
+        isCloneEntry={isCloneEntry}
+        isRemote={isRemote}
+        isStartDisabled={isStartDisabled}
+        isStarting={isStarting}
+        onStartSession={onStartSession}
+      />
     </ScrollView>
   );
 }

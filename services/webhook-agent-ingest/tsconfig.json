@@ -4,7 +4,11 @@
     "lib": ["esnext"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["@types/node", "./worker-configuration.d.ts"],
+    "types": [
+      "@types/node",
+      "./worker-configuration.d.ts",
+      "@cloudflare/vitest-pool-workers/types"
+    ],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -14,5 +18,12 @@
     "resolveJsonModule": true,
     "allowJs": true
   },
-  "include": ["worker-configuration.d.ts", "src/**/*.ts", "vitest.config.ts", "drizzle/**/*"]
+  "include": [
+    "worker-configuration.d.ts",
+    "src/**/*.ts",
+    "test/integration/setup.ts",
+    "vitest.config.ts",
+    "vitest.workers.config.ts",
+    "drizzle/**/*"
+  ]
 }

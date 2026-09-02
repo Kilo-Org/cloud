@@ -160,6 +160,18 @@ async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId
   return `${prefix}-${hashHex.substring(0, 48)}` as SandboxId;
 }
 
+export async function deriveSandboxAllocationId(
+  sandboxId: string,
+  intentId: string
+): Promise<SandboxId> {
+  const classification = classifySandboxId(sandboxId);
+  if (classification === 'unknown' || classification === 'legacy-shared' || !intentId) {
+    throw new Error('Sandbox allocation requires a generated sandbox ID and create intent');
+  }
+  const prefix = sandboxId.slice(0, sandboxId.indexOf('-'));
+  return hashToSandboxId(`control-allocation-v1:${sandboxId}:${intentId}`, prefix);
+}
+
 export async function deriveSharedSandboxId(
   routeKey: SandboxId,
   suffix: string

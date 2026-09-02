@@ -1,5 +1,7 @@
+import type * as DrizzleModule from '@/lib/drizzle';
+
 jest.mock('@/lib/drizzle', () => {
-  const actual = jest.requireActual<typeof import('@/lib/drizzle')>('@/lib/drizzle');
+  const actual = jest.requireActual<typeof DrizzleModule>('@/lib/drizzle');
   return {
     ...actual,
     readDb: { ...actual.readDb, transaction: jest.fn(), execute: jest.fn() },
@@ -324,12 +326,15 @@ describe('admin.gatewayUsage.getMonthlyUsage', () => {
     expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['development', 'test'])('allows the local readDb fallback in %s', async nodeEnv => {
-    jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
-    mockUsesSeparateReplica = false;
-    await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([]);
-    expect(mockTransaction).toHaveBeenCalledTimes(1);
-  });
+  it.each(['development', 'test'] as const)(
+    'allows the local readDb fallback in %s',
+    async nodeEnv => {
+      jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
+      mockUsesSeparateReplica = false;
+      await expect(caller().getMonthlyUsage(INPUT)).resolves.toEqual([]);
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('does not open a transaction for an already-aborted request', async () => {
     await expect(caller(true, AbortSignal.abort()).getMonthlyUsage(INPUT)).rejects.toMatchObject(

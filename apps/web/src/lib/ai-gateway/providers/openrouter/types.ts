@@ -3,7 +3,7 @@ import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
-  AwsCredentials,
+  BedrockCredentials,
   VertexCredentials,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -13,6 +13,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 export type OpenRouterProviderConfig = {
   order?: string[];
+  sort?: 'price' | 'throughput' | 'latency';
   only?: string[];
   ignore?: string[];
   data_collection?: 'allow' | 'deny';
@@ -26,7 +27,7 @@ export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterP
 
 export type VercelInferenceProviderConfig =
   | { apiKey: string; baseURL?: string }
-  | AwsCredentials
+  | BedrockCredentials
   | VertexCredentials;
 
 export type VercelProviderConfig = {

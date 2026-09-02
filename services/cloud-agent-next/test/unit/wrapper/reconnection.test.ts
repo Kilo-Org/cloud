@@ -28,6 +28,7 @@ import {
 import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
 import type { KiloEvent, WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
+import * as wrapperUtils from '../../../wrapper/src/utils.js';
 
 // ---------------------------------------------------------------------------
 // Polyfills for Node.js test environment
@@ -573,6 +574,47 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onReconnected).toHaveBeenCalled();
     expect(manager.isReconnecting()).toBe(false);
   });
+
+  it.each(['initial connection', 'ingest reconnection'])(
+    'keeps %s usable when a restored network-list probe rejects',
+    async phase => {
+      const kiloClient = createMockKiloClient();
+      const manager = createManagerWithClient(kiloClient);
+      const probe = Promise.withResolvers<never>();
+      const log = vi.spyOn(wrapperUtils, 'logToFile').mockImplementation(() => {});
+
+      try {
+        const ws = phase === 'ingest reconnection' ? await openConnection(manager) : undefined;
+        vi.mocked(kiloClient.getNetworkWaits)
+          .mockResolvedValueOnce([])
+          .mockReturnValueOnce(probe.promise);
+
+        if (ws) {
+          ws.simulateClose(1006);
+          await vi.advanceTimersByTimeAsync(1_000);
+          MockWebSocket.latest?.simulateOpen();
+          await vi.advanceTimersByTimeAsync(0);
+          expect(callbacks.onReconnected).toHaveBeenCalled();
+        } else {
+          await openConnection(manager);
+        }
+        expect(manager.isConnected()).toBe(true);
+
+        probe.reject(new Error('Network list failed: HTTP 500'));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(log).toHaveBeenCalledWith(
+          'failed to resume restored network waits: Network list failed: HTTP 500'
+        );
+        expect(manager.isConnected()).toBe(true);
+        expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+        expect(callbacks.onTerminalError).not.toHaveBeenCalled();
+      } finally {
+        await manager.close();
+        log.mockRestore();
+      }
+    }
+  );
 
   // -------------------------------------------------------------------------
   // Test: reconnection fails after all attempts

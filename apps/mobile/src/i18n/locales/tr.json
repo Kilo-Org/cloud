@@ -152,7 +152,11 @@
     "appearanceDark": "Koyu",
     "account": "Hesap",
     "prReviewAttribution": "PR incelemelerine uygulama atfı ekle",
-    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle"
+    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle",
+    "returnSendsMessage": "Enter tuşu mesaj gönderir",
+    "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajan mesaj giriş alanlarına yeni satır ekler.",
+    "biometricUnlock": "Biyometrik doğrulama ile kilit açma",
+    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -296,7 +300,8 @@
       "networkError": "Ağ hatası",
       "uploadFailed": "Yükleme başarısız oldu",
       "failedToUploadFile": "Dosya yüklenemedi: {{reason}}",
-      "nothingToPaste": "Yapıştırılacak bir şey yok"
+      "nothingToPaste": "Yapıştırılacak bir şey yok",
+      "metadataStripFailed": "Fotoğraf meta verileri kaldırılamadı."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -350,7 +355,7 @@
       "online": "Çevrimiçi",
       "idle": "Boşta",
       "offline": "Çevrimdışı",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "loadingUser": "Kullanıcı yükleniyor...",
       "waitingForStatus": "Bot durumu bekleniyor...",
       "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
@@ -721,9 +726,9 @@
       "destroying": "YOK EDİLİYOR",
       "provisioned": "SAĞLANDI",
       "restarting": "YENİDEN BAŞLATILIYOR",
-      "running": "Çalışıyor",
+      "running": "ÇALIŞIYOR",
       "shuttingDown": "KAPATILIYOR",
-      "starting": "Başlatılıyor",
+      "starting": "BAŞLATILIYOR",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
       "unknown": "BİLİNMİYOR",
@@ -903,7 +908,7 @@
       "transcriptWaiting": "İnceleme dökümü bekleniyor.",
       "transcriptEmpty": "Bu incelemeye ait döküm yok.",
       "transcriptRetry": "İnceleme dökümü yüklenemedi.",
-      "transcriptLive": "CANLI",
+      "transcriptLive": "Canlı",
       "agentIdle": "Ajan boşta",
       "agentWorking": "Ajan çalışıyor...",
       "anErrorOccurred": "Bir hata oluştu",
@@ -1097,7 +1102,7 @@
       "suggestedFix": "Önerilen düzeltme",
       "triageConfidence": "Triyaj güveni",
       "triageReasoning": "Triyaj gerekçesi",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "watchInCloudAgent": "Bulut Ajanı'nda izle",
       "whereFound": "Bunun bulunduğu yer ({{displayCount}})",
       "yes": "Evet"
@@ -1279,7 +1284,7 @@
       "sourceRecord": "Kaynak kaydı",
       "supersededBy": "Güncel bir bulgu tarafından geçersiz kılındı",
       "supersededByDescription": "Durum, analiz ve iyileştirme için güncel kaydı açmak üzere dokunun.",
-      "unknown": "BİLİNMİYOR",
+      "unknown": "Bilinmiyor",
       "updated": "Güncellendi",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
       "vulnerableVersions": "Savunmasız sürümler",
@@ -1613,7 +1618,8 @@
       "couldNotSearch": "Oturumlar aranamadı",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
-      "live": "CANLI"
+      "live": "CANLI",
+      "updating": "Güncelleniyor"
     },
     "sessionRow": {
       "deleteTitle": "Oturum silinsin mi?",
@@ -1627,7 +1633,7 @@
       "couldNotCopyId": "Oturum kimliği kopyalanamadı",
       "untitled": "Başlıksız oturum",
       "sessionDeleted": "Oturum silindi",
-      "needsInput": "Girdi gerekli",
+      "needsInput": "girdi gerekli",
       "fromPlatform": "{{platform}} üzerinden",
       "cent_one": "sent",
       "cent": "sent",
@@ -1657,7 +1663,9 @@
     "sessionExited": "Oturumdan çıkıldı",
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı — makineyi kontrol edin veya CLI'yı güncelleyin.",
-    "remoteSpawnInstanceDisconnected": "Seçili örnek bağlantısı kesildi. Cloud Agent'ta bir oturum başlatın veya başka bir örnek seçin."
+    "remoteSpawnInstanceDisconnected": "Seçili örnek bağlantısı kesildi. Cloud Agent'ta bir oturum başlatın veya başka bir örnek seçin.",
+    "liveCount_one": "{{count}} CANLI",
+    "liveCount_other": "{{count}} CANLI"
   },
   "agentChat": {
     "session": {
@@ -1687,7 +1695,11 @@
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
       "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin.",
-      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin."
+      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin.",
+      "cancelQueuedFailed": "Mesaj iptal edilemedi.",
+      "cancelQueuedRestoreAvailable": "Mesaj iptal edildi. Mesaj giriş alanına geri getirmek için “Geri yükleyin” düğmesine dokunun.",
+      "cancelQueuedRestored": "Mesaj iptal edildi. İstem, mesaj giriş alanına geri getirildi.",
+      "cancelQueuedUpgradeRequired": "Kuyruktaki mesajları iptal etmek daha yeni bir Kilo CLI gerektirir. Kilo CLI'yı güncelleyin ve yeniden bağlanın."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",
@@ -1759,7 +1771,8 @@
       "continueFrom": "{{title}} devam ediliyor",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam edemez. Bulut Ajanı veya başka bir CLI seçin.",
-      "importFailed": "Bu oturum içe aktarılamadı."
+      "importFailed": "Bu oturum içe aktarılamadı.",
+      "discardWithUploadsMessage": "İsteminiz ve gönderilen mesajlara eklenmemiş tüm yüklemeler silinecek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -1817,7 +1830,9 @@
       "noCliInstancesDescription": "Bilgisayarınızdaki bir projede `kilo remote` çalıştırın veya zaten çalışıyorsa Kilo CLI'yi güncelleyin.",
       "instanceOnProject": "{{project}} üzerinde {{name}}",
       "instanceOnProjectSuffix": "{{project}} üzerinde {{name}} ({{suffix}})",
-      "runOnCloudAgent": "Bulut Ajanında çalıştır"
+      "runOnCloudAgent": "Bulut Ajanında çalıştır",
+      "terminals": "Terminaller",
+      "remotes": "Uzak örnekler"
     },
     "modePicker": {
       "title": "Mod seç",
@@ -2007,7 +2022,11 @@
       "queuedAccessibility": "Mesaj kuyruğa alındı",
       "userMessage": "Kullanıcı mesajı",
       "assistantMessage": "Asistan mesajı",
-      "longPressHint": "Mesaj ayrıntıları için uzun basın"
+      "longPressHint": "Mesaj ayrıntıları için uzun basın",
+      "cancelQueued": "Mesajı iptal edin",
+      "cancelQueuedAccessibility": "Kuyruktaki mesajı iptal edin",
+      "restoreQueued": "Geri yükleyin",
+      "restoreQueuedAccessibility": "İptal edilen mesajı mesaj giriş alanına geri yükleyin"
     },
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",
@@ -2035,9 +2054,6 @@
     },
     "sessionFilter": {
       "title": "Oturumları filtrele",
-      "sortBy": "Sıralama ölçütü",
-      "sortLastUpdated": "Son güncellenen",
-      "sortCreated": "Oluşturulma",
       "platform": "Platform",
       "platformCloud": "Bulut",
       "platformExtension": "Eklenti",
@@ -2046,9 +2062,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Diğer",
-      "project": "Proje",
-      "removeProjectFilter": "{{label}} proje filtresini kaldır",
-      "removePlatformFilter": "{{label}} platform filtresini kaldır"
+      "project": "Proje"
     },
     "suggestion": {
       "title": "Öneri",
@@ -2091,7 +2105,9 @@
       "uploading": "Yükleniyor…",
       "uploaded": "Yüklendi",
       "uploadFailedRetry": "Yükleme başarısız oldu. Tekrar denemek için dokunun.",
-      "uploadFailedTerminal": "Bu dosya yüklenemiyor."
+      "uploadFailedTerminal": "Bu dosya yüklenemiyor.",
+      "moveLeft": "{{filename}} dosyasını sola taşıyın",
+      "moveRight": "{{filename}} dosyasını sağa taşıyın"
     },
     "attachmentPasteHint": {
       "accessibility": "Panodan görüntü yapıştır",
@@ -2121,7 +2137,11 @@
       "finalizingPlaceholder": "Tamamlanıyor...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Bu oturum dosya alamaz. Mesajınızı göndermek için ekleri kaldırın.",
-      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun."
+      "couldNotAttachFiles": "Dosyalar eklenemedi. Yeniden denemek için Gönder’e dokunun.",
+      "discardAttachmentsMessage": "Gönderilen mesajlara eklenmemiş yüklemeler silinecek.",
+      "discardAttachmentsTitle": "Ekler silinsin mi?",
+      "charactersRemaining": "{{count}} karakter kaldı",
+      "insertNewline": "Yeni satır ekleyin"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",
@@ -2197,7 +2217,7 @@
       "open": "açık pull request",
       "closed": "kapalı pull request",
       "merged": "birleştirilmiş pull request",
-      "draft": "Taslak çekme isteği",
+      "draft": "taslak çekme isteği",
       "updating": "Güncelleniyor, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "çekme isteği"
@@ -2276,7 +2296,7 @@
     "newCodingTask": "Yeni kodlama görevi",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Şu anda çalışan bir şey yok"
   },
   "imageViewer": {
     "close": "{{filename}} kapat",
@@ -2321,7 +2341,7 @@
     "optionsExpiredDescription": "Geri dönün ve bu seçiciyi önceki ekrandan yeniden açın."
   },
   "sessionRow": {
-    "needsInput": "Girdi gerekli"
+    "needsInput": "GİRDİ GEREKLİ"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -2340,7 +2360,8 @@
     "busy": "Sesli giriş meşgul. Tekrar deneyin.",
     "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokunun.",
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
-    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor."
+    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor.",
+    "listeningStopped": "Dinleme durdu."
   },
   "share": {
     "title": "Kilo'ya paylaş",
@@ -3030,7 +3051,7 @@
         "void": "Geçersiz",
         "draft": "Taslak",
         "uncollectible": "Tahsil edilemez",
-        "unknown": "BİLİNMİYOR"
+        "unknown": "Bilinmiyor"
       },
       "loadMore": "Daha fazla yükle",
       "loadMoreFailed": "Daha fazlası yüklenemedi",

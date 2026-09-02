@@ -78,6 +78,7 @@ describe('classifyPrReviewQueryState', () => {
       kind: 'retryable',
     });
     expect(classifyPrReviewQueryState(makeTrpcError('TIMEOUT'))).toEqual({ kind: 'retryable' });
+    expect(classifyPrReviewQueryState(makeTrpcError('BAD_GATEWAY'))).toEqual({ kind: 'retryable' });
   });
 });
 

@@ -152,7 +152,11 @@
     "appearanceDark": "ងងឹត",
     "account": "គណនី",
     "prReviewAttribution": "បន្ថែមការបញ្ជាក់កម្មវិធីទៅការពិនិត្យ PR",
-    "prReviewAttributionSubtitle": "បន្ថែមបាតកថា Reviewed via Kilo នៅពេលអ្នកដាក់ស្នើការពិនិត្យ។"
+    "prReviewAttributionSubtitle": "បន្ថែមបាតកថា Reviewed via Kilo នៅពេលអ្នកដាក់ស្នើការពិនិត្យ។",
+    "returnSendsMessage": "គ្រាប់ចុចបញ្ចូលផ្ញើសារ",
+    "returnSendsMessageSubtitle": "នៅពេលបិទ គ្រាប់ចុចបញ្ចូលនឹងបញ្ចូលបន្ទាត់ថ្មីក្នុងអ្នកតែងរបស់ភ្នាក់ងារ។",
+    "biometricUnlock": "ដោះសោដោយប្រើជីវមាត្រ",
+    "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។"
   },
   "prReview": {
     "pullRequestUnavailable": "សំណើទាញ (pull request) មិនអាចប្រើបានទេ",
@@ -750,7 +754,8 @@
       "networkError": "កំហុសបណ្តាញ",
       "uploadFailed": "ការផ្ទុកឡើងបានបរាជ័យ",
       "failedToUploadFile": "បរាជ័យក្នុងការផ្ទុកឡើងឯកសារ: {{reason}}",
-      "nothingToPaste": "គ្មានអ្វីត្រូវបិទភ្ជាប់"
+      "nothingToPaste": "គ្មានអ្វីត្រូវបិទភ្ជាប់",
+      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "កំពុងរង់ចាំការចម្លងនៃការពិនិត្យ។",
       "transcriptEmpty": "មិនមានការចម្លងសម្រាប់ការពិនិត្យនេះទេ។",
       "transcriptRetry": "មិនអាចផ្ទុកការចម្លងនៃការពិនិត្យបានទេ។",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "ភ្នាក់ងារទំនេរ",
       "agentWorking": "ភ្នាក់ងារកំពុងដំណើរការ...",
       "anErrorOccurred": "កំហុសមួយបានកើតឡើង",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "មិនអាចស្វែងរកវគ្គ",
       "completedWillAppear": "វគ្គដែលបានបញ្ចប់នឹងបង្ហាញនៅទីនេះ។",
       "noPastSessions": "គ្មានវគ្គកន្លងមក",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព"
     },
     "sessionRow": {
       "deleteTitle": "លុបវគ្គ?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "វគ្គបានចាកចេញ",
     "remoteSpawnRetryable": "មិនអាចទៅដល់ instance បានទេ — វាអាចត្រូវបានផ្ដាច់។",
     "remoteSpawnNonRetryable": "instance បរាជ័យក្នុងការចាប់ផ្ដើមវគ្គ — ពិនិត្យម៉ាស៊ីន ឬធ្វើបច្ចុប្បន្នភាព CLI។",
-    "remoteSpawnInstanceDisconnected": "instance ដែលបានជ្រើសរើសត្រូវបានផ្ដាច់។ ចាប់ផ្ដើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើស instance ផ្សេងទៀត។"
+    "remoteSpawnInstanceDisconnected": "instance ដែលបានជ្រើសរើសត្រូវបានផ្ដាច់។ ចាប់ផ្ដើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើស instance ផ្សេងទៀត។",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "កិច្ចការមុនកំពុងបញ្ចប់នៅឡើយ។ សូមរង់ចាំបន្តិច។",
       "serviceUnavailable": "សេវាកម្មមិនអាចប្រើបាននៅពេលនេះទេ។ សូមព្យាយាមម្តងទៀត។",
       "connectionTrouble": "បញ្ហាការតភ្ជាប់។ សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត។",
-      "modelUnavailable": "ម៉ូដែលនេះមិនអាចប្រើជាមួយ Cloud Agent បានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេង ហើយព្យាយាមម្តងទៀត។"
+      "modelUnavailable": "ម៉ូដែលនេះមិនអាចប្រើជាមួយ Cloud Agent បានទេ។ សូមជ្រើសរើសម៉ូដែលផ្សេង ហើយព្យាយាមម្តងទៀត។",
+      "cancelQueuedFailed": "មិនអាចលុបចោលសារបានទេ។",
+      "cancelQueuedRestoreAvailable": "បានលុបចោលសារ។ ប៉ះ ស្តារ ដើម្បីនាំសារត្រឡប់ទៅអ្នកតែង។",
+      "cancelQueuedRestored": "បានលុបចោលសារ។ ការជំរុញបានត្រឡប់មកអ្នកតែងវិញហើយ។",
+      "cancelQueuedUpgradeRequired": "ការលុបចោលសារដែលបានដាក់ក្នុងជួរត្រូវការ Kilo CLI កំណែថ្មីជាងនេះ។ ធ្វើបច្ចុប្បន្នភាព Kilo CLI ហើយភ្ជាប់ឡើងវិញ។"
     },
     "remoteSession": {
       "failedToCreate": "បរាជ័យក្នុងការបង្កើតវគ្គពីចម្ងាយ",
@@ -2213,7 +2225,8 @@
       "continueFrom": "កំពុងបន្ត {{title}}",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
+      "discardWithUploadsMessage": "ការជំរុញរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង ហើយមិនបានភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវបានលុប។"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "ដំណើរការ `kilo remote` ក្នុងគម្រោងមួយនៅលើកុំព្យូទ័ររបស់អ្នក ឬធ្វើបច្ចុប្បន្នភាព Kilo CLI ប្រសិនបើមានមួយកំពុងដំណើរការរួចហើយ។",
       "instanceOnProject": "{{name}} នៅលើ {{project}}",
       "instanceOnProjectSuffix": "{{name}} នៅលើ {{project}} ({{suffix}})",
-      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent"
+      "runOnCloudAgent": "ដំណើរការលើ Cloud Agent",
+      "terminals": "ស្ថានីយបញ្ជា",
+      "remotes": "ឧទាហរណ៍ពីចម្ងាយ"
     },
     "modePicker": {
       "title": "ជ្រើសរើសរបៀប",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "សារបានដាក់ក្នុងជួរ",
       "userMessage": "សារអ្នកប្រើ",
       "assistantMessage": "សារជំនួយការ",
-      "longPressHint": "ចុចឱ្យជាប់សម្រាប់ព័ត៌មានលម្អិតនៃសារ"
+      "longPressHint": "ចុចឱ្យជាប់សម្រាប់ព័ត៌មានលម្អិតនៃសារ",
+      "cancelQueued": "លុបចោលសារ",
+      "cancelQueuedAccessibility": "លុបចោលសារដែលបានដាក់ក្នុងជួរ",
+      "restoreQueued": "ស្តារ",
+      "restoreQueuedAccessibility": "ស្តារសារដែលបានលុបចោលទៅអ្នកតែង"
     },
     "olderMessages": {
       "arrived": "បានផ្ទុកសារមុនៗ",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "ត្រងវគ្គ",
-      "sortBy": "តម្រៀបតាម",
-      "sortLastUpdated": "បានធ្វើបច្ចុប្បន្នភាពចុងក្រោយ",
-      "sortCreated": "បានបង្កើត",
       "platform": "វេទិកា",
       "platformCloud": "Cloud",
       "platformExtension": "ផ្នែកបន្ថែម",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ផ្សេងទៀត",
-      "project": "គម្រោង",
-      "removeProjectFilter": "ដកតម្រងគម្រោង {{label}} ចេញ",
-      "removePlatformFilter": "ដកតម្រងវេទិកា {{label}} ចេញ"
+      "project": "គម្រោង"
     },
     "suggestion": {
       "title": "ការណែនាំ",
@@ -2545,7 +2559,9 @@
       "uploading": "កំពុងផ្ទុកឡើង…",
       "uploaded": "បានផ្ទុកឡើង",
       "uploadFailedRetry": "ការផ្ទុកឡើងបានបរាជ័យ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
-      "uploadFailedTerminal": "ឯកសារនេះមិនអាចផ្ទុកឡើងបានទេ។"
+      "uploadFailedTerminal": "ឯកសារនេះមិនអាចផ្ទុកឡើងបានទេ។",
+      "moveLeft": "ផ្លាស់ទី {{filename}} ទៅឆ្វេង",
+      "moveRight": "ផ្លាស់ទី {{filename}} ទៅស្តាំ"
     },
     "attachmentPasteHint": {
       "accessibility": "បិទភ្ជាប់រូបភាពពីក្តារតម្បៀតខ្ទាស់",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "កំពុងបញ្ចប់...",
       "messagePlaceholder": "សារ...",
       "cannotReceiveFiles": "វគ្គនេះមិនអាចទទួលឯកសារបានទេ។ ដកឯកសារភ្ជាប់ចេញដើម្បីផ្ញើសាររបស់អ្នក។",
-      "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះផ្ញើដើម្បីព្យាយាមម្តងទៀត។"
+      "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះផ្ញើដើម្បីព្យាយាមម្តងទៀត។",
+      "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង ហើយមិនបានភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវបានលុប។",
+      "discardAttachmentsTitle": "បោះបង់ឯកសារភ្ជាប់?",
+      "charactersRemaining": "នៅសល់ {{count}} តួអក្សរ",
+      "insertNewline": "បញ្ចូលបន្ទាត់ថ្មី"
     },
     "chatLink": {
       "linkCopied": "បានចម្លងតំណ",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "explore": "ស្វែងយល់",
     "seeAll": "មើលទាំងអស់",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ឥឡូវនេះគ្មានអ្វីកំពុងដំណើរការទេ"
   },
   "imageViewer": {
     "close": "បិទ {{filename}}",
@@ -2794,7 +2814,8 @@
     "busy": "ការបញ្ចូលសំឡេងកំពុងរវល់។ ព្យាយាមម្តងទៀត។",
     "stopped": "ការបញ្ចូលសំឡេងបានឈប់។ ប៉ះមីក្រូហ្វូន ដើម្បីព្យាយាមម្តងទៀត។",
     "unavailableDevice": "ការបញ្ចូលសំឡេងមិនអាចប្រើបាននៅលើឧបករណ៍នេះទេ។",
-    "unavailableLanguage": "ការបញ្ចូលសំឡេងមិនអាចប្រើបានសម្រាប់ភាសាឧបករណ៍នេះទេ។"
+    "unavailableLanguage": "ការបញ្ចូលសំឡេងមិនអាចប្រើបានសម្រាប់ភាសាឧបករណ៍នេះទេ។",
+    "listeningStopped": "ការស្តាប់បានឈប់។"
   },
   "share": {
     "title": "ចែករំលែកទៅ Kilo",

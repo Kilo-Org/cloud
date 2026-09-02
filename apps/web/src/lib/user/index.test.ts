@@ -131,6 +131,7 @@ import {
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
+  cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -201,6 +202,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(cloud_agent_worktrees);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
@@ -1502,6 +1504,42 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const worktreeId = `worktree_${randomUUID()}`;
+      const deletionStartedAt = '2026-08-27T08:00:00.000Z';
+      await db.insert(cloud_agent_worktrees).values([
+        {
+          worktree_id: worktreeId,
+          kilo_user_id: user.id,
+          name: 'Private customer incident',
+          deletion_started_at: deletionStartedAt,
+        },
+        {
+          worktree_id: `worktree_${randomUUID()}`,
+          kilo_user_id: otherUser.id,
+          name: 'Keep this name',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const [deletedUserWorktree] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.worktree_id, worktreeId));
+      expect(deletedUserWorktree.name).toBeNull();
+      expect(new Date(deletedUserWorktree.deletion_started_at ?? '').toISOString()).toBe(
+        deletionStartedAt
+      );
+      const [otherWorktree] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.kilo_user_id, otherUser.id));
+      expect(otherWorktree.name).toBe('Keep this name');
+    });
+
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
       const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
       const otherUser = await insertTestUser();

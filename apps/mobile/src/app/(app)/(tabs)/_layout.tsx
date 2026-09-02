@@ -10,8 +10,16 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
+import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
+import {
+  isAttentionAcked,
+  reconcileSessionAttention,
+  shouldShowNeedsInput,
+  useSessionAttentionRevision,
+} from '@/lib/session-attention';
 import {
   getEffectiveTabBarHeight,
   getTabBarIconSize,
@@ -75,6 +83,29 @@ export default function TabsLayout() {
   const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
   const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
   const { t } = useTranslation();
+  const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  const { activeSessions, isLoading, isError } = useLiveAgentSessions({
+    organizationId,
+    enabled: orgLoaded,
+  });
+  const attentionRevision = useSessionAttentionRevision();
+  useEffect(() => {
+    if (!orgLoaded) {
+      return;
+    }
+    for (const session of activeSessions) {
+      reconcileSessionAttention(session.id, session.status, null);
+    }
+  }, [activeSessions, orgLoaded, attentionRevision]);
+  const needsInputCount = activeSessions.filter(session =>
+    shouldShowNeedsInput({
+      status: session.status,
+      raiseId: session.status,
+      isAcked: isAttentionAcked(session.id, session.status),
+    })
+  ).length;
+  const needsInputBadge =
+    orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.
@@ -163,8 +194,11 @@ export default function TabsLayout() {
         name="(2_agents)"
         options={{
           title: t('tabs.agents'),
+          tabBarBadge: needsInputBadge,
           tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.agents'),
+            needsInputBadge
+              ? `${t('tabs.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
+              : t('tabs.agents'),
             tabBarPosition('agents', tabFlags) ?? 2,
             tabCount
           ),

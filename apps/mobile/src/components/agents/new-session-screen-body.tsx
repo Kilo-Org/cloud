@@ -247,6 +247,7 @@ export function NewSessionScreenBody() {
   const {
     data: instancesData,
     isLoading: isLoadingInstances,
+    isFetching: isFetchingInstances,
     refetch: refetchInstances,
   } = useQuery({
     ...trpc.activeSessions.listInstances.queryOptions(undefined, {
@@ -425,9 +426,10 @@ export function NewSessionScreenBody() {
     }
   }
 
-  // Discard confirm: leaving with a non-empty prompt asks first. Discard
-  // clears the stored draft and the route-owned prompt ref before the captured
-  // navigation action is replayed, so a discarded prompt can never resurface.
+  // Discard confirm: leaving with a non-empty prompt or unsent uploads asks
+  // first. Discard clears the stored draft and the route-owned prompt ref, then
+  // releases admitted uploads before the captured navigation action is
+  // replayed, so a discarded draft or unclaimed upload can never resurface.
   const handleDiscardDraft = useCallback(async () => {
     if (userId) {
       const cleared = await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
@@ -438,10 +440,14 @@ export function NewSessionScreenBody() {
       }
     }
     promptRef.current = '';
-  }, [userId, promptRef]);
+    // Release only after the discard is committed (clearDraft succeeded): a
+    // failed clear keeps the composer mounted, so the uploads stay recoverable.
+    attachments.releaseUnclaimedUploads();
+  }, [userId, promptRef, attachments]);
 
   useNewSessionDiscardGuard({
-    dirty: isCloneEntry ? false : hasPrompt,
+    dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
+    hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
     skipNextGuardRef: skipDiscardGuardRef,
   });
@@ -475,7 +481,8 @@ export function NewSessionScreenBody() {
     });
   }, []);
 
-  const { addCandidates, removeAttachment, retryAttachment } = attachments;
+  const { addCandidates, removeAttachment, retryAttachment, moveAttachment, reorderAttachments } =
+    attachments;
 
   const handleAddAttachment = useCallback(async () => {
     void addCandidates(
@@ -644,6 +651,8 @@ export function NewSessionScreenBody() {
         onAddAttachment={() => void handleAddAttachment()}
         onRemoveAttachment={handleRemoveAttachment}
         onRetryAttachment={handleRetryAttachment}
+        onMoveAttachment={moveAttachment}
+        onReorderAttachments={reorderAttachments}
         onRefetchModels={() => void refetchModels()}
         onPrefillAttachments={addCandidates}
         shareId={shareId}
@@ -652,6 +661,8 @@ export function NewSessionScreenBody() {
         runOnInstance={runOnInstance}
         instanceList={instanceList}
         isLoadingInstances={isLoadingInstances}
+        isFetchingInstances={isFetchingInstances}
+        onRefreshInstances={() => void refetchInstances()}
         onChangeRunOnInstance={handleRunOnChange}
         showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         folderPath={folderPath}

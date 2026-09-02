@@ -527,6 +527,21 @@ const wrapperRuntimeStateSchema = z.object({
   pingDeadlineAt: z.number().int().nonnegative().optional(),
   nextPingAt: z.number().int().nonnegative().optional(),
   noOutputDeadlineAt: z.number().int().nonnegative().optional(),
+  inputRequests: z
+    .array(
+      z.object({
+        kind: z.enum(['question', 'permission']),
+        requestId: z.string(),
+        kiloSessionId: z.string(),
+        messageIds: z.array(z.string()).nonempty(),
+        pending: z.boolean(),
+        tool: z.object({ messageID: z.string(), callID: z.string() }).optional(),
+      })
+    )
+    .optional(),
+  inputSessionOwners: z
+    .array(z.object({ kiloSessionId: z.string(), messageIds: z.array(z.string()).nonempty() }))
+    .optional(),
 });
 
 export type WrapperRuntimeState = z.infer<typeof wrapperRuntimeStateSchema>;
@@ -845,10 +860,12 @@ export async function recordMeaningfulWrapperOutput(
   wrapperConnectionId: string,
   now = Date.now(),
   nextPingAt = now + 60_000,
-  noOutputDeadlineAt = now + 5 * 60_000
+  noOutputDeadlineAt = now + 5 * 60_000,
+  inputState?: Pick<WrapperRuntimeState, 'inputRequests' | 'inputSessionOwners'>
 ): Promise<WrapperRuntimeState | null> {
   return updateIfCurrent(storage, wrapperGeneration, wrapperConnectionId, current => ({
     ...current,
+    ...inputState,
     lastWrapperMessageAt: now,
     noOutputDeadlineAt,
     nextPingAt: current.pingDeadlineAt === undefined ? nextPingAt : undefined,
@@ -882,6 +899,8 @@ export async function clearCurrentWrapperRuntimeLivenessState(
     lastWrapperConnectedAt: current.lastWrapperConnectedAt,
     lastWrapperMessageAt: current.lastWrapperMessageAt,
     lastWrapperPongAt: current.lastWrapperPongAt,
+    inputRequests: current.inputRequests,
+    inputSessionOwners: current.inputSessionOwners,
     finalizingWrapperRunId: current.finalizingWrapperRunId,
     wrapperIdleDeadlineAt: current.wrapperIdleDeadlineAt,
   }));

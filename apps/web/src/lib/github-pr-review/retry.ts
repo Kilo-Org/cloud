@@ -61,6 +61,12 @@ export async function withGitHubUserTokenRetry<T>(args: {
   call: (octokit: Octokit) => Promise<T>;
 }): Promise<T> {
   const first = await getGitHubUserAccessToken(args.kiloUserId, { op: 'fetch' });
+  if (first.status === 'temporarily_unavailable') {
+    throwTrpcFromClassification({
+      code: 'BAD_GATEWAY',
+      message: 'GitHub authorization is temporarily unavailable. Try again.',
+    });
+  }
   if (first.status !== 'connected') {
     throwTrpcFromClassification({
       code: 'PRECONDITION_FAILED',
@@ -83,6 +89,12 @@ export async function withGitHubUserTokenRetry<T>(args: {
       staleAuthorizationId: first.credential.authorizationId,
       staleCredentialVersion: first.credential.credentialVersion,
     });
+    if (rotate.status === 'temporarily_unavailable') {
+      throwTrpcFromClassification({
+        code: 'BAD_GATEWAY',
+        message: 'GitHub authorization is temporarily unavailable. Try again.',
+      });
+    }
     if (rotate.status !== 'connected') {
       throwTrpcFromClassification({
         code: 'PRECONDITION_FAILED',

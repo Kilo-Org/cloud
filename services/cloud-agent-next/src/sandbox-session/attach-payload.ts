@@ -1,9 +1,7 @@
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
-import { resolveGitHubTokenForRepo } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
-import type { GitTokenService } from '../types.js';
 import { getSessionWorkspacePath } from '../workspace.js';
 
 function rejectReservedControlRuntimeEnvironment(
@@ -15,6 +13,12 @@ function rejectReservedControlRuntimeEnvironment(
       throw new Error(`Reserved control runtime environment variable: ${key}`);
     }
   }
+}
+
+export function validateControlSessionOptions(metadata: Pick<SessionMetadata, 'profile'>): void {
+  const profile = readProfileBundle(metadata);
+  rejectReservedControlRuntimeEnvironment(profile.envVars);
+  rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
 }
 
 function gitFromMetadata(
@@ -56,8 +60,7 @@ export function buildSessionAttachPayload(
   const git = gitFromMetadata(metadata);
   const branch = metadata.workspace?.branchName ?? metadata.repository?.upstreamBranch;
   const profile = readProfileBundle(metadata);
-  rejectReservedControlRuntimeEnvironment(profile.envVars);
-  rejectReservedControlRuntimeEnvironment(profile.encryptedSecrets);
+  validateControlSessionOptions(metadata);
   const env = {
     ...(profile.envVars ?? {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
@@ -72,21 +75,4 @@ export function buildSessionAttachPayload(
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(preparation ? { preparation } : {}),
   };
-}
-
-export async function fillAttachGitToken(
-  metadata: SessionMetadata,
-  payload: SessionAttachPayload,
-  env: { GIT_TOKEN_SERVICE?: GitTokenService }
-): Promise<SessionAttachPayload> {
-  if (!payload.git || payload.git.token) return payload;
-  const repository = metadata.repository;
-  if (repository?.type !== 'github') return payload;
-  const resolved = await resolveGitHubTokenForRepo(env, {
-    githubRepo: repository.repo,
-    userId: metadata.identity.userId,
-    ...(metadata.identity.orgId ? { orgId: metadata.identity.orgId } : {}),
-  });
-  if (!resolved.success) return payload;
-  return { ...payload, git: { ...payload.git, token: resolved.value.token } };
 }

@@ -10,8 +10,8 @@ import { api_request_log } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
-const RETENTION_DAYS = 30;
-const BATCH_SIZE = 1_000;
+const RETENTION_DAYS = 7;
+const BATCH_SIZE = 10_000;
 
 function getDaysAgo(days: number) {
   const date = new Date();

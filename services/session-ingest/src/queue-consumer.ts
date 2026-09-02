@@ -292,7 +292,19 @@ function createIngestChunker(
         : itemDataBytes;
     if (itemDataBytes > MAX_INGEST_ITEM_BYTES) {
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
-      await env.SESSION_INGEST_R2.put(itemR2Key, itemDataJson);
+      const staged = await withDORetry(
+        () => getSessionIngestDO(env, { kiloUserId, sessionId }),
+        stub =>
+          stub.stageR2Object(
+            { kiloUserId, sessionId, key: itemR2Key },
+            new Blob([itemDataJson]).stream()
+          ),
+        'SessionIngestDO.stageR2Object'
+      );
+      if (!staged) {
+        accepted = false;
+        return false;
+      }
       chunkR2References[item_id] = itemR2Key;
     }
 

@@ -280,7 +280,8 @@
       "networkError": "Erreur réseau",
       "uploadFailed": "Échec de l'envoi",
       "failedToUploadFile": "Échec de l'envoi du fichier : {{reason}}",
-      "nothingToPaste": "Rien à coller"
+      "nothingToPaste": "Rien à coller",
+      "metadataStripFailed": "Impossible de supprimer les métadonnées de la photo."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1613,7 +1614,11 @@
       "previousTaskFinishing": "La tâche précédente est encore en cours. Veuillez patienter un instant.",
       "serviceUnavailable": "Le service est indisponible pour le moment. Veuillez réessayer.",
       "connectionTrouble": "Problème de connexion. Veuillez réessayer dans un instant.",
-      "modelUnavailable": "Ce modèle n'est pas disponible pour Cloud Agent. Choisissez un autre modèle et réessayez."
+      "modelUnavailable": "Ce modèle n'est pas disponible pour Cloud Agent. Choisissez un autre modèle et réessayez.",
+      "cancelQueuedFailed": "Impossible d'annuler le message.",
+      "cancelQueuedRestoreAvailable": "Message annulé. Touchez Restaurer pour le remettre dans le champ de saisie.",
+      "cancelQueuedRestored": "Message annulé. Le prompt est de nouveau dans le champ de saisie.",
+      "cancelQueuedUpgradeRequired": "L'annulation des messages en attente nécessite une version plus récente de Kilo CLI. Mettez à jour Kilo CLI et reconnectez-vous."
     },
     "remoteSession": {
       "failedToCreate": "Échec de la création de la session distante",
@@ -1685,7 +1690,8 @@
       "cliCannotContinue": "Cette CLI ne peut pas continuer une session. Choisissez Cloud Agent ou une autre CLI.",
       "continueFrom": "Continuation de {{title}}",
       "importFailed": "Impossible d'importer cette session.",
-      "importingSession": "Importation de la session"
+      "importingSession": "Importation de la session",
+      "discardWithUploadsMessage": "Votre prompt et les fichiers téléversés non joints à des messages envoyés seront supprimés."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -1744,7 +1750,9 @@
       "instanceOnProject": "{{name}} sur {{project}}",
       "instanceOnProjectSuffix": "{{name}} sur {{project}} ({{suffix}})",
       "runOnCloudAgent": "Exécuter sur Agent cloud",
-      "runOnAccessibility": "Exécuter sur : {{label}}"
+      "runOnAccessibility": "Exécuter sur : {{label}}",
+      "terminals": "Terminaux",
+      "remotes": "Instances distantes"
     },
     "modePicker": {
       "title": "Sélectionner le mode",
@@ -1934,7 +1942,11 @@
       "queuedAccessibility": "Message en file d'attente",
       "userMessage": "Message de l'utilisateur",
       "assistantMessage": "Message de l'assistant",
-      "longPressHint": "Appui long pour les détails du message"
+      "longPressHint": "Appui long pour les détails du message",
+      "cancelQueued": "Annuler le message",
+      "cancelQueuedAccessibility": "Annuler le message en attente",
+      "restoreQueued": "Restaurer",
+      "restoreQueuedAccessibility": "Restaurer le message annulé dans le champ de saisie"
     },
     "olderMessages": {
       "arrived": "Messages précédents chargés",
@@ -1965,9 +1977,6 @@
     },
     "sessionFilter": {
       "title": "Filtrer les sessions",
-      "sortBy": "Trier par",
-      "sortLastUpdated": "Dernière mise à jour",
-      "sortCreated": "Créé",
       "platform": "Plateforme",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -1976,9 +1985,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Autre",
-      "project": "Projet",
-      "removeProjectFilter": "Supprimer le filtre de projet {{label}}",
-      "removePlatformFilter": "Supprimer le filtre de plateforme {{label}}"
+      "project": "Projet"
     },
     "suggestion": {
       "title": "Suggestion",
@@ -2021,7 +2028,9 @@
       "uploading": "Envoi…",
       "uploaded": "Envoyé",
       "uploadFailedRetry": "Échec de l'envoi. Touchez pour réessayer.",
-      "uploadFailedTerminal": "Ce fichier ne peut pas être envoyé."
+      "uploadFailedTerminal": "Ce fichier ne peut pas être envoyé.",
+      "moveLeft": "Déplacer {{filename}} vers la gauche",
+      "moveRight": "Déplacer {{filename}} vers la droite"
     },
     "attachmentPasteHint": {
       "accessibility": "Coller l'image depuis le presse-papiers",
@@ -2051,7 +2060,11 @@
       "finalizingPlaceholder": "Finalisation...",
       "messagePlaceholder": "Message...",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Supprimez les pièces jointes pour envoyer votre message.",
-      "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer."
+      "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
+      "discardAttachmentsMessage": "Les fichiers téléversés non joints à des messages envoyés seront supprimés.",
+      "discardAttachmentsTitle": "Abandonner les pièces jointes ?",
+      "charactersRemaining": "{{count}} caractères restants",
+      "insertNewline": "Insérer un saut de ligne"
     },
     "chatLink": {
       "linkCopied": "Lien copié",
@@ -2181,7 +2194,11 @@
     "appearanceDark": "Sombre",
     "account": "Compte",
     "prReviewAttribution": "Ajouter l'attribution de l'application aux revues de PR",
-    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue."
+    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue.",
+    "returnSendsMessage": "La touche Entrée envoie le message",
+    "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
+    "biometricUnlock": "Déverrouiller avec la biométrie",
+    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2223,7 +2240,7 @@
     "newCodingTask": "Nouvelle tâche de codage",
     "explore": "Explorer",
     "seeAll": "Tout voir",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Rien n'est en cours d'exécution pour le moment"
   },
   "imageViewer": {
     "close": "Fermer {{filename}}",
@@ -2281,7 +2298,8 @@
     "busy": "La saisie vocale est occupée. Réessayez.",
     "stopped": "La saisie vocale s'est arrêtée. Touchez le microphone pour réessayer.",
     "unavailableDevice": "La saisie vocale n'est pas disponible sur cet appareil.",
-    "unavailableLanguage": "La saisie vocale n'est pas disponible pour la langue de cet appareil."
+    "unavailableLanguage": "La saisie vocale n'est pas disponible pour la langue de cet appareil.",
+    "listeningStopped": "Écoute arrêtée."
   },
   "share": {
     "title": "Partager vers Kilo",
@@ -2470,7 +2488,8 @@
       "couldNotSearch": "Impossible de rechercher des sessions",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session passée",
-      "live": "EN DIRECT"
+      "live": "EN DIRECT",
+      "updating": "Mise à jour en cours"
     },
     "sessionRow": {
       "deleteTitle": "Supprimer la session ?",
@@ -2516,7 +2535,10 @@
     "sessionExited": "Session terminée",
     "remoteSpawnRetryable": "Impossible d'atteindre l'instance — elle s'est peut-être déconnectée.",
     "remoteSpawnNonRetryable": "L'instance n'a pas pu démarrer la session — vérifiez la machine ou mettez à jour le CLI.",
-    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance."
+    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance.",
+    "liveCount_one": "{{count}} EN DIRECT",
+    "liveCount_other": "{{count}} EN DIRECT",
+    "liveCount_many": "{{count}} EN DIRECT"
   },
   "monoScrollBlock": {
     "contentTruncated": "Contenu tronqué",

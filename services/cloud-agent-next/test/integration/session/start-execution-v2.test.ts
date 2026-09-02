@@ -12,6 +12,7 @@ import {
 } from '../../../src/session/pending-messages.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import { listNonTerminalAcceptedMessages } from '../../../src/session/session-message-state.js';
+import { branchNameSchema } from '../../../src/persistence/schemas.js';
 
 import {
   groupedRegisterSessionInput,
@@ -21,6 +22,63 @@ import {
 } from '../../helpers/session-setup.js';
 
 describe('CloudAgentSession message admission', () => {
+  it('persists a readable default branch before preparation and retains it on registration retry', async () => {
+    const userId = 'user_readable_branch';
+    const sessionId = 'agent_readable_branch';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+    const input = groupedRegisterSessionInput({
+      sessionId,
+      userId,
+      prompt: 'use a readable branch',
+      mode: 'code',
+      model: 'test-model',
+      githubRepo: 'acme/repo',
+    });
+
+    const first = await stub.registerSession(input);
+    const metadata = await stub.getMetadata();
+    const replay = await stub.registerSession(input);
+    const replayedMetadata = await stub.getMetadata();
+
+    expect(first).toEqual({ success: true });
+    expect(metadata?.workspace?.branchName).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z2-7]{8}$/);
+    expect(branchNameSchema.safeParse(metadata?.workspace?.branchName).success).toBe(true);
+    expect(metadata?.repository?.upstreamBranch).toBeUndefined();
+    expect(metadata?.lifecycle.preparedAt).toBeUndefined();
+    expect(replay).toEqual({ success: false, error: 'Session already registered' });
+    expect(replayedMetadata?.workspace?.branchName).toBe(metadata?.workspace?.branchName);
+  });
+
+  it.each(['main', 'feature/custom-branch', 'refs/pull/4273/head'])(
+    'preserves the explicit branch %s during registration',
+    async branch => {
+      const userId = 'user_explicit_branch';
+      const sessionId = `agent_explicit_branch_${branch.replaceAll('/', '_')}`;
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+
+      const result = await stub.registerSession(
+        groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'keep the selected branch',
+          mode: 'code',
+          model: 'test-model',
+          githubRepo: 'acme/repo',
+          upstreamBranch: branch,
+        })
+      );
+      const metadata = await stub.getMetadata();
+
+      expect(result).toEqual({ success: true });
+      expect(metadata?.repository?.upstreamBranch).toBe(branch);
+      expect(metadata?.workspace?.branchName).toBe(branch);
+    }
+  );
+
   it('admits the already accepted initial turn through grouped session creation', async () => {
     const userId = 'user_grouped_start' as const;
     const sessionId = 'agent_grouped_start' as const;
@@ -627,12 +685,21 @@ describe('CloudAgentSession message admission', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       const first = await instance.createSessionWithInitialAdmission(input);
+      const firstBranch = (await instance.getMetadata())?.workspace?.branchName;
       const second = await instance.createSessionWithInitialAdmission(input);
-      return { first, second, pending: await listPendingSessionMessages(instance.ctx.storage) };
+      return {
+        first,
+        second,
+        firstBranch,
+        secondBranch: (await instance.getMetadata())?.workspace?.branchName,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
     });
 
     expect(result.first).toMatchObject({ success: true, messageId, outcome: 'queued' });
     expect(result.second).toEqual(result.first);
+    expect(result.firstBranch).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z2-7]{8}$/);
+    expect(result.secondBranch).toBe(result.firstBranch);
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe(messageId);
   });
@@ -868,7 +935,7 @@ describe('CloudAgentSession message admission', () => {
 
     expect(result.first).toMatchObject({ success: true, messageId });
     expect(result.replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
-    expect(result.metadata?.workspace).toEqual(input.workspace);
+    expect(result.metadata?.workspace).toMatchObject(input.workspace);
   });
 
   it('rejects readiness updates that change a shared route to another sandbox', async () => {

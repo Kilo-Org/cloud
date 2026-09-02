@@ -152,7 +152,11 @@
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
     "prReviewAttribution": "PR جائزوں میں ایپ انتساب شامل کریں",
-    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔"
+    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔",
+    "returnSendsMessage": "ریٹرن کلید پیغام بھیجتی ہے",
+    "returnSendsMessageSubtitle": "بند ہونے پر، ریٹرن ایجنٹ کے پیغام لکھنے کے خانوں میں نئی سطر داخل کرتی ہے۔",
+    "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
+    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -750,7 +754,8 @@
       "networkError": "نیٹ ورک کی خرابی",
       "uploadFailed": "اپ لوڈ ناکام",
       "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}",
-      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں"
+      "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں",
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "سیشنز تلاش نہیں ہو سکے",
       "completedWillAppear": "مکمل شدہ سیشنز یہاں ظاہر ہوں گے۔",
       "noPastSessions": "کوئی ماضی کے سیشن نہیں",
-      "live": "لائیو"
+      "live": "لائیو",
+      "updating": "اپڈیٹ ہو رہا ہے"
     },
     "sessionRow": {
       "deleteTitle": "سیشن حذف کریں؟",
@@ -2111,7 +2117,9 @@
     "sessionExited": "سیشن ختم ہو گیا",
     "remoteSpawnRetryable": "انسٹینس تک رسائی نہیں ہو سکی — شاید یہ منقطع ہو گیا ہے۔",
     "remoteSpawnNonRetryable": "انسٹینس سیشن شروع کرنے میں ناکام رہا — مشین چیک کریں یا CLI اپ ڈیٹ کریں۔",
-    "remoteSpawnInstanceDisconnected": "منتخب انسٹینس منقطع ہو گیا۔ Cloud Agent پر سیشن شروع کریں یا کوئی اور انسٹینس منتخب کریں۔"
+    "remoteSpawnInstanceDisconnected": "منتخب انسٹینس منقطع ہو گیا۔ Cloud Agent پر سیشن شروع کریں یا کوئی اور انسٹینس منتخب کریں۔",
+    "liveCount_one": "{{count}} لائیو",
+    "liveCount_other": "{{count}} لائیو"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
       "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "connectionTrouble": "کنکشن کا مسئلہ۔ براہ کرم ایک لمحے بعد دوبارہ کوشش کریں۔",
-      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔"
+      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔",
+      "cancelQueuedFailed": "پیغام منسوخ نہیں ہو سکا۔",
+      "cancelQueuedRestoreAvailable": "پیغام منسوخ ہو گیا۔ اسے پیغام لکھنے کے خانے میں واپس لانے کے لیے «بحال کریں» پر ٹیپ کریں۔",
+      "cancelQueuedRestored": "پیغام منسوخ ہو گیا۔ پرامپٹ پیغام لکھنے کے خانے میں واپس آ گیا ہے۔",
+      "cancelQueuedUpgradeRequired": "قطار میں موجود پیغامات منسوخ کرنے کے لیے نئے Kilo CLI کی ضرورت ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ جڑیں۔"
     },
     "remoteSession": {
       "failedToCreate": "ریموٹ سیشن بنانا ناکام",
@@ -2213,7 +2225,8 @@
       "continueFrom": "{{title}} جاری کیا جا رہا ہے",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
+      "discardWithUploadsMessage": "آپ کا پرامپٹ اور بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "اپنے کمپیوٹر پر کسی پروجیکٹ میں `kilo remote` چلائیں، یا اگر کوئی پہلے سے چل رہا ہو تو Kilo CLI اپ ڈیٹ کریں۔",
       "instanceOnProject": "{{project}} پر {{name}}",
       "instanceOnProjectSuffix": "{{project}} پر {{name}} ({{suffix}})",
-      "runOnCloudAgent": "کلاؤڈ ایجنٹ پر چلائیں"
+      "runOnCloudAgent": "کلاؤڈ ایجنٹ پر چلائیں",
+      "terminals": "ٹرمینلز",
+      "remotes": "ریموٹ انسٹینسز"
     },
     "modePicker": {
       "title": "موڈ منتخب کریں",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "پیغام قطار میں ہے",
       "userMessage": "صارف کا پیغام",
       "assistantMessage": "معاون کا پیغام",
-      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں"
+      "longPressHint": "پیغام کی تفصیلات کے لیے دیر تک دبائیں",
+      "cancelQueued": "پیغام منسوخ کریں",
+      "cancelQueuedAccessibility": "قطار میں موجود پیغام منسوخ کریں",
+      "restoreQueued": "بحال کریں",
+      "restoreQueuedAccessibility": "منسوخ شدہ پیغام کو پیغام لکھنے کے خانے میں بحال کریں"
     },
     "olderMessages": {
       "arrived": "پہلے کے پیغامات لوڈ ہو گئے",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "سیشن فلٹر کریں",
-      "sortBy": "ترتیب دیں",
-      "sortLastUpdated": "آخری اپڈیٹ",
-      "sortCreated": "تخلیق شدہ",
       "platform": "پلیٹ فارم",
       "platformCloud": "کلاؤڈ",
       "platformExtension": "ایکسٹینشن",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "دیگر",
-      "project": "پروجیکٹ",
-      "removeProjectFilter": "{{label}} پروجیکٹ فلٹر ہٹائیں",
-      "removePlatformFilter": "{{label}} پلیٹ فارم فلٹر ہٹائیں"
+      "project": "پروجیکٹ"
     },
     "suggestion": {
       "title": "تجویز",
@@ -2545,7 +2559,9 @@
       "uploading": "اپ لوڈ ہو رہا ہے…",
       "uploaded": "اپ لوڈ ہو گیا",
       "uploadFailedRetry": "اپ لوڈ ناکام۔ دوبارہ کوشش کے لیے تھپتھپائیں۔",
-      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔"
+      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔",
+      "moveLeft": "{{filename}} کو بائیں منتقل کریں",
+      "moveRight": "{{filename}} کو دائیں منتقل کریں"
     },
     "attachmentPasteHint": {
       "accessibility": "کلپ بورڈ سے تصویر چسپاں کریں",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "ختم کیا جا رہا ہے...",
       "messagePlaceholder": "پیغام...",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے اٹیچمنٹ ہٹائیں۔",
-      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔"
+      "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کے لیے بھیجنے پر تھپتھپائیں۔",
+      "discardAttachmentsMessage": "بھیجے گئے پیغامات سے غیر منسلک اپ لوڈز حذف ہو جائیں گے۔",
+      "discardAttachmentsTitle": "اٹیچمنٹس ضائع کریں؟",
+      "charactersRemaining": "{{count}} حروف باقی ہیں",
+      "insertNewline": "نئی سطر داخل کریں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "نیا کوڈنگ کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "اس وقت کچھ بھی نہیں چل رہا"
   },
   "imageViewer": {
     "close": "{{filename}} بند کریں",
@@ -2794,7 +2814,8 @@
     "busy": "وائس انپٹ مصروف ہے۔ دوبارہ کوشش کریں۔",
     "stopped": "وائس انپٹ رک گیا۔ دوبارہ کوشش کرنے کے لیے مائیکروفون پر ٹیپ کریں۔",
     "unavailableDevice": "وائس انپٹ اس ڈیوائس پر دستیاب نہیں ہے۔",
-    "unavailableLanguage": "وائس انپٹ اس ڈیوائس کی زبان کے لیے دستیاب نہیں ہے۔"
+    "unavailableLanguage": "وائس انپٹ اس ڈیوائس کی زبان کے لیے دستیاب نہیں ہے۔",
+    "listeningStopped": "سننا رک گیا۔"
   },
   "share": {
     "title": "Kilo پر شیئر کریں",

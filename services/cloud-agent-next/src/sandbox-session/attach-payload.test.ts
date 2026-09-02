@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { envVarsSchema } from '../types.js';
-import { buildSessionAttachPayload, fillAttachGitToken } from './attach-payload.js';
+import { buildSessionAttachPayload } from './attach-payload.js';
 
 describe('buildSessionAttachPayload', () => {
   it('packs directory, git clone, branch, snapshot identity, and session env', () => {
@@ -32,7 +32,7 @@ describe('buildSessionAttachPayload', () => {
     });
   });
 
-  it('packs setup commands, profile env, and preparation identity', () => {
+  it('packs setup commands, injected auth env, and preparation identity', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: {
@@ -41,7 +41,7 @@ describe('buildSessionAttachPayload', () => {
       },
       auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
       agent: { mode: 'code', model: 'kilo/test' },
-      profile: { envVars: { FOO: 'bar' }, setupCommands: ['pnpm install'] },
+      profile: { envVars: {}, encryptedSecrets: {}, setupCommands: ['pnpm install'] },
       workspace: { workspacePath: '/workspace/a' },
       lifecycle: { version: 1, timestamp: 1 },
     });
@@ -50,7 +50,7 @@ describe('buildSessionAttachPayload', () => {
     ).toEqual({
       snapshotIdentity: 'kilo_1',
       directory: '/workspace/a',
-      env: { FOO: 'bar', KILOCODE_TOKEN: 'cap_1' },
+      env: { KILOCODE_TOKEN: 'cap_1' },
       setupCommands: ['pnpm install'],
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
     });
@@ -109,33 +109,4 @@ describe('buildSessionAttachPayload', () => {
       );
     });
   }
-
-  it('fills a GitHub token from git-token-service when metadata has none', async () => {
-    const metadata = parseSessionMetadata({
-      metadataSchemaVersion: 2,
-      identity: {
-        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        userId: 'user-1',
-      },
-      auth: { kiloSessionId: 'kilo_1' },
-      agent: { mode: 'code', model: 'kilo/test' },
-      repository: { type: 'github', repo: 'acme/demo' },
-      workspace: { workspacePath: '/workspace/a' },
-      lifecycle: { version: 1, timestamp: 1 },
-    });
-    const payload = buildSessionAttachPayload(metadata);
-    expect(payload.git?.token).toBeUndefined();
-    const filled = await fillAttachGitToken(metadata, payload, {
-      GIT_TOKEN_SERVICE: {
-        getTokenForRepo: vi.fn().mockResolvedValue({
-          success: true,
-          token: 'ghs_resolved',
-          installationId: '1',
-          appType: 'standard',
-          accountLogin: 'acme',
-        }),
-      } as never,
-    });
-    expect(filled.git?.token).toBe('ghs_resolved');
-  });
 });

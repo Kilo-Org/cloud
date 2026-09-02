@@ -6,10 +6,13 @@ import { dedupeInstanceLabels, resolveInstancePickerViewState } from './instance
 
 function instance(overrides: Partial<InstancePickerInstance>): InstancePickerInstance {
   return {
-    connectionId: overrides.connectionId ?? 'conn-1',
-    name: overrides.name ?? 'laptop',
-    projectName: overrides.projectName ?? 'kilo',
-    version: overrides.version,
+    connectionId: 'conn-1',
+    name: 'laptop',
+    projectName: 'kilo',
+    kind: 'cli',
+    startedAt: null,
+    gitBranch: null,
+    ...overrides,
   };
 }
 
@@ -26,6 +29,61 @@ describe('dedupeInstanceLabels', () => {
     ]);
     expect(result.map(row => row.dedupSuffix)).toEqual([null, null, null]);
     expect(result.map(row => row.connectionId)).toEqual(['a', 'b', 'c']);
+    expect(result.map(row => row.testID)).toEqual([
+      'instance-picker-row-000061',
+      'instance-picker-row-000062',
+      'instance-picker-row-000063',
+    ]);
+  });
+
+  it('keeps identifiers across refreshes, reordered inputs, and changed displayed facts', () => {
+    const input = [
+      instance({ connectionId: 'a', name: 'laptop', projectName: 'kilo' }),
+      instance({ connectionId: 'b', name: 'desktop', projectName: 'cloud' }),
+    ];
+    const identifiers = dedupeInstanceLabels(input).map(row => row.testID);
+    expect(dedupeInstanceLabels(input.map(row => ({ ...row }))).map(row => row.testID)).toEqual(
+      identifiers
+    );
+    const refreshed = dedupeInstanceLabels(
+      input.toReversed().map(row =>
+        instance({
+          connectionId: row.connectionId,
+          name: 'renamed',
+          projectName: 'shared',
+          kind: 'remote',
+          gitBranch: 'feature/identity',
+          startedAt: new Date(2026, 7, 28, 12, 34).toISOString(),
+        })
+      )
+    );
+    expect(refreshed.map(row => row.testID)).toEqual(identifiers.toReversed());
+    expect(refreshed.map(row => row.dedupSuffix)).toEqual(['000062', '000061']);
+  });
+
+  it('keeps identifiers when shortened branches and displayed minutes collide', () => {
+    const first = instance({
+      connectionId: 'a',
+      gitBranch: 'feature/abcdefghijkl-a',
+      startedAt: new Date(2026, 7, 28, 12, 34, 1).toISOString(),
+    });
+    const second = instance({
+      connectionId: 'b',
+      gitBranch: 'feature/abcdefghijkl-b',
+      startedAt: new Date(2026, 7, 28, 12, 34, 59).toISOString(),
+    });
+    const [alone] = dedupeInstanceLabels([first]);
+    const [peer, duplicate] = dedupeInstanceLabels([second, first]);
+    const [aloneAgain] = dedupeInstanceLabels([first]);
+    expect(duplicate?.displayFacts).toBe(peer?.displayFacts);
+    expect([alone?.dedupSuffix, duplicate?.dedupSuffix, aloneAgain?.dedupSuffix]).toEqual([
+      null,
+      '000061',
+      null,
+    ]);
+    expect(alone?.testID).toBe('instance-picker-row-000061');
+    expect(duplicate?.testID).toBe(alone?.testID);
+    expect(aloneAgain?.testID).toBe(alone?.testID);
   });
 
   it('stamps both rows of a single duplicate pair with stable, distinct suffixes', () => {
@@ -81,6 +139,109 @@ describe('dedupeInstanceLabels', () => {
       instance({ connectionId: 'c' }),
     ];
     expect(dedupeInstanceLabels(input).map(row => row.connectionId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not hash a remote because of identical terminal and normalized legacy labels', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'r', kind: 'remote' }),
+      instance({ connectionId: 't', kind: 'cli' }),
+      instance({ connectionId: 'l' }),
+    ]);
+
+    expect(result.map(row => row.connectionId)).toEqual(['r', 't', 'l']);
+    expect(result.map(row => row.dedupSuffix)).toEqual([null, '000074', '00006c']);
+  });
+
+  it('keeps different branch facts instead of hashing same-folder connections', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', gitBranch: 'main' }),
+      instance({ connectionId: 'b', gitBranch: 'fix/mobile' }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual(['main', 'fix/mobile']);
+    expect(result.map(row => row.dedupSuffix)).toEqual([null, null]);
+  });
+
+  it('uses local dates and displayed minutes to distinguish equal branches', () => {
+    const result = dedupeInstanceLabels([
+      instance({
+        connectionId: 'a',
+        gitBranch: 'main',
+        startedAt: new Date(2026, 7, 28, 12, 34, 1).toISOString(),
+      }),
+      instance({
+        connectionId: 'b',
+        gitBranch: 'main',
+        startedAt: new Date(2026, 7, 28, 12, 35, 59).toISOString(),
+      }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual([
+      'main · Started Aug 28, 2026, 12:34 PM',
+      'main · Started Aug 28, 2026, 12:35 PM',
+    ]);
+    expect(result.map(row => row.dedupSuffix)).toEqual([null, null]);
+  });
+
+  it('formats start facts with the requested locale', () => {
+    const result = dedupeInstanceLabels(
+      [instance({ startedAt: new Date(2026, 7, 28, 12, 34).toISOString() })],
+      'de'
+    );
+
+    expect(result[0]?.displayFacts).toContain('28. Aug. 2026, 12:34');
+  });
+
+  it('hashes different raw timestamps within the same displayed minute', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', startedAt: new Date(2026, 7, 28, 12, 34, 1).toISOString() }),
+      instance({ connectionId: 'b', startedAt: new Date(2026, 7, 28, 12, 34, 59).toISOString() }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual([
+      'Started Aug 28, 2026, 12:34 PM',
+      'Started Aug 28, 2026, 12:34 PM',
+    ]);
+    expect(result.map(row => row.dedupSuffix)).toEqual(['000061', '000062']);
+  });
+
+  it('retains equal human facts and hashes only the remaining collision', () => {
+    const startedAt = new Date(2026, 7, 28, 12, 34).toISOString();
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', gitBranch: 'main', startedAt }),
+      instance({ connectionId: 'b', gitBranch: 'main', startedAt }),
+      instance({ connectionId: 'c', gitBranch: 'fix/mobile', startedAt }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual([
+      'main · Started Aug 28, 2026, 12:34 PM',
+      'main · Started Aug 28, 2026, 12:34 PM',
+      'fix/mobile · Started Aug 28, 2026, 12:34 PM',
+    ]);
+    expect(result.map(row => row.dedupSuffix)).toEqual(['000061', '000062', null]);
+  });
+
+  it('hashes branches that become identical after display shortening', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', gitBranch: 'feature/abcdefghijkl-a' }),
+      instance({ connectionId: 'b', gitBranch: 'feature/abcdefghijkl-b' }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual([
+      'feature/abcdefghijkl…',
+      'feature/abcdefghijkl…',
+    ]);
+    expect(result.map(row => row.dedupSuffix)).toEqual(['000061', '000062']);
+  });
+
+  it('treats empty branches as absent displayed facts', () => {
+    const result = dedupeInstanceLabels([
+      instance({ connectionId: 'a', gitBranch: '' }),
+      instance({ connectionId: 'b', gitBranch: null }),
+    ]);
+
+    expect(result.map(row => row.displayFacts)).toEqual(['', '']);
+    expect(result.map(row => row.dedupSuffix)).toEqual(['000061', '000062']);
   });
 });
 

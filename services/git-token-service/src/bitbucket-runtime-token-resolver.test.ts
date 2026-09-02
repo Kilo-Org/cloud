@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BitbucketApiError, type BitbucketRepository } from './bitbucket-api.js';
 import {
   listBitbucketRepositories,
+  resolveBitbucketCapabilitySubject,
   resolveBitbucketToken,
   selectCachedBitbucketRepository,
 } from './bitbucket-runtime-token-resolver.js';
@@ -36,6 +37,7 @@ const oauthAuthorization: Extract<BitbucketAuthorizationResult, { status: 'avail
   status: 'available',
   token: 'oauth-runtime-token',
   integrationId: '123e4567-e89b-12d3-a456-426614174044',
+  credentialId: '123e4567-e89b-12d3-a456-426614174045',
   workspace: { uuid: workspaceUuid, slug: 'acme', name: 'Acme' },
 };
 
@@ -156,6 +158,43 @@ describe('Bitbucket runtime token resolver', () => {
       organizationId,
       workspace: oauthAuthorization.workspace,
       repositoryUuid,
+    });
+  });
+
+  it('pins OAuth capability subjects to the current credential row', async () => {
+    const deps = dependencies();
+    deps.authorizationService.getAuthorization.mockResolvedValue({ status: 'not_connected' });
+    deps.oauthAuthorizationService.getAuthorization.mockResolvedValue(oauthAuthorization);
+
+    await expect(
+      resolveBitbucketCapabilitySubject({} as CloudflareEnv, tokenParams(), deps)
+    ).resolves.toEqual({
+      success: true,
+      subject: {
+        integrationId: oauthAuthorization.integrationId,
+        workspaceUuid,
+        workspaceSlug: 'acme',
+        repositoryUuid,
+        repositoryFullName: 'acme/widgets',
+        token: oauthAuthorization.token,
+        oauthCredentialId: oauthAuthorization.credentialId,
+      },
+    });
+  });
+
+  it('omits OAuth identity from workspace access token capability subjects', async () => {
+    await expect(
+      resolveBitbucketCapabilitySubject({} as CloudflareEnv, tokenParams(), dependencies())
+    ).resolves.toEqual({
+      success: true,
+      subject: {
+        integrationId: authorization.integrationId,
+        workspaceUuid,
+        workspaceSlug: 'acme',
+        repositoryUuid,
+        repositoryFullName: 'acme/widgets',
+        token: authorization.token,
+      },
     });
   });
 

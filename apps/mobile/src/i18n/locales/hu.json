@@ -152,7 +152,11 @@
     "appearanceDark": "Sötét",
     "account": "Fiók",
     "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
-    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el.",
+    "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
+    "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
+    "biometricUnlock": "Feloldás biometrikus azonosítással",
+    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -750,7 +754,8 @@
       "networkError": "Hálózati hiba",
       "uploadFailed": "A feltöltés nem sikerült",
       "failedToUploadFile": "Nem sikerült feltölteni a fájlt: {{reason}}",
-      "nothingToPaste": "Nincs mit beilleszteni"
+      "nothingToPaste": "Nincs mit beilleszteni",
+      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -833,7 +838,7 @@
       "managedByAdmin": "A számlázást a szervezeted adminisztrátora kezeli.",
       "couldNotLoad": "Nem sikerült betölteni a számlázási adatokat",
       "manageOnWeb": "Számlázás kezelése a weben",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Korai madár",
       "finalCommitTermEndsOn": "Az utolsó Commit-időszakod {{date}}-kor ér véget. Folytasd Standard csomaggal {{price}} áron, vagy a tárhely megszűnik.",
       "freeTrial": "Ingyenes próba",
@@ -851,7 +856,7 @@
       "trialDaysRemaining": "Próba: {{remaining}} van hátra",
       "trialEndingSoon": "Próba hamarosan vége: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1130,7 +1135,7 @@
       "destroying": "MEGSEMMISÍTÉS",
       "provisioned": "LÉTREHOZVA",
       "restarting": "ÚJRAINDÍTÁS",
-      "running": "Folyamatban",
+      "running": "FOLYAMATBAN",
       "shuttingDown": "LEÁLLÍTÁS",
       "starting": "INDÍTÁS",
       "stopped": "LEÁLLÍTVA",
@@ -1302,7 +1307,7 @@
       "threshold": "Küszöb",
       "pullRequest": "pull request",
       "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
-      "transcriptLive": "ÉLŐ",
+      "transcriptLive": "Élő",
       "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
       "transcriptWaiting": "Várakozás az áttekintés átiratára.",
       "agentIdle": "Ügynök tétlen",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "A munkamenetek keresése nem sikerült",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
-      "live": "ÉLŐ"
+      "live": "ÉLŐ",
+      "updating": "Frissítés"
     },
     "sessionRow": {
       "deleteTitle": "Munkamenet törlése?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "A munkamenet kilépett",
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet — ellenőrizze a gépet vagy frissítse a CLI-t.",
-    "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt."
+    "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt.",
+    "liveCount_one": "{{count}} ÉLŐ",
+    "liveCount_other": "{{count}} ÉLŐ"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
       "connectionTrouble": "Kapcsolódási probléma. Kérjük, próbálja újra egy pillanat múlva.",
-      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra."
+      "modelUnavailable": "Ez a modell nem érhető el a Cloud Agent számára. Válasszon másik modellt, és próbálja újra.",
+      "cancelQueuedFailed": "Nem sikerült visszavonni az üzenetet.",
+      "cancelQueuedRestoreAvailable": "Üzenet visszavonva. Koppintson a Visszaállítás gombra, hogy visszakerüljön az üzenetbeviteli mezőbe.",
+      "cancelQueuedRestored": "Üzenet visszavonva. A prompt visszakerült az üzenetbeviteli mezőbe.",
+      "cancelQueuedUpgradeRequired": "A várakozó üzenetek visszavonásához újabb Kilo CLI szükséges. Frissítse a Kilo CLI-t, és csatlakozzon újra."
     },
     "remoteSession": {
       "failedToCreate": "A távoli munkamenet létrehozása nem sikerült",
@@ -2213,7 +2225,8 @@
       "continueFrom": "Folytatás {{title}}",
       "importingSession": "Munkamenet importálása",
       "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "discardWithUploadsMessage": "A promptja és az elküldött üzenetekhez nem csatolt feltöltések törlődnek."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Futtassa a `kilo remote` parancsot egy projekten a számítógépén, vagy frissítse a Kilo CLI-t, ha már fut egy.",
       "instanceOnProject": "{{name}} a {{project}} projekten",
       "instanceOnProjectSuffix": "{{name}} a {{project}} projekten ({{suffix}})",
-      "runOnCloudAgent": "Futtatás a Cloud Ageneten"
+      "runOnCloudAgent": "Futtatás a Cloud Ageneten",
+      "terminals": "Terminálok",
+      "remotes": "Távoli példányok"
     },
     "modePicker": {
       "title": "Mód kiválasztása",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Üzenet sorban",
       "userMessage": "Felhasználói üzenet",
       "assistantMessage": "Asszisztens üzenet",
-      "longPressHint": "Az üzenet részleteihez tartsd nyomva"
+      "longPressHint": "Az üzenet részleteihez tartsd nyomva",
+      "cancelQueued": "Üzenet visszavonása",
+      "cancelQueuedAccessibility": "Várakozó üzenet visszavonása",
+      "restoreQueued": "Visszaállítás",
+      "restoreQueuedAccessibility": "Visszavont üzenet visszaállítása az üzenetbeviteli mezőbe"
     },
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Munkamenetek szűrése",
-      "sortBy": "Rendezés",
-      "sortLastUpdated": "Utolsó módosítás",
-      "sortCreated": "Létrehozva",
       "platform": "Platform",
       "platformCloud": "Felhő",
       "platformExtension": "Bővítmény",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Egyéb",
-      "project": "Projekt",
-      "removeProjectFilter": "{{label}} projekt szűrő eltávolítása",
-      "removePlatformFilter": "{{label}} platform szűrő eltávolítása"
+      "project": "Projekt"
     },
     "suggestion": {
       "title": "Javaslat",
@@ -2545,7 +2559,9 @@
       "uploading": "Feltöltés…",
       "uploaded": "Feltöltve",
       "uploadFailedRetry": "A feltöltés nem sikerült. Az újrapróbáláshoz koppints.",
-      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni."
+      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni.",
+      "moveLeft": "{{filename}} mozgatása balra",
+      "moveRight": "{{filename}} mozgatása jobbra"
     },
     "attachmentPasteHint": {
       "accessibility": "Kép beillesztése a vágólapról",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Befejezés...",
       "messagePlaceholder": "Üzenet...",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
-      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre."
+      "couldNotAttachFiles": "A fájlok csatolása nem sikerült. Az újrapróbáláshoz koppints a küldésre.",
+      "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
+      "discardAttachmentsTitle": "Elveti a csatolmányokat?",
+      "charactersRemaining": "{{count}} karakter maradt",
+      "insertNewline": "Új sor beszúrása"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",
@@ -2651,7 +2671,7 @@
       "open": "nyitott lekérési kérelem",
       "closed": "lezárt lekérési kérelem",
       "merged": "egybeolvasztott lekérési kérelem",
-      "draft": "Piszkozat pull request",
+      "draft": "piszkozat pull request",
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Új kódolási feladat",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Jelenleg semmi sem fut"
   },
   "imageViewer": {
     "close": "{{filename}} bezárása",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Menj vissza, és nyisd meg újra ezt a választót az előző képernyőről."
   },
   "sessionRow": {
-    "needsInput": "bemenetet igényel"
+    "needsInput": "BEMENETET IGÉNYEL"
   },
   "voiceInput": {
     "listening": "Figyelés...",
@@ -2794,7 +2814,8 @@
     "busy": "A hangbevitel foglalt. Próbálja újra.",
     "stopped": "A hangbevitel leállt. A mikrofon megérintésével próbálja újra.",
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
-    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez."
+    "unavailableLanguage": "A hangbevitel nem érhető el az eszköz nyelvéhez.",
+    "listeningStopped": "A figyelés leállt."
   },
   "share": {
     "title": "Megosztás a Kilo-val",

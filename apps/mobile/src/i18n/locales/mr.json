@@ -152,7 +152,11 @@
     "appearanceDark": "डार्क",
     "account": "खाते",
     "prReviewAttribution": "PR पुनरावलोकनांमध्ये अ‍ॅप श्रेय जोडा",
-    "prReviewAttributionSubtitle": "पुनरावलोकन सबमिट करताना Reviewed via Kilo फूटर जोडा"
+    "prReviewAttributionSubtitle": "पुनरावलोकन सबमिट करताना Reviewed via Kilo फूटर जोडा",
+    "returnSendsMessage": "रिटर्न कळ संदेश पाठवते",
+    "returnSendsMessageSubtitle": "बंद असताना, रिटर्न कळ एजंट कंपोझरमध्ये नवीन ओळ घालते.",
+    "biometricUnlock": "बायोमेट्रिक्स वापरून अनलॉक करा",
+    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -750,7 +754,8 @@
       "networkError": "नेटवर्क त्रुटी",
       "uploadFailed": "अपलोड अयशस्वी",
       "failedToUploadFile": "फाइल अपलोड करण्यात अयशस्वी: {{reason}}",
-      "nothingToPaste": "पेस्ट करण्यासारखे काही नाही"
+      "nothingToPaste": "पेस्ट करण्यासारखे काही नाही",
+      "metadataStripFailed": "फोटो मेटाडेटा काढता आला नाही."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "पुनरावलोकन उताराची वाट पाहत आहे.",
       "transcriptEmpty": "या पुनरावलोकनासाठी उतारा नाही.",
       "transcriptRetry": "पुनरावलोकन उतारा लोड करता आला नाही.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "एजंट निष्क्रिय",
       "agentWorking": "एजंट काम करत आहे...",
       "anErrorOccurred": "एक त्रुटी आली",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "सत्रे शोधता आली नाहीत",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "भूतकाळातील सत्रे नाहीत",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "अपडेट होत आहे"
     },
     "sessionRow": {
       "deleteTitle": "सत्र हटवायचे?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "सत्र बाहेर पडले",
     "remoteSpawnRetryable": "उदाहरणापर्यंत पोहोचता आले नाही — ते डिस्कनेक्ट झाले असावे.",
     "remoteSpawnNonRetryable": "उदाहरण सत्र सुरू करू शकले नाही — मशीन तपासा किंवा CLI अद्यतनित करा.",
-    "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा."
+    "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "मागील कार्य अजून पूर्ण होत आहे. कृपया क्षणभर थांबा.",
       "serviceUnavailable": "सेवा सध्या अनुपलब्ध आहे. पुन्हा प्रयत्न करा.",
       "connectionTrouble": "कनेक्शन समस्या. कृपया क्षणभरानंतर पुन्हा प्रयत्न करा.",
-      "modelUnavailable": "हे मॉडेल Cloud Agent साठी उपलब्ध नाही. दुसरे मॉडेल निवडून पुन्हा प्रयत्न करा."
+      "modelUnavailable": "हे मॉडेल Cloud Agent साठी उपलब्ध नाही. दुसरे मॉडेल निवडून पुन्हा प्रयत्न करा.",
+      "cancelQueuedFailed": "संदेश रद्द करता आला नाही.",
+      "cancelQueuedRestoreAvailable": "संदेश रद्द केला. तो कंपोझरमध्ये परत आणण्यासाठी पुनर्संचयित करा वर टॅप करा.",
+      "cancelQueuedRestored": "संदेश रद्द केला. प्रॉम्प्ट पुन्हा कंपोझरमध्ये आला आहे.",
+      "cancelQueuedUpgradeRequired": "रांगेतील संदेश रद्द करण्यासाठी Kilo CLI ची नवीन आवृत्ती आवश्यक आहे. Kilo CLI अद्ययावत करा आणि पुन्हा कनेक्ट करा."
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र तयार करण्यात अयशस्वी",
@@ -2213,7 +2225,8 @@
       "continueFrom": "सुरू ठेवत आहोत {{title}}",
       "importingSession": "सत्र आयात करत आहोत",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
-      "importFailed": "हे सत्र आयात करता आले नाही."
+      "importFailed": "हे सत्र आयात करता आले नाही.",
+      "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "तुमच्या संगणकावरील प्रकल्पात `kilo remote` चालवा, किंवा एक आधीच चालू असल्यास Kilo CLI अद्ययावत करा.",
       "instanceOnProject": "{{name}} {{project}} वर",
       "instanceOnProjectSuffix": "{{name}} {{project}} वर ({{suffix}})",
-      "runOnCloudAgent": "क्लाउड एजंटवर चालवा"
+      "runOnCloudAgent": "क्लाउड एजंटवर चालवा",
+      "terminals": "टर्मिनल्स",
+      "remotes": "रिमोट उदाहरणे"
     },
     "modePicker": {
       "title": "मोड निवडा",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "संदेश रांगेत आहे",
       "userMessage": "वापरकर्ता संदेश",
       "assistantMessage": "सहाय्यक संदेश",
-      "longPressHint": "संदेश तपशीलांसाठी लांब दाबा"
+      "longPressHint": "संदेश तपशीलांसाठी लांब दाबा",
+      "cancelQueued": "संदेश रद्द करा",
+      "cancelQueuedAccessibility": "रांगेतील संदेश रद्द करा",
+      "restoreQueued": "पुनर्संचयित करा",
+      "restoreQueuedAccessibility": "रद्द केलेला संदेश कंपोझरमध्ये पुनर्संचयित करा"
     },
     "olderMessages": {
       "arrived": "आधीचे संदेश लोड झाले",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "सत्रे फिल्टर करा",
-      "sortBy": "क्रमवारी लावा",
-      "sortLastUpdated": "शेवटचे अपडेट",
-      "sortCreated": "तयार केले",
       "platform": "प्लॅटफॉर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्स्टेन्शन",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "इतर",
-      "project": "प्रकल्प",
-      "removeProjectFilter": "{{label}} प्रकल्प फिल्टर काढा",
-      "removePlatformFilter": "{{label}} प्लॅटफॉर्म फिल्टर काढा"
+      "project": "प्रकल्प"
     },
     "suggestion": {
       "title": "सूचना",
@@ -2545,7 +2559,9 @@
       "uploading": "अपलोड होत आहे…",
       "uploaded": "अपलोड झाले",
       "uploadFailedRetry": "अपलोड अयशस्वी. पुन्हा प्रयत्न करण्यासाठी टॅप करा.",
-      "uploadFailedTerminal": "ही फाइल अपलोड करता येत नाही."
+      "uploadFailedTerminal": "ही फाइल अपलोड करता येत नाही.",
+      "moveLeft": "{{filename}} डावीकडे हलवा",
+      "moveRight": "{{filename}} उजवीकडे हलवा"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्डवरून प्रतिमा पेस्ट करा",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "पूर्ण होत आहे...",
       "messagePlaceholder": "संदेश...",
       "cannotReceiveFiles": "या सत्राला फाइल्स मिळू शकत नाहीत. तुमचा संदेश पाठवण्यासाठी संलग्नता काढा.",
-      "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा टॅप करा."
+      "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा टॅप करा.",
+      "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
+      "discardAttachmentsTitle": "संलग्नता टाकून द्यायच्या?",
+      "charactersRemaining": "{{count}} अक्षरे शिल्लक",
+      "insertNewline": "नवीन ओळ घाला"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी केली",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "नवीन कोडिंग कार्य",
     "explore": "एक्सप्लोर करा",
     "seeAll": "सर्व पहा",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "सध्या काहीही चालू नाही"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करा",
@@ -2794,7 +2814,8 @@
     "busy": "व्हॉइस इनपुट व्यस्त आहे. पुन्हा प्रयत्न करा.",
     "stopped": "व्हॉइस इनपुट थांबले. पुन्हा प्रयत्न करण्यासाठी मायक्रोफोनवर टॅप करा.",
     "unavailableDevice": "या डिव्हाइसवर व्हॉइस इनपुट उपलब्ध नाही.",
-    "unavailableLanguage": "या डिव्हाइसच्या भाषेसाठी व्हॉइस इनपुट उपलब्ध नाही."
+    "unavailableLanguage": "या डिव्हाइसच्या भाषेसाठी व्हॉइस इनपुट उपलब्ध नाही.",
+    "listeningStopped": "ऐकणे थांबले."
   },
   "share": {
     "title": "Kilo ला शेअर करा",

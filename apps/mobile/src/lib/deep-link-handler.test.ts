@@ -10,7 +10,6 @@ import {
   captureLaunchDeepLink,
   getPendingDeepLink,
 } from './deep-link-launch';
-import { _resetDevSessionInjectForTests, consumePendingDevSession } from './dev-session-inject';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
 import { resolvePendingNavigation } from './pending-navigation';
 
@@ -88,19 +87,15 @@ describe('redirectSystemPath', () => {
         return null;
       },
     });
-    _resetDevSessionInjectForTests();
     setGitHubInstallReturnOutcome(null);
     mocks.navigate.mockReset();
     mocks.shouldThrow = false;
-    vi.stubGlobal('__DEV__', true);
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
-    _resetDevSessionInjectForTests();
     setGitHubInstallReturnOutcome(null);
     mocks.shouldThrow = false;
-    vi.unstubAllGlobals();
   });
 
   describe('cold invariant', () => {
@@ -144,21 +139,6 @@ describe('redirectSystemPath', () => {
       expect(warm).toBe(path);
       expect(getPendingDeepLink()).toBeNull();
       expect(mocks.navigate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('dev session inject', () => {
-    it('stashes credentials from a kiloapp URL in a dev build', () => {
-      const path =
-        'kiloapp:///home?dev_session_token=tok&dev_session_refresh=ref&dev_session_expires_in=3600';
-      const result = redirectSystemPath({ path, initial: true });
-      expect(result).toBeNull();
-      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(0_home)');
-      expect(consumePendingDevSession()).toEqual({
-        token: 'tok',
-        refreshToken: 'ref',
-        expiresIn: 3600,
-      });
     });
   });
 

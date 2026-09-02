@@ -91,8 +91,11 @@ export function getChildSessionCardState(
   const taskName =
     description ?? (prompt ? truncateText(prompt, 60) : i18n.t('agentChat.childSession.task'));
 
-  const latestPart = findLatestAssistantPart(childMessages);
   const latestActivity: ChildSessionActivity | string = (() => {
+    if (part.state.status === 'completed' || part.state.status === 'error') {
+      return '';
+    }
+    const latestPart = findLatestAssistantPart(childMessages);
     if (!latestPart) {
       return i18n.t('agentChat.childSession.waitingForActivity');
     }

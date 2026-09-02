@@ -2,26 +2,30 @@ import { type Href, useRouter } from 'expo-router';
 import {
   Bell,
   Brain,
+  CornerDownLeft,
   Globe,
   type LucideIcon,
   MessageSquare,
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
-import { Switch, View } from 'react-native';
+import { ActivityIndicator, Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { AppUnlockFeedback } from '@/components/app-unlock-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { useAppUnlock } from '@/lib/app-unlock-context';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
@@ -39,6 +43,7 @@ type PreferenceRowProps = Readonly<{
   subtitle: string;
   value: boolean;
   disabled: boolean;
+  busy?: boolean;
   onValueChange: (next: boolean) => void;
 }>;
 
@@ -49,12 +54,17 @@ function PreferenceRow({
   subtitle,
   value,
   disabled,
+  busy = false,
   onValueChange,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <Icon size={18} color={colors.secondaryForeground} />
+      {busy ? (
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      ) : (
+        <Icon size={18} color={colors.secondaryForeground} />
+      )}
       <View className="flex-1">
         {/* Disabled cue is the muted title, not row opacity — see the same
             pattern in notifications-screen's CategoryRow. */}
@@ -69,7 +79,7 @@ function PreferenceRow({
         value={value}
         disabled={disabled}
         accessibilityLabel={title}
-        accessibilityState={{ disabled }}
+        accessibilityState={{ disabled, busy }}
         onValueChange={onValueChange}
       />
     </View>
@@ -78,6 +88,8 @@ function PreferenceRow({
 
 export function PreferencesScreen() {
   const router = useRouter();
+  const unlock = useAppUnlock();
+  const { setEnabled: handleUnlockChange } = unlock;
   const { preference: themePreference } = useThemePreference();
   const {
     defaultExpanded,
@@ -94,6 +106,8 @@ export function PreferencesScreen() {
     hasLoaded: prReviewFooterLoaded,
     setPrReviewFooter,
   } = usePrReviewFooterPreference();
+  const { returnSendsMessage, hasLoaded, setReturnSendsMessage } =
+    useReturnSendsMessagePreference();
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
@@ -112,6 +126,18 @@ export function PreferencesScreen() {
         contentContainerClassName="px-6 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        <View className="gap-2">
+          <PreferenceRow
+            icon={Shield}
+            title={t('preferences.biometricUnlock')}
+            subtitle={t('preferences.biometricUnlockSubtitle')}
+            value={unlock.enabled}
+            disabled={unlock.busy || unlock.status !== 'unlocked'}
+            busy={unlock.busy}
+            onValueChange={handleUnlockChange}
+          />
+          <AppUnlockFeedback outcome={unlock.purpose === 'setting' ? unlock.outcome : null} />
+        </View>
         <PreferenceRow
           icon={Brain}
           title={t('preferences.autoExpandThinking')}
@@ -135,6 +161,14 @@ export function PreferencesScreen() {
           value={prReviewFooter}
           disabled={!prReviewFooterLoaded}
           onValueChange={setPrReviewFooter}
+        />
+        <PreferenceRow
+          icon={CornerDownLeft}
+          title={t('preferences.returnSendsMessage')}
+          subtitle={t('preferences.returnSendsMessageSubtitle')}
+          value={returnSendsMessage}
+          disabled={!hasLoaded}
+          onValueChange={setReturnSendsMessage}
         />
 
         {/* Appearance */}

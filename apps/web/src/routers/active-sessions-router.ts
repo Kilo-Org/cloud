@@ -68,6 +68,11 @@ const connectedInstanceSchema = z.object({
   name: z.string(),
   projectName: z.string(),
   version: z.string().optional(),
+  // Old CLIs and hibernated attachments omit this metadata. Remove these defaults
+  // only after all supported metadata-free producers and attachments have retired.
+  kind: z.enum(['cli', 'remote']).default('cli'),
+  startedAt: z.string().datetime({ precision: 3 }).length(24).nullable().default(null),
+  gitBranch: z.string().max(24).nullable().default(null),
   /**
    * Capabilities advertised by this connected CLI instance. Omitted when the
    * CLI's latest attachment did not include a capabilities object (legacy CLI

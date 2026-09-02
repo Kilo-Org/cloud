@@ -115,8 +115,44 @@ describe('queueMessage', () => {
       userId: 'user_abc',
       turn: { type: 'prompt', prompt: 'hello' },
     });
-    expect(request?.turn.id).toBeUndefined();
+    expect(request?.turn.id).toMatch(/^msg_/);
   });
+
+  it.each(['prompt', 'command'] as const)(
+    'reuses an omitted %s ID after a committed response is lost',
+    async type => {
+      const admissions = new Map<string, SubmittedSessionMessageRequest>();
+      let attempts = 0;
+      const admitSubmittedMessage = vi.fn(
+        async (request: SubmittedSessionMessageRequest): Promise<SessionMessageAdmissionResult> => {
+          const messageId = request.turn.id;
+          if (!messageId) throw new Error('Missing durable message identity');
+          if (!admissions.has(messageId)) admissions.set(messageId, structuredClone(request));
+          attempts += 1;
+          if (attempts === 1)
+            throw Object.assign(new Error('Response lost after admission'), { retryable: true });
+          return { success: true, outcome: 'queued', compatibilityDelivery: 'queued', messageId };
+        }
+      );
+      const response = await queueMessage(
+        {
+          cloudAgentSessionId: 'workspace_existing',
+          turn:
+            type === 'prompt'
+              ? { type, prompt: 'hello' }
+              : { type, command: 'review', arguments: '--all' },
+        },
+        { env: makeEnv({ admitSubmittedMessage }) as Env, userId: 'user_abc' }
+      );
+
+      expect(attempts).toBe(2);
+      expect(admissions.size).toBe(1);
+      expect(admissions.has(response.messageId)).toBe(true);
+      expect(admitSubmittedMessage.mock.calls[0]?.[0].turn.id).toBe(
+        admitSubmittedMessage.mock.calls[1]?.[0].turn.id
+      );
+    }
+  );
 
   it('projects an already runtime-accepted replay as sent at the public seam', async () => {
     const { stub } = makeDoStub({
@@ -224,7 +260,7 @@ describe('queueMessage', () => {
       botId: 'bot_payload',
       turn: {
         type: 'prompt',
-        id: undefined,
+        id: expect.stringMatching(/^msg_/),
         prompt: 'inspect the screenshot',
         attachments: {
           path: '123e4567-e89b-12d3-a456-426614174000',

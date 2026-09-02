@@ -568,6 +568,7 @@ export const sessionEventV2RowSchema = z.object({
   gitUrl: z.string().nullable(),
   gitBranch: z.string().nullable(),
   parentSessionId: z.string().nullable(),
+  worktreeId: z.string().nullable().optional(),
   status: sessionStatusValueSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
 });

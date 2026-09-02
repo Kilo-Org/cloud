@@ -115,6 +115,130 @@ describe('message terminalization and stream events', () => {
     );
   });
 
+  it.each([false, true])(
+    'reports queued cancellation and successful retries with one client cancel event (first send fails: %s)',
+    async failFirstReport => {
+      const userId = `user_cancel_report_${failFirstReport}`;
+      const sessionId = `agent_cancel_report_${failFirstReport}`;
+      const messageId = 'msg_018f1e2d3c4bCancelReportAB';
+      const acceptedMessageId = 'msg_018f1e2d3c4bCancelActiveAB';
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+      const reports: CloudAgentQueueReport[] = [];
+      const callbackQueue = createCapturedQueue();
+      const broadcastTypes: string[] = [];
+      let interruptedReportAttempts = 0;
+
+      const first = await runInDurableObject(stub, async instance => {
+        injectReportQueue(instance, reports);
+        injectCallbackQueue(instance, callbackQueue);
+        await registerReadySession(instance, {
+          sessionId,
+          userId,
+          kiloSessionId,
+          prompt: 'queued cancellation',
+          mode: 'code',
+          model: 'test-model',
+          callbackTarget: { url: 'https://example.com/callback' },
+        });
+        for (const id of [messageId, acceptedMessageId]) {
+          await instance.admitSubmittedMessage(
+            queueUserMessageInput({ userId, messageId: id, prompt: 'queued cancellation' })
+          );
+        }
+        const admitted = await getSessionMessageState(instance.ctx.storage, acceptedMessageId);
+        if (!admitted) throw new Error('Expected admitted message');
+        await putSessionMessageState(instance.ctx.storage, {
+          ...admitted,
+          status: 'accepted',
+          acceptedAt: Date.now(),
+          dispatchAcceptanceKind: 'observed',
+          wrapperRunId: 'wr_cancel_report',
+        });
+        const accepted = await getSessionMessageState(instance.ctx.storage, acceptedMessageId);
+        const sendReport = instance['sendRunStateReport'].bind(instance);
+        instance['sendRunStateReport'] = async report => {
+          if (report.run.status === 'interrupted') {
+            interruptedReportAttempts += 1;
+            if (failFirstReport && interruptedReportAttempts === 1) {
+              throw new Error('Report queue temporarily unavailable');
+            }
+          }
+          return sendReport(report);
+        };
+        const broadcastEvent = instance['broadcastEvent'].bind(instance);
+        instance['broadcastEvent'] = event => {
+          broadcastTypes.push(event.stream_event_type);
+          broadcastEvent(event);
+        };
+
+        expect(await instance.cancelQueuedMessage(messageId)).toEqual({ dropped: true });
+        expect(await instance.cancelQueuedMessage(acceptedMessageId)).toEqual({ dropped: false });
+        expect(await instance.cancelQueuedMessage('msg_missing_cancel')).toEqual({
+          dropped: false,
+        });
+        expect(await getSessionMessageState(instance.ctx.storage, acceptedMessageId)).toEqual(
+          accepted
+        );
+        return {
+          canceled: await getSessionMessageState(instance.ctx.storage, messageId),
+          accepted,
+        };
+      });
+
+      expect(interruptedReportAttempts).toBe(1);
+      expect(reports.filter(report => report.run.status === 'interrupted')).toHaveLength(
+        failFirstReport ? 0 : 1
+      );
+      expect(first.canceled).toMatchObject({
+        status: 'interrupted',
+        completionSource: 'canceled',
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+        terminalAt: expect.any(Number),
+      });
+      expect(first.canceled?.terminalEffects).toBeUndefined();
+
+      const retry = await runInDurableObject(stub, async (instance, state) => {
+        expect(await instance.cancelQueuedMessage(messageId)).toEqual({ dropped: true });
+        const events = createEventQueries(
+          drizzle(state.storage, { logger: false }),
+          state.storage.sql
+        ).findByFilters({ eventTypes: ['cloud.message.canceled', 'cloud.message.failed'] });
+        return {
+          canceled: await getSessionMessageState(instance.ctx.storage, messageId),
+          accepted: await getSessionMessageState(instance.ctx.storage, acceptedMessageId),
+          events,
+        };
+      });
+
+      expect(interruptedReportAttempts).toBe(2);
+      expect(retry.canceled).toEqual(first.canceled);
+      expect(retry.accepted).toEqual(first.accepted);
+      expect(retry.events).toHaveLength(1);
+      expect(retry.events[0].stream_event_type).toBe('cloud.message.canceled');
+      expect(JSON.parse(retry.events[0].payload)).toEqual({ messageId });
+      expect(broadcastTypes).toEqual(['cloud.message.canceled']);
+      expect(callbackQueue.captured).toEqual([]);
+      const interruptedReports = reports.filter(report => report.run.status === 'interrupted');
+      expect(interruptedReports).toHaveLength(failFirstReport ? 1 : 2);
+      for (const report of interruptedReports) {
+        expect(report.run).toMatchObject({
+          messageId,
+          status: 'interrupted',
+          failureStage: 'interruption',
+          failureCode: 'user_interrupt',
+          queuedAt: new Date(first.canceled?.queuedAt ?? 0).toISOString(),
+          terminalAt: new Date(first.canceled?.terminalAt ?? 0).toISOString(),
+        });
+        expect(report.run).not.toHaveProperty('dispatchAcceptedAt');
+        expect(report.run).not.toHaveProperty('agentActivityObservedAt');
+        expect(report.run).not.toHaveProperty('diagnostic');
+      }
+    }
+  );
+
   it('alarm repairs terminal effects without duplicating a durable terminal event', async () => {
     const userId = 'user_term_repair_alarm';
     const sessionId = 'agent_term_repair_alarm';

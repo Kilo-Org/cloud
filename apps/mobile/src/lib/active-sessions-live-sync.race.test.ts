@@ -13,7 +13,103 @@ import {
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
+import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/query-client';
+
 setupTimers();
+
+describe('ActiveSessionsLiveSync — publication fences', () => {
+  it.each([
+    { operation: 'write', accountChange: true },
+    { operation: 'fetch', accountChange: true },
+    { operation: 'write', accountChange: false },
+    { operation: 'fetch', accountChange: false },
+  ])(
+    'fences queued $operation work after cancellation, accountChange=$accountChange',
+    async ({ operation, accountChange }) => {
+      const conn = makeConnection();
+      const qc = makeFakeQueryClient();
+      const sync = new ActiveSessionsLiveSync({
+        connection: conn,
+        queryClient: qc,
+        queryKey: QUERY_KEY,
+        queryFn: makeQueryFn(),
+      });
+      sync.attach();
+      const gate = deferred<undefined>();
+      const cancel = qc.cancelQueries.bind(qc);
+      let waiting = false;
+      vi.spyOn(qc, 'cancelQueries').mockImplementationOnce(async filters => {
+        await cancel(filters);
+        waiting = true;
+        await gate.promise;
+      });
+      if (operation === 'write') {
+        conn.__fireSystem({
+          event: 'sessions.list',
+          data: { sessions: [makeCached({ title: 'stale' })] },
+        });
+        conn.__fireSystem({ event: 'sessions.list', data: { sessions: [] } });
+      } else {
+        sync.scheduleRefresh('manual');
+      }
+      await vi.waitFor(() => {
+        expect(waiting).toBe(true);
+      });
+      if (accountChange) {
+        bumpAuthEpoch();
+        qc.clear();
+      } else {
+        setSignOutActive(true);
+      }
+      const current = { sessions: [makeCached({ title: 'Current account' })] };
+      qc.setQueryData(QUERY_KEY, current);
+      try {
+        gate.resolve(undefined);
+        await sync.getWriteQueue();
+        await sync.getFetchCompletion();
+        expect(qc.__getCached()).toEqual(current);
+        expect(qc.getQueryState(QUERY_KEY)?.fetchStatus).toBe('idle');
+        expect(qc.__hasPendingFetch()).toBe(false);
+      } finally {
+        sync.detach();
+        setSignOutActive(false);
+      }
+    }
+  );
+
+  it('rejects a server result after synchronous sign-out closes publication', async () => {
+    const conn = makeConnection();
+    const cached = { sessions: [makeCached({ title: 'Before sign-out' })] };
+    const qc = createKiloAppQueryClient();
+    qc.setQueryData(QUERY_KEY, cached);
+    const query = qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    const network = deferred<CachedActiveSessionsData>();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn: async () => {
+        const result = await network.promise;
+        return result;
+      },
+    });
+    sync.attach();
+    const pending = sync.refreshNow(QUERY_KEY);
+    await sync.getFetchQueue();
+    setSignOutActive(true);
+    try {
+      network.resolve({ sessions: [makeCached({ title: 'Late result' })] });
+      expect(await pending).toEqual({ accepted: false });
+      expect(qc.getQueryData(QUERY_KEY)).toEqual(cached);
+      expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(0);
+    } finally {
+      sync.detach();
+      setSignOutActive(false);
+    }
+  });
+});
 
 describe('ActiveSessionsLiveSync — race tests', () => {
   it('heartbeat wins over an in-flight fetch (cache reflects heartbeat)', async () => {

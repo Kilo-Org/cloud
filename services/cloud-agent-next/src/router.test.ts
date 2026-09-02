@@ -2779,7 +2779,7 @@ describe('legacy V2 execution response compatibility', () => {
     expect(request).toMatchObject({
       turn: {
         type: 'prompt',
-        id: undefined,
+        id: expect.stringMatching(/^msg_/),
         prompt: 'follow up',
         attachments: undefined,
       },
@@ -2803,7 +2803,7 @@ describe('legacy V2 execution response compatibility', () => {
       expect.objectContaining({
         turn: {
           type: 'command',
-          id: undefined,
+          id: expect.stringMatching(/^msg_/),
           command: 'compact',
           arguments: '--aggressive',
         },

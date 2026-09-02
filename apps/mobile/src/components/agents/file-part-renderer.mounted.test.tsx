@@ -181,11 +181,14 @@ beforeEach(() => {
   );
 });
 
-async function mount(part: FilePart): Promise<TestRenderer.ReactTestRenderer> {
+async function mount(
+  part: FilePart,
+  onLongPress?: () => void
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(createElement(FilePartRenderer, { part }));
+    ref.current = TestRenderer.create(createElement(FilePartRenderer, { part, onLongPress }));
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -284,6 +287,104 @@ async function selectActionSheet(index: number): Promise<void> {
 }
 
 describe('FilePartRenderer mounted', () => {
+  it.each([
+    { mime: 'image/png', filename: 'shot.png', label: 'Open shot.png full screen' },
+    { mime: 'text/markdown', filename: 'readme.md', label: 'Preview readme.md' },
+    { mime: 'application/pdf', filename: 'report.pdf', label: 'Open report.pdf' },
+  ])(
+    'forwards $mime long-press without replacing its normal tap',
+    async ({ mime, filename, label }) => {
+      expoFileSystemMock.fileText.mockResolvedValue('Attachment body');
+      const url = `https://example.test/${filename}`;
+      cacheFilePart('part-1', { url, mime, filename });
+      const part = makeFilePart({ id: 'part-1', mime, filename, url: '' });
+      const selected: string[] = [];
+      const renderer = await mount(part, () => {
+        selected.push(part.messageID);
+      });
+      const button = first(pressableByLabel(renderer.root, label));
+      act(() => {
+        (button.props.onLongPress as () => void)();
+      });
+      expect(selected).toEqual(['message-1']);
+      expect(findByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+      expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+      expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+      await press(button);
+      if (mime === 'image/png') {
+        expect(first(findByType(renderer.root, 'ImageViewerModal')).props.uri).toBe(url);
+      } else if (mime === 'text/markdown') {
+        expect(first(findByType(renderer.root, 'ChatMarkdownText')).props.value).toBe(
+          'Attachment body'
+        );
+      } else {
+        await selectActionSheet(0);
+        expect(texts(renderer.root)).toContain('Attachment body');
+      }
+      expect(selected).toEqual(['message-1']);
+      await unmount(renderer);
+    }
+  );
+
+  it('forwards image-error long-press without retrying until the normal tap', async () => {
+    cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
+    const selected: string[] = [];
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'shot.png', url: '' }),
+      () => {
+        selected.push('message-1');
+      }
+    );
+    act(() => {
+      (first(findByType(renderer.root, 'Image')).props.onError as () => void)();
+    });
+    const retry = first(pressableByLabel(renderer.root, 'Image unavailable, retry loading'));
+    act(() => {
+      (retry.props.onLongPress as () => void)();
+    });
+    expect(selected).toEqual(['message-1']);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('Image unavailable');
+    await press(retry);
+    expect(first(findByType(renderer.root, 'Image')).props.source).toEqual({
+      uri: 'https://x/a.png',
+    });
+    expect(selected).toEqual(['message-1']);
+    await unmount(renderer);
+  });
+
+  it('forwards image-presign failure long-press and preserves normal retry recovery', async () => {
+    const uuid = '88888888-8888-4888-8888-888888888888';
+    cacheFilePart('part-1', {
+      url: `file:///tmp/attachments/agent-1/user-1/${uuid}/${uuid}.png`,
+      mime: 'image/png',
+      filename: `${uuid}.png`,
+    });
+    getAttachmentDownloadUrlMutate.mockRejectedValueOnce(new Error('presign failed'));
+    const selected: string[] = [];
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'image/png', filename: `${uuid}.png`, url: '' }),
+      () => {
+        selected.push('message-1');
+      }
+    );
+    await flushAsync();
+    const retry = first(pressableByLabel(renderer.root, 'Image unavailable, retry loading'));
+    act(() => {
+      (retry.props.onLongPress as () => void)();
+    });
+    expect(selected).toEqual(['message-1']);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('Image unavailable');
+    await press(retry);
+    await flushAsync();
+    expect(first(findByType(renderer.root, 'Image')).props.source).toEqual({
+      uri: 'https://r2.example/signed',
+    });
+    expect(selected).toEqual(['message-1']);
+    await unmount(renderer);
+  });
+
   it('opens the full-screen viewer when an image FilePart is tapped', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
     const renderer = await mount(
@@ -774,6 +875,8 @@ describe('FilePartRenderer mounted', () => {
     const headers = findByType(root, 'SheetHeader');
     expect(headers).toHaveLength(1);
     expect(headers[0]?.props.onShare).toBeTypeOf('function');
+    // Filenames truncate in the middle so the extension stays visible.
+    expect(headers[0]?.props.titleEllipsis).toBe('middle');
 
     await act(async () => {
       await Promise.resolve();

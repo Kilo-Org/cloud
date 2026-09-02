@@ -27,10 +27,15 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
+// Hoisted so the iOS size test can flip the platform OS and re-evaluate the
+// QUEUED_CONTROL_MIN_HEIGHT module constant via vi.resetModules().
+const { reactNativeMock } = vi.hoisted(() => ({
+  reactNativeMock: { Platform: { OS: 'android' } },
+}));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
-  Platform: { OS: 'android' },
+  Platform: reactNativeMock.Platform,
 }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
@@ -181,6 +186,8 @@ async function renderBubbleWithHandlers(
     deliveryState?: MessageDeliveryState;
     onRetryMessage?: (m: StoredMessage) => void;
     onCopyToComposer?: (text: string) => void;
+    onRestoreQueued?: (m: StoredMessage) => void;
+    onLongPressDetails?: (m: StoredMessage) => void;
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
@@ -316,6 +323,106 @@ describe('MessageBubble failure footer', () => {
     (retry.props.onPress as () => void)();
     expect(onRetryMessage).toHaveBeenCalledWith(message);
   });
+});
+
+describe('MessageBubble queue indicator and restore', () => {
+  it('keeps Queued without a standalone cancellation control', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-queued'), {
+      deliveryState: { status: 'queued' },
+    });
+    expect(findText(tree, text => text === 'Queued')).toBe(true);
+    expect(findText(tree, text => text === 'Cancel message')).toBe(false);
+    expect(
+      findElementByType(
+        tree,
+        'Button',
+        props => props.accessibilityLabel === 'Cancel queued message'
+      )
+    ).toBeNull();
+  });
+
+  it.each([
+    ['android', 'min-h-12'],
+    ['ios', 'min-h-11'],
+  ])('keeps Restore targeting and the minimum target on %s', async (platform, minHeight) => {
+    reactNativeMock.Platform.OS = platform;
+    vi.resetModules();
+    try {
+      const message = userMessage('m-restore');
+      let restored: StoredMessage | undefined = undefined;
+      const tree = await renderBubbleWithHandlers(message, {
+        onRestoreQueued: selected => {
+          restored = selected;
+        },
+      });
+      expect(findText(tree, text => text === 'Restore')).toBe(true);
+      const restore = findElementByType(
+        tree,
+        'Button',
+        props => props.accessibilityLabel === 'Restore canceled message to the composer'
+      );
+      expect(restore?.props.accessibilityRole).toBe('button');
+      expect(restore?.props.className).toBe(minHeight);
+      expect(restore?.props.size).toBe('sm');
+      if (!restore) {
+        throw new Error('Restore control is missing');
+      }
+      (restore.props.onPress as () => void)();
+      expect(restored).toBe(message);
+    } finally {
+      reactNativeMock.Platform.OS = 'android';
+      vi.resetModules();
+    }
+  });
+});
+
+describe('MessageBubble attachment details entry', () => {
+  it.each([false, true])(
+    'selects the whole message from an attachment, with text=%s',
+    async withText => {
+      const actual = await vi.importActual<typeof PartTypes>('./part-types');
+      const { isFilePart, isTextPart } = await import('./part-types');
+      const { FilePartRenderer } = await import('./file-part-renderer');
+      vi.mocked(isFilePart).mockImplementation(actual.isFilePart);
+      vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+      try {
+        const message = userMessage('attachment-message');
+        const file = {
+          id: 'attachment-part',
+          sessionID: 'ses_1',
+          messageID: message.info.id,
+          type: 'file' as const,
+          mime: 'image/png',
+          url: 'https://example.test/image.png',
+        };
+        message.parts = [...(withText ? message.parts : []), file];
+        const selected: StoredMessage[] = [];
+        const tree = await renderBubbleWithHandlers(message, {
+          deliveryState: { status: 'queued' },
+          onLongPressDetails: value => {
+            selected.push(value);
+          },
+        });
+        const attachment = findElementByTypeFn(tree, FilePartRenderer);
+        if (!attachment) {
+          throw new Error('Attachment control is missing');
+        }
+        expect(attachment.props.part).toBe(file);
+        (attachment.props.onLongPress as () => void)();
+        expect(selected).toEqual([message]);
+        expect(findText(tree, text => text === 'Queued')).toBe(true);
+        expect(findText(tree, text => text === 'Cancel message')).toBe(false);
+
+        const withoutActions = await renderBubbleWithHandlers(message, {});
+        expect(
+          findElementByTypeFn(withoutActions, FilePartRenderer)?.props.onLongPress
+        ).toBeUndefined();
+      } finally {
+        vi.mocked(isFilePart).mockReturnValue(false);
+        vi.mocked(isTextPart).mockReturnValue(false);
+      }
+    }
+  );
 });
 
 describe('MessageBubble copy-to-composer human text', () => {
@@ -485,6 +592,15 @@ function findElementByTypeFn(
   node: unknown,
   typeFn: unknown
 ): { type: unknown; props: Record<string, unknown> } | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findElementByTypeFn(child, typeFn);
+      if (hit) {
+        return hit;
+      }
+    }
+    return null;
+  }
   if (node == null || typeof node !== 'object') {
     return null;
   }

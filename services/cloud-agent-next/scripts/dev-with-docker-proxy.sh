@@ -45,6 +45,17 @@ if [ -z "${MINIFLARE_CONTAINER_EGRESS_IMAGE:-}" ]; then
   esac
 fi
 
+if [ "${1:-}" = "--no-proxy" ]; then
+  shift
+  if [ -n "${DOCKER_SOCKET:-}" ]; then
+    case "$DOCKER_SOCKET" in
+      unix://*) export DOCKER_HOST="$DOCKER_SOCKET" ;;
+      *) export DOCKER_HOST="unix://$DOCKER_SOCKET" ;;
+    esac
+  fi
+  exec wrangler dev "$@"
+fi
+
 node "$script_dir/docker-privileged-proxy.mjs" &
 proxy=$!
 trap 'kill $proxy 2>/dev/null || true' EXIT INT TERM

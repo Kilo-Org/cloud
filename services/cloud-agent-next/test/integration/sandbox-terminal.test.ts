@@ -1,19 +1,36 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createMemoryProviderAdapter } from '../../src/sandbox-control/provider.js';
+import { deriveKiloSandboxTargets } from '../../src/kilo/kilo-targets.js';
+import {
+  decodeCloudflareProviderRef,
+  encodeCloudflareProviderRef,
+} from '../../src/sandbox-control/cloudflare-provider.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
+import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
+import {
+  WORKTREE_CREDENTIAL_CONTAINMENT,
+  type PhysicalRecord,
+} from '../../src/sandbox-control/physical-lifecycle.js';
+import {
+  sessionCredentialGrantSchema,
+  type SessionCredentialGrant,
+} from '../../src/sandbox-control/session-credentials.js';
 import { getSandboxSessionStub } from '../../src/sandbox-session/session-stub.js';
+import { createMessageId } from '../../src/session/message-id.js';
 import {
   requestFrameSchema,
   responseFrameSchema,
+  sessionAttachPayloadSchema,
   sessionTerminalConnectPayloadSchema,
   type RequestFrame,
   type ResponseFrame,
   type SessionTerminalConnectPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
-import type { SandboxId } from '../../src/types.js';
+import type { GitTokenService, SandboxId } from '../../src/types.js';
 import { getSessionWorkspacePath } from '../../src/workspace.js';
 
 type SocketFrame = string | ArrayBuffer;
@@ -118,8 +135,14 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
   const owner = ownerId ?? `user_${identity}`;
   const sessionId = `workspace_${identity}`;
   const sandboxId = `ses-${identity.replaceAll('-', '')}` as SandboxId;
-  const kiloSessionId = `ses_${identity.replaceAll('-', '')}`;
+  const kiloSessionId = `ses_${identity.replaceAll('-', '').slice(0, 26)}`;
   const wrapperInstanceId = crypto.randomUUID();
+  const creationId = crypto.randomUUID();
+  const providerInstanceId = encodeCloudflareProviderRef({
+    sandboxId,
+    containment: true,
+    instanceId: creationId,
+  });
   const ptyId = `pty_${identity.replaceAll('-', '')}`;
   const directory = getSessionWorkspacePath(organizationId, owner, sessionId);
   const sessionIdentity = {
@@ -129,20 +152,64 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     ...(organizationId ? { orgId: organizationId } : {}),
   };
   const credential = generateSandboxCredential();
+  const kiloToken = 'terminal-fixture-kilo-token';
+  const targets = deriveKiloSandboxTargets({}, kiloToken);
+  if (!targets.success) throw new Error('Invalid terminal fixture targets');
+  const now = Date.now();
+  const grant = sessionCredentialGrantSchema.parse({
+    version: 1,
+    scopeId: sessionId,
+    sandboxId,
+    directory,
+    userId: owner,
+    ...(organizationId ? { orgId: organizationId } : {}),
+    provider: 'cloudflare',
+    outboundContainerId: `contained-small:${sandboxId}`,
+    members: [{ sessionId, kiloSessionId }],
+    kilo: {
+      alias: createControlPlaneCredential(sandboxId, 'kilo'),
+      token: kiloToken,
+      targets: targets.targets,
+      capabilities: {},
+    },
+    preparedAt: now,
+    expiresAt: now + 4 * 60 * 60 * 1000,
+  });
   const controlStub = env.SANDBOX_CONTROL.getByName(sandboxId);
   const sessionStub = getSandboxSessionStub(env, owner, sessionId);
 
-  await runInDurableObject(controlStub, async instance => {
+  await runInDurableObject(controlStub, async (instance, state) => {
+    const provider = createMemoryProviderAdapter();
+    const broker = {
+      async issueKiloSessionCapability() {
+        return { success: true, capability: `kka1.${crypto.randomUUID()}` };
+      },
+    } satisfies Pick<GitTokenService, 'issueKiloSessionCapability'>;
+    Object.assign(instance, {
+      provider,
+      createProviderAdapter: () => provider,
+      env: {
+        ...env,
+        KILOCODE_BACKEND_BASE_URL: targets.targets.backendBaseUrl,
+        KILO_OPENROUTER_BASE: targets.targets.providerBaseUrl,
+        KILO_SESSION_INGEST_URL: targets.targets.sessionIngestBaseUrl,
+        GIT_TOKEN_SERVICE: broker,
+        SandboxSmallContainment: {
+          idFromName: (name: string) => ({ toString: () => `contained-small:${name}` }),
+        },
+      },
+    });
     await instance.initializeOwner(owner);
-    await instance.claimCreate(crypto.randomUUID());
-    await instance.confirmInstance(sandboxId);
+    await instance.claimCreate(creationId, false, sandboxId, WORKTREE_CREDENTIAL_CONTAINMENT);
+    await state.storage.put('worktree_credential_grants', [grant]);
+    await instance.confirmInstance(providerInstanceId);
     await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
   });
 
   await runInDurableObject(sessionStub, async instance => {
     const result = await instance.registerSession({
       identity: sessionIdentity,
-      auth: { kiloSessionId },
+      auth: { kiloSessionId, kilocodeToken: kiloToken },
       agent: { mode: 'code', model: 'test-model' },
       workspace: { sandboxId, sandboxProvider: 'cloudflare' },
     });
@@ -165,7 +232,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       operation: 'sandbox.hello',
       payload: {
         protocolVersion: 1,
-        providerInstanceId: sandboxId,
+        providerInstanceId,
         wrapperInstanceId,
       },
     })
@@ -186,11 +253,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     kiloReady: true,
   });
 
-  let resolvePreparation: (() => void) | undefined;
-  const prepared = new Promise<void>(resolve => {
-    resolvePreparation = resolve;
-  });
-
+  const prepared = Promise.withResolvers<void>();
   const fixture: TerminalFixture = {
     ownerId: owner,
     sessionId,
@@ -265,6 +328,10 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
 
     if (request.operation === 'session.attach') {
       expect(request.session).toEqual({ sessionId, kiloSessionId, directory });
+      expect(sessionAttachPayloadSchema.parse(request.payload)).toMatchObject({
+        directory,
+        kilo: { scopeId: grant.scopeId, token: grant.kilo.alias, targets: grant.kilo.targets },
+      });
       sendResponse(control, request.requestId, { attached: true });
       return;
     }
@@ -278,7 +345,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
         messageId: payload.messageId,
         status: 'accepted',
       });
-      resolvePreparation?.();
+      prepared.resolve();
       return;
     }
 
@@ -392,31 +459,36 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     })
   );
 
-  await runInDurableObject(controlStub, instance =>
-    instance.request({ operation: 'sandbox.status', payload: {} })
-  );
-
-  await expect(
-    runInDurableObject(controlStub, instance => instance.getStatus())
-  ).resolves.toMatchObject({
-    connection: 'ready',
-    physical: 'running',
-    wrapperInstanceId,
+  await vi.waitFor(async () => {
+    await expect(
+      runInDurableObject(controlStub, instance => instance.getStatus())
+    ).resolves.toMatchObject({
+      connection: 'ready',
+      physical: 'running',
+      wrapperInstanceId,
+    });
   });
 
+  const messageId = createMessageId();
   const admission = await runInDurableObject(sessionStub, instance =>
     instance.createSessionWithInitialAdmission({
       identity: sessionIdentity,
-      auth: { kiloSessionId },
+      auth: { kiloSessionId, kilocodeToken: kiloToken },
       agent: { mode: 'code', model: 'test-model' },
       workspace: { sandboxId, sandboxProvider: 'cloudflare' },
       message: {
-        initialTurn: { messageId: `msg_${identity}`, type: 'prompt', prompt: 'Prepare workspace' },
+        initialTurn: { messageId, type: 'prompt', prompt: 'Prepare workspace' },
       },
     })
   );
   if (!admission.success) throw new Error(`Session admission failed: ${admission.error}`);
-  await prepared;
+  await prepared.promise;
+  await vi.waitFor(async () => {
+    await expect(sessionStub.getMessageResult(messageId)).resolves.toMatchObject({
+      type: 'found',
+      result: { status: 'running' },
+    });
+  });
 
   const created = await runInDurableObject(sessionStub, instance =>
     instance.createTerminal({ cols: 80, rows: 24 })
@@ -433,6 +505,186 @@ afterEach(async () => {
 });
 
 describe('SandboxSession terminal bridge in the Workers runtime', () => {
+  it.each<{
+    name: string;
+    marker: (providerRef: string) => PhysicalRecord['containment'];
+  }>([
+    { name: 'missing', marker: () => undefined },
+    {
+      name: 'pre-worktree',
+      marker: providerRef => ({ kilocode: true, github: true, providerRef }),
+    },
+    {
+      name: 'uncontained Kilo credentials',
+      marker: providerRef => ({ ...WORKTREE_CREDENTIAL_CONTAINMENT, kilocode: false, providerRef }),
+    },
+    {
+      name: 'uncontained GitHub credentials',
+      marker: providerRef => ({ ...WORKTREE_CREDENTIAL_CONTAINMENT, github: false, providerRef }),
+    },
+    {
+      name: 'stale physical instance',
+      marker: providerRef => {
+        const ref = decodeCloudflareProviderRef(providerRef);
+        if (!ref) throw new Error('Invalid terminal fixture provider reference');
+        return {
+          ...WORKTREE_CREDENTIAL_CONTAINMENT,
+          providerRef: encodeCloudflareProviderRef({ ...ref, instanceId: crypto.randomUUID() }),
+        };
+      },
+    },
+  ])('denies terminal access with a $name containment marker', async ({ marker }) => {
+    const fixture = await createFixture();
+    const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const physical = await instance.getPhysicalRecord();
+      if (!physical.providerRef) throw new Error('Missing terminal fixture provider reference');
+      await state.storage.put('physical_record', {
+        ...physical,
+        containment: marker(physical.providerRef),
+      });
+    });
+
+    await expect(
+      runInDurableObject(control, instance =>
+        instance.validateTerminalAccess({
+          sessionId: fixture.sessionId,
+          ownerId: fixture.ownerId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        })
+      )
+    ).resolves.toMatchObject({ allowed: false });
+    const session = getSandboxSessionStub(env, fixture.ownerId, fixture.sessionId);
+    await expect(
+      runInDurableObject(session, instance => instance.createTerminal())
+    ).resolves.toMatchObject({ success: false });
+  });
+
+  it('rejects a raw provider reference even with a matching containment marker', async () => {
+    const fixture = await createFixture();
+    const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      const physical = await instance.getPhysicalRecord();
+      await state.storage.put('physical_record', {
+        ...physical,
+        providerRef: fixture.sandboxId,
+        containment: { ...WORKTREE_CREDENTIAL_CONTAINMENT, providerRef: fixture.sandboxId },
+      });
+    });
+
+    await expect(
+      runInDurableObject(control, instance =>
+        instance.validateTerminalAccess({
+          sessionId: fixture.sessionId,
+          ownerId: fixture.ownerId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        })
+      )
+    ).resolves.toMatchObject({ allowed: false });
+  });
+
+  it.each<{
+    name: string;
+    update: (grant: SessionCredentialGrant) => SessionCredentialGrant | undefined;
+  }>([
+    { name: 'missing', update: () => undefined },
+    {
+      name: 'expired without a broker',
+      update: grant => ({
+        ...grant,
+        preparedAt: 0,
+        expiresAt: 1,
+        kilo: { ...grant.kilo, capabilities: {} },
+      }),
+    },
+    {
+      name: 'future-dated',
+      update: grant => ({
+        ...grant,
+        preparedAt: Date.now() + 60 * 60 * 1000,
+        expiresAt: Date.now() + 2 * 60 * 60 * 1000,
+      }),
+    },
+    { name: 'another owner', update: grant => ({ ...grant, userId: 'user_other' }) },
+    { name: 'another organization', update: grant => ({ ...grant, orgId: 'org_other' }) },
+    { name: 'another directory', update: grant => ({ ...grant, directory: '/workspace/other' }) },
+    {
+      name: 'another session',
+      update: grant => {
+        const sessionId = `workspace_${crypto.randomUUID()}`;
+        return {
+          ...grant,
+          scopeId: sessionId,
+          members: grant.members.map(member => ({ ...member, sessionId })),
+          kilo: { ...grant.kilo, capabilities: {} },
+        };
+      },
+    },
+    {
+      name: 'another Kilo root',
+      update: grant => ({
+        ...grant,
+        members: grant.members.map(member => ({
+          ...member,
+          kiloSessionId: 'ses_00000000000000000000000000',
+        })),
+      }),
+    },
+    {
+      name: 'another sandbox',
+      update: grant => ({
+        ...grant,
+        sandboxId: 'ses-fedcba',
+        kilo: { ...grant.kilo, alias: createControlPlaneCredential('ses-fedcba', 'kilo') },
+      }),
+    },
+    {
+      name: 'another provider',
+      update: grant => ({
+        ...grant,
+        provider: 'vercel',
+        outboundContainerId: undefined,
+        kilo: { ...grant.kilo, capabilities: {} },
+      }),
+    },
+  ])('denies terminal access with a grant for $name', async ({ name, update }) => {
+    const fixture = await createFixture(undefined, 'org_terminal_containment');
+    const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+    await runInDurableObject(control, async (instance, state) => {
+      if (name === 'expired without a broker') {
+        const bindings = instance as unknown as { env: { GIT_TOKEN_SERVICE?: GitTokenService } };
+        delete bindings.env.GIT_TOKEN_SERVICE;
+      }
+      const grants = sessionCredentialGrantSchema
+        .array()
+        .parse(await state.storage.get('worktree_credential_grants'));
+      const grant = grants[0];
+      if (!grant) throw new Error('Missing terminal fixture grant');
+      const updated = update(grant);
+      await state.storage.put(
+        'worktree_credential_grants',
+        updated ? [sessionCredentialGrantSchema.parse(updated)] : []
+      );
+    });
+
+    await expect(
+      runInDurableObject(control, instance =>
+        instance.validateTerminalAccess({
+          sessionId: fixture.sessionId,
+          ownerId: fixture.ownerId,
+          organizationId: 'org_terminal_containment',
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        })
+      )
+    ).resolves.toMatchObject({ allowed: false });
+    const session = getSandboxSessionStub(env, fixture.ownerId, fixture.sessionId);
+    await expect(
+      runInDurableObject(session, instance =>
+        instance.resizeTerminal({ ptyId: fixture.ptyId, cols: 100, rows: 30 })
+      )
+    ).resolves.toMatchObject({ success: false });
+  });
+
   it('pairs reentrant hibernating sockets and forwards native terminal frames', async () => {
     const fixture = await createFixture();
     const browser = await fixture.openBrowser({ initialOutput: 'initial output' });

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { resolveVoiceInputControlState } from '@/lib/voice-input/voice-input-view-state';
 
-type VoiceInputButtonSize = 'sm' | 'md';
+type VoiceInputButtonSize = 'sm' | 'md' | 'lg';
 
 type VoiceInputButtonProps = {
   disabled: boolean;
@@ -19,6 +19,7 @@ type VoiceInputButtonProps = {
 
 // Visual class and hitSlop travel as a coupled pair so the effective touch
 // target stays >=44pt (visual size + 2 * hitSlop per side) at every size.
+// `lg` reaches the 48dp Android minimum for the composer input row.
 const SIZE_STYLES = {
   sm: {
     className: 'h-8 w-8 rounded-full',
@@ -26,6 +27,10 @@ const SIZE_STYLES = {
   },
   md: {
     className: 'h-9 w-9 rounded-full',
+    hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
+  },
+  lg: {
+    className: 'h-10 w-10 rounded-full',
     hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
   },
 } satisfies Record<

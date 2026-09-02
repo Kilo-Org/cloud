@@ -6,7 +6,7 @@ import {
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
-import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
+import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import {
   useAgentSessions,
   useAgentSessionSearch,
@@ -17,11 +17,11 @@ export function useAgentSessionListData(options: {
   organizationId: string | null;
   platformFilter: string[];
   projectFilter: string[];
-  sortBy: AgentSessionSortBy;
   ready: boolean;
   searchQuery: string;
 }) {
-  const { organizationId, platformFilter, projectFilter, sortBy, ready, searchQuery } = options;
+  const { organizationId, platformFilter, projectFilter, ready, searchQuery } = options;
+  const sortBy = SESSION_LIST_SORT;
   const createdOnPlatform = useMemo(
     () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
     [platformFilter]
@@ -32,6 +32,7 @@ export function useAgentSessionListData(options: {
   );
   const {
     storedSessions,
+    activeSessionIds,
     dateGroups,
     activeIsError,
     storedIsError,
@@ -147,6 +148,7 @@ export function useAgentSessionListData(options: {
 
   return {
     storedSessions,
+    activeSessionIds,
     storedIsFetching,
     storedLoadedPageCount,
     paging,

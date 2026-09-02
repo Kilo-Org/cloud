@@ -152,7 +152,11 @@
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
     "prReviewAttribution": "Añadir atribución de la app a las revisiones de PR",
-    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión."
+    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión.",
+    "returnSendsMessage": "La tecla Intro envía el mensaje",
+    "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
+    "biometricUnlock": "Desbloquear con biometría",
+    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano."
   },
   "notifications": {
     "channel": {
@@ -296,7 +300,8 @@
       "networkError": "Error de red",
       "uploadFailed": "Subida fallida",
       "failedToUploadFile": "No se pudo subir el archivo: {{reason}}",
-      "nothingToPaste": "No hay nada que pegar"
+      "nothingToPaste": "No hay nada que pegar",
+      "metadataStripFailed": "No se pudieron eliminar los metadatos de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -905,7 +910,7 @@
       "transcriptWaiting": "Esperando la transcripción de la revisión.",
       "transcriptEmpty": "No hay transcripción para esta revisión.",
       "transcriptRetry": "No se pudo cargar la transcripción de la revisión.",
-      "transcriptLive": "EN VIVO",
+      "transcriptLive": "En vivo",
       "agentIdle": "Agente inactivo",
       "agentWorking": "Agente trabajando...",
       "anErrorOccurred": "Se produjo un error",
@@ -1619,7 +1624,8 @@
       "couldNotSearch": "No se pudieron buscar las sesiones",
       "completedWillAppear": "Las sesiones completadas aparecerán aquí.",
       "noPastSessions": "No hay sesiones pasadas",
-      "live": "EN VIVO"
+      "live": "EN VIVO",
+      "updating": "Actualizando"
     },
     "sessionRow": {
       "deleteTitle": "¿Eliminar sesión?",
@@ -1665,7 +1671,10 @@
     "sessionExited": "La sesión finalizó",
     "remoteSpawnRetryable": "No se pudo conectar con la instancia: es posible que se haya desconectado.",
     "remoteSpawnNonRetryable": "La instancia no pudo iniciar la sesión: revisa la máquina o actualiza la CLI.",
-    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia."
+    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia.",
+    "liveCount_one": "{{count}} EN VIVO",
+    "liveCount_other": "{{count}} EN VIVO",
+    "liveCount_many": "{{count}} EN VIVO"
   },
   "agentChat": {
     "session": {
@@ -1695,7 +1704,11 @@
       "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
       "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
       "connectionTrouble": "Problema de conexión. Inténtalo de nuevo en un momento.",
-      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo."
+      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo.",
+      "cancelQueuedFailed": "No se pudo cancelar el mensaje.",
+      "cancelQueuedRestoreAvailable": "Mensaje cancelado. Toca Restaurar para devolverlo al campo de mensaje.",
+      "cancelQueuedRestored": "Mensaje cancelado. El prompt vuelve a estar en el campo de mensaje.",
+      "cancelQueuedUpgradeRequired": "Cancelar mensajes en cola requiere una versión más reciente de Kilo CLI. Actualiza Kilo CLI y vuelve a conectarte."
     },
     "remoteSession": {
       "failedToCreate": "No se pudo crear la sesión remota",
@@ -1767,7 +1780,8 @@
       "continueFrom": "Continuando {{title}}",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
-      "importFailed": "No se pudo importar esta sesión."
+      "importFailed": "No se pudo importar esta sesión.",
+      "discardWithUploadsMessage": "Se eliminarán tu prompt y los archivos subidos que no estén adjuntos a mensajes enviados."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} archivo actualizado",
@@ -1826,7 +1840,9 @@
       "noCliInstancesDescription": "Ejecuta `kilo remote` en un proyecto de tu ordenador, o actualiza la CLI de Kilo si ya hay una en marcha.",
       "instanceOnProject": "{{name}} en {{project}}",
       "instanceOnProjectSuffix": "{{name}} en {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Ejecutar en Agente en la nube"
+      "runOnCloudAgent": "Ejecutar en Agente en la nube",
+      "terminals": "Terminales",
+      "remotes": "Instancias remotas"
     },
     "modePicker": {
       "title": "Seleccionar modo",
@@ -2016,7 +2032,11 @@
       "queuedAccessibility": "Mensaje en cola",
       "userMessage": "Mensaje del usuario",
       "assistantMessage": "Mensaje del asistente",
-      "longPressHint": "Mantén pulsado para ver los detalles del mensaje"
+      "longPressHint": "Mantén pulsado para ver los detalles del mensaje",
+      "cancelQueued": "Cancelar mensaje",
+      "cancelQueuedAccessibility": "Cancelar mensaje en cola",
+      "restoreQueued": "Restaurar",
+      "restoreQueuedAccessibility": "Restaurar el mensaje cancelado en el campo de mensaje"
     },
     "olderMessages": {
       "arrived": "Mensajes anteriores cargados",
@@ -2047,9 +2067,6 @@
     },
     "sessionFilter": {
       "title": "Filtrar sesiones",
-      "sortBy": "Ordenar por",
-      "sortLastUpdated": "Última actualización",
-      "sortCreated": "Creado",
       "platform": "Plataforma",
       "platformCloud": "Nube",
       "platformExtension": "Extensión",
@@ -2058,9 +2075,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Otro",
-      "project": "Proyecto",
-      "removeProjectFilter": "Quitar el filtro de proyecto {{label}}",
-      "removePlatformFilter": "Quitar el filtro de plataforma {{label}}"
+      "project": "Proyecto"
     },
     "suggestion": {
       "title": "Sugerencia",
@@ -2103,7 +2118,9 @@
       "uploading": "Subiendo…",
       "uploaded": "Subido",
       "uploadFailedRetry": "La subida falló. Toca para reintentar.",
-      "uploadFailedTerminal": "Este archivo no se puede subir."
+      "uploadFailedTerminal": "Este archivo no se puede subir.",
+      "moveLeft": "Mover {{filename}} a la izquierda",
+      "moveRight": "Mover {{filename}} a la derecha"
     },
     "attachmentPasteHint": {
       "accessibility": "Pegar imagen del portapapeles",
@@ -2133,7 +2150,11 @@
       "finalizingPlaceholder": "Finalizando...",
       "messagePlaceholder": "Mensaje...",
       "cannotReceiveFiles": "Esta sesión no puede recibir archivos. Quita los archivos adjuntos para enviar tu mensaje.",
-      "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Toca enviar para reintentar."
+      "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Toca enviar para reintentar.",
+      "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
+      "discardAttachmentsTitle": "¿Descartar adjuntos?",
+      "charactersRemaining": "Quedan {{count}} caracteres",
+      "insertNewline": "Insertar salto de línea"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",
@@ -2210,7 +2231,7 @@
       "open": "solicitud de cambios abierta",
       "closed": "solicitud de cambios cerrada",
       "merged": "solicitud de cambios fusionada",
-      "draft": "Pull request en borrador",
+      "draft": "pull request en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2289,7 +2310,7 @@
     "newCodingTask": "Nueva tarea de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "No hay nada en ejecución ahora mismo"
   },
   "imageViewer": {
     "close": "Cerrar {{filename}}",
@@ -2353,7 +2374,8 @@
     "busy": "La entrada de voz está ocupada. Inténtalo de nuevo.",
     "stopped": "La entrada de voz se detuvo. Toca el micrófono para intentarlo de nuevo.",
     "unavailableDevice": "La entrada de voz no está disponible en este dispositivo.",
-    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo."
+    "unavailableLanguage": "La entrada de voz no está disponible para el idioma de este dispositivo.",
+    "listeningStopped": "Escucha detenida."
   },
   "share": {
     "title": "Compartir en Kilo",
@@ -2542,7 +2564,7 @@
       "skipped": "{{displayCount}} omitidas",
       "title": "Verificaciones",
       "viewOnGitHub": "Ver PR en GitHub",
-      "checkDetails": "Detalles de la verificación",
+      "checkDetails": "detalles de la verificación",
       "pullRequest": "pull request"
     },
     "composer": {

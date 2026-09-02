@@ -183,6 +183,304 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
       })
     ).resolves.toBeNull();
   });
+
+  it('uses the existing verifier strictly by default before account lookup', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'resource-audience',
+    });
+    let lookupCount = 0;
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: TEST_JWT_SECRET,
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper: async (...args) => {
+          lookupCount++;
+          return getUserPepper(...args);
+        },
+      })
+    ).resolves.toBeNull();
+    expect(lookupCount).toBe(0);
+  });
+
+  it('dispatches the existing verifier audience option for string and array claims', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const arrayAudienceToken = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setAudience(['other-resource', 'resource-audience'])
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+    const matchingString = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'resource-audience',
+    });
+    const absentAudience = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+    const mismatchedAudience = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'other-resource',
+    });
+    const params = {
+      nextAuthSecret: TEST_JWT_SECRET,
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+      audience: 'resource-audience',
+    } as const;
+
+    for (const testCase of [
+      { token: matchingString.token, result: { userId: 'user-xyz-789' } },
+      { token: arrayAudienceToken, result: { userId: 'user-xyz-789' } },
+      { token: absentAudience.token, result: null },
+      { token: mismatchedAudience.token, result: null },
+    ]) {
+      let lookupCount = 0;
+      await expect(
+        verifyKiloBearerAgainstCurrentPepper({
+          ...params,
+          token: testCase.token,
+          getUserPepper: async (...args) => {
+            lookupCount++;
+            return getUserPepper(...args);
+          },
+        })
+      ).resolves.toEqual(testCase.result);
+      expect(lookupCount).toBe(testCase.result === null ? 0 : 1);
+    }
+  });
+
+  it('applies required and legacy resource audience policies before account lookup', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+    });
+    const params = {
+      token,
+      nextAuthSecret: TEST_JWT_SECRET,
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+    };
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        ...params,
+        getUserPepper,
+        resourceAudience: { audience: 'resource-audience', mode: 'allow-legacy' },
+      })
+    ).resolves.toEqual({ userId: 'user-xyz-789' });
+    let lookupCount = 0;
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        ...params,
+        getUserPepper: async (...args) => {
+          lookupCount++;
+          return getUserPepper(...args);
+        },
+        resourceAudience: { audience: 'resource-audience', mode: 'required' },
+      })
+    ).resolves.toBeNull();
+    expect(lookupCount).toBe(0);
+  });
+
+  it('compares present resource-token pepper claims against a non-null stored pepper', async () => {
+    const tokens = await Promise.all([
+      signKiloToken({
+        userId: 'user-xyz-789',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'production',
+        audience: 'resource-audience',
+      }),
+      signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: null,
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'production',
+        audience: 'resource-audience',
+      }),
+      signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: 'pepper-stale',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'production',
+        audience: 'resource-audience',
+      }),
+      signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: 'pepper-current',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'production',
+        audience: 'resource-audience',
+      }),
+    ]);
+    const params = {
+      nextAuthSecret: TEST_JWT_SECRET,
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+      getUserPepper,
+      resourceAudience: { audience: 'resource-audience', mode: 'required' } as const,
+    };
+
+    for (const [token, result] of [
+      [tokens[0]!.token, { userId: 'user-xyz-789' }],
+      [tokens[1]!.token, null],
+      [tokens[2]!.token, null],
+      [tokens[3]!.token, { userId: 'user-xyz-789' }],
+    ] as const) {
+      await expect(verifyKiloBearerAgainstCurrentPepper({ ...params, token })).resolves.toEqual(
+        result
+      );
+    }
+  });
+
+  it('denies missing and blocked resource-token accounts and never bypasses pepper checks', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-stale',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'resource-audience',
+    });
+    const params = {
+      token,
+      nextAuthSecret: TEST_JWT_SECRET,
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+      resourceAudience: { audience: 'resource-audience', mode: 'required' } as const,
+    };
+
+    userResultByUserId.clear();
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({ ...params, getUserPepper })
+    ).resolves.toBeNull();
+    userResultByUserId.set('user-xyz-789', {
+      pepper: 'pepper-current',
+      blockedReason: 'manual block',
+    });
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({ ...params, getUserPepper, allowBlocked: true })
+    ).resolves.toBeNull();
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({ ...params, getUserPepper })
+    ).resolves.toBeNull();
+  });
+
+  it('denies resource tokens with missing or mismatched env values when workerEnv is set', async () => {
+    const tokens = await Promise.all([
+      signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: 'pepper-current',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        audience: 'resource-audience',
+      }),
+      signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: 'pepper-current',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'staging',
+        audience: 'resource-audience',
+      }),
+    ]);
+    for (const { token } of tokens) {
+      await expect(
+        verifyKiloBearerAgainstCurrentPepper({
+          token,
+          nextAuthSecret: TEST_JWT_SECRET,
+          workerEnv: 'production',
+          connectionString: 'postgres://test',
+          getUserPepper,
+          resourceAudience: { audience: 'resource-audience', mode: 'required' },
+        })
+      ).resolves.toBeNull();
+    }
+  });
+
+  it('propagates resource secret-provider failures without an account lookup', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'resource-audience',
+    });
+    let lookupCount = 0;
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: { get: async () => Promise.reject(new Error('secrets store unavailable')) },
+        workerEnv: 'production',
+        connectionString: 'postgres://test',
+        getUserPepper: async (...args) => {
+          lookupCount++;
+          return getUserPepper(...args);
+        },
+        resourceAudience: { audience: 'resource-audience', mode: 'required' },
+      })
+    ).rejects.toThrow('secrets store unavailable');
+    expect(lookupCount).toBe(0);
+  });
+
+  it('propagates account lookup failures after resource verification', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      audience: 'resource-audience',
+    });
+
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token,
+        nextAuthSecret: TEST_JWT_SECRET,
+        connectionString: 'postgres://test',
+        getUserPepper: async () => Promise.reject(new Error('connection refused')),
+        resourceAudience: { audience: 'resource-audience', mode: 'required' },
+      })
+    ).rejects.toThrow('connection refused');
+  });
+
+  it('rejects mutually configured audience policies explicitly', async () => {
+    await expect(
+      verifyKiloBearerAgainstCurrentPepper({
+        token: null,
+        nextAuthSecret: TEST_JWT_SECRET,
+        connectionString: 'postgres://test',
+        audience: 'legacy-audience',
+        resourceAudience: { audience: 'resource-audience', mode: 'required' },
+      } as never)
+    ).rejects.toThrow('mutually exclusive');
+  });
 });
 
 describe('internal service tokens (no apiTokenPepper, no env)', () => {

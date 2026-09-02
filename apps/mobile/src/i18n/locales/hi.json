@@ -152,7 +152,11 @@
     "appearanceDark": "गहरा",
     "account": "खाता",
     "prReviewAttribution": "PR समीक्षाओं में ऐप एट्रिब्यूशन जोड़ें",
-    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।"
+    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।",
+    "returnSendsMessage": "रिटर्न कुंजी संदेश भेजती है",
+    "returnSendsMessageSubtitle": "बंद होने पर, रिटर्न कुंजी एजेंट के संदेश इनपुट में नई पंक्ति डालती है।",
+    "biometricUnlock": "बायोमेट्रिक्स से अनलॉक करें",
+    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -266,7 +270,8 @@
       "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड विफल",
       "failedToUploadFile": "फ़ाइल अपलोड करने में विफल: {{reason}}",
-      "nothingToPaste": "चिपकाने के लिए कुछ नहीं"
+      "nothingToPaste": "चिपकाने के लिए कुछ नहीं",
+      "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1613,7 +1618,8 @@
       "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
       "tryAdjustFilters": "अपने फ़िल्टर समायोजित करने या साफ़ करने का प्रयास करें।",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
-      "live": "लाइव"
+      "live": "लाइव",
+      "updating": "अपडेट हो रहा है"
     },
     "sessionRow": {
       "copyId": "सत्र ID कॉपी करें",
@@ -1657,7 +1663,9 @@
     "sessionExited": "सत्र समाप्त हो गया",
     "remoteSpawnRetryable": "इंस्टेंस तक नहीं पहुँचा जा सका — हो सकता है वह डिस्कनेक्ट हो गया हो।",
     "remoteSpawnNonRetryable": "इंस्टेंस सत्र शुरू करने में विफल रहा — मशीन जाँचें या CLI अपडेट करें।",
-    "remoteSpawnInstanceDisconnected": "चयनित इंस्टेंस डिस्कनेक्ट हो गया। Cloud Agent पर सत्र शुरू करें या दूसरा इंस्टेंस चुनें।"
+    "remoteSpawnInstanceDisconnected": "चयनित इंस्टेंस डिस्कनेक्ट हो गया। Cloud Agent पर सत्र शुरू करें या दूसरा इंस्टेंस चुनें।",
+    "liveCount_one": "{{count}} लाइव",
+    "liveCount_other": "{{count}} लाइव"
   },
   "agentChat": {
     "session": {
@@ -1687,7 +1695,11 @@
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
       "connectionTrouble": "कनेक्शन समस्या. कृपया थोड़ी देर में फिर से प्रयास करें.",
-      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें."
+      "modelUnavailable": "यह मॉडल Cloud Agent के लिए उपलब्ध नहीं है. दूसरा मॉडल चुनें और फिर से प्रयास करें.",
+      "cancelQueuedFailed": "संदेश रद्द नहीं किया जा सका।",
+      "cancelQueuedRestoreAvailable": "संदेश रद्द कर दिया गया। इसे संदेश इनपुट में वापस लाने के लिए पुनर्स्थापित करें पर टैप करें।",
+      "cancelQueuedRestored": "संदेश रद्द कर दिया गया। प्रॉम्प्ट संदेश इनपुट में वापस आ गया है।",
+      "cancelQueuedUpgradeRequired": "कतार में लगे संदेशों को रद्द करने के लिए Kilo CLI का नया संस्करण आवश्यक है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "sessionConnection": {
       "connecting": "कनेक्ट हो रहा है…",
@@ -1759,7 +1771,8 @@
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
       "continueFrom": "{{title}} जारी रखा जा रहा है",
       "importFailed": "यह सत्र आयात नहीं हो सका।",
-      "importingSession": "सत्र आयात किया जा रहा है"
+      "importingSession": "सत्र आयात किया जा रहा है",
+      "discardWithUploadsMessage": "आपका प्रॉम्प्ट और भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -1790,7 +1803,9 @@
       "noCliInstancesDescription": "अपने कंप्यूटर पर किसी प्रोजेक्ट में `kilo remote` चलाएँ, या अगर पहले से चल रहा है तो Kilo CLI अपडेट करें।",
       "instanceOnProject": "{{project}} पर {{name}}",
       "instanceOnProjectSuffix": "{{project}} पर {{name}} ({{suffix}})",
-      "runOnCloudAgent": "क्लाउड एजेंट पर चलाएँ"
+      "runOnCloudAgent": "क्लाउड एजेंट पर चलाएँ",
+      "terminals": "टर्मिनल",
+      "remotes": "रिमोट इंस्टेंस"
     },
     "modePicker": {
       "title": "मोड चुनें",
@@ -1980,7 +1995,11 @@
       "queuedAccessibility": "संदेश कतार में",
       "userMessage": "उपयोगकर्ता संदेश",
       "assistantMessage": "सहायक संदेश",
-      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ"
+      "longPressHint": "संदेश विवरण के लिए देर तक दबाएँ",
+      "cancelQueued": "संदेश रद्द करें",
+      "cancelQueuedAccessibility": "कतार में लगा संदेश रद्द करें",
+      "restoreQueued": "पुनर्स्थापित करें",
+      "restoreQueuedAccessibility": "रद्द किए गए संदेश को संदेश इनपुट में पुनर्स्थापित करें"
     },
     "olderMessages": {
       "arrived": "पहले के संदेश लोड हो गए",
@@ -2008,9 +2027,6 @@
     },
     "sessionFilter": {
       "title": "सत्र फ़िल्टर करें",
-      "sortBy": "इससे क्रमबद्ध करें",
-      "sortLastUpdated": "अंतिम बार अपडेट",
-      "sortCreated": "बनाया गया",
       "platform": "प्लेटफ़ॉर्म",
       "platformCloud": "क्लाउड",
       "platformExtension": "एक्सटेंशन",
@@ -2019,9 +2035,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "अन्य",
-      "project": "प्रोजेक्ट",
-      "removeProjectFilter": "{{label}} प्रोजेक्ट फ़िल्टर हटाएँ",
-      "removePlatformFilter": "{{label}} प्लेटफ़ॉर्म फ़िल्टर हटाएँ"
+      "project": "प्रोजेक्ट"
     },
     "modelPicker": {
       "title": "मॉडल चुनें",
@@ -2057,7 +2071,9 @@
       "uploading": "अपलोड हो रहा है…",
       "uploaded": "अपलोड हो गया",
       "uploadFailedRetry": "अपलोड विफल रहा। फिर से कोशिश करने के लिए टैप करें।",
-      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।"
+      "uploadFailedTerminal": "यह फ़ाइल अपलोड नहीं की जा सकती।",
+      "moveLeft": "{{filename}} को बाएँ ले जाएँ",
+      "moveRight": "{{filename}} को दाएँ ले जाएँ"
     },
     "attachmentPasteHint": {
       "accessibility": "क्लिपबोर्ड से छवि पेस्ट करें",
@@ -2087,7 +2103,11 @@
       "finalizingPlaceholder": "समाप्त किया जा रहा है...",
       "messagePlaceholder": "संदेश...",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
-      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।"
+      "couldNotAttachFiles": "फ़ाइलें संलग्न नहीं की जा सकीं। फिर से कोशिश करने के लिए भेजें पर टैप करें।",
+      "discardAttachmentsMessage": "भेजे गए संदेशों से न जुड़ी अपलोड की गई फ़ाइलें हटा दी जाएँगी।",
+      "discardAttachmentsTitle": "संलग्नक ख़ारिज करें?",
+      "charactersRemaining": "{{count}} अक्षर शेष",
+      "insertNewline": "नई पंक्ति डालें"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",
@@ -2276,7 +2296,7 @@
     "newCodingTask": "नया कोडिंग कार्य",
     "explore": "एक्सप्लोर करें",
     "seeAll": "सभी देखें",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "अभी कुछ भी नहीं चल रहा है"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करें",
@@ -2340,7 +2360,8 @@
     "busy": "वॉइस इनपुट व्यस्त है। फिर से प्रयास करें।",
     "stopped": "वॉइस इनपुट रुक गया। फिर से प्रयास करने के लिए माइक्रोफ़ोन पर टैप करें।",
     "unavailableDevice": "इस डिवाइस पर वॉइस इनपुट उपलब्ध नहीं है।",
-    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।"
+    "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।",
+    "listeningStopped": "सुनना बंद हो गया।"
   },
   "share": {
     "title": "Kilo पर साझा करें",

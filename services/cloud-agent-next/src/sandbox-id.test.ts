@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
+  classifySandboxId,
+  deriveSandboxAllocationId,
   deriveSharedSandboxId,
   generateSandboxId,
   generateSandboxRoutingTarget,
@@ -10,6 +12,29 @@ import {
   selectSandboxForNewSession,
 } from './sandbox-id.js';
 import type { Env, SandboxId } from './types.js';
+
+describe('deriveSandboxAllocationId', () => {
+  it.each(['org', 'usr', 'bot', 'ubt', 'ses', 'istd', 'crv', 'dind'])(
+    'preserves %s allocation classification while separating create intents',
+    async prefix => {
+      const logicalId = `${prefix}-${'a'.repeat(48)}`;
+      const first = await deriveSandboxAllocationId(logicalId, 'intent_1');
+      const second = await deriveSandboxAllocationId(logicalId, 'intent_2');
+      expect(first).toBe(await deriveSandboxAllocationId(logicalId, 'intent_1'));
+      expect(first).not.toBe(logicalId);
+      expect(first).not.toBe(second);
+      expect(first.length).toBeLessThanOrEqual(63);
+      expect(classifySandboxId(first)).toBe(classifySandboxId(logicalId));
+    }
+  );
+
+  it('rejects an invalid logical allocation or missing intent', async () => {
+    await expect(deriveSandboxAllocationId('invalid', 'intent_1')).rejects.toThrow(
+      'generated sandbox ID'
+    );
+    await expect(deriveSandboxAllocationId('ses-abcdef', '')).rejects.toThrow('create intent');
+  });
+});
 
 describe('generateSandboxId', () => {
   describe('shared sandbox (default)', () => {

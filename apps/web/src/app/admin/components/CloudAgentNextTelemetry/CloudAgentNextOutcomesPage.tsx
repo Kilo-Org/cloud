@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -85,6 +85,7 @@ const utcLongLabel = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
+  second: '2-digit',
   hourCycle: 'h23',
 });
 
@@ -249,17 +250,49 @@ function responsibilityBadge(responsibility: TopError['responsibility']) {
 function ErrorSessionsDialog({
   error,
   interval,
+  trigger,
   onClose,
 }: {
   error: TopError;
   interval: CloudAgentNextHealthFilters;
+  trigger: HTMLButtonElement;
   onClose: () => void;
 }) {
   const sessions = useCloudAgentNextHealthErrorSessions(interval, error);
-  const rows = sessions.data?.rows ?? [];
+  const [diagnosticCheckTime, setDiagnosticCheckTime] = useState(Date.now);
+  const now = Date.now();
+  const rows = (sessions.data?.rows ?? []).map(row => {
+    const retained = row.diagnosticExpiresAt && new Date(row.diagnosticExpiresAt).getTime() > now;
+    return {
+      ...row,
+      diagnostic: retained ? row.diagnostic : null,
+    };
+  });
+  const nextDiagnosticExpiry = rows.reduce((next, row) => {
+    const expiry = row.diagnosticExpiresAt ? new Date(row.diagnosticExpiresAt).getTime() : 0;
+    return row.diagnostic && expiry > diagnosticCheckTime ? Math.min(next, expiry) : next;
+  }, Infinity);
+
+  useEffect(() => {
+    if (!Number.isFinite(nextDiagnosticExpiry)) return;
+    const timeout = window.setTimeout(
+      () => setDiagnosticCheckTime(Date.now()),
+      Math.min(nextDiagnosticExpiry - Date.now(), 2_147_483_647)
+    );
+    return () => window.clearTimeout(timeout);
+  }, [nextDiagnosticExpiry, diagnosticCheckTime]);
+
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
-      <DialogContent className="grid max-h-[calc(100vh-3rem)] w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-5xl">
+      <DialogContent
+        className="grid max-h-[calc(100vh-3rem)] w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-5xl"
+        onCloseAutoFocus={event => {
+          if (trigger.isConnected) {
+            event.preventDefault();
+            trigger.focus();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Affected sessions</DialogTitle>
           <DialogDescription>
@@ -304,43 +337,86 @@ function ErrorSessionsDialog({
                 showText
               />
             </div>
+            <p className="text-muted-foreground text-xs">
+              Message and wrapper IDs, diagnostics, and last seen refer to the latest matching event
+              per session. Diagnostics expire after 30 days; stored text is redacted and may be
+              generic. No message history is loaded.
+            </p>
             <div className="min-h-0 overflow-auto rounded-lg border">
               <Table>
                 <TableCaption className="sr-only">
-                  Sessions affected by the selected Cloud Agent error.
+                  Sessions affected by the selected Cloud Agent error and their latest matching
+                  event.
                 </TableCaption>
                 <TableHeader className="bg-card sticky top-0 z-10">
                   <TableRow>
                     <TableHead>Kilo session ID</TableHead>
                     <TableHead>Cloud Agent ID</TableHead>
-                    <TableHead>Latest occurrence (UTC)</TableHead>
+                    <TableHead>Last seen (UTC)</TableHead>
                     <TableHead className="text-right">Events</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map(row => (
-                    <TableRow key={row.cloudAgentSessionId}>
-                      <TableCell className="font-mono text-xs">
-                        <span className="flex items-center gap-1">
-                          {row.kiloSessionId}
-                          <CopyButton text={row.kiloSessionId} label="Kilo session ID" />
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <span className="flex items-center gap-1">
-                          {row.cloudAgentSessionId}
-                          <CopyButton text={row.cloudAgentSessionId} label="Cloud Agent ID" />
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs whitespace-nowrap">
-                        {row.occurredAt
-                          ? `${utcLongLabel.format(new Date(row.occurredAt))} UTC`
-                          : '--'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {row.matchingEvents.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
+                    <Fragment key={row.cloudAgentSessionId}>
+                      <TableRow className="border-b-0">
+                        <TableCell className="font-mono text-xs">
+                          <span className="flex items-center gap-1">
+                            {row.kiloSessionId}
+                            <CopyButton text={row.kiloSessionId} label="Kilo session ID" />
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <span className="flex items-center gap-1">
+                            {row.cloudAgentSessionId}
+                            <CopyButton text={row.cloudAgentSessionId} label="Cloud Agent ID" />
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs whitespace-nowrap">
+                          {row.lastSeen ? (
+                            <time dateTime={row.lastSeen} title={row.lastSeen}>
+                              {utcLongLabel.format(new Date(row.lastSeen))} UTC
+                            </time>
+                          ) : (
+                            '--'
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {row.matchingEvents.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={4} className="pt-0">
+                          <dl className="grid gap-3 text-xs sm:grid-cols-3">
+                            {[
+                              { label: 'Sandbox ID', value: row.sandboxId },
+                              {
+                                label:
+                                  error.source === 'setup' ? 'Initial message ID' : 'Message ID',
+                                value: row.messageId,
+                              },
+                              { label: 'Wrapper run ID', value: row.wrapperRunId },
+                            ].map(({ label, value }) => (
+                              <div key={label} className="min-w-0">
+                                <dt className="text-muted-foreground">{label}</dt>
+                                <dd className="flex items-center gap-1 font-mono">
+                                  <span className="break-all">{value ?? 'Not recorded'}</span>
+                                  {value && (
+                                    <CopyButton text={value} label={label} className="shrink-0" />
+                                  )}
+                                </dd>
+                              </div>
+                            ))}
+                            <div className="sm:col-span-3">
+                              <dt className="text-muted-foreground">Stored diagnostic</dt>
+                              <dd className="mt-1 wrap-anywhere whitespace-pre-wrap">
+                                {row.diagnostic || 'Not available (missing or expired)'}
+                              </dd>
+                            </div>
+                          </dl>
+                        </TableCell>
+                      </TableRow>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -354,18 +430,23 @@ function ErrorSessionsDialog({
 
 function TopErrors({
   errors,
+  totals,
   interval,
   responsibility,
   summary,
   onResponsibilityChange,
 }: {
   errors: TopError[];
+  totals: HealthData['errorTotals'];
   interval: CloudAgentNextHealthFilters;
   responsibility: CloudAgentFailureResponsibilityFilter;
   summary: HealthData['summary'];
   onResponsibilityChange: (value: CloudAgentFailureResponsibilityFilter) => void;
 }) {
-  const [selectedError, setSelectedError] = useState<TopError | null>(null);
+  const [selectedError, setSelectedError] = useState<{
+    error: TopError;
+    trigger: HTMLButtonElement;
+  } | null>(null);
   const total = errors.reduce((count, error) => count + error.count, 0);
   return (
     <Card>
@@ -374,7 +455,11 @@ function TopErrors({
           <div>
             <CardTitle>Top errors</CardTitle>
             <CardDescription className="mt-1">
-              Setup failures and failed runs only. {total.toLocaleString()} events in the top 10.
+              Setup failures and failed runs only. Showing {errors.length.toLocaleString()} of{' '}
+              {totals.groups.toLocaleString()} groups, covering {total.toLocaleString()} of{' '}
+              {totals.events.toLocaleString()} events for the selected responsibility.
+              {totals.groups > errors.length &&
+                ` ${(totals.groups - errors.length).toLocaleString()} groups not shown (top 10 limit).`}{' '}
               Select an error to inspect sessions.
             </CardDescription>
           </div>
@@ -404,6 +489,11 @@ function TopErrors({
             </Select>
           </div>
         </div>
+        <p className="text-muted-foreground text-xs">
+          Sessions and known sandboxes are distinct within each group, not additive across groups.
+          Known sandboxes exclude sessions without a recorded sandbox ID; zero known does not mean
+          zero impact.
+        </p>
       </CardHeader>
       <CardContent>
         {errors.length === 0 ? (
@@ -423,6 +513,8 @@ function TopErrors({
                   <TableHead>Reason</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead className="text-right">Events</TableHead>
+                  <TableHead className="text-right">Affected sessions</TableHead>
+                  <TableHead className="text-right">Known sandboxes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,7 +528,7 @@ function TopErrors({
                         variant="ghost"
                         className="h-auto w-full justify-start px-2 py-2 text-left"
                         aria-label={`View affected sessions for ${RESPONSIBILITY_LABELS[error.responsibility]} ${failureReasonLabel(error.reason)}, ${error.count.toLocaleString()} events`}
-                        onClick={() => setSelectedError(error)}
+                        onClick={event => setSelectedError({ error, trigger: event.currentTarget })}
                       >
                         <span className="flex min-w-0 flex-col gap-0.5">
                           <span className="text-sm">{failureReasonLabel(error.reason)}</span>
@@ -450,6 +542,18 @@ function TopErrors({
                     <TableCell className="text-right font-mono tabular-nums">
                       {error.count.toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {error.affectedSessions.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span className="font-mono">{error.knownSandboxes.toLocaleString()}</span>
+                      {error.sessionsWithoutSandbox > 0 && (
+                        <p className="text-muted-foreground text-xs">
+                          {error.sessionsWithoutSandbox.toLocaleString()}{' '}
+                          {error.sessionsWithoutSandbox === 1 ? 'session' : 'sessions'} without ID
+                        </p>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -458,8 +562,9 @@ function TopErrors({
         )}
         {selectedError && (
           <ErrorSessionsDialog
-            error={selectedError}
+            error={selectedError.error}
             interval={interval}
+            trigger={selectedError.trigger}
             onClose={() => setSelectedError(null)}
           />
         )}
@@ -571,6 +676,7 @@ export default function CloudAgentNextOutcomesPage() {
             <HealthSummary summary={health.data.summary} />
             <TopErrors
               errors={health.data.topErrors}
+              totals={health.data.errorTotals}
               interval={interval}
               responsibility={responsibility}
               summary={health.data.summary}

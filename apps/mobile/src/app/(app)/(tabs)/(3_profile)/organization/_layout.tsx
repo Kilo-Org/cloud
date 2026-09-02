@@ -1,7 +1,11 @@
 import { Stack } from 'expo-router';
+import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
 import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
+
+const screenLayout: typeof privacyScreenLayout = props =>
+  appUnlockScreenLayout({ children: privacyScreenLayout(props) });
 
 export default function OrganizationLayout() {
   const { fullSheetDetent } = useFormSheetDetents();
@@ -14,7 +18,7 @@ export default function OrganizationLayout() {
   };
 
   return (
-    <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
+    <Stack screenLayout={screenLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="invite-member" options={sheetOptions} />
       <Stack.Screen name="member-limit" options={sheetOptions} />
       <Stack.Screen name="low-balance-alert" options={sheetOptions} />

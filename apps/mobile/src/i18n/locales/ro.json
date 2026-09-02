@@ -152,7 +152,11 @@
     "appearanceDark": "Întunecat",
     "account": "Cont",
     "prReviewAttribution": "Adaugă atribuirea aplicației la revizuirile PR",
-    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire."
+    "prReviewAttributionSubtitle": "Adaugă un subsol „Revizuit prin Kilo” când trimiți o revizuire.",
+    "returnSendsMessage": "Tasta Enter trimite mesajul",
+    "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților.",
+    "biometricUnlock": "Deblocare prin autentificare biometrică",
+    "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponibil",
@@ -197,7 +201,7 @@
       "diffTooLarge": "Diff prea mare pentru a fi afișat",
       "openOnGitHub": "Deschide pe GitHub",
       "openDiffOnGitHub": "Deschide diff-ul acestui fișier pe GitHub",
-      "githubDiff": "diff GitHub"
+      "githubDiff": "Diff GitHub"
     },
     "floatingActions": {
       "clearSelection": "Șterge selecția",
@@ -757,7 +761,8 @@
       "networkError": "Eroare de rețea",
       "uploadFailed": "Încărcarea a eșuat",
       "failedToUploadFile": "Încărcarea fișierului a eșuat: {{reason}}",
-      "nothingToPaste": "Nimic de lipit"
+      "nothingToPaste": "Nimic de lipit",
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -842,7 +847,7 @@
       "managedByAdmin": "Facturarea este gestionată de administratorul organizației tale.",
       "couldNotLoad": "Informațiile de facturare nu au putut fi încărcate",
       "manageOnWeb": "Gestionare facturare pe Web",
-      "commitPlan": "commit",
+      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Termenul tău final de angajare se încheie pe {{date}}. Continuă ca Standard la {{price}}, sau găzduirea se încheie.",
       "freeTrial": "Perioadă de probă gratuită",
@@ -859,7 +864,7 @@
       "trialDaysRemaining": "Perioadă de probă: {{remaining}} rămase",
       "trialEndingSoon": "Perioada de probă se încheie curând: {{remaining}}",
       "planName": {
-        "commit": "commit",
+        "commit": "Commit",
         "standard": "Standard"
       }
     },
@@ -1138,9 +1143,9 @@
       "destroying": "SE DISTRUGE",
       "provisioned": "PUS ÎN FUNCȚIUNE",
       "restarting": "SE REPORNEȘTE",
-      "running": "Rulează",
+      "running": "RULEAZĂ",
       "shuttingDown": "SE ÎNCHIDE",
-      "starting": "Se pornește",
+      "starting": "SE PORNEȘTE",
       "stopped": "OPRIT",
       "stopping": "SE OPRESTE",
       "unknown": "NECUNOSCUT",
@@ -1313,7 +1318,7 @@
       "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
       "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
       "transcriptRetry": "Nu s-a putut încărca transcrierea revizuirii.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agent inactiv",
       "agentWorking": "Agent lucrează...",
       "anErrorOccurred": "A apărut o eroare",
@@ -2080,7 +2085,8 @@
       "couldNotSearch": "Nu s-au putut căuta sesiunile",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune trecută",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Se actualizează"
     },
     "sessionRow": {
       "deleteTitle": "Ștergi sesiunea?",
@@ -2126,7 +2132,10 @@
     "sessionExited": "Sesiunea a fost închisă",
     "remoteSpawnRetryable": "Nu s-a putut ajunge la instanță — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică mașina sau actualizează CLI-ul.",
-    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță."
+    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE",
+    "liveCount_few": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2156,7 +2165,11 @@
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
       "connectionTrouble": "Probleme de conexiune. Te rugăm să reîncerci într-un moment.",
-      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou."
+      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou.",
+      "cancelQueuedFailed": "Nu s-a putut anula mesajul.",
+      "cancelQueuedRestoreAvailable": "Mesaj anulat. Atinge Restabilește pentru a-l readuce în câmpul de mesaj.",
+      "cancelQueuedRestored": "Mesaj anulat. Promptul este din nou în câmpul de mesaj.",
+      "cancelQueuedUpgradeRequired": "Anularea mesajelor în așteptare necesită un Kilo CLI mai nou. Actualizează Kilo CLI și reconectează-te."
     },
     "remoteSession": {
       "failedToCreate": "Nu s-a putut crea sesiunea de la distanță",
@@ -2228,7 +2241,8 @@
       "continueFrom": "Continuare {{title}}",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune."
+      "importFailed": "Nu s-a putut importa această sesiune.",
+      "discardWithUploadsMessage": "Promptul tău și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2287,7 +2301,9 @@
       "noCliInstancesDescription": "Rulează `kilo remote` într-un proiect de pe computerul tău sau actualizează Kilo CLI dacă unul rulează deja.",
       "instanceOnProject": "{{name}} pe {{project}}",
       "instanceOnProjectSuffix": "{{name}} pe {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Rulează pe Cloud Agent"
+      "runOnCloudAgent": "Rulează pe Cloud Agent",
+      "terminals": "Terminale",
+      "remotes": "Instanțe la distanță"
     },
     "modePicker": {
       "title": "Selectează modul",
@@ -2477,7 +2493,11 @@
       "queuedAccessibility": "Mesaj pus în coadă",
       "userMessage": "Mesaj de utilizator",
       "assistantMessage": "Mesaj de asistent",
-      "longPressHint": "Atingere lungă pentru detaliile mesajului"
+      "longPressHint": "Atingere lungă pentru detaliile mesajului",
+      "cancelQueued": "Anulează mesajul",
+      "cancelQueuedAccessibility": "Anulează mesajul în așteptare",
+      "restoreQueued": "Restabilește",
+      "restoreQueuedAccessibility": "Restabilește mesajul anulat în câmpul de mesaj"
     },
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",
@@ -2508,9 +2528,6 @@
     },
     "sessionFilter": {
       "title": "Filtrează sesiunile",
-      "sortBy": "Sortare după",
-      "sortLastUpdated": "Actualizat recent",
-      "sortCreated": "Creat",
       "platform": "Platformă",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",
@@ -2519,9 +2536,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Altele",
-      "project": "Proiect",
-      "removeProjectFilter": "Elimină filtrul de proiect {{label}}",
-      "removePlatformFilter": "Elimină filtrul de platformă {{label}}"
+      "project": "Proiect"
     },
     "suggestion": {
       "title": "Sugestie",
@@ -2564,7 +2579,9 @@
       "uploading": "Se încarcă…",
       "uploaded": "Încărcat",
       "uploadFailedRetry": "Încărcarea a eșuat. Atinge pentru a reîncerca.",
-      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat."
+      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat.",
+      "moveLeft": "Mută {{filename}} la stânga",
+      "moveRight": "Mută {{filename}} la dreapta"
     },
     "attachmentPasteHint": {
       "accessibility": "Inserează imaginea din clipboard",
@@ -2594,7 +2611,11 @@
       "finalizingPlaceholder": "Se finalizează...",
       "messagePlaceholder": "Mesaj...",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
-      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou."
+      "couldNotAttachFiles": "Fișierele nu au putut fi atașate. Atinge trimitere pentru a încerca din nou.",
+      "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
+      "discardAttachmentsTitle": "Renunți la atașamente?",
+      "charactersRemaining": "{{count}} caractere rămase",
+      "insertNewline": "Inserează o linie nouă"
     },
     "chatLink": {
       "linkCopied": "Link copiat",
@@ -2659,7 +2680,7 @@
       "olderActivity": "Activitate anterioară",
       "olderActivityDescription": "Cost neatribuit istoricului încărcat",
       "ofWindowTokens": "din {{window}} tokeni",
-      "tokens": "Token-uri",
+      "tokens": "token-uri",
       "tokensWithPercentage": "tokeni ({{percentage}})",
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} pași",
@@ -2671,7 +2692,7 @@
       "open": "pull request deschisă",
       "closed": "pull request închisă",
       "merged": "pull request îmbinată",
-      "draft": "Pull request în ciornă",
+      "draft": "pull request în ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2750,7 +2771,7 @@
     "newCodingTask": "Sarcină de codare nouă",
     "explore": "Explorează",
     "seeAll": "Vezi tot",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Nimic nu rulează în acest moment"
   },
   "imageViewer": {
     "close": "Închide {{filename}}",
@@ -2795,7 +2816,7 @@
     "optionsExpiredDescription": "Întoarce-te și redeschide acest selector de pe ecranul anterior."
   },
   "sessionRow": {
-    "needsInput": "necesită introducere"
+    "needsInput": "NECESITĂ INTRODUCERE"
   },
   "voiceInput": {
     "listening": "Se ascultă...",
@@ -2814,7 +2835,8 @@
     "busy": "Introducerea vocală este ocupată. Încearcă din nou.",
     "stopped": "Introducerea vocală s-a oprit. Atinge microfonul pentru a încerca din nou.",
     "unavailableDevice": "Introducerea vocală nu este disponibilă pe acest dispozitiv.",
-    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv."
+    "unavailableLanguage": "Introducerea vocală nu este disponibilă pentru limba acestui dispozitiv.",
+    "listeningStopped": "Ascultarea s-a oprit."
   },
   "share": {
     "title": "Distribuie către Kilo",

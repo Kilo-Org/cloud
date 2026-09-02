@@ -1,6 +1,7 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import type { z } from 'zod';
 import type { personalPrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
 
@@ -53,11 +54,16 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
+
+const mockCancelQueuedMessage =
+  jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
 
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  cancelQueuedMessage: mockCancelQueuedMessage,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -121,6 +127,16 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   rethrowAsPaymentRequired: jest.fn(),
 }));
 
+jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
+  createWorktreeChat: mockCreateWorktreeChat,
+}));
+
+jest.mock('@/lib/trpc/min-version', () => ({
+  ...jest.requireActual<typeof MinimumVersionModule>('@/lib/trpc/min-version'),
+  getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
+  enforceMinimumVersion: jest.fn(() => ({ pass: true })),
+}));
+
 jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
 }));
@@ -157,10 +173,16 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyUserOwnsSessionV2ByCloudAgentId: mockVerifyUserOwnsSessionV2ByCloudAgentId,
 }));
 
-let createCaller: (ctx: { user: User }) => {
+let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   prepareSession: (input: z.infer<typeof personalPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
+  }>;
+  createWorktreeChat: (input: { sourceKiloSessionId: string; operationKey: string }) => Promise<{
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+    worktreeId: string;
+    replayed?: boolean;
   }>;
   sendMessage: (input: {
     cloudAgentSessionId: string;
@@ -177,6 +199,7 @@ let createCaller: (ctx: { user: User }) => {
     contentLength: number;
   }) => Promise<unknown>;
   getAttachmentDownloadUrl: (input: { messageUuid: string; filename: string }) => Promise<unknown>;
+  cancelQueuedMessage: (input: { sessionId: string; messageId: string }) => Promise<unknown>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -188,6 +211,7 @@ let createCaller: (ctx: { user: User }) => {
 };
 
 beforeAll(async () => {
+  const { createCallerFactory } = await import('@/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
 });
@@ -413,6 +437,30 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
   });
 });
 
+describe('cloudAgentNextRouter.cancelQueuedMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockCancelQueuedMessage.mockResolvedValue({ dropped: true });
+  });
+
+  it('denies canceling a queued message on a session the user does not own', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.cancelQueuedMessage({
+        sessionId: 'agent_123',
+        messageId: 'msg_123456789abc123456789ABCDE',
+      })
+    ).rejects.toThrow('Session not found or access denied');
+
+    expect(mockCancelQueuedMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('cloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -521,6 +569,49 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       isFree: false,
       hasUserByokAvailable: false,
     });
+  });
+
+  it('derives browser provenance when the authenticated request is not mobile', async () => {
+    const caller = createCaller({
+      user: { id: 'user-browser', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser' })
+    );
+  });
+
+  it('derives mobile provenance from authenticated headers even when public input attempts to forge browser provenance', async () => {
+    const caller = createCaller({
+      user: { id: 'user-mobile', is_admin: false } as User,
+      headersList: new Headers({
+        'x-kilo-client': 'mobile',
+        'x-kilo-app-platform': 'ios',
+        'x-kilo-app-version': '1.0.0',
+      }),
+    });
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      clientProvenance: 'browser',
+    } as z.infer<typeof personalPrepareSessionNextSchema>);
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile' })
+    );
   });
 
   it('rejects devcontainer sessions when the feature flag is disabled', async () => {
@@ -717,5 +808,49 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({ cloneFromKiloSessionId })
     );
+  });
+});
+
+describe('cloudAgentNextRouter.createWorktreeChat', () => {
+  const uuid = '12345678-1234-4234-9234-123456789abc';
+  const sourceKiloSessionId = 'ses_12345678901234567890123456';
+  const result = {
+    kiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
+    cloudAgentSessionId: `workspace_${uuid}` as const,
+    worktreeId: `worktree_${uuid}` as const,
+    replayed: true,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateWorktreeChat.mockResolvedValue(result);
+  });
+
+  it('forwards only the authenticated owner and canonical sibling action to the shared operation', async () => {
+    const user = { id: 'oauth/github|owner', is_admin: false } as User;
+    const headersList = new Headers({ 'x-kilo-client': 'web' });
+    const caller = createCaller({ user, headersList });
+
+    await expect(
+      caller.createWorktreeChat({ sourceKiloSessionId, operationKey: uuid })
+    ).resolves.toEqual(result);
+
+    expect(mockCreateWorktreeChat).toHaveBeenCalledWith({
+      user,
+      headersList,
+      sourceKiloSessionId,
+      operationKey: uuid,
+    });
+  });
+
+  it.each([
+    { sourceKiloSessionId: 'ses_invalid', operationKey: uuid },
+    { sourceKiloSessionId, operationKey: 'invalid-uuid' },
+    { sourceKiloSessionId, operationKey: uuid, clientProvenance: 'browser' },
+  ])('rejects malformed or untrusted public input %j', async input => {
+    const caller = createCaller({ user: { id: 'owner', is_admin: false } as User });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
   });
 });

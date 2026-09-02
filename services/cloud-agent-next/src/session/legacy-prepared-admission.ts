@@ -7,7 +7,7 @@ import type { QueueAckResponse } from '../router/schemas.js';
 import { logger } from '../logger.js';
 import { recordCloudAgentSessionFailure } from '../telemetry/session-reports.js';
 import type { Env } from '../types.js';
-import type { SessionId, UserId } from '../types/ids.js';
+import type { SessionId } from '../types/ids.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { projectAdmissionToPublicAck, throwAdmissionError } from './queue-message.js';
@@ -22,7 +22,7 @@ export async function replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
 ): Promise<QueueAckResponse | undefined> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: LegacyRegisteredInitialAdmissionRequest = {
-    userId: ctx.userId as UserId,
+    userId: ctx.userId,
     botId: ctx.botId,
   };
   const result = await withDORetry<
@@ -65,7 +65,7 @@ export async function admitLegacyPreparedInitialMessage(
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: LegacyRegisteredInitialAdmissionRequest = {
-    userId: ctx.userId as UserId,
+    userId: ctx.userId,
     botId: ctx.botId,
   };
   let result: SessionMessageAdmissionResult;

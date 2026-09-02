@@ -6,6 +6,7 @@ import {
   VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG,
   VercelSandboxRestClient,
   type VercelSandboxCommand,
+  type VercelSandboxNetworkPolicy,
   type VercelSandboxResource,
   type VercelSandboxSession,
 } from './vercel-sandbox-rest-client.js';
@@ -13,6 +14,7 @@ import {
 const sandboxName = 'ses-exact-runtime';
 const sessionId = 'sbox_session_exact';
 const commandId = 'cmd_exact';
+const injectedCredential = 'secret-firewall-injected-credential';
 
 function sandbox(overrides: Partial<VercelSandboxResource> = {}): VercelSandboxResource {
   return {
@@ -84,6 +86,32 @@ function createInput() {
   };
 }
 
+function networkPolicy(): VercelSandboxNetworkPolicy {
+  return {
+    mode: 'custom',
+    allowedDomains: ['api.kilo.ai', '*'],
+    injectionRules: [
+      {
+        domain: 'api.kilo.ai',
+        headers: {
+          authorization: `Bearer ${injectedCredential}`,
+          host: 'api.kilo.ai',
+        },
+        match: {
+          headers: [
+            {
+              key: { exact: 'authorization' },
+              value: { exact: 'Bearer harmless-kilo-placeholder' },
+            },
+          ],
+          path: { startsWith: '/api/provider/' },
+          method: ['POST'],
+        },
+      },
+    ],
+  };
+}
+
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return Response.json(body, init);
 }
@@ -105,6 +133,7 @@ describe('VercelSandboxRestClient', () => {
     const [url, init] = providerFetch.mock.calls[0];
     expect(url).toBe('https://api.vercel.com/v2/sandboxes?teamId=team_test');
     expect(init.method).toBe('POST');
+    expect(init.redirect).toBe('manual');
     expect(JSON.parse(init.body as string)).toEqual({
       projectId: 'prj_test',
       name: sandboxName,
@@ -117,6 +146,33 @@ describe('VercelSandboxRestClient', () => {
         [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: 'operation-123',
         [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: 'runtime-build-123',
       },
+    });
+  });
+
+  it('creates a contained sandbox with a nested REST-native policy and redirects disabled', async () => {
+    const providerFetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ sandbox: sandbox(), session: session(), routes: [] }));
+    const policy = networkPolicy();
+
+    await clientFor(providerFetch).createSandbox({ ...createInput(), networkPolicy: policy });
+
+    const [url, init] = providerFetch.mock.calls[0];
+    expect(url).toBe('https://api.vercel.com/v2/sandboxes?teamId=team_test');
+    expect(init.redirect).toBe('manual');
+    expect(JSON.parse(init.body as string)).toEqual({
+      projectId: 'prj_test',
+      name: sandboxName,
+      source: { type: 'snapshot', snapshotId: 'snap_base' },
+      runtime: 'node24',
+      timeout: 300_000,
+      persistent: false,
+      tags: {
+        [VERCEL_CLOUD_AGENT_RESOURCE_TAG]: VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE,
+        [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: 'operation-123',
+        [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: 'runtime-build-123',
+      },
+      networkPolicy: policy,
     });
   });
 
@@ -196,6 +252,7 @@ describe('VercelSandboxRestClient', () => {
     expect(providerFetch.mock.calls[0][0]).toBe(
       'https://api.vercel.com/v2/sandboxes/sessions/sbox_session_exact?teamId=team_test'
     );
+    expect(providerFetch.mock.calls[0][1].redirect).toBe('manual');
   });
 
   it('executes a detached command and correlates its session', async () => {
@@ -343,6 +400,203 @@ describe('VercelSandboxRestClient', () => {
           : client.killCommand(sessionId, commandId, 9);
     await expect(call).rejects.toThrow(`Vercel Sandbox ${operation} failed (correlation_mismatch)`);
   });
+
+  it('updates the exact physical session with an unwrapped REST-native network policy', async () => {
+    const providerFetch = vi.fn().mockResolvedValue(jsonResponse({ session: session() }));
+    const policy = networkPolicy();
+
+    const result = await clientFor(providerFetch).updateNetworkPolicy(
+      sessionId,
+      sandboxName,
+      policy
+    );
+
+    expect(result).toEqual(session());
+    const [url, init] = providerFetch.mock.calls[0];
+    expect(url).toBe(
+      'https://api.vercel.com/v2/sandboxes/sessions/sbox_session_exact/network-policy?teamId=team_test'
+    );
+    expect(init.method).toBe('POST');
+    expect(init.redirect).toBe('manual');
+    expect(new Headers(init.headers).get('content-type')).toBe('application/json');
+    expect(JSON.parse(init.body as string)).toEqual(policy);
+  });
+
+  it.each([
+    ['session', session({ id: 'sbox_other' })],
+    ['sandbox', session({ sourceSandboxName: 'ses-other' })],
+  ])('rejects a network-policy response with a mismatched %s', async (_field, returnedSession) => {
+    const client = clientFor(vi.fn().mockResolvedValue(jsonResponse({ session: returnedSession })));
+
+    await expect(
+      client.updateNetworkPolicy(sessionId, sandboxName, networkPolicy())
+    ).rejects.toMatchObject({
+      kind: 'correlation_mismatch',
+      operation: 'update-network-policy',
+      message: 'Vercel Sandbox update-network-policy failed (correlation_mismatch)',
+    });
+  });
+
+  it.each(['create', 'get-session'] as const)(
+    'rejects redirects for ordinary authenticated %s requests without exposing the management token',
+    async operation => {
+      const reflectedResponse = 'secret-access-token reflected-provider-body';
+      const providerFetch = vi.fn().mockResolvedValue(
+        new Response(reflectedResponse, {
+          status: 307,
+          headers: { location: 'https://redirect.example/management' },
+        })
+      );
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox(createInput())
+          : client.getSession(sessionId, sandboxName);
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'request_failed',
+        operation,
+        status: 307,
+        message: `Vercel Sandbox ${operation} failed (request_failed, status 307)`,
+      });
+      expect(String(error)).not.toContain('secret-access-token');
+      expect(String(error)).not.toContain('reflected-provider-body');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      expect(providerFetch.mock.calls[0][1].redirect).toBe('manual');
+    }
+  );
+
+  it.each(['create', 'get-session'] as const)(
+    'sanitizes redirect failures for ordinary authenticated %s requests',
+    async operation => {
+      const providerFetch = vi
+        .fn()
+        .mockRejectedValue(new TypeError('redirect failed for secret-access-token'));
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox(createInput())
+          : client.getSession(sessionId, sandboxName);
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'request_failed',
+        operation,
+        message: `Vercel Sandbox ${operation} failed (request_failed)`,
+      });
+      expect(String(error)).not.toContain('secret-access-token');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      expect(providerFetch.mock.calls[0][1].redirect).toBe('manual');
+    }
+  );
+
+  it.each(['create', 'update-network-policy'] as const)(
+    'rejects a redirect response for secret-bearing %s requests without forwarding the policy',
+    async operation => {
+      const providerFetch = vi.fn().mockResolvedValue(
+        new Response(injectedCredential, {
+          status: 307,
+          headers: { location: 'https://redirect.example/network-policy' },
+        })
+      );
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox({ ...createInput(), networkPolicy: networkPolicy() })
+          : client.updateNetworkPolicy(sessionId, sandboxName, networkPolicy());
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'request_failed',
+        operation,
+        status: 307,
+        message: `Vercel Sandbox ${operation} failed (request_failed, status 307)`,
+      });
+      expect(String(error)).not.toContain(injectedCredential);
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      expect(providerFetch.mock.calls[0][1].redirect).toBe('manual');
+    }
+  );
+
+  it.each(['create', 'update-network-policy'] as const)(
+    'sanitizes redirect failures for secret-bearing %s requests',
+    async operation => {
+      const providerFetch = vi
+        .fn()
+        .mockRejectedValue(new TypeError(`redirect failed for ${injectedCredential}`));
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox({ ...createInput(), networkPolicy: networkPolicy() })
+          : client.updateNetworkPolicy(sessionId, sandboxName, networkPolicy());
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'request_failed',
+        operation,
+        message: `Vercel Sandbox ${operation} failed (request_failed)`,
+      });
+      expect(String(error)).not.toContain(injectedCredential);
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      expect(providerFetch.mock.calls[0][1].redirect).toBe('manual');
+    }
+  );
+
+  it.each(['create', 'update-network-policy'] as const)(
+    'never exposes reflected credentials from rejected %s policy requests',
+    async operation => {
+      const reflectedResponse = `${injectedCredential} secret-access-token reflected-provider-body`;
+      const providerFetch = vi
+        .fn()
+        .mockResolvedValue(new Response(reflectedResponse, { status: 403 }));
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox({ ...createInput(), networkPolicy: networkPolicy() })
+          : client.updateNetworkPolicy(sessionId, sandboxName, networkPolicy());
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'request_failed',
+        operation,
+        status: 403,
+        message: `Vercel Sandbox ${operation} failed (request_failed, status 403)`,
+      });
+      expect(String(error)).not.toContain(injectedCredential);
+      expect(String(error)).not.toContain('secret-access-token');
+      expect(String(error)).not.toContain('reflected-provider-body');
+    }
+  );
+
+  it.each(['create', 'update-network-policy'] as const)(
+    'never exposes reflected credentials from invalid successful %s responses',
+    async operation => {
+      const providerFetch = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ token: injectedCredential, reflected: 'provider-body' }));
+      const client = clientFor(providerFetch);
+      const request =
+        operation === 'create'
+          ? client.createSandbox({ ...createInput(), networkPolicy: networkPolicy() })
+          : client.updateNetworkPolicy(sessionId, sandboxName, networkPolicy());
+
+      const error = await request.catch(cause => cause);
+
+      expect(error).toMatchObject({
+        kind: 'invalid_response',
+        operation,
+        message: `Vercel Sandbox ${operation} failed (invalid_response)`,
+      });
+      expect(String(error)).not.toContain(injectedCredential);
+      expect(String(error)).not.toContain('provider-body');
+    }
+  );
 
   it('extends and stops the exact correlated session without a named DELETE API', async () => {
     const providerFetch = vi

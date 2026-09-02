@@ -43,6 +43,7 @@ vi.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: vi.fn(),
 }));
 vi.mock('@sentry/react-native', () => ({ TimeToFullDisplay: () => null }));
+vi.mock('expo-status-bar', () => ({ StatusBar: 'StatusBar' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 

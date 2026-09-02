@@ -95,9 +95,9 @@ function migratedPids(config: ToolCgroupConfig, name: string): number[] {
 }
 
 describe('parseToolCgroupConfig', () => {
-  it('defaults to off mode with standard knobs', () => {
+  it('defaults to enforce mode with standard knobs', () => {
     const config = parseToolCgroupConfig({}, () => {});
-    expect(config.mode).toBe('off');
+    expect(config.mode).toBe('enforce');
     expect(config.reserveBytes).toBe(1536 * 1024 * 1024);
     expect(config.serverLimitBytes).toBeNull();
     expect(config.cpuWeight).toBeNull();
@@ -106,10 +106,9 @@ describe('parseToolCgroupConfig', () => {
     expect(config.oomGroup).toBe(true);
   });
 
-  it('honors env overrides', () => {
+  it('honors tuning env overrides', () => {
     const config = parseToolCgroupConfig(
       {
-        TOOL_CGROUP_MODE: 'enforce',
         TOOL_CGROUP_RESERVE_MB: '2048',
         TOOL_CGROUP_SERVER_LIMIT_MB: '1280',
         TOOL_CGROUP_SWEEP_INTERVAL_MS: '500',
@@ -151,20 +150,19 @@ describe('parseToolCgroupConfig', () => {
     ).toBeNull();
   });
 
-  it('falls back on invalid values and clamps the sweep interval', () => {
+  it('keeps enforce mode while handling invalid tuning values', () => {
     const logs: string[] = [];
     const config = parseToolCgroupConfig(
       {
-        TOOL_CGROUP_MODE: 'bogus',
         TOOL_CGROUP_RESERVE_MB: 'abc',
         TOOL_CGROUP_SWEEP_INTERVAL_MS: '1',
       },
       message => logs.push(message)
     );
-    expect(config.mode).toBe('off');
+    expect(config.mode).toBe('enforce');
     expect(config.reserveBytes).toBe(1536 * 1024 * 1024);
     expect(config.sweepIntervalMs).toBe(200);
-    expect(logs.length).toBe(2);
+    expect(logs.length).toBe(1);
   });
 });
 
@@ -537,8 +535,9 @@ describe('rollback hygiene (mode=off)', () => {
       writeFileSync(join(cgroupRoot, name, 'memory.max'), '4294967296');
     }
     const logs: string[] = [];
-    const result = startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, message => logs.push(message), {
+    const result = startToolCgroup({}, message => logs.push(message), {
       cgroupRoot,
+      mode: 'off',
     });
     expect(result).toBeNull();
     expect(readFileSync(join(cgroupRoot, 'kilo-tools', 'memory.max'), 'utf8')).toBe('max');
@@ -551,16 +550,14 @@ describe('rollback hygiene (mode=off)', () => {
     mkdirSync(join(cgroupRoot, 'kilo-tools'));
     writeFileSync(join(cgroupRoot, 'kilo-tools', 'cpu.weight'), '25');
     const logs: string[] = [];
-    startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, message => logs.push(message), { cgroupRoot });
+    startToolCgroup({}, message => logs.push(message), { cgroupRoot, mode: 'off' });
     expect(readFileSync(join(cgroupRoot, 'kilo-tools', 'cpu.weight'), 'utf8')).toBe('100');
     expect(logs.filter(line => line.includes('tool_cgroup_stale_cap_reset')).length).toBe(1);
   });
 
   it('is a no-op when no cgroup dirs exist', () => {
     const cgroupRoot = makeTempDir();
-    expect(() =>
-      startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, () => {}, { cgroupRoot })
-    ).not.toThrow();
+    expect(() => startToolCgroup({}, () => {}, { cgroupRoot, mode: 'off' })).not.toThrow();
   });
 
   it('does not rewrite an already-uncapped cgroup', () => {
@@ -568,18 +565,19 @@ describe('rollback hygiene (mode=off)', () => {
     mkdirSync(join(cgroupRoot, 'kilo-tools'));
     writeFileSync(join(cgroupRoot, 'kilo-tools', 'memory.max'), 'max');
     const logs: string[] = [];
-    startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, message => logs.push(message), { cgroupRoot });
+    startToolCgroup({}, message => logs.push(message), { cgroupRoot, mode: 'off' });
     expect(logs.some(line => line.includes('tool_cgroup_stale_cap_reset'))).toBe(false);
   });
 });
 
 describe('startToolCgroup', () => {
   it('returns null when mode is off', () => {
-    expect(startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, () => {})).toBeNull();
+    expect(startToolCgroup({}, () => {}, { mode: 'off' })).toBeNull();
   });
 
   it('returns null when the cgroup fs is unavailable', () => {
-    const result = startToolCgroup({ TOOL_CGROUP_MODE: 'observe' }, () => {}, {
+    const result = startToolCgroup({}, () => {}, {
+      mode: 'observe',
       cgroupRoot: join(makeTempDir(), 'missing'),
     });
     expect(result).toBeNull();
@@ -587,7 +585,8 @@ describe('startToolCgroup', () => {
 
   it('configures both slices and starts the sweeper against working roots', () => {
     const config = makeConfig({});
-    const manager = startToolCgroup({ TOOL_CGROUP_MODE: 'enforce' }, () => {}, {
+    const manager = startToolCgroup({}, () => {}, {
+      mode: 'enforce',
       cgroupRoot: config.cgroupRoot,
       procRoot: config.procRoot,
       selfPid: 100,

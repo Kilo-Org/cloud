@@ -152,7 +152,11 @@
     "appearanceDark": "Donker",
     "account": "Rekening",
     "prReviewAttribution": "Voeg app-toeskrywing by PR-hersienings toe",
-    "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien"
+    "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien",
+    "returnSendsMessage": "Terugkeersleutel stuur boodskap",
+    "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die terugkeersleutel 'n nuwe reël in agente se boodskapinvoer in.",
+    "biometricUnlock": "Ontsluit met biometrie",
+    "biometricUnlockSubtitle": "Ontsluit wanneer die app begin en nadat dit vyf minute in die agtergrond was."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -750,7 +754,8 @@
       "networkError": "Netwerkfout",
       "uploadFailed": "Oplaai het misluk",
       "failedToUploadFile": "Kon lêer nie oplaai nie: {{reason}}",
-      "nothingToPaste": "Niks om te plak nie"
+      "nothingToPaste": "Niks om te plak nie",
+      "metadataStripFailed": "Foto se metadata kon nie verwyder word nie."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "Wag vir die hersieningtranskripsie.",
       "transcriptEmpty": "Geen transkripsie vir hierdie hersiening nie.",
       "transcriptRetry": "Kon nie die hersieningtranskripsie laai nie.",
-      "transcriptLive": "LEWEND",
+      "transcriptLive": "Lewend",
       "agentIdle": "Agent ledig",
       "agentWorking": "Agent werk...",
       "anErrorOccurred": "'n Fout het voorgekom",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "Kon sessies nie soek nie",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
-      "live": "LEWEND"
+      "live": "LEWEND",
+      "updating": "Besig om op te dateer"
     },
     "sessionRow": {
       "deleteTitle": "Sessie verwyder?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "Sessie beëindig",
     "remoteSpawnRetryable": "Kon nie die instansie bereik nie — dit het moontlik ontkoppel.",
     "remoteSpawnNonRetryable": "Die instansie kon nie die sessie begin nie — kontroleer die masjien of werk die CLI op.",
-    "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie."
+    "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie.",
+    "liveCount_one": "{{count}} LEWEND",
+    "liveCount_other": "{{count}} LEWEND"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "Die vorige taak is nog besig. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
       "connectionTrouble": "Verbindingsprobleem. Probeer asseblief oor 'n oomblik weer.",
-      "modelUnavailable": "Hierdie model is nie beskikbaar vir Cloud Agent nie. Kies 'n ander model en probeer weer."
+      "modelUnavailable": "Hierdie model is nie beskikbaar vir Cloud Agent nie. Kies 'n ander model en probeer weer.",
+      "cancelQueuedFailed": "Kon die boodskap nie kanselleer nie.",
+      "cancelQueuedRestoreAvailable": "Boodskap gekanselleer. Tik Herstel om dit na die boodskapinvoer terug te plaas.",
+      "cancelQueuedRestored": "Boodskap gekanselleer. Die aansporing is terug in die boodskapinvoer.",
+      "cancelQueuedUpgradeRequired": "Om boodskappe in die wagry te kanselleer, vereis 'n nuwer Kilo CLI. Dateer Kilo CLI op en maak weer verbinding."
     },
     "remoteSession": {
       "failedToCreate": "Kon afgeleë sessie nie skep nie",
@@ -2213,7 +2225,8 @@
       "continueFrom": "Gaan voort met {{title}}",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortgaan nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Kon hierdie sessie nie invoer nie."
+      "importFailed": "Kon hierdie sessie nie invoer nie.",
+      "discardWithUploadsMessage": "Jou aansporing en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Loop `kilo remote` in 'n projek op jou rekenaar, of werk Kilo CLI by as een reeds loop.",
       "instanceOnProject": "{{name}} op {{project}}",
       "instanceOnProjectSuffix": "{{name}} op {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Loop op Cloud Agent"
+      "runOnCloudAgent": "Loop op Cloud Agent",
+      "terminals": "Terminale",
+      "remotes": "Afgeleë instansies"
     },
     "modePicker": {
       "title": "Kies modus",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Boodskap in die ry",
       "userMessage": "Gebruikerboodskap",
       "assistantMessage": "Assistentboodskap",
-      "longPressHint": "Hou lank in vir boodskapbesonderhede"
+      "longPressHint": "Hou lank in vir boodskapbesonderhede",
+      "cancelQueued": "Kanselleer boodskap",
+      "cancelQueuedAccessibility": "Kanselleer boodskap in die wagry",
+      "restoreQueued": "Herstel",
+      "restoreQueuedAccessibility": "Herstel gekanselleerde boodskap na die boodskapinvoer"
     },
     "olderMessages": {
       "arrived": "Vroeër boodskappe gelaai",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Filtreer sessies",
-      "sortBy": "Sorteer op",
-      "sortLastUpdated": "Laas bygewerk",
-      "sortCreated": "Geskep",
       "platform": "Platform",
       "platformCloud": "Wolk",
       "platformExtension": "Uitbreiding",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ander",
-      "project": "Projek",
-      "removeProjectFilter": "Verwyder {{label}} projekfilter",
-      "removePlatformFilter": "Verwyder {{label}} platformfilter"
+      "project": "Projek"
     },
     "suggestion": {
       "title": "Voorstel",
@@ -2545,7 +2559,9 @@
       "uploading": "Laai op…",
       "uploaded": "Opgelaai",
       "uploadFailedRetry": "Oplaai het misluk. Tik om weer te probeer.",
-      "uploadFailedTerminal": "Hierdie lêer kan nie opgelaai word nie."
+      "uploadFailedTerminal": "Hierdie lêer kan nie opgelaai word nie.",
+      "moveLeft": "Skuif {{filename}} links",
+      "moveRight": "Skuif {{filename}} regs"
     },
     "attachmentPasteHint": {
       "accessibility": "Plak beeld van knipbord",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Sluit af...",
       "messagePlaceholder": "Boodskap...",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
-      "couldNotAttachFiles": "Kon nie lêers aanheg nie. Tik stuur om weer te probeer."
+      "couldNotAttachFiles": "Kon nie lêers aanheg nie. Tik stuur om weer te probeer.",
+      "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal verwyder word.",
+      "discardAttachmentsTitle": "Aanhegsels weggooi?",
+      "charactersRemaining": "{{count}} karakters oor",
+      "insertNewline": "Voeg nuwe reël in"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",
@@ -2640,7 +2660,7 @@
       "olderActivity": "Ouer aktiwiteit",
       "olderActivityDescription": "Koste nie toegeskryf aan die gelaai geskiedenis nie",
       "ofWindowTokens": "van {{window}} tekens",
-      "tokens": "Tokens",
+      "tokens": "tokens",
       "tokensWithPercentage": "tekens ({{percentage}})",
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
@@ -2651,7 +2671,7 @@
       "open": "oop trekversoek",
       "closed": "geslote trekkingsversoek",
       "merged": "saamgevoegde trekkingsversoek",
-      "draft": "Konsep-trekversoek",
+      "draft": "konsep-trekversoek",
       "updating": "Werk op, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "trekversoek"
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Nuwe koderingstaak",
     "explore": "Verken",
     "seeAll": "Sien alles",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Niks loop tans nie"
   },
   "imageViewer": {
     "close": "Maak {{filename}} toe",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Gaan terug en maak hierdie keuseerder van die vorige skerm af weer oop."
   },
   "sessionRow": {
-    "needsInput": "benodig invoer"
+    "needsInput": "BENODIG INVOER"
   },
   "voiceInput": {
     "listening": "Luister...",
@@ -2794,7 +2814,8 @@
     "busy": "Steminvoer is besig. Probeer weer.",
     "stopped": "Steminvoer het gestop. Tik die mikrofoon om weer te probeer.",
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
-    "unavailableLanguage": "Steminvoer is nie vir hierdie toesteltaal beskikbaar nie."
+    "unavailableLanguage": "Steminvoer is nie vir hierdie toesteltaal beskikbaar nie.",
+    "listeningStopped": "Luister het gestop."
   },
   "share": {
     "title": "Deel na Kilo",

@@ -239,6 +239,8 @@ export type SessionStatus =
 export type ConnectedEventData = {
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
+  activeMessageId?: string | null;
+  pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
 };
 
 /**

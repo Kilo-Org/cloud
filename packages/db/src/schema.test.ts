@@ -456,6 +456,72 @@ describe('database schema', () => {
     }
   });
 
+  it('requires cloud agent run diagnostic text and expiry to be set and cleared together', async () => {
+    const sessionId = `schema-cloud-agent-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    await schemaTestDb.db.insert(schema.cloud_agent_sessions).values({
+      cloud_agent_session_id: sessionId,
+      kilo_session_id: `${sessionId}-kilo`,
+      initial_message_id: `${sessionId}-initial`,
+      created_at: now,
+    });
+
+    try {
+      const runs = await schemaTestDb.db
+        .insert(schema.cloud_agent_session_runs)
+        .values([
+          {
+            cloud_agent_session_id: sessionId,
+            message_id: 'no-diagnostic',
+            status: 'failed',
+          },
+          {
+            cloud_agent_session_id: sessionId,
+            message_id: 'retained-diagnostic',
+            status: 'failed',
+            error_message_redacted: 'The model context limit was exceeded',
+            error_expires_at: now,
+          },
+        ])
+        .returning();
+
+      expect(runs).toHaveLength(2);
+      const clearedRuns = await schemaTestDb.db
+        .update(schema.cloud_agent_session_runs)
+        .set({ error_message_redacted: null, error_expires_at: null })
+        .where(eq(schema.cloud_agent_session_runs.cloud_agent_session_id, sessionId))
+        .returning();
+      expect(clearedRuns).toHaveLength(2);
+      for (const run of clearedRuns) {
+        expect(run).toMatchObject({ error_message_redacted: null, error_expires_at: null });
+      }
+      await expect(
+        schemaTestDb.db.insert(schema.cloud_agent_session_runs).values({
+          cloud_agent_session_id: sessionId,
+          message_id: 'missing-text',
+          status: 'failed',
+          error_expires_at: now,
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'cloud_agent_session_runs_error_expiry_check' },
+      });
+      await expect(
+        schemaTestDb.db.insert(schema.cloud_agent_session_runs).values({
+          cloud_agent_session_id: sessionId,
+          message_id: 'missing-expiry',
+          status: 'failed',
+          error_message_redacted: 'The model context limit was exceeded',
+        })
+      ).rejects.toMatchObject({
+        cause: { constraint: 'cloud_agent_session_runs_error_expiry_check' },
+      });
+    } finally {
+      await schemaTestDb.db
+        .delete(schema.cloud_agent_sessions)
+        .where(eq(schema.cloud_agent_sessions.cloud_agent_session_id, sessionId));
+    }
+  });
+
   /**
    * This test ensures that if someone adds/removes values from enums used in schema check constraints,
    * they are reminded to generate a migration. The check constraints in the database must match the

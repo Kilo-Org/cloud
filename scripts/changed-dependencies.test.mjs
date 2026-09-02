@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { posix } from 'node:path';
 import test from 'node:test';
+import { load } from 'js-yaml';
 
 import { changedDependencyWorkspaces } from './changed-dependencies.mjs';
 
@@ -255,4 +258,87 @@ test('a missing dependency cannot silently skip tests', () => {
   delete after.lockfile.snapshots['leaf@1.0.0'];
 
   assert.throws(() => changedDependencyWorkspaces(snapshot(), after), /Missing lockfile entry/);
+});
+
+function readWorkflow(file) {
+  return load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8'));
+}
+
+function matchesPatterns(value, patterns) {
+  return patterns.some(pattern => posix.matchesGlob(value, pattern));
+}
+
+function admitsEvent(event, branch, path) {
+  return (
+    event !== undefined &&
+    (!event?.branches || matchesPatterns(branch, event.branches)) &&
+    (!event?.['branches-ignore'] || !matchesPatterns(branch, event['branches-ignore'])) &&
+    (!event?.paths || matchesPatterns(path, event.paths)) &&
+    (!event?.['paths-ignore'] || !matchesPatterns(path, event['paths-ignore']))
+  );
+}
+
+for (const [file, paths, filterName] of [
+  ['ci.yml', ['apps/web/src/routers/active-sessions-router.ts'], 'kilocode_backend'],
+  [
+    'kilo-app-ci.yml',
+    [
+      'apps/mobile/src/app/index.tsx',
+      'packages/trpc/src/mobile.ts',
+      'apps/web/src/routers/active-sessions-router.ts',
+    ],
+  ],
+  [
+    'extension-ci.yml',
+    [
+      'apps/extension/tests/e2e/agents-fixture.ts',
+      'apps/web/src/routers/active-sessions-router.ts',
+    ],
+    'extension',
+  ],
+]) {
+  test(`${file} admits main and stack PRs, keeps main-only pushes and relevant paths`, () => {
+    const workflow = readWorkflow(file);
+    for (const branch of ['main', 'mobile-ux-ad6d-s1', 'mobile-ux-ad6d-s5', 'feature/other']) {
+      for (const path of paths) {
+        assert.equal(
+          admitsEvent(workflow.on.pull_request, branch, path),
+          true,
+          `PR ${branch}: ${path}`
+        );
+        assert.equal(
+          admitsEvent(workflow.on.push, branch, path),
+          branch === 'main',
+          `push ${branch}: ${path}`
+        );
+      }
+    }
+    if (filterName) {
+      const step = workflow.jobs.changes.steps.find(step => step.id === 'filter');
+      const patterns = load(step.with.filters)[filterName];
+      for (const path of paths) assert.equal(matchesPatterns(path, patterns), true, path);
+      assert.equal(matchesPatterns('docs/unrelated.md', patterns), false);
+    } else {
+      assert.equal(
+        admitsEvent(workflow.on.pull_request, 'mobile-ux-ad6d-s1', 'docs/unrelated.md'),
+        false
+      );
+      assert.equal(admitsEvent(workflow.on.push, 'main', 'docs/unrelated.md'), false);
+      assert.ok(Object.hasOwn(workflow.on, 'workflow_call'));
+    }
+  });
+}
+
+test('the ingest workspace runs only the explicit native attachment regression', () => {
+  const workflow = readWorkflow('ci.yml');
+  const path = 'services/session-ingest/test/integration/user-connection-attachment.test.ts';
+  assert.equal(admitsEvent(workflow.on.pull_request, 'mobile-ux-ad6d-s1', path), true);
+  const step = workflow.jobs['workspace-tests'].steps.find(step =>
+    step.run?.includes('test:integration')
+  );
+  assert.equal(step?.if, "matrix.workspace.name == 'cloudflare-session-ingest'");
+  assert.equal(
+    step?.run,
+    'pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts'
+  );
 });

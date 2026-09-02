@@ -19,6 +19,10 @@
       "specifier": "../../tools/oxlint/zod-utils.mjs"
     },
     {
+      "name": "rn-modal-backdrop",
+      "specifier": "../../tools/oxlint/rn-modal-backdrop.mjs"
+    },
+    {
       "name": "no-literal-copy",
       "specifier": "../../tools/oxlint/no-literal-copy/index.ts"
     }
@@ -211,9 +215,16 @@
     "anti-slop/no-runtime-typeof": "error",
     "anti-slop/no-unknown-returns": "error",
     "zod-utils/no-inline-zod-schema": "error",
+    "rn-modal-backdrop/require-backdrop": "error",
     "no-literal-copy/no-literal-copy": "error"
   },
   "overrides": [
+    {
+      "files": ["src/components/ui/icons.test.ts"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
     {
       "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
       "rules": {
@@ -246,7 +257,7 @@
       }
     },
     {
-      "files": ["src/app/_layout.tsx"],
+      "files": ["src/app/_layout.tsx", "src/components/animated-splash-overlay.tsx"],
       "rules": {
         "react/style-prop-object": "off"
       }

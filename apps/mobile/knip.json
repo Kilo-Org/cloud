@@ -22,5 +22,8 @@
   },
   "babel": {
     "config": ["babel.config.js"]
+  },
+  "rules": {
+    "catalogReferences": "off"
   }
 }

@@ -30,6 +30,7 @@ const hoisted = vi.hoisted(() => {
   return {
     randomUUID: vi.fn(() => `uuid-${(idCounter += 1)}`),
     uploadOne: vi.fn(),
+    releasePendingUploads: vi.fn(() => undefined),
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock('@/lib/agent-attachments/upload-task', () => ({
   measureLocalSize: hoisted.measureLocalSize,
   describeTerminalReason: () => "This file can't be uploaded.",
   uploadOne: hoisted.uploadOne,
+  releasePendingUploads: hoisted.releasePendingUploads,
 }));
 vi.mock('expo-file-system', () => {
   class FileMock {
@@ -408,17 +410,57 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
-describe('addCandidates defers document uploads', () => {
+/** Runs `uploadPending` inside `act` and returns the settled, non-undefined result. */
+async function uploadPendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
+  let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+  await act(async () => {
+    result = await hookApi().uploadPending();
+  });
+  return result as unknown as Awaited<ReturnType<HookApi['uploadPending']>>;
+}
+
+describe('addCandidates uploads documents at selection (Step 2)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
   });
 
-  it('adds a pending chip without starting an upload', async () => {
+  it('starts the upload for a document at selection time and flips the chip to uploading', async () => {
     const renderer = await mountHook();
     await addDocument();
-    expect(hookApi().attachments[0]?.status).toBe('pending');
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
+    renderer.unmount();
+  });
+
+  it('never uploads a strip-failed image and marks it a terminal chip', async () => {
+    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    // A strip failure returns the original URI, which the hook reads as
+    // metadataStripFailed.
+    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+      uri: 'file:///cache/IMG_0001.HEIC',
+      width: 100,
+      height: 100,
+    });
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(true);
+    expect(chip?.metadataStripFailed).toBe(true);
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     renderer.unmount();
   });
@@ -427,6 +469,7 @@ describe('addCandidates defers document uploads', () => {
 describe('uploadPending', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
@@ -440,19 +483,31 @@ describe('uploadPending', () => {
     hoisted.uploadOne.mockReturnValue(controlled);
   });
 
-  it('resolves { ok: false } on a terminal upload failure and short-circuits a later call', async () => {
+  it('resolves { ok: false } while a selection-time upload is still in flight', async () => {
+    const renderer = await mountHook();
+    // Starts the upload; the chip is 'uploading'.
+    await addDocument();
+
+    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    await act(async () => {
+      result = await hookApi().uploadPending();
+    });
+    expect(result).toEqual({ ok: false });
+    // The in-flight upload is not re-triggered by uploadPending.
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('resolves { ok: false } after a terminal upload failure and short-circuits a later call', async () => {
     const renderer = await mountHook();
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
-      const result = await pending;
-      expect(result).toEqual({ ok: false });
+      await settle();
     });
     expect(hookApi().attachments[0]?.terminal).toBe(true);
 
-    // The terminal chip now short-circuits a second uploadPending.
     await act(async () => {
       const result = await hookApi().uploadPending();
       expect(result).toEqual({ ok: false });
@@ -461,15 +516,18 @@ describe('uploadPending', () => {
     renderer.unmount();
   });
 
-  it('resolves { ok: true, wire, submission } on full success', async () => {
+  it('resolves { ok: true, wire, submission } once the select-time upload settles', async () => {
     const renderer = await mountHook();
     await addDocument();
 
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
     let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
     await act(async () => {
-      const pending = hookApi().uploadPending();
-      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      result = await pending;
+      result = await hookApi().uploadPending();
     });
 
     expect(result).toEqual({
@@ -481,6 +539,369 @@ describe('uploadPending', () => {
         files: [{ remoteName: 'doc.pdf', originalName: 'doc.pdf', size: 1024 }],
       },
     });
+    renderer.unmount();
+  });
+
+  it('retries restored chips under the original upload path after a failed optimistic send', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+
+    const original = await uploadPendingResult();
+    expect(original).toEqual(expect.objectContaining({ ok: true }));
+    expect(original.ok).toBe(true);
+    if (!original.ok) {
+      throw new Error('expected upload to succeed');
+    }
+    const originalPath = original.wire?.path;
+    expect(originalPath).toBeDefined();
+
+    // The optimistic clear must keep the path; a transport failure then
+    // restores the same chips so the retry reuses the original upload path.
+    const chips = hookApi().attachments;
+    await act(async () => {
+      hookApi().clearOptimistic();
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+    await act(async () => {
+      hookApi().restoreChips(chips);
+      await settle();
+    });
+
+    const retry = await uploadPendingResult();
+    expect(retry).toEqual(expect.objectContaining({ ok: true }));
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) {
+      throw new Error('expected retry upload to succeed');
+    }
+    expect(retry.wire?.path).toBe(originalPath);
+    expect(retry.wire?.files).toEqual(['doc.pdf']);
+    renderer.unmount();
+  });
+
+  it('rotates the upload path and submission messageUuid after commitSent', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+
+    const first = await uploadPendingResult();
+    expect(first).toEqual(expect.objectContaining({ ok: true }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error('expected first upload to succeed');
+    }
+    const firstPath = first.wire?.path;
+    const firstUuid = first.submission?.messageUuid;
+    expect(firstPath).toBeDefined();
+    expect(firstUuid).toBeDefined();
+
+    // A successful send rotates both refs: the next message must presign and
+    // submit under fresh UUIDs instead of reusing the previous message's.
+    await act(async () => {
+      hookApi().commitSent();
+      await settle();
+    });
+
+    const second = await uploadPendingResult();
+    expect(second).toEqual(expect.objectContaining({ ok: true }));
+    expect(second.ok).toBe(true);
+    if (!second.ok) {
+      throw new Error('expected second upload to succeed');
+    }
+    expect(second.wire?.path).toBeDefined();
+    expect(second.wire?.path).not.toBe(firstPath);
+    expect(second.submission?.messageUuid).not.toBe(firstUuid);
+    renderer.unmount();
+  });
+});
+
+describe('restoreFileParts — cancel/restore re-send admission', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+  });
+
+  it('re-admits a restored file chip on the next send with its remote key', async () => {
+    const renderer = await mountHook();
+    const remoteName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: remoteName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${remoteName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    expect(chip?.remoteKey).toBe(`user-1/cloud-agent/msg-uuid-1/${remoteName}`);
+    expect(chip?.remoteFilename).toBe(remoteName);
+
+    const result = await uploadPendingResult();
+
+    // The restored chip must appear in the wire and submission, not be
+    // silently dropped as a "ready" chip that sends nothing.
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The restored chip's objects live under the canceled message's UUID, so
+    // the wire path must be that UUID, not the rotated current path.
+    expect(result.wire?.path).toBe('msg-uuid-1');
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('re-admits an optimistic cloud-agent file part on the next send', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: remoteName,
+          mime: '',
+          url: `cloud-agent://12345678-1234-4234-9234-123456789abc/${remoteName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    expect(chip?.remoteFilename).toBe(remoteName);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The wire path is the original upload messageUuid the optimistic part encoded.
+    expect(result.wire?.path).toBe('12345678-1234-4234-9234-123456789abc');
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('recovers messageUuid and remoteKey from a presigned https URL', async () => {
+    const renderer = await mountHook();
+    const remoteName = '87654321-4321-4321-8321-cba987654321.md';
+    const messageUuid = '12345678-1234-4234-9234-123456789abc';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: 'notes.md',
+          mime: 'text/markdown',
+          url: `https://r2.example.com/attachments/user-1/cloud-agent/${messageUuid}/${remoteName}?X-Amz-Expires=3600&X-Amz-Signature=deadbeef`,
+        },
+      ]);
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploaded');
+    // The remote filename comes from the key path, not the picker filename.
+    expect(chip?.remoteFilename).toBe(remoteName);
+    // The admission marker is the credential-free key, not the signed URL.
+    expect(chip?.remoteKey).toBe(`cloud-agent/${messageUuid}/${remoteName}`);
+
+    const result = await uploadPendingResult();
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected restored-chip upload to succeed');
+    }
+    expect(result.wire?.files).toEqual([remoteName]);
+    // The re-send must reuse the canceled message's path, not the rotated one.
+    expect(result.wire?.path).toBe(messageUuid);
+    expect(result.submission?.files.map(file => file.remoteName)).toEqual([remoteName]);
+    renderer.unmount();
+  });
+
+  it('skips a part with no URL (not recoverable)', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      hookApi().restoreFileParts([{ filename: 'ghost.pdf', mime: 'application/pdf', url: '' }]);
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('replaces occupied-composer chips with the restored set instead of merging', async () => {
+    const renderer = await mountHook();
+    // Seed an occupied composer with an existing chip.
+    await act(async () => {
+      hookApi().restoreChips([makeAttachment({ id: 'existing', filename: 'existing.pdf' })]);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['existing.pdf']);
+
+    const restoredName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: restoredName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${restoredName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    // The restored set replaces the seeded chip: no merge, no cap overrun.
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments[0]?.id).not.toBe('existing');
+    renderer.unmount();
+  });
+});
+
+describe('useAgentAttachmentUpload — attachment reorder (attachment reorder)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  async function addThreeDocuments(): Promise<void> {
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'a.pdf', uri: 'file:///cache/a.pdf' },
+        { name: 'b.pdf', uri: 'file:///cache/b.pdf' },
+        { name: 'c.pdf', uri: 'file:///cache/c.pdf' },
+      ]);
+    });
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+  }
+
+  async function pendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
+    const resultRef: { current: Awaited<ReturnType<HookApi['uploadPending']>> | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      resultRef.current = await hookApi().uploadPending();
+    });
+    const result = resultRef.current;
+    if (result === undefined) {
+      throw new Error('uploadPending did not resolve');
+    }
+    return result;
+  }
+
+  it('moves a chip one slot and keeps submission order in sync', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    const b = hookApi().attachments[1];
+    if (!b) {
+      throw new Error('attachment missing');
+    }
+    // Move b left: [a, b, c] -> [b, a, c].
+    await act(async () => {
+      hookApi().moveAttachment(b.id, 'left');
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['b.pdf', 'a.pdf', 'c.pdf']);
+
+    const result = await pendingResult();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.submission?.files.map(file => file.originalName)).toEqual([
+        'b.pdf',
+        'a.pdf',
+        'c.pdf',
+      ]);
+    }
+    renderer.unmount();
+  });
+
+  it('clamps moveAttachment at both strip edges', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    const a = hookApi().attachments[0];
+    const c = hookApi().attachments[2];
+    if (!a || !c) {
+      throw new Error('attachment missing');
+    }
+    await act(async () => {
+      hookApi().moveAttachment(a.id, 'left');
+      hookApi().moveAttachment(c.id, 'right');
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
+    renderer.unmount();
+  });
+
+  it('reorders by index and keeps wire/submission order in sync', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    // Move the last chip to the front: [a, b, c] -> [c, a, b].
+    await act(async () => {
+      hookApi().reorderAttachments(2, 0);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['c.pdf', 'a.pdf', 'b.pdf']);
+
+    const result = await pendingResult();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.submission?.files.map(file => file.originalName)).toEqual([
+        'c.pdf',
+        'a.pdf',
+        'b.pdf',
+      ]);
+      // The wire path carries the same slot order as the submission files.
+      expect(result.wire?.files).toHaveLength(3);
+    }
+    renderer.unmount();
+  });
+
+  it('no-ops an out-of-range reorder', async () => {
+    const renderer = await mountHook();
+    await addThreeDocuments();
+
+    await act(async () => {
+      hookApi().reorderAttachments(0, 3);
+      hookApi().reorderAttachments(-1, 0);
+      hookApi().reorderAttachments(1, 1);
+      await settle();
+    });
+    expect(hookApi().attachments.map(item => item.filename)).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
     renderer.unmount();
   });
 });
@@ -580,6 +1001,7 @@ describe('selection-time image upload (Step 2)', () => {
 describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
@@ -596,10 +1018,15 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       resolveUpload = resolve;
       rejectUpload = reject;
     });
-    // The mock mirrors `uploadOne`'s real contract: it hands the created
-    // task's `cancelAsync` back through `onTask` before the upload settles.
+    // The mock mirrors `uploadOne`'s real contract: it admits the key through
+    // `onAdmitted` and hands the created task's `cancelAsync` back through
+    // `onTask` before the upload settles.
     hoisted.uploadOne.mockImplementation(
-      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onAdmitted?: (key: string) => void;
+      }) => {
+        args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
         args.onTask?.({ cancelAsync: hoisted.cancelAsync });
         const result = await controlled;
         return result;
@@ -610,13 +1037,10 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('announces success exactly once when the upload resolves', async () => {
     const renderer = await mountHook();
     await addDocument();
-    expect(hookApi().attachments[0]?.status).toBe('pending');
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
-      await Promise.resolve();
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
@@ -633,9 +1057,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
-      await pending;
       await settle();
     });
 
@@ -656,9 +1078,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
-      await pending;
       await settle();
     });
 
@@ -675,9 +1095,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     const renderer = await mountHook();
     await addDocument();
     await act(async () => {
-      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
-      await pending;
       await settle();
     });
     expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
@@ -715,12 +1133,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       throw new Error('attachment id missing');
     }
 
-    // Start the upload, then remove the chip while it is in flight.
-    let pending: Promise<unknown> | undefined = undefined;
-    await act(async () => {
-      pending = hookApi().uploadPending();
-      await Promise.resolve();
-    });
+    // The upload is already in flight; remove the chip before it settles.
     await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
@@ -729,7 +1142,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
@@ -769,11 +1181,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     const renderer = await mountHook();
     await addDocument();
 
-    let pending: Promise<unknown> | undefined = undefined;
-    await act(async () => {
-      pending = hookApi().uploadPending();
-      await Promise.resolve();
-    });
     await act(async () => {
       hookApi().reset();
       await settle();
@@ -782,13 +1189,52 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
-      await pending;
       await settle();
     });
 
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('never announces or writes back a chip discarded by restoreFileParts', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const discardedId = hookApi().attachments[0]?.id;
+    if (!discardedId) {
+      throw new Error('attachment id missing');
+    }
+    expect(hookApi().attachments[0]?.status).toBe('uploading');
+
+    const restoredName = '8f14e45f-ceea-4b2a-8c6d-1a2b3c4d5e6f.pdf';
+    await act(async () => {
+      hookApi().restoreFileParts([
+        {
+          filename: restoredName,
+          mime: 'application/pdf',
+          url: `file:///tmp/attachments/session-1/user-1/msg-uuid-1/${restoredName}`,
+        },
+      ]);
+      await settle();
+    });
+
+    // Restore replaces the occupied chip and cancels its in-flight upload.
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments[0]?.id).not.toBe(discardedId);
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+
+    // The stale upload later resolves: it must not announce, toast, or write
+    // the discarded chip back into the attachments list.
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hookApi().attachments.map(item => item.filename)).toEqual([restoredName]);
+    expect(hookApi().attachments.map(item => item.id)).not.toContain(discardedId);
     renderer.unmount();
   });
 
@@ -838,12 +1284,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -876,12 +1316,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     if (!id) {
       throw new Error('attachment id missing');
     }
-
-    await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
 
     await act(async () => {
       hookApi().removeAttachment(id);
@@ -925,12 +1359,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -957,12 +1385,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -984,12 +1406,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -1004,12 +1420,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().reset();
       await settle();
     });
@@ -1022,12 +1432,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
   it('cancels every in-flight upload on unmount with no toast and no state flip', async () => {
     const renderer = await mountHook();
     await addDocument();
-
-    await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
 
     await act(async () => {
       renderer.unmount();
@@ -1057,12 +1461,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     }
 
     await act(async () => {
-      void hookApi().uploadPending();
-      // let the upload start and the cancel handle register
-      await Promise.resolve();
-    });
-
-    await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
     });
@@ -1076,6 +1474,178 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('useAgentAttachmentUpload — release of admitted keys (Steps 4/5)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.releasePendingUploads.mockClear();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.cancelAsync.mockReset();
+    hoisted.fileDelete.mockReset();
+    hoisted.deletedUris.clear();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockImplementation(
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        onAdmitted?: (key: string) => void;
+      }) => {
+        args.onAdmitted?.('org/2026/08/uuid/doc.pdf');
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        const result = await controlled;
+        return result;
+      }
+    );
+  });
+
+  it('releases the admitted key when the chip is removed', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
+    renderer.unmount();
+  });
+
+  it('does not release after a retryable failure (the chip stays recoverable)', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(false);
+    // The admitted key is retained for the retry, and nothing was released.
+    expect(chip?.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    expect(hoisted.releasePendingUploads).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('releases the prior admitted key before re-presigning on Retry', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+    const chip = hookApi().attachments[0];
+    const id = chip?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    expect(chip.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    expect(hoisted.releasePendingUploads).not.toHaveBeenCalled();
+
+    // The retried attempt gets a fresh pending promise to resolve.
+    const retried = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValueOnce(retried);
+
+    // Record how many presigns had already run when the release fires: the
+    // release must precede the retry's re-presign, or the stale row is still
+    // pending when the replacement row is admitted and the cap can trip.
+    let presignsBeforeRelease = -1;
+    hoisted.releasePendingUploads.mockImplementation(() => {
+      presignsBeforeRelease = hoisted.uploadOne.mock.calls.length;
+    });
+
+    await act(async () => {
+      hookApi().retryAttachment(id);
+      await settle();
+    });
+
+    // One released row (the prior key) plus one fresh presign: the pending
+    // count stays the same instead of growing one row per retry.
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(2);
+    expect(presignsBeforeRelease).toBe(1);
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    expect(hookApi().attachments[0]?.status).toBe('uploaded');
+    expect(hookApi().attachments[0]?.remoteKey).toBe('org/2026/08/uuid/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('ignores a Retry tap when the chip is not in the error state', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    const presigns = hoisted.uploadOne.mock.calls.length;
+
+    await act(async () => {
+      hookApi().retryAttachment(id);
+      await settle();
+    });
+
+    // A successful chip is not retryable: Retry must not presign again.
+    expect(hoisted.uploadOne.mock.calls.length).toBe(presigns);
+    renderer.unmount();
+  });
+
+  it('releases every admitted key on leave via releaseUnclaimedUploads', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    await act(async () => {
+      hookApi().releaseUnclaimedUploads();
+      await settle();
+    });
+
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledTimes(1);
+    expect(hoisted.releasePendingUploads).toHaveBeenCalledWith({
+      organizationId: undefined,
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
     renderer.unmount();
   });
 });

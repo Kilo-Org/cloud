@@ -14,6 +14,7 @@ import {
 } from '../../../src/session/pending-messages.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import { PENDING_FLUSH_DEBOUNCE_MS } from '../../../src/session/session-message-queue.js';
+import { WRAPPER_NO_OUTPUT_TIMEOUT_MS } from '../../../src/session/agent-runtime.js';
 import {
   getSessionMessageState,
   listMessagesWithPendingCallbacks,
@@ -29,6 +30,7 @@ import {
 import {
   getSandboxRecoveryState,
   getWrapperLease,
+  type WrapperRuntimeState,
 } from '../../../src/session/wrapper-runtime-state.js';
 
 const createMessage = (overrides: Partial<PendingSessionMessage>): PendingSessionMessage => ({
@@ -104,6 +106,87 @@ describe('pending session messages', () => {
     expect(result.remaining.map(message => message.messageId)).toEqual([
       'msg_018f1e2d3c4bKeepMsgAbCdEfG',
     ]);
+  });
+
+  it('cancels a pending message without touching the accepted current message', async () => {
+    const userId = 'user_pending_cancel_queued';
+    const sessionId = 'agent_pending_cancel_queued';
+    const pendingMessageId = 'msg_018f1e2d3c4bCancelQueuedAA';
+    const currentMessageId = 'msg_018f1e2d3c4bCurrentRunABCD';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '55555555-5555-4555-5555-555555555550',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-cancel-queued',
+      });
+      // Admit the turn so the pending row, queued `SessionMessageState`, and the
+      // queued replay event all exist before the drop — the exact shape finding
+      // 1 must terminalize.
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'queued to cancel',
+          messageId: pendingMessageId,
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
+      expect(admission).toMatchObject({ success: true, outcome: 'queued' });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: currentMessageId,
+        status: 'accepted',
+        prompt: 'current run',
+        createdAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_cancel_queued',
+      });
+
+      const cancelPending = await instance.cancelQueuedMessage(pendingMessageId);
+      const cancelMissing = await instance.cancelQueuedMessage('msg_018f1e2d3c4bMissingMsgABC');
+      const cancelCurrent = await instance.cancelQueuedMessage(currentMessageId);
+
+      const db = drizzle(instance.ctx.storage, { logger: false });
+      const eventQueries = createEventQueries(db, instance.ctx.storage.sql);
+      const queuedEvents = eventQueries
+        .findByFilters({ eventTypes: ['cloud.message.queued'] })
+        .filter(event => JSON.parse(event.payload).messageId === pendingMessageId);
+      const canceledEvents = eventQueries
+        .findByFilters({ eventTypes: ['cloud.message.canceled'] })
+        .filter(event => JSON.parse(event.payload).messageId === pendingMessageId);
+
+      return {
+        cancelPending,
+        cancelMissing,
+        cancelCurrent,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+        current: await getSessionMessageState(instance.ctx.storage, currentMessageId),
+        canceled: await getSessionMessageState(instance.ctx.storage, pendingMessageId),
+        queuedEvents,
+        canceledEvents,
+      };
+    });
+
+    expect(result.cancelPending).toEqual({ dropped: true });
+    expect(result.cancelMissing).toEqual({ dropped: false });
+    expect(result.cancelCurrent).toEqual({ dropped: false });
+    expect(result.pending).toHaveLength(0);
+    expect(result.current).toMatchObject({ status: 'accepted' });
+    // The dropped id's durable state is terminal, not queued, so a re-admit
+    // rejects it as already terminal instead of ACKing it as still queued.
+    expect(result.canceled?.status).toBe('interrupted');
+    expect(result.canceled?.completionSource).toBe('canceled');
+    // The drop persists `cloud.message.canceled` after the queued replay event.
+    expect(result.queuedEvents).toHaveLength(1);
+    expect(result.canceledEvents).toHaveLength(1);
+    expect(result.canceledEvents[0].id).toBeGreaterThan(result.queuedEvents[0].id);
   });
 
   it('finds by clientRequestId', async () => {
@@ -1819,6 +1902,108 @@ describe('pending session messages', () => {
     expect(result.stale?.health).toBe('stale');
   });
 
+  it.each(['question', 'permission'] as const)(
+    'keeps current pending %s health healthy beyond the no-output deadline without changing timestamps',
+    async kind => {
+      const userId = `user_pending_health_${kind}`;
+      const sessionId = `agent_pending_health_${kind}`;
+      const messageId = 'msg_018f1e2d3c4bHealthInputAbC';
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+
+      const result = await runInDurableObject(stub, async instance => {
+        const now = Date.now();
+        const acceptedAt = now - 451_000;
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId,
+          status: 'accepted',
+          prompt: 'waiting for human input',
+          createdAt: acceptedAt,
+          acceptedAt,
+          wrapperRunId: 'wr_health_input',
+        });
+        const request = {
+          kind,
+          requestId: 'request_health_input',
+          kiloSessionId: 'ses_health_input',
+          messageIds: [messageId],
+          pending: true,
+        };
+        const runtime: WrapperRuntimeState = {
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_health_input',
+          wrapperRunId: 'wr_health_input',
+          lastWrapperMessageAt: acceptedAt,
+          lastWrapperPongAt: now,
+          nextPingAt: now + 60_000,
+          noOutputDeadlineAt: acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+          inputRequests: [request],
+        };
+        const readHealth = async (state: WrapperRuntimeState) => {
+          await instance.ctx.storage.put('wrapper_runtime_state', state);
+          const health = await instance.getCurrentMessageWork();
+          expect(await instance.ctx.storage.get('wrapper_runtime_state')).toEqual(state);
+          return health;
+        };
+        const health = await readHealth(runtime);
+        expect(runtime.noOutputDeadlineAt).toBeLessThan(now);
+
+        const terminalMessageId = 'msg_018f1e2d3c4bHealthEndedAbC';
+        const otherRunMessageId = 'msg_018f1e2d3c4bHealthOtherAbC';
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId: terminalMessageId,
+          status: 'completed',
+          prompt: 'old completed work',
+          createdAt: acceptedAt - 1,
+          acceptedAt: acceptedAt - 1,
+          terminalAt: now - 1,
+          wrapperRunId: 'wr_health_input',
+        });
+        await putSessionMessageState(instance.ctx.storage, {
+          messageId: otherRunMessageId,
+          status: 'accepted',
+          prompt: 'another wrapper run',
+          createdAt: now,
+          acceptedAt: now,
+          wrapperRunId: 'wr_health_other',
+        });
+        const staleCases: Array<{ label: string; state: WrapperRuntimeState }> = [
+          { label: 'expired ping', state: { ...runtime, pingDeadlineAt: now - 1 } },
+          { label: 'genuine silence', state: { ...runtime, inputRequests: [] } },
+          {
+            label: 'resolved input',
+            state: { ...runtime, inputRequests: [{ ...request, pending: false }] },
+          },
+          {
+            label: 'missing input owner',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: ['missing'] }] },
+          },
+          {
+            label: 'terminal input owner',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: [terminalMessageId] }] },
+          },
+          {
+            label: 'input owner from another run',
+            state: { ...runtime, inputRequests: [{ ...request, messageIds: [otherRunMessageId] }] },
+          },
+          { label: 'stale runtime', state: { ...runtime, wrapperRunId: 'wr_health_replacement' } },
+          { label: 'finalizing', state: { ...runtime, finalizingWrapperRunId: 'wr_health_input' } },
+        ];
+        for (const testCase of staleCases) {
+          expect(await readHealth(testCase.state), testCase.label).toEqual({
+            messageId,
+            status: 'running',
+            health: 'stale',
+          });
+        }
+        return health;
+      });
+
+      expect(result).toEqual({ messageId, status: 'running', health: 'healthy' });
+    }
+  );
+
   it('drains a pending current message while another accepted message shares the fenced wrapper run', async () => {
     const userId = 'user_pending_flush_active';
     const sessionId = 'agent_pending_flush_active';
@@ -2753,7 +2938,7 @@ describe('pending session messages', () => {
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
 
-    const result = await runInDurableObject(stub, async (instance, state) => {
+    const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {
         execute: async () => {
           throw new Error('wrapper still unavailable');
@@ -2834,7 +3019,7 @@ describe('pending session messages', () => {
       env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
     );
 
-    const result = await runInDurableObject(stub, async (instance, state) => {
+    const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {
         execute: async () => {
           throw new Error('wrapper still unavailable');

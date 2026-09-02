@@ -33,6 +33,7 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
   }
 
   async getAccess(sessionId: string): Promise<CachedSessionAccess | null> {
+    if (this.ctx.storage.kv.get(`deletedSession/${sessionId}`) === true) return null;
     const row = this.db
       .select({
         sessionId: sessions.session_id,
@@ -59,6 +60,15 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
   }
 
   async putValidated(access: CachedSessionAccess): Promise<void> {
+    if (this.ctx.storage.kv.get(`deletedSession/${access.sessionId}`) === true) return;
+    const scopeKey = `cloudAgentScope/${access.sessionId}`;
+    const scopeIdentity = JSON.stringify([
+      access.cloudAgentSessionScopeId ?? null,
+      access.organizationId ?? null,
+    ]);
+    const existingScope = this.ctx.storage.kv.get(scopeKey);
+    if (existingScope !== undefined && existingScope !== scopeIdentity) return;
+    if (access.cloudAgentSessionScopeId != null) this.ctx.storage.kv.put(scopeKey, scopeIdentity);
     const now = Date.now();
     const authorizationExpiresAt = now + SESSION_ACCESS_CACHE_TTL_MS;
     // Expired rows are unreadable but would otherwise accumulate forever;
@@ -81,6 +91,12 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
         },
       })
       .run();
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    this.ctx.storage.kv.put(`deletedSession/${sessionId}`, true);
+    this.ctx.storage.kv.delete(`cloudAgentScope/${sessionId}`);
+    this.db.delete(sessions).where(eq(sessions.session_id, sessionId)).run();
   }
 
   async remove(sessionId: string): Promise<void> {

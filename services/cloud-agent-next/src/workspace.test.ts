@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 
 const { mockTimeoutWarn, mockTimeoutWithFields, mockTimeoutWithTags } = vi.hoisted(() => {
   const warn = vi.fn();
@@ -41,6 +42,7 @@ import {
   setupWorkspace,
   getBaseWorkspacePath,
   getSessionWorkspacePath,
+  getWorktreeWorkspacePath,
   getSessionHomePath,
   sanitizeIdForPath,
   LOW_DISK_THRESHOLD_MB,
@@ -93,6 +95,27 @@ describe('setupWorkspace', () => {
       recursive: true,
     });
     expect(mkdir).toHaveBeenNthCalledWith(2, '/home/agent-session', { recursive: true });
+  });
+
+  it('creates a canonical shared worktree directory and a chat-specific home', async () => {
+    const mkdir = vi.fn().mockResolvedValue(undefined);
+    const sandbox = { mkdir } as unknown as SandboxInstance;
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+
+    const paths = await setupWorkspace(
+      sandbox,
+      'oauth/google:1234',
+      undefined,
+      'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+      worktreeId
+    );
+
+    expect(paths).toEqual({
+      workspacePath: `/workspace/oauth-google-1234/worktrees/${worktreeId}`,
+      sessionHome: '/home/workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+    });
+    expect(mkdir).toHaveBeenNthCalledWith(1, paths.workspacePath, { recursive: true });
+    expect(mkdir).toHaveBeenNthCalledWith(2, paths.sessionHome, { recursive: true });
   });
 });
 
@@ -1343,6 +1366,34 @@ describe('workspace path construction', () => {
   const ORG_ID = '33c8c114-791f-463c-9f7f-fe74b284cfcf';
   const BOT_USER_ID = `bot-code-review-${ORG_ID}`;
   const SESSION_ID = 'agent_420ae020-e3c4-4e67-878b-66672c3d997e';
+  const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+
+  it('builds owner-scoped canonical worktree paths for personal and organization sessions', () => {
+    expect(getWorktreeWorkspacePath(undefined, 'user-1', WORKTREE_ID)).toBe(
+      `/workspace/user-1/worktrees/${WORKTREE_ID}`
+    );
+    expect(getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID)).toBe(
+      `/workspace/${ORG_ID}/user-1/worktrees/${WORKTREE_ID}`
+    );
+  });
+
+  it('preserves arbitrary OAuth user IDs in canonical worktree paths', () => {
+    expect(getWorktreeWorkspacePath(ORG_ID, 'oauth/google:1234', WORKTREE_ID)).toBe(
+      `/workspace/${ORG_ID}/oauth-google-1234/worktrees/${WORKTREE_ID}`
+    );
+  });
+
+  it.each([
+    '',
+    'worktree_invalid',
+    'worktree_../../outside',
+    'worktree_420ae020-e3c4-4e67-878b-66672c3d997e/child',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects unsafe worktree ID %s before constructing a path', worktreeId => {
+    expect(() =>
+      getWorktreeWorkspacePath(ORG_ID, 'user-1', worktreeId as CloudAgentWorktreeId)
+    ).toThrow(/invalid worktree id/);
+  });
 
   it('keeps the userId segment between the org and the sessions directory', () => {
     // Dropping this segment would yield `/workspace/<orgId>/sessions/<sessionId>`,

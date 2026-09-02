@@ -27,12 +27,37 @@ export function acceptedSubmissionAttachmentIdsToRemove(
     .map(attachment => attachment.id);
 }
 
+export function getChatInputPresentationCommands(
+  slashCommands: SlashCommand[],
+  hasWorktreeAction: boolean
+): SlashCommand[] {
+  if (!hasWorktreeAction || slashCommands.some(command => command.trigger === 'new')) {
+    return slashCommands;
+  }
+
+  return [
+    ...slashCommands,
+    {
+      trigger: 'new',
+      label: 'New chat',
+      description: 'Start a new chat in this worktree',
+      expansion: '',
+    },
+  ];
+}
+
+export function isWorktreeNewChatCommand(message: string, hasWorktreeAction: boolean): boolean {
+  return hasWorktreeAction && message.trim() === '/new';
+}
+
 export function shouldRejectAttachedSlashCommand(
   message: string,
   slashCommands: Pick<SlashCommand, 'trigger'>[],
-  hasAttachments: boolean
+  hasAttachments: boolean,
+  isWorktreeChatCommand = false
 ): boolean {
   if (!hasAttachments) return false;
+  if (isWorktreeChatCommand) return true;
 
   const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(message.trim());
   return Boolean(slashMatch && slashCommands.some(command => command.trigger === slashMatch[1]));

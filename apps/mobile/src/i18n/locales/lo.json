@@ -152,7 +152,11 @@
     "appearanceDark": "ມືດ",
     "account": "ບັນຊີ",
     "prReviewAttribution": "ຕື່ມການລະບຸແຫຼ່ງຂອງແອັບລົງໃນການທົບທວນ PR",
-    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ."
+    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ.",
+    "returnSendsMessage": "ປຸ່ມຂຶ້ນແຖວໃໝ່ສົ່ງຂໍ້ຄວາມ",
+    "returnSendsMessageSubtitle": "ເມື່ອປິດ, ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມຂອງຕົວແທນ.",
+    "biometricUnlock": "ປົດລັອກດ້ວຍຂໍ້ມູນຊີວະມິຕິ",
+    "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -750,7 +754,8 @@
       "networkError": "ຂໍ້ຜິດພາດເຄືອຂ່າຍ",
       "uploadFailed": "ການອັບໂຫລດລົ້ມເຫລວ",
       "failedToUploadFile": "ການອັບໂຫລດໄຟລ໌ລົ້ມເຫລວ: {{reason}}",
-      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ"
+      "nothingToPaste": "ບໍ່ມີຫຍັງໃຫ້ວາງ",
+      "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນ metadata ຂອງຮູບໄດ້."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "ກຳລັງລໍຖ້າການຖອດຄວາມຂອງການທົບທວນ.",
       "transcriptEmpty": "ບໍ່ມີການຖອດຄວາມຂອງການທົບທວນນີ້.",
       "transcriptRetry": "ບໍ່ສາມາດໂຫຼດການຖອດຄວາມຂອງການທົບທວນ.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "ເອເຈນວ່າງ",
       "agentWorking": "ເອເຈນກຳລັງເຮັດວຽກ...",
       "anErrorOccurred": "ເກີດຂໍ້ຜິດພາດ",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນ",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "ກຳລັງອັບເດດ"
     },
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນ?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "ເຊດຊັນອອກແລ້ວ",
     "remoteSpawnRetryable": "ບໍ່ສາມາດເຂົ້າເຖິງ instance ໄດ້ — ມັນອາດຈະຕັດການເຊື່ອມຕໍ່.",
     "remoteSpawnNonRetryable": "instance ລົ້ມເຫຼວໃນການເລີ່ມເຊດຊັນ — ກວດເຄື່ອງ ຫຼື ອັບເດດ CLI.",
-    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ."
+    "remoteSpawnInstanceDisconnected": "instance ທີ່ເລືອກໄດ້ຕັດການເຊື່ອມຕໍ່. ເລີ່ມເຊດຊັນໃນ Cloud Agent ຫຼື ເລືອກ instance ອື່ນ.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
       "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
       "connectionTrouble": "ມີບັນຫາການເຊື່ອມຕໍ່. ກະລຸນາລອງໃໝ່ໃນອີກເລັກນ້ອຍ.",
-      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່."
+      "modelUnavailable": "ຮູບແບບນີ້ບໍ່ສາມາດໃຊ້ກັບ Cloud Agent ໄດ້. ກະລຸນາເລືອກຮູບແບບອື່ນ ແລ້ວລອງໃໝ່.",
+      "cancelQueuedFailed": "ບໍ່ສາມາດຍົກເລີກຂໍ້ຄວາມໄດ້.",
+      "cancelQueuedRestoreAvailable": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ແຕະ ກູ້ຄືນ ເພື່ອນຳມັນກັບໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ.",
+      "cancelQueuedRestored": "ຍົກເລີກຂໍ້ຄວາມແລ້ວ. ຂໍ້ຄວາມກັບຄືນມາຢູ່ໃນຊ່ອງປ້ອນຂໍ້ຄວາມແລ້ວ.",
+      "cancelQueuedUpgradeRequired": "ການຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງຕ້ອງໃຊ້ Kilo CLI ລຸ້ນໃໝ່ກວ່າ. ອັບເດດ Kilo CLI ແລ້ວເຊື່ອມຕໍ່ໃໝ່."
     },
     "remoteSession": {
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນທາງໄກ",
@@ -2213,7 +2225,8 @@
       "continueFrom": "ກຳລັງສືບຕໍ່ {{title}}",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດສືບຕໍ່ເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
+      "discardWithUploadsMessage": "ຂໍ້ຄວາມຂອງທ່ານ ແລະ ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "ດຳເນີນການ `kilo remote` ໃນໂປຣເຈັກໃນຄອມພິວເຕີຂອງທ່ານ, ຫຼື ອັບເດດ Kilo CLI ຖ້າມີອັນທີ່ກຳລັງດຳເນີນຢູ່.",
       "instanceOnProject": "{{name}} ໃນ {{project}}",
       "instanceOnProjectSuffix": "{{name}} ໃນ {{project}} ({{suffix}})",
-      "runOnCloudAgent": "ດຳເນີນການໃນ Cloud Agent"
+      "runOnCloudAgent": "ດຳເນີນການໃນ Cloud Agent",
+      "terminals": "ເທີມິນັລ",
+      "remotes": "ອິນສະແຕນທາງໄກ"
     },
     "modePicker": {
       "title": "ເລືອກໂໝດ",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "ຂໍ້ຄວາມເຂົ້າຄິວ",
       "userMessage": "ຂໍ້ຄວາມຜູ້ໃຊ້",
       "assistantMessage": "ຂໍ້ຄວາມຜູ້ຊ່ວຍ",
-      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ"
+      "longPressHint": "ກົດຄ້າງເພື່ອເບິ່ງລາຍລະອຽດຂໍ້ຄວາມ",
+      "cancelQueued": "ຍົກເລີກຂໍ້ຄວາມ",
+      "cancelQueuedAccessibility": "ຍົກເລີກຂໍ້ຄວາມທີ່ລໍຖ້າສົ່ງ",
+      "restoreQueued": "ກູ້ຄືນ",
+      "restoreQueuedAccessibility": "ກູ້ຄືນຂໍ້ຄວາມທີ່ຍົກເລີກໄປຍັງຊ່ອງປ້ອນຂໍ້ຄວາມ"
     },
     "olderMessages": {
       "arrived": "ຂໍ້ຄວາມກ່ອນໜ້າໂຫລດແລ້ວ",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
-      "sortBy": "ຮຽງລຳດັບໂດຍ",
-      "sortLastUpdated": "ອັບເດດຫລ້າສຸດ",
-      "sortCreated": "ສ້າງເມື່ອ",
       "platform": "ເວທີ",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ອື່ນໆ",
-      "project": "ໂຄງການ",
-      "removeProjectFilter": "ລຶບຕົວກັ່ນຕອງໂຄງການ {{label}}",
-      "removePlatformFilter": "ລຶບຕົວກັ່ນຕອງເວທີ {{label}}"
+      "project": "ໂຄງການ"
     },
     "suggestion": {
       "title": "ຄຳແນະນຳ",
@@ -2545,7 +2559,9 @@
       "uploading": "ກຳລັງອັບໂຫລດ…",
       "uploaded": "ອັບໂຫລດແລ້ວ",
       "uploadFailedRetry": "ການອັບໂຫລດລົ້ມເຫລວ. ແຕະເພື່ອລອງອີກ.",
-      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້."
+      "uploadFailedTerminal": "ໄຟລ໌ນີ້ບໍ່ສາມາດອັບໂຫລດໄດ້.",
+      "moveLeft": "ຍ້າຍ {{filename}} ໄປທາງຊ້າຍ",
+      "moveRight": "ຍ້າຍ {{filename}} ໄປທາງຂວາ"
     },
     "attachmentPasteHint": {
       "accessibility": "ວາງຮູບພາບຈາກຄລິບບອດ",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "ກຳລັງສຳເລັດ...",
       "messagePlaceholder": "ຂໍ້ຄວາມ...",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ບໍ່ສາມາດຮັບໄຟລ໌. ລຶບໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
-      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ."
+      "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌. ແຕະສົ່ງເພື່ອລອງອີກ.",
+      "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫລດແຕ່ບໍ່ໄດ້ແນບກັບຂໍ້ຄວາມທີ່ສົ່ງແລ້ວຈະຖືກລຶບ.",
+      "discardAttachmentsTitle": "ຍົກເລີກໄຟລ໌ແນບ?",
+      "charactersRemaining": "ເຫຼືອ {{count}} ຕົວອັກສອນ",
+      "insertNewline": "ແຊກແຖວໃໝ່"
     },
     "chatLink": {
       "linkCopied": "ສຳເນົາລິ້ງແລ້ວ",
@@ -2730,7 +2750,7 @@
     "newCodingTask": "ວຽກການຂຽນໂຄ້ດໃໝ່",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "ຕອນນີ້ບໍ່ມີຫຍັງກຳລັງເຮັດວຽກ"
   },
   "imageViewer": {
     "close": "ປິດ {{filename}}",
@@ -2794,7 +2814,8 @@
     "busy": "ການປ້ອນສຽງກຳລັງຫຍຸ້ງ. ລອງອີກຄັ້ງ.",
     "stopped": "ການປ້ອນສຽງຢຸດແລ້ວ. ແຕະໄມໂຄຣໂຟນເພື່ອລອງອີກຄັ້ງ.",
     "unavailableDevice": "ການປ້ອນສຽງບໍ່ມີໃນອຸປະກອນນີ້.",
-    "unavailableLanguage": "ການປ້ອນສຽງບໍ່ມີສຳລັບພາສາຂອງອຸປະກອນນີ້."
+    "unavailableLanguage": "ການປ້ອນສຽງບໍ່ມີສຳລັບພາສາຂອງອຸປະກອນນີ້.",
+    "listeningStopped": "ຢຸດການຟັງແລ້ວ."
   },
   "share": {
     "title": "ແບ່ງປັນໄປ Kilo",

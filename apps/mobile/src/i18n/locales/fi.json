@@ -152,7 +152,11 @@
     "appearanceDark": "Tumma",
     "account": "Tili",
     "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
-    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun."
+    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun.",
+    "returnSendsMessage": "Enter-näppäin lähettää viestin",
+    "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin.",
+    "biometricUnlock": "Avaa lukitus biometrisellä tunnistuksella",
+    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -750,7 +754,8 @@
       "networkError": "Verkkovirhe",
       "uploadFailed": "Lataus epäonnistui",
       "failedToUploadFile": "Tiedoston lataaminen epäonnistui: {{reason}}",
-      "nothingToPaste": "Ei mitään liitettävää"
+      "nothingToPaste": "Ei mitään liitettävää",
+      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1304,7 +1309,7 @@
       "transcriptWaiting": "Odotetaan tarkistuksen transkriptiota.",
       "transcriptEmpty": "Ei transkriptiota tälle tarkistukselle.",
       "transcriptRetry": "Tarkistuksen transkriptiota ei voitu ladata.",
-      "transcriptLive": "LIVE",
+      "transcriptLive": "Live",
       "agentIdle": "Agentti vapaalla",
       "agentWorking": "Agentti työstää...",
       "anErrorOccurred": "Tapahtui virhe",
@@ -2067,7 +2072,8 @@
       "couldNotSearch": "Istuntoja ei voitu hakea",
       "completedWillAppear": "Valmistuneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
-      "live": "LIVE"
+      "live": "LIVE",
+      "updating": "Päivitetään"
     },
     "sessionRow": {
       "deleteTitle": "Poistetaanko istunto?",
@@ -2111,7 +2117,9 @@
     "sessionExited": "Istunto päättyi",
     "remoteSpawnRetryable": "Yhteyttä instanssiin ei saatu — se on voinut katketa.",
     "remoteSpawnNonRetryable": "Instanssi ei käynnistänyt istuntoa — tarkista kone tai päivitä CLI.",
-    "remoteSpawnInstanceDisconnected": "Valittu instanssi katkaisi yhteyden. Aloita istunto Cloud Agentissa tai valitse toinen instanssi."
+    "remoteSpawnInstanceDisconnected": "Valittu instanssi katkaisi yhteyden. Aloita istunto Cloud Agentissa tai valitse toinen instanssi.",
+    "liveCount_one": "{{count}} LIVE",
+    "liveCount_other": "{{count}} LIVE"
   },
   "agentChat": {
     "session": {
@@ -2141,7 +2149,11 @@
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua.",
-      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen."
+      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen.",
+      "cancelQueuedFailed": "Viestiä ei voitu peruuttaa.",
+      "cancelQueuedRestoreAvailable": "Viesti peruutettu. Napauta Palauta palauttaaksesi sen viestikenttään.",
+      "cancelQueuedRestored": "Viesti peruutettu. Kehote on taas viestikentässä.",
+      "cancelQueuedUpgradeRequired": "Jonossa olevien viestien peruuttaminen edellyttää uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",
@@ -2213,7 +2225,8 @@
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "continueFrom": "Jatketaan {{title}}",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
-      "importingSession": "Tuodaan istuntoa"
+      "importingSession": "Tuodaan istuntoa",
+      "discardWithUploadsMessage": "Kehotteesi ja ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan."
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2240,7 +2253,7 @@
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "Tehtävä",
+      "toolTask": "tehtävä",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
       "linesBadge": "{{displayCount}} riviä",
@@ -2271,7 +2284,9 @@
       "noCliInstancesDescription": "Aja `kilo remote` projektissa tietokoneellasi tai päivitä Kilo CLI, jos sellainen on jo käynnissä.",
       "instanceOnProject": "{{name}} projektissa {{project}}",
       "instanceOnProjectSuffix": "{{name}} projektissa {{project}} ({{suffix}})",
-      "runOnCloudAgent": "Aja Cloud Agentissa"
+      "runOnCloudAgent": "Aja Cloud Agentissa",
+      "terminals": "Päätteet",
+      "remotes": "Etäinstanssit"
     },
     "modePicker": {
       "title": "Valitse tila",
@@ -2461,7 +2476,11 @@
       "queuedAccessibility": "Viesti jonossa",
       "userMessage": "Käyttäjän viesti",
       "assistantMessage": "Avustajan viesti",
-      "longPressHint": "Pitkä painallus viestin tietoja varten"
+      "longPressHint": "Pitkä painallus viestin tietoja varten",
+      "cancelQueued": "Peruuta viesti",
+      "cancelQueuedAccessibility": "Peruuta jonossa oleva viesti",
+      "restoreQueued": "Palauta",
+      "restoreQueuedAccessibility": "Palauta peruutettu viesti viestikenttään"
     },
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",
@@ -2489,9 +2508,6 @@
     },
     "sessionFilter": {
       "title": "Suodata istuntoja",
-      "sortBy": "Lajittele",
-      "sortLastUpdated": "Päivitetty viimeksi",
-      "sortCreated": "Luotu",
       "platform": "Alusta",
       "platformCloud": "Pilvi",
       "platformExtension": "Laajennus",
@@ -2500,9 +2516,7 @@
       "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
-      "project": "Projekti",
-      "removeProjectFilter": "Poista {{label}} projektisuodatin",
-      "removePlatformFilter": "Poista {{label}} alustasuodatin"
+      "project": "Projekti"
     },
     "suggestion": {
       "title": "Ehdotus",
@@ -2545,7 +2559,9 @@
       "uploading": "Ladataan…",
       "uploaded": "Ladattu",
       "uploadFailedRetry": "Lataus epäonnistui. Napauta yrittääksesi uudelleen.",
-      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata."
+      "uploadFailedTerminal": "Tätä tiedostoa ei voi ladata.",
+      "moveLeft": "Siirrä {{filename}} vasemmalle",
+      "moveRight": "Siirrä {{filename}} oikealle"
     },
     "attachmentPasteHint": {
       "accessibility": "Liitä kuva leikepöydältä",
@@ -2575,7 +2591,11 @@
       "finalizingPlaceholder": "Viimeistellään...",
       "messagePlaceholder": "Viesti...",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet lähettääksesi viestisi.",
-      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen."
+      "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Napauta lähetä yrittääksesi uudelleen.",
+      "discardAttachmentsMessage": "Ladatut tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
+      "discardAttachmentsTitle": "Hylätäänkö liitteet?",
+      "charactersRemaining": "{{count}} merkkiä jäljellä",
+      "insertNewline": "Lisää rivinvaihto"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",
@@ -2651,7 +2671,7 @@
       "open": "avoin pull request",
       "closed": "suljettu pull request",
       "merged": "yhdistetty pull request",
-      "draft": "Luonnos-pull request",
+      "draft": "luonnos-pull request",
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2730,7 +2750,7 @@
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "noLiveSessions": "Nothing running right now"
+    "noLiveSessions": "Mitään ei ole käynnissä juuri nyt"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",
@@ -2775,7 +2795,7 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "vaatii syötettä"
+    "needsInput": "VAATII SYÖTETTÄ"
   },
   "voiceInput": {
     "listening": "Kuunnellaan...",
@@ -2794,7 +2814,8 @@
     "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
     "stopped": "Puheentunnistus pysähtyi. Napauta mikrofonia yrittääksesi uudelleen.",
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
-    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle."
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle.",
+    "listeningStopped": "Kuuntelu pysähtyi."
   },
   "share": {
     "title": "Jaa Kiloon",

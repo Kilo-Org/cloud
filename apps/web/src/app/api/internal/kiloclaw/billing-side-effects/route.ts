@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -87,18 +87,6 @@ function logBillingSideEffect(
     return;
   }
   console.log(record);
-}
-
-function secretMatches(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function hasOrganizationDestinationPath(
@@ -404,7 +392,7 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
 export async function POST(request: NextRequest) {
   const correlation = readBillingCorrelationHeaders(request.headers) ?? undefined;
   const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
+  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
     logBillingSideEffect('error', 'Rejected billing side effect request', {
       ...correlation,
       event: 'request_rejected',

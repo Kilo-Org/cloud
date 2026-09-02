@@ -1,0 +1,1 @@
+ALTER TABLE `trigger_config` ADD `sandbox_allocation` text;

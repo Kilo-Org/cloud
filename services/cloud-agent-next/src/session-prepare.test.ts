@@ -168,12 +168,10 @@ function createInternalApiContext(options: {
   internalApiSecret?: string | null;
   requestInternalApiKey?: string | null;
   skipBalanceCheck?: boolean;
+  credentialContainmentEnabled?: string;
   doStub?: ReturnType<typeof createMockDOStub>;
   getTokenForRepo?: ReturnType<typeof vi.fn>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
-  githubTokenContainmentOrgIds?: string;
-  gitlabTokenContainmentOrgIds?: string;
-  kilocodeTokenContainmentOrgIds?: string;
 }): TRPCContext {
   const doStub = options.doStub ?? createMockDOStub();
   const effectiveUserId =
@@ -244,9 +242,7 @@ function createInternalApiContext(options: {
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
-      GITHUB_TOKEN_CONTAINMENT_ORG_IDS: options.githubTokenContainmentOrgIds,
-      GITLAB_TOKEN_CONTAINMENT_ORG_IDS: options.gitlabTokenContainmentOrgIds,
-      KILOCODE_TOKEN_CONTAINMENT_ORG_IDS: options.kilocodeTokenContainmentOrgIds,
+      CREDENTIAL_CONTAINMENT_ENABLED: options.credentialContainmentEnabled,
     },
   } as TRPCContext;
 }
@@ -472,10 +468,7 @@ describe('prepareSession endpoint', () => {
       sandboxId: 'crv-abcdef',
     });
     const doStub = createMockDOStub();
-    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, githubTokenContainmentOrgIds: orgId })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     const result = await caller.prepareSession({
       prompt: 'Test prompt',
@@ -567,7 +560,7 @@ describe('prepareSession endpoint', () => {
           sandboxId: 'crv-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: true,
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         },
       })
     );
@@ -706,6 +699,9 @@ describe('prepareSession endpoint', () => {
           orgId: organizationId,
           createdOnPlatform: 'code-review',
         }),
+        workspace: expect.objectContaining({
+          credentialContainment: { github: false, gitlab: false, bitbucket: true, kilocode: true },
+        }),
         repository: {
           type: 'bitbucket',
           url: 'https://bitbucket.org/acme/repo.git',
@@ -797,10 +793,7 @@ describe('prepareSession endpoint', () => {
       put: vi.fn(),
     };
     const doStub = createMockDOStub();
-    const context = createInternalApiContext({
-      doStub,
-      githubTokenContainmentOrgIds: '*',
-    });
+    const context = createInternalApiContext({ doStub });
     Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
 
@@ -819,7 +812,7 @@ describe('prepareSession endpoint', () => {
           sandboxId: failoverSandboxId,
           sandboxProvider: 'cloudflare',
           shallow: undefined,
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
           sandboxRoute: {
             kind: 'shared',
             routeKey,
@@ -909,10 +902,10 @@ describe('prepareSession endpoint', () => {
     expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
-  it('enables containment for standard GitHub sessions when the org is in the allow-list', async () => {
+  it('enables containment when the global flag is true', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, githubTokenContainmentOrgIds: '*' })
+      createInternalApiContext({ doStub, credentialContainmentEnabled: 'true' })
     );
 
     await caller.prepareSession({
@@ -937,30 +930,26 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
   });
 
-  it('disables GitHub containment for an explicitly empty allow-list', async () => {
+  it('disables all containment when the global flag is false', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(
-      createInternalApiContext({
-        doStub,
-        githubTokenContainmentOrgIds: '',
-      })
+      createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
     );
 
     await caller.prepareSession({
-      prompt: 'Disable GitHub containment',
+      prompt: 'Test containment disabled',
       mode: 'code',
       model: 'claude-3',
       githubRepo: 'Kilo-Org/kg',
-      autoInitiate: true,
     });
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(doStub.registerSession).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
           credentialContainment: {
@@ -974,11 +963,9 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('persists Kilo-only containment for standard GitLab sessions', async () => {
+  it('enables containment for standard GitLab sessions', async () => {
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, kilocodeTokenContainmentOrgIds: '*' })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.prepareSession({
       prompt: 'Test GitLab containment',
@@ -992,50 +979,15 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: true },
+          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: true },
         }),
       })
     );
   });
 
-  it('does not enable containment for standard GitHub sessions when the org is not in the allow-list', async () => {
+  it('enables containment for personal GitHub sessions without an organization', async () => {
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({
-        doStub,
-        githubTokenContainmentOrgIds: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      })
-    );
-
-    await caller.prepareSession({
-      prompt: 'Test containment disabled',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'Kilo-Org/kg',
-      autoInitiate: true,
-      kilocodeOrganizationId: '550e8400-e29b-41d4-a716-446655440000',
-    });
-
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-        }),
-      })
-    );
-  });
-
-  it('enables containment for standard GitHub sessions when the org is in the allow-list', async () => {
-    const doStub = createMockDOStub();
-    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, githubTokenContainmentOrgIds: orgId })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.prepareSession({
       prompt: 'Test containment',
@@ -1043,13 +995,12 @@ describe('prepareSession endpoint', () => {
       model: 'claude-3',
       githubRepo: 'Kilo-Org/kg',
       autoInitiate: true,
-      kilocodeOrganizationId: orgId,
     });
 
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
@@ -1376,12 +1327,10 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
-  it('persists containment intent for standard GitHub grouped starts when the org is in the allow-list', async () => {
+  it('persists default containment for standard GitHub grouped starts', async () => {
     const doStub = createMockDOStub();
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, githubTokenContainmentOrgIds: orgId })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.start({
       message: { prompt: 'Test containment' },
@@ -1404,7 +1353,7 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
+          credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
         }),
       })
     );
@@ -1440,11 +1389,9 @@ describe('start endpoint', () => {
     );
   });
 
-  it('persists GitLab-only containment for standard GitLab grouped starts', async () => {
+  it('persists default containment for standard GitLab grouped starts', async () => {
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({ doStub, gitlabTokenContainmentOrgIds: '*' })
-    );
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
     await caller.start({
       message: { prompt: 'Test GitLab containment' },
@@ -1455,41 +1402,51 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: expect.objectContaining({
-          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: false },
+          credentialContainment: { github: false, gitlab: true, bitbucket: false, kilocode: true },
         }),
       })
     );
   });
 
-  it('does not persist containment intent for standard GitHub grouped starts when the org is not in the allow-list', async () => {
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(
-      createInternalApiContext({
-        doStub,
-        githubTokenContainmentOrgIds: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-      })
-    );
+  it.each([
+    { type: 'github', repo: 'Kilo-Org/kg' },
+    { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+    {
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    },
+    { type: 'git', url: 'https://git.example.com/acme/repo.git' },
+  ] as const)(
+    'disables all containment for $type grouped starts when the global flag is false',
+    async repository => {
+      const doStub = createMockDOStub();
+      const caller = appRouter.createCaller(
+        createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' })
+      );
 
-    await caller.start({
-      message: { prompt: 'Test containment disabled' },
-      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-      repository: { type: 'github', repo: 'Kilo-Org/kg' },
-      options: { kilocodeOrganizationId: '550e8400-e29b-41d4-a716-446655440000' },
-    });
+      await caller.start({
+        message: { prompt: 'Test containment disabled' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository,
+        options: { kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+      });
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspace: expect.objectContaining({
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-        }),
-      })
-    );
-  });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          }),
+        })
+      );
+    }
+  );
 
   it.each(['cloud-agent-web', 'slack'])(
     'resolves implicit profiles for approved grouped %s start',

@@ -1,5 +1,9 @@
 import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from './types.js';
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
+import {
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import { logger } from './logger.js';
 import {
   inspectWrapperContainers,
@@ -207,6 +211,18 @@ export function getSessionWorkspacePath(
   return `${getBaseWorkspacePath(kilocodeOrganizationId, userId)}/sessions/${safeSessionId}`;
 }
 
+export function getWorktreeWorkspacePath(
+  kilocodeOrganizationId: string | null | undefined,
+  userId: string,
+  worktreeId: CloudAgentWorktreeId
+): string {
+  const parsed = cloudAgentWorktreeIdSchema.safeParse(worktreeId);
+  if (!parsed.success) {
+    throw invalidSegment('worktree id');
+  }
+  return `${getBaseWorkspacePath(kilocodeOrganizationId, userId)}/worktrees/${parsed.data}`;
+}
+
 export function getSessionHomePath(sessionId: string): string {
   return `${SESSION_HOME_ROOT}/${requireGeneratedIdPathSegment(sessionId, 'session id')}`;
 }
@@ -359,9 +375,12 @@ export async function setupWorkspace(
   sandbox: SandboxInstance,
   userId: string,
   kilocodeOrganizationId: string | undefined,
-  sessionId: string
+  sessionId: string,
+  worktreeId?: CloudAgentWorktreeId
 ): Promise<SessionPaths> {
-  const sessionWorkspacePath = getSessionWorkspacePath(kilocodeOrganizationId, userId, sessionId);
+  const sessionWorkspacePath = worktreeId
+    ? getWorktreeWorkspacePath(kilocodeOrganizationId, userId, worktreeId)
+    : getSessionWorkspacePath(kilocodeOrganizationId, userId, sessionId);
   const sessionHome = getSessionHomePath(sessionId);
 
   try {

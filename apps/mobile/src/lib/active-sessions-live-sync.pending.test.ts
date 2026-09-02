@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
+
 import {
   ActiveSessionsLiveSync,
   makeCached,
@@ -70,10 +72,14 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     expect(sync.getPendingReasons().has('cli-disconnected')).toBe(true);
     expect(qc.__hasPendingFetch()).toBe(true);
     expect(queryFn).toHaveBeenCalledTimes(2);
-    // Resolve it; the reason clears.
+    const query = qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(0);
+    // Only the accepted replacement clears the reason.
     qc.__triggerFetchResolve({ sessions: [] });
     await sync.getFetchCompletion();
     expect(sync.getPendingReasons().has('cli-disconnected')).toBe(false);
+    expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(1);
+    expect(qc.__getCached()).toEqual({ sessions: [] });
   });
 
   it('a fetch that errors does not clear its reason (transient failure)', async () => {

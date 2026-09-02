@@ -32,7 +32,6 @@ export const USER_DELETION_COMPLETION_HTML =
   'This email is your confirmation that the Kilo account associated with this email address has been permanently deleted and anonymized.<br /><br />If you did not request this deletion, please contact Kilo support immediately.';
 export const USER_DELETION_PYLON_REPLY_HTML =
   'This email is your confirmation that the Kilo account associated with this email address has been permanently deleted and anonymized.<br /><br />Your account will be deleted in our case management system immediately after this email. Please do not respond to this email, as it will automatically re-create your account in the system.';
-export const USER_DELETION_SESSION_INGEST_AUDIENCE = 'session-ingest:user-deletion';
 export const USER_DELETION_PYLON_API_BASE = 'https://api.usepylon.com';
 export const USER_DELETION_CUSTOMERIO_TRACK_BASE = 'https://track.customer.io';
 export const USER_DELETION_DEFAULT_POSTHOG_HOST = 'https://us.posthog.com';

@@ -4,11 +4,9 @@ import { cli_sessions_v2 } from '@kilocode/db/schema';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { generateInternalServiceToken } from '@/lib/tokens';
-import {
-  USER_DELETION_RESOURCE_BATCH_SIZE,
-  USER_DELETION_SESSION_INGEST_AUDIENCE,
-} from '@/lib/user/deletion-queue/deletion-constants';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import type {
   DeletionHandlerContext,
@@ -147,9 +145,9 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
 
   if (!SESSION_INGEST_WORKER_URL) return configurationMissing();
 
-  const token = generateInternalServiceToken(userId, {
+  const token = generateBoundedInternalServiceToken(userId, {
     expiresIn: 5 * 60,
-    audience: USER_DELETION_SESSION_INGEST_AUDIENCE,
+    audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
   });
   let progress = step.progress_json;
 

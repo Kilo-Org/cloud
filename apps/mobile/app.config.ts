@@ -262,6 +262,7 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    './plugins/withAndroidExpoModuleRepos',
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
     // dangerous mods run in reverse registration order, so the earlier entry

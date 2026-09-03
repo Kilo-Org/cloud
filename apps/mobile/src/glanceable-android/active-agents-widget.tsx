@@ -199,40 +199,12 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
   );
 }
 
-/**
- * The mark, with the stale warning under it when counts are showing too.
- *
- * Stale is the one status that carries both, and the warning belongs with the
- * mark rather than under the rows: a fourth line below three counts reads as a
- * fourth state.
- */
+// The mark alone, never a status line beside it: stale is the one status that
+// carries both, and the iOS card drops the warning while counts show too. A
+// line under the mark cost the rows their width and read as a fourth state.
 const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26 } satisfies Record<Size, number>;
 /** A short cell runs its counts in a row, so the gap separates states, not lines. */
 const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6 } satisfies Record<Size, number>;
-
-function markGroup(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
-  const mark = logo(MARK_SIZE_DP[shape.size]);
-  if (props.countLines.length === 0 || props.statusLine === null) {
-    return mark;
-  }
-  return (
-    <FlexWidget
-      style={{
-        flexDirection: 'column',
-        alignItems: startEdge(shape.rtl),
-        flexGap: 3,
-      }}
-    >
-      {mark}
-      <TextWidget
-        text={props.statusLine}
-        maxLines={1}
-        truncate="END"
-        style={{ color: palette.muted, fontSize: 11 }}
-      />
-    </FlexWidget>
-  );
-}
 
 function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   if (props.countLines.length === 0) {
@@ -290,7 +262,7 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
           padding: 14,
         }}
       >
-        {markGroup(props, palette, shape)}
+        {logo(MARK_SIZE_DP[size])}
         {body}
       </FlexWidget>
     );
@@ -312,8 +284,8 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
       }}
     >
       {/* No array here: a wrapper element per slot would add a layout node. */}
-      {rtl ? body : markGroup(props, palette, shape)}
-      {rtl ? markGroup(props, palette, shape) : body}
+      {rtl ? body : logo(MARK_SIZE_DP[size])}
+      {rtl ? logo(MARK_SIZE_DP[size]) : body}
     </FlexWidget>
   );
 }

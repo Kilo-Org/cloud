@@ -33,7 +33,11 @@ export type GlanceableCountFormat = (value: number) => string;
  * the widget host. Android has no elapsed timer, so there is no elapsed anchor.
  */
 export type AndroidWidgetProps = {
-  /** Translated locked copy; null while counts show (happy). Stale carries both. */
+  /**
+   * Translated locked copy, drawn only when no counts are. Stale carries both,
+   * and the widget then draws the counts; the ongoing notification is the one
+   * surface that says the counts are delayed.
+   */
   statusLine: string | null;
   /** Every count line in rank order (needs-input, running, idle), zeros included. */
   countLines: AndroidWidgetCount[];

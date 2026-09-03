@@ -194,17 +194,12 @@ describe('renderActiveAgentsWidget', () => {
     }
   );
 
-  // The stale warning sits with the mark, above the rows, so a fourth line
-  // under three counts cannot read as a fourth state.
+  // Stale draws its counts and no warning, the same as the iOS card: a fourth
+  // line under three counts read as a fourth state. Only the spoken label
+  // still says the counts are delayed.
   it.each([
-    {
-      width: 120,
-      visibleText: ['Updates delayed', '2', 'Needs input', '4', 'Working', '3', 'Idle'],
-    },
-    {
-      width: 250,
-      visibleText: ['Updates delayed', '2', 'Needs input', '4', 'Working', '3', 'Idle'],
-    },
+    { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle'] },
+    { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle'] },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',
     ({ width, visibleText }) => {

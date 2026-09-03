@@ -50,6 +50,11 @@ export function preloadLanguagePreference(): void {
   store.preload();
 }
 
+/** Await the stored preference. For callers with no React tree. */
+export async function whenLanguagePreferenceLoaded(): Promise<void> {
+  await store.whenLoaded();
+}
+
 export function useLanguagePreference() {
   const preference = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);

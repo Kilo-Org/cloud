@@ -82,20 +82,27 @@ function collectText(node: unknown): string[] {
   return output;
 }
 
-function render(props: ReturnType<typeof buildAndroidWidgetProps>, width: number, height = 200) {
-  return renderActiveAgentsWidget(props, {
-    widgetName: 'ActiveAgentsWidget',
-    widgetId: 1,
-    width,
-    height,
-    screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
-  }) as unknown as { light: MockElement; dark: MockElement };
+type Cell = { width: number; height?: number; rtl?: boolean };
+
+function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
+  const { width, height = 200, rtl = false } = cell;
+  return renderActiveAgentsWidget(
+    props,
+    {
+      widgetName: 'ActiveAgentsWidget',
+      widgetId: 1,
+      width,
+      height,
+      screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
+    },
+    rtl
+  ) as unknown as { light: MockElement; dark: MockElement };
 }
 
 describe('renderActiveAgentsWidget', () => {
   it('returns distinct light and dark layouts through the theme callback', () => {
     const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
-    const rep = render(props, 250);
+    const rep = render(props, { width: 250 });
 
     expect(rep.light).toBeDefined();
     expect(rep.dark).toBeDefined();
@@ -106,13 +113,33 @@ describe('renderActiveAgentsWidget', () => {
     expect(rep.dark.props.style?.backgroundColor).toBe(darkColors.background);
   });
 
+  // The library's flex engine has no reading direction of its own, so every
+  // row reverses its own children and every column flips its alignment.
+  it('mirrors every row for a right-to-left language', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      {},
+      translate
+    );
+
+    expect(collectText(render(props, { width: 250, rtl: true }).light)).toEqual([
+      'Needs input',
+      '1',
+      'Working',
+      '1',
+      'Idle',
+      '0',
+      'Open agents',
+    ]);
+  });
+
   it('shows only the primary count at a small width', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'question' }, { status: 'busy' }, { status: 'busy' }], 0),
       {},
       translate
     );
-    const rep = render(props, 120);
+    const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
 
     expect(text).toEqual(['1', 'Needs input']);
@@ -124,7 +151,7 @@ describe('renderActiveAgentsWidget', () => {
       {},
       translate
     );
-    const rep = render(props, 250);
+    const rep = render(props, { width: 250 });
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
@@ -145,7 +172,7 @@ describe('renderActiveAgentsWidget', () => {
         translate
       );
 
-      expect(collectText(render(props, width, 100).light)).toEqual(visibleText);
+      expect(collectText(render(props, { width, height: 100 }).light)).toEqual(visibleText);
     }
   );
 
@@ -177,7 +204,7 @@ describe('renderActiveAgentsWidget', () => {
         {},
         translate
       );
-      const rep = render(props, width);
+      const rep = render(props, { width });
 
       for (const surface of [rep.light, rep.dark]) {
         expect(surface.props.accessibilityLabel).toBe(
@@ -202,7 +229,7 @@ describe('renderActiveAgentsWidget', () => {
       {},
       translate
     );
-    const rep = render(props, 250);
+    const rep = render(props, { width: 250 });
     const text = collectText(rep.light);
 
     expect(text).toEqual(['Status expired']);
@@ -210,7 +237,7 @@ describe('renderActiveAgentsWidget', () => {
 
   it('labels the whole widget with the Open agents deep-link click action', () => {
     const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
-    const rep = render(props, 250);
+    const rep = render(props, { width: 250 });
 
     expect(rep.light.props.clickAction).toBe('OPEN_URI');
     expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });

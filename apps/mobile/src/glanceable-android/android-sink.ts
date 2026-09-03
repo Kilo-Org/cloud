@@ -14,7 +14,7 @@ import {
 } from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableCount } from './count-format';
+import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import {
   end as endLiveUpdate,
   setWidgetSnapshot,
@@ -45,7 +45,10 @@ function translate(key: string): string {
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
 let notificationActive = false;
 let revision = 0;
-let pending: { snapshot: GlanceableAgentsSnapshot; ctx: GlanceableSinkContext } | null = null;
+let pending: {
+  snapshot: GlanceableAgentsSnapshot;
+  ctx: GlanceableSinkContext;
+} | null = null;
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
 
@@ -59,7 +62,8 @@ export function getCurrentWidgetProps(): AndroidWidgetProps | null {
 function renderWidgetNow(props: AndroidWidgetProps): void {
   void requestWidgetUpdate({
     widgetName: WIDGET_NAME,
-    renderWidget: info => renderActiveAgentsWidget(getCurrentWidgetProps() ?? props, info),
+    renderWidget: info =>
+      renderActiveAgentsWidget(getCurrentWidgetProps() ?? props, info, isWidgetRtl()),
   });
 }
 

@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
 import { numberFormat } from '@/lib/intl-cache';
 
 /**
@@ -11,4 +12,15 @@ import { numberFormat } from '@/lib/intl-cache';
  */
 export function formatGlanceableCount(value: number): string {
   return numberFormat(i18n.language, { useGrouping: false }).format(value);
+}
+
+/**
+ * Whether the active language reads right to left.
+ *
+ * `syncRtl` flips the native direction for the app's own views, but a widget
+ * draws through the library's own flex engine, which has no direction. The
+ * layout mirrors itself from this instead.
+ */
+export function isWidgetRtl(): boolean {
+  return RTL_LANGUAGES.has(i18n.language as SupportedLanguage);
 }

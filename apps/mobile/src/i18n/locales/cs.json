@@ -628,6 +628,10 @@
   },
   "notifications": {
     "title": "Oznámení",
+    "liveActivities": "Živé aktivity",
+    "liveActivitySubtitle": "Zobrazovat aktivní agenty na uzamčené obrazovce",
+    "liveUpdates": "Živé aktualizace",
+    "liveUpdateSubtitle": "Zobrazovat aktivní agenty v oznámeních",
     "push": "Push",
     "enabled": "Oznámení povolena",
     "onDescription": "Push oznámení jsou pro toto zařízení zapnutá.",
@@ -3263,11 +3267,12 @@
     "stale": "Nyní nelze aktualizovat",
     "expired": "Platnost stavu vypršela",
     "signedOut": "Přihlaste se pro zobrazení agentů",
-    "privacy": "Agenti jsou skrytí",
+    "privacy": "Otevřete Kilo a zobrazte agenty",
     "openAgents": "Otevřít agenty",
-    "running": "BĚŽÍ",
+    "running": "Pracuji",
     "needsInput": "vyžaduje vstup",
-    "reconnecting": "Obnovování připojení",
-    "channelName": "Aktivní agenti"
+    "idle": "Nečinný",
+    "channelName": "Aktivní agenti",
+    "activityKitDisabledBody": "Zapněte Živé aktivity v Nastavení, abyste viděli aktivní agenty na zamknuté obrazovce."
   }
 }

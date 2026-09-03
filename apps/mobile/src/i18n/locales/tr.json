@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Bildirimler",
+    "liveActivities": "Canlı etkinlikler",
+    "liveActivitySubtitle": "Etkin ajanları Kilit Ekranı’nda göster",
+    "liveUpdates": "Canlı güncellemeler",
+    "liveUpdateSubtitle": "Etkin aracıları bildirimlerinizde göster",
     "push": "Anlık",
     "enabled": "Bildirimler etkin",
     "onDescription": "Anlık bildirimler bu cihaz için açık.",
@@ -3219,11 +3223,12 @@
     "stale": "Şu anda güncellenemiyor",
     "expired": "Durumun süresi doldu",
     "signedOut": "Ajanları görmek için oturum açın",
-    "privacy": "Ajanlar gizli",
+    "privacy": "Ajanları görmek için Kilo'yu açın",
     "openAgents": "Ajanları açın",
     "running": "Çalışıyor",
     "needsInput": "Girdi gerekli",
-    "reconnecting": "Yeniden bağlanılıyor",
-    "channelName": "Etkin ajanlar"
+    "idle": "Boşta",
+    "channelName": "Etkin ajanlar",
+    "activityKitDisabledBody": "Etkin ajanları Kilit Ekranı'nda görmek için Ayarlar'dan Canlı Etkinlikler'i açın."
   }
 }

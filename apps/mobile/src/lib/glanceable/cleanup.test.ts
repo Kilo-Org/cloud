@@ -72,9 +72,39 @@ describe('cleanup', () => {
       expect(calls.map(call => call.type)).toEqual(['publish', 'endImmediate']);
       const snapshot = lastSnapshot(calls);
       expect(snapshot.status).toBe('signed_out');
-      expect(snapshot.running + snapshot.needsInput + snapshot.reconnecting).toBe(0);
+      expect(snapshot.running + snapshot.needsInput + snapshot.idle).toBe(0);
     } finally {
       unregisterGlanceableSink(sink);
+    }
+  });
+
+  it('blanks every other sink when one sink throws', () => {
+    // A throwing WidgetKit or ActivityKit host function must not reach the
+    // caller: `writeSignedOutSnapshotAndEnd` runs inside the auth transition,
+    // so a propagated failure would abort the sign-in outright.
+    const throwing: GlanceableSink = {
+      publish() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+      startOrUpdate() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+      endImmediate() {
+        throw new Error('Exception in HostFunction: <unknown>');
+      },
+    };
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(throwing);
+    registerGlanceableSink(sink);
+    try {
+      expect(() => {
+        writeSignedOutSnapshotAndEnd();
+      }).not.toThrow();
+      expect(calls.map(call => call.type)).toEqual(['publish', 'endImmediate']);
+      expect(lastSnapshot(calls).status).toBe('signed_out');
+    } finally {
+      unregisterGlanceableSink(sink);
+      unregisterGlanceableSink(throwing);
     }
   });
 
@@ -85,7 +115,7 @@ describe('cleanup', () => {
       writePrivacySnapshotAndEnd();
       const snapshot = lastSnapshot(calls);
       expect(snapshot.status).toBe('privacy');
-      expect(snapshot.running + snapshot.needsInput + snapshot.reconnecting).toBe(0);
+      expect(snapshot.running + snapshot.needsInput + snapshot.idle).toBe(0);
     } finally {
       unregisterGlanceableSink(sink);
     }
@@ -211,8 +241,8 @@ describe('cleanup', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
-      reconnecting: 1,
-      eligibleStartedAt: '2026-08-26T23:00:00.000Z',
+      idle: 1,
+      needsInputSince: '2026-08-26T23:00:00.000Z',
     };
     _setLastGlanceableSnapshotForTests(seeded);
 
@@ -239,8 +269,8 @@ describe('cleanup', () => {
           status: 'expired',
           running: 0,
           needsInput: 0,
-          reconnecting: 0,
-          eligibleStartedAt: null,
+          idle: 0,
+          needsInputSince: null,
         });
       }
     } finally {
@@ -262,8 +292,8 @@ describe('cleanup', () => {
         status,
         running: 0,
         needsInput: 0,
-        reconnecting: 0,
-        eligibleStartedAt: null,
+        idle: 0,
+        needsInputSince: null,
       };
       _setLastGlanceableSnapshotForTests(terminal);
 
@@ -280,8 +310,8 @@ describe('cleanup', () => {
             expiresAt: terminal.expiresAt,
             running: 0,
             needsInput: 0,
-            reconnecting: 0,
-            eligibleStartedAt: null,
+            idle: 0,
+            needsInputSince: null,
           });
         }
       } finally {

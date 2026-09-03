@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Benachrichtigungen",
+    "liveActivities": "Live-Aktivitäten",
+    "liveActivitySubtitle": "Aktive Agenten auf dem Sperrbildschirm anzeigen",
+    "liveUpdates": "Live-Updates",
+    "liveUpdateSubtitle": "Aktive Agents in deinen Benachrichtigungen anzeigen",
     "push": "Push",
     "enabled": "Benachrichtigungen aktiviert",
     "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
@@ -3219,11 +3223,12 @@
     "stale": "Aktualisierung derzeit nicht möglich",
     "expired": "Status abgelaufen",
     "signedOut": "Melde dich an, um Agenten zu sehen",
-    "privacy": "Agenten ausgeblendet",
+    "privacy": "Öffne Kilo, um Agenten zu sehen",
     "openAgents": "Agenten öffnen",
-    "running": "LÄUFT",
+    "running": "Wird bearbeitet",
     "needsInput": "Eingabe erforderlich",
-    "reconnecting": "Verbindung wird wiederhergestellt",
-    "channelName": "Aktive Agenten"
+    "idle": "Inaktiv",
+    "channelName": "Aktive Agenten",
+    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   }
 }

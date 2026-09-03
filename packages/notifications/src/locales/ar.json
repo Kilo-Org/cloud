@@ -7,7 +7,8 @@
       "instanceLifecycle": "المثيل لديك به تحديث",
       "scheduledAction": "إجراء مجدول به تحديث",
       "lowBalance": "رصيدك يحتاج إلى انتباه",
-      "securityFinding": "نتيجة أمان تحتاج إلى انتباه"
+      "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
+      "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
   },
   "cloudAgentSession": {

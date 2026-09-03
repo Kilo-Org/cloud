@@ -7,7 +7,8 @@
       "instanceLifecycle": "May update ang iyong instance",
       "scheduledAction": "May update ang isang naka-schedule na aksyon",
       "lowBalance": "Kailangan ng atensyon ang iyong balance",
-      "securityFinding": "Kailangan ng atensyon ang isang security finding"
+      "securityFinding": "Kailangan ng atensyon ang isang security finding",
+      "activeAgentsGlanceable": "May update ang mga aktibong agent"
     }
   },
   "cloudAgentSession": {

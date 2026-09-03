@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Jakinarazpenak",
+    "liveActivities": "Zuzeneko jarduerak",
+    "liveActivitySubtitle": "Erakutsi agente aktiboak blokeo-pantailan",
+    "liveUpdates": "Zuzeneko eguneratzeak",
+    "liveUpdateSubtitle": "Erakutsi agente aktiboak zure jakinarazpenetan",
     "push": "Bultzadazkoak",
     "enabled": "Jakinarazpenak gaituta",
     "onDescription": "Bultzadazko jakinarazpenak piztuta daude gailu honetan.",
@@ -3219,11 +3223,12 @@
     "stale": "Ezin da orain eguneratu",
     "expired": "Egoera iraungi da",
     "signedOut": "Hasi saioa agenteak ikusteko",
-    "privacy": "Agenteak ezkutatuta",
+    "privacy": "Ireki Kilo agenteak ikusteko",
     "openAgents": "Ireki agenteak",
-    "running": "Exekutatzen",
+    "running": "Lanean",
     "needsInput": "sarreraren zain",
-    "reconnecting": "Berriro konektatzen",
-    "channelName": "Agente aktiboak"
+    "idle": "Geldirik",
+    "channelName": "Agente aktiboak",
+    "activityKitDisabledBody": "Aktibatu Zuzeneko jarduerak Ezarpenetan, Agente aktiboak Blokeo-pantailan ikusteko."
   }
 }

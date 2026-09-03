@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Notifikasyon",
+    "liveActivities": "Aktivite an dirèk",
+    "liveActivitySubtitle": "Montre ajans aktif yo sou ekran vewouye a",
+    "liveUpdates": "Mizajou an dirèk",
+    "liveUpdateSubtitle": "Montre ajan aktif yo nan notifikasyon ou yo",
     "push": "Pouse",
     "enabled": "Notifikasyon aktive",
     "onDescription": "Notifikasyon pouse louvri pou aparèy sa a.",
@@ -3219,11 +3223,12 @@
     "stale": "Pa ka mete ajou kounye a",
     "expired": "Estati a ekspire",
     "signedOut": "Konekte pou wè ajans yo",
-    "privacy": "Ajans yo kache",
+    "privacy": "Ouvri Kilo pou wè ajans",
     "openAgents": "Louvri ajans yo",
-    "running": "AP KOURI",
+    "running": "Ap travay",
     "needsInput": "bezwen input",
-    "reconnecting": "Ap rekonekte",
-    "channelName": "Ajans aktif yo"
+    "idle": "Anchaj",
+    "channelName": "Ajans aktif yo",
+    "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."
   }
 }

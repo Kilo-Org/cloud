@@ -14,6 +14,8 @@ import { eq, inArray } from 'drizzle-orm';
 import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
+import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
+import { refreshGlanceableSnapshot } from '../lib/glanceable-refresh';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -59,6 +61,13 @@ export class NotificationChannelDO extends DurableObject<Env> {
   // sequential post-failure retry (claim already released) still reuses the
   // `pending` slot as before.
   private readonly inFlight = new Set<string>();
+
+  async refreshGlanceableSnapshot(params: {
+    userId: string;
+    organizationId: string | null;
+  }): Promise<void> {
+    await refreshGlanceableSnapshot(params, this.ctx.storage, glanceableDeliveryDeps(this.env));
+  }
 
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     if (this.inFlight.has(input.idempotencyKey)) {

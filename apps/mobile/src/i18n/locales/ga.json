@@ -635,6 +635,10 @@
   },
   "notifications": {
     "title": "Fógraí",
+    "liveActivities": "Gníomhaíochtaí beo",
+    "liveActivitySubtitle": "Taispeáin gníomhairí gníomhacha ar an scáileán glasáilte",
+    "liveUpdates": "Nuashonruithe beo",
+    "liveUpdateSubtitle": "Taispeáin gníomhairí gníomhacha i d'fhógraí",
     "push": "Brú",
     "enabled": "Fógraí cumasaithe",
     "onDescription": "Tá brú-fhógraí ar siúl don ghléas seo.",
@@ -3285,11 +3289,12 @@
     "stale": "Ní féidir nuashonrú anois",
     "expired": "Stádas imithe in éag",
     "signedOut": "Sínigh isteach chun gníomhairí a fheiceáil",
-    "privacy": "Gníomhairí i bhfolach",
+    "privacy": "Oscail Kilo chun gníomhairí a fheiceáil",
     "openAgents": "Oscail gníomhairí",
-    "running": "AG RITH",
+    "running": "Ag obair",
     "needsInput": "teastaíonn ionchur",
-    "reconnecting": "Ag athcheangal",
-    "channelName": "Gníomhairí gníomhacha"
+    "idle": "Díomhaoin",
+    "channelName": "Gníomhairí gníomhacha",
+    "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
   }
 }

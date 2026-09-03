@@ -163,6 +163,10 @@
       "securityFindingsSubtitle": "nuovi risultati e promemoria SLA"
     },
     "title": "Notifiche",
+    "liveActivities": "Attività in tempo reale",
+    "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
+    "liveUpdates": "Aggiornamenti live",
+    "liveUpdateSubtitle": "Mostra gli agenti attivi nelle notifiche",
     "push": "Push",
     "enabled": "Notifiche attivate",
     "onDescription": "Le notifiche push sono attive per questo dispositivo.",
@@ -3241,11 +3245,12 @@
     "stale": "Impossibile aggiornare ora",
     "expired": "Stato scaduto",
     "signedOut": "Accedi per vedere gli agenti",
-    "privacy": "Agenti nascosti",
+    "privacy": "Apri Kilo per vedere gli agenti",
     "openAgents": "Apri agenti",
-    "running": "IN ESECUZIONE",
+    "running": "In corso",
     "needsInput": "richiede input",
-    "reconnecting": "Riconnessione in corso",
-    "channelName": "Agenti attivi"
+    "idle": "Inattivo",
+    "channelName": "Agenti attivi",
+    "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."
   }
 }

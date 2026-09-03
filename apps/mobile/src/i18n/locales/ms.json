@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Pemberitahuan",
+    "liveActivities": "Aktiviti langsung",
+    "liveActivitySubtitle": "Tunjukkan ejen aktif pada Skrin Kunci",
+    "liveUpdates": "Kemas kini langsung",
+    "liveUpdateSubtitle": "Tunjukkan ejen aktif dalam pemberitahuan anda",
     "push": "Push",
     "enabled": "Pemberitahuan didayakan",
     "onDescription": "Pemberitahuan push dihidupkan untuk peranti ini.",
@@ -3219,11 +3223,12 @@
     "stale": "Tidak dapat mengemas kini sekarang",
     "expired": "Status tamat tempoh",
     "signedOut": "Log masuk untuk melihat ejen",
-    "privacy": "Ejen disembunyikan",
+    "privacy": "Buka Kilo untuk melihat ejen",
     "openAgents": "Buka ejen",
-    "running": "Sedang berjalan",
+    "running": "Memproses…",
     "needsInput": "perlu input",
-    "reconnecting": "Menyambung semula",
-    "channelName": "Ejen aktif"
+    "idle": "Melahu",
+    "channelName": "Ejen aktif",
+    "activityKitDisabledBody": "Hidupkan Aktiviti Langsung dalam Tetapan untuk melihat Ejen Aktif pada Skrin Kunci."
   }
 }

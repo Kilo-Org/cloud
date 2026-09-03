@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Meddelelser",
+    "liveActivities": "Live-aktiviteter",
+    "liveActivitySubtitle": "Vis aktive agenter på låseskærmen",
+    "liveUpdates": "Liveopdateringer",
+    "liveUpdateSubtitle": "Vis aktive agenter i dine notifikationer",
     "push": "Push",
     "enabled": "Meddelelser aktiveret",
     "onDescription": "Push-meddelelser er til for denne enhed.",
@@ -3219,11 +3223,12 @@
     "stale": "Kan ikke opdatere nu",
     "expired": "Status er udløbet",
     "signedOut": "Log ind for at se agenter",
-    "privacy": "Agenter er skjult",
+    "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
-    "running": "KØRER",
+    "running": "Arbejder",
     "needsInput": "kræver input",
-    "reconnecting": "Genopretter forbindelsen",
-    "channelName": "Aktive agenter"
+    "idle": "Inaktiv",
+    "channelName": "Aktive agenter",
+    "activityKitDisabledBody": "Slå Liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   }
 }

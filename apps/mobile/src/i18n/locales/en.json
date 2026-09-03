@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Notifications",
+    "liveActivities": "Live Activities",
+    "liveActivitySubtitle": "Show active agents on the Lock Screen",
+    "liveUpdates": "Live Updates",
+    "liveUpdateSubtitle": "Show active agents in your notifications",
     "push": "Push",
     "enabled": "Notifications enabled",
     "onDescription": "Push notifications are on for this device.",
@@ -3219,11 +3223,12 @@
     "stale": "Can't update now",
     "expired": "Status expired",
     "signedOut": "Sign in to see agents",
-    "privacy": "Agents hidden",
+    "privacy": "Open Kilo to see agents",
     "openAgents": "Open agents",
-    "running": "Running",
+    "running": "Working",
     "needsInput": "Needs input",
-    "reconnecting": "Reconnecting",
-    "channelName": "Active agents"
+    "idle": "Idle",
+    "channelName": "Active agents",
+    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   }
 }

@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "ማሳወቂያዎች",
+    "liveActivities": "የቀጥታ እንቅስቃሴዎች",
+    "liveActivitySubtitle": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ አሳይ",
+    "liveUpdates": "የቀጥታ ዝማኔዎች",
+    "liveUpdateSubtitle": "ንቁ ወኪሎችን በማሳወቂያዎችዎ ውስጥ አሳይ",
     "push": "ግፋ",
     "enabled": "ማሳወቂያዎች ነቅተዋል",
     "onDescription": "የግፋ ማሳወቂያዎች ለዚህ መሣሪያ በርተዋል።",
@@ -3219,11 +3223,12 @@
     "stale": "አሁን ማዘመን አይቻልም",
     "expired": "የሁኔታው ጊዜ አልፏል",
     "signedOut": "ወኪሎችን ለማየት ይግቡ",
-    "privacy": "ወኪሎች ተደብቀዋል",
+    "privacy": "ወኪሎችን ለማየት Kilo ይክፈቱ",
     "openAgents": "ወኪሎችን ይክፈቱ",
-    "running": "በስራ ላይ",
+    "running": "በመስራት ላይ",
     "needsInput": "ግብዓት ይፈልጋል",
-    "reconnecting": "እንደገና በመገናኘት ላይ",
-    "channelName": "ንቁ ወኪሎች"
+    "idle": "በእረፍት",
+    "channelName": "ንቁ ወኪሎች",
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"
   }
 }

@@ -7,7 +7,8 @@
       "instanceLifecycle": "ඔබගේ අවස්ථාවට යාවත්කාලීනයක් ඇත",
       "scheduledAction": "සැලසුම්ගත ක්‍රියාවකට යාවත්කාලීනයක් ඇත",
       "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
-      "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි"
+      "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",
+      "activeAgentsGlanceable": "සක්‍රිය නියෝජිතයන්ට යාවත්කාලීනයක් ඇත"
     }
   },
   "cloudAgentSession": {

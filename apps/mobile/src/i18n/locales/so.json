@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Ogaysiisyada",
+    "liveActivities": "Hawlaha tooska ah",
+    "liveActivitySubtitle": "Ku muuji wakiillada firfircoon Shaashadda Qufulka",
+    "liveUpdates": "Cusboonaysiin toos ah",
+    "liveUpdateSubtitle": "Muuji wakiillada firfircoon ogeysiisyadaada",
     "push": "Push",
     "enabled": "Ogaysiisyadu waa daaran",
     "onDescription": "Ogaysiisyada push waxay u daaran aaladdan.",
@@ -3219,11 +3223,12 @@
     "stale": "Hadda lama cusboonaysiin karo",
     "expired": "Xaaladdu way dhacday",
     "signedOut": "Soo gal si aad u aragto wakiillada",
-    "privacy": "Wakiillada waa la qariyay",
+    "privacy": "Fur Kilo si aad wakiillada u aragto",
     "openAgents": "Fur wakiillada",
-    "running": "Socodaya",
+    "running": "Waa shaqaynayaa",
     "needsInput": "u baahan wax-soo-gal",
-    "reconnecting": "Dib u xiriirinaya",
-    "channelName": "Wakiillada firfircoon"
+    "idle": "Firfircooni la'aan",
+    "channelName": "Wakiillada firfircoon",
+    "activityKitDisabledBody": "Ku daar Hawlaha Tooska ah Dejinta si aad Wakiillada firfircoon ugu aragto Shaashadda Qufulka."
   }
 }

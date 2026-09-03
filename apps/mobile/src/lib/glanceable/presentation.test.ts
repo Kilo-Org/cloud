@@ -51,7 +51,7 @@ describe('presentation precedence', () => {
 });
 
 describe('primary rank and locked copy keys', () => {
-  it('ranks needs-input, then reconnecting, then running', () => {
+  it('ranks needs-input, then running, then idle', () => {
     const mixed = snapshot({
       sessions: [
         { status: 'busy' },
@@ -61,13 +61,33 @@ describe('primary rank and locked copy keys', () => {
         { status: 'question' },
       ],
     });
-    expect(primaryGlanceableCount(mixed)).toEqual({ key: 'glanceable.needsInput', count: 1 });
+    // `retry` folds into needs-input, so the question plus the retry make 2.
+    expect(primaryGlanceableCount(mixed)).toEqual({
+      key: 'glanceable.needsInput',
+      kind: 'needsInput',
+      count: 2,
+    });
 
-    const noInput = snapshot({ sessions: [{ status: 'busy' }, { status: 'retry' }] });
-    expect(primaryGlanceableCount(noInput)).toEqual({ key: 'glanceable.reconnecting', count: 1 });
+    const noInput = snapshot({ sessions: [{ status: 'busy' }, { status: 'idle' }] });
+    expect(primaryGlanceableCount(noInput)).toEqual({
+      key: 'glanceable.running',
+      kind: 'running',
+      count: 1,
+    });
+
+    const onlyIdle = snapshot({ sessions: [{ status: 'idle' }] });
+    expect(primaryGlanceableCount(onlyIdle)).toEqual({
+      key: 'glanceable.idle',
+      kind: 'idle',
+      count: 1,
+    });
 
     const onlyRunning = snapshot({ sessions: [{ status: 'busy' }, { status: 'busy' }] });
-    expect(primaryGlanceableCount(onlyRunning)).toEqual({ key: 'glanceable.running', count: 2 });
+    expect(primaryGlanceableCount(onlyRunning)).toEqual({
+      key: 'glanceable.running',
+      kind: 'running',
+      count: 2,
+    });
 
     expect(primaryGlanceableCount(snapshot({}))).toBeNull();
   });
@@ -107,37 +127,69 @@ describe('spoken label shape', () => {
     ]);
   });
 });
+describe('numeric spoken label', () => {
+  it('speaks numeric counts then Open agents for happy', () => {
+    const happy = snapshot({
+      sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
+    });
+    expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
+      '1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word, numeric counts, then Open agents for stale', () => {
+    const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
+    expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
+      'glanceable.stale, 1 glanceable.running, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word then Open agents when no counts exist', () => {
+    expect(glanceableSpokenLabel(snapshot({ status: 'empty' }), {}, key => key)).toBe(
+      'glanceable.empty, glanceable.openAgents'
+    );
+  });
+
+  it('never speaks a title, organization name, or raw id', () => {
+    const spoken = glanceableSpokenLabel(
+      snapshot({ sessions: [{ status: 'busy' }] }),
+      {},
+      key => key
+    );
+    expect(spoken).not.toContain('u1');
+  });
+});
 
 describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
     'glanceable.needsInput': 'Needs input',
-    'glanceable.reconnecting': 'Reconnecting',
-    'glanceable.running': 'Running',
+    'glanceable.idle': 'Idle',
+    'glanceable.running': 'Working',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',
     'glanceable.stale': 'Updates delayed',
     'glanceable.expired': 'Status expired',
     'glanceable.signedOut': 'Sign in to see agents',
-    'glanceable.privacy': 'Agents hidden',
+    'glanceable.privacy': 'Open Kilo to see agents',
     'glanceable.openAgents': 'Open agents',
   };
   const translate = (key: string): string => copy[key] ?? key;
   const mixed = {
     ...snapshot({ status: 'happy' }),
     needsInput: 2,
-    reconnecting: 3,
+    idle: 3,
     running: 4,
   };
 
   it('speaks each numeric count in rank order before Open agents', () => {
     expect(glanceableSpokenLabel(mixed, {}, translate)).toBe(
-      '2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+      '2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it('speaks the translated stale warning before retained numeric counts', () => {
     expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate)).toBe(
-      'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+      'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
@@ -152,7 +204,7 @@ describe('numeric spoken label', () => {
     ['empty', 'No work in progress, Open agents'],
     ['expired', 'Status expired, Open agents'],
     ['signed_out', 'Sign in to see agents, Open agents'],
-    ['privacy', 'Agents hidden, Open agents'],
+    ['privacy', 'Open Kilo to see agents, Open agents'],
   ] as const)('hides numeric counts when the status is %s', (status, expected) => {
     expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate)).toBe(expected);
   });
@@ -163,7 +215,7 @@ describe('numeric spoken label', () => {
       'Sign in to see agents, Open agents'
     );
     expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate)).toBe(
-      'Agents hidden, Open agents'
+      'Open Kilo to see agents, Open agents'
     );
   });
 });

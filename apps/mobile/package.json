@@ -1,6 +1,6 @@
 {
   "name": "kilo-app",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start --dev-client",
@@ -94,6 +94,7 @@
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "57.0.1",
     "expo-store-review": "~57.0.2",
+    "expo-task-manager": "57.0.12",
     "expo-tracking-transparency": "~57.0.1",
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "57.0.11",
@@ -123,6 +124,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@expo/plist": "0.8.1",
     "@sentry/cli": "catalog:",
     "@types/react": "19.2.14",
     "@types/react-test-renderer": "^19.1.0",

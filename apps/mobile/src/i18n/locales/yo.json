@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Awọn ifitonileti",
+    "liveActivities": "Awọn iṣẹ laaye",
+    "liveActivitySubtitle": "Fi awọn aṣoju to n ṣiṣẹ han lori Iboju Titiipa",
+    "liveUpdates": "Awọn imudojuiwọn taara",
+    "liveUpdateSubtitle": "Fi awọn aṣoju to n ṣiṣẹ han ninu awọn iwifunni rẹ",
     "push": "Titari",
     "enabled": "Awọn ifitonileti mu ṣiṣẹ",
     "onDescription": "Awọn ifitonileti titari wa ni lori ẹ̀rọ yii.",
@@ -3219,11 +3223,12 @@
     "stale": "Ko le ṣe imudojuiwọn bayi",
     "expired": "Ipo ti pari akoko",
     "signedOut": "Wọle lati ri awọn aṣoju",
-    "privacy": "Awọn aṣoju wa ni ipamọ",
+    "privacy": "Ṣi Kilo lati ri awọn aṣoju",
     "openAgents": "Ṣii awọn aṣoju",
-    "running": "ǸJẸ́ ṢÍṢIṢẸ́",
+    "running": "Nṣiṣẹ́",
     "needsInput": "nilo igbewọle",
-    "reconnecting": "Ti n tun sopọ",
-    "channelName": "Awọn aṣoju to n ṣiṣẹ"
+    "idle": "Ìsinmi",
+    "channelName": "Awọn aṣoju to n ṣiṣẹ",
+    "activityKitDisabledBody": "Tan Awọn Iṣẹ Lọwọlọwọ ninu Eto lati ri Awọn aṣoju to n ṣiṣẹ lori Iboju Titiipa."
   }
 }

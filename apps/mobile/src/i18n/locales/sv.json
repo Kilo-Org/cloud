@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Aviseringar",
+    "liveActivities": "Liveaktiviteter",
+    "liveActivitySubtitle": "Visa aktiva agenter på låsskärmen",
+    "liveUpdates": "Liveuppdateringar",
+    "liveUpdateSubtitle": "Visa aktiva agenter i dina aviseringar",
     "push": "Push",
     "enabled": "Aviseringar aktiverade",
     "onDescription": "Pushaviseringar är på för den här enheten.",
@@ -3219,11 +3223,12 @@
     "stale": "Kan inte uppdatera nu",
     "expired": "Statusen har gått ut",
     "signedOut": "Logga in för att se agenter",
-    "privacy": "Agenter dolda",
+    "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
-    "running": "KÖRS",
+    "running": "Arbetar",
     "needsInput": "kräver indata",
-    "reconnecting": "Återansluter",
-    "channelName": "Aktiva agenter"
+    "idle": "Inaktiv",
+    "channelName": "Aktiva agenter",
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."
   }
 }

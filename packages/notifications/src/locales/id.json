@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instance Anda memiliki pembaruan",
       "scheduledAction": "Tindakan terjadwal memiliki pembaruan",
       "lowBalance": "Saldo Anda perlu diperhatikan",
-      "securityFinding": "Temuan keamanan perlu diperhatikan"
+      "securityFinding": "Temuan keamanan perlu diperhatikan",
+      "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
     }
   },
   "cloudAgentSession": {

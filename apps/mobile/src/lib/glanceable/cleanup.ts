@@ -6,7 +6,7 @@ import {
 
 import { getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
-import { getGlanceableSinks } from './sink-registry';
+import { forEachSink, getGlanceableDelivery } from './sink-registry';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
 // publisher captures it at construction and refuses to emit once it advances,
@@ -85,8 +85,8 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     status,
     running: 0,
     needsInput: 0,
-    reconnecting: 0,
-    eligibleStartedAt: null,
+    idle: 0,
+    needsInputSince: null,
   };
 }
 
@@ -94,16 +94,16 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  getGlanceableDelivery().cleanupTokens('scope');
   const snapshot = buildTerminalSnapshot(status);
-  const sinks = getGlanceableSinks();
   // Write the snapshot first, then end: the surface shows the terminal copy
   // before the native activity ends.
-  for (const sink of sinks) {
+  forEachSink('terminal_publish', sink => {
     sink.publish(snapshot);
-  }
-  for (const sink of sinks) {
+  });
+  forEachSink('terminal_end', sink => {
     sink.endImmediate();
-  }
+  });
 }
 
 /** Blank on logout or direct account switch. */
@@ -142,7 +142,7 @@ export function republishLastSnapshotStale(): void {
     return;
   }
   const snapshot = withStatus(previous, 'stale', Date.now());
-  for (const sink of getGlanceableSinks()) {
+  forEachSink('stale_publish', sink => {
     sink.publish(snapshot);
-  }
+  });
 }

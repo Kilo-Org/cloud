@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "התראות",
+    "liveActivities": "פעילויות בזמן אמת",
+    "liveActivitySubtitle": "הצג סוכנים פעילים במסך הנעילה",
+    "liveUpdates": "עדכונים חיים",
+    "liveUpdateSubtitle": "הצג סוכנים פעילים בהתראות שלך",
     "push": "דחיפה",
     "enabled": "התראות מופעלות",
     "onDescription": "התראות דחיפה מופעלות עבור מכשיר זה.",
@@ -3241,11 +3245,12 @@
     "stale": "לא ניתן לעדכן כעת",
     "expired": "תוקף המצב פג",
     "signedOut": "היכנס כדי לראות סוכנים",
-    "privacy": "הסוכנים מוסתרים",
+    "privacy": "פתח את Kilo כדי לראות סוכנים",
     "openAgents": "פתח סוכנים",
-    "running": "רץ",
+    "running": "עובד",
     "needsInput": "נדרש קלט",
-    "reconnecting": "מתחבר מחדש",
-    "channelName": "סוכנים פעילים"
+    "idle": "בטל",
+    "channelName": "סוכנים פעילים",
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   }
 }

@@ -2,15 +2,21 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { isValidElement, type ReactNode } from 'react';
-import { type WidgetRepresentation, type WidgetTaskHandler } from 'react-native-android-widget';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  collectText,
+  NOW,
+  runWidgetTask,
+  secureStore,
+  snapshotFor,
+  store,
+} from './register.test-helpers';
 
 const mocks = vi.hoisted(() => {
   let snapshot: string | null = null;
   let deadline = 0;
   return {
-    registerWidgetTaskHandler: vi.fn<(handler: WidgetTaskHandler) => void>(),
     native: {
       setWidgetSnapshot: (next: string, expiresAt: number) => {
         snapshot = next;
@@ -24,49 +30,27 @@ const mocks = vi.hoisted(() => {
       snapshot = null;
       deadline = 0;
     },
+    language: { value: 'en' },
   };
 });
 
 vi.mock('expo', () => ({ requireOptionalNativeModule: () => mocks.native }));
+// The widget task resolves the language itself; the real store needs natives.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => mocks.language.value,
+  whenLanguagePreferenceLoaded: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn() },
   Alert: { alert: vi.fn() },
   Linking: { openSettings: vi.fn() },
 }));
 vi.mock('react-native-android-widget', () => ({
-  registerWidgetTaskHandler: mocks.registerWidgetTaskHandler,
   requestWidgetUpdate: vi.fn().mockResolvedValue(undefined),
   FlexWidget: () => null,
   TextWidget: () => null,
+  ImageWidget: () => null,
 }));
-
-const NOW = 1_750_000_000_000;
-const store = new Map<string, string>();
-const secureStore = {
-  setItemAsync: vi.fn(async (key: string, value: string) => {
-    store.set(key, value);
-    await Promise.resolve();
-  }),
-  getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
-};
-
-function snapshotFor(
-  sessions: { status: string }[] = [
-    { status: 'question' },
-    { status: 'retry' },
-    { status: 'busy' },
-    { status: 'busy' },
-  ],
-  status: GlanceableAgentsSnapshot['status'] = 'happy'
-): GlanceableAgentsSnapshot {
-  return buildGlanceableSnapshot({
-    sessions,
-    status,
-    userId: 'u1',
-    organizationId: null,
-    now: NOW,
-  });
-}
 
 async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
   const persist = await import('@/lib/glanceable/persist');
@@ -79,45 +63,8 @@ async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
   vi.resetModules();
   const freshPersist = await import('@/lib/glanceable/persist');
   freshPersist._setSecureStoreForTests(secureStore);
-  await import('./register');
-  const handler = mocks.registerWidgetTaskHandler.mock.lastCall?.[0];
-  if (handler === undefined) {
-    throw new Error('The widget task handler was not registered');
-  }
-  return handler;
-}
-
-async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
-  const renders: WidgetRepresentation[] = [];
-  await handler({
-    widgetAction: 'WIDGET_UPDATE',
-    widgetInfo: {
-      widgetName: 'ActiveAgentsWidget',
-      widgetId: 1,
-      width,
-      height: 100,
-      screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
-    },
-    renderWidget: widget => {
-      renders.push(widget);
-    },
-  });
-  const [rendered] = renders;
-  if (rendered === undefined || !('light' in rendered)) {
-    throw new Error('The widget task did not render its themed layouts');
-  }
-  return rendered;
-}
-
-function collectText(node: ReactNode): string[] {
-  if (Array.isArray(node)) {
-    return node.flatMap((child: ReactNode) => collectText(child));
-  }
-  if (!isValidElement<{ text?: string; children?: ReactNode }>(node)) {
-    return [];
-  }
-  const text = node.props.text === undefined ? [] : [node.props.text];
-  return [...text, ...collectText(node.props.children)];
+  const { handleWidgetTask } = await import('./register');
+  return handleWidgetTask;
 }
 
 beforeEach(() => {
@@ -138,14 +85,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// A widget redraw runs headless: nothing else applies the language.
+it('applies the resolved language before it renders', async () => {
+  mocks.language.value = 'ar';
+  const handler = await registerAfterRestart(snapshotFor());
+  const { i18n } = await import('@/i18n');
+
+  await runWidgetTask(handler, 250);
+  mocks.language.value = 'en';
+
+  expect(i18n.language).toBe('ar');
+});
+
 describe.each([120, 250])('registered widget handler at %d dp', width => {
   it('restores unexpired persisted counts after a fresh process starts', async () => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
-    const expected =
-      width === 120
-        ? ['1 Needs input']
-        : ['1 Needs input', '1 Reconnecting', '2 Running', 'Open agents'];
+    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -191,7 +147,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('preserves the %s blank even after expiry', async (status, copy) => {
     const stored = snapshotFor([], status);
@@ -208,10 +164,13 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const stored = snapshotFor();
     const handler = await registerAfterRestart(stored);
     const { androidSink } = await import('./android-sink');
-    androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
+    androidSink.publish({
+      ...snapshotFor([{ status: 'busy' }]),
+      revision: stored.revision + 1,
+    });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -233,13 +192,13 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('reads a native %s blank instead of stale legacy storage', async (status, copy) => {
     const old = snapshotFor();
@@ -263,8 +222,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       const handler = await registerAfterRestart(null);
 
       const current = await runWidgetTask(handler, width);
-      expect(collectText(current.light)).toContain('1 Needs input');
-      expect(collectText(current.dark)).toContain('1 Needs input');
+      expect(collectText(current.light)).toEqual(expect.arrayContaining(['2', 'Needs input']));
+      expect(collectText(current.dark)).toEqual(expect.arrayContaining(['2', 'Needs input']));
       expect(mocks.getDeadline()).toBe(expiresAt);
 
       vi.setSystemTime(expiresAt);
@@ -308,10 +267,13 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     secureStore.getItemAsync.mockReturnValueOnce(read.promise);
 
     const rendering = runWidgetTask(handler, width);
-    androidSink.publish({ ...snapshotFor([{ status: 'busy' }]), revision: stored.revision + 1 });
+    androidSink.publish({
+      ...snapshotFor([{ status: 'busy' }]),
+      revision: stored.revision + 1,
+    });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected = width === 120 ? ['1 Running'] : ['1 Running', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);

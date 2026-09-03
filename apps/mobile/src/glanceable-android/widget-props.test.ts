@@ -15,14 +15,14 @@ const NOW = 1_750_000_000_000;
 
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
-  'glanceable.reconnecting': 'Reconnecting',
-  'glanceable.running': 'Running',
+  'glanceable.idle': 'Idle',
+  'glanceable.running': 'Working',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
   'glanceable.expired': 'Status expired',
   'glanceable.signedOut': 'Sign in to see agents',
-  'glanceable.privacy': 'Agents hidden',
+  'glanceable.privacy': 'Open Kilo to see agents',
   'glanceable.openAgents': 'Open agents',
 };
 const translate = (key: string): string => COPY[key] ?? key;
@@ -45,7 +45,7 @@ function snapshotFor(
 const MIXED = {
   ...snapshotFor([], 0, 'happy'),
   needsInput: 2,
-  reconnecting: 3,
+  idle: 3,
   running: 4,
 };
 
@@ -53,17 +53,16 @@ describe('buildAndroidWidgetProps', () => {
   it('ranks the compact primary count and keeps all expanded numeric counts', () => {
     const props = buildAndroidWidgetProps(MIXED, {}, translate);
     expect(props.primaryLabel).toBe('Needs input');
-    expect(props.primaryCount).toBe(2);
     expect(props.countLines).toEqual([
-      { label: 'Needs input', count: 2 },
-      { label: 'Reconnecting', count: 3 },
-      { label: 'Running', count: 4 },
+      { label: 'Needs input', kind: 'needsInput', count: '2' },
+      { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Idle', kind: 'idle', count: '3' },
     ]);
   });
 
   it.each([
-    ['happy', '2 Needs input, 3 Reconnecting, 4 Running, Open agents'],
-    ['stale', 'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'],
+    ['happy', '2 Needs input, 4 Working, 3 Idle, Open agents'],
+    ['stale', 'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'],
   ] as const)(
     'includes numeric counts and the action in the %s spoken label',
     (status, expected) => {
@@ -82,26 +81,26 @@ describe('buildAndroidWidgetProps', () => {
     ][] = [
       ['waiting', [], 'Waiting for agents', 0, false],
       ['empty', [], 'No work in progress', 0, false],
-      ['stale', [{ status: 'busy' }], 'Updates delayed', 1, true],
+      // Counts show for stale, and all three rows draw whenever they show, so
+      // the widget's rows never reflow as work moves between states.
+      ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
-      ['privacy', [], 'Agents hidden', 0, false],
+      ['privacy', [], 'Open Kilo to see agents', 0, false],
     ];
-    for (const [status, sessions, statusLine, counts, showOpenAgents] of cases) {
+    for (const [status, sessions, statusLine, counts] of cases) {
       const props = buildAndroidWidgetProps(snapshotFor(sessions, 0, status), {}, translate);
       expect(props.statusLine).toBe(statusLine);
       expect(props.countLines).toHaveLength(counts);
-      expect(props.showOpenAgents).toBe(showOpenAgents);
     }
   });
 
   it('carries no title, organization name, or raw id into the widget payload', () => {
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
       userId: 'user-9f3a-leak',
       organizationId: 'org-acme-7-leak',
       now: NOW,
-      previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
     });
 
     const props = buildAndroidWidgetProps(snapshot, {}, translate);
@@ -110,10 +109,7 @@ describe('buildAndroidWidgetProps', () => {
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'countLines',
-      'openAgentsLabel',
-      'primaryCount',
       'primaryLabel',
-      'showOpenAgents',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -130,18 +126,17 @@ describe('current widget deadline rendering', () => {
     vi.useRealTimers();
   });
 
-  it.each(['happy', 'stale'] as const)('hides expired %s counts and the visible action', status => {
+  it.each(['happy', 'stale'] as const)('hides expired %s counts', status => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW + 28_800_000);
     const props = buildCurrentWidgetProps({ ...MIXED, status }, translate);
     expect(props.statusLine).toBe('Status expired');
     expect(props.countLines).toEqual([]);
     expect(props.accessibilityLabel).toBe('Status expired, Open agents');
-    expect(props.showOpenAgents).toBe(false);
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
     ['empty', 'No work in progress'],
     ['waiting', 'Waiting for agents'],
@@ -152,7 +147,6 @@ describe('current widget deadline rendering', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.accessibilityLabel).toBe(`${expected}, Open agents`);
     expect(props.countLines).toEqual([]);
-    expect(props.showOpenAgents).toBe(false);
   });
 
   it('hides counts when the stored expiry is not a valid date', () => {
@@ -165,13 +159,13 @@ describe('current widget deadline rendering', () => {
 describe('buildOngoingNotificationText', () => {
   it('lists every ranked numeric count for happy work', () => {
     expect(buildOngoingNotificationText(MIXED, {}, translate)).toBe(
-      '2 Needs input, 3 Reconnecting, 4 Running'
+      '2 Needs input, 4 Working, 3 Idle'
     );
   });
 
   it('adds the translated stale warning without losing eligible counts', () => {
     expect(buildOngoingNotificationText({ ...MIXED, status: 'stale' }, {}, translate)).toBe(
-      'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running'
+      'Updates delayed, 2 Needs input, 4 Working, 3 Idle'
     );
   });
 
@@ -190,10 +184,10 @@ describe('buildOngoingNotificationText', () => {
 
 describe('buildCompactNotificationText', () => {
   it.each([
-    { needsInput: 2, reconnecting: 3, running: 4, expected: '2' },
-    { needsInput: 0, reconnecting: 3, running: 4, expected: '3' },
-    { needsInput: 0, reconnecting: 0, running: 4, expected: '4' },
-    { needsInput: 0, reconnecting: 0, running: 0, expected: null },
+    { needsInput: 2, idle: 3, running: 4, expected: '2' },
+    { needsInput: 0, idle: 3, running: 4, expected: '4' },
+    { needsInput: 0, idle: 3, running: 0, expected: '3' },
+    { needsInput: 0, idle: 0, running: 0, expected: null },
   ])('uses the ranked primary number $expected, not the total or full summary', counts => {
     const snapshot = { ...MIXED, ...counts };
     expect(buildCompactNotificationText(snapshot, {})).toBe(counts.expected);
@@ -209,30 +203,26 @@ describe('status precedence and count hiding', () => {
     ['empty', 'No work in progress'],
     ['expired', 'Status expired'],
     ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
   ] as const)('hides counts on every Android surface for %s', (status, expected) => {
     const snapshot = { ...MIXED, status };
     const props = buildAndroidWidgetProps(snapshot, {}, translate);
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe(0);
-    expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, {})).toBeNull();
   });
 
   it.each([
     [{ signedOut: true, orgInvalid: true }, 'Sign in to see agents'],
-    [{ orgInvalid: true }, 'Agents hidden'],
+    [{ orgInvalid: true }, 'Open Kilo to see agents'],
   ] as const)('honors auth overrides before stale counts: %j', (flags, expected) => {
     const snapshot = { ...MIXED, status: 'stale' as const };
     const props = buildAndroidWidgetProps(snapshot, flags, translate);
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe(0);
-    expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, flags, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, flags)).toBeNull();
   });

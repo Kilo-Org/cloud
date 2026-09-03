@@ -48,6 +48,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
   CornerDownLeft: 'CornerDownLeft',
+  Gauge: 'Gauge',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
   Shield: 'Shield',

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instance-kaagu wuxuu leeyahay cusboonaysiin",
       "scheduledAction": "Fal la qorsheeyay ayaa leh cusboonaysiin",
       "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
-      "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan"
+      "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
+      "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
   },
   "cloudAgentSession": {

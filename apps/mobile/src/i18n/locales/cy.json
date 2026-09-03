@@ -642,6 +642,10 @@
   },
   "notifications": {
     "title": "Hysbysiadau",
+    "liveActivities": "Gweithgareddau byw",
+    "liveActivitySubtitle": "Dangos asiantau gweithredol ar y sgrin clo",
+    "liveUpdates": "Diweddariadau byw",
+    "liveUpdateSubtitle": "Dangos asiantau gweithredol yn eich hysbysiadau",
     "push": "Gwthio",
     "enabled": "Hysbysiadau wedi'u galluogi",
     "onDescription": "Mae hysbysiadau gwthio ymlaen ar gyfer y ddyfais hon.",
@@ -3307,11 +3311,12 @@
     "stale": "Methu diweddaru nawr",
     "expired": "Mae'r statws wedi dod i ben",
     "signedOut": "Mewngofnodwch i weld asiantau",
-    "privacy": "Asiantau wedi'u cuddio",
+    "privacy": "Agorwch Kilo i weld asiantau",
     "openAgents": "Agorwch asiantau",
-    "running": "YN RHEDEG",
+    "running": "Yn gweithio",
     "needsInput": "angen mewnbwn",
-    "reconnecting": "Yn ailgysylltu",
-    "channelName": "Asiantau gweithredol"
+    "idle": "Segur",
+    "channelName": "Asiantau gweithredol",
+    "activityKitDisabledBody": "Trowch Weithgareddau Byw ymlaen yn Gosodiadau i weld Asiantau gweithredol ar y Sgrin Glo."
   }
 }

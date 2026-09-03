@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Notificări",
+    "liveActivities": "Activități live",
+    "liveActivitySubtitle": "Afișează agenții activi pe ecranul blocat",
+    "liveUpdates": "Actualizări în timp real",
+    "liveUpdateSubtitle": "Afișează agenții activi în notificări",
     "push": "Push",
     "enabled": "Notificări activate",
     "onDescription": "Notificările push sunt activate pentru acest dispozitiv.",
@@ -3241,11 +3245,12 @@
     "stale": "Nu se poate actualiza acum",
     "expired": "Stare expirată",
     "signedOut": "Autentifică-te pentru a vedea agenții",
-    "privacy": "Agenți ascunși",
+    "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
-    "running": "Rulează",
+    "running": "Se procesează",
     "needsInput": "necesită introducere",
-    "reconnecting": "Se reconectează",
-    "channelName": "Agenți activi"
+    "idle": "Inactiv",
+    "channelName": "Agenți activi",
+    "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."
   }
 }

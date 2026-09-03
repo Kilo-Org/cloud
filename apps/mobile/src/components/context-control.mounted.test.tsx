@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts native presentation with mocked bridges. */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer mounts native presentation with mocked bridges. */
 import { createElement, type ElementType } from 'react';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +13,7 @@ const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
   setItemAsync: storage.write,

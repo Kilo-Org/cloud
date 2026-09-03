@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Varsler",
+    "liveActivities": "Sanntidsaktiviteter",
+    "liveActivitySubtitle": "Vis aktive agenter på låseskjermen",
+    "liveUpdates": "Sanntidsoppdateringer",
+    "liveUpdateSubtitle": "Vis aktive agenter i varslene dine",
     "push": "Push",
     "enabled": "Varsler aktivert",
     "onDescription": "Push-varsler er på for denne enheten.",
@@ -3219,11 +3223,12 @@
     "stale": "Kan ikke oppdatere nå",
     "expired": "Statusen er utløpt",
     "signedOut": "Logg inn for å se agenter",
-    "privacy": "Agenter er skjult",
+    "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
-    "running": "KJØRER",
+    "running": "Jobber",
     "needsInput": "trenger innspill",
-    "reconnecting": "Kobler til på nytt",
-    "channelName": "Aktive agenter"
+    "idle": "Ledig",
+    "channelName": "Aktive agenter",
+    "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."
   }
 }

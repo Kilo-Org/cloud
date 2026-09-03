@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Mga Notipikasyon",
+    "liveActivities": "Mga live na aktibidad",
+    "liveActivitySubtitle": "Ipakita ang mga aktibong agent sa Lock Screen",
+    "liveUpdates": "Live na update",
+    "liveUpdateSubtitle": "Ipakita ang mga aktibong agent sa iyong mga notification",
     "push": "Push",
     "enabled": "Pinagana ang mga notipikasyon",
     "onDescription": "Naka-on ang push notifications para sa device na ito.",
@@ -3219,11 +3223,12 @@
     "stale": "Hindi makapag-update ngayon",
     "expired": "Nag-expire ang katayuan",
     "signedOut": "Mag-sign in para makita ang mga agent",
-    "privacy": "Nakatago ang mga agent",
+    "privacy": "Buksan ang Kilo para makita ang mga agent",
     "openAgents": "Buksan ang mga agent",
-    "running": "TUMATAKBO",
+    "running": "Gumagawa",
     "needsInput": "kailangan ng input",
-    "reconnecting": "Muling kumokonekta",
-    "channelName": "Mga aktibong agent"
+    "idle": "Idle",
+    "channelName": "Mga aktibong agent",
+    "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."
   }
 }

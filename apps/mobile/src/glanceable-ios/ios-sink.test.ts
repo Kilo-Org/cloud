@@ -5,7 +5,12 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
+import {
+  _resetLiveActivitySwitchForTests,
+  setLiveActivityEnabledValue,
+} from '@/lib/glanceable/live-activity-switch';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
@@ -14,8 +19,18 @@ import {
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
 
-import { _resetIosSinkForTests, getActivityKitDenied, iosSink } from './ios-sink';
-import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
+import {
+  _resetIosSinkForTests,
+  clearActivityKitDeniedIfAvailable,
+  getActivityKitDenied,
+  iosSink,
+} from './ios-sink';
+import {
+  buildGlanceableLiveActivityContentState,
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+  toWidgetProps,
+} from './view-props';
 
 // Native surfaces are unreachable under vitest: expo-widgets factories, the
 // swift-ui component tree, and react-native are stubbed so the sink is the real
@@ -39,16 +54,19 @@ vi.mock('react-native', () => ({ PlatformColor: (name: string) => name }));
 
 const mockState = vi.hoisted(() => ({
   startError: null as { code: string; message: string } | null,
-  instances: [] as unknown[],
-  started: [] as { props: unknown; url?: string }[],
+  instancesError: null as { code: string; message: string } | null,
+  instances: [] as object[],
+  started: [] as { props: unknown; url?: string; ended: boolean; dismissAt: number | null }[],
   updated: [] as unknown[],
   snapshots: [] as unknown[],
   timeline: [] as { date: Date; props: unknown }[],
   ended: [] as { policy: unknown; props?: unknown; contentDate?: unknown }[],
+  updatePromise: null as Promise<void> | null,
 }));
 
 vi.mock('expo-widgets', () => ({
   after: (date: Date) => ({ after: date }),
+  widgetsDirectory: 'file:///app-group/ExpoWidgets/',
   createLiveActivity: () => ({
     start: (props: unknown, url?: string) => {
       if (mockState.startError !== null) {
@@ -56,17 +74,49 @@ vi.mock('expo-widgets', () => ({
         error.code = mockState.startError.code;
         throw error;
       }
-      mockState.started.push({ props, url });
-      return {
-        update: (next: unknown) => {
+      const state = { props, url, ended: false, dismissAt: null as number | null };
+      const id = `local-${mockState.started.length}`;
+      mockState.started.push(state);
+      const instance = {
+        getInfo: () => ({ id, state: state.ended ? 'ended' : 'active' }),
+        getPushToken: vi.fn().mockResolvedValue(null),
+        update: async (next: unknown) => {
           mockState.updated.push(next);
+          if (mockState.updatePromise !== null) {
+            await mockState.updatePromise;
+          }
+          state.props = next;
         },
-        end: (policy: unknown, finalProps?: unknown, contentDate?: unknown) => {
+        end: (
+          policy: 'immediate' | { after: Date },
+          finalProps?: unknown,
+          contentDate?: unknown
+        ) => {
+          state.ended = true;
+          state.dismissAt = policy === 'immediate' ? Date.now() : policy.after.getTime();
+          state.props = finalProps;
+          if (policy === 'immediate') {
+            mockState.instances = mockState.instances.filter(current => current !== instance);
+          }
           mockState.ended.push({ policy, props: finalProps, contentDate });
         },
       };
+      mockState.instances.push(instance);
+      return instance;
     },
-    getInstances: () => mockState.instances,
+    getInstances: (includeEnded = false) => {
+      if (mockState.instancesError !== null) {
+        const error = new Error(mockState.instancesError.message) as Error & { code: string };
+        error.code = mockState.instancesError.code;
+        throw error;
+      }
+      return mockState.instances
+        .map((instance, index) => ({
+          getInfo: () => ({ id: `adopted-${index}`, state: 'active' }),
+          ...instance,
+        }))
+        .filter(instance => includeEnded || instance.getInfo().state === 'active');
+    },
   }),
   createWidget: () => ({
     updateSnapshot: (props: unknown) => {
@@ -84,13 +134,28 @@ vi.mock('expo-widgets', () => ({
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 
+const subscriptions = new Set<string>();
 const delivery = {
-  registerTokens: vi.fn(),
-  unregisterTokens: vi.fn(),
+  registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
+  registerTokens: vi.fn(() => {
+    subscriptions.add('scope');
+    subscriptions.add('activity');
+  }),
+  cleanupTokens: vi.fn((lifetime: 'scope' | 'activity') => {
+    subscriptions.delete('activity');
+    if (lifetime === 'scope') {
+      subscriptions.delete('scope');
+    }
+  }),
+  unregisterTokens: vi.fn().mockImplementation(async () => {
+    await Promise.resolve();
+    subscriptions.clear();
+    return { ok: true, tokens: [] };
+  }),
 };
 
 function snapshotFor(
-  sessions: { status: string }[],
+  sessions: { status: string; statusUpdatedAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -105,14 +170,18 @@ function snapshotFor(
 }
 
 beforeEach(() => {
+  _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  subscriptions.clear();
   mockState.startError = null;
+  mockState.instancesError = null;
   mockState.instances = [];
   mockState.started = [];
   mockState.updated = [];
   mockState.snapshots = [];
   mockState.timeline = [];
   mockState.ended = [];
+  mockState.updatePromise = null;
   setGlanceableDelivery(delivery);
   registerGlanceableSink(iosSink);
   vi.clearAllMocks();
@@ -124,17 +193,45 @@ afterEach(() => {
 });
 
 describe('iosSink start and update', () => {
+  it('registers a session-less scope without a Live Activity and accepts later background work', () => {
+    const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
+    publisher.handleSessions([], CTX);
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No work in progress' });
+    expect(subscriptions).toEqual(new Set(['scope']));
+
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
+    expect(mockState.started).toMatchObject([{ ended: false, props: { running: 1 } }]);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
+    publisher.dispose();
+  });
+
+  it('starts nothing while the in-app switch is off, and starts once it is on', () => {
+    setLiveActivityEnabledValue(false);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    expect(mockState.started).toEqual([]);
+    // The widget families are not covered by this switch: they are opt-in by
+    // placement, so publish still writes their timeline.
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 0));
+    expect(mockState.snapshots.at(-1)).toMatchObject({ primaryCount: 1 });
+
+    setLiveActivityEnabledValue(true);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    expect(mockState.started.length).toBe(1);
+  });
+
   it('starts once and updates the same activity on a newer revision', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
 
     expect(mockState.started.length).toBe(1);
     expect(mockState.updated.length).toBe(1);
-    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
     expect(delivery.unregisterTokens).not.toHaveBeenCalled();
   });
 
-  it('discards an older revision without overwriting the newest updatedAt and props', () => {
+  it('discards an older revision without overwriting the newest props', async () => {
     const newer = snapshotFor([{ status: 'busy' }], 1);
     const older = {
       ...snapshotFor([{ status: 'busy' }, { status: 'busy' }], 0),
@@ -147,12 +244,12 @@ describe('iosSink start and update', () => {
     expect(mockState.updated.length).toBe(0);
 
     iosSink.endImmediate();
-    expect(mockState.ended.length).toBe(1);
-    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBe(
-      Date.parse(newer.updatedAt)
-    );
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
+    expect(mockState.ended[0]?.contentDate).toBeInstanceOf(Date);
     expect(
-      (mockState.ended[0]?.props as GlanceableViewProps | undefined)?.countLines[0]?.count
+      (mockState.ended[0]?.props as GlanceableLiveActivityContentState | undefined)?.running
     ).toBe(1);
   });
 
@@ -195,7 +292,13 @@ describe('iosSink start and update', () => {
   });
 
   it('adopts the newest existing instance instead of starting a second activity', () => {
-    mockState.instances = [{ update: (next: unknown) => mockState.updated.push(next) }];
+    mockState.instances = [
+      {
+        update: (next: unknown) => {
+          mockState.updated.push(next);
+        },
+      },
+    ];
 
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
 
@@ -206,40 +309,212 @@ describe('iosSink start and update', () => {
 });
 
 describe('iosSink end', () => {
-  it('ends immediately with contentDate from the last updatedAt on signed-out', () => {
-    // The eligible snapshot's updatedAt is the fixed NOW; the signed-out publish
-    // must advance `lastUpdatedAt`, so fake a later clock and prove `end` uses
-    // the terminal snapshot's timestamp, not the eligible one.
+  it('ends with a contentDate not older than the last native write', async () => {
+    const writeTime = NOW + 120_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(writeTime));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
+
+    const contentDate = mockState.ended[0]?.contentDate as Date | undefined;
+    expect(contentDate).toBeInstanceOf(Date);
+    // The snapshot's updatedAt (NOW) is older than the write wall-clock; an end
+    // carrying NOW instead would be discarded by ActivityKit.
+    expect(contentDate?.getTime()).toBeGreaterThanOrEqual(writeTime);
+  });
+
+  it('preserves scope delivery when no activity handle exists', async () => {
+    mockState.instances = [];
+    delivery.registerScopeTokens();
+
+    iosSink.endImmediate();
+    await Promise.resolve();
+
+    expect(mockState.ended.length).toBe(0);
+    expect(subscriptions).toEqual(new Set(['scope']));
+  });
+
+  it('ends immediately on signed-out with a wall-clock contentDate', async () => {
+    // The eligible snapshot's updatedAt is the fixed NOW; the native writes run
+    // at the faked later wall-clock, so `end` must carry that write time, not
+    // the snapshot's logical updatedAt.
     const terminalTime = NOW + 120_000;
     vi.useFakeTimers();
     vi.setSystemTime(new Date(terminalTime));
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
 
     writeSignedOutSnapshotAndEnd();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
 
-    expect(mockState.ended.length).toBe(1);
     expect(mockState.ended[0]?.policy).toBe('immediate');
     expect(mockState.ended[0]?.contentDate).toBeInstanceOf(Date);
-    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBe(terminalTime);
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      terminalTime
+    );
+    expect(subscriptions.size).toBe(0);
   });
 
-  it('ends with the published empty snapshot contentDate, not the eligible one', () => {
+  it('ends with the wall-clock of the last publish, not the eligible start', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
 
-    const later = new Date(NOW + 60_000).toISOString();
-    iosSink.publish({ ...snapshotFor([], 1, 'empty'), updatedAt: later });
+    const publishTime = NOW + 60_000;
+    vi.setSystemTime(new Date(publishTime));
+    iosSink.publish(snapshotFor([], 1, 'empty'));
     iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
 
-    expect(mockState.ended.length).toBe(1);
     expect(mockState.ended[0]?.policy).toBe('immediate');
-    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBe(NOW + 60_000);
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      publishTime
+    );
   });
 
-  it('adopts and ends a leftover activity when the handle is null after restart', () => {
+  it('awaits the in-flight publish update so the end contentDate is not older than the native write', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    // The native update does not settle at the JS publish stamp: ActivityKit
+    // stamps its own later wall-clock at native execution. Simulate that gap.
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
+    iosSink.publish(snapshotFor([], 2, 'empty'));
+
+    const nativeWriteTime = NOW + 50;
+    vi.setSystemTime(new Date(nativeWriteTime));
+    update.resolve(undefined);
+
+    iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
+
+    const contentDate = mockState.ended[0]?.contentDate as Date | undefined;
+    expect(contentDate).toBeInstanceOf(Date);
+    // The end must not carry the earlier JS publish stamp (NOW), which ActivityKit
+    // discards as older than the native write.
+    expect(contentDate?.getTime()).toBeGreaterThanOrEqual(nativeWriteTime);
+  });
+
+  it('ends once after the pending update when concurrent ends target the same activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
+    iosSink.publish(snapshotFor([], 2, 'empty'));
+    iosSink.endImmediate();
+    iosSink.endImmediate();
+
+    await Promise.resolve();
+    expect(mockState.started[0]?.ended).toBe(false);
+    expect(mockState.ended).toEqual([]);
+
+    const nativeWriteTime = NOW + 50;
+    vi.setSystemTime(new Date(nativeWriteTime));
+    update.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.ended).toEqual([
+      {
+        policy: 'immediate',
+        props: expect.objectContaining({ status: 'empty', running: 0 }),
+        contentDate: expect.any(Date),
+      },
+    ]);
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      nativeWriteTime
+    );
+  });
+
+  it('keeps a new activity and its pending update when an older end finishes', async () => {
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 4), CTX);
+    const oldUpdate = Promise.withResolvers<undefined>();
+    mockState.updatePromise = oldUpdate.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 5));
+    iosSink.publish(snapshotFor([], 6, 'empty'));
+    iosSink.endImmediate();
+
+    const newSnapshot = snapshotFor([{ status: 'question' }], 0);
+    iosSink.publish(newSnapshot);
+    iosSink.startOrUpdate(newSnapshot, CTX);
+    const newUpdate = Promise.withResolvers<undefined>();
+    mockState.updatePromise = newUpdate.promise;
+    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }, { status: 'question' }], 1), CTX);
+
+    oldUpdate.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.started).toMatchObject([
+      { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
+      { ended: false, props: { status: 'happy', running: 0, needsInput: 1 } },
+    ]);
+
+    // The older end must not reset the new revision or forget its pending update.
+    mockState.updatePromise = null;
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.endImmediate();
+    await Promise.resolve();
+    expect(mockState.started[1]?.ended).toBe(false);
+
+    newUpdate.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(mockState.started[1]?.ended).toBe(true);
+    });
+    expect(mockState.started).toMatchObject([
+      { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
+      { ended: true, props: { status: 'happy', running: 0, needsInput: 2 } },
+    ]);
+  });
+
+  it('ends with the terminal props and a fresh date after a pending update rejects', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
+    iosSink.publish(snapshotFor([], 2, 'empty'));
+    iosSink.endImmediate();
+
+    const failureTime = NOW + 50;
+    vi.setSystemTime(new Date(failureTime));
+    update.reject(new Error('Native update failed'));
+    await vi.waitFor(() => {
+      expect(mockState.started[0]?.ended).toBe(true);
+    });
+
+    expect(mockState.started[0]?.props).toMatchObject({ status: 'empty', running: 0 });
+    expect((mockState.ended[0]?.contentDate as Date | undefined)?.getTime()).toBeGreaterThanOrEqual(
+      failureTime
+    );
+  });
+
+  it('adopts and ends a leftover activity when the handle is null after restart', async () => {
     mockState.instances = [
       {
-        update: (next: unknown) => mockState.updated.push(next),
+        getPushToken: vi.fn().mockResolvedValue(null),
+        update: (next: unknown) => {
+          mockState.updated.push(next);
+        },
         end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
           mockState.ended.push({ policy, props, contentDate }),
       },
@@ -247,25 +522,195 @@ describe('iosSink end', () => {
 
     iosSink.endImmediate();
 
-    expect(mockState.ended.length).toBe(1);
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
     expect(mockState.ended[0]?.policy).toBe('immediate');
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions.has('activity')).toBe(false);
   });
 
-  it('ends after the 8s terminal window when work becomes empty', () => {
-    vi.useFakeTimers();
-    const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
+  it('ends the native activity even when its token lookup rejects', async () => {
+    mockState.instances = [
+      {
+        getPushToken: vi.fn().mockRejectedValue(new Error('native token unavailable')),
+        end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
+          mockState.ended.push({ policy, props, contentDate }),
+      },
+    ];
+    delivery.registerScopeTokens();
 
-    publisher.handleSessions([{ status: 'busy' }], CTX);
-    expect(mockState.started.length).toBe(1);
-    expect(mockState.ended.length).toBe(0);
+    iosSink.endImmediate();
+    await vi.waitFor(() => {
+      expect(mockState.ended.length).toBe(1);
+    });
 
-    publisher.handleSessions([{ status: 'idle' }], CTX);
-    expect(mockState.ended.length).toBe(0);
-
-    vi.advanceTimersByTime(8000);
-    expect(mockState.ended.length).toBe(1);
     expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(subscriptions).toEqual(new Set(['scope']));
+  });
+
+  it('submits terminal content and native dismissal without running the publisher timer', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
+    publisher.handleSessions([{ status: 'busy' }], CTX);
+    publisher.handleSessions([], CTX);
+    await iosSink.waitForNativeTerminal?.();
+
+    expect(mockState.started).toMatchObject([
+      {
+        ended: true,
+        dismissAt: NOW + 8000,
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
+      },
+    ]);
+    expect(subscriptions).toEqual(new Set(['scope']));
+    publisher.dispose();
+  });
+
+  it('keeps the full native terminal window after a delayed update', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }]), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
+    iosSink.publish(snapshotFor([], 2));
+    vi.setSystemTime(NOW + 60_000);
+    update.resolve(undefined);
+    await iosSink.waitForNativeTerminal?.();
+
+    expect(mockState.started[0]).toMatchObject({
+      ended: true,
+      dismissAt: NOW + 68_000,
+      props: { status: 'empty', running: 0 },
+    });
+    expect(mockState.ended[0]?.contentDate).toEqual(new Date(NOW + 60_000));
+  });
+
+  it('keeps fresh work after an older native dismissal and an older publisher timer', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const older = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW });
+    older.handleSessions([{ status: 'busy' }], CTX);
+    older.handleSessions([], CTX);
+    await iosSink.waitForNativeTerminal?.();
+    const newer = new GlanceablePublisher({ sinks: [iosSink], now: () => NOW + 1 });
+    newer.handleSessions([{ status: 'question' }], CTX);
+    await vi.advanceTimersByTimeAsync(8000);
+
+    expect(
+      mockState.started.filter(state => state.dismissAt === null || state.dismissAt > Date.now())
+    ).toMatchObject([{ ended: false, props: { status: 'happy', needsInput: 1, running: 0 } }]);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
+    older.dispose();
+    newer.dispose();
+  });
+
+  it.each(['privacy', 'signed_out'] as const)(
+    'dismisses retained terminal handles immediately for %s',
+    async status => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }]), CTX);
+      iosSink.publish(snapshotFor([], 1));
+      await iosSink.waitForNativeTerminal?.();
+      expect(mockState.started[0]?.dismissAt).toBe(NOW + 8000);
+
+      iosSink.publish(snapshotFor([], 2, status));
+      iosSink.endImmediate();
+      await iosSink.waitForNativeTerminal?.();
+      expect(mockState.started[0]).toMatchObject({
+        dismissAt: NOW,
+        props: { status, running: 0, needsInput: 0, idle: 0 },
+      });
+    }
+  );
+
+  it.each(['privacy', 'signed_out'] as const)(
+    'removes adopted work as well as a retained terminal handle for %s',
+    async status => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }]), CTX);
+      iosSink.publish(snapshotFor([], 1));
+      await iosSink.waitForNativeTerminal?.();
+
+      let visible = true;
+      let content: Partial<GlanceableLiveActivityContentState> = { status: 'happy', running: 4 };
+      mockState.instances.push({
+        getPushToken: vi.fn().mockResolvedValue('adopted-token'),
+        end: (
+          policy: 'immediate' | { after: Date },
+          props?: Partial<GlanceableLiveActivityContentState>
+        ) => {
+          visible = policy !== 'immediate';
+          content = props ?? {};
+        },
+      });
+      iosSink.publish(snapshotFor([], 2, status));
+      await iosSink.waitForNativeTerminal?.();
+
+      expect(visible).toBe(false);
+      expect(content).toMatchObject({ status, running: 0, needsInput: 0, idle: 0 });
+      expect(mockState.started[0]?.dismissAt).toBe(NOW);
+    }
+  );
+
+  it('supersedes a pending terminal intent without ending new-scope work', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }]), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
+    iosSink.publish(snapshotFor([], 2));
+    iosSink.publish(snapshotFor([], 3, 'privacy'));
+    iosSink.endImmediate();
+
+    mockState.updatePromise = null;
+    const ctx = { userId: 'u2', organizationId: 'new-org' };
+    const fresh = buildGlanceableSnapshot({
+      ...ctx,
+      sessions: [{ status: 'question' }],
+      now: NOW + 1,
+    });
+    iosSink.publish(fresh);
+    iosSink.startOrUpdate(fresh, ctx);
+    update.resolve(undefined);
+    await iosSink.waitForNativeTerminal?.();
+
+    expect(mockState.ended).toMatchObject([
+      {
+        policy: 'immediate',
+        props: { status: 'privacy', running: 0, needsInput: 0 },
+      },
+    ]);
+    expect(mockState.started).toMatchObject([
+      { ended: true, dismissAt: NOW, props: { status: 'privacy' } },
+      { ended: false, dismissAt: null, props: { status: 'happy', needsInput: 1 } },
+    ]);
+    expect(subscriptions).toEqual(new Set(['scope', 'activity']));
+  });
+
+  it('carries the wait only while a row needs input', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const waited = new Date(NOW - 600_000).toISOString();
+    const publisher = new GlanceablePublisher({ sinks: [iosSink], now: () => Date.now() });
+    publisher.handleSessions([{ status: 'question', statusUpdatedAt: waited }], CTX);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mockState.started).toMatchObject([
+      { ended: false, props: { needsInput: 1, needsInputSince: waited } },
+    ]);
+
+    // The wait clears with the state it described; it is read from the rows, so
+    // no stale anchor survives the transition to work that needs nothing.
+    vi.setSystemTime(NOW + 60_000);
+    publisher.handleSessions([{ status: 'busy' }], CTX);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mockState.started).toMatchObject([
+      { ended: false, props: { running: 1, needsInput: 0, needsInputSince: null } },
+    ]);
     publisher.dispose();
   });
 });
@@ -284,7 +729,7 @@ describe('iosSink widget publish', () => {
       expect(mockState.timeline).toHaveLength(2);
       expect(mockState.timeline[0]?.props).toMatchObject({
         primaryCount: 1,
-        showOpenAgents: true,
+        primaryKind: 'running',
       });
       const expired = mockState.timeline[1];
       expect(expired?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
@@ -293,13 +738,14 @@ describe('iosSink widget publish', () => {
       expect(expiredProps.countLines).toEqual([]);
       expect(expiredProps.primaryCount).toBe(0);
       expect(expiredProps.statusLine).toBe('Status expired');
-      expect(expiredProps.showOpenAgents).toBe(false);
+      // Omitted, not null: UserDefaults rejects a null value. See toWidgetProps.
+      expect(expiredProps.primaryKind).toBeUndefined();
     }
   );
 
   it.each([
     ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
   ] as const)('keeps %s copy after a previous active timeline expires', (status, statusLine) => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -330,10 +776,8 @@ describe('iosSink widget publish', () => {
         statusLine,
         countLines: [],
         primaryCount: 0,
-        primaryLabel: null,
-        elapsedAnchor: null,
-        showOpenAgents: false,
       });
+      expect(Object.values(visible?.props ?? {})).not.toContain(null);
     }
     expect(mockState.timeline).toHaveLength(1);
   });
@@ -347,57 +791,72 @@ describe('iosSink widget publish', () => {
       boolean,
     ][] = [
       ['empty', [], 'No work in progress', 0, false],
-      ['stale', [{ status: 'busy' }], "Can't update now", 1, true],
+      // Stale draws rows, and all three draw whenever rows draw, so the
+      // surface never reflows as work moves between states.
+      ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
-      ['privacy', [], 'Agents hidden', 0, false],
+      ['privacy', [], 'Open Kilo to see agents', 0, false],
     ];
-    for (const [status, sessions, statusLine, counts, showOpenAgents] of cases) {
+    for (const [status, sessions, statusLine, counts, hasPrimary] of cases) {
       iosSink.publish(snapshotFor(sessions, 0, status));
-      const props = mockState.snapshots.at(-1) as GlanceableViewProps;
+      const props = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
       expect(props.statusLine).toBe(statusLine);
       expect(props.countLines).toHaveLength(counts);
-      expect(props.showOpenAgents).toBe(showOpenAgents);
+      expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
   });
 });
 
-describe('iosSink Live Activity copy', () => {
-  it('mirrors empty copy onto the Live Activity without starting a second one', () => {
+describe('iosSink Live Activity content-state', () => {
+  it('ends with empty content-state without starting a second activity', async () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.publish(snapshotFor([], 1));
+    await iosSink.waitForNativeTerminal?.();
 
-    expect(mockState.started.length).toBe(1);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe('No work in progress');
-    expect(updated?.countLines).toEqual([]);
+    expect(mockState.started).toMatchObject([
+      {
+        ended: true,
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
+      },
+    ]);
   });
 
-  it('mirrors stale copy with counts onto the Live Activity', () => {
+  it('mirrors the stale content-state with counts onto the Live Activity', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.publish(snapshotFor([{ status: 'busy' }], 1, 'stale'));
 
     expect(mockState.started.length).toBe(1);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe("Can't update now");
-    expect(updated?.countLines).toHaveLength(1);
+    const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
+    expect(updated?.status).toBe('stale');
+    expect(updated?.running).toBe(1);
   });
 
   it('adopts and updates a leftover activity from publish when the handle is null', () => {
-    mockState.instances = [{ update: (next: unknown) => mockState.updated.push(next) }];
+    mockState.instances = [
+      {
+        update: (next: unknown) => {
+          mockState.updated.push(next);
+        },
+      },
+    ];
 
     iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
 
     expect(mockState.started.length).toBe(0);
     expect(mockState.ended.length).toBe(0);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.countLines).toHaveLength(1);
+    const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
+    expect(updated?.status).toBe('happy');
+    expect(updated?.running).toBe(1);
     expect(delivery.registerTokens).not.toHaveBeenCalled();
   });
 
-  it('ends an adopted leftover activity when publish receives ineligible work', () => {
+  it('gives adopted empty work the native terminal window without a publisher timer', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
     mockState.instances = [
       {
+        getPushToken: vi.fn().mockResolvedValue(null),
         update: (next: unknown) => mockState.updated.push(next),
         end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
           mockState.ended.push({ policy, props, contentDate }),
@@ -405,19 +864,61 @@ describe('iosSink Live Activity copy', () => {
     ];
 
     iosSink.publish(snapshotFor([], 1, 'empty'));
+    await iosSink.waitForNativeTerminal?.();
 
-    expect(mockState.ended.length).toBe(1);
-    expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(mockState.ended).toMatchObject([
+      {
+        policy: { after: new Date(NOW + 8000) },
+        props: { status: 'empty', running: 0, needsInput: 0, idle: 0 },
+        contentDate: new Date(NOW),
+      },
+    ]);
     expect(mockState.updated.length).toBe(0);
-    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions.has('activity')).toBe(false);
+  });
+});
+
+describe('clearActivityKitDeniedIfAvailable', () => {
+  it('returns false when the surface was never denied', () => {
+    expect(clearActivityKitDeniedIfAvailable()).toBe(false);
+    expect(getActivityKitDenied()).toBe(false);
+  });
+
+  it('clears the denied latch and returns true when ActivityKit is available again', () => {
+    mockState.startError = {
+      code: 'ERR_LIVE_ACTIVITIES_NOT_SUPPORTED',
+      message: 'Live Activities are not supported on this device',
+    };
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    expect(getActivityKitDenied()).toBe(true);
+
+    expect(clearActivityKitDeniedIfAvailable()).toBe(true);
+    expect(getActivityKitDenied()).toBe(false);
+  });
+
+  it('keeps the denied latch when the probe still reports unavailability', () => {
+    mockState.startError = {
+      code: 'ERR_LIVE_ACTIVITIES_NOT_SUPPORTED',
+      message: 'Live Activities are not supported on this device',
+    };
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    expect(getActivityKitDenied()).toBe(true);
+
+    mockState.startError = null;
+    mockState.instancesError = {
+      code: 'ERR_LIVE_ACTIVITIES_NOT_SUPPORTED',
+      message: 'still unavailable',
+    };
+    expect(clearActivityKitDeniedIfAvailable()).toBe(false);
+    expect(getActivityKitDenied()).toBe(true);
   });
 });
 
 describe('buildGlanceableViewProps', () => {
-  it('ranks the compact primary count as needs-input, then reconnecting, then running', () => {
+  it('ranks the compact primary count as needs-input, then running, then idle', () => {
     const props = buildGlanceableViewProps(
       snapshotFor(
-        [{ status: 'busy' }, { status: 'busy' }, { status: 'retry' }, { status: 'question' }],
+        [{ status: 'busy' }, { status: 'busy' }, { status: 'idle' }, { status: 'question' }],
         0
       ),
       {},
@@ -427,21 +928,19 @@ describe('buildGlanceableViewProps', () => {
     expect(props.primaryCount).toBe(1);
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
-      'glanceable.reconnecting',
       'glanceable.running',
+      'glanceable.idle',
     ]);
   });
 
   it('carries no title, organization name, or raw id into the widget JSON', () => {
-    // Decouple the eligible-start anchor from `updatedAt` so the assertion below
-    // proves the builder copies `eligibleStartedAt` (not `updatedAt`) into
-    // `elapsedAnchor`; on a fresh snapshot the two timestamps are equal.
+    // A waiting row with its own status timestamp, so the assertion below
+    // covers the one field that carries a time into the widget payload.
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
       userId: 'user-9f3a-leak',
       organizationId: 'org-acme-7-leak',
       now: NOW,
-      previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
     });
 
     const props = buildGlanceableViewProps(snapshot, {}, key => key);
@@ -450,11 +949,10 @@ describe('buildGlanceableViewProps', () => {
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'countLines',
-      'elapsedAnchor',
-      'openAgentsLabel',
+      'needsInputSince',
       'primaryCount',
+      'primaryKind',
       'primaryLabel',
-      'showOpenAgents',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -463,5 +961,76 @@ describe('buildGlanceableViewProps', () => {
     expect(json).not.toContain(snapshot.updatedAt);
     expect(json).not.toContain('revision');
     expect(json).not.toContain('title');
+  });
+
+  it('carries the oldest wait through the stale status', () => {
+    const waited = new Date(NOW - 600_000).toISOString();
+    const stale = snapshotFor([{ status: 'question', statusUpdatedAt: waited }], 1, 'stale');
+
+    // Stale means updates stopped, not that the wait ended, so the Live
+    // Activity keeps reporting how long the agent has been blocked. Only that
+    // surface carries the wait — no widget family is wide enough for it.
+    expect(buildGlanceableLiveActivityContentState(stale).needsInputSince).toBe(waited);
+  });
+
+  it('reports no wait unless a row needs input', () => {
+    const working = snapshotFor(
+      [{ status: 'busy', statusUpdatedAt: new Date(NOW - 600_000).toISOString() }],
+      1
+    );
+    expect(buildGlanceableLiveActivityContentState(working).needsInputSince).toBeNull();
+
+    const empty = snapshotFor([], 1, 'empty');
+    expect(buildGlanceableLiveActivityContentState(empty).needsInputSince).toBeNull();
+  });
+
+  it('speaks the status word, numeric counts, then Open agents', () => {
+    const stale = buildGlanceableViewProps(
+      snapshotFor([{ status: 'busy' }, { status: 'busy' }, { status: 'question' }], 1, 'stale'),
+      {},
+      key => key
+    );
+    expect(stale.accessibilityLabel).toBe(
+      'glanceable.stale, 1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+    );
+
+    const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    expect(happy.accessibilityLabel).toBe('1 glanceable.running, glanceable.openAgents');
+
+    const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
+    expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');
+  });
+});
+
+describe('toWidgetProps', () => {
+  it('omits every null field so the UserDefaults write cannot throw', () => {
+    const props = toWidgetProps(
+      buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key)
+    );
+
+    expect(Object.values(props)).not.toContain(null);
+    expect('primaryLabel' in props).toBe(false);
+    expect('primaryKind' in props).toBe(false);
+    expect('needsInputSince' in props).toBe(false);
+    expect(props.statusLine).toBe('glanceable.empty');
+  });
+
+  it('keeps every non-null field', () => {
+    const source = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+
+    expect(toWidgetProps(source)).toMatchObject({
+      primaryLabel: 'glanceable.needsInput',
+      primaryKind: 'needsInput',
+      primaryCount: 1,
+      countLines: [
+        { kind: 'needsInput', count: 1 },
+        { kind: 'running', count: 0 },
+        { kind: 'idle', count: 0 },
+      ],
+    });
   });
 });

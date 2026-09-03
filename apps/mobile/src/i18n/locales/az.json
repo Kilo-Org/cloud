@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Bildirişlər",
+    "liveActivities": "Canlı fəaliyyətlər",
+    "liveActivitySubtitle": "Aktiv agentləri kilid ekranında göstərin",
+    "liveUpdates": "Canlı yeniləmələr",
+    "liveUpdateSubtitle": "Aktiv agentləri bildirişlərinizdə göstərin",
     "push": "Push",
     "enabled": "Bildirişlər aktivdir",
     "onDescription": "Push bildirişləri bu cihaz üçün açıqdır.",
@@ -3219,11 +3223,12 @@
     "stale": "Hazırda yeniləmək mümkün deyil",
     "expired": "Statusun müddəti bitib",
     "signedOut": "Agentləri görmək üçün daxil olun",
-    "privacy": "Agentlər gizlədilib",
+    "privacy": "Agentləri görmək üçün Kilo-nu açın",
     "openAgents": "Agentləri açın",
-    "running": "İŞLƏYİR",
+    "running": "İşlənir",
     "needsInput": "GİRİŞ TƏLƏB OLUNUR",
-    "reconnecting": "Yenidən qoşulur",
-    "channelName": "Aktiv agentlər"
+    "idle": "Boşda",
+    "channelName": "Aktiv agentlər",
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."
   }
 }

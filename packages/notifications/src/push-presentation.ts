@@ -12,6 +12,7 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
   { id: 'balance', name: 'Balance alerts', importance: 'default' },
   { id: 'security', name: 'Security findings', importance: 'high' },
+  { id: 'active-agents', name: 'Active agents', importance: 'default' },
 ] as const;
 
 export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
@@ -31,6 +32,8 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_finding':
     case 'security_lifecycle':
       return 'security';
+    case 'active_agents_glanceable':
+      return 'active-agents';
     default: {
       // Exhaustiveness: new PushData variants must be handled above.
       const _exhaustive: never = data;
@@ -109,6 +112,18 @@ export function genericPushContentForPushData(
           'generic.body.securityFinding',
           undefined,
           'A security finding needs attention'
+        ),
+      };
+    case 'active_agents_glanceable':
+      // Generic, count-free lock-screen banner copy: the ongoing notification
+      // never leaks how many agents are running or which sessions they are.
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.activeAgentsGlanceable',
+          undefined,
+          'Active agents have an update'
         ),
       };
     default: {

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Ваш інстанс мае абнаўленне",
       "scheduledAction": "Запланаванае дзеянне мае абнаўленне",
       "lowBalance": "Ваш баланс патрабуе ўвагі",
-      "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі"
+      "securityFinding": "Знаходка ў бяспецы патрабуе ўвагі",
+      "activeAgentsGlanceable": "Актыўныя агенты маюць абнаўленне"
     }
   },
   "cloudAgentSession": {

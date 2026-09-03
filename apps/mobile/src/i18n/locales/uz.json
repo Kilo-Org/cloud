@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Bildirishnomalar",
+    "liveActivities": "Jonli faoliyatlar",
+    "liveActivitySubtitle": "Faol agentlarni qulflash ekranida ko‘rsatish",
+    "liveUpdates": "Jonli yangilanishlar",
+    "liveUpdateSubtitle": "Faol agentlarni bildirishnomalaringizda ko'rsatish",
     "push": "Push",
     "enabled": "Bildirishnomalar yoqilgan",
     "onDescription": "Push bildirishnomalari bu qurilmada yoqilgan.",
@@ -3219,11 +3223,12 @@
     "stale": "Hozir yangilab bo'lmaydi",
     "expired": "Holat muddati tugadi",
     "signedOut": "Agentlarni ko'rish uchun tizimga kiring",
-    "privacy": "Agentlar yashirilgan",
+    "privacy": "Agentlarni ko'rish uchun Kilo'ni oching",
     "openAgents": "Agentlarni oching",
     "running": "Ishlamoqda",
     "needsInput": "kiritish kerak",
-    "reconnecting": "Qayta ulanmoqda",
-    "channelName": "Faol agentlar"
+    "idle": "Kutmoqda",
+    "channelName": "Faol agentlar",
+    "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
   }
 }

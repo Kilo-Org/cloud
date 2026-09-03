@@ -1,6 +1,7 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  type GlanceableCountKind,
   glanceableCountLines,
   glanceableSpokenLabel,
   glanceableStatusCopyKey,
@@ -9,8 +10,22 @@ import {
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
 
-/** One translated count line for an Android surface. */
-type AndroidWidgetCount = { label: string; count: number };
+/** One translated count line for an Android surface. `kind` picks dot and color. */
+type AndroidWidgetCount = {
+  label: string;
+  kind: GlanceableCountKind;
+  count: string;
+};
+
+/**
+ * Format a count in the active language's own digits.
+ *
+ * The default writes them the way `String` does, which is what the 80 languages
+ * with Latin default digits need; the app injects an `Intl` formatter so fa, ps,
+ * ckb, my, ne, bn, and mr read in their own numerals. Injected rather than
+ * imported so this module stays free of i18n and of React Native.
+ */
+export type GlanceableCountFormat = (value: number) => string;
 
 /**
  * The props the Android widget renders. The builder below is the only producer,
@@ -18,27 +33,27 @@ type AndroidWidgetCount = { label: string; count: number };
  * the widget host. Android has no elapsed timer, so there is no elapsed anchor.
  */
 export type AndroidWidgetProps = {
-  /** Translated locked copy; null while counts show (happy). Stale carries both. */
+  /**
+   * Translated locked copy, drawn only when no counts are. Stale carries both,
+   * and the widget then draws the counts; the ongoing notification is the one
+   * surface that says the counts are delayed.
+   */
   statusLine: string | null;
-  /** Non-zero count lines in rank order (needs-input, reconnecting, running). */
+  /** Every count line in rank order (needs-input, running, idle), zeros included. */
   countLines: AndroidWidgetCount[];
-  /** Top-ranked count label for compact widths; null when no eligible work. */
+  /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
-  /** Top-ranked count value for compact widths; 0 when no eligible work. */
-  primaryCount: number;
-  /** Translated "Open agents" affordance. */
-  openAgentsLabel: string;
-  /** True for happy and stale — the only statuses that show counts. */
-  showOpenAgents: boolean;
   /** Spoken label: status words, counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
 
 /** Build the Android widget props from a snapshot, surface flags, and a translator. */
+// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat = String
 ): AndroidWidgetProps {
   const status = resolveGlanceableStatus(snapshot, flags);
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
@@ -49,12 +64,10 @@ export function buildAndroidWidgetProps(
     statusLine: statusKey === null ? null : translate(statusKey),
     countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       label: translate(line.key),
-      count: line.count,
+      kind: line.kind,
+      count: formatCount(line.count),
     })),
     primaryLabel: primary === null ? null : translate(primary.key),
-    primaryCount: primary === null ? 0 : primary.count,
-    openAgentsLabel: translate('glanceable.openAgents'),
-    showOpenAgents: showCounts,
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
@@ -62,22 +75,24 @@ export function buildAndroidWidgetProps(
 /** Every redraw checks the data deadline, including a task queued by an older alarm. */
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat = String
 ): AndroidWidgetProps {
   const expiresAt = Date.parse(snapshot.expiresAt);
   if (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
     (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
   ) {
-    return buildExpiredWidgetProps(snapshot, translate);
+    return buildExpiredWidgetProps(snapshot, translate, formatCount);
   }
-  return buildAndroidWidgetProps(snapshot, {}, translate);
+  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount);
 }
 
 /** Zero-count expired props: the single future redraw hides counts at expiresAt. */
 function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat
 ): AndroidWidgetProps {
   return buildAndroidWidgetProps(
     {
@@ -85,11 +100,12 @@ function buildExpiredWidgetProps(
       status: 'expired',
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
-      eligibleStartedAt: null,
+      idle: 0,
+      needsInputSince: null,
     },
     {},
-    translate
+    translate,
+    formatCount
   );
 }
 
@@ -100,9 +116,6 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
     statusLine: empty,
     countLines: [],
     primaryLabel: null,
-    primaryCount: 0,
-    openAgentsLabel: translate('glanceable.openAgents'),
-    showOpenAgents: false,
     accessibilityLabel: empty,
   };
 }
@@ -111,16 +124,22 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
  * Ongoing notification: every ranked count, with a warning when stale, otherwise
  * the locked status copy. Never a title, organization name, or id.
  */
+// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
 export function buildOngoingNotificationText(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat = String
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status === 'happy' || status === 'stale') {
-    const lines = glanceableCountLines(snapshot);
+    // A sentence, not a layout: a zero row holds a widget's rows still, but
+    // "0 Working" in a notification line is only noise.
+    const lines = glanceableCountLines(snapshot).filter(line => line.count > 0);
     if (lines.length > 0) {
-      const counts = lines.map(line => `${line.count} ${translate(line.key)}`).join(', ');
+      const counts = lines
+        .map(line => `${formatCount(line.count)} ${translate(line.key)}`)
+        .join(', ');
       return status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
     }
   }
@@ -130,12 +149,13 @@ export function buildOngoingNotificationText(
 /** The promoted chip shows only the primary number; the full text keeps all labels. */
 export function buildCompactNotificationText(
   snapshot: GlanceableAgentsSnapshot,
-  flags: GlanceableSurfaceFlags
+  flags: GlanceableSurfaceFlags,
+  formatCount: GlanceableCountFormat = String
 ): string | null {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status !== 'happy' && status !== 'stale') {
     return null;
   }
   const primary = primaryGlanceableCount(snapshot);
-  return primary === null ? null : String(primary.count);
+  return primary === null ? null : formatCount(primary.count);
 }

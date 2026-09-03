@@ -7,7 +7,8 @@
       "instanceLifecycle": "인스턴스에 업데이트가 있습니다",
       "scheduledAction": "예약된 작업에 업데이트가 있습니다",
       "lowBalance": "잔액 확인이 필요합니다",
-      "securityFinding": "보안 발견 사항 확인이 필요합니다"
+      "securityFinding": "보안 발견 사항 확인이 필요합니다",
+      "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다"
     }
   },
   "cloudAgentSession": {

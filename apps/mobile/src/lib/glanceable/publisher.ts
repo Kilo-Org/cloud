@@ -5,11 +5,17 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   type GlanceableAgentsSnapshotStatus,
+  type GlanceableSessionRow,
   isEligibleGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { type GlanceableSink, type GlanceableSinkContext } from './sink-registry';
+import {
+  getGlanceableDelivery,
+  type GlanceableSink,
+  type GlanceableSinkContext,
+  guardSink,
+} from './sink-registry';
 
 /**
  * Framework-agnostic publisher state machine. Derives one versioned snapshot
@@ -61,7 +67,7 @@ export function withStatus(
       ...snapshot,
       revision: snapshot.revision + 1,
       status: expired ? 'expired' : 'stale',
-      ...(expired ? { running: 0, needsInput: 0, reconnecting: 0, eligibleStartedAt: null } : {}),
+      ...(expired ? { running: 0, needsInput: 0, idle: 0, needsInputSince: null } : {}),
     };
   }
   const updatedAt = new Date(now).toISOString();
@@ -104,10 +110,11 @@ export class GlanceablePublisher {
   }
 
   /** Cache success: derive the next snapshot from the current session rows. */
-  handleSessions(sessions: readonly { status: string }[], ctx: GlanceablePublisherContext): void {
+  handleSessions(sessions: readonly GlanceableSessionRow[], ctx: GlanceablePublisherContext): void {
     if (this.isGated()) {
       return;
     }
+    getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
     this.applyExpiry(now, ctx);
 
@@ -117,7 +124,6 @@ export class GlanceablePublisher {
       organizationId: ctx.organizationId,
       now,
       previousRevision: this.current?.revision ?? 0,
-      previousEligibleStartedAt: this.current?.eligibleStartedAt ?? null,
     });
 
     if (isEligibleGlanceableWork(snapshot)) {
@@ -146,6 +152,7 @@ export class GlanceablePublisher {
     if (this.isGated()) {
       return;
     }
+    getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     if (this.current !== null) {
       return;
     }
@@ -191,6 +198,9 @@ export class GlanceablePublisher {
     if (this.current !== null && shouldDiscardGlanceableRevision(incoming, this.current)) {
       return;
     }
+    if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
+      getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
+    }
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.
     this.cancelCoalesce();
@@ -216,14 +226,22 @@ export class GlanceablePublisher {
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {
     for (const sink of this.sinks) {
-      sink.publish(snapshot);
-      sink.startOrUpdate(snapshot, ctx);
+      // Guarded separately: a failing widget timeline write must not skip the
+      // Live Activity start that follows it.
+      guardSink('emit_publish', () => {
+        sink.publish(snapshot);
+      });
+      guardSink('emit_start_or_update', () => {
+        sink.startOrUpdate(snapshot, ctx);
+      });
     }
   }
 
   private publish(snapshot: GlanceableAgentsSnapshot): void {
     for (const sink of this.sinks) {
-      sink.publish(snapshot);
+      guardSink('publish', () => {
+        sink.publish(snapshot);
+      });
     }
   }
 
@@ -250,7 +268,11 @@ export class GlanceablePublisher {
       this.terminalTimer = null;
       this.activityStarted = false;
       for (const sink of this.sinks) {
-        sink.endImmediate();
+        guardSink('terminal_end', () => {
+          if (!sink.waitForNativeTerminal) {
+            sink.endImmediate();
+          }
+        });
       }
     }, this.terminalMs);
   }

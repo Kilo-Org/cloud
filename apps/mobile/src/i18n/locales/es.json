@@ -183,6 +183,10 @@
       "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA"
     },
     "title": "Notificaciones",
+    "liveActivities": "Actividades en directo",
+    "liveActivitySubtitle": "Muestra los agentes activos en la pantalla bloqueada",
+    "liveUpdates": "Actualizaciones en vivo",
+    "liveUpdateSubtitle": "Muestra los agentes activos en tus notificaciones",
     "push": "Push",
     "enabled": "Notificaciones activadas",
     "onDescription": "Las notificaciones push están activadas para este dispositivo.",
@@ -3241,11 +3245,12 @@
     "stale": "No se puede actualizar ahora",
     "expired": "Estado caducado",
     "signedOut": "Inicia sesión para ver los agentes",
-    "privacy": "Agentes ocultos",
+    "privacy": "Abre Kilo para ver los agentes",
     "openAgents": "Abrir agentes",
-    "running": "EN EJECUCIÓN",
+    "running": "Trabajando",
     "needsInput": "requiere entrada",
-    "reconnecting": "Reconectando",
-    "channelName": "Agentes activos"
+    "idle": "Inactivo",
+    "channelName": "Agentes activos",
+    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
   }
 }

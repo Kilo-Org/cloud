@@ -5,6 +5,10 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 
+function noop(): void {
+  // Placeholder until the promise executor hands over its resolve.
+}
+
 /**
  * Module-level store for a SecureStore-backed preference so every hook
  * instance (settings sheet, message list, new-session screen) shares one
@@ -33,6 +37,13 @@ export function createSecureStorePreference<T>(options: {
   // value even when mergeOnLoad is set.
   let cleared = false;
   let loadStarted = false;
+  let markLoaded = noop;
+  // Resolves once the disk read settles, so a caller with no React tree (the
+  // Android widget task) can await the stored value instead of reading the
+  // default.
+  const loaded = new Promise<void>(resolve => {
+    markLoaded = resolve;
+  });
   const listeners = new Set<() => void>();
 
   const emit = () => {
@@ -58,10 +69,14 @@ export function createSecureStorePreference<T>(options: {
       // user has done anything, so there's nothing actionable to tell them.
       // Just log so we can see failure rates.
       Sentry.captureException(error, {
-        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
+        tags: {
+          'error.subsystem': 'preferences',
+          'error.operation': 'load_secure_store',
+        },
       });
     } finally {
       hasLoaded = true;
+      markLoaded();
       emit();
     }
   };
@@ -85,13 +100,20 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
+  const preload = () => {
+    if (!loadStarted) {
+      loadStarted = true;
+      void load();
+    }
+  };
+
   return {
     /** Start the disk read without registering a listener (module-scope warm-up). */
-    preload: () => {
-      if (!loadStarted) {
-        loadStarted = true;
-        void load();
-      }
+    preload,
+    /** Start the disk read and await it. For callers outside a React tree. */
+    whenLoaded: async () => {
+      preload();
+      await loaded;
     },
     subscribe: (listener: () => void) => {
       if (!loadStarted) {

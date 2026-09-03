@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Arifa",
+    "liveActivities": "Shughuli za moja kwa moja",
+    "liveActivitySubtitle": "Onyesha mawakala hai kwenye Skrini ya Kufunga",
+    "liveUpdates": "Masasisho ya moja kwa moja",
+    "liveUpdateSubtitle": "Onyesha mawakala wanaotumika katika arifa zako",
     "push": "Push",
     "enabled": "Arifa zimewashwa",
     "onDescription": "Arifa za push zimewashwa kwa kifaa hiki.",
@@ -3219,11 +3223,12 @@
     "stale": "Haiwezi kusasisha sasa",
     "expired": "Muda wa hali umeisha",
     "signedOut": "Ingia ili uone mawakala",
-    "privacy": "Mawakala wamefichwa",
+    "privacy": "Fungua Kilo ili kuona mawakala",
     "openAgents": "Fungua mawakala",
-    "running": "Inaendelea",
+    "running": "Inafanya kazi",
     "needsInput": "inahitaji mchango",
-    "reconnecting": "Inaunganisha tena",
-    "channelName": "Mawakala wanaofanya kazi"
+    "idle": "Hakikazi",
+    "channelName": "Mawakala wanaofanya kazi",
+    "activityKitDisabledBody": "Washa Shughuli za Moja kwa Moja katika Mipangilio ili uone Mawakala wanaofanya kazi kwenye Skrini Iliyofungwa."
   }
 }

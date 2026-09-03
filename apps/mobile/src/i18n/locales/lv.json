@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Paziņojumi",
+    "liveActivities": "Tiešās aktivitātes",
+    "liveActivitySubtitle": "Rādīt aktīvos aģentus bloķēšanas ekrānā",
+    "liveUpdates": "Tiešraides atjauninājumi",
+    "liveUpdateSubtitle": "Rādīt aktīvos aģentus paziņojumos",
     "push": "Push",
     "enabled": "Paziņojumi iespējoti",
     "onDescription": "Push paziņojumi šai ierīcei ir ieslēgti.",
@@ -3241,11 +3245,12 @@
     "stale": "Pašlaik nevar atjaunināt",
     "expired": "Statusa derīgums ir beidzies",
     "signedOut": "Pieraksties, lai redzētu aģentus",
-    "privacy": "Aģenti ir paslēpti",
+    "privacy": "Atveriet Kilo, lai redzētu aģentus",
     "openAgents": "Atvērt aģentus",
-    "running": "DARBOJAS",
+    "running": "Apstrādā",
     "needsInput": "nepieciešama ievade",
-    "reconnecting": "Atkārtoti izveido savienojumu",
-    "channelName": "Aktīvie aģenti"
+    "idle": "Dīkstāvē",
+    "channelName": "Aktīvie aģenti",
+    "activityKitDisabledBody": "Ieslēdz tiešraides aktivitātes iestatījumos, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   }
 }

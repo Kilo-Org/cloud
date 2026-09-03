@@ -92,6 +92,7 @@ import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
   renameAndroidNotificationChannels,
+  setupNotificationBackgroundHandler,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -153,6 +154,9 @@ function preloadStartupFonts(): void {
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
 setupNotificationHandler();
+// Applies the aggregate glanceable push while backgrounded/killed via a
+// headless expo-notifications task; see setupNotificationBackgroundHandler.
+setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();

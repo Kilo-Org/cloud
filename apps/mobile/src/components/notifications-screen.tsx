@@ -17,15 +17,17 @@ import {
   MessageSquare,
   RefreshCw,
   ShieldAlert,
+  Smartphone,
   Sparkles,
   Wallet,
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
+import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,6 +50,7 @@ import {
   nextMutationGeneration,
 } from '@/lib/hooks/mutation-generations';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
+import { useLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -63,6 +66,18 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
+
+/**
+ * The glanceable row's subtitle: what it promises while the OS allows it, and
+ * what to do about it when the OS does not. Each platform names its own surface
+ * and its own setting.
+ */
+function glanceableSubtitleKey(allowed: boolean, isIos: boolean): string {
+  if (!allowed) {
+    return isIos ? 'glanceable.activityKitDisabledBody' : 'notifications.disabledMessage';
+  }
+  return isIos ? 'notifications.liveActivitySubtitle' : 'notifications.liveUpdateSubtitle';
+}
 const deviceTokenQueryKey = ['devicePushToken'] as const;
 
 /**
@@ -311,12 +326,33 @@ export function NotificationsScreen() {
   const notificationsEnabled = permissionGranted && serverRegistered;
   const showEnableCta = deriveShowEnableCta(notificationsEnabled);
 
+  const {
+    liveActivityEnabled,
+    hasLoaded: liveActivityLoaded,
+    setLiveActivityEnabled,
+  } = useLiveActivityPreference();
+  // ActivityKit's own switch. Read on mount and again on every foreground,
+  // because the only way to change it is to leave for Settings and come back.
+  const [systemAllowsLiveActivities, setSystemAllowsLiveActivities] = useState(
+    liveActivitiesAllowedBySystem
+  );
+  const isIos = Platform.OS === 'ios';
+  // The OS switch that governs the glanceable surface: ActivityKit's own on
+  // iOS, the notification permission on Android, which is what a Live Update
+  // posts through.
+  const systemAllowsGlanceable = isIos ? systemAllowsLiveActivities : permissionGranted;
+  // Off in Settings, or a state the screen has not read yet: either way the
+  // switch must not accept a change it cannot honor.
+  const liveActivityRowDisabled =
+    !liveActivityLoaded || !systemAllowsGlanceable || (!isIos && permissionLoading);
+
   // Re-check permission on foreground resume
   const { isActive } = useAppLifecycle();
   const wasActiveRef = useRef(isActive);
   useEffect(() => {
     if (!wasActiveRef.current && isActive) {
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+      setSystemAllowsLiveActivities(liveActivitiesAllowedBySystem());
     }
     wasActiveRef.current = isActive;
   }, [isActive, queryClient]);
@@ -541,6 +577,57 @@ export function NotificationsScreen() {
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        {/* The glanceable surface. First on the screen because it is what the
+            user sees without opening the app, and it must not sit below seven
+            category rows. Each platform names it the way its own OS does:
+            a Live Activity on iOS, a Live Update on Android. */}
+        <View className="gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}
+          </Text>
+          <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+            <Smartphone size={18} color={colors.secondaryForeground} />
+            <View className="flex-1">
+              {/* Disabled cue is the muted title, not row opacity — the same
+                  pattern as CategoryRow below. */}
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  liveActivityRowDisabled && 'text-muted-foreground'
+                )}
+              >
+                {t('glanceable.channelName')}
+              </Text>
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
+              </Text>
+            </View>
+            <Switch
+              value={systemAllowsGlanceable && liveActivityEnabled}
+              disabled={liveActivityRowDisabled}
+              accessibilityLabel={t('glanceable.channelName')}
+              accessibilityState={{ disabled: liveActivityRowDisabled }}
+              onValueChange={setLiveActivityEnabled}
+            />
+          </View>
+          {/* Our switch cannot turn ActivityKit's back on, so the row offers
+              the only thing that can instead of pretending otherwise. Android
+              needs no button here: the master gate below already enables the
+              same permission. */}
+          {isIos && !systemAllowsLiveActivities && (
+            <Pressable
+              onPress={() => void Linking.openSettings()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.openSettings')}
+              className="items-center rounded-lg bg-primary py-2.5 active:opacity-80"
+            >
+              <Text className="text-sm font-semibold text-primary-foreground">
+                {t('common.openSettings')}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
         {/* Master gate */}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

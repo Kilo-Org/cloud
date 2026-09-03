@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "通知",
+    "liveActivities": "即時動態",
+    "liveActivitySubtitle": "在鎖定畫面上顯示使用中的代理",
+    "liveUpdates": "即時更新",
+    "liveUpdateSubtitle": "在通知中顯示活躍代理",
     "push": "推播",
     "enabled": "已啟用通知",
     "onDescription": "此裝置的推播通知已開啟。",
@@ -3219,11 +3223,12 @@
     "stale": "目前無法更新",
     "expired": "狀態已過期",
     "signedOut": "請登入以查看代理",
-    "privacy": "代理已隱藏",
+    "privacy": "開啟 Kilo 以查看代理",
     "openAgents": "開啟代理",
-    "running": "執行中",
+    "running": "處理中",
     "needsInput": "需要輸入",
-    "reconnecting": "正在重新連線",
-    "channelName": "使用中的代理"
+    "idle": "閒置",
+    "channelName": "使用中的代理",
+    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，以在鎖定畫面上查看使用中的代理。"
   }
 }

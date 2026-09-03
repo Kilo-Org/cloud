@@ -1,10 +1,26 @@
 import type {
+  RefreshGlanceableSessionsParams,
   SendAgentSessionNotificationParams,
   SendAgentSessionNotificationResult,
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
 } from '@kilocode/notifications';
 import type { AttentionSignal } from './dos/session-ingest-attention';
+import type { Env } from './env';
+
+/** Call only after the snapshot source reflects the transition. Never gate on attention pushes. */
+export async function refreshGlanceableSessions(
+  env: Pick<Env, 'NOTIFICATIONS'>,
+  params: RefreshGlanceableSessionsParams
+): Promise<void> {
+  try {
+    await env.NOTIFICATIONS.refreshGlanceableSessions(params);
+  } catch (error) {
+    console.warn('Glanceable aggregate refresh failed (non-fatal)', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export type RemoteSessionInfo = {
   parentSessionId: string | null;

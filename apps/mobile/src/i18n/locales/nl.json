@@ -183,6 +183,10 @@
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen"
     },
     "title": "Meldingen",
+    "liveActivities": "Live activiteiten",
+    "liveActivitySubtitle": "Actieve agents tonen op het toegangsscherm",
+    "liveUpdates": "Live-updates",
+    "liveUpdateSubtitle": "Actieve agents in je meldingen tonen",
     "push": "Push",
     "enabled": "Meldingen ingeschakeld",
     "onDescription": "Pushmeldingen staan aan voor dit apparaat.",
@@ -3219,11 +3223,12 @@
     "stale": "Kan nu niet bijwerken",
     "expired": "Status verlopen",
     "signedOut": "Log in om agents te zien",
-    "privacy": "Agents verborgen",
+    "privacy": "Open Kilo om agents te zien",
     "openAgents": "Agents openen",
     "running": "Bezig",
     "needsInput": "heeft invoer nodig",
-    "reconnecting": "Opnieuw verbinden",
-    "channelName": "Actieve agents"
+    "idle": "Inactief",
+    "channelName": "Actieve agents",
+    "activityKitDisabledBody": "Schakel liveactiviteiten in via Instellingen om actieve agents op het toegangsscherm te zien."
   }
 }

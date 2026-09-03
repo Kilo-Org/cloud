@@ -101,6 +101,7 @@ const readCacheMock = vi.hoisted(() => ({
 // force it to reject without loading the tRPC/notifications chain.
 const logoutCleanupMock = vi.hoisted(() => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+  unregisterActivityTokensAndTombstone: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Hoisted so sign-out can assert the queued consent outcome is cleared during
@@ -209,6 +210,9 @@ const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFoot
     clearPrReviewFooterPreference: vi.fn(),
   }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
+vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
+  clearLiveActivityPreference: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
@@ -519,6 +523,22 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
+
+    unmount();
+  });
+
+  it('unregisters the prior account activity tokens on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The switch unregisters the prior scope's activity tokens (tombstone on
+    // failure) without revoking the device session — runLogoutCleanup must not
+    // run on a plain sign-in.
+    expect(logoutCleanupMock.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
 
     unmount();
   });

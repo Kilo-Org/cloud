@@ -58,6 +58,60 @@ describe('sendPushNotifications', () => {
     });
   });
 
+  it('stops remaining chunks when the refresh loses ownership', async () => {
+    const nextMessage: ExpoPushMessage = { ...message, to: 'ExponentPushToken[token-2]' };
+    chunkPushNotifications.mockReturnValue([[message], [nextMessage]]);
+    let current = true;
+    const delivered: ExpoPushMessage[] = [];
+    sendPushNotificationsAsync.mockImplementation(async chunk => {
+      delivered.push(...chunk);
+      current = false;
+      return [{ status: 'ok', id: 'ticket-1' }];
+    });
+
+    const result = await sendPushNotifications(
+      [message, nextMessage],
+      'access-token',
+      async () => current
+    );
+
+    expect(delivered).toEqual([message]);
+    expect(result).toEqual({
+      ticketTokenPairs: [{ ticketId: 'ticket-1', token: 'ExponentPushToken[token-1]' }],
+      staleTokens: [],
+      ticketErrors: [],
+    });
+  });
+
+  it.each(['transport', 'ticket'] as const)(
+    'stops a superseded retry after a %s failure',
+    async failure => {
+      let current = true;
+      const delivered: ExpoPushMessage[] = [];
+      sendPushNotificationsAsync
+        .mockImplementationOnce(async () => {
+          current = false;
+          if (failure === 'transport') throw new Error('network timeout');
+          return [
+            {
+              status: 'error',
+              message: 'Rate exceeded',
+              details: { error: 'MessageRateExceeded' },
+            },
+          ];
+        })
+        .mockImplementation(async chunk => {
+          delivered.push(...chunk);
+          return [{ status: 'ok', id: 'stale-ticket' }];
+        });
+
+      const result = await sendPushNotifications([message], 'access-token', async () => current);
+
+      expect(delivered).toEqual([]);
+      expect(result).toEqual({ ticketTokenPairs: [], staleTokens: [], ticketErrors: [] });
+    }
+  );
+
   it('does not retry permanent stale-token ticket failures', async () => {
     sendPushNotificationsAsync.mockResolvedValueOnce([
       {

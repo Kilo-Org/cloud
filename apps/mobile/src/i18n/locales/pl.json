@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Powiadomienia",
+    "liveActivities": "Aktywności na żywo",
+    "liveActivitySubtitle": "Pokazuj aktywnych agentów na ekranie blokady",
+    "liveUpdates": "Aktualizacje na żywo",
+    "liveUpdateSubtitle": "Pokazuj aktywne agenty w powiadomieniach",
     "push": "Push",
     "enabled": "Powiadomienia włączone",
     "onDescription": "Powiadomienia push są włączone dla tego urządzenia.",
@@ -3263,11 +3267,12 @@
     "stale": "Nie można teraz zaktualizować",
     "expired": "Status wygasł",
     "signedOut": "Zaloguj się, aby zobaczyć agentów",
-    "privacy": "Agenci ukryci",
+    "privacy": "Otwórz Kilo, aby zobaczyć agentów",
     "openAgents": "Otwórz agentów",
-    "running": "W toku",
+    "running": "Pracuję",
     "needsInput": "wymaga danych",
-    "reconnecting": "Ponowne łączenie",
-    "channelName": "Aktywni agenci"
+    "idle": "Bezczynny",
+    "channelName": "Aktywni agenci",
+    "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   }
 }

@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Teavitused",
+    "liveActivities": "Reaalajas tegevused",
+    "liveActivitySubtitle": "Näita aktiivseid agente lukustuskuval",
+    "liveUpdates": "Reaalajas värskendused",
+    "liveUpdateSubtitle": "Näita aktiivseid agente teavitustes",
     "push": "Push",
     "enabled": "Teavitused on lubatud",
     "onDescription": "Push-teavitused on selle seadme jaoks sisse lülitatud.",
@@ -3219,11 +3223,12 @@
     "stale": "Praegu ei saa uuendada",
     "expired": "Olek on aegunud",
     "signedOut": "Agentide nägemiseks logige sisse",
-    "privacy": "Agendid on peidetud",
+    "privacy": "Agentide nägemiseks ava Kilo",
     "openAgents": "Avage agendid",
-    "running": "TÖÖTAB",
+    "running": "Töötamine",
     "needsInput": "vajab sisendit",
-    "reconnecting": "Ühenduse taastamine",
-    "channelName": "Aktiivsed agendid"
+    "idle": "Ooterežiimis",
+    "channelName": "Aktiivsed agendid",
+    "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
   }
 }

@@ -6,8 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
+import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -16,7 +18,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
  *
  * The JS side owns the translated copy and the revision guard; this module owns
  * the fixed notification id, the dedicated `active-agents` channel (default
- * importance, silent, no heads-up), and the API 36.1+ promotion gate.
+ * importance, silent, no heads-up), the API 36.1+ promotion gate, and the
+ * content intent plus named action that open the Agents tab via a deep link.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -26,12 +29,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       isPromotionCapable()
     }
 
-    Function("start") { title: String, text: String, compactText: String?, promotion: Boolean ->
-      post(title, text, compactText, promotion, 0)
+    Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean ->
+      post(title, text, openAgentsLabel, compactText, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, compactText: String?, promotion: Boolean, timeoutMs: Double ->
-      post(title, text, compactText, promotion, timeoutMs.toLong())
+    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Double ->
+      post(title, text, openAgentsLabel, compactText, promotion, timeoutMs.toLong())
     }
 
     Function("end") {
@@ -47,8 +50,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
     }
   }
 
+  // `AppContext` exposes only the React context. Every entry point here runs
+  // from a JS call, so losing it means the module cannot work at all.
   private val context: Context
-    get() = appContext.reactContext ?: appContext.applicationContext
+    get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
   private val notificationManager: NotificationManager
     get() = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -102,16 +107,24 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  private fun post(title: String, text: String, compactText: String?, promotion: Boolean, timeoutMs: Long) {
+  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Long) {
+    val contentIntent = openAgentsPendingIntent()
     val builder = newBuilder(title)
       .setSmallIcon(smallIconId())
       .setContentTitle(title)
       .setContentText(text)
-      .setContentIntent(openAgentsPendingIntent())
+      .setContentIntent(contentIntent)
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setSound(null)
       .setCategory(Notification.CATEGORY_STATUS)
+      .addAction(
+        Notification.Action.Builder(
+          Icon.createWithResource(context, smallIconId()),
+          openAgentsLabel,
+          contentIntent
+        ).build()
+      )
 
     // API 36.1+ Live Update: promote only when the device reports the capability.
     // setRequestPromotedOngoing does not exist; use the documented flag setter.

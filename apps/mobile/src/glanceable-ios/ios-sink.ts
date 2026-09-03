@@ -1,26 +1,35 @@
 import {
+  GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type LiveActivity } from 'expo-widgets';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
+import { after, type LiveActivity } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
 import { getGlanceableDelivery, type GlanceableSink } from '@/lib/glanceable/sink-registry';
+import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 
 import { ActiveAgentsLiveActivity } from './active-agents-live-activity';
 import { ActiveAgentsWidget } from './active-agents-widget';
-import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
+import {
+  buildGlanceableLiveActivityContentState,
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+  toWidgetProps,
+} from './view-props';
 
 /** Open-agents destination, kept in step with the inlined widget URL. */
 const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
 
-type Activity = LiveActivity<Partial<GlanceableViewProps>>;
+type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
 let revision = 0;
-let lastUpdatedAt: string | null = null;
-let lastProps: Partial<GlanceableViewProps> | null = null;
+/** In-flight native `update`; `end` awaits it so its contentDate is never older. */
+let inFlightUpdate: Promise<void> | null = null;
+let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
 
 function translate(key: string): string {
   return i18n.t(key);
@@ -38,51 +47,183 @@ function isActivityKitUnavailable(error: unknown): boolean {
   );
 }
 
-/**
- * Adopt the newest ActivityKit instance into the in-memory handle. After a
- * process restart the JS handle is null while ActivityKit still holds the
- * activity, so end/publish must adopt before acting. Returns null when none
- * exists. Only ActivityKit unavailability is permanent; a transient error
- * leaves denial unset so a later call retries.
- */
-function adoptExistingActivity(): Activity | null {
+/** Recheck native state even when JavaScript missed the remote terminal snapshot. */
+function refreshActivity(): boolean {
   try {
-    return ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
+    if (activity !== null) {
+      const { state } = activity.getInfo();
+      if (state === 'active' || state === 'stale') {
+        return true;
+      }
+      getGlanceableDelivery().cleanupTokens('activity', readEndingToken(activity));
+      activity = null;
+      inFlightUpdate = null;
+      lastProps = null;
+      revision = 0;
+    }
+    // Wrappers change on discovery; only native IDs identify pending ends.
+    activity =
+      ActiveAgentsLiveActivity.getInstances().findLast(
+        instance => !endingActivities.has(instance.getInfo().id)
+      ) ?? null;
+    return true;
   } catch (error) {
     if (isActivityKitUnavailable(error)) {
       activityKitDeniedState = true;
     }
-    return null;
+    // Do not update an unverified cached handle or start a duplicate on a read failure.
+    return false;
   }
 }
 
 function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<GlanceableViewProps> {
-  return buildGlanceableViewProps(
-    {
-      ...snapshot,
-      status: 'expired',
-      running: 0,
-      needsInput: 0,
-      reconnecting: 0,
-      eligibleStartedAt: null,
-    },
-    {},
-    translate
+  return toWidgetProps(
+    buildGlanceableViewProps(
+      {
+        ...snapshot,
+        status: 'expired',
+        running: 0,
+        needsInput: 0,
+        idle: 0,
+        needsInputSince: null,
+      },
+      {},
+      translate
+    )
   );
 }
 
-function endNow(): void {
-  // A process restart leaves the JS handle null while ActivityKit still
-  // holds the activity; adopt it so the end actually clears the Lock Screen.
-  activity ??= adoptExistingActivity();
-  if (activity === null) {
+async function readEndingToken(instance: Activity): Promise<string | null> {
+  try {
+    return await instance.getPushToken();
+  } catch {
+    // Recorded tokens still need cleanup when the native lookup fails.
+    return null;
+  }
+}
+
+type EndIntent = {
+  dismissAt: number | null;
+  props: Partial<GlanceableLiveActivityContentState> | null;
+};
+type EndingActivity = {
+  id: string;
+  instance: Activity;
+  update: Promise<void> | null;
+  token: Promise<string | null>;
+  intent: EndIntent;
+  pending: Promise<void> | null;
+};
+// Only pending native submissions live in JS. Native discovery owns terminal visibility.
+const endingActivities = new Map<string, EndingActivity>();
+
+async function finishEnd(ending: EndingActivity): Promise<void> {
+  let completed = false;
+  try {
+    try {
+      await ending.update;
+    } catch {
+      // A rejected update must not block the end; its contentDate still advances.
+    }
+    await ending.token;
+    if (ending.intent.dismissAt !== null) {
+      ending.intent.dismissAt = Date.now() + GLANCEABLE_TERMINAL_MS;
+    }
+    // Read the latest intent at the native boundary. Privacy can supersede an
+    // empty snapshot during either await, including an already-submitted end.
+    for (;;) {
+      const intent = ending.intent;
+      // eslint-disable-next-line no-await-in-loop -- serialize a privacy dismissal after an in-flight native end
+      await ending.instance.end(
+        intent.dismissAt === null ? 'immediate' : after(new Date(intent.dismissAt)),
+        intent.props ?? undefined,
+        new Date()
+      );
+      if (intent === ending.intent) {
+        break;
+      }
+    }
+    completed = true;
+  } catch (error) {
+    // Native reports missing IDs as dismissed; only confirmed absence settles a failed end.
+    if (ending.instance.getInfo().state !== 'dismissed') {
+      throw error;
+    }
+    completed = true;
+  } finally {
+    ending.pending = null;
+    if (completed) {
+      endingActivities.delete(ending.id);
+    }
+  }
+}
+
+async function scheduleEnd(ending: EndingActivity): Promise<void> {
+  if (ending.pending !== null) {
     return;
   }
-  const contentDate = lastUpdatedAt === null ? undefined : new Date(lastUpdatedAt);
-  void activity.end('immediate', lastProps ?? undefined, contentDate);
+  ending.pending = finishEnd(ending);
+  try {
+    await ending.pending;
+  } catch {
+    // Foreground publication is best-effort; background callers await the original task.
+  }
+}
+
+function endNow(
+  dismissAt: number | null = null,
+  props: Partial<GlanceableLiveActivityContentState> | null = lastProps
+): void {
+  const targets = new Map<string, Activity>();
+  if (dismissAt === null) {
+    try {
+      // Privacy must include terminal content, even after JS state was discarded.
+      for (const instance of ActiveAgentsLiveActivity.getInstances(true)) {
+        targets.set(instance.getInfo().id, instance);
+      }
+    } catch (error) {
+      if (isActivityKitUnavailable(error)) {
+        activityKitDeniedState = true;
+      }
+    }
+  } else if (!refreshActivity()) {
+    return;
+  }
+  const currentId = activity?.getInfo().id;
+  if (activity !== null && currentId !== undefined) {
+    targets.set(currentId, activity);
+  }
+  for (const [id, instance] of targets) {
+    if (!endingActivities.has(id)) {
+      const token = readEndingToken(instance);
+      // Capture before end, and retire tokens before fresh work can register.
+      getGlanceableDelivery().cleanupTokens('activity', token);
+      endingActivities.set(id, {
+        id,
+        instance,
+        update: id === currentId ? inFlightUpdate : null,
+        token,
+        intent: { dismissAt, props },
+        pending: null,
+      });
+    }
+  }
   activity = null;
+  inFlightUpdate = null;
+  lastProps = null;
   revision = 0;
-  getGlanceableDelivery().unregisterTokens();
+  for (const ending of endingActivities.values()) {
+    if (
+      dismissAt === null &&
+      (ending.intent.dismissAt !== null || (props !== null && props !== ending.intent.props))
+    ) {
+      ending.intent = { dismissAt: null, props: props ?? ending.intent.props };
+    }
+    void scheduleEnd(ending);
+  }
+  if (dismissAt === null && endingActivities.size === 0) {
+    getGlanceableDelivery().cleanupTokens('activity');
+  }
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
@@ -90,18 +231,46 @@ export function getActivityKitDenied(): boolean {
   return activityKitDeniedState;
 }
 
+/**
+ * Re-probe ActivityKit after the user may have re-enabled it in Settings.
+ * Clears the denied latch when the surface is available again and returns true;
+ * keeps the latch and returns false when it is still unavailable (or the probe
+ * is a transient read failure). The caller then re-emits eligible work through
+ * `startOrUpdate`, whose `start` re-checks availability authoritatively.
+ */
+export function clearActivityKitDeniedIfAvailable(): boolean {
+  if (!activityKitDeniedState) {
+    return false;
+  }
+  try {
+    ActiveAgentsLiveActivity.getInstances();
+    activityKitDeniedState = false;
+    return true;
+  } catch {
+    // Still unavailable (or transient): keep the latch.
+    return false;
+  }
+}
+
 /** Test-only: drop all sink state between cases. */
 export function _resetIosSinkForTests(): void {
   activityKitDeniedState = false;
   activity = null;
   revision = 0;
-  lastUpdatedAt = null;
+  inFlightUpdate = null;
   lastProps = null;
+  endingActivities.clear();
 }
 
 export const iosSink: GlanceableSink = {
+  async waitForNativeTerminal() {
+    await Promise.all(
+      [...endingActivities.values()].map((ending): Promise<void> | null => ending.pending)
+    );
+  },
+
   publish(snapshot) {
-    const props = buildGlanceableViewProps(snapshot, {}, translate);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot replaces the timeline, so terminal copy needs no expiry frame.
     if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {
@@ -110,90 +279,63 @@ export const iosSink: GlanceableSink = {
         { date: new Date(snapshot.expiresAt), props: buildExpiredProps(snapshot) },
       ]);
     }
-    // Mirror the published snapshot onto a present Live Activity so the empty
-    // "No work in progress" and stale "Can't update now" copy shows during the
-    // terminal window before `endImmediate` ends it. Never start an activity
-    // here: start is reserved for the first eligible emit. Record the applied
-    // snapshot so a later `end` carries a contentDate that is not older than
-    // this update (ActivityKit ignores an end older than the last update).
-    // Adopt a leftover instance first: after a process restart the JS handle is
-    // null while ActivityKit still holds the activity.
-    const adopted = activity === null;
-    activity ??= adoptExistingActivity();
-    if (activity !== null) {
-      lastUpdatedAt = snapshot.updatedAt;
-      lastProps = props;
-      if (adopted && !isEligibleGlanceableWork(snapshot)) {
-        // The publisher's process-local `activityStarted` is false on a fresh
-        // process, so an ineligible snapshot only reaches `publish` and the
-        // terminal `endImmediate` never fires for it. End the adopted leftover
-        // instead of mirroring it onto the Lock Screen.
-        endNow();
-        return;
-      }
-      void activity.update(props);
+    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    if (!isEligibleGlanceableWork(snapshot)) {
+      // ActivityKit owns removal after this call, even if JavaScript stops.
+      // The after-date retains Lock Screen content, not the Dynamic Island.
+      const immediate = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
+      endNow(immediate ? null : Date.now() + GLANCEABLE_TERMINAL_MS, contentState);
+      return;
+    }
+    // Never start here. Recheck cached native work and preserve update/end ordering.
+    if (refreshActivity() && activity !== null) {
+      lastProps = contentState;
+      inFlightUpdate = activity.update(lastProps);
     }
   },
 
   startOrUpdate(snapshot, ctx) {
-    if (activityKitDeniedState || !isEligibleGlanceableWork(snapshot)) {
+    // The in-app switch is checked first: it is the one the user set here, and
+    // honoring it costs no native call. ActivityKit's own switch still decides
+    // the rest, and `start` remains the authority on it.
+    if (
+      !getLiveActivityEnabled() ||
+      activityKitDeniedState ||
+      !isEligibleGlanceableWork(snapshot) ||
+      !refreshActivity()
+    ) {
       return;
     }
 
-    const props = buildGlanceableViewProps(snapshot, {}, translate);
+    const contentState = buildGlanceableLiveActivityContentState(snapshot);
 
     if (activity === null) {
-      // Adopt the newest existing instance before starting a second one, so a
-      // process restart updates the activity it started earlier.
-      let adopted = false;
       try {
-        const instances = ActiveAgentsLiveActivity.getInstances();
-        const newest = instances.at(-1);
-        if (newest !== undefined) {
-          activity = newest;
-          adopted = true;
-        }
+        activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL);
+        inFlightUpdate = null;
       } catch (error) {
+        // Only ActivityKit unavailability is permanent; transient starts retry later.
         if (isActivityKitUnavailable(error)) {
           activityKitDeniedState = true;
-          return;
         }
-        // A transient getInstances failure leaves activity null; the start
-        // below still runs, so a later emit can retry.
+        return;
       }
-
-      if (activity === null) {
-        try {
-          activity = ActiveAgentsLiveActivity.start(props, OPEN_AGENTS_URL);
-        } catch (error) {
-          // Only ActivityKit unavailability is permanent; a transient
-          // StartLiveActivityException leaves denial unset so a later emit retries.
-          if (isActivityKitUnavailable(error)) {
-            activityKitDeniedState = true;
-          }
-          activity = null;
-          return;
-        }
-      }
-
-      lastUpdatedAt = snapshot.updatedAt;
-      lastProps = props;
+      lastProps = contentState;
       revision = snapshot.revision;
-      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId);
-      if (adopted) {
-        void activity.update(props);
-      }
+      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
       return;
     }
 
+    // publish can adopt an activity before this method sees it. Bind its token
+    // listener here too; delivery deduplicates the sink's stable native handle.
+    getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
     // The publisher coalesces and guards revisions, but keep the sink monotonic
     // so a late or replayed emit can never move the surface backwards.
     if (snapshot.revision <= revision) {
       return;
     }
-    lastUpdatedAt = snapshot.updatedAt;
-    lastProps = props;
-    void activity.update(props);
+    lastProps = contentState;
+    inFlightUpdate = activity.update(contentState);
     revision = snapshot.revision;
   },
 

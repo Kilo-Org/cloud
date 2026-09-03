@@ -7,7 +7,8 @@
       "instanceLifecycle": "Dæmið þitt hefur uppfærslu",
       "scheduledAction": "Skipulögð aðgerð hefur uppfærslu",
       "lowBalance": "Staðan þín þarfnast athygli",
-      "securityFinding": "Öryggisfundur þarfnast athygli"
+      "securityFinding": "Öryggisfundur þarfnast athygli",
+      "activeAgentsGlanceable": "Virk umboð hafa uppfærslu"
     }
   },
   "cloudAgentSession": {

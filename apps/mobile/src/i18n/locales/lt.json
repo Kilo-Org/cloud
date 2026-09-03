@@ -628,6 +628,10 @@
   },
   "notifications": {
     "title": "Pranešimai",
+    "liveActivities": "Tiesioginės veiklos",
+    "liveActivitySubtitle": "Rodyti aktyvius agentus užrakinimo ekrane",
+    "liveUpdates": "Tiesioginiai naujinimai",
+    "liveUpdateSubtitle": "Rodyti aktyvius agentus pranešimuose",
     "push": "Push",
     "enabled": "Pranešimai įjungti",
     "onDescription": "Push pranešimai šiame įrenginyje įjungti.",
@@ -3263,11 +3267,12 @@
     "stale": "Dabar nepavyksta atnaujinti",
     "expired": "Būsenos galiojimas baigėsi",
     "signedOut": "Prisijunkite, kad matytumėte agentus",
-    "privacy": "Agentai paslėpti",
+    "privacy": "Atidarykite Kilo, kad pamatytumėte agentus",
     "openAgents": "Atidaryti agentus",
     "running": "Vykdoma",
     "needsInput": "reikia įvesties",
-    "reconnecting": "Jungiamasi iš naujo",
-    "channelName": "Aktyvūs agentai"
+    "idle": "Neaktyvus",
+    "channelName": "Aktyvūs agentai",
+    "activityKitDisabledBody": "Nustatymuose įjunkite tiesiogines veiklas, kad užrakinimo ekrane matytumėte aktyvius agentus."
   }
 }

@@ -13,10 +13,17 @@ import { requireOptionalNativeModule } from 'expo';
 
 type LiveUpdateNativeModule = {
   isPromotionCapable(): boolean;
-  start(title: string, text: string, compactText: string | null, promotion: boolean): void;
+  start(
+    title: string,
+    text: string,
+    openAgentsLabel: string,
+    compactText: string | null,
+    promotion: boolean
+  ): void;
   update(
     title: string,
     text: string,
+    openAgentsLabel: string,
     compactText: string | null,
     promotion: boolean,
     timeoutMs: number
@@ -36,18 +43,25 @@ function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 
-export function start(title: string, text: string, compactText: string | null): void {
-  nativeModule?.start(title, text, compactText, isPromotionCapable());
+// eslint-disable-next-line max-params -- mirrors the native presentation fields
+export function start(
+  title: string,
+  text: string,
+  openAgentsLabel: string,
+  compactText: string | null
+): void {
+  nativeModule?.start(title, text, openAgentsLabel, compactText, isPromotionCapable());
 }
 
 // eslint-disable-next-line max-params -- translated bridge fields plus the native terminal timeout
 export function update(
   title: string,
   text: string,
+  openAgentsLabel: string,
   compactText: string | null,
   timeoutMs = 0
 ): void {
-  nativeModule?.update(title, text, compactText, isPromotionCapable(), timeoutMs);
+  nativeModule?.update(title, text, openAgentsLabel, compactText, isPromotionCapable(), timeoutMs);
 }
 
 export function end(): void {

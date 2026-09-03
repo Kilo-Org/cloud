@@ -84,8 +84,9 @@ describe('GlanceablePublisher', () => {
     );
     const snapshot = lastSnapshot(calls, 'startOrUpdate');
     expect(snapshot.running).toBe(2);
-    expect(snapshot.needsInput).toBe(1);
-    expect(snapshot.reconnecting).toBe(1);
+    // `retry` folds into needs-input: both mean the agent cannot go on alone.
+    expect(snapshot.needsInput).toBe(2);
+    expect(snapshot.idle).toBe(1);
     expect(snapshot.status).toBe('happy');
   });
 
@@ -121,15 +122,18 @@ describe('GlanceablePublisher', () => {
     expect(count(calls, 'startOrUpdate')).toBe(started);
   });
 
-  it('publishes empty for idle-only sessions without starting or ending', () => {
+  it('starts for idle-only sessions but not when no session is connected', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
-    publisher.handleSessions([{ status: 'idle' }, { status: 'idle' }], PUB_CTX);
+    publisher.handleSessions([], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(0);
     expect(lastSnapshot(calls, 'publish').status).toBe('empty');
     vi.advanceTimersByTime(8000);
     expect(count(calls, 'endImmediate')).toBe(0);
+    // An idle agent is still connected, so the notch shows it ranked last.
+    publisher.handleSessions([{ status: 'idle' }, { status: 'idle' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate')).toMatchObject({ status: 'happy', idle: 2 });
     publisher.dispose();
   });
 
@@ -139,7 +143,7 @@ describe('GlanceablePublisher', () => {
     publisher.handleFetchStarted(PUB_CTX);
     expect(lastSnapshot(calls, 'publish').status).toBe('waiting');
     expect(count(calls, 'startOrUpdate')).toBe(0);
-    publisher.handleSessions([{ status: 'idle' }], PUB_CTX);
+    publisher.handleSessions([], PUB_CTX);
     expect(lastSnapshot(calls, 'publish').status).toBe('empty');
   });
 
@@ -148,7 +152,7 @@ describe('GlanceablePublisher', () => {
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
     publisher.handleSessions(
-      [{ status: 'busy' }, { status: 'question' }, { status: 'retry' }],
+      [{ status: 'busy' }, { status: 'question' }, { status: 'idle' }],
       PUB_CTX
     );
     const successful = lastSnapshot(calls, 'publish');
@@ -169,10 +173,10 @@ describe('GlanceablePublisher', () => {
         status,
         running: expectedCount,
         needsInput: expectedCount,
-        reconnecting: expectedCount,
+        idle: expectedCount,
       });
     }
-    expect(lastSnapshot(calls, 'publish').eligibleStartedAt).toBeNull();
+    expect(lastSnapshot(calls, 'publish').needsInputSince).toBeNull();
     publisher.dispose();
   });
 

@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Obaveštenja",
+    "liveActivities": "Aktivnosti uživo",
+    "liveActivitySubtitle": "Prikaži aktivne agente na zaključanom ekranu",
+    "liveUpdates": "Ažuriranja uživo",
+    "liveUpdateSubtitle": "Prikazuj aktivne agente u obaveštenjima",
     "push": "Push",
     "enabled": "Obaveštenja omogućena",
     "onDescription": "Push obaveštenja su uključena za ovaj uređaj.",
@@ -3241,11 +3245,12 @@
     "stale": "Ažuriranje trenutno nije moguće",
     "expired": "Status je istekao",
     "signedOut": "Prijavite se da biste videli agente",
-    "privacy": "Agenti su skriveni",
+    "privacy": "Otvorite Kilo da vidite agente",
     "openAgents": "Otvorite agente",
-    "running": "U toku",
+    "running": "Radim…",
     "needsInput": "zahteva unos",
-    "reconnecting": "Ponovno povezivanje",
-    "channelName": "Aktivni agenti"
+    "idle": "Neaktivan",
+    "channelName": "Aktivni agenti",
+    "activityKitDisabledBody": "Uključite Aktivnosti uživo u Podešavanjima da biste videli aktivne agente na zaključanom ekranu."
   }
 }

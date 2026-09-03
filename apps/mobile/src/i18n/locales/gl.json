@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Notificacións",
+    "liveActivities": "Actividades en directo",
+    "liveActivitySubtitle": "Amosa os axentes activos na pantalla de bloqueo",
+    "liveUpdates": "Actualizacións en directo",
+    "liveUpdateSubtitle": "Mostrar os axentes activos nas notificacións",
     "push": "Push",
     "enabled": "Notificacións activadas",
     "onDescription": "As notificacións push están activadas para este dispositivo.",
@@ -3219,11 +3223,12 @@
     "stale": "Non se pode actualizar agora",
     "expired": "Estado caducado",
     "signedOut": "Inicia sesión para ver os axentes",
-    "privacy": "Axentes ocultos",
+    "privacy": "Abre Kilo para ver os axentes",
     "openAgents": "Abrir axentes",
-    "running": "Executando",
+    "running": "Traballando",
     "needsInput": "precisa entrada",
-    "reconnecting": "Reconectando",
-    "channelName": "Axentes activos"
+    "idle": "Inactivo",
+    "channelName": "Axentes activos",
+    "activityKitDisabledBody": "Activa as actividades en directo en Configuración para ver os axentes activos na pantalla de bloqueo."
   }
 }

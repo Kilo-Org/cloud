@@ -6,13 +6,14 @@ import {
   countGlanceableSessions,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   isEligibleGlanceableWork,
+  oldestNeedsInputSince,
   shouldDiscardGlanceableRevision,
 } from './glanceable-agents-snapshot';
 
 const NOW = 1_750_000_000_000;
 
 describe('countGlanceableSessions', () => {
-  it('maps busy/question/permission/retry and ignores idle and unknown', () => {
+  it('maps busy to running, question/permission/retry to needs-input, idle to idle', () => {
     const counts = countGlanceableSessions([
       { status: 'busy' },
       { status: 'busy' },
@@ -26,7 +27,7 @@ describe('countGlanceableSessions', () => {
       { status: 'failed' },
       { status: 'mystery' },
     ]);
-    expect(counts).toEqual({ running: 2, needsInput: 3, reconnecting: 1 });
+    expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2 });
   });
 
   it('counts Cloud Agent-shaped and CLI-shaped rows together on status alone', () => {
@@ -34,17 +35,23 @@ describe('countGlanceableSessions', () => {
     const cliRow = { status: 'retry', connectionId: 'cli-1' };
     expect(countGlanceableSessions([cloudRow, cliRow])).toEqual({
       running: 1,
-      needsInput: 0,
-      reconnecting: 1,
+      needsInput: 1,
+      idle: 0,
     });
   });
 
-  it('produces zero eligible counts for idle-only sessions', () => {
+  it('counts idle-only sessions as idle', () => {
     expect(countGlanceableSessions([{ status: 'idle' }, { status: 'idle' }])).toEqual({
       running: 0,
       needsInput: 0,
-      reconnecting: 0,
+      idle: 2,
     });
+  });
+
+  it('ignores a completed or unknown status entirely', () => {
+    expect(
+      countGlanceableSessions([{ status: 'completed' }, { status: 'failed' }, { status: 'nope' }])
+    ).toEqual({ running: 0, needsInput: 0, idle: 0 });
   });
 });
 
@@ -82,38 +89,57 @@ describe('buildGlanceableSnapshot', () => {
     );
   });
 
-  it('keeps revision monotonic and eligibleStartedAt while work stays eligible', () => {
+  it('keeps revision monotonic and reports the oldest wait from the rows', () => {
+    const waitedLonger = new Date(NOW - 600_000).toISOString();
     const first = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
+      sessions: [{ status: 'question', statusUpdatedAt: waitedLonger }],
       userId: 'u1',
       organizationId: null,
       now: NOW,
     });
     const second = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }, { status: 'question' }],
+      sessions: [
+        { status: 'busy' },
+        { status: 'question', statusUpdatedAt: waitedLonger },
+        { status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+      ],
       userId: 'u1',
       organizationId: null,
       now: NOW + 5000,
       previousRevision: first.revision,
-      previousEligibleStartedAt: first.eligibleStartedAt,
     });
     expect(second.revision).toBe(first.revision + 1);
-    expect(second.eligibleStartedAt).toBe(first.eligibleStartedAt);
-    expect(second.needsInput).toBe(1);
+    expect(second.needsInput).toBe(2);
+    // Read from the rows every build, so a later revision still reports the
+    // oldest wait rather than a value latched at the first eligible emit.
+    expect(second.needsInputSince).toBe(waitedLonger);
   });
 
-  it('clears eligibleStartedAt when no eligible work remains', () => {
+  it('clears needsInputSince when no session is connected', () => {
     const snapshot = buildGlanceableSnapshot({
-      sessions: [{ status: 'idle' }],
+      sessions: [{ status: 'completed' }],
       userId: 'u1',
       organizationId: null,
       now: NOW,
       previousRevision: 3,
-      previousEligibleStartedAt: new Date(NOW - 60_000).toISOString(),
     });
     expect(snapshot.status).toBe('empty');
-    expect(snapshot.eligibleStartedAt).toBeNull();
+    expect(snapshot.needsInputSince).toBeNull();
     expect(snapshot.revision).toBe(4);
+  });
+
+  it('reports no wait while work runs but nothing needs input', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+        { status: 'idle', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.status).toBe('happy');
+    expect(snapshot.needsInputSince).toBeNull();
   });
 
   it('sets organizationBound only when organizationId is a string', () => {
@@ -216,5 +242,47 @@ describe('isEligibleGlanceableWork and revision discard', () => {
     expect(shouldDiscardGlanceableRevision(lowerRevision, current)).toBe(true);
     expect(shouldDiscardGlanceableRevision(olderAtEqualRevision, current)).toBe(true);
     expect(shouldDiscardGlanceableRevision(newerAtEqualRevision, current)).toBe(false);
+  });
+});
+
+describe('oldestNeedsInputSince', () => {
+  const at = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it('returns the earliest wait among the needs-input rows', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'question', statusUpdatedAt: at(60_000) },
+        { status: 'retry', statusUpdatedAt: at(600_000) },
+        { status: 'permission', statusUpdatedAt: at(120_000) },
+      ])
+    ).toBe(at(600_000));
+  });
+
+  it('ignores a row that does not need input, however old', () => {
+    expect(
+      oldestNeedsInputSince([
+        { status: 'busy', statusUpdatedAt: at(9_000_000) },
+        { status: 'idle', statusUpdatedAt: at(8_000_000) },
+        { status: 'question', statusUpdatedAt: at(1000) },
+      ])
+    ).toBe(at(1000));
+  });
+
+  it('skips a missing or unparseable timestamp instead of reporting now', () => {
+    expect(oldestNeedsInputSince([{ status: 'question' }])).toBeNull();
+    expect(
+      oldestNeedsInputSince([{ status: 'question', statusUpdatedAt: 'not a date' }])
+    ).toBeNull();
+    expect(
+      oldestNeedsInputSince([
+        { status: 'question', statusUpdatedAt: 'not a date' },
+        { status: 'question', statusUpdatedAt: at(300_000) },
+      ])
+    ).toBe(at(300_000));
+  });
+
+  it('returns null when nothing needs input', () => {
+    expect(oldestNeedsInputSince([{ status: 'busy', statusUpdatedAt: at(1000) }])).toBeNull();
+    expect(oldestNeedsInputSince([])).toBeNull();
   });
 });

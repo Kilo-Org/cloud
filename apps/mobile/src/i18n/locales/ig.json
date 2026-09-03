@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Ọkwa",
+    "liveActivities": "Ọrụ ndụ",
+    "liveActivitySubtitle": "Gosi ndị ọrụ na-arụ ọrụ na Lock Screen",
+    "liveUpdates": "Mmelite ndụ",
+    "liveUpdateSubtitle": "Gosi ndị ọrụ na-arụ ọrụ na ọkwa gị",
     "push": "Push",
     "enabled": "Ọkwa agbanyela",
     "onDescription": "Ọkwa push dị maka ngwaọrụ a.",
@@ -3219,11 +3223,12 @@
     "stale": "Enweghị ike imelite ugbu a",
     "expired": "Oge ọnọdụ agwụla",
     "signedOut": "Banye iji hụ ndị ọrụ",
-    "privacy": "Ezochiri ndị ọrụ",
+    "privacy": "Mepee Kilo ka ị hụ ndị ọrụ",
     "openAgents": "Mepee ndị ọrụ",
-    "running": "NA-AGBA",
+    "running": "Na-arụ ọrụ",
     "needsInput": "chọrọ ntinye",
-    "reconnecting": "Na-ejikọ ọzọ",
-    "channelName": "Ndị ọrụ na-arụ ọrụ"
+    "idle": "Ọrụ na-agaghị",
+    "channelName": "Ndị ọrụ na-arụ ọrụ",
+    "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
   }
 }

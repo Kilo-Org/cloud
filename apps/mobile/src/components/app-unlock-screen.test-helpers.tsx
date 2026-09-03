@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
@@ -102,6 +102,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Icon',
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
+  Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',

@@ -46,11 +46,19 @@ export const glanceableAgentsSnapshotSchema = z.object({
   accountEpoch: z.number().int().optional(),
   organizationBound: z.boolean(),
   status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
+  /** Sessions actively doing something. */
   running: z.number().int().min(0),
+  /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
   needsInput: z.number().int().min(0),
-  reconnecting: z.number().int().min(0),
-  /** ISO 8601 timestamp or null; binds the elapsed-time display. */
-  eligibleStartedAt: z.string().nullable(),
+  /** Sessions connected but doing nothing. */
+  idle: z.number().int().min(0),
+  /**
+   * ISO 8601 timestamp or null: when the longest-waiting needs-input session
+   * entered that state. Null when nothing needs input, or when no row carried
+   * a status timestamp. Only needs-input carries a duration, because a wait is
+   * the one interval the user can act on — see `oldestNeedsInputSince`.
+   */
+  needsInputSince: z.string().nullable(),
 });
 
 export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;
@@ -58,18 +66,35 @@ export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSc
 export type GlanceableCounts = {
   running: number;
   needsInput: number;
-  reconnecting: number;
+  idle: number;
 };
 
+/** One session row, as both producers read it from the active-sessions list. */
+export type GlanceableSessionRow = {
+  status: string;
+  /** ISO 8601; when this session's status last changed. Absent on old rows. */
+  statusUpdatedAt?: string;
+};
+
+/** Statuses that mean the agent waits on the user and cannot go on alone. */
+const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
+
 /**
- * Map session rows to the three eligible counts. `busy` → running,
- * `question`/`permission` → needs-input, `retry` → reconnecting. `idle` and
- * any unknown status are ignored. Do not call `isCompletedStatus` here.
+ * Map session rows to the three glanceable counts. `busy` → running,
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
+ * unknown status is ignored. Do not call `isCompletedStatus` here.
+ *
+ * `retry` folds into needs-input because it means one thing to the user: the
+ * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
+ * disconnects while that session was waiting on an answer, and the CLI writes
+ * it while backing off after a provider error.
  */
-export function countGlanceableSessions(sessions: readonly { status: string }[]): GlanceableCounts {
+export function countGlanceableSessions(
+  sessions: readonly GlanceableSessionRow[]
+): GlanceableCounts {
   let running = 0;
   let needsInput = 0;
-  let reconnecting = 0;
+  let idle = 0;
   for (const session of sessions) {
     switch (session.status) {
       case 'busy':
@@ -77,17 +102,44 @@ export function countGlanceableSessions(sessions: readonly { status: string }[])
         break;
       case 'question':
       case 'permission':
+      case 'retry':
         needsInput += 1;
         break;
-      case 'retry':
-        reconnecting += 1;
+      case 'idle':
+        idle += 1;
         break;
       default:
-        // idle and unknown statuses contribute nothing.
+        // An unknown status contributes nothing.
         break;
     }
   }
-  return { running, needsInput, reconnecting };
+  return { running, needsInput, idle };
+}
+
+/**
+ * The earliest `statusUpdatedAt` among the needs-input sessions, or null when
+ * none waits or none carried a usable timestamp.
+ *
+ * The counts are aggregates, so a single duration can only honestly describe
+ * the oldest wait: it is a floor on how long the user has kept an agent
+ * blocked. A row with a missing or unparseable timestamp is skipped rather
+ * than treated as waiting since now, which would understate the wait.
+ */
+export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[]): string | null {
+  let oldest: number | null = null;
+  let oldestIso: string | null = null;
+  for (const session of sessions) {
+    if (!NEEDS_INPUT_STATUSES.has(session.status) || session.statusUpdatedAt === undefined) {
+      continue;
+    }
+    const at = Date.parse(session.statusUpdatedAt);
+    if (Number.isNaN(at) || (oldest !== null && at >= oldest)) {
+      continue;
+    }
+    oldest = at;
+    oldestIso = session.statusUpdatedAt;
+  }
+  return oldestIso;
 }
 
 // FNV-1a 32-bit over UTF-16 code units (two bytes each). Deterministic across
@@ -120,13 +172,12 @@ export function buildOpaqueScopeKey(input: {
 }
 
 export type BuildGlanceableSnapshotInput = {
-  sessions: readonly { status: string }[];
+  sessions: readonly GlanceableSessionRow[];
   userId: string;
   organizationId: string | null;
   /** Epoch milliseconds. */
   now: number;
   previousRevision?: number;
-  previousEligibleStartedAt?: string | null;
   accountEpoch?: number;
   /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
   status?: GlanceableAgentsSnapshotStatus;
@@ -134,18 +185,18 @@ export type BuildGlanceableSnapshotInput = {
 
 /**
  * Build a snapshot from the current session rows. Revision increases by one
- * on every build. `eligibleStartedAt` keeps the previous value while work
- * stays eligible, starts at `now` when work becomes eligible, and is null
- * otherwise.
+ * on every build. `needsInputSince` comes straight from the rows, so it needs
+ * no carry-forward across revisions: it is data, not a latch.
  */
 export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  const eligible = counts.running + counts.needsInput + counts.reconnecting > 0;
+  // Idle counts: a connected agent doing nothing is still something the user
+  // wants on the Lock Screen, and the Dynamic Island ranks it last.
+  const eligible = counts.running + counts.needsInput + counts.idle > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
-  const eligibleStartedAt = eligible ? (input.previousEligibleStartedAt ?? updatedAt) : null;
 
   return {
     schemaVersion: GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
@@ -158,14 +209,14 @@ export function buildGlanceableSnapshot(
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,
-    reconnecting: counts.reconnecting,
-    eligibleStartedAt,
+    idle: counts.idle,
+    needsInputSince: oldestNeedsInputSince(input.sessions),
   };
 }
 
-/** True when any eligible count is non-zero. */
+/** True when any agent is connected, whether working, waiting, or idle. */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.reconnecting > 0;
+  return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
 }
 
 /**

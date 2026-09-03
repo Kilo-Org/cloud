@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Fampandrenesana",
+    "liveActivities": "Hetsika mivantana",
+    "liveActivitySubtitle": "Asehoy ny agent miasa eo amin’ny efijery mihidy",
+    "liveUpdates": "Fanavaozana mivantana",
+    "liveUpdateSubtitle": "Asehoy ao amin'ny fampahafantarana ny mpandraharaha miasa",
     "push": "Push",
     "enabled": "Alefa ny fampandrenesana",
     "onDescription": "Miasa amin'ity fitaovana ity ny fampandrenesana push.",
@@ -3219,11 +3223,12 @@
     "stale": "Tsy afaka manavao izao",
     "expired": "Lany daty ny sata",
     "signedOut": "Midira mba hahitana ny agent",
-    "privacy": "Nafenina ny agent",
+    "privacy": "Sokafy Kilo hijery ny agent",
     "openAgents": "Sokafy ny agent",
-    "running": "MANDEHA",
+    "running": "Miasa",
     "needsInput": "mila fampidirana",
-    "reconnecting": "Mampifandray indray",
-    "channelName": "Agent mavitrika"
+    "idle": "Tsy mihetsika",
+    "channelName": "Agent mavitrika",
+    "activityKitDisabledBody": "Alefaso ao amin'ny Fikirana ny Hetsika Mivantana mba hahitana ny Agent Mavitrika eo amin'ny Efijery Fihidy."
   }
 }

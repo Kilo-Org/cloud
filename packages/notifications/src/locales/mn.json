@@ -7,7 +7,8 @@
       "instanceLifecycle": "Таны инстанц шинэчлэлттэй байна",
       "scheduledAction": "Төлөвлөсөн үйлдэл шинэчлэлттэй байна",
       "lowBalance": "Таны үлдэгдэл анхаарал шаарддаг",
-      "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг"
+      "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг",
+      "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
     }
   },
   "cloudAgentSession": {

@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Kennisgewings",
+    "liveActivities": "Live-aktiwiteite",
+    "liveActivitySubtitle": "Wys aktiewe agente op die sluitskerm",
+    "liveUpdates": "Lewendige opdaterings",
+    "liveUpdateSubtitle": "Wys aktiewe agente in jou kennisgewings",
     "push": "Druk",
     "enabled": "Kennisgewings geaktiveer",
     "onDescription": "Drukkennisgewings is aan vir hierdie toestel.",
@@ -3219,11 +3223,12 @@
     "stale": "Kan nie nou opdateer nie",
     "expired": "Status het verval",
     "signedOut": "Meld aan om agente te sien",
-    "privacy": "Agente versteek",
+    "privacy": "Open Kilo om agente te sien",
     "openAgents": "Maak agente oop",
-    "running": "LOOP",
+    "running": "Werk",
     "needsInput": "benodig invoer",
-    "reconnecting": "Verbind tans weer",
-    "channelName": "Aktiewe agente"
+    "idle": "Onaktief",
+    "channelName": "Aktiewe agente",
+    "activityKitDisabledBody": "Skakel Regstreekse Aktiwiteite in Instellings aan om Aktiewe Agente op die Sluitskerm te sien."
   }
 }

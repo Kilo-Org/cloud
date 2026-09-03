@@ -5,6 +5,8 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { GlanceablePublisher } from '@/lib/glanceable/publisher';
+import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { i18n } from '@/i18n';
 
 import {
@@ -29,10 +31,11 @@ const mocks = vi.hoisted(() => {
   let widgetSnapshot: string | null = null;
   let widgetDeadline = 0;
 
-  // eslint-disable-next-line max-params -- the fake models the native bridge's timeout argument
+  // eslint-disable-next-line max-params -- the fake models the native bridge arguments
   function post(
     title: string,
     text: string,
+    _openAgentsLabel: string,
     compactText: string | null,
     promotion: boolean,
     timeoutMs = 0
@@ -80,11 +83,28 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-android-widget', () => ({
   FlexWidget: () => null,
   TextWidget: () => null,
+  ImageWidget: () => null,
   requestWidgetUpdate: (...args: unknown[]) => mocks.requestWidgetUpdate(...args),
 }));
 
 const NOW = 1_750_000_000_000;
-const CTX = { organizationId: null };
+const CTX = { organizationId: null, userId: 'u1' };
+
+const subscriptions = new Set<string>();
+const delivery = {
+  registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
+  registerTokens: vi.fn(() => subscriptions.add('scope')),
+  cleanupTokens: vi.fn((lifetime: 'scope' | 'activity') => {
+    if (lifetime === 'scope') {
+      subscriptions.clear();
+    }
+  }),
+  unregisterTokens: vi.fn().mockImplementation(async () => {
+    await Promise.resolve();
+    subscriptions.clear();
+    return { ok: true, tokens: [] };
+  }),
+};
 
 function snapshotFor(
   sessions: { status: string }[],
@@ -104,7 +124,7 @@ function snapshotFor(
 const MIXED = {
   ...snapshotFor([], 0, 'happy'),
   needsInput: 2,
-  reconnecting: 3,
+  idle: 3,
   running: 4,
 };
 
@@ -139,6 +159,12 @@ beforeEach(() => {
   _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
+  setGlanceableDelivery(delivery);
+  subscriptions.clear();
+  delivery.registerScopeTokens.mockClear();
+  delivery.registerTokens.mockClear();
+  delivery.cleanupTokens.mockClear();
+  delivery.unregisterTokens.mockClear();
   mocks.native.isPromotionCapable.mockReturnValue(true);
   mocks.native.end();
   mocks.native.start.mockClear();
@@ -154,12 +180,31 @@ afterEach(() => {
 });
 
 describe('androidSink start and update', () => {
+  it('keeps scope delivery available before and after work arrives in the background', async () => {
+    const publisher = new GlanceablePublisher({ sinks: [androidSink], now: () => NOW });
+    publisher.handleSessions([], CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toBeNull();
+    expect(getCurrentWidgetProps()?.statusLine).toBe('No work in progress');
+    expect(subscriptions).toEqual(new Set(['scope']));
+
+    publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.text).toBe('1 Working');
+
+    publisher.handleSessions([], CTX);
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(mocks.getNotification()).toBeNull();
+    expect(subscriptions).toEqual(new Set(['scope']));
+    publisher.dispose();
+  });
+
   it('forwards the ranked compact number and all counts on start and update', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: true,
     });
@@ -168,21 +213,36 @@ describe('androidSink start and update', () => {
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '3 Reconnecting, 4 Running',
-      compactText: '3',
+      text: '4 Working, 3 Idle',
+      compactText: '4',
       promotion: true,
     });
 
-    androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, reconnecting: 0 }, CTX);
+    androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, idle: 0 }, CTX);
     await flushAsync();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '4 Running',
+      text: '4 Working',
       compactText: '4',
       promotion: true,
     });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.native.update).toHaveBeenCalledTimes(2);
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '2 Needs input, 4 Working, 3 Idle',
+      'Open agents',
+      '2',
+      true
+    );
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      '4 Working',
+      'Open agents',
+      '4',
+      true,
+      0
+    );
   });
 
   it('keeps the full summary when the device cannot promote', async () => {
@@ -192,7 +252,7 @@ describe('androidSink start and update', () => {
 
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: false,
     });
@@ -209,8 +269,8 @@ describe('androidSink start and update', () => {
 
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '3 Reconnecting, 4 Running',
-      compactText: '3',
+      text: '4 Working, 3 Idle',
+      compactText: '4',
       promotion: true,
     });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -280,7 +340,61 @@ describe('androidSink start and update', () => {
       expect(mocks.native.update).not.toHaveBeenCalled();
     }
   );
+
+  it('registers the android_ongoing token on a successful start', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }], 0);
+    androidSink.startOrUpdate(snapshot, CTX);
+    await flushAsync();
+
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(delivery.registerTokens).toHaveBeenCalledWith(snapshot, CTX.organizationId, CTX.userId);
+    expect(delivery.unregisterTokens).not.toHaveBeenCalled();
+  });
+
+  it('does not register tokens when permission is denied', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
 });
+
+describe('androidSink app-state retry', () => {
+  it('restarts pending work and registers tokens once permission is granted', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    const snapshot = snapshotFor([{ status: 'busy' }], 0);
+    androidSink.startOrUpdate(snapshot, CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(delivery.registerTokens).toHaveBeenCalledWith(snapshot, CTX.organizationId, CTX.userId);
+  });
+
+  it('does not restart pending work while permission is still denied', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+
+    await handleAppStateActive();
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+});
+
+/** The working row's count — the rows always carry all three states in order. */
+function runningCount(): string | undefined {
+  return getCurrentWidgetProps()?.countLines.find(line => line.kind === 'running')?.count;
+}
 
 describe('androidSink widget publish and end', () => {
   it('publishes the widget snapshot on every publish', () => {
@@ -291,7 +405,7 @@ describe('androidSink widget publish and end', () => {
       expect.objectContaining({ widgetName: 'ActiveAgentsWidget' })
     );
     expect(getCurrentWidgetProps()?.statusLine).toBeNull();
-    expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+    expect(runningCount()).toBe('1');
   });
 
   it('publishes the stale warning and retained counts through the native bridge', async () => {
@@ -301,15 +415,15 @@ describe('androidSink widget publish and end', () => {
 
     const notification = mocks.getNotification();
     expect(notification?.text).toContain(i18n.t('glanceable.stale'));
-    expect(notification?.text).toContain('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(notification?.text).toContain('2 Needs input, 4 Working, 3 Idle');
     expect(notification?.compactText).toBe('2');
     expect(getCurrentWidgetProps()?.accessibilityLabel).toContain(
-      '2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+      '2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it.each([
-    ['privacy', 'Agents hidden'],
+    ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
   ] as const)('cancels both deadlines immediately for %s', async (status, copy) => {
     androidSink.publish(MIXED);
@@ -349,7 +463,18 @@ describe('androidSink widget publish and end', () => {
     androidSink.endImmediate();
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
     expect(getCurrentWidgetProps()).not.toBeNull();
-    expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+    expect(runningCount()).toBe('1');
+  });
+
+  it('ends the ongoing notification without removing widget delivery', async () => {
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).not.toBeNull();
+
+    androidSink.endImmediate();
+    await flushAsync();
+    expect(mocks.getNotification()).toBeNull();
+    expect(subscriptions).toEqual(new Set(['scope']));
   });
 
   it.each(['happy', 'stale'] as const)(
@@ -361,12 +486,10 @@ describe('androidSink widget publish and end', () => {
       expect(vi.getTimerCount()).toBe(0);
 
       vi.setSystemTime(NOW + 28_799_999);
-      expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+      expect(runningCount()).toBe('1');
       vi.setSystemTime(NOW + 28_800_000);
       expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
       expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-      expect(getCurrentWidgetProps()?.primaryCount).toBe(0);
-      expect(getCurrentWidgetProps()?.showOpenAgents).toBe(false);
     }
   );
 
@@ -383,7 +506,7 @@ describe('androidSink widget publish and end', () => {
     androidSink.endImmediate();
     expect(mocks.getWidgetDeadline()).toBe(NOW + 28_860_000);
     vi.setSystemTime(NOW + 28_800_000);
-    expect(getCurrentWidgetProps()?.primaryCount).toBe(1);
+    expect(runningCount()).toBe('1');
     expect(mocks.getNotification()).toBeNull();
   });
 
@@ -392,7 +515,7 @@ describe('androidSink widget publish and end', () => {
     vi.setSystemTime(NOW + 60_000);
     androidSink.publish({ ...MIXED, status: 'stale', revision: 2 });
     expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
-    expect(getCurrentWidgetProps()?.primaryCount).toBe(2);
+    expect(getCurrentWidgetProps()?.countLines.at(0)?.count).toBe('2');
     vi.setSystemTime(NOW + 28_800_000);
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
   });
@@ -435,7 +558,7 @@ describe('androidSink widget publish and end', () => {
     expect(() => {
       androidSink.publish(empty);
     }).toThrow('Cannot persist the active agents notification timeout');
-    expect(mocks.getNotification()?.text).toBe('2 Needs input, 3 Reconnecting, 4 Running');
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
     expect(mocks.getRequestedNotificationDeadline()).toBeNull();
 
     vi.setSystemTime(NOW + 3000);
@@ -469,7 +592,7 @@ describe('androidSink widget publish and end', () => {
 
       expect(mocks.getRequestedNotificationDeadline()).toBeNull();
       expect(mocks.getNotification()).toMatchObject({
-        text: '2 Needs input, 3 Reconnecting, 4 Running',
+        text: '2 Needs input, 4 Working, 3 Idle',
         compactText: '2',
       });
       expect(mocks.getWidgetDeadline()).toBe(method === 'publish' ? NOW + 28_800_000 : 0);
@@ -529,7 +652,7 @@ describe('handleAppStateActive permission alert', () => {
     await handleAppStateActive();
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
-      text: '2 Needs input, 3 Reconnecting, 4 Running',
+      text: '2 Needs input, 4 Working, 3 Idle',
       compactText: '2',
       promotion: true,
     });

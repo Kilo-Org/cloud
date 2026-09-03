@@ -24,7 +24,7 @@ import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
-import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
+import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
@@ -45,6 +45,7 @@ import {
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
@@ -221,6 +222,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // Blank the prior account's glanceable surface before any credential
         // persist, so a direct account switch never shows the previous account.
         writeSignedOutSnapshotAndEnd();
+        // Unregister the prior account's activity tokens (Live Activity /
+        // push-to-start) BEFORE persisting the new credentials, so the
+        // unregister runs under the old token owner's auth. This never revokes
+        // the device session or unregisters the Expo push token (logout-only).
+        await unregisterActivityTokensAndTombstone();
         setAuthEpoch(currentAuthEpoch());
         setToken(undefined);
         clearActiveToken();
@@ -385,6 +391,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearAgentModelPreference();
           clearReasoningPreference();
           clearKeepScreenOnPreference();
+          clearLiveActivityPreference();
           clearSessionScopedState();
           clearPrReviewFooterPreference();
         } finally {

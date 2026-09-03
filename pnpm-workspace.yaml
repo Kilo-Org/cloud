@@ -43,7 +43,7 @@ catalog:
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
   wrangler: 4.112.0
-  zod: 4.4.3
+  zod: 4.5.4
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:

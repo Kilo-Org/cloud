@@ -91,8 +91,8 @@ catalogs:
       specifier: 4.112.0
       version: 4.112.0
     zod:
-      specifier: 4.4.3
-      version: 4.4.3
+      specifier: 4.5.4
+      version: 4.5.4
 
 overrides:
   '@babel/plugin-transform-modules-systemjs': 7.29.7
@@ -241,7 +241,7 @@ importers:
         version: link:../../packages/trpc
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
-        version: 1.30.0(zod@4.4.3)
+        version: 1.30.0(zod@4.5.4)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.100.10(react@19.2.6)
@@ -277,7 +277,7 @@ importers:
         version: 4.0.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@playwright/test':
         specifier: 1.58.2
@@ -629,7 +629,7 @@ importers:
         version: 3.0.2
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     dependenciesMeta:
       '@kilocode/kilo-chat-hooks':
         injected: true
@@ -708,11 +708,11 @@ importers:
         version: 3.5.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@anatine/zod-mock':
         specifier: 3.14.0
-        version: 3.14.0(@faker-js/faker@10.3.0)(zod@4.4.3)
+        version: 3.14.0(@faker-js/faker@10.3.0)(zod@4.5.4)
       '@chromatic-com/storybook':
         specifier: 5.2.1
         version: 5.2.1(@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(esbuild@0.28.1)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(utf-8-validate@6.0.6))(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
@@ -727,7 +727,7 @@ importers:
         version: 10.4.6(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(esbuild@0.28.1)(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@25.5.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(type-fest@4.41.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)(webpack@5.105.4(esbuild@0.28.1))
       '@storybook/test-runner':
         specifier: 0.24.4
-        version: 0.24.4(@types/node@25.5.2)(node-notifier@10.0.1)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
+        version: 0.24.4(@swc/helpers@0.5.23)(@types/node@25.5.2)(node-notifier@10.0.1)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
       '@tailwindcss/typography':
         specifier: 0.5.19
         version: 0.5.19(tailwindcss@4.2.4)
@@ -778,16 +778,16 @@ importers:
     dependencies:
       '@ai-sdk/anthropic':
         specifier: 4.0.15
-        version: 4.0.15(zod@4.4.3)
+        version: 4.0.15(zod@4.5.4)
       '@ai-sdk/gateway':
         specifier: 4.0.21
-        version: 4.0.21(zod@4.4.3)
+        version: 4.0.21(zod@4.5.4)
       '@ai-sdk/openai-compatible':
         specifier: 3.0.11
-        version: 3.0.11(zod@4.4.3)
+        version: 3.0.11(zod@4.5.4)
       '@anthropic-ai/sdk':
         specifier: 0.104.1
-        version: 0.104.1(zod@4.4.3)
+        version: 0.104.1(zod@4.5.4)
       '@apple/app-store-server-library':
         specifier: 3.1.0
         version: 3.1.0
@@ -799,19 +799,19 @@ importers:
         version: 3.1009.0
       '@chat-adapter/github':
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@chat-adapter/linear':
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(graphql@16.14.2)(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(graphql@16.14.2)(zod@4.5.4)
       '@chat-adapter/slack':
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.5.4)
       '@chat-adapter/state-memory':
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@chat-adapter/state-redis':
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@emoji-mart/data':
         specifier: 1.2.1
         version: 1.2.1
@@ -874,7 +874,7 @@ importers:
         version: 0.17.15(react@19.2.6)
       '@mdx-js/loader':
         specifier: 3.1.1
-        version: 3.1.1(webpack@5.105.4(@swc/core@1.15.18))
+        version: 3.1.1(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       '@mdx-js/react':
         specifier: 3.1.1
         version: 3.1.1(@types/react@19.2.14)(react@19.2.6)
@@ -892,7 +892,7 @@ importers:
         version: 16.3.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@next/mdx':
         specifier: 16.3.3
-        version: 16.3.3(@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18)))(@mdx-js/react@3.1.1(@types/react@19.2.14)(react@19.2.6))
+        version: 16.3.3(@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))))(@mdx-js/react@3.1.1(@types/react@19.2.14)(react@19.2.6))
       '@next/third-parties':
         specifier: 16.3.3
         version: 16.3.3(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)
@@ -976,7 +976,7 @@ importers:
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@sentry/nextjs':
         specifier: 10.69.0
-        version: 10.69.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18))
+        version: 10.69.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       '@sentry/opentelemetry':
         specifier: 10.69.0
         version: 10.69.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))
@@ -1042,7 +1042,7 @@ importers:
         version: 6.0.0
       ai:
         specifier: 7.0.29
-        version: 7.0.29(zod@4.4.3)
+        version: 7.0.29(zod@4.5.4)
       archiver:
         specifier: 7.0.1
         version: 7.0.1
@@ -1054,7 +1054,7 @@ importers:
         version: 2.3.0
       chat:
         specifier: 4.36.0
-        version: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+        version: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -1138,7 +1138,7 @@ importers:
         version: 4.24.15(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       openai:
         specifier: 6.49.0
-        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
+        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.5.4)
       p-limit:
         specifier: 'catalog:'
         version: 7.3.0
@@ -1207,11 +1207,11 @@ importers:
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@chromatic-com/playwright':
         specifier: 0.12.8
-        version: 0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.18)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        version: 0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@jest/globals':
         specifier: 30.3.0
         version: 30.3.0
@@ -1223,7 +1223,7 @@ importers:
         version: 1.58.2
       '@swc/jest':
         specifier: 0.2.39
-        version: 0.2.39(@swc/core@1.15.18)
+        version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       '@tailwindcss/postcss':
         specifier: 4.2.4
         version: 4.2.4
@@ -1304,7 +1304,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1323,7 +1323,7 @@ importers:
         version: 0.12.79
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1351,7 +1351,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@trpc/server':
         specifier: 'catalog:'
@@ -1379,7 +1379,7 @@ importers:
         version: 2.18.1(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@jest/globals':
         specifier: 30.3.0
@@ -1389,7 +1389,7 @@ importers:
         version: link:../session-ingest-contracts
       '@swc/jest':
         specifier: 0.2.39
-        version: 0.2.39(@swc/core@1.15.18)
+        version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
@@ -1407,7 +1407,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/containers':
         specifier: 0.3.7
@@ -1441,7 +1441,7 @@ importers:
         version: 8.20.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@jest/globals':
         specifier: 30.3.0
@@ -1481,7 +1481,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1503,7 +1503,7 @@ importers:
         version: 3.0.2
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1547,7 +1547,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1563,7 +1563,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1579,7 +1579,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1598,7 +1598,7 @@ importers:
         version: 26.3.6(typescript@5.9.3)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1626,7 +1626,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1663,7 +1663,7 @@ importers:
         version: 19.3.1(@types/node@25.5.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
@@ -1697,7 +1697,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1737,7 +1737,7 @@ importers:
         version: 6.2.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1765,7 +1765,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/jest':
         specifier: 29.5.14
@@ -1814,7 +1814,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/containers':
         specifier: 0.1.1
@@ -1900,7 +1900,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -1943,7 +1943,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -1977,7 +1977,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2050,7 +2050,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/containers':
         specifier: 0.3.7
@@ -2130,7 +2130,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2204,7 +2204,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2256,7 +2256,7 @@ importers:
         version: 3.1.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/sandbox':
         specifier: 0.6.11
@@ -2311,7 +2311,7 @@ importers:
         version: 9.0.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2321,7 +2321,7 @@ importers:
         version: 4.20260605.1
       '@swc/jest':
         specifier: 0.2.39
-        version: 0.2.39(@swc/core@1.15.18)
+        version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       '@types/jest':
         specifier: 30.0.0
         version: 30.0.0
@@ -2366,7 +2366,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2433,7 +2433,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2476,7 +2476,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/bun':
         specifier: 1.3.14
@@ -2513,7 +2513,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2541,7 +2541,7 @@ importers:
         version: 6.2.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2563,7 +2563,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
-        version: 1.30.0(zod@4.4.3)
+        version: 1.30.0(zod@4.5.4)
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20
@@ -2578,7 +2578,7 @@ importers:
         version: 9.0.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2648,7 +2648,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -2737,7 +2737,7 @@ importers:
         version: 6.2.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2786,7 +2786,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2845,7 +2845,7 @@ importers:
         version: 3.1.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2864,7 +2864,7 @@ importers:
         version: 2.2.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       esbuild:
         specifier: '>=0.28.1'
@@ -2925,7 +2925,7 @@ importers:
         version: 6.2.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -2959,7 +2959,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: '>=24 <25'
@@ -3005,7 +3005,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -3042,7 +3042,7 @@ importers:
         version: 4.12.34
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -3082,7 +3082,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -3113,7 +3113,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -3159,7 +3159,7 @@ importers:
         version: 6.2.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -3199,7 +3199,7 @@ importers:
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -3254,7 +3254,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -3309,7 +3309,7 @@ importers:
         version: 1.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.5.4
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
@@ -9333,9 +9333,6 @@ packages:
 
   '@swc/counter@0.1.3':
     resolution: {integrity: sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==}
-
-  '@swc/helpers@0.5.15':
-    resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
@@ -18807,6 +18804,9 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
+
   zustand@5.0.12:
     resolution: {integrity: sha512-i77ae3aZq4dhMlRhJVCYgMLKuSiZAaUPAct2AksxQ+gOtimhGMdXljRT21P5BNpeT4kXlLIckvkPM029OljD7g==}
     engines: {node: '>=12.20.0'}
@@ -18841,32 +18841,32 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@ai-sdk/anthropic@4.0.15(zod@4.4.3)':
+  '@ai-sdk/anthropic@4.0.15(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 5.0.10(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/gateway@4.0.21(zod@4.4.3)':
+  '@ai-sdk/gateway@4.0.21(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
+      '@ai-sdk/provider-utils': 5.0.10(zod@4.5.4)
       '@vercel/oidc': 3.2.0
-      zod: 4.4.3
+      zod: 4.5.4
 
-  '@ai-sdk/openai-compatible@3.0.11(zod@4.4.3)':
+  '@ai-sdk/openai-compatible@3.0.11(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 5.0.10(zod@4.5.4)
+      zod: 4.5.4
 
-  '@ai-sdk/provider-utils@5.0.10(zod@4.4.3)':
+  '@ai-sdk/provider-utils@5.0.10(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.0.8
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@ai-sdk/provider@4.0.3':
     dependencies:
@@ -18888,18 +18888,18 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@anatine/zod-mock@3.14.0(@faker-js/faker@10.3.0)(zod@4.4.3)':
+  '@anatine/zod-mock@3.14.0(@faker-js/faker@10.3.0)(zod@4.5.4)':
     dependencies:
       '@faker-js/faker': 10.3.0
       randexp: 0.5.3
-      zod: 4.4.3
+      zod: 4.5.4
 
-  '@anthropic-ai/sdk@0.104.1(zod@4.4.3)':
+  '@anthropic-ai/sdk@0.104.1(zod@4.5.4)':
     dependencies:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
-      zod: 4.4.3
+      zod: 4.5.4
 
   '@anthropic-ai/sdk@0.109.1(zod@4.4.3)':
     dependencies:
@@ -20353,23 +20353,23 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@chat-adapter/github@4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/github@4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)':
     dependencies:
-      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@octokit/auth-app': 8.2.0
       '@octokit/rest': 22.0.1
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
     transitivePeerDependencies:
       - ai
       - supports-color
       - workflow
       - zod
 
-  '@chat-adapter/linear@4.36.0(ai@7.0.29(zod@4.4.3))(graphql@16.14.2)(zod@4.4.3)':
+  '@chat-adapter/linear@4.36.0(ai@7.0.29(zod@4.5.4))(graphql@16.14.2)(zod@4.5.4)':
     dependencies:
-      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@linear/sdk': 76.0.0(graphql@16.14.2)
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
     transitivePeerDependencies:
       - ai
       - graphql
@@ -20377,21 +20377,21 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/shared@4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/shared@4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)':
     dependencies:
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
     transitivePeerDependencies:
       - ai
       - supports-color
       - workflow
       - zod
 
-  '@chat-adapter/slack@4.36.0(ai@7.0.29(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.4.3)':
+  '@chat-adapter/slack@4.36.0(ai@7.0.29(zod@4.5.4))(bufferutil@4.1.0)(utf-8-validate@6.0.6)(zod@4.5.4)':
     dependencies:
-      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      '@chat-adapter/shared': 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       '@slack/socket-mode': 2.0.7(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@slack/web-api': 7.19.0
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
     transitivePeerDependencies:
       - ai
       - bufferutil
@@ -20401,18 +20401,18 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/state-memory@4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/state-memory@4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)':
     dependencies:
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
     transitivePeerDependencies:
       - ai
       - supports-color
       - workflow
       - zod
 
-  '@chat-adapter/state-redis@4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)':
+  '@chat-adapter/state-redis@4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)':
     dependencies:
-      chat: 4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3)
+      chat: 4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4)
       redis: 5.11.0
     transitivePeerDependencies:
       - '@node-rs/xxhash'
@@ -20421,7 +20421,7 @@ snapshots:
       - workflow
       - zod
 
-  '@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.18)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(utf-8-validate@6.0.6)':
+  '@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(utf-8-validate@6.0.6)':
     dependencies:
       '@chromaui/rrweb-snapshot': 2.0.0-alpha.18-noAbsolute
       '@playwright/test': 1.58.2
@@ -20429,7 +20429,7 @@ snapshots:
       '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
       '@storybook/csf': 0.1.13
       '@storybook/manager-api': 8.5.8(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
-      '@storybook/server-webpack5': 8.5.8(@swc/core@1.15.18)(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)
+      '@storybook/server-webpack5': 8.5.8(@swc/core@1.15.18(@swc/helpers@0.5.23))(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)
       storybook: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6)
       ts-dedent: 2.2.0
     transitivePeerDependencies:
@@ -22947,12 +22947,12 @@ snapshots:
 
   '@mdn/browser-compat-data@8.0.2': {}
 
-  '@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18))':
+  '@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))':
     dependencies:
       '@mdx-js/mdx': 3.1.1
       source-map: 0.7.6
     optionalDependencies:
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
     transitivePeerDependencies:
       - supports-color
 
@@ -23108,7 +23108,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.5.4)':
     dependencies:
       '@hono/node-server': 2.0.10(hono@4.12.34)
       ajv: 8.20.0
@@ -23125,8 +23125,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.1(zod@4.4.3)
+      zod: 4.5.4
+      zod-to-json-schema: 3.25.1(zod@4.5.4)
     transitivePeerDependencies:
       - supports-color
 
@@ -23207,11 +23207,11 @@ snapshots:
 
   '@next/env@16.3.3': {}
 
-  '@next/mdx@16.3.3(@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18)))(@mdx-js/react@3.1.1(@types/react@19.2.14)(react@19.2.6))':
+  '@next/mdx@16.3.3(@mdx-js/loader@3.1.1(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))))(@mdx-js/react@3.1.1(@types/react@19.2.14)(react@19.2.6))':
     dependencies:
       source-map: 0.7.6
     optionalDependencies:
-      '@mdx-js/loader': 3.1.1(webpack@5.105.4(@swc/core@1.15.18))
+      '@mdx-js/loader': 3.1.1(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       '@mdx-js/react': 3.1.1(@types/react@19.2.14)(react@19.2.6)
 
   '@next/swc-darwin-arm64@16.3.3':
@@ -25266,7 +25266,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@sentry/bundler-plugins@10.69.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18))':
+  '@sentry/bundler-plugins@10.69.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))':
     dependencies:
       '@babel/core': 7.29.7
       '@sentry/cli': 2.58.6
@@ -25277,7 +25277,7 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.62.3
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -25436,7 +25436,7 @@ snapshots:
     dependencies:
       '@sentry/core': 10.69.0
 
-  '@sentry/nextjs@10.69.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18))':
+  '@sentry/nextjs@10.69.0(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react@19.2.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.62.3)
@@ -25449,7 +25449,7 @@ snapshots:
       '@sentry/react': 10.69.0(react@19.2.6)
       '@sentry/server-utils': 10.69.0
       '@sentry/vercel-edge': 10.69.0
-      '@sentry/webpack-plugin': 5.4.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18))
+      '@sentry/webpack-plugin': 5.4.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       next: 16.3.3(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       rollup: 4.62.3
       stacktrace-parser: 0.1.11
@@ -25588,10 +25588,10 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@sentry/core': 10.69.0
 
-  '@sentry/webpack-plugin@5.4.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18))':
+  '@sentry/webpack-plugin@5.4.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))':
     dependencies:
-      '@sentry/bundler-plugins': 10.69.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18))
-      webpack: 5.105.4(@swc/core@1.15.18)
+      '@sentry/bundler-plugins': 10.69.0(rollup@4.62.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
     transitivePeerDependencies:
       - encoding
       - rollup
@@ -26195,7 +26195,7 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@storybook/builder-webpack5@8.5.8(@swc/core@1.15.18)(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)':
+  '@storybook/builder-webpack5@8.5.8(@swc/core@1.15.18(@swc/helpers@0.5.23))(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)':
     dependencies:
       '@storybook/core-webpack': 8.5.8(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
       '@types/semver': 7.7.1
@@ -26203,23 +26203,23 @@ snapshots:
       case-sensitive-paths-webpack-plugin: 2.4.0
       cjs-module-lexer: 1.4.3
       constants-browserify: 1.0.0
-      css-loader: 6.11.0(webpack@5.105.4(@swc/core@1.15.18))
+      css-loader: 6.11.0(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       es-module-lexer: 1.7.0
-      fork-ts-checker-webpack-plugin: 8.0.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18))
-      html-webpack-plugin: 5.6.6(webpack@5.105.4(@swc/core@1.15.18))
+      fork-ts-checker-webpack-plugin: 8.0.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
+      html-webpack-plugin: 5.6.6(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       magic-string: 0.30.21
       path-browserify: 1.0.1
       process: 0.11.10
       semver: 7.8.5
       storybook: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6)
-      style-loader: 3.3.4(webpack@5.105.4(@swc/core@1.15.18))
-      terser-webpack-plugin: 5.4.0(@swc/core@1.15.18)(webpack@5.105.4(@swc/core@1.15.18))
+      style-loader: 3.3.4(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
+      terser-webpack-plugin: 5.4.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       ts-dedent: 2.2.0
       url: 0.11.4
       util: 0.12.5
       util-deprecate: 1.0.2
-      webpack: 5.105.4(@swc/core@1.15.18)
-      webpack-dev-middleware: 6.1.3(webpack@5.105.4(@swc/core@1.15.18))
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
+      webpack-dev-middleware: 6.1.3(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       webpack-hot-middleware: 2.26.1
       webpack-virtual-modules: 0.6.2
     optionalDependencies:
@@ -26465,9 +26465,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/server-webpack5@8.5.8(@swc/core@1.15.18)(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)':
+  '@storybook/server-webpack5@8.5.8(@swc/core@1.15.18(@swc/helpers@0.5.23))(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)':
     dependencies:
-      '@storybook/builder-webpack5': 8.5.8(@swc/core@1.15.18)(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)
+      '@storybook/builder-webpack5': 8.5.8(@swc/core@1.15.18(@swc/helpers@0.5.23))(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))(typescript@5.9.3)
       '@storybook/preset-server-webpack': 8.5.8(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
       '@storybook/server': 8.5.8(storybook@10.4.6(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))
       storybook: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6)
@@ -26506,15 +26506,15 @@ snapshots:
       ts-dedent: 2.2.0
       yaml: 2.8.4
 
-  '@storybook/test-runner@0.24.4(@types/node@25.5.2)(node-notifier@10.0.1)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))':
+  '@storybook/test-runner@0.24.4(@swc/helpers@0.5.23)(@types/node@25.5.2)(node-notifier@10.0.1)(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(bufferutil@4.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(utf-8-validate@6.0.6))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/generator': 7.29.1
       '@babel/template': 7.28.6
       '@babel/types': 7.29.0
       '@jest/types': 30.3.0
-      '@swc/core': 1.15.18
-      '@swc/jest': 0.2.39(@swc/core@1.15.18)
+      '@swc/core': 1.15.18(@swc/helpers@0.5.23)
+      '@swc/jest': 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       expect-playwright: 0.8.0
       jest: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
       jest-circus: 30.3.0
@@ -26578,7 +26578,7 @@ snapshots:
   '@swc/core-win32-x64-msvc@1.15.18':
     optional: true
 
-  '@swc/core@1.15.18':
+  '@swc/core@1.15.18(@swc/helpers@0.5.23)':
     dependencies:
       '@swc/counter': 0.1.3
       '@swc/types': 0.1.25
@@ -26593,21 +26593,18 @@ snapshots:
       '@swc/core-win32-arm64-msvc': 1.15.18
       '@swc/core-win32-ia32-msvc': 1.15.18
       '@swc/core-win32-x64-msvc': 1.15.18
+      '@swc/helpers': 0.5.23
 
   '@swc/counter@0.1.3': {}
-
-  '@swc/helpers@0.5.15':
-    dependencies:
-      tslib: 2.8.1
 
   '@swc/helpers@0.5.23':
     dependencies:
       tslib: 2.8.1
 
-  '@swc/jest@0.2.39(@swc/core@1.15.18)':
+  '@swc/jest@0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))':
     dependencies:
       '@jest/create-cache-key-function': 30.3.0
-      '@swc/core': 1.15.18
+      '@swc/core': 1.15.18(@swc/helpers@0.5.23)
       '@swc/counter': 0.1.3
       jsonc-parser: 3.3.1
 
@@ -27807,12 +27804,12 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ai@7.0.29(zod@4.4.3):
+  ai@7.0.29(zod@4.5.4):
     dependencies:
-      '@ai-sdk/gateway': 4.0.21(zod@4.4.3)
+      '@ai-sdk/gateway': 4.0.21(zod@4.5.4)
       '@ai-sdk/provider': 4.0.3
-      '@ai-sdk/provider-utils': 5.0.10(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 5.0.10(zod@4.5.4)
+      zod: 4.5.4
 
   ajv-formats@2.1.1:
     dependencies:
@@ -28569,7 +28566,7 @@ snapshots:
 
   character-reference-invalid@2.0.1: {}
 
-  chat@4.36.0(ai@7.0.29(zod@4.4.3))(zod@4.4.3):
+  chat@4.36.0(ai@7.0.29(zod@4.5.4))(zod@4.5.4):
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
@@ -28579,8 +28576,8 @@ snapshots:
       remend: 1.2.2
       unified: 11.0.5
     optionalDependencies:
-      ai: 7.0.29(zod@4.4.3)
-      zod: 4.4.3
+      ai: 7.0.29(zod@4.5.4)
+      zod: 4.5.4
     transitivePeerDependencies:
       - supports-color
 
@@ -29061,7 +29058,7 @@ snapshots:
       randombytes: 2.1.0
       randomfill: 1.0.4
 
-  css-loader@6.11.0(webpack@5.105.4(@swc/core@1.15.18)):
+  css-loader@6.11.0(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
       icss-utils: 5.1.0(postcss@8.5.25)
       postcss: 8.5.25
@@ -29072,7 +29069,7 @@ snapshots:
       postcss-value-parser: 4.2.0
       semver: 7.8.5
     optionalDependencies:
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
 
   css-loader@6.11.0(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -30945,7 +30942,7 @@ snapshots:
       cross-spawn: 7.0.6
       signal-exit: 3.0.7
 
-  fork-ts-checker-webpack-plugin@8.0.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18)):
+  fork-ts-checker-webpack-plugin@8.0.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
       '@babel/code-frame': 7.29.7
       chalk: 4.1.2
@@ -30960,7 +30957,7 @@ snapshots:
       semver: 7.8.5
       tapable: 2.3.0
       typescript: 5.9.3
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
 
   fork-ts-checker-webpack-plugin@8.0.0(typescript@5.9.3)(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -31431,7 +31428,7 @@ snapshots:
 
   html-url-attributes@3.0.1: {}
 
-  html-webpack-plugin@5.6.6(webpack@5.105.4(@swc/core@1.15.18)):
+  html-webpack-plugin@5.6.6(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
       '@types/html-minifier-terser': 6.1.0
       html-minifier-terser: 6.1.0
@@ -31439,7 +31436,7 @@ snapshots:
       pretty-error: 4.0.0
       tapable: 2.3.0
     optionalDependencies:
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
 
   html-webpack-plugin@5.6.6(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -34419,11 +34416,11 @@ snapshots:
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 4.4.3
 
-  openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3):
+  openai@6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.5.4):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.21
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      zod: 4.4.3
+      zod: 4.5.4
 
   openclaw@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
@@ -37006,9 +37003,9 @@ snapshots:
 
   stubborn-utils@1.0.2: {}
 
-  style-loader@3.3.4(webpack@5.105.4(@swc/core@1.15.18)):
+  style-loader@3.3.4(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
 
   style-loader@3.3.4(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -37154,15 +37151,15 @@ snapshots:
 
   terminal-size@4.0.1: {}
 
-  terser-webpack-plugin@5.4.0(@swc/core@1.15.18)(webpack@5.105.4(@swc/core@1.15.18)):
+  terser-webpack-plugin@5.4.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.46.0
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
     optionalDependencies:
-      '@swc/core': 1.15.18
+      '@swc/core': 1.15.18(@swc/helpers@0.5.23)
 
   terser-webpack-plugin@5.4.0(esbuild@0.28.1)(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -38123,7 +38120,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  webpack-dev-middleware@6.1.3(webpack@5.105.4(@swc/core@1.15.18)):
+  webpack-dev-middleware@6.1.3(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))):
     dependencies:
       colorette: 2.0.20
       memfs: 3.5.3
@@ -38131,7 +38128,7 @@ snapshots:
       range-parser: 1.2.1
       schema-utils: 4.3.3
     optionalDependencies:
-      webpack: 5.105.4(@swc/core@1.15.18)
+      webpack: 5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))
 
   webpack-dev-middleware@6.1.3(webpack@5.105.4(esbuild@0.28.1)):
     dependencies:
@@ -38185,7 +38182,7 @@ snapshots:
       - esbuild
       - uglify-js
 
-  webpack@5.105.4(@swc/core@1.15.18):
+  webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.8
@@ -38209,7 +38206,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.0
-      terser-webpack-plugin: 5.4.0(@swc/core@1.15.18)(webpack@5.105.4(@swc/core@1.15.18))
+      terser-webpack-plugin: 5.4.0(@swc/core@1.15.18(@swc/helpers@0.5.23))(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23)))
       watchpack: 2.5.1
       webpack-sources: 3.3.4
     transitivePeerDependencies:
@@ -38712,11 +38709,17 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
+  zod-to-json-schema@3.25.1(zod@4.5.4):
+    dependencies:
+      zod: 4.5.4
+
   zod@3.25.76: {}
 
   zod@4.1.8: {}
 
   zod@4.4.3: {}
+
+  zod@4.5.4: {}
 
   zustand@5.0.12(@types/react@19.2.14)(immer@11.1.4)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3)):
     optionalDependencies:

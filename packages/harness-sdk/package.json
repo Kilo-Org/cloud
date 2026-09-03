@@ -20,7 +20,8 @@
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
     "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test",
     "test:e2e": "tsx e2e/live.ts",
-    "typecheck:e2e": "tsgo --noEmit -p e2e/tsconfig.json"
+    "typecheck:e2e": "tsgo --noEmit -p e2e/tsconfig.json",
+    "test:e2e:models": "tsx e2e/models.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.104.1",

@@ -117,6 +117,37 @@ or a repeated large `cache write` means the prefix moved.
 `e2e/node-fetch.ts` is the whole Node adapter, about ten lines. That is the
 measure of what `FetchLike` asks of a caller.
 
+### Many models, a longer conversation
+
+`pnpm test:e2e:models` holds a five turn conversation with each of the ten most
+used models on OpenRouter. The last question can only be answered from the
+history, so the run proves the prompt actually carries the conversation.
+
+Measured on 2026-09-03, five turns each, the Kilo organization:
+
+| Model | Recalled | Cache read | Input | Ratio |
+|---|---|---:|---:|---:|
+| `openai/gpt-5.6-luna` | yes | 56324 | 15 | 0.9997 |
+| `z-ai/glm-5.3-flash` | yes | 34560 | 21754 | 0.6137 |
+| `deepseek/deepseek-v4-flash-0731` | yes | 56320 | 324 | 0.9943 |
+| `tencent/hy4-preview` | — | — | — | 404, not allowed for the team |
+| `xiaomi/mimo-v2.5` | yes | 57600 | 194 | 0.9966 |
+| `tencent/hy3` | yes | 55808 | 491 | 0.9913 |
+| `deepseek/deepseek-v4-flash` | yes | 56320 | 324 | 0.9943 |
+| `minimax/minimax-m3` | yes | 57009 | 75 | 0.9987 |
+| `nvidia/nemotron-3-ultra-550b-a55b` | yes | 40960 | 17899 | 0.6959 |
+| `google/gemini-3.7-flash` | yes | 40755 | 17884 | 0.6950 |
+
+Every served model took the `messages` shape. Two lessons hold beyond this run:
+
+- **The ratio is the provider's, not the package's.** The package places the
+  same breakpoints for every model. A provider that caches on its own terms
+  lands near 0.99; one that does not lands near 0.6, and it varies between runs
+  on the same model. Do not chase a low number as if it were a defect here.
+- **A small token budget reads as a broken transport.** At 64 tokens, four of
+  these ten answered nothing: a reasoning model spends the budget before it
+  writes a word. The run uses 1024.
+
 ## Decisions
 
 ### The session bridges; the plugin decides

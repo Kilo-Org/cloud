@@ -15,7 +15,8 @@
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src"
   },
   "dependencies": {
-    "effect": "3.22.1"
+    "effect": "3.22.1",
+    "ulid": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

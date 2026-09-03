@@ -1398,7 +1398,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1498,6 +1498,9 @@ importers:
       effect:
         specifier: 3.22.1
         version: 3.22.1
+      ulid:
+        specifier: 'catalog:'
+        version: 3.0.2
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

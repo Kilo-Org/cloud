@@ -50,8 +50,22 @@ regression until a measurement says otherwise.
 
 ## Recorded deviations
 
-- `import/no-named-export` is off. This package is a library; a barrel needs
-  named exports.
-- `import/group-exports` stays on. Declare a name, then export it in one
-  `export type { ... }` block and one `export { ... }` block at the end of the
-  file.
+Every rule below is off because it costs more than it gives. Add a row when you
+turn one off, and give the reason.
+
+| Rule | Reason |
+|---|---|
+| `import/no-named-export` | This package is a library. A barrel needs named exports. |
+| `import/consistent-type-specifier-style` | It deadlocks with `consistent-type-imports` and `no-duplicate-imports`. Inline `type` specifiers win. |
+| `no-ternary` | A ternary is the normal form for a two-branch expression. |
+| `sort-imports` | It sorts by member syntax, which no formatter keeps. |
+| `id-length` | Effect names its type parameters `A`, `E`, and `R`. |
+| `vitest/no-importing-vitest-globals` | An explicit import beats a global. |
+| `vitest/prefer-to-be-truthy` | `toBe(true)` states the value; `toBeTruthy` does not. |
+
+`new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
+`Context.Tag` is a call, not a constructor.
+
+`import/group-exports` stays on. Declare a name, then export it in one
+`export type { ... }` block and one `export { ... }` block at the end of the
+file.

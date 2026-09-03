@@ -32,7 +32,19 @@
       }
     ],
     "import/no-named-export": "off",
-    "import/no-default-export": "error"
+    "import/no-default-export": "error",
+    "no-ternary": "off",
+    "new-cap": [
+      "error",
+      {
+        "capIsNewExceptions": ["Tag", "GenericTag", "Context.Tag", "Context.GenericTag"]
+      }
+    ],
+    "sort-imports": "off",
+    "vitest/no-importing-vitest-globals": "off",
+    "vitest/prefer-to-be-truthy": "off",
+    "id-length": "off",
+    "import/consistent-type-specifier-style": "off"
   },
   "overrides": [
     {

@@ -37,14 +37,16 @@
     "new-cap": [
       "error",
       {
-        "capIsNewExceptions": ["Tag", "GenericTag", "Context.Tag", "Context.GenericTag"]
+        "capIsNewExceptions": ["Tag", "GenericTag", "TaggedError", "TaggedClass"]
       }
     ],
     "sort-imports": "off",
     "vitest/no-importing-vitest-globals": "off",
     "vitest/prefer-to-be-truthy": "off",
     "id-length": "off",
-    "import/consistent-type-specifier-style": "off"
+    "import/consistent-type-specifier-style": "off",
+    "max-classes-per-file": "off",
+    "sort-keys": "off"
   },
   "overrides": [
     {

@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["esnext"],
-    "types": ["node"],
+    "types": [],
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -21,8 +21,6 @@
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "isolatedModules": true,
-    "declaration": true,
-    "isolatedDeclarations": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true

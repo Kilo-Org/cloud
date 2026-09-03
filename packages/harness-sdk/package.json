@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "effect": "3.22.1",
-    "ulid": "catalog:"
+    "ulid": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

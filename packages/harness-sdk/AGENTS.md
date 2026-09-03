@@ -17,6 +17,16 @@ file before you change any file in this package.
 8. Use a library when a library does the work. Do not write what a dependency
    already gives you.
 9. Prove behavior with a local end-to-end run.
+10. Validate every incoming value with Zod at the edge. An edge is any point
+    where a value enters from outside the package: a store, a model reply, a
+    tool result, a caller's input. Do not validate a value the package already
+    made; that costs CPU and proves nothing.
+11. Keep the package maintainable. Keep a file small and give it one job. If a
+    file passes about 100 lines, split it.
+12. Keep the core free of a runtime. The package must run on Node, in a
+    browser, and in a mobile app. Do not import `node:`, `Buffer`, `process`,
+    or a DOM type. A runtime belongs in a plugin. `tsconfig.json` sets
+    `"types": []` to enforce this.
 
 ## Performance
 
@@ -45,6 +55,10 @@ regression until a measurement says otherwise.
 | Path | Purpose |
 |---|---|
 | `src/index.ts` | The public entry point |
+| `src/session.ts` | The session and its append-only turns |
+| `src/turn.ts` | One turn, shaped as one SQLite row |
+| `src/storage.ts` | The `SessionStore` plugin point; no plugin yet |
+| `src/id.ts` | The `IdGenerator` plugin point and the ULID plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config; stricter than the root config |
 
@@ -65,6 +79,9 @@ turn one off, and give the reason.
 
 `new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
 `Context.Tag` is a call, not a constructor.
+
+`isolatedDeclarations` is off. It cannot infer a Zod schema type, and the
+package ships its source, so it buys no build time.
 
 `import/group-exports` stays on. Declare a name, then export it in one
 `export type { ... }` block and one `export { ... }` block at the end of the

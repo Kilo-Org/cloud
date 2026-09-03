@@ -1501,6 +1501,9 @@ importers:
       ulid:
         specifier: 'catalog:'
         version: 3.0.2
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

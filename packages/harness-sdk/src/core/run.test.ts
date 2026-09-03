@@ -1,6 +1,7 @@
 import { Chunk, Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { layerTableCatalog } from '../plugins/catalog/table.js';
+import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
 import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
 import type { SessionBusyError } from './ask.js';
@@ -38,7 +39,7 @@ const run = <A>(
   store?: Layer.Layer<SessionStore>
 ) => {
   const model = fakeModel(replies);
-  const layers = Layer.mergeAll(layerAssembler, silentCatalog, model.layer);
+  const layers = Layer.mergeAll(layerAssembler, silentCatalog, layerSeededEntropy(1), model.layer);
   const program = Effect.scoped(Effect.flatMap(openSession(options), use));
   return Effect.runPromise(
     Effect.provide(program, store === undefined ? layers : Layer.merge(layers, store))
@@ -111,7 +112,7 @@ it('raises the token ceiling for one question only', async () => {
 
 it('asks with the same effort on every question of a session', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
-  const layers = Layer.mergeAll(layerAssembler, silentCatalog, model.layer);
+  const layers = Layer.mergeAll(layerAssembler, silentCatalog, layerSeededEntropy(1), model.layer);
   await Effect.runPromise(
     Effect.provide(
       Effect.scoped(
@@ -134,7 +135,7 @@ it('takes the ceiling from the model catalog when the caller names none', async 
           Stream.runDrain(session.ask('a'))
         )
       ),
-      Layer.mergeAll(layerAssembler, catalogSaying(2048), model.layer)
+      Layer.mergeAll(layerAssembler, catalogSaying(2048), layerSeededEntropy(1), model.layer)
     )
   );
   expect(model.calls[0]?.maxTokens).toBe(2048);
@@ -152,7 +153,7 @@ it('lets the session and then the question beat the catalog', async () => {
           )
         )
       ),
-      Layer.mergeAll(layerAssembler, catalogSaying(2048), model.layer)
+      Layer.mergeAll(layerAssembler, catalogSaying(2048), layerSeededEntropy(1), model.layer)
     )
   );
   expect(model.calls.map(call => call.maxTokens)).toEqual([512, 99]);

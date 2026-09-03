@@ -4,6 +4,7 @@ import { openSession, type SessionHandle } from '../src/core/run.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
+import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
 import { layerTableCatalog } from '../src/plugins/catalog/table.js';
 import { layerStaticToken } from '../src/plugins/token/static.js';
@@ -53,6 +54,7 @@ const catalog = layerTableCatalog({}, { apiKinds: ['messages', 'responses', 'cha
 
 const layers = Layer.mergeAll(
   layerAssembler,
+  layerWebCrypto,
   catalog,
   layerKiloGateway({
     baseUrl,

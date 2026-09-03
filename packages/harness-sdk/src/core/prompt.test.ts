@@ -1,14 +1,23 @@
 import { Chunk, Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { assemble } from '../plugins/prompt/default.js';
+import { seededEntropy } from '../plugins/entropy/seeded.js';
 import { makeTurn } from './turn.js';
+
+const entropy = seededEntropy(1);
 
 const system = 'You are a harness.';
 
 const run = <A>(effect: Effect.Effect<A>): A => Effect.runSync(effect);
 
 const turns = (...contents: readonly string[]) =>
-  Chunk.fromIterable(run(Effect.all(contents.map(content => makeTurn('ses_1', 'user', content)))));
+  Chunk.fromIterable(
+    run(
+      Effect.all(
+        contents.map(content => makeTurn(entropy, { sessionId: 'ses_1', role: 'user', content }))
+      )
+    )
+  );
 
 it('breaks the cache after the system prompt and on the last turn', () => {
   const prompt = assemble({ system, turns: turns('a', 'b') });
@@ -23,7 +32,9 @@ it('gives the same bytes for the same input', () => {
 
 it('leaves every earlier message unchanged when a turn is appended', () => {
   const before = turns('a', 'b');
-  const [added] = run(Effect.all([makeTurn('ses_1', 'assistant', 'c')]));
+  const [added] = run(
+    Effect.all([makeTurn(entropy, { sessionId: 'ses_1', role: 'assistant', content: 'c' })])
+  );
   const after = Chunk.append(before, added);
 
   const grown = assemble({ system, turns: after });

@@ -28,8 +28,7 @@
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",
     "openai": "6.49.0",
-    "typia": "14.0.4",
-    "ulid": "catalog:"
+    "typia": "14.0.4"
   },
   "devDependencies": {
     "@ttsc/unplugin": "0.28.3",

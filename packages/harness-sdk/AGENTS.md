@@ -23,7 +23,6 @@ file before you change any file in this package.
 
    | Job | Library |
    |---|---|
-   | Identifiers | `ulid` (`monotonicFactory`) |
    | Server-sent events | `eventsource-parser` |
    | Schemas and validation | `typia` (compile time, via `ttsc`) |
    | Effects, streams, retry, layers | `effect` |
@@ -32,6 +31,15 @@ file before you change any file in this package.
    The two model SDKs are imported with `import type` and never called, so they
    add no runtime code. They make the compiler reject a wrong field name in a
    request body.
+
+   **Rejected: `ulid`.** Its `node` export condition resolves to a build whose
+   first line is `import crypto from 'node:crypto'`, and its other build calls
+   `detectPRNG()` at module scope, which throws on a runtime with no global
+   `crypto` — so importing it either drags a runtime into the core or fails at
+   import on a mobile build. `core/id.ts` encodes the ULID itself in about
+   forty lines of arithmetic and takes its randomness from a plugin. This is
+   the one place the package writes what a library already does, and principle
+   12 is why.
 9. Prove behavior with a local end-to-end run.
 10. Validate every incoming value at the edge with typia. An edge is any point
     where a value enters from outside the package: a store, a model reply, a
@@ -48,16 +56,25 @@ file before you change any file in this package.
     2026-09-03, Node v24.14.1, macOS arm64, median of 7 runs.
 11. Keep the package maintainable. Keep a file small and give it one job. If a
     file passes about 100 lines, split it.
-12. Keep the core free of a runtime. Do not import `node:`, `Buffer`,
-    `process`, or a DOM type. A runtime belongs in a plugin.
+12. Be agnostic about the platform. Anything a runtime does differently is a
+    plugin point, not a branch and not an import. Do not reference `node:`,
+    `Buffer`, `process`, `globalThis`, or a DOM type anywhere in `core/`.
 
-    `tsconfig.json` sets `"types": []`, which removes the ambient Node globals
-    and so makes first-party `process` or `Buffer` a compile error. It stops
-    there. It cannot see a dependency's own imports, and `skipLibCheck: true`
-    removes the rest of the leverage. `core/id.ts` imports `ulid`, which
-    resolves to `node:crypto` on Node, so the core does not yet meet this rule
-    for a browser or a mobile build. The package targets Node and Bun today;
-    fix this when a third target is real, not before.
+    There are two such points today. `FetchLike` is how a request leaves, and
+    `EntropySource` is where random bytes come from. Both are the same shape of
+    problem: every runtime has one, no two agree on where it lives, and a
+    package that picks for the caller stops running somewhere.
+
+    `tsconfig.json` sets `"types": []`, which makes a first-party `process` or
+    `Buffer` a compile error. That is all it does — it cannot see a
+    dependency's own imports, and `skipLibCheck: true` removes the rest of the
+    leverage. So the rule is checked by reading the build, not by trusting the
+    compiler:
+
+    ```
+    grep -rn "node:" dist/            # comments only
+    grep -rn "globalThis" dist/core/  # nothing
+    ```
 13. Measure, do not guess. A decision about performance is made from data.
     Write the benchmark, run it, and put the number in the commit message or
     in this file. "This looks slow" is not a finding, and neither is "this
@@ -128,11 +145,9 @@ Marginal cost through `openSession`, `ask`, the gateway and a fake transport,
 | SSE parse and wire read (the validator table above) | 0.25 |
 | typia validation alone | 0.005 |
 
-Nothing here is being changed. 7 us per token is 7 ms on a thousand token
-answer, against seconds of model latency, and collapsing the operator chain
-would trade the package's one idiom for 2 ms. The numbers are recorded so the
-next change to this path argues from data rather than from instinct — in
-either direction.
+Nothing here is being changed: 7 us per token is 7 ms on a thousand token
+answer, against seconds of model latency. The table exists so the next change
+to this path argues from data, in either direction.
 
 ## The toolchain
 
@@ -197,20 +212,18 @@ The older `/api/openrouter` prefix also works; the package does not use it.
 
 ## The local end-to-end run
 
-`pnpm test:e2e` writes a cache entry on the first call and expects the second
-call to read it. About one run in five fails with a ratio of 0, because the
-provider has not made the entry readable yet. Re-run before you go looking for
-a bug; a real prefix regression fails every time, not one time in five.
+`pnpm test:e2e` asks two questions in one session against the real gateway and
+checks that the second call reads the cache the first one wrote. It uses the
+kilo CLI token from `~/.local/share/kilo/auth.json`, never prints it, and
+spends a small amount of real credit.
 
+The system prompt is long on purpose: the cached prefix must clear the model's
+minimum, 4096 tokens on Haiku 4.5, or nothing caches and the check fails for
+the wrong reason.
 
-`pnpm test:e2e` calls the real gateway with the kilo CLI token from
-`~/.local/share/kilo/auth.json`. It never prints the token. It spends a small
-amount of real credit.
-
-It asks two questions in one session and checks the second call. The system
-prompt is long on purpose: the cached prefix must clear the model's minimum,
-which is 4096 tokens on Haiku 4.5, or nothing caches and the check fails for the
-wrong reason.
+About one run in five fails with a ratio of 0, because the provider has not
+made the entry readable yet. Re-run before looking for a bug — a real prefix
+regression fails every time, not one time in five.
 
 Measured on 2026-09-03, `anthropic/claude-haiku-4.5`, the Kilo organization:
 
@@ -232,36 +245,18 @@ measure of what `FetchLike` asks of a caller.
 used models on OpenRouter. The last question can only be answered from the
 history, so the run proves the prompt actually carries the conversation.
 
-Measured on 2026-09-03, five turns each, the Kilo organization:
+The last table was measured before the usage merge was fixed, when the gateway
+overwrote counts instead of raising them, so a provider echoing zeros in its
+last frame scored near zero on counts that were never wrong. It is deleted
+rather than kept as a number nobody can cite. Re-run and record a fresh one.
 
-| Model | Recalled | Cache read | Input | Ratio |
-|---|---|---:|---:|---:|
-| `openai/gpt-5.6-luna` | yes | 56324 | 15 | 0.9997 |
-| `z-ai/glm-5.3-flash` | yes | 34560 | 21754 | 0.6137 |
-| `deepseek/deepseek-v4-flash-0731` | yes | 56320 | 324 | 0.9943 |
-| `tencent/hy4-preview` | — | — | — | 404, not allowed for the team |
-| `xiaomi/mimo-v2.5` | yes | 57600 | 194 | 0.9966 |
-| `tencent/hy3` | yes | 55808 | 491 | 0.9913 |
-| `deepseek/deepseek-v4-flash` | yes | 56320 | 324 | 0.9943 |
-| `minimax/minimax-m3` | yes | 57009 | 75 | 0.9987 |
-| `nvidia/nemotron-3-ultra-550b-a55b` | yes | 40960 | 17899 | 0.6959 |
-| `google/gemini-3.7-flash` | yes | 40755 | 17884 | 0.6950 |
+Two lessons hold beyond any one run:
 
-**This table is suspect and needs a re-run.** It was measured before the
-usage merge was fixed: the gateway overwrote counts instead of raising them, so
-a provider that echoes zeros in its last frame recorded a ratio near zero from
-counts that were never wrong. The three low rows carry exactly that signature.
-Re-run `pnpm test:e2e:models` and replace this table before citing it.
-
-Every served model took the `messages` shape. Two lessons hold beyond this run:
-
-- **The ratio is the provider's, not the package's.** The package places the
-  same breakpoints for every model. A provider that caches on its own terms
-  lands near 0.99; one that does not lands near 0.6, and it varies between runs
-  on the same model. Do not chase a low number as if it were a defect here.
-- **A small token budget reads as a broken transport.** At 64 tokens, four of
-  these ten answered nothing: a reasoning model spends the budget before it
-  writes a word. The run uses 1024.
+- **The ratio is partly the provider's.** The package places the same
+  breakpoints for every model, so a spread across models is not a defect here.
+  Read a low number as a question, not a bug — but rule out the package first.
+- **A small token budget reads as a broken transport.** At 64 tokens a
+  reasoning model spends the budget before it writes a word. The run uses 1024.
 
 ### Effort is not the token ceiling
 
@@ -269,17 +264,9 @@ Every served model took the `messages` shape. Two lessons hold beyond this run:
 a dial the model follows. A reasoning model pays for its thinking out of
 `maxTokens`, so the two meet, but one does not replace the other.
 
-Measured on 2026-09-03 at 64 tokens with `effort: 'low'`:
-
-| Model | Shape | Answers |
-|---|---|---|
-| `xiaomi/mimo-v2.5` | messages | 4 of 5, up from 1 |
-| `z-ai/glm-5.3-flash` | messages | 4 of 5, up from 4 |
-| `tencent/hy3` | messages, then completions | 0 of 5 either way |
-| `deepseek/deepseek-v4-flash` | completions | 1 of 5 |
-
-Low effort helps, and it does not rescue a wall that is too low. Raise
-`maxTokens` first; reach for `effort` to cut cost once answers arrive.
+Measured at 64 tokens: low effort raised answers on two of four models and
+rescued none of the models that answered nothing. Raise `maxTokens` first;
+reach for `effort` to cut cost once answers arrive.
 
 ## Decisions
 
@@ -322,16 +309,13 @@ would sit in the prefix of every later request.
 `appendTurn` is a pure function. It does not touch the `SessionStore` plugin.
 Do not make it write through.
 
-- A pure append has no error channel and no requirement, so no caller inherits
-  a store failure.
-- The runner flushes once per step, so one step is one transaction, not one
-  transaction per turn.
-- A session runs with no store at all. This is what lets the package run in a
-  browser or in a mobile app.
+- A pure append has no error channel, so no caller inherits a store failure.
+- One step is one transaction, not one transaction per turn.
+- A session runs with no store at all.
 
 The cost is that a crash drops whatever the store still holds. That is the
-store plugin's call: it is told about every turn as it happens, and about the
-close, and it decides whether to write at once, to batch, or to buffer.
+plugin's call: it hears every turn and the close, and decides whether to write
+at once, to batch, or to buffer.
 
 ### A reloaded turn must equal the turn that was written
 
@@ -343,22 +327,18 @@ local end-to-end run.
 ## What is not pluggable, and why
 
 Two seams were cut after they were built. Both failed the same test: name the
-second implementation, and say whether it is one a caller should be allowed to
-write.
+second implementation, and say whether a caller should be allowed to write it.
 
-**The identifier.** It must sort by the order it was made in, because a store
-rebuilds the prompt prefix in that order and a prefix in the wrong order misses
-the cache. A plugin returning a random identifier typechecks, passes every
-test, and breaks that one reload later. There is one right answer, so
-`core/id.ts` makes it. One module also means one monotonic sequence; two
-factories can hand out the same millisecond twice.
+**The identifier ordering.** An identifier must sort by the order it was made
+in, because a store rebuilds the prompt prefix in that order. A plugin
+returning a random identifier typechecks, passes every test, and breaks the
+cache one reload later. The ordering is not a choice; where the randomness
+comes from is, and that is `EntropySource`.
 
-**The token ceiling.** It had become the third of three ways to set one number,
-behind `AskOptions.maxTokens` and `SessionOptions.maxTokens`, and it only fired
-when a caller set neither. The argument for it was that a plugin could read the
-model's own limit — which is what `ModelCatalog` knows. `ask.ts` now reads
-`maxTokens ?? catalog maxOutputTokens ?? 4096`, and the catalog is only asked
-when nobody named a number.
+**The token ceiling.** It was the third of three ways to set one number and
+fired only when a caller set neither of the other two. `ModelCatalog` already
+knows a model's own limit, so `ask.ts` reads
+`maxTokens ?? catalog maxOutputTokens ?? 4096`.
 
 ## Layout
 
@@ -379,7 +359,8 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/prompt.ts` | The `Prompt` shape and the `PromptAssembler` plugin point |
 | `src/core/model.ts` | The `ModelClient` plugin point; transport only |
 | `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
-| `src/core/id.ts` | `{prefix}_{ulid}`; deliberately not a plugin point |
+| `src/core/id.ts` | `{prefix}_{ulid}`; the encoding, and the monotonic order |
+| `src/core/entropy.ts` | The `EntropySource` plugin point; random bytes |
 | `src/core/catalog.ts` | The `ModelCatalog` plugin point; shapes and output limit |
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
@@ -387,6 +368,8 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/model/fake.ts` | A scripted model, for this package's tests. Excluded from `dist/` |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/catalog/table.ts` | A catalog the caller writes down |
+| `src/plugins/entropy/web-crypto.ts` | The default source: the global `crypto` |
+| `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/gateway/` | The kilo gateway plugin |
@@ -416,8 +399,7 @@ had been deleted went on resolving against a stale artifact.
 
 ## Recorded deviations
 
-Every rule below is off because it costs more than it gives. Add a row when you
-turn one off, and give the reason.
+Add a row when you turn one off, and give the reason.
 
 | Rule | Reason |
 |---|---|

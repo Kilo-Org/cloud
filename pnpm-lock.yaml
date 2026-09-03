@@ -1510,9 +1510,6 @@ importers:
       typia:
         specifier: 14.0.4
         version: 14.0.4(ttsc@0.28.3)
-      ulid:
-        specifier: 'catalog:'
-        version: 3.0.2
     devDependencies:
       '@ttsc/unplugin':
         specifier: 0.28.3

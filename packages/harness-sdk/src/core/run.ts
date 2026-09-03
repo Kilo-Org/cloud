@@ -1,6 +1,7 @@
 import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
 import { type AskOptions, askWith, onStore, type SessionBusyError, type Wiring } from './ask.js';
 import { ModelCatalog } from './catalog.js';
+import { EntropySource } from './entropy.js';
 import {
   type Effort,
   ModelClient,
@@ -58,13 +59,15 @@ const openSession = (
 ): Effect.Effect<
   SessionHandle,
   never,
-  PromptAssembler | ModelClient | ModelCatalog | Scope.Scope
+  PromptAssembler | ModelClient | ModelCatalog | EntropySource | Scope.Scope
 > =>
   Effect.gen(function* () {
-    const opened = yield* makeSession();
+    const entropy = yield* EntropySource;
+    const opened = yield* makeSession(entropy);
     const wiring: Wiring = {
       ...options,
       id: opened.id,
+      entropy,
       assembler: yield* PromptAssembler,
       client: yield* ModelClient,
       catalog: yield* ModelCatalog,

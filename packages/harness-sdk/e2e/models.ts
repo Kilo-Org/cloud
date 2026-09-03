@@ -5,6 +5,7 @@ import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession, type SessionHandle } from '../src/core/run.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
+import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
 import { layerTableCatalog } from '../src/plugins/catalog/table.js';
 import { layerStaticToken } from '../src/plugins/token/static.js';
@@ -94,6 +95,7 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) => {
     Effect.provide(
       Layer.mergeAll(
         layerAssembler,
+        layerWebCrypto,
         catalog,
         layerKiloGateway({
           baseUrl: process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai',

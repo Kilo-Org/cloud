@@ -1,5 +1,6 @@
 import { Data, Effect, Option, Ref, Stream } from 'effect';
 import type { ModelCatalogService } from './catalog.js';
+import type { EntropySourceService } from './entropy.js';
 import type { Effort, ModelClientService, ModelError, ModelEvent, ModelUsage } from './model.js';
 import type { PromptAssemblerService } from './prompt.js';
 import { appendTurn, type Session } from './session.js';
@@ -34,6 +35,7 @@ interface Wiring {
   readonly maxTokens?: number;
   readonly effort?: Effort;
   readonly catalog: ModelCatalogService;
+  readonly entropy: EntropySourceService;
   readonly assembler: PromptAssemblerService;
   readonly client: ModelClientService;
   readonly store: Option.Option<SessionStoreService>;
@@ -91,7 +93,10 @@ const answerOf = (
   options: AskOptions | undefined
 ): Effect.Effect<Answer, StoreError> =>
   Effect.gen(function* () {
-    yield* Effect.flatMap(makeTurn(wiring.id, 'user', text), turn => record(wiring, turn));
+    yield* Effect.flatMap(
+      makeTurn(wiring.entropy, { sessionId: wiring.id, role: 'user', content: text }),
+      turn => record(wiring, turn)
+    );
     const { turns } = yield* Ref.get(wiring.state);
     const spoken = yield* Ref.make('');
     const maxTokens = yield* ceilingOf(wiring, options);
@@ -110,7 +115,13 @@ const answerOf = (
           event.kind === 'delta'
             ? Ref.update(spoken, held => held + event.text)
             : Ref.get(spoken).pipe(
-                Effect.flatMap(said => makeTurn(wiring.id, 'assistant', said)),
+                Effect.flatMap(said =>
+                  makeTurn(wiring.entropy, {
+                    sessionId: wiring.id,
+                    role: 'assistant',
+                    content: said,
+                  })
+                ),
                 Effect.flatMap(turn => record(wiring, turn)),
                 Effect.zipRight(Ref.update(wiring.totals, held => add(held, event.usage)))
               )

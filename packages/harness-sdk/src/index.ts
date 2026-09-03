@@ -1,6 +1,7 @@
 export type { AskOptions } from './core/ask.js';
 export { SessionBusyError } from './core/ask.js';
 export * from './core/catalog.js';
+export * from './core/entropy.js';
 export * from './core/fetch.js';
 export * from './core/id.js';
 export * from './core/model.js';
@@ -13,6 +14,8 @@ export * from './core/token.js';
 export * from './core/turn.js';
 export * from './core/usage.js';
 export * from './plugins/catalog/table.js';
+export * from './plugins/entropy/seeded.js';
+export * from './plugins/entropy/web-crypto.js';
 export * from './plugins/gateway/index.js';
 export * from './plugins/prompt/default.js';
 export * from './plugins/retry/backoff.js';

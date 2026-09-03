@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import type { EntropySourceService } from './entropy.js';
 import { makeId } from './id.js';
 
 /**
@@ -18,8 +19,15 @@ type TurnRole = 'user' | 'assistant';
 
 const idPrefix = 'trn';
 
-const makeTurn = (sessionId: string, role: TurnRole, content: string): Effect.Effect<Turn> =>
-  Effect.map(makeId(idPrefix), id => ({ id, sessionId, role, content }));
+/** What a turn is made of, before it has an identifier. */
+interface TurnDraft {
+  readonly sessionId: string;
+  readonly role: TurnRole;
+  readonly content: string;
+}
 
-export type { Turn, TurnRole };
+const makeTurn = (entropy: EntropySourceService, draft: TurnDraft): Effect.Effect<Turn> =>
+  Effect.map(makeId(entropy, idPrefix), id => ({ id, ...draft }));
+
+export type { Turn, TurnDraft, TurnRole };
 export { makeTurn };

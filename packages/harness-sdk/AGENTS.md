@@ -48,6 +48,19 @@ file before you change any file in this package.
     browser, and in a mobile app. Do not import `node:`, `Buffer`, `process`,
     or a DOM type. A runtime belongs in a plugin. `tsconfig.json` sets
     `"types": []` to enforce this.
+13. Measure, do not guess. A decision about performance is made from data.
+    Write the benchmark, run it, and put the number in the commit message or
+    in this file. "This looks slow" is not a finding, and neither is "this
+    should be faster".
+
+    This cuts both ways. Before you optimise, measure that the cost is real
+    and that it is worth the change: two of the three debts this package
+    recorded in its first pass turned out not to exist, and the obvious fix
+    for one of them was twice as slow as the code it replaced.
+
+    Measure the environment too, not just the machine in front of you. A
+    validator that is fast on Node can be three times slower in a worker,
+    and the benchmark that misses that ships the wrong library.
 
 ## Performance
 

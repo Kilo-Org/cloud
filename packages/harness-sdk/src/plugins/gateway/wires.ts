@@ -21,10 +21,7 @@ const asModelError = (error: CatalogError | ModelError): ModelError =>
     : error;
 
 /** Asks the catalog what the model speaks and returns the best wire for it. */
-const wireFor = (
-  catalog: ModelCatalogService,
-  model: string
-): Effect.Effect<Wire, ModelError> =>
+const wireFor = (catalog: ModelCatalogService, model: string): Effect.Effect<Wire, ModelError> =>
   catalog.facts(model).pipe(
     Effect.mapError(asModelError),
     Effect.flatMap(facts => {

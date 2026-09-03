@@ -20,11 +20,11 @@ import { layerSqliteStore, type SqlDriver, type SqlValue } from './sqlite.js';
  * collapse into one key, which no query here can produce: every read selects
  * from a single table and joins nothing.
  */
-const rowsOf = (
-  database: DatabaseSync,
-  sql: string,
-  params: readonly SqlValue[]
-): unknown[][] => database.prepare(sql).all(...params).map(Object.values);
+const rowsOf = (database: DatabaseSync, sql: string, params: readonly SqlValue[]): unknown[][] =>
+  database
+    .prepare(sql)
+    .all(...params)
+    .map(Object.values);
 
 /**
  * Adapts a database to the driver seam.

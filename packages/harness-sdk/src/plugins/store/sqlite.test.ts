@@ -9,7 +9,8 @@ const database = (): DatabaseSync => new DatabaseSync(':memory:');
 const use = <A, E>(
   db: DatabaseSync,
   run: (store: SessionStoreService) => Effect.Effect<A, E>
-): Promise<A> => Effect.runPromise(Effect.provide(Effect.flatMap(SessionStore, run), layerNodeStore(db)));
+): Promise<A> =>
+  Effect.runPromise(Effect.provide(Effect.flatMap(SessionStore, run), layerNodeStore(db)));
 
 const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5' };
 

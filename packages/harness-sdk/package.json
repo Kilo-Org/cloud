@@ -10,7 +10,8 @@
     "./core": "./dist/core/index.js",
     "./plugins/gateway": "./dist/plugins/gateway/index.js",
     "./plugins/prompt": "./dist/plugins/prompt/default.js",
-    "./plugins/store/node": "./dist/plugins/store/node.js"
+    "./plugins/store/node": "./dist/plugins/store/node.js",
+    "./plugins/store/expo": "./dist/plugins/store/expo.js"
   },
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",
@@ -40,6 +41,7 @@
     "@ttsc/unplugin": "0.28.3",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
+    "expo-sqlite": "~57.0.1",
     "ttsc": "0.28.3",
     "typescript": "7.0.2",
     "vitest": "catalog:"

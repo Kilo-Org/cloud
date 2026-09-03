@@ -71,7 +71,11 @@
       }
     },
     {
-      "files": ["src/plugins/store/node.ts", "src/plugins/store/sqlite.test.ts"],
+      "files": [
+        "src/plugins/store/node.ts",
+        "src/plugins/store/*.test.ts",
+        "src/core/resume-fixture.ts"
+      ],
       "rules": {
         "import/no-nodejs-modules": "off"
       }

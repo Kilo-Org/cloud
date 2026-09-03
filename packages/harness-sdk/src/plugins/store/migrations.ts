@@ -9,9 +9,9 @@
 const migrations: readonly (readonly string[])[] = [
   /* 0000_blushing_vance_astro */
   [
-    "CREATE TABLE `sessions` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`system` text NOT NULL,\n\t`model` text NOT NULL,\n\t`effort` text,\n\t`max_tokens` integer\n);",
-    "CREATE TABLE `turns` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`session_id` text NOT NULL,\n\t`role` text NOT NULL,\n\t`content` text NOT NULL,\n\tFOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE no action\n);",
-    "CREATE INDEX `turns_session_id_id` ON `turns` (`session_id`,`id`);",
+    'CREATE TABLE `sessions` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`system` text NOT NULL,\n\t`model` text NOT NULL,\n\t`effort` text,\n\t`max_tokens` integer\n);',
+    'CREATE TABLE `turns` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`session_id` text NOT NULL,\n\t`role` text NOT NULL,\n\t`content` text NOT NULL,\n\tFOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE no action\n);',
+    'CREATE INDEX `turns_session_id_id` ON `turns` (`session_id`,`id`);',
   ],
 ];
 

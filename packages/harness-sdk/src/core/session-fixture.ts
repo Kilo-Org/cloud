@@ -6,7 +6,8 @@ import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
 import type { SessionBusyError } from './ask.js';
 import type { ModelError, ModelRequest } from './model.js';
-import { openSession, type SessionHandle } from './run.js';
+import { openSession } from './run.js';
+import type { SessionHandle } from './wiring.js';
 import { SessionStore, StoreError } from './storage.js';
 import type { Turn } from './turn.js';
 

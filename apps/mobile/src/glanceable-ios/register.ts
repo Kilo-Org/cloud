@@ -1,5 +1,7 @@
+import { Platform } from 'react-native';
+
 import { i18n } from '@/i18n';
-import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import {
   getLiveActivityEnabled,
   subscribeLiveActivityEnabled,
@@ -39,6 +41,13 @@ subscribeLiveActivityEnabled(() => {
   const next = getLiveActivityEnabled();
   if (liveActivityAllowed && !next) {
     iosSink.endImmediate();
+    // `endImmediate` retires only the activity tokens. The push-to-start
+    // subscription outlives them, so a remote start would still reach a
+    // switched-off surface. `canRegisterActivityTokenKind` keeps it retired
+    // until the switch returns.
+    if (Platform.OS === 'ios') {
+      getGlanceableDelivery().cleanupTokens('scope');
+    }
   }
   liveActivityAllowed = next;
 });

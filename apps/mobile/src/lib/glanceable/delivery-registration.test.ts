@@ -67,6 +67,10 @@ import {
   writePrivacySnapshotAndEnd,
   writeSignedOutSnapshotAndEnd,
 } from './cleanup';
+import {
+  _resetLiveActivitySwitchForTests,
+  setLiveActivityEnabledValue,
+} from './live-activity-switch';
 import { GlanceablePublisher } from './publisher';
 import { getGlanceableDelivery } from './sink-registry';
 // Import side effect: registers the real delivery under the mocks above.
@@ -137,9 +141,11 @@ describe('delivery registerTokens', () => {
     logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
+    _resetLiveActivitySwitchForTests();
   });
 
   afterEach(() => {
+    _resetLiveActivitySwitchForTests();
     vi.useRealTimers();
   });
 
@@ -781,6 +787,32 @@ describe('delivery registerTokens', () => {
     await flushRegistration();
 
     expect(rows).toEqual(new Map([['token-1', 'org-1']]));
+  });
+
+  it('does not re-register the push-to-start subscription while the switch is off', async () => {
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+
+    // The switch going off retires the subscription, exactly as the iOS
+    // register does alongside `endImmediate`.
+    setLiveActivityEnabledValue(false);
+    await getGlanceableDelivery().unregisterTokens('scope');
+    expect(rows.size).toBe(0);
+
+    // A later cache success must not hand the server a remote start again.
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    // Switching back on restores it on the next scope refresh.
+    setLiveActivityEnabledValue(true);
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
   });
 
   it('waits for an in-flight activity upsert before removing only activity tokens', async () => {

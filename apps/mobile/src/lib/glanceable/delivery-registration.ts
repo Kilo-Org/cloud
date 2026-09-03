@@ -12,6 +12,9 @@ import {
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
+import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
+
+import { canRegisterActivityTokenKind } from './live-activity-switch';
 import {
   type GlanceableActivity,
   type GlanceableDelivery,
@@ -39,26 +42,6 @@ let activitySubscription: ReturnType<GlanceableActivity['addPushTokenListener']>
 const scopeTokens = new Set<string>();
 const activityTokens = new Set<string>();
 let registerEpoch = 0;
-
-/** FIFO chain: an upsert and delete of a stable token must never race. */
-let mutationTail: Promise<void> | null = null;
-const NOOP = (): void => undefined;
-
-async function enqueueTokenMutation<T>(op: () => Promise<T>): Promise<T> {
-  const previous = mutationTail;
-  let release: () => void = NOOP;
-  const gate = new Promise<void>(resolve => {
-    release = resolve;
-  });
-  mutationTail = gate;
-  // The tail is a release gate, not the mutation promise; it always resolves.
-  await previous;
-  try {
-    return await op();
-  } finally {
-    release();
-  }
-}
 
 // Pure suites must not load the native notification graph.
 let getDevicePushTokenForTests: (() => Promise<string | null>) | null = null;
@@ -96,7 +79,7 @@ async function canRegister(target: Registration): Promise<boolean> {
 }
 
 async function registerToken(target: Registration, token: string): Promise<void> {
-  if (!isCurrent(target) || !token) {
+  if (!isCurrent(target) || !token || !canRegisterActivityTokenKind(target.kind)) {
     return;
   }
   target.token = token;
@@ -335,7 +318,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   scopeTokens.clear();
   activityTokens.clear();
   pushToStartToken = null;
-  mutationTail = null;
+  resetTokenMutationQueue();
   if (Platform.OS === 'ios') {
     observePushToStart(null);
   }

@@ -14,6 +14,15 @@ export function getLiveActivityEnabled(): boolean {
   return enabled;
 }
 
+/**
+ * The switch owns the iOS push-to-start subscription. While it is off, that
+ * token must never reach the server: `endImmediate` clears the activity, but a
+ * live subscription would still let a remote start reopen the surface.
+ */
+export function canRegisterActivityTokenKind(kind: string): boolean {
+  return kind !== 'ios_push_to_start' || enabled;
+}
+
 export function setLiveActivityEnabledValue(next: boolean): void {
   if (next === enabled) {
     return;

@@ -39,6 +39,7 @@ import {
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import * as wasteland from './town/wasteland';
+import * as legacyTokenRenewal from './town/legacy-token-renewal';
 import { pickCanonicalBead, type ReporterBead } from './town/wasteland-reporter';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext } from './town/actions';
@@ -5062,9 +5063,23 @@ export class TownDO extends DurableObject<Env> {
     const nowSeconds = Math.floor(now / 1000);
     if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
 
-    // Token expires within 7 days — remint it
+    const identity = await this.getPrivateTownIdentity();
     const userId = payload.kiloUserId;
-    if (!userId) return;
+    if (!identity || !userId) return;
+
+    try {
+      const authorized = await legacyTokenRenewal.isLegacyTownTokenRenewalAuthorized(
+        this.env,
+        identity,
+        userId,
+        payload.apiTokenPepper ?? null
+      );
+      if (!authorized) return;
+    } catch {
+      // An unavailable authority must never revive a legacy token.
+      logger.warn('refreshKilocodeTokenIfExpiring: current authorization unavailable');
+      return;
+    }
 
     const newToken = await generateKiloApiToken(
       { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },

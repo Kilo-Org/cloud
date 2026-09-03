@@ -1029,6 +1029,9 @@ test.describe('control-plane sandbox header', () => {
     await fixture.advance(20_000);
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
     await expectStaticIndicator(page);
+    const delayedResponse = page.waitForResponse(response =>
+      response.url().includes('getSandboxStatus')
+    );
     pending.resolve(
       success(
         fixture.snapshot({
@@ -1038,6 +1041,19 @@ test.describe('control-plane sandbox header', () => {
         })
       )
     );
+    await (await delayedResponse).finished();
+    await expect(details(page)).toContainText('out of date');
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    fixture.setReply(() =>
+      success(
+        fixture.snapshot({
+          status: 'sleeping',
+          detailCode: 'sandbox_stopped',
+          estimatedSleepAt: null,
+        })
+      )
+    );
+    await fixture.refresh();
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Sleeping');
   });
 
@@ -1149,20 +1165,110 @@ test.describe('control-plane sandbox header', () => {
     fixture.setReply(() => pending.promise);
     await fixture.refresh();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await fixture.advance(visibleAt - 1_000 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(visibleAt - 10_000 - (await page.evaluate(() => Date.now())));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    await page.clock.resume();
+    const delayedResponse = page.waitForResponse(response =>
+      response.url().includes('getSandboxStatus')
+    );
     pending.resolve(success(await fixture.currentSnapshot({ estimatedSleepAt: deadline })));
+    await (await delayedResponse).finished();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    fixture.setReply(() => success(fixture.snapshot({ estimatedSleepAt: deadline })));
+    await fixture.refresh();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    fixture.setReply(() => new Promise(() => {}));
+    await fixture.refresh();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
     await settlePausedStatus(page, 'Active');
-    await fixture.advance(visibleAt - 1 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(visibleAt - 1_000 - (await page.evaluate(() => Date.now())));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await expect(sleepTime(page)).toHaveCount(0);
     const beforeEstimate = fixture.statusRequests.length;
-    await fixture.advance(1);
+    await fixture.advance(2_000);
     await expect(sleepTime(page)).toHaveAttribute('datetime', new Date(deadline).toISOString());
     await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     expect(fixture.statusRequests).toHaveLength(beforeEstimate);
   });
+
+  test('does not reveal sleep timing early when a delayed response reports less than two minutes idle', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await page.clock.setFixedTime(baseTime);
+    const pending = deferred<RpcResult>();
+    fixture.setReply(() => pending.promise);
+    await fixture.open();
+    await expect.poll(() => fixture.statusRequests.length).toBe(1);
+    await indicator(page).click();
+    await page.clock.setSystemTime(baseTime);
+    await page.clock.pauseAt(baseTime + 1_000);
+    await fixture.advance(9_000);
+    pending.resolve(
+      success(
+        fixture.snapshot({
+          observedAt: baseTime + 10_000,
+          estimatedSleepAt: baseTime + 200_000,
+        })
+      )
+    );
+    await settlePausedStatus(page, 'Active');
+    await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
+    await expect(sleepTime(page)).toHaveCount(0);
+    fixture.setReply(() => new Promise(() => {}));
+    await fixture.advance(4_000);
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    await expect(sleepTime(page)).toHaveCount(0);
+    await fixture.advance(1_000);
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    await expect(details(page)).toContainText('out of date');
+    await expectUnavailableRuntime(page);
+  });
+
+  for (const serverOffsetMs of [-20_000, 20_000]) {
+    test(`keeps fresh runtime and a local countdown when the browser clock is ${serverOffsetMs < 0 ? 'ahead of' : 'behind'} the server`, async ({
+      page,
+    }) => {
+      const fixture = await mountFixtures(page);
+      fixture.setReply(request =>
+        success(
+          fixture.snapshot({
+            observedAt: request.at + serverOffsetMs,
+            estimatedSleepAt: request.at + serverOffsetMs + 130_000,
+          })
+        )
+      );
+      await fixture.open();
+      await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+      await indicator(page).click();
+      await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
+      await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Standard');
+      await debugSummary(page).click();
+      await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
+      await expect(detailValue(details(page), 'Started').locator('time')).toHaveAttribute(
+        'datetime',
+        new Date(runtimeMetadata.startedAt).toISOString()
+      );
+      await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
+      const requestAt = fixture.statusRequests[0].at;
+      const serverDeadline = new Date(requestAt + serverOffsetMs + 130_000).toISOString();
+      await expect(sleepTime(page)).toHaveAttribute('datetime', serverDeadline);
+      const pending = deferred<RpcResult>();
+      fixture.setReply(() => pending.promise);
+      await fixture.refresh();
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+      const requestCount = fixture.statusRequests.length;
+      await fixture.advance(requestAt + 11_000 - (await page.evaluate(() => Date.now())));
+      await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+      await expect(sleepTime(page)).toHaveText('About 2 min if inactive');
+      await expect(sleepTime(page)).toHaveAttribute('datetime', serverDeadline);
+      await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
+      await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
+      expect(fixture.statusRequests).toHaveLength(requestCount);
+      await expectSafe(page);
+    });
+  }
 
   test('updates the relative countdown at a minute boundary without another status response', async ({
     page,
@@ -1180,11 +1286,11 @@ test.describe('control-plane sandbox header', () => {
     fixture.setReply(() => pending.promise);
     await fixture.refresh();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await fixture.advance(deadline - 120_001 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(deadline - 121_000 - (await page.evaluate(() => Date.now())));
     await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
     await expect(sleepTime(page)).toHaveAttribute('datetime', new Date(deadline).toISOString());
     const beforeBoundary = fixture.statusRequests.length;
-    await fixture.advance(1);
+    await fixture.advance(1_000);
     await expect(sleepTime(page)).toHaveText('About 2 min if inactive');
     await expect(sleepTime(page)).toHaveAttribute('datetime', new Date(deadline).toISOString());
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
@@ -1207,33 +1313,46 @@ test.describe('control-plane sandbox header', () => {
     fixture.setReply(() => pending.promise);
     await fixture.refresh();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await fixture.advance(deadline - 60_001 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(deadline - 61_000 - (await page.evaluate(() => Date.now())));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await expect(sleepTime(page)).toHaveText('About 2 min if inactive');
     const beforeWarning = fixture.statusRequests.length;
-    await fixture.advance(1);
+    await fixture.advance(1_000);
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Sleeping soon');
     await expect(details(page).getByText('Sleeping soon', { exact: true })).toBeVisible();
     await expect(sleepTime(page)).toHaveText('About 1 min if inactive');
     await expect(sleepTime(page)).toHaveAttribute('datetime', new Date(deadline).toISOString());
     await expectStaticIndicator(page);
     expect(fixture.statusRequests).toHaveLength(beforeWarning);
-    await fixture.advance(deadline - 1_000 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(deadline - 10_000 - (await page.evaluate(() => Date.now())));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    await page.clock.resume();
+    const delayedResponse = page.waitForResponse(response =>
+      response.url().includes('getSandboxStatus')
+    );
     pending.resolve(success(await fixture.currentSnapshot({ estimatedSleepAt: deadline })));
+    await (await delayedResponse).finished();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    fixture.setReply(() => success(fixture.snapshot({ estimatedSleepAt: deadline })));
+    await fixture.refresh();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Sleeping soon');
+    const sleepResponse = deferred<RpcResult>();
+    fixture.setReply(() => sleepResponse.promise);
+    await fixture.refresh();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
     await settlePausedStatus(page, 'Sleeping soon');
-    await fixture.advance(deadline - 1 - (await page.evaluate(() => Date.now())));
+    await fixture.advance(deadline - 1_000 - (await page.evaluate(() => Date.now())));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Sleeping soon');
     await expect(sleepTime(page)).toHaveText('About 1 min if inactive');
     const beforeExpiry = fixture.statusRequests.length;
-    await fixture.advance(1);
+    await fixture.advance(1_000);
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await expect(sleepTime(page)).toHaveCount(0);
     expect(fixture.statusRequests).toHaveLength(beforeExpiry);
     await page.clock.resume();
-    fixture.setReply(() =>
+    sleepResponse.resolve(
       success(
-        fixture.snapshot({
+        await fixture.currentSnapshot({
           status: 'sleeping',
           detailCode: 'sandbox_stopped',
           estimatedSleepAt: null,
@@ -1241,7 +1360,6 @@ test.describe('control-plane sandbox header', () => {
         })
       )
     );
-    await fixture.refresh();
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Sleeping');
     await expect(detailValue(details(page), 'Stopped').locator('time')).toHaveAttribute(
       'datetime',
@@ -1272,7 +1390,8 @@ test.describe('control-plane sandbox header', () => {
     const remaining = freshUntil - (await page.evaluate(() => Date.now()));
     await fixture.advance(Math.max(0, remaining));
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
-    pending.resolve(success(fixture.snapshot({ observedAt: baseTime })));
+    await fixture.advance(15_000);
+    pending.resolve(success(await fixture.currentSnapshot()));
     await expect(details(page)).toContainText('out of date');
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
     await expectUnavailableRuntime(page);
@@ -1305,7 +1424,14 @@ test.describe('control-plane sandbox header', () => {
     await expect(details(page)).toContainText('out of date');
     await expectUnavailableRuntime(page);
     await expect(sleepTime(page)).toHaveCount(0);
+    const delayedResponse = page.waitForResponse(response =>
+      response.url().includes('getSandboxStatus')
+    );
     pending.resolve(success(await fixture.currentSnapshot()));
+    await (await delayedResponse).finished();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Unknown');
+    fixture.setReply(() => success(fixture.snapshot()));
+    await fixture.refresh();
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await expect(sleepTime(page)).toBeVisible();
   });

@@ -1,7 +1,11 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import type { CloudAgentSessionId, KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
-import { isSandboxStatusEligible, sandboxStatusPresentation } from './sandbox-status';
+import {
+  isSandboxStatusEligible,
+  observeSandboxStatus,
+  sandboxStatusPresentation,
+} from './sandbox-status';
 
 const now = 1_800_000_000_000;
 const snapshot: SandboxStatusSnapshot = {
@@ -22,7 +26,8 @@ const runtime = {
 const observation = {
   data: snapshot,
   observation: 'observing' as const,
-  dataUpdatedAt: now,
+  requestedAt: now,
+  receivedAt: now,
   freshAfter: now,
   estimateAfter: 0,
   sessionActive: false,
@@ -72,7 +77,118 @@ describe('sandbox status eligibility', () => {
   });
 });
 
+describe('sandbox status observation', () => {
+  it('retains request time when a delayed response arrives after activity or resuming', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const pending = Promise.withResolvers<SandboxStatusSnapshot>();
+    try {
+      const result = observeSandboxStatus(() => pending.promise);
+      clock.mockReturnValue(now + 10_000);
+      pending.resolve({ ...snapshot, observedAt: now + 10_000 });
+      const received = await result;
+      expect(received.requestedAt).toBe(now);
+      expect(received.receivedAt).toBe(now + 10_000);
+      const input = {
+        ...observation,
+        data: received.snapshot,
+        requestedAt: received.requestedAt,
+        receivedAt: received.receivedAt,
+        now: now + 10_000,
+      };
+      expect(sandboxStatusPresentation(input)).toMatchObject({
+        status: 'active',
+        nextChangeAt: now + 15_000,
+      });
+      expect(sandboxStatusPresentation({ ...input, estimateAfter: now + 1 })).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      expect(sandboxStatusPresentation({ ...input, freshAfter: now + 1 })).toMatchObject({
+        status: 'unknown',
+        estimatedSleepAt: null,
+      });
+      expect(sandboxStatusPresentation({ ...input, now: now + 15_000 })).toMatchObject({
+        status: 'unknown',
+        estimatedSleepAt: null,
+      });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
 describe('sandbox status presentation', () => {
+  it('does not count request latency toward the two-minute idle reveal delay', () => {
+    const input = {
+      ...observation,
+      data: {
+        ...snapshot,
+        observedAt: now + 10_000,
+        estimatedSleepAt: now + 191_000,
+      },
+      receivedAt: now + 10_000,
+      now: now + 10_000,
+    };
+    expect(sandboxStatusPresentation(input)).toMatchObject({
+      status: 'active',
+      estimatedSleepAt: null,
+      sleepMinutesRemaining: null,
+      nextChangeAt: now + 11_000,
+    });
+    expect(sandboxStatusPresentation({ ...input, now: now + 11_000 })).toMatchObject({
+      status: 'active',
+      estimatedSleepAt: input.data.estimatedSleepAt,
+      sleepMinutesRemaining: 3,
+      nextChangeAt: now + 15_000,
+    });
+  });
+
+  it.each([-20_000, -1_000, 1_000, 20_000])(
+    'uses client freshness and server-relative sleep timing with %d ms clock skew',
+    offsetMs => {
+      const observedAt = now - offsetMs;
+      const data = {
+        ...snapshot,
+        runtime,
+        observedAt,
+        estimatedSleepAt: observedAt + 120_000,
+      };
+      expect(sandboxStatusPresentation({ ...observation, data, now: now + 500 })).toMatchObject({
+        status: 'active',
+        provider: 'Cloudflare',
+        kiloCliVersion: runtime.kiloCliVersion,
+        estimatedSleepAt: data.estimatedSleepAt,
+        sleepMinutesRemaining: 2,
+        nextChangeAt: now + 15_000,
+      });
+      expect(sandboxStatusPresentation({ ...observation, data, now: now + 15_000 })).toMatchObject({
+        status: 'unknown',
+        estimatedSleepAt: null,
+      });
+      expect(
+        sandboxStatusPresentation({ ...observation, data, estimateAfter: now + 1 })
+      ).toMatchObject({ status: 'active', estimatedSleepAt: null });
+      const finalMinute = { ...data, estimatedSleepAt: observedAt + 60_001 };
+      expect(sandboxStatusPresentation({ ...observation, data: finalMinute })).toMatchObject({
+        status: 'active',
+        sleepMinutesRemaining: 2,
+        nextChangeAt: now + 1,
+      });
+      expect(
+        sandboxStatusPresentation({ ...observation, data: finalMinute, now: now + 1 })
+      ).toMatchObject({
+        status: 'sleeping-soon',
+        estimatedSleepAt: finalMinute.estimatedSleepAt,
+        sleepMinutesRemaining: 1,
+        nextChangeAt: now + 15_000,
+      });
+      const expiring = { ...data, estimatedSleepAt: observedAt + 2_000 };
+      expect(
+        sandboxStatusPresentation({ ...observation, data: expiring, now: now + 2_000 })
+      ).toMatchObject({ status: 'active', estimatedSleepAt: null, nextChangeAt: now + 15_000 });
+    }
+  );
+
   it.each([
     ['active', 'sandbox_ready', 'Active'],
     ['sleeping', 'sandbox_stopped', 'Sleeping'],
@@ -269,7 +385,8 @@ describe('sandbox status presentation', () => {
       sandboxStatusPresentation({
         ...observation,
         data: { ...data, observedAt: now + 1_000 },
-        dataUpdatedAt: now + 1_000,
+        requestedAt: now + 1_000,
+        receivedAt: now + 1_000,
         estimateAfter: now + 1,
         now: now + 1_000,
       })
@@ -307,10 +424,9 @@ describe('sandbox status presentation', () => {
 
   it.each([
     { now: now + 15_000 },
-    { dataUpdatedAt: now - 15_000, freshAfter: 0 },
-    { data: { ...snapshot, runtime, observedAt: now - 15_000 }, freshAfter: 0 },
+    { requestedAt: now - 15_000, freshAfter: 0 },
     { freshAfter: now + 1 },
-    { data: { ...snapshot, runtime, observedAt: now + 1 } },
+    { requestedAt: now + 1 },
   ])('bounds freshness and requires fresh evidence after resuming: %j', override => {
     expect(
       sandboxStatusPresentation({ ...observation, data: { ...snapshot, runtime }, ...override })

@@ -17,10 +17,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import {
   SANDBOX_STATUS_POLL_INTERVAL_MS,
+  observeSandboxStatus,
   sandboxStatusPresentation,
   type SandboxStatusPresentation,
 } from './sandbox-status';
@@ -118,6 +119,7 @@ export function SandboxStatusIndicator({
   sessionActive: boolean;
 }) {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const [observation, setObservation] = useState({
     enabled: false,
     initialized: false,
@@ -185,13 +187,23 @@ export function SandboxStatusIndicator({
     };
   }, []);
 
+  const queryKey = organizationId
+    ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryKey({
+        organizationId,
+        cloudAgentSessionId,
+      })
+    : trpc.cloudAgentNext.getSandboxStatus.queryKey({ cloudAgentSessionId });
   const query = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryOptions({
-          organizationId,
-          cloudAgentSessionId,
-        })
-      : trpc.cloudAgentNext.getSandboxStatus.queryOptions({ cloudAgentSessionId })),
+    queryKey: [...queryKey, 'observation'],
+    queryFn: ({ signal }) =>
+      observeSandboxStatus(() =>
+        organizationId
+          ? trpcClient.organizations.cloudAgentNext.getSandboxStatus.query(
+              { organizationId, cloudAgentSessionId },
+              { signal }
+            )
+          : trpcClient.cloudAgentNext.getSandboxStatus.query({ cloudAgentSessionId }, { signal })
+      ),
     enabled: observation.enabled,
     refetchInterval: observation.enabled ? SANDBOX_STATUS_POLL_INTERVAL_MS : false,
     refetchIntervalInBackground: false,
@@ -217,7 +229,7 @@ export function SandboxStatusIndicator({
 
   const now = Math.max(clock, Date.now());
   const view = sandboxStatusPresentation({
-    data: query.data,
+    data: query.data?.snapshot,
     observation: !observation.initialized
       ? 'checking'
       : !observation.enabled || query.fetchStatus === 'paused'
@@ -227,7 +239,8 @@ export function SandboxStatusIndicator({
           : !query.isFetchedAfterMount || query.isPending
             ? 'checking'
             : 'observing',
-    dataUpdatedAt: query.dataUpdatedAt,
+    requestedAt: query.data?.requestedAt ?? 0,
+    receivedAt: query.data?.receivedAt ?? 0,
     freshAfter: observation.freshAfter,
     estimateAfter: activity.changedAt,
     sessionActive,

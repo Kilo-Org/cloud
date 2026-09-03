@@ -12,6 +12,12 @@ export const SANDBOX_STATUS_FRESHNESS_MS = 15_000;
 export const SANDBOX_SLEEP_ESTIMATE_DELAY_MS = 120_000;
 export const SANDBOX_SLEEP_SOON_MS = 60_000;
 
+export async function observeSandboxStatus(read: () => Promise<unknown>) {
+  const requestedAt = Date.now();
+  const snapshot = await read();
+  return { snapshot, requestedAt, receivedAt: Date.now() };
+}
+
 export function isSandboxStatusEligible({
   currentUserId,
   sessionId,
@@ -81,7 +87,8 @@ export type SandboxStatusPresentation = {
 export function sandboxStatusPresentation({
   data,
   observation,
-  dataUpdatedAt,
+  requestedAt,
+  receivedAt,
   freshAfter,
   estimateAfter,
   sessionActive,
@@ -89,7 +96,8 @@ export function sandboxStatusPresentation({
 }: {
   data: unknown;
   observation: 'checking' | 'paused' | 'unavailable' | 'observing';
-  dataUpdatedAt: number;
+  requestedAt: number;
+  receivedAt: number;
   freshAfter: number;
   estimateAfter: number;
   sessionActive: boolean;
@@ -124,30 +132,43 @@ export function sandboxStatusPresentation({
   const parsed = baseGetSandboxStatusNextOutputSchema.safeParse(data);
   if (!parsed.success) return unavailable;
   const snapshot = parsed.data;
-  const evidenceAt = Math.min(snapshot.observedAt, dataUpdatedAt);
-  const freshUntil = evidenceAt + SANDBOX_STATUS_FRESHNESS_MS;
-  if (evidenceAt < freshAfter || snapshot.observedAt > now || now >= freshUntil) {
+  const freshUntil = requestedAt + SANDBOX_STATUS_FRESHNESS_MS;
+  if (
+    requestedAt < freshAfter ||
+    receivedAt < requestedAt ||
+    receivedAt > now ||
+    now >= freshUntil
+  ) {
     return { ...unavailable, detail: 'Sandbox status is out of date. Waiting for a fresh update.' };
   }
 
+  const localSleepDeadline =
+    snapshot.estimatedSleepAt !== null
+      ? requestedAt + (snapshot.estimatedSleepAt - snapshot.observedAt)
+      : null;
   const sleepDeadline =
     !sessionActive &&
     snapshot.status === 'active' &&
     snapshot.provider !== 'Unknown' &&
     snapshot.inactivityTimeoutMs !== null &&
-    snapshot.observedAt >= estimateAfter &&
-    snapshot.estimatedSleepAt !== null &&
-    snapshot.estimatedSleepAt > now
-      ? snapshot.estimatedSleepAt
+    requestedAt >= estimateAfter &&
+    localSleepDeadline !== null &&
+    localSleepDeadline > now
+      ? localSleepDeadline
       : null;
   const estimateVisibleAt =
     sleepDeadline !== null && snapshot.inactivityTimeoutMs !== null
-      ? sleepDeadline - snapshot.inactivityTimeoutMs + SANDBOX_SLEEP_ESTIMATE_DELAY_MS
+      ? sleepDeadline -
+        snapshot.inactivityTimeoutMs +
+        SANDBOX_SLEEP_ESTIMATE_DELAY_MS +
+        (receivedAt - requestedAt)
       : null;
   const estimatedSleepAt =
-    estimateVisibleAt !== null && now >= estimateVisibleAt ? sleepDeadline : null;
+    estimateVisibleAt !== null && now >= estimateVisibleAt ? snapshot.estimatedSleepAt : null;
   const sleepMinutesRemaining =
-    estimatedSleepAt !== null ? Math.ceil((estimatedSleepAt - now) / 60_000) : null;
+    estimatedSleepAt !== null && sleepDeadline !== null
+      ? Math.ceil((sleepDeadline - now) / 60_000)
+      : null;
   const sleepingSoon = sleepDeadline !== null && sleepDeadline - now <= SANDBOX_SLEEP_SOON_MS;
   const deadlines = [freshUntil];
   if (sleepDeadline !== null) {
@@ -156,8 +177,8 @@ export function sandboxStatusPresentation({
     if (sleepingSoonAt > now) deadlines.push(sleepingSoonAt);
   }
   if (estimateVisibleAt !== null && estimateVisibleAt > now) deadlines.push(estimateVisibleAt);
-  if (estimatedSleepAt !== null && sleepMinutesRemaining !== null) {
-    deadlines.push(estimatedSleepAt - (sleepMinutesRemaining - 1) * 60_000);
+  if (sleepDeadline !== null && sleepMinutesRemaining !== null) {
+    deadlines.push(sleepDeadline - (sleepMinutesRemaining - 1) * 60_000);
   }
 
   const runtime = snapshot.runtime;

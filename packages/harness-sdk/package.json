@@ -18,7 +18,9 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
-    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test",
+    "test:e2e": "tsx e2e/live.ts",
+    "typecheck:e2e": "tsgo --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.104.1",

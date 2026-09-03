@@ -92,6 +92,31 @@ A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 body is read, so a second try never repeats text the caller has already seen.
 The older `/api/openrouter` prefix also works; the package does not use it.
 
+## The local end-to-end run
+
+`pnpm test:e2e` calls the real gateway with the kilo CLI token from
+`~/.local/share/kilo/auth.json`. It never prints the token. It spends a small
+amount of real credit.
+
+It asks two questions in one session and checks the second call. The system
+prompt is long on purpose: the cached prefix must clear the model's minimum,
+which is 4096 tokens on Haiku 4.5, or nothing caches and the check fails for the
+wrong reason.
+
+Measured on 2026-09-03, `anthropic/claude-haiku-4.5`, the Kilo organization:
+
+| Call | input | cache read | cache write |
+|---|---:|---:|---:|
+| First | 3 | 0 | 11822 |
+| Second | 3 | 11822 | 13 |
+
+The second call read the whole prefix and wrote only what the first exchange
+added. The hit ratio was 0.9995. That is the healthy shape; a growing `input`
+or a repeated large `cache write` means the prefix moved.
+
+`e2e/node-fetch.ts` is the whole Node adapter, about ten lines. That is the
+measure of what `FetchLike` asks of a caller.
+
 ## Decisions
 
 ### The session bridges; the plugin decides

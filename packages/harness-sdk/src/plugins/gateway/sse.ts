@@ -1,21 +1,25 @@
+import { createParser } from 'eventsource-parser';
+
 /**
- * Server-sent events framing. A chunk of the body can stop in the middle of an
- * event, so `frames` keeps the unfinished tail and returns it as `rest`.
+ * Reads server-sent events. `eventsource-parser` holds the framing: a chunk may
+ * stop in the middle of an event, a data field may run over several lines, and
+ * a comment carries nothing.
+ *
+ * The reader holds state, so make one per stream. `[DONE]` is not part of the
+ * event stream standard; it is how OpenAI marks the end, and it carries nothing.
  */
-const frames = (buffer: string): { readonly events: readonly string[]; readonly rest: string } => {
-  const parts = buffer.split('\n\n');
-  const rest = parts.pop() ?? '';
-  return { events: parts, rest };
+const sseReader = (): ((chunk: string) => readonly string[]) => {
+  let events: string[] = [];
+  const parser = createParser({
+    onEvent: event => {
+      events.push(event.data);
+    },
+  });
+  return chunk => {
+    events = [];
+    parser.feed(chunk);
+    return events.filter(data => data !== '' && data !== '[DONE]');
+  };
 };
 
-/** Joins the `data:` lines of one event. Returns undefined for an event with none. */
-const dataOf = (frame: string): string | undefined => {
-  const data = frame
-    .split('\n')
-    .filter(line => line.startsWith('data:'))
-    .map(line => line.slice('data:'.length).trim())
-    .join('\n');
-  return data === '' || data === '[DONE]' ? undefined : data;
-};
-
-export { dataOf, frames };
+export { sseReader };

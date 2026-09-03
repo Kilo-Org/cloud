@@ -1498,6 +1498,9 @@ importers:
       effect:
         specifier: 3.22.1
         version: 3.22.1
+      eventsource-parser:
+        specifier: 3.0.8
+        version: 3.0.8
       ulid:
         specifier: 'catalog:'
         version: 3.0.2

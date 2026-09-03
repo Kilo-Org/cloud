@@ -15,7 +15,15 @@ file before you change any file in this package.
 7. Own the core plugins. The package ships its own default for each plugin
    point.
 8. Use a library when a library does the work. Do not write what a dependency
-   already gives you.
+   already gives you. If you write more than about ten lines of a solved
+   problem, say which library you rejected and why.
+
+   | Job | Library |
+   |---|---|
+   | Identifiers | `ulid` (`monotonicFactory`) |
+   | Server-sent events | `eventsource-parser` |
+   | Schemas and validation | `zod` |
+   | Effects, streams, retry, layers | `effect` |
 9. Prove behavior with a local end-to-end run.
 10. Validate every incoming value with Zod at the edge. An edge is any point
     where a value enters from outside the package: a store, a model reply, a
@@ -134,7 +142,7 @@ Inside `src/plugins/gateway/`:
 | `index.ts` | The layer: shape choice, send, stream |
 | `http.ts` | The post, the headers, and the retry |
 | `api-kind.ts` | The three shapes and which one to pick |
-| `sse.ts` | Server-sent events framing |
+| `sse.ts` | A reader over `eventsource-parser` |
 | `wire/` | One file per shape, plus the shared `Wire` |
 | `fake.ts` | The fake `fetch` the gateway tests share |
 

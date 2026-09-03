@@ -10,7 +10,7 @@ import {
   type ModelUsage,
   zeroUsage,
 } from '../../core/model.js';
-import { dataOf, frames } from './sse.js';
+import { sseReader } from './sse.js';
 import { completionsWire } from './wire/completions.js';
 import { messagesWire } from './wire/messages.js';
 import { responsesWire } from './wire/responses.js';
@@ -84,19 +84,15 @@ const stream = (
   request: ModelRequest
 ): Stream.Stream<ModelEvent, ModelError> =>
   Stream.unwrap(
-    Effect.map(Ref.make(zeroUsage), usage =>
-      Stream.unwrap(
+    Effect.map(Ref.make(zeroUsage), usage => {
+      const read = sseReader();
+      return Stream.unwrap(
         Effect.map(wireFor(config, request.model), wire =>
           Stream.fromEffect(
             post(config, wire.path, JSON.stringify(wire.toBody({ ...request, stream: true })))
           ).pipe(
             Stream.flatMap(chunksOf),
-            Stream.mapAccum('', (buffer: string, chunk: string) => {
-              const framed = frames(buffer + chunk);
-              return [framed.rest, framed.events];
-            }),
-            Stream.flattenIterables,
-            Stream.filterMap(frame => Option.fromNullable(dataOf(frame))),
+            Stream.mapConcat(chunk => read(chunk)),
             Stream.mapEffect(data => eventsOf(wire, usage, data)),
             Stream.filterMap(text => text),
             Stream.map((text): ModelEvent => ({ kind: 'delta', text })),
@@ -107,8 +103,8 @@ const stream = (
             )
           )
         )
-      )
-    )
+      );
+    })
   );
 
 /** The kilo gateway plugin. It picks the best shape the model speaks. */

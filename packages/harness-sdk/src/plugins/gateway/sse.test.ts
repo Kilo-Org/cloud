@@ -1,18 +1,20 @@
 import { expect, it } from 'vitest';
-import { dataOf, frames } from './sse.js';
+import { sseReader } from './sse.js';
 
-it('keeps an unfinished event as the rest', () => {
-  expect(frames('data: a\n\ndata: b')).toEqual({ events: ['data: a'], rest: 'data: b' });
+it('holds an unfinished event until the rest of it arrives', () => {
+  const read = sseReader();
+  expect(read('data: {"a":')).toEqual([]);
+  expect(read('1}\n\n')).toEqual(['{"a":1}']);
 });
 
-it('joins the data lines of one event', () => {
-  expect(dataOf('event: x\ndata: {"a":1}')).toBe('{"a":1}');
+it('joins a data field written over two lines', () => {
+  expect(sseReader()('data: one\ndata: two\n\n')).toEqual(['one\ntwo']);
 });
 
-it('reads a data field split over two lines', () => {
-  expect(dataOf('data: one\ndata: two')).toBe('one\ntwo');
+it('reads two events out of one chunk', () => {
+  expect(sseReader()('data: a\n\ndata: b\n\n')).toEqual(['a', 'b']);
 });
 
-it('skips the done marker', () => {
-  expect(dataOf('data: [DONE]')).toBeUndefined();
+it('skips a comment and the done marker', () => {
+  expect(sseReader()(': ping\n\ndata: [DONE]\n\n')).toEqual([]);
 });

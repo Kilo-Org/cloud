@@ -421,6 +421,81 @@ The cost is that a crash drops whatever the store still holds. That is the
 plugin's call: it hears every turn and the close, and decides whether to write
 at once, to batch, or to buffer.
 
+### The store is one shared implementation and a one-function driver
+
+`src/plugins/store/sqlite.ts` holds every query. A driver supplies one function
+— run this SQL with these parameters, give back the rows by position — so
+`node.ts` and `expo.ts` are about twenty lines each and share all of it.
+
+The schema is written in `schema.ts` and the SQL is generated from it, so a
+migration and a query can never disagree about a column. Run `pnpm migrations`
+after editing the schema: it calls drizzle-kit and then inlines the SQL into
+`src/plugins/store/migrations.ts`.
+
+**Migrations are inlined, never read from disk.** React Native has no filesystem
+to read them from, and Drizzle's answer there is a Babel plugin, which a package
+must not force on the people who install it. The applied version lives in
+SQLite's own `user_version`, so the store needs no table to know where it
+stands, and the whole set is applied in one transaction.
+
+**A Drizzle type states what the schema declares, not what the file on disk
+holds.** Every row is asserted with typia on the way out. A database written by
+an older build, or by another program, still arrives as `unknown`.
+
+### Three tables, and a read with no join
+
+| Table | Holds |
+|---|---|
+| `sessions` | What `SessionOptions` freezes: system, model, effort, maxTokens |
+| `turns` | The identifier, the session, and the role. No content of its own |
+| `parts` | One row per piece of a turn: text, reasoning, or an image |
+
+`parts.session_id` repeats what `turn_id` could reach. It is there for the
+reader: loading a session is two indexed scans over two tables and no join at
+all, and the parts are matched onto their turns in one pass in memory. Both
+indexes cover `(session_id, id)`, so each read is a range over one index with no
+sort, because a ULID already carries the order.
+
+A turn and its parts are written in one transaction. A turn whose parts went
+missing would read back as an empty message and quietly shorten the prompt.
+
+**An image is stored as base64, not as a blob.** Base64 is what every gateway
+shape wants on the wire, so storing it that way costs a third more space and
+saves encoding the image again on every single request. The read path is the
+prompt builder, and it is the path that matters.
+
+`sessions` records the options because a continued session must be reopened with
+them. Resuming under a system prompt that differs by one byte drops the whole
+cached prefix, and the only symptom is the bill.
+
+### Reasoning is kept and never sent back
+
+A reasoning model's thinking arrives as its own stream event and is stored as
+its own part, ahead of what the model then said. `assemble` drops it.
+
+A provider issues a signature with a thinking block and refuses the block when
+it comes back without one. So the reasoning is there for whoever reads the
+session, and never for a prompt. `reasoning.test.ts` holds that: the second call
+of a session carries the answer and not the thinking.
+
+The three shapes name the field differently, and two providers relayed through
+the chat shape disagree with each other, so each is read on its own terms.
+
+### A dropped stream stops the call
+
+Every call carries an abort signal, and the handle is scoped to the stream
+rather than to the request. A streamed call resolves as soon as the headers
+arrive and keeps producing for a long time after, so a handle released when the
+request resolved would cancel nothing and the provider would keep charging.
+
+`AbortController` is read off the global, the way the entropy plugin reads
+`crypto`, because it is a global in every runtime that has `fetch` and this
+package already asks the caller for a `fetch`. A runtime without one still
+works and simply cannot stop a call early.
+
+The package declares only the part of a signal it hands on, so an adapter names
+the type its own runtime has. `e2e/node-fetch.ts` shows the one line.
+
 ### A reloaded turn must equal the turn that was written
 
 The prompt prefix is rebuilt from the store. If `load` returns a turn that
@@ -455,14 +530,16 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 |---|---|
 | `src/index.ts` | The public entry point; core and every owned plugin |
 | `src/core/index.ts` | The `/core` entry point; every core module, no plugin |
-| `src/core/run.ts` | `openSession`: the handle a consumer drives |
+| `src/core/run.ts` | `openSession`: a new session |
+| `src/core/resume.ts` | `continueSession` and `cloneSession`: one the store already holds |
+| `src/core/wiring.ts` | What every session shares: the options, the handle, the bridge |
 | `src/core/ask.ts` | One question and one answer, with the turn rules |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
-| `src/core/turn.ts` | One turn, shaped as one SQLite row |
+| `src/core/turn.ts` | One turn and its parts: text, reasoning, or an image |
 | `src/core/prompt.ts` | The `Prompt` shape and the `PromptAssembler` plugin point |
 | `src/core/model.ts` | The `ModelClient` plugin point; transport only |
-| `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
+| `src/core/storage.ts` | The `SessionStore` plugin point |
 | `src/core/id.ts` | `{prefix}_{ulid}`; the encoding, and the monotonic order |
 | `src/core/entropy.ts` | The `EntropySource` plugin point; random bytes |
 | `src/core/session-fixture.ts` | What the session tests share. Excluded from `dist/` |
@@ -478,6 +555,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
+| `src/plugins/store/` | The SQLite store, and one adapter per platform |
 | `src/plugins/gateway/` | The kilo gateway plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config. The repo has no root `tsconfig.json`; this one stands alone |
@@ -489,7 +567,7 @@ Inside `src/plugins/gateway/`:
 | `index.ts` | The layer: send, stream, and the resolved plugins |
 | `wires.ts` | Asks the catalog and picks the best wire for a model |
 | `test-gateway.ts` | The gateway with test plugins, for the unit tests. Excluded from `dist/` |
-| `http.ts` | The post, the headers, and the retry |
+| `http.ts` | The post, the headers, the retry, and the abort handle |
 | `api-kind.ts` | The three shapes and which one to pick |
 | `sse.ts` | A reader over `eventsource-parser` |
 | `wire/` | One file per shape, plus the shared `Wire` |

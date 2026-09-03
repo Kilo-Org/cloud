@@ -1,0 +1,16 @@
+name: CI smoke test
+
+on:
+  push:
+    branches:
+      - ci/smoke-test
+
+permissions: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Check runner
+        run: printf '%s\n' 'CI smoke test completed.'

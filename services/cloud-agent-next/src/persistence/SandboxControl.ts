@@ -257,6 +257,14 @@ export type SandboxControlStatus = {
   wrapperInstanceId?: string;
 };
 
+export type ControlRuntimeCredentialProxyFence = {
+  plane: 'control';
+  allocationId: string;
+  providerInstanceId: string;
+  connectionId: string;
+  wrapperInstanceId: string;
+};
+
 export class SandboxControl extends DurableObject<Env> {
   readonly sandboxId: string;
   private socketHandler: SandboxControlSocketHandler;
@@ -506,6 +514,65 @@ export class SandboxControl extends DurableObject<Env> {
     return this.readOwner();
   }
 
+  async getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+  }): Promise<ControlRuntimeCredentialProxyFence | null> {
+    await this.ensureOperationalInitialized();
+    if (
+      typeof input.ownerId !== 'string' ||
+      typeof input.sessionId !== 'string' ||
+      typeof input.kiloSessionId !== 'string' ||
+      typeof input.directory !== 'string'
+    ) {
+      return null;
+    }
+    const [ownerId, routes, physical] = await Promise.all([
+      this.readOwner(),
+      loadRouteTable(this.ctx.storage),
+      loadPhysicalRecord(this.ctx.storage),
+    ]);
+    if (ownerId !== input.ownerId) return null;
+    const route = routes.get(input.sessionId);
+    if (
+      !route ||
+      route.ownerId !== input.ownerId ||
+      route.kiloSessionId !== input.kiloSessionId ||
+      route.directory !== input.directory
+    ) {
+      return null;
+    }
+    const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+    if (
+      this.runtimeDeleted ||
+      this.exclusiveDeletionWorktreeId ||
+      (worktreeId && this.deletingWorktrees.has(worktreeId)) ||
+      physical.state !== 'running' ||
+      physical.stopTombstone !== null ||
+      physical.createIntent === null ||
+      physical.providerRef === null
+    ) {
+      return null;
+    }
+    const runtime = this.readyWrapperRuntime();
+    if (
+      !runtime ||
+      !runtime.wrapperInstanceId ||
+      runtime.providerInstanceId !== physical.providerRef
+    ) {
+      return null;
+    }
+    return {
+      plane: 'control',
+      allocationId: physical.createIntent.intentId,
+      providerInstanceId: runtime.providerInstanceId,
+      connectionId: runtime.connectionId,
+      wrapperInstanceId: runtime.wrapperInstanceId,
+    };
+  }
+
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
     await this.assertRequestWorktreeAdmission(input);
@@ -523,6 +590,14 @@ export class SandboxControl extends DurableObject<Env> {
       runtime.wrapperInstanceId !== expectedWrapperInstanceId
     ) {
       throw new Error('Sandbox wrapper runtime changed');
+    }
+    if (
+      input.expectedConnection &&
+      (runtime.connectionId !== input.expectedConnection.connectionId ||
+        runtime.providerInstanceId !== input.expectedConnection.providerInstanceId ||
+        runtime.wrapperInstanceId !== input.expectedConnection.wrapperInstanceId)
+    ) {
+      throw new Error('Sandbox control connection changed');
     }
     const isCurrent = () => {
       const current = this.readyWrapperRuntime();

@@ -10,6 +10,7 @@ import type {
 } from '../sandbox-control/terminal-billing.js';
 import type { Env } from '../types.js';
 import type { SandboxAcquisition } from '../persistence/SandboxControl.js';
+import type { ControlRuntimeCredentialProxyFence } from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
@@ -38,6 +39,12 @@ type SandboxControlRpc = {
     physical: PhysicalState;
     wrapperInstanceId?: string;
   }>;
+  getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+  }): Promise<ControlRuntimeCredentialProxyFence | null>;
   quarantineRuntime(input: {
     ownerId: string;
     sessionId: string;
@@ -67,6 +74,12 @@ export function sandboxControlRpc(env: Env, sandboxId: string): SandboxControlRp
       ),
     ensureReady: input => stub().ensureReady(input),
     getStatus: () => stub().getStatus(),
+    getRuntimeCredentialProxyFence: input =>
+      withDORetry(
+        stub,
+        control => control.getRuntimeCredentialProxyFence(input),
+        'getRuntimeCredentialProxyFence'
+      ),
     quarantineRuntime: input => stub().quarantineRuntime(input),
     attachSession: input => stub().attachSession(input),
     detachSession: sessionId =>

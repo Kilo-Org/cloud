@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
 import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
 import { createServiceState } from '../../../../packages/cloud-agent-sdk/src/service-state';
 import { SandboxSession } from './SandboxSession.js';
@@ -24,6 +25,7 @@ import {
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
+import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
 import type {
   AcceptedCommandTurn,
   AcceptedPromptTurn,
@@ -980,6 +982,10 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   const storage = {
     kv,
     sql: {},
+    get: async <T>(key: string): Promise<T | undefined> => kv.get<T>(key),
+    put: async (key: string, value: unknown): Promise<void> => {
+      kv.put(key, value);
+    },
     transactionSync: <T>(callback: () => T) => callback(),
     getAlarm: vi.fn(async () => alarmAt),
     setAlarm: vi.fn(async (at: number | Date) => {
@@ -1018,6 +1024,13 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   });
   const control = {
     getStatus: vi.fn(async (): Promise<ControlStatus> => ({ ...status })),
+    getRuntimeCredentialProxyFence: vi.fn(async () => ({
+      plane: 'control' as const,
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      connectionId: 'connection_1',
+      wrapperInstanceId: RUNTIME_ID,
+    })),
     ensureReady: vi.fn(
       async (_input: Parameters<Control['ensureReady']>[0]): Promise<ControlStatus> => ({
         ...status,
@@ -1037,6 +1050,8 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   } satisfies Control;
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
+    WORKER_URL: 'https://worker.example.test',
+    NEXTAUTH_SECRET: 'test-secret',
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user_1',
@@ -1124,6 +1139,37 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       }),
     snapshot: async () => (await session.fetch(new Request('http://unit.test/stream'))).json(),
   };
+}
+
+function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFixture>) {
+  const authorizationId = '44444444-4444-4444-8444-444444444444';
+  const token = jwt.sign(
+    {
+      runtimeAuthorization: { id: authorizationId },
+      exp: Math.floor(Date.now() / 1000) + 60 * 60,
+    },
+    'test-secret'
+  );
+  fixture.storage.kv.put(
+    'session_metadata',
+    serializeSessionMetadata({
+      ...fixture.metadata,
+      auth: { ...fixture.metadata.auth, kilocodeToken: token },
+    })
+  );
+  fixture.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, {
+    version: 1,
+    id: authorizationId,
+    resourceKind: 'cloud-agent-next',
+    resourceId: SESSION_ID,
+    userId: 'user_1',
+    authorizationUserId: 'user_1',
+    issuedAt: '2026-01-01T00:00:00.000Z',
+    state: 'active',
+    bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'b'.repeat(64) },
+    source: { admissionSource: 'user' },
+  });
+  return token;
 }
 
 function delegateRequest(
@@ -2116,6 +2162,81 @@ describe('SandboxSession orchestration', () => {
       });
     }
   );
+
+  it.each(['revoked', 'deleted'] as const)(
+    'immediately denies runtime proxy issue and resolution after terminal lifecycle is %s despite pending or failed detach',
+    async lifecycle => {
+      const fixture = sessionFixture({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'user_1',
+          orgId: 'org_1',
+          billingOrigin: 'cloud-agent-web',
+        },
+      });
+      installModernRuntimeAuthorization(fixture);
+      const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+        wrapperRunId: 'ignored',
+        wrapperGeneration: 0,
+        wrapperConnectionId: 'ignored',
+      });
+      expect(handle).toEqual(expect.any(String));
+
+      const detach = deferred<{ existed: boolean }>();
+      fixture.control.detachSession.mockImplementationOnce(() => detach.promise);
+      const blocked =
+        lifecycle === 'revoked'
+          ? fixture.session.closeOrgStreams('org_1')
+          : fixture.session.deleteSession();
+
+      await expect(
+        fixture.session.issueRuntimeCredentialProxyGrant({
+          wrapperRunId: 'ignored',
+          wrapperGeneration: 0,
+          wrapperConnectionId: 'ignored',
+        })
+      ).resolves.toBeNull();
+      await expect(fixture.session.resolveRuntimeCredentialProxyGrant(handle!)).resolves.toBeNull();
+
+      detach.reject(new Error('detach failed'));
+      await expect(blocked).rejects.toThrow('detach failed');
+      await expect(fixture.session.resolveRuntimeCredentialProxyGrant(handle!)).resolves.toBeNull();
+    }
+  );
+
+  it('sends modern attach credentials only through the Worker proxy handle and exact proxy targets', async () => {
+    const fixture = sessionFixture();
+    const backingToken = installModernRuntimeAuthorization(fixture);
+
+    await fixture.admit('modern-proxy');
+    await fixture.flush();
+
+    const attach = fixture.control.request.mock.calls.find(
+      ([input]) => input.operation === 'session.attach'
+    )?.[0];
+    expect(attach).toMatchObject({
+      expectedConnection: {
+        providerInstanceId: 'provider_1',
+        connectionId: 'connection_1',
+        wrapperInstanceId: RUNTIME_ID,
+      },
+      payload: {
+        kilo: {
+          scopeId: SESSION_ID,
+          token: expect.stringMatching(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
+          targets: {
+            backendBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/backend',
+            providerBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/provider',
+            sessionIngestBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/ingest',
+          },
+        },
+      },
+    });
+    const serialized = JSON.stringify(attach?.payload);
+    expect(serialized).not.toContain(KILO_CREDENTIAL);
+    expect(serialized).not.toContain(backingToken);
+    expect(serialized).not.toContain('test-secret');
+  });
 
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',

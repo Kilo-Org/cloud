@@ -733,6 +733,7 @@ describe('server runtime credential proxy', () => {
     return issueRuntimeCredentialProxyHandle(
       { NEXTAUTH_SECRET: secret } as never,
       createRuntimeProxyGrant({
+        plane: 'legacy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
         sessionId: 'agent_proxy',
         kiloSessionId: 'kilo_proxy',

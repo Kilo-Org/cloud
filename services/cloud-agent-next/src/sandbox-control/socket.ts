@@ -53,6 +53,7 @@ export type SandboxControlOutboundRequest = {
   payload: unknown;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  expectedConnection?: SandboxControlConnectionIdentity;
 };
 
 export type SandboxControlConnectionIdentity = {

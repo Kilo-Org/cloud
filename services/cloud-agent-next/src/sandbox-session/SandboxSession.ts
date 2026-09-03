@@ -8,6 +8,16 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { resolveSecret } from '../auth.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../runtime-credential-proxy-rpc.js';
+import {
+  runtimeCredentialProxyBaseUrl,
+  runtimeProxyGrantSchema,
+  RUNTIME_PROXY_GRANT_KEY,
+  verifyRuntimeCredentialProxyHandle,
+} from '../runtime-credential-proxy.js';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
@@ -105,6 +115,7 @@ import {
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
   wrapperInstanceIdSchema,
+  type SessionAttachPayload,
   type SessionSyncResult,
   type SessionEventIdentity,
   type SessionPreparingPayload,
@@ -554,7 +565,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async getMetadata(): Promise<SessionMetadata | null> {
-    return this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
+    return this.deletedWorktreeId || this.terminalLifecycle.isBlocked()
       ? null
       : this.terminalLifecycle.getStoredMetadata();
   }
@@ -589,23 +600,80 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  /**
-   * The control plane persists only a wrapper instance ID, not the complete
-   * allocation generation plus wrapper run/connection tuple required to fence
-   * a bearer credential. Keep this RPC fail-closed until that lifecycle exists.
-   */
   async issueRuntimeCredentialProxyGrant(_fence: {
     wrapperRunId: string;
     wrapperGeneration: number;
     wrapperConnectionId: string;
   }): Promise<string | null> {
-    return null;
+    const metadata = await this.getMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !kiloSessionId || !sandboxId) return null;
+    const control = sandboxControlRpc(this.env, sandboxId);
+    const readFence = () =>
+      control.getRuntimeCredentialProxyFence({
+        ownerId: metadata.identity.userId,
+        sessionId: metadata.identity.sessionId,
+        kiloSessionId,
+        directory: this.directory(metadata),
+      });
+    const fence = await readFence();
+    if (!fence) return null;
+    const token = await this.getRuntimeToken();
+    const [latestMetadata, storedAuthorization, latestFence] = await Promise.all([
+      this.getMetadata(),
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      readFence(),
+    ]);
+    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    if (
+      !latestFence ||
+      latestFence.allocationId !== fence.allocationId ||
+      latestFence.providerInstanceId !== fence.providerInstanceId ||
+      latestFence.connectionId !== fence.connectionId ||
+      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
+    ) {
+      return null;
+    }
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata: latestMetadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence: latestFence,
+      token,
+      mode: 'contained',
+    });
   }
 
   async resolveRuntimeCredentialProxyGrant(
     _handle: string
   ): Promise<{ token: string; organizationId?: string } | null> {
-    return null;
+    return resolvePersistedRuntimeProxyCredential({
+      env: this.env,
+      storage: this.ctx.storage,
+      handle: _handle,
+      metadata: () => this.getMetadata(),
+      authorization: async () => {
+        const parsed = RuntimeAuthorizationSchema.safeParse(
+          await this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        return parsed.success ? parsed.data : null;
+      },
+      fence: async () => {
+        const metadata = await this.getMetadata();
+        const kiloSessionId = metadata?.auth.kiloSessionId;
+        const sandboxId = metadata?.workspace?.sandboxId;
+        if (!metadata || !kiloSessionId || !sandboxId) return null;
+        return sandboxControlRpc(this.env, sandboxId).getRuntimeCredentialProxyFence({
+          ownerId: metadata.identity.userId,
+          sessionId: metadata.identity.sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        });
+      },
+      token: () => this.getRuntimeToken(),
+    });
   }
 
   async reauthorizeRuntimeAuthorization(input: {
@@ -1757,6 +1825,55 @@ export class SandboxSession extends DurableObject<Env> {
             await this.compensateSessionAttachment(metadata);
           return;
         }
+        const authorization = RuntimeAuthorizationSchema.safeParse(
+          this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        let proxyKilo: SessionAttachPayload['kilo'] | undefined;
+        let proxyFence:
+          | {
+              providerInstanceId: string;
+              connectionId: string;
+              wrapperInstanceId: string;
+            }
+          | undefined;
+        if (authorization.success && authorization.data.state === 'active') {
+          const proxyBaseUrl = this.env.WORKER_URL
+            ? runtimeCredentialProxyBaseUrl(this.env.WORKER_URL)
+            : null;
+          if (!proxyBaseUrl) throw new Error('Runtime credential proxy is unavailable');
+          const handle = await wait(
+            () =>
+              this.issueRuntimeCredentialProxyGrant({
+                wrapperRunId: '',
+                wrapperGeneration: 0,
+                wrapperConnectionId: '',
+              }),
+            SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+          );
+          if (!handle) throw new Error('Runtime credential proxy grant is unavailable');
+          const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+          if (!claims) throw new Error('Runtime credential proxy grant is invalid');
+          const grant = runtimeProxyGrantSchema.safeParse(
+            this.ctx.storage.kv.get<unknown>(RUNTIME_PROXY_GRANT_KEY)
+          );
+          if (!grant.success || grant.data.plane !== 'control') {
+            throw new Error('Runtime credential proxy grant is unavailable');
+          }
+          proxyFence = {
+            providerInstanceId: grant.data.providerInstanceId,
+            connectionId: grant.data.connectionId,
+            wrapperInstanceId: grant.data.wrapperInstanceId,
+          };
+          proxyKilo = {
+            ...status.attachment.kilo,
+            token: handle,
+            targets: {
+              backendBaseUrl: `${proxyBaseUrl}/backend`,
+              providerBaseUrl: `${proxyBaseUrl}/provider`,
+              sessionIngestBaseUrl: `${proxyBaseUrl}/ingest`,
+            },
+          };
+        }
         await dispatch('attach', () =>
           wait(
             async () =>
@@ -1766,7 +1883,14 @@ export class SandboxSession extends DurableObject<Env> {
                     operation: 'session.attach',
                     session,
                     expectedWrapperInstanceId: wrapperInstanceId,
-                    payload: attachPayload,
+                    ...(proxyFence ? { expectedConnection: proxyFence } : {}),
+                    payload: proxyKilo
+                      ? {
+                          ...attachPayload,
+                          env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                          kilo: proxyKilo,
+                        }
+                      : attachPayload,
                     timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
                   })
                 )

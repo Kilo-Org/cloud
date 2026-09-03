@@ -8,6 +8,7 @@ import {
   RUNTIME_PROXY_GRANT_KEY,
   runtimeProxyGrantSchema,
   verifyRuntimeCredentialProxyHandle,
+  type RuntimeProxyFence,
   type RuntimeProxyGrant,
 } from './runtime-credential-proxy.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
@@ -15,13 +16,6 @@ import type { SessionMetadata } from './persistence/session-metadata.js';
 type Storage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
-};
-
-type RuntimeFence = {
-  generation: number;
-  allocationId: string;
-  wrapperRunId: string;
-  wrapperConnectionId: string;
 };
 
 const RUNTIME_PROXY_LEASE_MS = 24 * 60 * 60_000;
@@ -33,7 +27,7 @@ function tokenExpiry(token: string): number | null {
     : null;
 }
 
-function context(metadata: SessionMetadata, fence: RuntimeFence) {
+function context(metadata: SessionMetadata, fence: RuntimeProxyFence) {
   const kiloSessionId = metadata.auth.kiloSessionId;
   if (!kiloSessionId) return null;
   return {
@@ -41,8 +35,21 @@ function context(metadata: SessionMetadata, fence: RuntimeFence) {
     kiloSessionId,
     userId: metadata.identity.userId,
     ...(metadata.identity.orgId ? { orgId: metadata.identity.orgId } : {}),
-    ...fence,
+    fence,
   };
+}
+
+function sameFence(left: RuntimeProxyFence, right: RuntimeProxyFence): boolean {
+  if (left.plane !== right.plane || left.allocationId !== right.allocationId) return false;
+  return left.plane === 'legacy' && right.plane === 'legacy'
+    ? left.generation === right.generation &&
+        left.wrapperRunId === right.wrapperRunId &&
+        left.wrapperConnectionId === right.wrapperConnectionId
+    : left.plane === 'control' &&
+        right.plane === 'control' &&
+        left.providerInstanceId === right.providerInstanceId &&
+        left.connectionId === right.connectionId &&
+        left.wrapperInstanceId === right.wrapperInstanceId;
 }
 
 /**
@@ -55,7 +62,7 @@ export async function issuePersistedRuntimeProxyGrant(input: {
   storage: Storage;
   metadata: SessionMetadata | null;
   authorization: RuntimeAuthorization | null;
-  fence: RuntimeFence | null;
+  fence: RuntimeProxyFence | null;
   token: string | null;
   mode: RuntimeProxyGrant['mode'];
 }): Promise<string | null> {
@@ -78,10 +85,8 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     parsedExisting.data.kiloSessionId === current.kiloSessionId &&
     parsedExisting.data.userId === current.userId &&
     parsedExisting.data.orgId === current.orgId &&
-    parsedExisting.data.generation === current.generation &&
-    parsedExisting.data.allocationId === current.allocationId &&
-    parsedExisting.data.wrapperRunId === current.wrapperRunId &&
-    parsedExisting.data.wrapperConnectionId === current.wrapperConnectionId &&
+    parsedExisting.data.allocationId === current.fence.allocationId &&
+    sameFence(parsedExisting.data, current.fence) &&
     parsedExisting.data.mode === input.mode &&
     parsedExisting.data.leaseExpiresAt > Date.now()
   ) {
@@ -92,9 +97,11 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     );
   }
   const issuedAt = Date.now();
+  const { fence, ...identity } = current;
   const grant = createRuntimeProxyGrant({
     authorizationId: input.authorization.id,
-    ...current,
+    ...identity,
+    ...fence,
     mode: input.mode,
     leaseExpiresAt: issuedAt + RUNTIME_PROXY_LEASE_MS,
     state: 'active',
@@ -110,7 +117,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   handle: string;
   metadata: () => Promise<SessionMetadata | null>;
   authorization: () => Promise<RuntimeAuthorization | null>;
-  fence: () => Promise<RuntimeFence | null>;
+  fence: () => Promise<RuntimeProxyFence | null>;
   token: () => Promise<string | null>;
 }): Promise<{ token: string; organizationId?: string } | null> {
   const claims = await verifyRuntimeCredentialProxyHandle(input.env as never, input.handle);

@@ -417,6 +417,7 @@ describe('sandbox status presentation', () => {
       })
     ).toMatchObject({
       status: 'sleeping',
+      detail: 'Send a message to resume.',
       provider: 'Vercel',
       sandboxType: 'Small',
       kiloCliVersion: '7.4.20',

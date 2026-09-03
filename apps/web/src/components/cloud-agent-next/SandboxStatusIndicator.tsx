@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import {
@@ -126,10 +125,42 @@ export function SandboxStatusIndicator({
   });
   const [clock, setClock] = useState(0);
   const [activity, setActivity] = useState({ active: sessionActive, changedAt: 0 });
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [openMode, setOpenMode] = useState<'preview' | 'pinned' | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const debugSummaryRef = useRef<HTMLElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detailsId = useId();
+
+  function cancelPreviewClose() {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function closePopover() {
+    cancelPreviewClose();
+    setOpenMode(null);
+  }
+
+  function schedulePreviewClose() {
+    cancelPreviewClose();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setOpenMode(current => (current === 'preview' ? null : current));
+    }, 150);
+  }
+
+  function pinPopover() {
+    cancelPreviewClose();
+    setOpenMode('pinned');
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   if (activity.active !== sessionActive) {
     setActivity({ active: sessionActive, changedAt: Date.now() });
@@ -217,62 +248,77 @@ export function SandboxStatusIndicator({
 
   return (
     <Popover
-      open={popoverOpen}
+      open={openMode !== null}
       onOpenChange={open => {
-        setTooltipOpen(false);
-        setPopoverOpen(open);
+        if (open) pinPopover();
+        else closePopover();
       }}
     >
-      <Tooltip open={tooltipOpen && !popoverOpen} onOpenChange={setTooltipOpen}>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              ref={triggerRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground size-11 min-h-11 min-w-11 shrink-0"
-              aria-label={`Sandbox status: ${view.label}`}
-              {...(popoverOpen ? { 'aria-describedby': detailsId } : {})}
-            >
-              <span className="relative size-6">
-                <Box aria-hidden="true" className="size-5" />
-                <span className="bg-background absolute right-0 bottom-0 flex size-3.5 items-center justify-center rounded-full">
-                  <StatusBadgeIcon
-                    aria-hidden="true"
-                    className={cn(
-                      'size-3',
-                      view.status === 'active' && 'text-status-success-icon size-1.5 fill-current',
-                      view.status === 'error' && 'text-status-destructive-icon',
-                      (view.status === 'sleeping-soon' ||
-                        view.status === 'starting' ||
-                        view.status === 'stopping' ||
-                        view.status === 'unreachable') &&
-                        'text-status-warning-icon'
-                    )}
-                  />
-                </span>
-              </span>
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        {!popoverOpen && (
-          <TooltipContent
-            side="bottom"
-            align="end"
-            className="w-80 max-w-[calc(100vw-2rem)] p-4 text-left"
-          >
-            <SandboxStatusDetails view={view} />
-          </TooltipContent>
-        )}
-      </Tooltip>
-      {popoverOpen && (
+      <PopoverTrigger asChild>
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={`Sandbox status: ${view.label}`}
+          {...(openMode !== null ? { 'aria-describedby': detailsId } : {})}
+          onPointerEnter={event => {
+            if (event.pointerType !== 'mouse') return;
+            cancelPreviewClose();
+            setOpenMode(current => current ?? 'preview');
+          }}
+          onPointerLeave={schedulePreviewClose}
+          onClick={event => {
+            event.preventDefault();
+            if (openMode === 'pinned') {
+              closePopover();
+            } else {
+              pinPopover();
+              debugSummaryRef.current?.focus();
+            }
+          }}
+        >
+          <span className="relative size-4">
+            <Box aria-hidden="true" className="size-4" />
+            <span className="bg-background absolute -right-1.5 -bottom-1.5 flex size-3.5 items-center justify-center rounded-full">
+              <StatusBadgeIcon
+                aria-hidden="true"
+                className={cn(
+                  view.status === 'active'
+                    ? 'text-status-success-icon size-1.5! fill-current'
+                    : 'size-3!',
+                  view.status === 'error' && 'text-status-destructive-icon',
+                  (view.status === 'sleeping-soon' ||
+                    view.status === 'starting' ||
+                    view.status === 'stopping' ||
+                    view.status === 'unreachable') &&
+                    'text-status-warning-icon'
+                )}
+              />
+            </span>
+          </span>
+        </Button>
+      </PopoverTrigger>
+      {openMode !== null && (
         <PopoverContent
           side="bottom"
           align="end"
           className="w-80 max-w-[calc(100vw-2rem)] p-4"
           aria-label="Sandbox status details"
-          onEscapeKeyDown={() => triggerRef.current?.focus()}
+          onPointerEnter={cancelPreviewClose}
+          onPointerLeave={schedulePreviewClose}
+          onPointerDownCapture={pinPopover}
+          onFocusCapture={pinPopover}
+          onOpenAutoFocus={event => {
+            if (openMode === 'preview') event.preventDefault();
+          }}
+          onCloseAutoFocus={event => {
+            if (openMode === 'preview') event.preventDefault();
+          }}
+          onEscapeKeyDown={() => {
+            if (openMode === 'pinned') triggerRef.current?.focus();
+          }}
           onKeyDown={event => {
             if (
               event.key === 'Tab' &&
@@ -282,7 +328,7 @@ export function SandboxStatusIndicator({
               (event.shiftKey || event.target !== event.currentTarget)
             ) {
               triggerRef.current?.focus();
-              setPopoverOpen(false);
+              closePopover();
             }
           }}
         >
@@ -290,7 +336,10 @@ export function SandboxStatusIndicator({
             <SandboxStatusDetails view={view} />
           </div>
           <details className="group mt-3 border-t text-xs">
-            <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden">
+            <summary
+              ref={debugSummaryRef}
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden"
+            >
               <ChevronRight aria-hidden="true" className="size-3 group-open:rotate-90" />
               Debug
             </summary>

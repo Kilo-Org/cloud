@@ -274,10 +274,12 @@ repository.
    locally invent `sleeping`; new authoritative evidence is required.
 9. Details MUST group the current text status, runtime information, and known
    lifecycle timing. Runtime information MUST identify the provider and bounded
-   sandbox type using plain-language labels. The click/touch popup MUST include
-   a Debug section, collapsed by default, with labeled control-plane mode and
-   reported CLI/wrapper versions. The hover tooltip MUST remain noninteractive
-   and omit Debug. Compact runtime codes MUST NOT be shown. Missing versions
+   sandbox type using plain-language labels. Hover, click, and touch MUST show
+   the same popup, including a Debug section collapsed by default with labeled
+   control-plane mode and reported CLI/wrapper versions. Hover MUST NOT move
+   keyboard focus. Moving into the popup MUST keep it open; clicking the trigger
+   or interacting inside MUST keep the same view open until dismissed. Compact
+   runtime codes MUST NOT be shown. Missing versions
    MUST display Unknown rather than guessed values. Debug MUST NOT contain a
    unique sandbox or provider identifier.
    Known physical start/stop dates MUST use local display times; unknown dates

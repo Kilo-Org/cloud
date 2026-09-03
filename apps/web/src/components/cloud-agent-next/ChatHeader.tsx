@@ -136,15 +136,15 @@ export function ChatHeader({
           />
         )}
         {onToggleSound && (
-          <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
+          <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="toolbar" />
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               ref={moreOptionsTriggerRef}
-              size="icon"
+              size="icon-sm"
               variant="ghost"
-              className="h-8 w-8"
+              className="text-muted-foreground"
               aria-label="More options"
             >
               <MoreHorizontal className="h-4 w-4" />

@@ -167,7 +167,9 @@ export function sandboxStatusPresentation({
     label: sleepingSoon ? 'Sleeping soon' : statusLabels[snapshot.status],
     detail: sleepingSoon
       ? 'The sandbox will sleep soon if inactivity continues.'
-      : SANDBOX_STATUS_DETAIL_MESSAGES[snapshot.detailCode],
+      : snapshot.status === 'sleeping'
+        ? 'Send a message to resume.'
+        : SANDBOX_STATUS_DETAIL_MESSAGES[snapshot.detailCode],
     provider: snapshot.provider,
     sandboxType: sandboxTypes[runtime?.sandboxType ?? 'unknown'],
     kiloCliVersion: runtime?.kiloCliVersion ?? null,

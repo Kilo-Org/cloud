@@ -350,13 +350,18 @@ async function settlePausedStatus(page: Page, label: string) {
     .toBe(`Sandbox status: ${label}`);
 }
 
-async function expectStaticIndicator(page: Page) {
+async function expectStaticIndicator(page: Page, targetSize = 32) {
   const button = indicator(page);
   await expect(button).toHaveText('');
-  await expect(button).toHaveCSS('width', '44px');
-  await expect(button).toHaveCSS('height', '44px');
+  await expect(button).toHaveCSS('width', `${targetSize}px`);
+  await expect(button).toHaveCSS('height', `${targetSize}px`);
   await expect(button.locator('svg')).toHaveCount(2);
   await expect(button.locator('svg').first()).toHaveClass(/lucide-box/);
+  await expect(button.locator('svg').first()).toHaveCSS('width', '16px');
+  await expect(button.locator('svg').first()).toHaveCSS('height', '16px');
+  const badgeSize = (await button.getAttribute('aria-label')) === 'Sandbox status: Active' ? 6 : 12;
+  await expect(button.locator('svg').last()).toHaveCSS('width', `${badgeSize}px`);
+  await expect(button.locator('svg').last()).toHaveCSS('height', `${badgeSize}px`);
   for (const icon of await button.locator('svg').all()) {
     await expect(icon).toBeVisible();
     await expect(icon).toHaveAttribute('aria-hidden', 'true');
@@ -371,6 +376,41 @@ async function expectStaticIndicator(page: Page) {
       )
     )
   ).toBe(true);
+}
+
+async function expectToolbarGeometry(page: Page, targetSize = 32) {
+  const sandbox = indicator(page);
+  const radius = await sandbox.evaluate(element => getComputedStyle(element).borderRadius);
+  const centerY = await sandbox.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return box.y + box.height / 2;
+  });
+  for (const button of [
+    sandbox,
+    page.getByRole('button', { name: /^(Mute|Enable) completion sounds$/ }),
+    page.getByRole('button', { name: 'More options', exact: true }),
+    page.getByRole('button', { name: 'Send feedback', exact: true }),
+  ]) {
+    await expect(button).toHaveCSS('width', `${targetSize}px`);
+    await expect(button).toHaveCSS('height', `${targetSize}px`);
+    await expect(button).toHaveCSS('border-radius', radius);
+    const icon = button.locator('svg').first();
+    await expect(icon).toHaveCSS('width', '16px');
+    await expect(icon).toHaveCSS('height', '16px');
+    const geometry = await button.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      const icon = element.querySelector('svg')?.getBoundingClientRect();
+      if (!icon) throw new Error('Toolbar icon is missing');
+      return {
+        centerY: box.y + box.height / 2,
+        offsetX: icon.x + icon.width / 2 - (box.x + box.width / 2),
+        offsetY: icon.y + icon.height / 2 - (box.y + box.height / 2),
+      };
+    });
+    expect(geometry.centerY).toBeCloseTo(centerY, 1);
+    expect(geometry.offsetX).toBeCloseTo(0, 1);
+    expect(geometry.offsetY).toBeCloseTo(0, 1);
+  }
 }
 
 async function expectUnavailableRuntime(page: Page) {
@@ -682,7 +722,154 @@ test.describe('control-plane sandbox header', () => {
     await expect(sleepTime(page)).toHaveCount(0);
   });
 
-  test('shares only the status description across tooltip and popup, excluding Debug and versions', async ({
+  test('pins the same hover popup on click without changing its content or stealing focus on hover', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    const composer = page.getByRole('combobox', { name: 'Ask anything…' });
+    await composer.focus();
+    await indicator(page).hover();
+    await fixture.advance(250);
+    await expect(details(page)).toBeVisible();
+    await expect(details(page)).toHaveCount(1);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(composer).toBeFocused();
+    await expect(details(page).getByText('Active', { exact: true })).toBeVisible();
+    await expect(
+      details(page).getByRole('heading', { name: 'Runtime', exact: true })
+    ).toBeVisible();
+    await expect(details(page).getByRole('heading', { name: 'Timing', exact: true })).toBeVisible();
+    await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
+    await expect(detailValue(details(page), 'Sandbox type')).toHaveText('Standard');
+    await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
+    await expectDebugCollapsed(page);
+    await expect(details(page)).toHaveCSS('width', '320px');
+    await expect(details(page)).toHaveCSS('padding', '16px');
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'true');
+    const preview = await details(page).evaluateHandle(element => element);
+    const debug = await debugDisclosure(page).evaluateHandle(element => element);
+    const hoverContent = await details(page).innerText();
+    const hoverClass = await details(page).getAttribute('class');
+    const descriptionId = await indicator(page).getAttribute('aria-describedby');
+    if (!descriptionId) throw new Error('Sandbox status description is missing');
+    const sharedDetails = details(page).locator(`[id="${descriptionId}"]`);
+    const description = await sharedDetails.innerText();
+    await expect(sharedDetails.locator('details, summary, code')).toHaveCount(0);
+    await expect(sharedDetails).not.toContainText(
+      /Debug|Execution|Control plane|Kilo CLI|Wrapper|Runtime code|7\.4\.20|2\.4\.0/
+    );
+    await expect(indicator(page)).toHaveAccessibleDescription(description);
+    await indicator(page).click();
+    await fixture.advance(250);
+    await expect(details(page)).toHaveCount(1);
+    expect(await details(page).evaluate((element, original) => element === original, preview)).toBe(
+      true
+    );
+    expect(
+      await debugDisclosure(page).evaluate((element, original) => element === original, debug)
+    ).toBe(true);
+    await expect(details(page)).toHaveText(hoverContent, { useInnerText: true });
+    expect(await details(page).getAttribute('class')).toBe(hoverClass);
+    await expect(details(page)).toHaveCSS('width', '320px');
+    await expect(details(page)).toHaveCSS('padding', '16px');
+    await expectDebugCollapsed(page);
+    await expect(debugSummary(page)).toBeFocused();
+    await expect(indicator(page)).toHaveAttribute('aria-describedby', descriptionId);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await fixture.advance(500);
+    await expect(details(page)).toBeVisible();
+    await expect(debugSummary(page)).toBeFocused();
+    await debugSummary(page).click();
+    await expect(debugDisclosure(page).locator('dl')).toBeVisible();
+    await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
+    await expect(indicator(page)).toHaveAccessibleDescription(description);
+    await expect(sharedDetails).toHaveText(description, { useInnerText: true });
+    await expectSafe(page);
+    await indicator(page).click();
+    await fixture.advance(500);
+    await expect(details(page)).toHaveCount(0);
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(indicator(page)).toBeFocused();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await preview.dispose();
+    await debug.dispose();
+  });
+
+  test('keeps a preview open across pointer travel and closes only after leaving both surfaces', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    const composer = page.getByRole('combobox', { name: 'Ask anything…' });
+    await composer.focus();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    await indicator(page).hover();
+    await page.clock.runFor(250);
+    await expect(details(page)).toBeVisible();
+    const preview = await details(page).evaluateHandle(element => element);
+    const triggerBox = await indicator(page).boundingBox();
+    const popupBox = await details(page).boundingBox();
+    if (!triggerBox || !popupBox) throw new Error('Sandbox status surfaces are missing');
+    await page.mouse.move(
+      triggerBox.x + triggerBox.width / 2,
+      (triggerBox.y + triggerBox.height + popupBox.y) / 2
+    );
+    await page.clock.runFor(100);
+    await expect(details(page)).toBeVisible();
+    await debugSummary(page).hover();
+    await page.clock.runFor(250);
+    await expect(details(page)).toBeVisible();
+    await expect(composer).toBeFocused();
+    await expectDebugCollapsed(page);
+    await page.mouse.move(0, 0);
+    await page.clock.runFor(100);
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'true');
+    await indicator(page).hover();
+    await page.clock.runFor(250);
+    await expect(details(page)).toBeVisible();
+    expect(await details(page).evaluate((element, original) => element === original, preview)).toBe(
+      true
+    );
+    await debugSummary(page).hover();
+    await page.clock.runFor(250);
+    await expect(details(page)).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.clock.runFor(100);
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'true');
+    await page.clock.runFor(100);
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'false');
+    await page.clock.runFor(250);
+    await expect(details(page)).toHaveCount(0);
+    await expect(composer).toBeFocused();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await preview.dispose();
+  });
+
+  test('dismisses a hover-only preview with Escape without moving composer focus', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    const composer = page.getByRole('combobox', { name: 'Ask anything…' });
+    await composer.focus();
+    await indicator(page).hover();
+    await fixture.advance(250);
+    await expect(details(page)).toBeVisible();
+    await expect(composer).toBeFocused();
+    await page.keyboard.press('Escape');
+    await fixture.advance(500);
+    await expect(details(page)).toHaveCount(0);
+    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(composer).toBeFocused();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+  });
+
+  test('pins the hover popup when Debug is expanded and preserves it after pointer leave', async ({
     page,
   }) => {
     const fixture = await mountFixtures(page);
@@ -690,61 +877,57 @@ test.describe('control-plane sandbox header', () => {
     await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await indicator(page).hover();
     await fixture.advance(250);
-    const tooltip = page.getByRole('tooltip');
-    await expect(tooltip).toBeVisible();
-    const tooltipSurface = page.locator('[data-slot="tooltip-content"]').filter({ has: tooltip });
-    await expect(tooltipSurface).toHaveCSS('width', '320px');
-    await expect(tooltipSurface).toHaveCSS('padding', '16px');
-    await expect(tooltipSurface.locator('details, summary, code')).toHaveCount(0);
-    await expect(tooltipSurface).not.toContainText(
-      /Debug|Execution|Control plane|Kilo CLI|Wrapper|Runtime code|7\.4\.20|2\.4\.0/
-    );
-    await expect(detailValue(tooltip, 'Provider')).toHaveText('Cloudflare');
-    await expect(detailValue(tooltip, 'Sandbox type')).toHaveText('Standard');
-    await expect(detailValue(tooltip, 'Sleeps in').locator('time')).toHaveText(
-      'About 3 min if inactive'
-    );
-    const hoverDetails = await tooltip.innerText();
-    await expect(indicator(page)).toHaveAttribute('aria-describedby', /.+/);
-    await page.keyboard.press('Escape');
-    await fixture.advance(250);
-    await expect(tooltip).toHaveCount(0);
+    await expectDebugCollapsed(page);
+    const preview = await details(page).evaluateHandle(element => element);
+    const debug = await debugDisclosure(page).evaluateHandle(element => element);
+    await debugSummary(page).click();
+    await expect(debugDisclosure(page)).toHaveJSProperty('open', true);
+    await expect(debugDisclosure(page).locator('dl')).toBeVisible();
+    await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
     await page.mouse.move(0, 0);
+    await fixture.advance(500);
+    await expect(details(page)).toHaveCount(1);
+    expect(await details(page).evaluate((element, original) => element === original, preview)).toBe(
+      true
+    );
+    expect(
+      await debugDisclosure(page).evaluate((element, original) => element === original, debug)
+    ).toBe(true);
+    await expect(debugDisclosure(page)).toHaveJSProperty('open', true);
+    await expect(debugDisclosure(page).locator('dl')).toBeVisible();
+    await expect(debugSummary(page)).toBeFocused();
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Ask anything…' }).click();
+    await fixture.advance(250);
+    await expect(details(page)).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Ask anything…' })).toBeFocused();
+    await indicator(page).click();
+    await expectDebugCollapsed(page);
+    await expect(debugSummary(page)).toBeFocused();
+    await preview.dispose();
+    await debug.dispose();
+  });
+
+  test('opens details from keyboard focus and preserves Escape, Tab and outside dismissal', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
     await page.getByRole('button', { name: 'New terminal' }).focus();
     await page.keyboard.press('Tab');
     await expect(indicator(page)).toBeFocused();
     await expect(indicator(page)).not.toHaveCSS('box-shadow', 'none');
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toHaveText(hoverDetails, { useInnerText: true });
     await page.keyboard.press('Enter');
     await fixture.advance(250);
     await expect(details(page)).toBeVisible();
-    await expect(tooltip).toHaveCount(0);
     await expectDebugCollapsed(page);
     await expect(debugSummary(page)).toBeFocused();
-    await expect(indicator(page)).toHaveAttribute('aria-describedby', /.+/);
-    const descriptionId = await indicator(page).getAttribute('aria-describedby');
-    if (!descriptionId) throw new Error('Sandbox status description is missing');
-    const sharedDetails = details(page).locator(`[id="${descriptionId}"]`);
-    await expect(sharedDetails).toHaveText(hoverDetails, { useInnerText: true });
-    await expect(sharedDetails.locator('details, summary, code')).toHaveCount(0);
-    await expect(sharedDetails).not.toContainText(
-      /Debug|Execution|Control plane|Kilo CLI|Wrapper|Runtime code|7\.4\.20|2\.4\.0/
-    );
-    await expect(details(page)).toHaveCSS('width', '320px');
-    await expect(details(page)).toHaveCSS('padding', '16px');
-    await expect(indicator(page)).toHaveAttribute('aria-expanded', 'true');
-    await expect(indicator(page)).toHaveAccessibleDescription(hoverDetails);
-    await debugSummary(page).click();
-    await expect(debugDisclosure(page).locator('dl')).toBeVisible();
-    await expectDebugValues(page, runtimeMetadata.kiloCliVersion, runtimeMetadata.wrapperVersion);
-    await expect(indicator(page)).toHaveAccessibleDescription(hoverDetails);
-    await expect(sharedDetails).toHaveText(hoverDetails, { useInnerText: true });
-    await expectSafe(page);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await fixture.advance(250);
     await expect(details(page)).toHaveCount(0);
-    await expect(tooltip).toHaveCount(0);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expect(indicator(page)).toBeFocused();
     await page.keyboard.press('Space');
     await fixture.advance(250);
@@ -758,9 +941,8 @@ test.describe('control-plane sandbox header', () => {
     await expect(details(page)).toBeVisible();
     await page.getByRole('combobox', { name: 'Ask anything…' }).click();
     await expect(details(page)).toHaveCount(0);
-    const box = await indicator(page).boundingBox();
-    expect(box?.width).toBeGreaterThanOrEqual(44);
-    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await expectStaticIndicator(page);
+    await expectToolbarGeometry(page);
   });
 
   for (const key of ['Enter', 'Space']) {
@@ -1359,8 +1541,48 @@ test.describe('control-plane sandbox header', () => {
     expect(fixture.statusRequests.every(r => r.cloudAgentSessionId === firstWorkspace)).toBe(true);
   });
 
+  test('uses matching hover and keyboard focus highlights for toolbar buttons', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    await fixture.open();
+    await page.addStyleTag({ content: 'button { transition: none !important; }' });
+    await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+    await expectStaticIndicator(page);
+    await expectToolbarGeometry(page);
+    const highlights = [];
+    for (const button of [
+      indicator(page),
+      page.getByRole('button', { name: 'Mute completion sounds', exact: true }),
+      page.getByRole('button', { name: 'More options', exact: true }),
+      page.getByRole('button', { name: 'Send feedback', exact: true }),
+    ]) {
+      await button.hover();
+      await fixture.advance(250);
+      const hover = await button.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, color: style.color };
+      });
+      expect(hover.background).not.toBe('rgba(0, 0, 0, 0)');
+      await page.mouse.move(0, 0);
+      await page.keyboard.press('Tab');
+      await button.focus();
+      await fixture.advance(250);
+      await expect(button).toBeFocused();
+      const focus = await button.evaluate(element => getComputedStyle(element).boxShadow);
+      expect(focus).not.toBe('none');
+      highlights.push({ hover, focus });
+    }
+    for (const highlight of highlights) expect(highlight).toEqual(highlights[0]);
+    await page.getByRole('button', { name: 'Mute completion sounds', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Enable completion sounds', exact: true })
+    ).toBeVisible();
+    await expectToolbarGeometry(page);
+  });
+
   for (const width of [375, 820, 1440]) {
-    test(`keeps a touch-safe indicator and existing controls usable at ${width}px`, async ({
+    test(`keeps compact toolbar controls aligned and usable at ${width}px`, async ({
       page,
     }, testInfo) => {
       await page.setViewportSize({ width, height: width === 375 ? 812 : 1000 });
@@ -1388,9 +1610,7 @@ test.describe('control-plane sandbox header', () => {
       await page.keyboard.press('Enter');
       await fixture.advance(250);
       await expect(details(page)).toBeVisible();
-      const target = await indicator(page).boundingBox();
-      expect(target?.width).toBeGreaterThanOrEqual(44);
-      expect(target?.height).toBeGreaterThanOrEqual(44);
+      await expectToolbarGeometry(page);
       await expectStaticIndicator(page);
       await expectDebugCollapsed(page);
       for (const expanded of [false, true]) {
@@ -1447,6 +1667,8 @@ test.describe('control-plane sandbox header', () => {
       const fixture = await mountFixtures(page);
       await fixture.open();
       await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+      await expectStaticIndicator(page, 44);
+      await expectToolbarGeometry(page, 44);
       await indicator(page).tap();
       await fixture.advance(250);
       await expect(details(page)).toBeVisible();
@@ -1454,6 +1676,7 @@ test.describe('control-plane sandbox header', () => {
       await expect(detailValue(details(page), 'Provider')).toHaveText('Cloudflare');
       await expect(sleepTime(page)).toHaveText('About 3 min if inactive');
       await expectDebugCollapsed(page);
+      await expect(debugSummary(page)).toBeFocused();
       await debugSummary(page).tap();
       await expect(debugDisclosure(page)).toHaveJSProperty('open', true);
       await expect(debugDisclosure(page).locator('dl')).toBeVisible();

@@ -22,7 +22,7 @@ const turn = (role: Turn['role'], content: string): Turn => ({
   id: `trn_${content}`,
   sessionId: 'ses_1',
   role,
-  content,
+  parts: [{ id: `prt_${content}`, kind: 'text', body: content }],
 });
 
 /** A request over a two turn session, used by every gateway test. */

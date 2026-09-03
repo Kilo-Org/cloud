@@ -7,7 +7,7 @@ import {
   type StoredSession,
   type StoreError,
 } from './storage.js';
-import { makeTurn, type Turn } from './turn.js';
+import { draftOf, makeTurn, type Turn } from './turn.js';
 import {
   handleOf,
   type SessionContext,
@@ -70,9 +70,10 @@ const continueSession = (
 /**
  * Copies the turns onto a new session, in order.
  *
- * Each copy is a new turn, because a turn identifier names one row and carries
- * its order. The text is what the model sees, so the copy renders to the same
- * bytes as the original and inherits its warm cache.
+ * Each copy is a new turn with new parts, because an identifier names one row
+ * and carries its order. The content is unchanged, and the content is what the
+ * model sees, so the copy renders to the same bytes and inherits the warm
+ * cache.
  */
 const copyTurns = (
   store: SessionStoreService,
@@ -81,7 +82,11 @@ const copyTurns = (
 ): Effect.Effect<readonly Turn[], StoreError> =>
   Effect.forEach(into.source, turn =>
     Effect.tap(
-      makeTurn(entropy, { sessionId: into.sessionId, role: turn.role, content: turn.content }),
+      makeTurn(entropy, {
+        sessionId: into.sessionId,
+        role: turn.role,
+        parts: turn.parts.map(draftOf),
+      }),
       copy => store.append(copy)
     )
   );

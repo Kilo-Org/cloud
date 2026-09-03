@@ -26,7 +26,9 @@ const sessions = sqliteTable('sessions', {
 });
 
 /**
- * One row per turn, in the flat shape `Turn` already has.
+ * One row per turn. A turn holds no content of its own: its content is its
+ * parts, which is what makes an image or a piece of reasoning storable beside
+ * text without a column per kind.
  *
  * The index covers the pair, not the session alone: every read asks for one
  * session's turns in identifier order, and the pair answers that straight from
@@ -40,9 +42,36 @@ const turns = sqliteTable(
       .notNull()
       .references(() => sessions.id),
     role: text('role', { enum: ['user', 'assistant'] }).notNull(),
-    content: text('content').notNull(),
   },
   table => [index('turns_session_id_id').on(table.sessionId, table.id)]
 );
 
-export { sessions, turns };
+/**
+ * One row per piece of a turn, ordered by identifier like everything else.
+ *
+ * `session_id` repeats what `turn_id` could reach, and it is there for the
+ * reader: loading a session is then two indexed scans over two tables with no
+ * join at all, rather than a join whose cost grows with the conversation.
+ *
+ * `body` is the only payload column, because every kind has exactly one payload
+ * — the text, the reasoning, or the base64 of the image. `media` names the
+ * media type and is empty for everything but an image.
+ */
+const parts = sqliteTable(
+  'parts',
+  {
+    id: text('id').primaryKey(),
+    turnId: text('turn_id')
+      .notNull()
+      .references(() => turns.id),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id),
+    kind: text('kind', { enum: ['text', 'reasoning', 'image'] }).notNull(),
+    body: text('body').notNull(),
+    media: text('media'),
+  },
+  table => [index('parts_session_id_id').on(table.sessionId, table.id)]
+);
+
+export { parts, sessions, turns };

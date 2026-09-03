@@ -1,6 +1,8 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { PromptPart } from '../../../core/prompt.js';
+import { dataUri } from './parts.js';
 import type { Wire } from './wire.js';
 import type { TokenCount } from './usage.js';
 
@@ -10,6 +12,15 @@ import type { TokenCount } from './usage.js';
  * request of one session lands on the same cache entry.
  */
 type ResponsesBody = OpenAI.Responses.ResponseCreateParams;
+
+/**
+ * This shape has no cache breakpoint, so a part carries no mark. An image goes
+ * as a data URI, which is the only way this shape takes bytes.
+ */
+const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent =>
+  part.kind === 'text'
+    ? { type: 'input_text', text: part.text }
+    : { type: 'input_image', image_url: dataUri(part), detail: 'auto' };
 
 const toBody = ({
   prompt,
@@ -27,7 +38,7 @@ const toBody = ({
   ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
   input: prompt.messages.map(message => ({
     role: message.role,
-    content: [{ type: 'input_text' as const, text: message.text }],
+    content: message.parts.map(renderPart),
   })),
 });
 

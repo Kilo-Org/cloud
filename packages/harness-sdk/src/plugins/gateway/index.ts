@@ -22,9 +22,18 @@ interface Gateway extends HttpCaller {
   readonly catalog: ModelCatalogService;
 }
 
-/** `request.stream` is already set by the caller; the wire reads it. */
+/**
+ * `request.stream` is already set by the caller; the wire reads it.
+ *
+ * Rendering is wrapped because a wire refuses what its shape cannot carry: an
+ * image in a media type the provider does not take throws here, and that is a
+ * failed call, not a crash.
+ */
 const bodyFor = (gateway: Gateway, wire: Wire, request: ModelRequest) =>
-  post(gateway, wire.path, JSON.stringify(wire.toBody(request)));
+  Effect.try({
+    try: () => JSON.stringify(wire.toBody(request)),
+    catch: cause => new ModelError({ reason: 'unsupported', cause }),
+  }).pipe(Effect.flatMap(body => post(gateway, wire.path, body)));
 
 const send = (gateway: Gateway, request: ModelRequest): Effect.Effect<ModelReply, ModelError> =>
   wireFor(gateway.catalog, request.model).pipe(

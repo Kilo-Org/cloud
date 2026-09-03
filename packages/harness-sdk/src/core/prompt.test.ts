@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { assemble } from '../plugins/prompt/default.js';
 import { seededEntropy } from '../plugins/entropy/seeded.js';
 import { makeTurn } from './turn.js';
+import { textIn } from './prompt.js';
 
 const entropy = seededEntropy(1);
 
@@ -14,7 +15,13 @@ const turns = (...contents: readonly string[]) =>
   Chunk.fromIterable(
     run(
       Effect.all(
-        contents.map(content => makeTurn(entropy, { sessionId: 'ses_1', role: 'user', content }))
+        contents.map(content =>
+          makeTurn(entropy, {
+            sessionId: 'ses_1',
+            role: 'user',
+            parts: [{ kind: 'text', body: content }],
+          })
+        )
       )
     )
   );
@@ -33,13 +40,19 @@ it('gives the same bytes for the same input', () => {
 it('leaves every earlier message unchanged when a turn is appended', () => {
   const before = turns('a', 'b');
   const [added] = run(
-    Effect.all([makeTurn(entropy, { sessionId: 'ses_1', role: 'assistant', content: 'c' })])
+    Effect.all([
+      makeTurn(entropy, {
+        sessionId: 'ses_1',
+        role: 'assistant',
+        parts: [{ kind: 'text', body: 'c' }],
+      }),
+    ])
   );
   const after = Chunk.append(before, added);
 
   const grown = assemble({ system, turns: after });
-  expect(grown.messages.slice(0, Chunk.size(before)).map(message => message.text)).toEqual(
-    assemble({ system, turns: before }).messages.map(message => message.text)
+  expect(grown.messages.slice(0, Chunk.size(before)).map(textIn)).toEqual(
+    assemble({ system, turns: before }).messages.map(textIn)
   );
   expect(grown.system).toEqual(assemble({ system, turns: before }).system);
 });

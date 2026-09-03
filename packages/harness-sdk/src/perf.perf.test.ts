@@ -47,7 +47,12 @@ const sessionOf = (turns: number) => {
         makeTurn(entropy, {
           sessionId: held.id,
           role: index % 2 === 0 ? 'user' : 'assistant',
-          content: `message number ${String(index)} with enough text to weigh something`,
+          parts: [
+            {
+              kind: 'text',
+              body: `message number ${String(index)} with enough text to weigh something`,
+            },
+          ],
         })
       )
     );

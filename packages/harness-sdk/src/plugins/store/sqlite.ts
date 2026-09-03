@@ -9,9 +9,9 @@ import {
   type SessionStoreService,
   type StoredSession,
 } from '../../core/storage.js';
-import type { Turn } from '../../core/turn.js';
+import type { Turn, TurnPart, TurnRole } from '../../core/turn.js';
 import { migrations } from './migrations.js';
-import { sessions, turns } from './schema.js';
+import { parts, sessions, turns } from './schema.js';
 
 /**
  * The SQLite store, written once for every platform.
@@ -50,12 +50,50 @@ interface SessionRow {
 interface TurnRow {
   readonly id: string;
   readonly sessionId: string;
-  readonly role: 'user' | 'assistant';
-  readonly content: string;
+  readonly role: TurnRole;
+}
+
+interface PartRow {
+  readonly id: string;
+  readonly turnId: string;
+  readonly kind: TurnPart['kind'];
+  readonly body: string;
+  readonly media: string | null;
 }
 
 const assertSessions = createAssert<readonly SessionRow[]>();
 const assertTurns = createAssert<readonly TurnRow[]>();
+const assertParts = createAssert<readonly PartRow[]>();
+
+/**
+ * A row is one part, and only an image names a media type. A row that claims to
+ * be an image without one is a row this package did not write, so it is refused
+ * rather than repaired.
+ */
+const asPart = (row: PartRow): TurnPart => {
+  if (row.kind !== 'image') {
+    return { id: row.id, kind: row.kind, body: row.body };
+  }
+  if (row.media === null) {
+    throw new Error(`the image part ${row.id} names no media type`);
+  }
+  return { id: row.id, kind: 'image', body: row.body, media: row.media };
+};
+
+/** Groups the parts by turn in one pass, so joining them back on costs no scan. */
+const byTurn = (rows: readonly PartRow[]): Map<string, TurnPart[]> => {
+  const held = new Map<string, TurnPart[]>();
+  for (const row of rows) {
+    const already = held.get(row.turnId);
+    const part = asPart(row);
+    if (already === undefined) {
+      held.set(row.turnId, [part]);
+    } else {
+      already.push(part);
+    }
+  }
+  return held;
+};
 
 /** A column with no value is a value the caller never named, which is absent here. */
 const asStoredSession = (row: SessionRow): StoredSession => ({
@@ -104,23 +142,68 @@ const applyPending = async (driver: SqlDriver, applied: number): Promise<void> =
   await driver(`PRAGMA user_version = ${String(migrations.length)}`, [], 'run');
 };
 
-/**
- * Migrates in one transaction, so a process that dies part way leaves the
- * version and the schema still agreeing with each other.
- */
-const migrate = async (driver: SqlDriver): Promise<void> => {
-  const applied = await versionOf(driver);
-  if (applied >= migrations.length) {
-    return;
-  }
+/** Runs the work as one unit, so a process that dies part way leaves nothing half done. */
+const transact = async (driver: SqlDriver, run: () => Promise<void>): Promise<void> => {
   await driver('BEGIN', [], 'run');
   try {
-    await applyPending(driver, applied);
+    await run();
     await driver('COMMIT', [], 'run');
   } catch (error) {
     await driver('ROLLBACK', [], 'run');
     throw error;
   }
+};
+
+/** Migrates in one unit, so the version and the schema always agree. */
+const migrate = async (driver: SqlDriver): Promise<void> => {
+  const applied = await versionOf(driver);
+  if (applied >= migrations.length) {
+    return;
+  }
+  await transact(driver, () => applyPending(driver, applied));
+};
+
+type Db = ReturnType<typeof drizzle>;
+
+/**
+ * Writes the turn and its parts as one unit. A turn whose parts went missing
+ * would read back as an empty message and quietly shorten the prompt.
+ */
+const insertTurn = (db: Db, driver: SqlDriver, turn: Turn): Promise<void> =>
+  transact(driver, async () => {
+    await db.insert(turns).values({ id: turn.id, sessionId: turn.sessionId, role: turn.role });
+    if (turn.parts.length > 0) {
+      await db.insert(parts).values(
+        turn.parts.map(part => ({
+          id: part.id,
+          turnId: turn.id,
+          sessionId: turn.sessionId,
+          kind: part.kind,
+          body: part.body,
+          ...(part.kind === 'image' ? { media: part.media } : {}),
+        }))
+      );
+    }
+  });
+
+/**
+ * Two indexed scans and no join. Both tables carry the session, so each read is
+ * a range over one index and the parts are matched up in memory, in one pass.
+ */
+const selectTurns = async (db: Db, sessionId: string): Promise<readonly Turn[]> => {
+  const [turnRows, partRows] = await Promise.all([
+    db.select().from(turns).where(eq(turns.sessionId, sessionId)).orderBy(asc(turns.id)),
+    db.select().from(parts).where(eq(parts.sessionId, sessionId)).orderBy(asc(parts.id)),
+  ]);
+  const held = byTurn(assertParts(partRows));
+  return assertTurns(turnRows).map(
+    (turn): Turn => ({
+      id: turn.id,
+      sessionId: turn.sessionId,
+      role: turn.role,
+      parts: held.get(turn.id) ?? [],
+    })
+  );
 };
 
 /**
@@ -143,20 +226,9 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
         return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
       }),
 
-    append: turn =>
-      attempt('append', async () => {
-        await db.insert(turns).values(turn);
-      }),
+    append: turn => attempt('append', () => insertTurn(db, driver, turn)),
 
-    load: sessionId =>
-      attempt('load', async () => {
-        const rows = await db
-          .select()
-          .from(turns)
-          .where(eq(turns.sessionId, sessionId))
-          .orderBy(asc(turns.id));
-        return assertTurns(rows) satisfies readonly Turn[];
-      }),
+    load: sessionId => attempt('load', () => selectTurns(db, sessionId)),
 
     flush: () => Effect.void,
   };

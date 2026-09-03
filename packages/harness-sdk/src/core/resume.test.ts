@@ -4,6 +4,7 @@ import { asked, bench, options, prompted } from './resume-fixture.js';
 import { cloneSession, continueSession, SessionNotFoundError } from './resume.js';
 import { openSession } from './run.js';
 import { texts } from './session-fixture.js';
+import { textIn } from './prompt.js';
 
 it('carries the turns of an earlier run into the next one', async () => {
   const desk = bench();
@@ -46,11 +47,7 @@ it('asks the next question with the whole restored conversation in front of it',
     Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
   );
 
-  expect(resumed.calls[0]?.prompt.messages.map(message => message.text)).toEqual([
-    'first',
-    'an answer',
-    'second',
-  ]);
+  expect(resumed.calls[0]?.prompt.messages.map(textIn)).toEqual(['first', 'an answer', 'second']);
 });
 
 it('refuses an identifier the store has never held', async () => {

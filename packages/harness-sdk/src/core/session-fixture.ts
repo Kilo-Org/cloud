@@ -9,7 +9,7 @@ import type { ModelError, ModelRequest } from './model.js';
 import { openSession } from './run.js';
 import type { SessionHandle } from './wiring.js';
 import { SessionStore, StoreError } from './storage.js';
-import type { Turn } from './turn.js';
+import { textOf, type Turn } from './turn.js';
 
 /**
  * What the session tests share. It lives outside a `*.test.ts` file so three
@@ -37,7 +37,7 @@ const recordingStore = (): {
   const layer = Layer.succeed(SessionStore, {
     create: () => Effect.void,
     read: () => Effect.succeed(Option.none()),
-    append: (turn: Turn) => Effect.sync(() => void seen.push(`${turn.role}:${turn.content}`)),
+    append: (turn: Turn) => Effect.sync(() => void seen.push(`${turn.role}:${textOf(turn)}`)),
     load: () => Effect.succeed([] as readonly Turn[]),
     flush: () => Effect.sync(() => void seen.push('flush')),
   });
@@ -61,7 +61,7 @@ const brokenStore = (
     append: (turn: Turn) =>
       broken === 'append'
         ? refuse('append')
-        : Effect.sync(() => void seen.push(`${turn.role}:${turn.content}`)),
+        : Effect.sync(() => void seen.push(`${turn.role}:${textOf(turn)}`)),
     load: () => Effect.succeed([] as readonly Turn[]),
     flush: () =>
       broken === 'flush' ? refuse('flush') : Effect.sync(() => void seen.push('flush')),
@@ -83,7 +83,7 @@ const run = <A>(
 };
 
 const texts = (turns: Chunk.Chunk<Turn>): readonly string[] =>
-  Chunk.toReadonlyArray(turns).map(turn => `${turn.role}:${turn.content}`);
+  Chunk.toReadonlyArray(turns).map(turn => `${turn.role}:${textOf(turn)}`);
 
 export {
   brokenStore,

@@ -4,6 +4,7 @@ import { expect, it } from 'vitest';
 import { SessionStore, type SessionStoreService } from '../../core/storage.js';
 import { expoDriver, type ExpoDatabase } from './expo.js';
 import { layerSqliteStore, type SqlValue } from './sqlite.js';
+import { textOf } from '../../core/turn.js';
 
 /**
  * Expo's SQLite is a native module, so it cannot run here. What can run is the
@@ -52,14 +53,24 @@ it('carries a session and its turns through the Expo shape', async () => {
   const read = await use(database, store =>
     Effect.gen(function* () {
       yield* store.create(session);
-      yield* store.append({ id: 'trn_1', sessionId: 'ses_1', role: 'user', content: 'hello' });
-      yield* store.append({ id: 'trn_2', sessionId: 'ses_1', role: 'assistant', content: 'hi' });
+      yield* store.append({
+        id: 'trn_1',
+        sessionId: 'ses_1',
+        role: 'user',
+        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+      });
+      yield* store.append({
+        id: 'trn_2',
+        sessionId: 'ses_1',
+        role: 'assistant',
+        parts: [{ id: `prt_${String('hi')}`, kind: 'text', body: 'hi' }],
+      });
       return { options: yield* store.read('ses_1'), turns: yield* store.load('ses_1') };
     })
   );
 
   expect(read.options).toMatchObject({ _tag: 'Some', value: session });
-  expect(read.turns.map(turn => turn.content)).toEqual(['hello', 'hi']);
+  expect(read.turns.map(textOf)).toEqual(['hello', 'hi']);
 });
 
 it('finalizes every statement it prepares, including the one that failed', async () => {
@@ -67,7 +78,12 @@ it('finalizes every statement it prepares, including the one that failed', async
 
   const failed = await use(database, store =>
     Effect.flip(
-      store.append({ id: 'trn_1', sessionId: 'ses_missing', role: 'user', content: 'hello' })
+      store.append({
+        id: 'trn_1',
+        sessionId: 'ses_missing',
+        role: 'user',
+        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+      })
     )
   );
 

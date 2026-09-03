@@ -16,7 +16,7 @@ const turnsOf = (sessionId: string, count: number) =>
         makeTurn(entropy, {
           sessionId,
           role: index % 2 === 0 ? 'user' : 'assistant',
-          content: `message number ${String(index)}`,
+          parts: [{ kind: 'text', body: `message number ${String(index)}` }],
         })
       )
     )

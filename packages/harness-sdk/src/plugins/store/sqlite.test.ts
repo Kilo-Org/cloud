@@ -2,7 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { Effect, Layer, Option } from 'effect';
 import { expect, it } from 'vitest';
 import { SessionStore, type SessionStoreService } from '../../core/storage.js';
+import { migrations } from './migrations.js';
 import { layerNodeStore } from './node.js';
+import { textOf } from '../../core/turn.js';
 
 const database = (): DatabaseSync => new DatabaseSync(':memory:');
 
@@ -19,8 +21,11 @@ it('leaves an already migrated database alone when it is opened again', async ()
   await use(db, () => Effect.void);
   await use(db, () => Effect.void);
 
+  /* Every migration, applied once. A second open that re-ran them would throw
+     on the first CREATE TABLE. */
   const versions = db.prepare('PRAGMA user_version').all();
-  expect(versions).toEqual([{ user_version: 1 }]);
+  expect(versions).toEqual([{ user_version: migrations.length }]);
+  expect(migrations.length).toBeGreaterThan(1);
 });
 
 it('reads the turns back in the order they were appended', async () => {
@@ -33,14 +38,20 @@ it('reads the turns back in the order they were appended', async () => {
           id: `trn_${String(index)}`,
           sessionId: session.id,
           role,
-          content: `message ${String(index)}`,
+          parts: [
+            {
+              id: `prt_${String(`message ${String(index)}`)}`,
+              kind: 'text',
+              body: `message ${String(index)}`,
+            },
+          ],
         });
       }
       return yield* store.load(session.id);
     })
   );
 
-  expect(loaded.map(turn => turn.content)).toEqual(['message 0', 'message 1', 'message 2']);
+  expect(loaded.map(textOf)).toEqual(['message 0', 'message 1', 'message 2']);
 });
 
 it('gives back the options a session was opened with, absent ones included', async () => {
@@ -69,7 +80,12 @@ it('answers with nothing for a session it has never heard of', async () => {
 it('refuses a turn whose session was never created', async () => {
   const failed = await use(database(), store =>
     store
-      .append({ id: 'trn_1', sessionId: 'ses_missing', role: 'user', content: 'hello' })
+      .append({
+        id: 'trn_1',
+        sessionId: 'ses_missing',
+        role: 'user',
+        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+      })
       .pipe(Effect.flip)
   );
 
@@ -78,15 +94,27 @@ it('refuses a turn whose session was never created', async () => {
 
 it('refuses a row the schema cannot explain rather than handing it back', async () => {
   const db = database();
-  await use(db, store => store.create(session));
-  db.prepare('INSERT INTO turns VALUES (?, ?, ?, ?)').run('trn_1', session.id, 'banana', 'hello');
+  await use(db, store =>
+    Effect.zipRight(
+      store.create(session),
+      store.append({ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] })
+    )
+  );
+  db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?)').run(
+    'prt_1',
+    'trn_1',
+    session.id,
+    'banana',
+    'hello',
+    null
+  );
 
   const failed = await use(db, store => Effect.flip(store.load(session.id)));
 
   /* The cause is named, so a validator that has silently stopped running
      cannot pass this test by failing for some other reason. */
   expect(failed).toMatchObject({ operation: 'load' });
-  expect(String(failed.cause)).toContain('invalid type on $input[0].role');
+  expect(String(failed.cause)).toContain('invalid type on $input[0].kind');
 });
 
 it('keeps two sessions apart', async () => {
@@ -95,13 +123,23 @@ it('keeps two sessions apart', async () => {
     Effect.gen(function* () {
       yield* store.create(session);
       yield* store.create({ ...session, id: 'ses_2' });
-      yield* store.append({ id: 'trn_1', sessionId: 'ses_1', role: 'user', content: 'first' });
-      yield* store.append({ id: 'trn_2', sessionId: 'ses_2', role: 'user', content: 'second' });
+      yield* store.append({
+        id: 'trn_1',
+        sessionId: 'ses_1',
+        role: 'user',
+        parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
+      });
+      yield* store.append({
+        id: 'trn_2',
+        sessionId: 'ses_2',
+        role: 'user',
+        parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
+      });
       return yield* store.load('ses_2');
     })
   );
 
-  expect(loaded.map(turn => turn.content)).toEqual(['second']);
+  expect(loaded.map(textOf)).toEqual(['second']);
 });
 
 /** The layer builds the store once, so a driver that cannot migrate fails there. */

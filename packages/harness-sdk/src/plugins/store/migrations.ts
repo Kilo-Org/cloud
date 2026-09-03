@@ -13,6 +13,12 @@ const migrations: readonly (readonly string[])[] = [
     'CREATE TABLE `turns` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`session_id` text NOT NULL,\n\t`role` text NOT NULL,\n\t`content` text NOT NULL,\n\tFOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE no action\n);',
     'CREATE INDEX `turns_session_id_id` ON `turns` (`session_id`,`id`);',
   ],
+  /* 0001_tranquil_reptil */
+  [
+    'CREATE TABLE `parts` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`turn_id` text NOT NULL,\n\t`session_id` text NOT NULL,\n\t`kind` text NOT NULL,\n\t`body` text NOT NULL,\n\t`media` text,\n\tFOREIGN KEY (`turn_id`) REFERENCES `turns`(`id`) ON UPDATE no action ON DELETE no action,\n\tFOREIGN KEY (`session_id`) REFERENCES `sessions`(`id`) ON UPDATE no action ON DELETE no action\n);',
+    'CREATE INDEX `parts_session_id_id` ON `parts` (`session_id`,`id`);',
+    'ALTER TABLE `turns` DROP COLUMN `content`;',
+  ],
 ];
 
 export { migrations };

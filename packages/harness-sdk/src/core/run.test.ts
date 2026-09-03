@@ -4,6 +4,7 @@ import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
 import { fakeModel } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
 import { ModelError } from './model.js';
+import { textIn } from './prompt.js';
 import { openSession } from './run.js';
 import { options, run, silentCatalog, texts } from './session-fixture.js';
 import { hitRatio } from './usage.js';
@@ -30,8 +31,8 @@ it('asks the second question with the first exchange already in the prompt', asy
   const { calls } = await run([{ deltas: ['one'] }, { deltas: ['two'] }], session =>
     Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
   );
-  expect(calls[0]?.prompt.messages.map(message => message.text)).toEqual(['a']);
-  expect(calls[1]?.prompt.messages.map(message => message.text)).toEqual(['a', 'one', 'b']);
+  expect(calls[0]?.prompt.messages.map(textIn)).toEqual(['a']);
+  expect(calls[1]?.prompt.messages.map(textIn)).toEqual(['a', 'one', 'b']);
 });
 
 it('adds up the token counts of every call', async () => {

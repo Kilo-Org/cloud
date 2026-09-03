@@ -1,28 +1,51 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
+import { isLast } from './parts.js';
 import type { Wire } from './wire.js';
 import { type Counts, set, type TokenCount } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
-type ContentBlock = Anthropic.TextBlockParam;
+type ContentBlock = Anthropic.TextBlockParam | Anthropic.ImageBlockParam;
 type MessagesBody = Anthropic.MessageCreateParams;
+type MediaType = Anthropic.Base64ImageSource['media_type'];
 
 const ephemeral = { type: 'ephemeral' } as const;
 
-const block = (text: string, cache: boolean): ContentBlock =>
+/**
+ * Anthropic names the four image types it takes. The stored media type is a
+ * plain string, so it is checked here rather than assumed: an image this shape
+ * cannot carry must say so, not be sent and refused.
+ */
+const assertMedia = createAssert<MediaType>();
+
+/** The system prompt takes text only, so it has a builder of its own. */
+const textBlock = (text: string, cache: boolean): Anthropic.TextBlockParam =>
   cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
+
+const imageBlock = (media: string, data: string, cache: boolean): ContentBlock => {
+  const source = { type: 'base64' as const, media_type: assertMedia(media), data };
+  return cache ? { type: 'image', source, cache_control: ephemeral } : { type: 'image', source };
+};
+
+const renderPart = (part: PromptPart, cache: boolean): ContentBlock =>
+  part.kind === 'text' ? textBlock(part.text, cache) : imageBlock(part.media, part.data, cache);
+
+const renderMessage = (
+  message: PromptMessage
+): { role: 'user' | 'assistant'; content: ContentBlock[] } => ({
+  role: message.role,
+  content: message.parts.map((part, index) => renderPart(part, isLast(message, index))),
+});
 
 const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): MessagesBody => ({
   model,
   max_tokens: maxTokens,
   stream,
   ...(effort === undefined ? {} : { output_config: { effort } }),
-  system: prompt.system.map(part => block(part.text, part.cache)),
-  messages: prompt.messages.map(message => ({
-    role: message.role,
-    content: [block(message.text, message.cache)],
-  })),
+  system: prompt.system.map(part => textBlock(part.text, part.cache)),
+  messages: prompt.messages.map(renderMessage),
 });
 
 /**

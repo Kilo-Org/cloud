@@ -13,7 +13,7 @@ import {
 import { PromptAssembler } from './prompt.js';
 import type { Session } from './session.js';
 import { SessionStore, type StoreError } from './storage.js';
-import type { Turn } from './turn.js';
+import type { PartDraft, Turn } from './turn.js';
 
 /**
  * What a session is opened with. Every value is frozen for the life of the
@@ -41,7 +41,7 @@ interface SessionHandle {
   readonly id: string;
   /** Asks the model. The stream ends with `done`, which carries this call's counts. */
   readonly ask: (
-    text: string,
+    input: string | readonly PartDraft[],
     options?: AskOptions
   ) => Stream.Stream<ModelEvent, ModelError | StoreError | SessionBusyError>;
   readonly history: Effect.Effect<Chunk.Chunk<Turn>>;

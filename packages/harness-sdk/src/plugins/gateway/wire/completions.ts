@@ -1,9 +1,10 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
+import { dataUri, isLast } from './parts.js';
 import type { Wire } from './wire.js';
 import type { TokenCount } from './usage.js';
-import type { ContentBlock } from './messages.js';
 
 /**
  * The OpenAI chat shape, with one extension. `cache_control` on a content block
@@ -19,10 +20,40 @@ type CompletionsBody = Omit<OpenAI.Chat.ChatCompletionCreateParams, 'messages'> 
   }[];
 };
 
-const ephemeral = { type: 'ephemeral' } as const;
+/** The OpenAI content block, plus the breakpoint the gateway forwards. */
+type ContentBlock =
+  | { readonly type: 'text'; readonly text: string; readonly cache_control?: Ephemeral }
+  | {
+      readonly type: 'image_url';
+      readonly image_url: { readonly url: string };
+      readonly cache_control?: Ephemeral;
+    };
+
+interface Ephemeral {
+  readonly type: 'ephemeral';
+}
+
+const ephemeral: Ephemeral = { type: 'ephemeral' };
 
 const block = (text: string, cache: boolean): ContentBlock =>
   cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
+
+const renderPart = (part: PromptPart, cache: boolean): ContentBlock => {
+  if (part.kind === 'text') {
+    return block(part.text, cache);
+  }
+  const image_url = { url: dataUri(part) };
+  return cache
+    ? { type: 'image_url', image_url, cache_control: ephemeral }
+    : { type: 'image_url', image_url };
+};
+
+const renderMessage = (
+  message: PromptMessage
+): { role: 'user' | 'assistant'; content: readonly ContentBlock[] } => ({
+  role: message.role,
+  content: message.parts.map((part, index) => renderPart(part, isLast(message, index))),
+});
 
 const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): CompletionsBody => ({
   model,
@@ -35,10 +66,7 @@ const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): Com
       role: 'system' as const,
       content: [block(part.text, part.cache)],
     })),
-    ...prompt.messages.map(message => ({
-      role: message.role,
-      content: [block(message.text, message.cache)],
-    })),
+    ...prompt.messages.map(renderMessage),
   ],
 });
 
@@ -108,5 +136,5 @@ const completionsWire: Wire = {
   toUsage,
 };
 
-export type { CompletionsBody };
+export type { CompletionsBody, ContentBlock };
 export { completionsWire };

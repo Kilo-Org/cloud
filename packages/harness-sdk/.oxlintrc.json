@@ -74,10 +74,12 @@
       "files": [
         "src/plugins/store/node.ts",
         "src/plugins/store/*.test.ts",
-        "src/core/resume-fixture.ts"
+        "src/core/resume-fixture.ts",
+        "src/core/image.test.ts"
       ],
       "rules": {
-        "import/no-nodejs-modules": "off"
+        "import/no-nodejs-modules": "off",
+        "unicorn/no-null": "off"
       }
     }
   ]

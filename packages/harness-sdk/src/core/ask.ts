@@ -5,7 +5,7 @@ import type { Effort, ModelClientService, ModelError, ModelEvent, ModelUsage } f
 import type { PromptAssemblerService } from './prompt.js';
 import { appendTurn, type Session } from './session.js';
 import type { SessionStoreService, StoreError } from './storage.js';
-import { makeTurn, type Turn } from './turn.js';
+import { makeTurn, partsOf, type PartDraft, type Turn } from './turn.js';
 import { add } from './usage.js';
 
 /**
@@ -89,12 +89,12 @@ type Answer = Stream.Stream<ModelEvent, ModelError | StoreError>;
  */
 const answerOf = (
   wiring: Wiring,
-  text: string,
+  input: string | readonly PartDraft[],
   options: AskOptions | undefined
 ): Effect.Effect<Answer, StoreError> =>
   Effect.gen(function* () {
     yield* Effect.flatMap(
-      makeTurn(wiring.entropy, { sessionId: wiring.id, role: 'user', content: text }),
+      makeTurn(wiring.entropy, { sessionId: wiring.id, role: 'user', parts: partsOf(input) }),
       turn => record(wiring, turn)
     );
     const { turns } = yield* Ref.get(wiring.state);
@@ -119,7 +119,7 @@ const answerOf = (
                   makeTurn(wiring.entropy, {
                     sessionId: wiring.id,
                     role: 'assistant',
-                    content: said,
+                    parts: [{ kind: 'text', body: said }],
                   })
                 ),
                 Effect.flatMap(turn => record(wiring, turn)),
@@ -142,7 +142,7 @@ const answerOf = (
 const askWith =
   (wiring: Wiring) =>
   (
-    text: string,
+    input: string | readonly PartDraft[],
     options?: AskOptions
   ): Stream.Stream<ModelEvent, ModelError | StoreError | SessionBusyError> =>
     Stream.unwrap(
@@ -151,7 +151,7 @@ const askWith =
         (held): Effect.Effect<Answer, StoreError | SessionBusyError> =>
           held
             ? Effect.fail(new SessionBusyError({ sessionId: wiring.id }))
-            : answerOf(wiring, text, options).pipe(
+            : answerOf(wiring, input, options).pipe(
                 Effect.map(answer => Stream.ensuring(answer, Ref.set(wiring.busy, false))),
                 Effect.onError(() => Ref.set(wiring.busy, false))
               )

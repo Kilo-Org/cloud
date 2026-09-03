@@ -2,16 +2,29 @@ import { type Chunk, Context } from 'effect';
 import type { Turn, TurnRole } from './turn.js';
 
 /**
- * A block of the prompt. `cache` marks a cache breakpoint: the model caches
- * every byte up to and including this block.
+ * A block of the system prompt. `cache` marks a cache breakpoint: the model
+ * caches every byte up to and including this block.
  */
 interface PromptBlock {
   readonly text: string;
   readonly cache: boolean;
 }
 
-interface PromptMessage extends PromptBlock {
+/**
+ * One piece of a message, as the transport plugin will render it. A turn's
+ * reasoning never becomes one of these: a thinking block sent back without the
+ * signature the provider issued is rejected, so reasoning is kept for the
+ * reader and left out of the prompt.
+ */
+type PromptPart =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'image'; readonly media: string; readonly data: string };
+
+/** `cache` marks the breakpoint, which belongs to the message, not to a part. */
+interface PromptMessage {
   readonly role: TurnRole;
+  readonly parts: readonly PromptPart[];
+  readonly cache: boolean;
 }
 
 /** What the transport plugin sends. The order on the wire is system, then messages. */
@@ -37,10 +50,17 @@ interface PromptAssemblerService {
   readonly assemble: (input: PromptInput) => Prompt;
 }
 
+/** The text of a message, which is all of it for a message that carries no image. */
+const textIn = (message: PromptMessage): string =>
+  message.parts
+    .filter(part => part.kind === 'text')
+    .map(part => part.text)
+    .join('');
+
 class PromptAssembler extends Context.Tag('harness/PromptAssembler')<
   PromptAssembler,
   PromptAssemblerService
 >() {}
 
-export type { Prompt, PromptAssemblerService, PromptBlock, PromptInput, PromptMessage };
-export { PromptAssembler };
+export type { Prompt, PromptAssemblerService, PromptBlock, PromptInput, PromptMessage, PromptPart };
+export { PromptAssembler, textIn };

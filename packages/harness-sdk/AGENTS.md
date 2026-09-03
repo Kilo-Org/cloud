@@ -11,7 +11,10 @@ file before you change any file in this package.
    proves the absence of behavior.
 4. Performance is a hard requirement. See "Performance" below.
 5. Use Effect (`effect`) for the control flow, the errors, and the resources.
-6. Make every part pluggable. If a part can be a plugin, make it a plugin.
+6. Make every part pluggable, where a second implementation is real. A seam
+   earns its place by the plugin somebody will actually write. Do not add one
+   whose only other implementation would be wrong: see "What is not
+   pluggable" below.
 7. Own the core plugins. The package ships its own default for each plugin
    point.
 8. Use a library when a library does the work. Do not write what a dependency
@@ -284,6 +287,26 @@ differs from the written turn in one byte or in the order, the prefix changes
 and the model cache misses. The SQLite plugin must prove the round trip with a
 local end-to-end run.
 
+## What is not pluggable, and why
+
+Two seams were cut after they were built. Both failed the same test: name the
+second implementation, and say whether it is one a caller should be allowed to
+write.
+
+**The identifier.** It must sort by the order it was made in, because a store
+rebuilds the prompt prefix in that order and a prefix in the wrong order misses
+the cache. A plugin returning a random identifier typechecks, passes every
+test, and breaks that one reload later. There is one right answer, so
+`core/id.ts` makes it. One module also means one monotonic sequence; two
+factories can hand out the same millisecond twice.
+
+**The token ceiling.** It had become the third of three ways to set one number,
+behind `AskOptions.maxTokens` and `SessionOptions.maxTokens`, and it only fired
+when a caller set neither. The argument for it was that a plugin could read the
+model's own limit — which is what `ModelCatalog` knows. `ask.ts` now reads
+`maxTokens ?? catalog maxOutputTokens ?? 4096`, and the catalog is only asked
+when nobody named a number.
+
 ## Layout
 
 `core/` holds the contracts and the pure domain. `plugins/` holds the
@@ -301,14 +324,11 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | `src/core/prompt.ts` | The `Prompt` shape and the `PromptAssembler` plugin point |
 | `src/core/model.ts` | The `ModelClient` plugin point; transport only |
 | `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
-| `src/core/id.ts` | The `IdGenerator` plugin point |
-| `src/core/ceiling.ts` | The `TokenCeiling` plugin point |
-| `src/core/catalog.ts` | The `ModelCatalog` plugin point; what a model can do |
+| `src/core/id.ts` | `{prefix}_{ulid}`; deliberately not a plugin point |
+| `src/core/catalog.ts` | The `ModelCatalog` plugin point; shapes and output limit |
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
-| `src/plugins/id/ulid.ts` | The identifier plugin |
-| `src/plugins/ceiling/fixed.ts` | One ceiling for every model |
 | `src/plugins/model/fake.ts` | A scripted model, for tests without a network |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/catalog/table.ts` | A catalog the caller writes down |

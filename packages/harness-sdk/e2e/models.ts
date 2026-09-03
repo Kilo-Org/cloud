@@ -5,8 +5,6 @@ import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession, type SessionHandle } from '../src/core/run.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerFixedCeiling } from '../src/plugins/ceiling/fixed.js';
-import { layerUlid } from '../src/plugins/id/ulid.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
 import { layerTableCatalog } from '../src/plugins/catalog/table.js';
 import { layerStaticToken } from '../src/plugins/token/static.js';
@@ -71,8 +69,10 @@ const ask = (session: SessionHandle, text: string) =>
       : { ...held, usage: event.usage }
   );
 
-const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
-  Effect.scoped(
+const converse = (model: string, kinds: readonly ApiKind[], token: string) => {
+  /** Both the session and the gateway ask the catalog, so it is shared, not nested. */
+  const catalog = layerTableCatalog({}, { apiKinds: kinds });
+  return Effect.scoped(
     Effect.gen(function* () {
       const session = yield* openSession({
         system,
@@ -93,9 +93,8 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
   ).pipe(
     Effect.provide(
       Layer.mergeAll(
-        layerUlid,
         layerAssembler,
-        layerFixedCeiling(),
+        catalog,
         layerKiloGateway({
           baseUrl: process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai',
           org: {
@@ -103,18 +102,11 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
             id: process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56',
           },
           fetch: nodeFetch,
-        }).pipe(
-          Layer.provide(
-            Layer.mergeAll(
-              layerTableCatalog({}, { apiKinds: kinds }),
-              layerStaticToken(token),
-              layerBackoff()
-            )
-          )
-        )
+        }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
       )
     )
   );
+};
 
 const token = await kiloToken();
 

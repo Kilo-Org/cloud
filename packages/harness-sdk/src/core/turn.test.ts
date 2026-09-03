@@ -1,12 +1,9 @@
 import { Chunk, Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { IdGenerator } from './id.js';
-import { layerUlid } from '../plugins/id/ulid.js';
 import { appendTurn, makeSession } from './session.js';
 import { makeTurn } from './turn.js';
 
-const run = <A>(effect: Effect.Effect<A, never, IdGenerator>): A =>
-  Effect.runSync(Effect.provide(effect, layerUlid));
+const run = <A>(effect: Effect.Effect<A>): A => Effect.runSync(effect);
 
 it('makes a turn that carries its fields and a trn_{ulid} identifier', () => {
   const turn = run(makeTurn('ses_1', 'user', 'hello'));

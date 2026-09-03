@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { createIs } from 'typia';
-import { IdGenerator } from './id.js';
+import { makeId } from './id.js';
 
 /**
  * One turn of a conversation. The shape is one SQLite row: flat, four columns,
@@ -25,15 +25,8 @@ const isTurn = createIs<Turn>();
 
 const idPrefix = 'trn';
 
-const makeTurn = (
-  sessionId: string,
-  role: TurnRole,
-  content: string
-): Effect.Effect<Turn, never, IdGenerator> =>
-  IdGenerator.pipe(
-    Effect.flatMap(generator => generator.generate(idPrefix)),
-    Effect.map(id => ({ id, sessionId, role, content }))
-  );
+const makeTurn = (sessionId: string, role: TurnRole, content: string): Effect.Effect<Turn> =>
+  Effect.map(makeId(idPrefix), id => ({ id, sessionId, role, content }));
 
 export type { Turn, TurnRole };
 export { isTurn, makeTurn };

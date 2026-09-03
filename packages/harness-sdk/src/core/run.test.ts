@@ -1,7 +1,6 @@
 import { Chunk, Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
-import { layerFixedCeiling } from '../plugins/ceiling/fixed.js';
-import { layerUlid } from '../plugins/id/ulid.js';
+import { layerTableCatalog } from '../plugins/catalog/table.js';
 import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
 import { ModelError } from './model.js';
@@ -11,6 +10,13 @@ import type { Turn } from './turn.js';
 import { hitRatio } from './usage.js';
 
 const options = { system: 'sys', model: 'claude-opus-5', maxTokens: 1024 };
+
+/** A catalog that names no output limit, so the package falls back to 4096. */
+const silentCatalog = layerTableCatalog({}, { apiKinds: ['messages'] });
+
+/** A catalog that does name one, which is what a caller who names none gets. */
+const catalogSaying = (maxOutputTokens: number) =>
+  layerTableCatalog({}, { apiKinds: ['messages'], maxOutputTokens });
 
 const recordingStore = (): {
   readonly seen: string[];
@@ -31,7 +37,7 @@ const run = <A>(
   store?: Layer.Layer<SessionStore>
 ) => {
   const model = fakeModel(replies);
-  const layers = Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(), model.layer);
+  const layers = Layer.mergeAll(layerAssembler, silentCatalog, model.layer);
   const program = Effect.scoped(Effect.flatMap(openSession(options), use));
   return Effect.runPromise(
     Effect.provide(program, store === undefined ? layers : Layer.merge(layers, store))
@@ -104,7 +110,7 @@ it('raises the token ceiling for one question only', async () => {
 
 it('asks with the same effort on every question of a session', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
-  const layers = Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(), model.layer);
+  const layers = Layer.mergeAll(layerAssembler, silentCatalog, model.layer);
   await Effect.runPromise(
     Effect.provide(
       Effect.scoped(
@@ -118,7 +124,7 @@ it('asks with the same effort on every question of a session', async () => {
   expect(model.calls.map(call => call.effort)).toEqual(['low', 'low']);
 });
 
-it('takes the ceiling from the plugin when the caller names none', async () => {
+it('takes the ceiling from the model catalog when the caller names none', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
   await Effect.runPromise(
     Effect.provide(
@@ -127,13 +133,13 @@ it('takes the ceiling from the plugin when the caller names none', async () => {
           Stream.runDrain(session.ask('a'))
         )
       ),
-      Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(2048), model.layer)
+      Layer.mergeAll(layerAssembler, catalogSaying(2048), model.layer)
     )
   );
   expect(model.calls[0]?.maxTokens).toBe(2048);
 });
 
-it('lets the session and then the question beat the plugin', async () => {
+it('lets the session and then the question beat the catalog', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
   await Effect.runPromise(
     Effect.provide(
@@ -145,7 +151,7 @@ it('lets the session and then the question beat the plugin', async () => {
           )
         )
       ),
-      Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(2048), model.layer)
+      Layer.mergeAll(layerAssembler, catalogSaying(2048), model.layer)
     )
   );
   expect(model.calls.map(call => call.maxTokens)).toEqual([512, 99]);

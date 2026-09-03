@@ -1,7 +1,6 @@
 import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
 import { type AskOptions, askWith, onStore, type Wiring } from './ask.js';
-import { TokenCeiling } from './ceiling.js';
-import { IdGenerator } from './id.js';
+import { ModelCatalog } from './catalog.js';
 import {
   type Effort,
   ModelClient,
@@ -25,7 +24,7 @@ interface SessionOptions {
   readonly system: string;
   readonly model: string;
   /**
-   * The default ceiling on one answer. Without one the `TokenCeiling` plugin
+   * The default ceiling on one answer. Without one the catalog's output limit
    * decides. One question may raise or lower it either way.
    */
   readonly maxTokens?: number;
@@ -59,18 +58,16 @@ const openSession = (
 ): Effect.Effect<
   SessionHandle,
   never,
-  IdGenerator | PromptAssembler | ModelClient | TokenCeiling | Scope.Scope
+  PromptAssembler | ModelClient | ModelCatalog | Scope.Scope
 > =>
   Effect.gen(function* () {
-    const ids = yield* IdGenerator;
     const wiring: Wiring = {
       ...options,
-      ids,
       assembler: yield* PromptAssembler,
       client: yield* ModelClient,
-      ceiling: yield* TokenCeiling,
+      catalog: yield* ModelCatalog,
       store: yield* Effect.serviceOption(SessionStore),
-      state: yield* Ref.make(yield* Effect.provideService(makeSession(), IdGenerator, ids)),
+      state: yield* Ref.make(yield* makeSession()),
       totals: yield* Ref.make(zeroUsage),
       gate: yield* Effect.makeSemaphore(1),
     };

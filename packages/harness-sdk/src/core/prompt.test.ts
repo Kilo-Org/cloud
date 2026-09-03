@@ -1,14 +1,11 @@
 import { Chunk, Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { IdGenerator } from './id.js';
-import { layerUlid } from '../plugins/id/ulid.js';
 import { assemble } from '../plugins/prompt/default.js';
 import { makeTurn } from './turn.js';
 
 const system = 'You are a harness.';
 
-const run = <A>(effect: Effect.Effect<A, never, IdGenerator>): A =>
-  Effect.runSync(Effect.provide(effect, layerUlid));
+const run = <A>(effect: Effect.Effect<A>): A => Effect.runSync(effect);
 
 const turns = (...contents: readonly string[]) =>
   Chunk.fromIterable(run(Effect.all(contents.map(content => makeTurn('ses_1', 'user', content)))));

@@ -1,11 +1,8 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { IdGenerator } from './id.js';
-import { layerUlid } from '../plugins/id/ulid.js';
 import { makeSession } from './session.js';
 
-const run = <A>(effect: Effect.Effect<A, never, IdGenerator>): A =>
-  Effect.runSync(Effect.provide(effect, layerUlid));
+const run = <A>(effect: Effect.Effect<A>): A => Effect.runSync(effect);
 
 it('makes an identifier of the form ses_{ulid}', () => {
   expect(run(makeSession()).id).toMatch(/^ses_[0-9A-HJKMNP-TV-Z]{26}$/);

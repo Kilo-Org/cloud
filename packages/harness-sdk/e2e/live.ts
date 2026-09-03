@@ -4,8 +4,6 @@ import { openSession, type SessionHandle } from '../src/core/run.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerFixedCeiling } from '../src/plugins/ceiling/fixed.js';
-import { layerUlid } from '../src/plugins/id/ulid.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
 import { layerTableCatalog } from '../src/plugins/catalog/table.js';
 import { layerStaticToken } from '../src/plugins/token/static.js';
@@ -50,22 +48,18 @@ const program = Effect.gen(function* () {
   return { id: session.id, first, second, total: yield* session.usage };
 });
 
+/** Both the session and the gateway ask the catalog, so it is shared, not nested. */
+const catalog = layerTableCatalog({}, { apiKinds: ['messages', 'responses', 'chat_completions'] });
+
 const layers = Layer.mergeAll(
-  layerUlid,
   layerAssembler,
-  layerFixedCeiling(),
+  catalog,
   layerKiloGateway({
     baseUrl,
     org: { kind: 'organization', id: organizationId },
     fetch: nodeFetch,
   }).pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        layerTableCatalog({}, { apiKinds: ['messages', 'responses', 'chat_completions'] }),
-        layerStaticToken(await kiloToken()),
-        layerBackoff()
-      )
-    )
+    Layer.provide(Layer.mergeAll(catalog, layerStaticToken(await kiloToken()), layerBackoff()))
   )
 );
 

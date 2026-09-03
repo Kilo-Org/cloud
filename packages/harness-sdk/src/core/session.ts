@@ -1,5 +1,5 @@
 import { Chunk, Effect } from 'effect';
-import { IdGenerator } from './id.js';
+import { makeId } from './id.js';
 import type { Turn } from './turn.js';
 
 /**
@@ -14,12 +14,9 @@ interface Session {
 
 const idPrefix = 'ses';
 
-/** Makes an empty session. The `IdGenerator` plugin makes the identifier. */
-const makeSession = (): Effect.Effect<Session, never, IdGenerator> =>
-  IdGenerator.pipe(
-    Effect.flatMap(generator => generator.generate(idPrefix)),
-    Effect.map(id => ({ id, turns: Chunk.empty<Turn>() }))
-  );
+/** Makes an empty session. */
+const makeSession = (): Effect.Effect<Session> =>
+  Effect.map(makeId(idPrefix), id => ({ id, turns: Chunk.empty<Turn>() }));
 
 /** Appends a turn. `Chunk` shares the earlier turns, so nothing is copied. */
 const appendTurn = (session: Session, turn: Turn): Session => ({

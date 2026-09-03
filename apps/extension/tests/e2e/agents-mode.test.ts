@@ -936,7 +936,7 @@ test('Agents session header reports context usage and session cost', async () =>
     data,
     eventId: ++eventCounter,
     executionId: 'exec-usage',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });

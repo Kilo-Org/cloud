@@ -2,6 +2,11 @@ const directories = new Map<string, string>();
 const rootBySessionId = new Map<string, string>();
 const rootsByDirectory = new Map<string, Set<string>>();
 const detachedSessionIds = new Set<string>();
+const rootAttachments = new Map<string, symbol>();
+
+export function rootAttachmentId(rootKiloSessionId: string): symbol | undefined {
+  return rootAttachments.get(rootKiloSessionId);
+}
 
 function removeDirectoryRoot(directory: string, rootKiloSessionId: string): void {
   const roots = rootsByDirectory.get(directory);
@@ -16,6 +21,9 @@ export function rememberSessionDirectory(kiloSessionId: string, directory: strin
 
 export function rememberAttachedRoot(rootKiloSessionId: string, directory: string): void {
   const previousDirectory = directories.get(rootKiloSessionId);
+  if (!rootAttachments.has(rootKiloSessionId) || previousDirectory !== directory) {
+    rootAttachments.set(rootKiloSessionId, Symbol());
+  }
   if (previousDirectory && previousDirectory !== directory) {
     removeDirectoryRoot(previousDirectory, rootKiloSessionId);
   }
@@ -37,6 +45,7 @@ export function forgetAttachedRoot(rootKiloSessionId: string, directory?: string
     return;
   }
   if (attachedDirectory) removeDirectoryRoot(attachedDirectory, rootKiloSessionId);
+  rootAttachments.delete(rootKiloSessionId);
   detachedSessionIds.add(rootKiloSessionId);
   for (const [sessionId, root] of rootBySessionId) {
     if (root !== rootKiloSessionId) continue;
@@ -104,6 +113,7 @@ export function resetSessionDirectoryState(): void {
   rootBySessionId.clear();
   rootsByDirectory.clear();
   detachedSessionIds.clear();
+  rootAttachments.clear();
 }
 
 export function directoryForSession(kiloSessionId: string | undefined): string | undefined {

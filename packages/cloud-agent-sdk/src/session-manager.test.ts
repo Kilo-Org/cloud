@@ -450,6 +450,204 @@ describe('createSessionManager', () => {
   // switchSession
   // -------------------------------------------------------------------------
 
+  describe('worktreeChangesRefresh', () => {
+    const ready = {
+      type: 'worktree.changes.ready',
+      cloudSessionId: 'agent-1',
+      revision: 2,
+    } satisfies NormalizedEvent;
+    const connected = {
+      type: 'connected',
+      cloudSessionId: 'agent-1',
+      sessionStatus: { type: 'idle' },
+    } satisfies NormalizedEvent;
+
+    it('publishes ready revisions and every idle connected event without changing chat state', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const { store } = config;
+      expect(store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      const state = {
+        activity: store.get(mgr.atoms.activity),
+        status: store.get(mgr.atoms.agentStatus),
+        messages: store.get(mgr.atoms.messagesList),
+        pending: store.get(mgr.atoms.pendingMessages),
+      };
+      const listener = jest.fn();
+      const unsubscribe = store.sub(mgr.atoms.worktreeChangesRefresh, listener);
+
+      mockSessionCallbacks.onEvent?.(ready);
+      expect(store.get(mgr.atoms.worktreeChangesRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 0,
+      });
+      mockSessionCallbacks.onEvent?.(connected);
+      const firstConnected = store.get(mgr.atoms.worktreeChangesRefresh);
+      expect(firstConnected).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 1,
+      });
+      mockSessionCallbacks.onEvent?.(connected);
+      expect(store.get(mgr.atoms.worktreeChangesRefresh)).toEqual({
+        cloudSessionId: 'agent-1',
+        revision: 2,
+        connectionVersion: 2,
+      });
+      expect(store.get(mgr.atoms.worktreeChangesRefresh)).not.toBe(firstConnected);
+      expect(listener).toHaveBeenCalledTimes(3);
+      expect(store.get(mgr.atoms.activity)).toBe(state.activity);
+      expect(store.get(mgr.atoms.agentStatus)).toBe(state.status);
+      expect(store.get(mgr.atoms.messagesList)).toBe(state.messages);
+      expect(store.get(mgr.atoms.pendingMessages)).toBe(state.pending);
+      unsubscribe();
+      mgr.destroy();
+    });
+
+    it('retains the highest ready revision and object when updates are coalesced', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const listener = jest.fn();
+      const unsubscribe = config.store.sub(mgr.atoms.worktreeChangesRefresh, listener);
+      try {
+        mockSessionCallbacks.onEvent?.(ready);
+        mockSessionCallbacks.onEvent?.({ ...ready, revision: 3 });
+        const latestSignal = config.store.get(mgr.atoms.worktreeChangesRefresh);
+        for (const revision of [2, 3, 1]) {
+          mockSessionCallbacks.onEvent?.({ ...ready, revision });
+          expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBe(latestSignal);
+        }
+        expect(latestSignal).toEqual({
+          cloudSessionId: 'agent-1',
+          revision: 3,
+          connectionVersion: 0,
+        });
+        expect(listener).toHaveBeenCalledTimes(2);
+      } finally {
+        unsubscribe();
+        mgr.destroy();
+      }
+    });
+
+    it.each([1, 2, 3])(
+      'preserves the reconnect version when followed by ready revision %s',
+      async revision => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        try {
+          mockSessionCallbacks.onEvent?.(ready);
+          mockSessionCallbacks.onEvent?.(connected);
+          const connectedSignal = config.store.get(mgr.atoms.worktreeChangesRefresh);
+          mockSessionCallbacks.onEvent?.({ ...ready, revision });
+          expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toEqual({
+            cloudSessionId: 'agent-1',
+            revision: Math.max(2, revision),
+            connectionVersion: 1,
+          });
+          if (revision <= 2) {
+            expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBe(connectedSignal);
+          } else {
+            expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).not.toBe(connectedSignal);
+          }
+        } finally {
+          mgr.destroy();
+        }
+      }
+    );
+
+    it.each([ready, connected])('ignores mismatched Cloud session IDs for $type', async event => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      for (const cloudSessionId of ['agent-other', 'ses-1', '']) {
+        mockSessionCallbacks.onEvent?.({ ...event, cloudSessionId });
+        expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      }
+      mgr.destroy();
+    });
+
+    it('ignores signals without a current Cloud session or envelope identity', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          cloudAgentSessionId: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onEvent?.(ready);
+      mockSessionCallbacks.onEvent?.(connected);
+      expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      config.store.set(mgr.atoms.sessionId, cloudAgentId('agent-1'));
+      mockSessionCallbacks.onEvent?.({ type: 'connected' });
+      expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      mgr.destroy();
+    });
+
+    it.each(['ses-1', 'ses-2'])(
+      'resets and rejects stale callbacks when switching to %s',
+      async nextId => {
+        const config = createMockConfig({
+          fetchSession: jest
+            .fn()
+            .mockResolvedValueOnce(defaultFetchedSession)
+            .mockResolvedValueOnce({
+              ...defaultFetchedSession,
+              kiloSessionId: kiloId(nextId),
+              cloudAgentSessionId: cloudAgentId('agent-2'),
+            }),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const oldOnEvent = mockSessionCallbacks.onEvent;
+        oldOnEvent?.({ ...ready, revision: 10 });
+        oldOnEvent?.(connected);
+        oldOnEvent?.(connected);
+        const switching = mgr.switchSession(kiloId(nextId));
+        expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+        oldOnEvent?.(connected);
+        expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+        await switching;
+        for (const event of [ready, connected]) {
+          oldOnEvent?.({ ...event, cloudSessionId: 'agent-2' });
+          mockSessionCallbacks.onEvent?.(event);
+          expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+        }
+        mockSessionCallbacks.onEvent?.({ ...ready, cloudSessionId: 'agent-2' });
+        expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toEqual({
+          cloudSessionId: 'agent-2',
+          revision: 2,
+          connectionVersion: 0,
+        });
+        mockSessionCallbacks.onEvent?.({ ...connected, cloudSessionId: 'agent-2' });
+        expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toEqual({
+          cloudSessionId: 'agent-2',
+          revision: 2,
+          connectionVersion: 1,
+        });
+        mgr.destroy();
+      }
+    );
+
+    it('resets on destroy and rejects retained callbacks', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const oldOnEvent = mockSessionCallbacks.onEvent;
+      oldOnEvent?.(ready);
+      mgr.destroy();
+      expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+      oldOnEvent?.(ready);
+      oldOnEvent?.(connected);
+      expect(config.store.get(mgr.atoms.worktreeChangesRefresh)).toBeNull();
+    });
+  });
+
   describe('switchSession', () => {
     it('sets isLoading=true synchronously and clears it after completion', async () => {
       const config = createMockConfig();

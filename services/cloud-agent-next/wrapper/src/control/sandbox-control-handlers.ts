@@ -15,6 +15,7 @@ import {
   sessionDetachPayloadSchema,
   sessionMessageOutcomeSchema,
   sessionEventPayloadSchema,
+  sessionGitSummaryPayloadSchema,
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
   sessionQuestionResolvePayloadSchema,
@@ -54,7 +55,11 @@ import {
   type WorktreeKiloRuntime,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime.js';
-import { assertDirectoryActive, fenceDirectoryOperations } from './worktree-operations';
+import {
+  assertDirectoryActive,
+  fenceDirectoryOperations,
+  runDirectoryOperation,
+} from './worktree-operations';
 import {
   createWorktreeKiloCleanupClient,
   deleteWorktree,
@@ -62,6 +67,7 @@ import {
   validateWorktreeDirectory,
   type WorktreeKiloCleanupClient,
 } from './delete-worktree';
+import { collectWorktreeChanges } from './worktree-changes';
 
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
@@ -223,6 +229,7 @@ export type HandlerDeps = {
   applyAttach?: typeof applySessionAttach;
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
+  collectWorktreeChanges?: typeof collectWorktreeChanges;
 };
 
 export type ControlHandlerResult =
@@ -529,7 +536,7 @@ export async function handleControlRequest(
     return fail('protocol_error', 'session identity is required', false);
   }
   if (
-    (!deps.kiloReady || deps.signal?.aborted) &&
+    (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
     operation !== 'session.abort' &&
     operation !== 'session.detach'
   ) {
@@ -636,6 +643,8 @@ async function handleSessionControlRequest(
         sessionTerminalConnectResultSchema,
         (runtime, identity, parsed) => runtime.connect(identity, parsed)
       );
+    case 'session.git.summary':
+      return handleGitSummary(session, payload, deps);
     default:
       return fail('unknown_operation', 'Unknown operation', false);
   }
@@ -773,6 +782,41 @@ async function handleTerminalOperation<Payload, Result>(
   } catch (error) {
     return terminalFailure(error);
   }
+}
+
+async function handleGitSummary(
+  session: SessionRequestIdentity,
+  payload: unknown,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult> {
+  const parsed = sessionGitSummaryPayloadSchema.safeParse(payload);
+  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  const directory = session.directory;
+  return runDirectoryOperation(directory, async () => {
+    if (rootForSession(session.kiloSessionId, directory) !== session.kiloSessionId) {
+      return fail('not_ready', 'Session directory is not attached', false);
+    }
+    if (deps.signal?.aborted) return missingKilo();
+    let result: Awaited<ReturnType<typeof collectWorktreeChanges>>;
+    try {
+      result = await (deps.collectWorktreeChanges ?? collectWorktreeChanges)(
+        directory,
+        parsed.data,
+        undefined,
+        deps.signal
+      );
+    } catch {
+      return deps.signal?.aborted
+        ? missingKilo()
+        : fail('capture_failed', 'Worktree capture failed', true);
+    }
+    assertDirectoryActive(directory);
+    if (deps.signal?.aborted) return missingKilo();
+    if (rootForSession(session.kiloSessionId, directory) !== session.kiloSessionId) {
+      return fail('not_ready', 'Session directory is not attached', false);
+    }
+    return ok(result);
+  });
 }
 
 function validAttachmentPaths(

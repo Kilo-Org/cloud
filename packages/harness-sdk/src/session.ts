@@ -11,14 +11,12 @@ interface Session {
 
 const idPrefix = 'ses';
 
-/** Makes a session. Without an identifier, the `IdGenerator` plugin makes one. */
-const make = (id?: string): Effect.Effect<Session, never, IdGenerator> =>
-  id === undefined
-    ? IdGenerator.pipe(
-        Effect.flatMap(generator => generator.generate(idPrefix)),
-        Effect.map(generated => ({ id: generated }))
-      )
-    : Effect.succeed({ id });
+/** Makes a session. The `IdGenerator` plugin makes the identifier. */
+const make = (): Effect.Effect<Session, never, IdGenerator> =>
+  IdGenerator.pipe(
+    Effect.flatMap(generator => generator.generate(idPrefix)),
+    Effect.map(id => ({ id }))
+  );
 
 export type { Session };
 export { idPrefix, make };

@@ -14,7 +14,3 @@ it('orders two identifiers by the order they were made in', () => {
   const [first, second] = run(Effect.all([make(), make()]));
   expect(first.id < second.id).toBe(true);
 });
-
-it('keeps the identifier it is given', () => {
-  expect(run(make('ses_fixed')).id).toBe('ses_fixed');
-});

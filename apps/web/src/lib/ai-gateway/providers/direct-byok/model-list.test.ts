@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { db, readDb } from '@/lib/drizzle';
+import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
 import { cachedEnhancedDirectByokModelList } from './model-list';
 import type { DirectByokModel } from './types';
@@ -13,10 +13,17 @@ jest.mock('@/lib/drizzle', () => ({
 }));
 jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
 
-const mockReplicaSelect = jest.mocked(readDb.select);
 const mockLimit = jest.fn<(limit: number) => Promise<{ models: unknown }[]>>();
 const mockWhere = jest.fn<(condition: SQL) => { limit: typeof mockLimit }>();
-const mockFrom = jest.fn();
+const mockFrom = jest.fn<(table: typeof direct_byok_model_lists) => { where: typeof mockWhere }>();
+const { readDb: mockReadDb } = jest.requireMock<{
+  readDb: {
+    select: jest.Mock<
+      (fields: { models: typeof direct_byok_model_lists.models }) => { from: typeof mockFrom }
+    >;
+  };
+}>('@/lib/drizzle');
+const mockReplicaSelect = mockReadDb.select;
 const ttl = 600_000;
 
 function model(id: string, overrides: Partial<DirectByokModel> = {}): DirectByokModel {
@@ -64,7 +71,7 @@ beforeEach(() => {
   mockLimit.mockResolvedValue([]);
   mockWhere.mockReturnValue({ limit: mockLimit });
   mockFrom.mockReturnValue({ where: mockWhere });
-  mockReplicaSelect.mockReturnValue({ from: mockFrom } as ReturnType<typeof readDb.select>);
+  mockReplicaSelect.mockReturnValue({ from: mockFrom });
   getModels = cachedEnhancedDirectByokModelList({ providerId: 'codestral', recommendedModels });
 });
 

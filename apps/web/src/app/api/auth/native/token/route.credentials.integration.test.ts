@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { and, eq } from 'drizzle-orm';
@@ -12,6 +12,7 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { device_refresh_tokens, device_sessions, native_attested_keys } from '@kilocode/db/schema';
 
+jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) } }));
 jest.mock('@/lib/user', () => ({
   ...(jest.requireActual('@/lib/user') as object),
   createOrUpdateUser: jest.fn(),

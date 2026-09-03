@@ -11,7 +11,9 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+
+    "plugins": [{ "transform": "typia/lib/transform" }]
   },
   "include": ["**/*.ts"]
 }

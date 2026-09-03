@@ -1,4 +1,4 @@
-import { Chunk, Effect, Layer } from 'effect';
+import { Chunk, Effect, Layer, Option } from 'effect';
 import { layerTableCatalog } from '../plugins/catalog/table.js';
 import type { ModelCatalog } from './catalog.js';
 import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
@@ -34,6 +34,8 @@ const recordingStore = (): {
 } => {
   const seen: string[] = [];
   const layer = Layer.succeed(SessionStore, {
+    create: () => Effect.void,
+    read: () => Effect.succeed(Option.none()),
     append: (turn: Turn) => Effect.sync(() => void seen.push(`${turn.role}:${turn.content}`)),
     load: () => Effect.succeed([] as readonly Turn[]),
     flush: () => Effect.sync(() => void seen.push('flush')),
@@ -53,12 +55,15 @@ const brokenStore = (
   const refuse = (operation: 'append' | 'flush') =>
     Effect.fail(new StoreError({ operation, cause: 'the disk is full' }));
   const layer = Layer.succeed(SessionStore, {
+    create: () => Effect.void,
+    read: () => Effect.succeed(Option.none()),
     append: (turn: Turn) =>
       broken === 'append'
         ? refuse('append')
         : Effect.sync(() => void seen.push(`${turn.role}:${turn.content}`)),
     load: () => Effect.succeed([] as readonly Turn[]),
-    flush: () => (broken === 'flush' ? refuse('flush') : Effect.sync(() => void seen.push('flush'))),
+    flush: () =>
+      broken === 'flush' ? refuse('flush') : Effect.sync(() => void seen.push('flush')),
   });
   return { seen, layer };
 };

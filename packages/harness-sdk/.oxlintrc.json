@@ -69,6 +69,12 @@
       "rules": {
         "unicorn/require-module-specifiers": "off"
       }
+    },
+    {
+      "files": ["src/plugins/store/node.ts", "src/plugins/store/sqlite.test.ts"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
     }
   ]
 }

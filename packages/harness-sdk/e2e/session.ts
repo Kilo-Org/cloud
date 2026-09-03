@@ -151,4 +151,6 @@ if (!(refused._tag === 'Left' && refused.left instanceof SessionBusyError)) {
 }
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(`\nPASS: the prefix held across ${String(questions)} calls, and a busy session refused.`);
+console.log(
+  `\nPASS: the prefix held across ${String(questions)} calls, and a busy session refused.`
+);

@@ -77,9 +77,7 @@ const runShape = async (kind: ApiKind) => {
     return { first, second, total: yield* session.usage };
   });
 
-  return Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, layers)))
-  );
+  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
 };
 
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
@@ -116,4 +114,6 @@ for (const kind of kinds) {
 }
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every shape carried the conversation, and both cache-controlling shapes cached.');
+console.log(
+  '\nPASS: every shape carried the conversation, and both cache-controlling shapes cached.'
+);

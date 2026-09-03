@@ -22,6 +22,10 @@ jest.mock(
     }) as never
 );
 
+let findAdministeredInstallation: (params: {
+  accessToken: string;
+  installationId: number | string;
+}) => Promise<{ id: number } | null>;
 let assertUserAdministersInstallation: (params: {
   accessToken: string;
   installationId: number | string;
@@ -29,6 +33,7 @@ let assertUserAdministersInstallation: (params: {
 
 beforeAll(async () => {
   const mod = await import('./app-selector');
+  findAdministeredInstallation = mod.findAdministeredInstallation;
   assertUserAdministersInstallation = mod.assertUserAdministersInstallation;
 });
 
@@ -42,6 +47,43 @@ function mockPage(installations: Array<{ id: number }>, totalCount: number) {
     },
   });
 }
+
+describe('findAdministeredInstallation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns the installation when it is on the first page', async () => {
+    const match = {
+      id: INSTALLATION_ID,
+      account: { id: 1, login: 'octocat' },
+      repository_selection: 'all',
+      permissions: { contents: 'write' },
+      events: ['issues'],
+      created_at: '2026-09-01T00:00:00.000Z',
+    };
+    mockPage([match, { id: 11111 }], 2);
+
+    const result = await findAdministeredInstallation({
+      accessToken: 'test-token',
+      installationId: INSTALLATION_ID,
+    });
+
+    expect(result).toEqual(match);
+    expect(mockListInstallationsForAuthenticatedUser).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns null when the installation is absent', async () => {
+    mockPage([{ id: 11111 }], 1);
+
+    const result = await findAdministeredInstallation({
+      accessToken: 'test-token',
+      installationId: INSTALLATION_ID,
+    });
+
+    expect(result).toBeNull();
+  });
+});
 
 describe('assertUserAdministersInstallation', () => {
   beforeEach(() => {

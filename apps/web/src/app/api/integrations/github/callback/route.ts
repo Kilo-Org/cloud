@@ -10,7 +10,7 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import {
   getGitHubAppCredentials,
-  assertUserAdministersInstallation,
+  findAdministeredInstallation,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -467,7 +467,12 @@ async function handleCoreInstallFlow(params: {
   }
 
   // Require proof that the OAuth-authorized GitHub user administers the
-  // installation before using app credentials to fetch or persist it.
+  // installation before persisting it. The user-token installation list is the
+  // source of truth here: app-JWT GET /app/installations/{id} can 404 for a
+  // just-created installation (GitHub replication lag) even after the user
+  // token already sees it.
+  let installation;
+  let userAccessToken: string | undefined;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
     const rejectUnauthorizedInstallation = () =>
@@ -490,12 +495,12 @@ async function handleCoreInstallFlow(params: {
 
     try {
       const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
-      const isAdmin = await assertUserAdministersInstallation({
+      const administeredInstallation = await findAdministeredInstallation({
         accessToken: exchangeResult.accessToken,
         installationId,
       });
 
-      if (!isAdmin) {
+      if (!administeredInstallation) {
         console.log('[github_admin_proof:fail_non_admin]', {
           github_user_id: exchangeResult.id,
           github_user_login: exchangeResult.login,
@@ -509,6 +514,8 @@ async function handleCoreInstallFlow(params: {
         github_user_login: exchangeResult.login,
         installation_id: installationId,
       });
+      installation = administeredInstallation;
+      userAccessToken = exchangeResult.accessToken;
     } catch (error) {
       console.error('[github_admin_proof:error]', {
         installation_id: installationId,
@@ -523,89 +530,126 @@ async function handleCoreInstallFlow(params: {
       });
       return rejectUnauthorizedInstallation();
     }
-  }
-
-  // Fetch installation details from GitHub
-  const auth = createAppAuth({
-    appId: credentials.appId,
-    privateKey: credentials.privateKey,
-  });
-
-  const appAuth = await auth({ type: 'app' });
-  const octokitApp = new Octokit({
-    auth: appAuth.token,
-  });
-
-  let installation;
-  try {
-    console.log('Fetching installation details for ID:', installationId);
-    const result = await octokitApp.apps.getInstallation({
-      installation_id: parseInt(installationId),
-    });
-    installation = result.data;
-  } catch (error) {
-    const err = error as { message?: string; status?: number };
-
-    captureException(error, {
-      tags: {
-        endpoint: 'github/callback',
-        source: 'github_api_get_installation',
-        status: err.status?.toString() || 'unknown',
-      },
-      extra: {
-        installationId,
-        ownerId,
-        ownerType: owner.type,
-        setupAction,
-        errorStatus: err.status,
-        errorMessage: err.message,
-      },
+  } else {
+    const auth = createAppAuth({
+      appId: credentials.appId,
+      privateKey: credentials.privateKey,
     });
 
-    if (err.status === 404) {
-      const encodedInstallationId = encodeURIComponent(installationId);
+    const appAuth = await auth({ type: 'app' });
+    const octokitApp = new Octokit({
+      auth: appAuth.token,
+    });
+
+    try {
+      console.log('Fetching installation details for ID:', installationId);
+      const result = await octokitApp.apps.getInstallation({
+        installation_id: parseInt(installationId, 10),
+      });
+      installation = result.data;
+    } catch (error) {
+      const err = error as { message?: string; status?: number };
+
+      if (err.status === 404) {
+        captureMessage('GitHub installation not found for authenticated app', {
+          level: 'warning',
+          tags: {
+            endpoint: 'github/callback',
+            source: 'github_api_get_installation',
+            status: '404',
+          },
+          extra: {
+            installationId,
+            ownerType: owner.type,
+            setupAction,
+            githubAppType,
+          },
+        });
+
+        const encodedInstallationId = encodeURIComponent(installationId);
+
+        if (isAppInitiated) {
+          return NextResponse.redirect(
+            new URL(appFallbackPath('error=installation_not_found'), APP_URL)
+          );
+        }
+        return NextResponse.redirect(
+          new URL(
+            appendQueryParam(
+              redirectPath,
+              `error=installation_not_found&id=${encodedInstallationId}`
+            ),
+            APP_URL
+          )
+        );
+      }
+
+      captureException(error, {
+        tags: {
+          endpoint: 'github/callback',
+          source: 'github_api_get_installation',
+          status: err.status?.toString() || 'unknown',
+        },
+        extra: {
+          installationId,
+          ownerType: owner.type,
+          setupAction,
+          githubAppType,
+          errorStatus: err.status,
+          errorMessage: err.message,
+        },
+      });
 
       if (isAppInitiated) {
         return NextResponse.redirect(
-          new URL(appFallbackPath('error=installation_not_found'), APP_URL)
+          new URL(appFallbackPath('error=installation_failed'), APP_URL)
         );
       }
-      return NextResponse.redirect(
-        new URL(
-          appendQueryParam(
-            redirectPath,
-            `error=installation_not_found&id=${encodedInstallationId}`
-          ),
-          APP_URL
-        )
-      );
+      throw error;
     }
-
-    if (isAppInitiated) {
-      return NextResponse.redirect(new URL(appFallbackPath('error=installation_failed'), APP_URL));
-    }
-    throw error;
   }
 
   // Get selected repositories
   let repositories: PlatformRepository[] | null = null;
   if (installation.repository_selection === 'selected') {
     console.log('Fetching repositories for installation:', installationId);
-    const installationAuth = await auth({
-      type: 'installation',
-      installationId: parseInt(installationId),
-    });
-    const octokitInstallation = new Octokit({
-      auth: installationAuth.token,
-    });
+    const numericInstallationId = parseInt(installationId, 10);
 
-    const { data: reposData } = await octokitInstallation.apps.listReposAccessibleToInstallation();
-    repositories = reposData.repositories.map(repo => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.full_name,
-      private: repo.private,
-    }));
+    if (userAccessToken) {
+      const octokitUser = new Octokit({
+        auth: userAccessToken,
+      });
+      const { data: reposData } = await octokitUser.apps.listInstallationReposForAuthenticatedUser({
+        installation_id: numericInstallationId,
+      });
+      repositories = reposData.repositories.map(repo => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        private: repo.private,
+      }));
+    } else {
+      const auth = createAppAuth({
+        appId: credentials.appId,
+        privateKey: credentials.privateKey,
+      });
+      const installationAuth = await auth({
+        type: 'installation',
+        installationId: numericInstallationId,
+      });
+      const octokitInstallation = new Octokit({
+        auth: installationAuth.token,
+      });
+
+      const { data: reposData } =
+        await octokitInstallation.apps.listReposAccessibleToInstallation();
+      repositories = reposData.repositories.map(repo => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        private: repo.private,
+      }));
+    }
   }
 
   // Store installation in database

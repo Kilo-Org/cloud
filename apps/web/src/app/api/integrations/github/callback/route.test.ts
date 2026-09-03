@@ -14,7 +14,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import { findAdministeredInstallation } from '@/lib/integrations/platforms/github/app-selector';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -45,6 +45,7 @@ jest.mock('@octokit/rest', () => ({
     apps: {
       getInstallation: jest.fn(),
       listReposAccessibleToInstallation: jest.fn(),
+      listInstallationReposForAuthenticatedUser: jest.fn(),
     },
   })),
 }));
@@ -60,7 +61,14 @@ jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
     appName: 'KiloConnect',
     webhookSecret: 'webhook-secret',
   })),
-  assertUserAdministersInstallation: jest.fn(async () => true),
+  findAdministeredInstallation: jest.fn(async () => ({
+    id: 98765,
+    account: { id: 12_345, login: 'securexg' },
+    created_at: '2026-07-09T19:00:00.000Z',
+    events: ['issues'],
+    permissions: { contents: 'write' },
+    repository_selection: 'all',
+  })),
 }));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -93,7 +101,7 @@ const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
-const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedFindAdministeredInstallation = jest.mocked(findAdministeredInstallation);
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
@@ -103,6 +111,14 @@ const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
 const GITHUB_USER_ID = '12345';
 const INSTALLATION_ID = '98765';
 const INSTALL_STATE_TOKEN = 'valid-database-token-for-callback-tests';
+const ADMINISTERED_INSTALLATION = {
+  id: 98765,
+  account: { id: 12_345, login: 'securexg' },
+  created_at: '2026-07-09T19:00:00.000Z',
+  events: ['issues'],
+  permissions: { contents: 'write' },
+  repository_selection: 'all',
+};
 
 beforeEach(() => {
   mockedExchangeGitHubOAuthCode.mockResolvedValue({
@@ -110,7 +126,7 @@ beforeEach(() => {
     login: 'octocat',
     accessToken: 'ghu_test-token',
   });
-  mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+  mockedFindAdministeredInstallation.mockResolvedValue(ADMINISTERED_INSTALLATION as never);
 });
 
 function makeRequest(pathWithQuery: string) {
@@ -733,7 +749,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('app-initiated installation_not_found redirects to /github-app fallback', async () => {
+  test('app-initiated install uses the user-token installation when app JWT getInstallation would 404', async () => {
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
     mockedConsumeInstallState.mockResolvedValue({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
@@ -766,8 +783,131 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
+    expect(mockedFindAdministeredInstallation).toHaveBeenCalledWith({
+      accessToken: 'ghu_test-token',
+      installationId: INSTALLATION_ID,
+    });
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      expect.objectContaining({
+        platformInstallationId: INSTALLATION_ID,
+        platformAccountLogin: 'securexg',
+      })
+    );
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+  });
+
+  test('install lists selected repositories with the user token', async () => {
+    const listInstallationReposForAuthenticatedUser = jest.fn(async () => ({
+      data: {
+        repositories: [
+          { id: 1, name: 'alpha', full_name: 'securexg/alpha', private: true },
+          { id: 2, name: 'beta', full_name: 'securexg/beta', private: false },
+        ],
+      },
+    }));
+    mockedFindAdministeredInstallation.mockResolvedValue({
+      ...ADMINISTERED_INSTALLATION,
+      repository_selection: 'selected',
+    } as never);
+    mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/github-app',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => {
+              throw Object.assign(new Error('Not Found'), { status: 404 });
+            }),
+            listReposAccessibleToInstallation: jest.fn(),
+            listInstallationReposForAuthenticatedUser,
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=abc`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?github_install=success');
+    expect(listInstallationReposForAuthenticatedUser).toHaveBeenCalledWith({
+      installation_id: Number(INSTALLATION_ID),
+    });
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      expect.objectContaining({
+        repositoryAccess: 'selected',
+        repositories: [
+          { id: 1, name: 'alpha', full_name: 'securexg/alpha', private: true },
+          { id: 2, name: 'beta', full_name: 'securexg/beta', private: false },
+        ],
+      })
+    );
+  });
+
+  test('app-initiated installation_not_found redirects to /github-app fallback', async () => {
+    mockedConsumeInstallState.mockResolvedValue({
+      token: DB_TOKEN,
+      kilo_user_id: USER_ID,
+      owner_type: 'user',
+      owner_id: USER_ID,
+      github_app_type: 'standard',
+      return_to: '/cloud/sessions',
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => {
+              const err = Object.assign(new Error('Not Found'), { status: 404 });
+              throw err;
+            }),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&state=${DB_TOKEN}`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
     expectRedirectLocation(response, '/github-app?fromApp=1&error=installation_not_found');
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'GitHub installation not found for authenticated app',
+      expect.objectContaining({
+        level: 'warning',
+        extra: expect.objectContaining({
+          installationId: INSTALLATION_ID,
+          githubAppType: 'standard',
+        }),
+      })
+    );
+    const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
+    expect(serializedMessage).not.toContain(USER_ID);
   });
 
   test('ambiguous app-initiated pending request returns successful pending no-op', async () => {
@@ -972,7 +1112,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
         }) as never
     );
     mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
-    mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+    mockedFindAdministeredInstallation.mockResolvedValue(ADMINISTERED_INSTALLATION as never);
     mockedExchangeGitHubOAuthCode.mockResolvedValue({
       id: GITHUB_USER_ID,
       login: 'octocat',
@@ -992,7 +1132,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
-    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedFindAdministeredInstallation).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 
@@ -1007,7 +1147,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, `/integrations/github?success=installed`);
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
-    expect(mockedAssertUserAdministersInstallation).toHaveBeenCalledWith({
+    expect(mockedFindAdministeredInstallation).toHaveBeenCalledWith({
       accessToken: 'ghu_test-token',
       installationId: INSTALLATION_ID,
     });
@@ -1015,7 +1155,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
   });
 
   test('rejects an install when admin check returns false', async () => {
-    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
+    mockedFindAdministeredInstallation.mockResolvedValue(null);
 
     const { GET } = await import('./route');
     const response = await GET(
@@ -1027,7 +1167,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalled();
-    expect(mockedAssertUserAdministersInstallation).toHaveBeenCalled();
+    expect(mockedFindAdministeredInstallation).toHaveBeenCalled();
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
@@ -1119,7 +1259,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     logSpy.mockClear();
 
     // Case 2: code present but non-admin — should log fail_non_admin.
-    mockedAssertUserAdministersInstallation.mockResolvedValue(false);
+    mockedFindAdministeredInstallation.mockResolvedValue(null);
     await GET(
       makeRequest(
         `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
@@ -1211,16 +1351,8 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
       consumed_at: null,
       created_at: new Date().toISOString(),
     });
-    mockedOctokit.mockImplementation(
-      () =>
-        ({
-          apps: {
-            getInstallation: jest.fn(async () => {
-              throw new Error('get installation failed');
-            }),
-            listReposAccessibleToInstallation: jest.fn(),
-          },
-        }) as never
+    mockedUpsertPlatformIntegrationForOwner.mockRejectedValue(
+      new Error('persist installation failed')
     );
 
     const { GET } = await import('./route');

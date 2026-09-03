@@ -7,6 +7,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { CenteredState } from '@/components/centered-state';
+import { StateSurface } from '@/components/centered-state-surface';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -147,7 +149,7 @@ export function ImageViewerModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-background">
+      <StateSurface className="flex-1 bg-background">
         <View
           className="flex-row items-center justify-between border-b border-border bg-background px-4"
           style={{ paddingTop: insets.top, height: insets.top + 56 }}
@@ -193,10 +195,12 @@ export function ImageViewerModal({
               </GestureDetector>
             ) : null}
             {uri && imageError ? (
-              <View className="flex-row items-center gap-2">
-                <AlertCircle size={14} color="#ffffff" />
-                <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>
-              </View>
+              <CenteredState className="w-full">
+                <View className="flex-row items-center justify-center gap-2 px-6">
+                  <AlertCircle size={14} color="#ffffff" />
+                  <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>
+                </View>
+              </CenteredState>
             ) : null}
           </View>
         </GestureHandlerRootView>
@@ -213,7 +217,7 @@ export function ImageViewerModal({
             </View>
           </View>
         ) : null}
-      </View>
+      </StateSurface>
     </Modal>
   );
 }

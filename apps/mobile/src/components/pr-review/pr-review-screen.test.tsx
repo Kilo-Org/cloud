@@ -330,7 +330,7 @@ describe('PrReviewScreen share action', () => {
   });
 });
 
-describe('PrReviewScreen Overview bottom inset (plan §6)', () => {
+describe('PrReviewScreen Overview scrolling', () => {
   beforeEach(() => {
     prQueryResult = {
       data: undefined,
@@ -351,25 +351,25 @@ describe('PrReviewScreen Overview bottom inset (plan §6)', () => {
     });
   }
 
-  it('renders the Overview body inside DetailScreenScrollView', () => {
-    expect(findOverviewScroll()).not.toBeNull();
+  it('does not wrap the Overview in a second scroller', () => {
+    expect(findOverviewScroll()).toBeNull();
   });
 
-  it('drops the fixed pb-12 clearance from the Overview scroll container', () => {
-    // eslint-disable-next-line new-cap
-    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    const scroll = findElement({
+  it('passes the refresh control to the Overview', () => {
+    const renderScreen = PrReviewScreen;
+    const element = renderScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const overview = findElement({
       node: element,
-      type: 'DetailScreenScrollView',
-      prop: 'contentContainerClassName',
-      value: 'gap-5 px-4',
+      type: 'PrReviewOverview',
+      prop: 'isActive',
+      value: true,
     });
-    expect(scroll).not.toBeNull();
-    if (!scroll) {
-      throw new Error('Overview scroll not found');
+    expect(overview).not.toBeNull();
+    if (!overview) {
+      throw new Error('Overview not found');
     }
-    const className = (scroll.props as { contentContainerClassName?: string })
-      .contentContainerClassName;
-    expect(className).not.toContain('pb-12');
+    const refresh = (overview.props as { refreshControl: React.ReactElement }).refreshControl;
+    expect(refresh.type).toBe('RefreshControl');
+    expect((refresh.props as { onRefresh: unknown }).onRefresh).toEqual(expect.any(Function));
   });
 });

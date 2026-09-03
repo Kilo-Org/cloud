@@ -29,6 +29,7 @@ const controls = vi.hoisted(() => ({
   renameSession: vi.fn(),
 }));
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', async () => {
   const React = await import('react');
   // Virtualized cells reuse their renderer until its identity changes. This
@@ -328,6 +329,27 @@ describe('AgentSessionListContent liveness', () => {
     );
     expect(rows(renderer)).toEqual([{ id: 'cached', live: true, metaWhileLive: true }]);
     expect(hosts(renderer, 'AccessibleStatus')).toHaveLength(0);
+  });
+
+  it.each([
+    { hasAnySessions: false },
+    { hasAnySessions: false, isError: true },
+    { hasActiveQuery: true, isSearching: true },
+    { hasActiveQuery: true, isSearching: false },
+    { hasActiveQuery: true, isSearching: true, isError: true },
+    { hasActiveQuery: true, isSearching: false, isError: true },
+  ])('centers a refreshable body outside the list for %j', async overrides => {
+    const props = contentProps(overrides);
+    const renderer = mount(props);
+    const centered = hosts(renderer, 'CenteredState');
+    expect(centered).toHaveLength(1);
+    expect(hosts(renderer, 'SectionList')).toHaveLength(0);
+    const refresh = centered[0]?.props.refreshControl as ReactElement<{ onRefresh: () => void }>;
+    await act(async () => {
+      refresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(props.refetch).toHaveBeenCalledOnce();
   });
 
   it('keeps the loading skeletons instead of flashing empty history', () => {

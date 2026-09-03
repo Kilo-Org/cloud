@@ -78,6 +78,8 @@ const a11yMock = vi.hoisted(() => ({
   moveA11yFocus: vi.fn(),
 }));
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',
@@ -690,9 +692,26 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     expect(modals[0]?.props.animationType).toBe('slide');
     expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
     expect(modals[0]?.props.transparent).toBeUndefined();
-    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    expect(surface[0]?.props.style).toBeUndefined();
 
     renderer.unmount();
+  });
+
+  it('centers an empty preview outside the content scroller', async () => {
+    fileText.mockResolvedValueOnce('');
+    const renderer = await openMarkdownPreview();
+    const modal = nodesByType(renderer.root, 'Modal')[0];
+    if (!modal) {
+      throw new Error('Modal not found');
+    }
+    expect(nodesByType(modal, 'CenteredState')).toHaveLength(1);
+    expect(nodesByType(modal, 'ScrollView')).toHaveLength(0);
+    expect(nodesByType(modal, 'SheetHeader')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('sizes the preview ScrollView to fill the sheet surface with flex-1', async () => {

@@ -3,6 +3,7 @@ import { MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/sch
 import { desc } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -23,7 +24,10 @@ export async function GET() {
     );
   }
 
-  const auth = await getUserFromAuth({ adminOnly: false }).catch(() => null);
+  const auth = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  }).catch(() => null);
   if (auth?.organizationId && auth.user) {
     // Filter to the caller's own member-effective access so the catalog agrees
     // with what the gateway (`[...path]/route.ts`) will actually allow. Owners

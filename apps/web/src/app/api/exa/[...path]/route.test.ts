@@ -11,6 +11,7 @@ import {
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -104,6 +105,10 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(response).toBe(authFailedResponse);
       expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+        adminOnly: false,
+        expectedAudience: KILO_GATEWAY_AUDIENCE,
+      });
     });
   });
 

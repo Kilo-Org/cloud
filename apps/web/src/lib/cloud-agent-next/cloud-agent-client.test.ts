@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as TrpcClientModule from '@trpc/client';
+import type * as CloudAgentClientModule from './cloud-agent-client';
 import type {
-  CloudAgentNextClient as CloudAgentNextClientType,
+  ComputeBillingStatus,
   CreateWorktreeChatInput,
   CreateWorktreeChatOutput,
   DeleteWorktreeInput,
   DeleteWorktreeOutput,
+  GetSessionInput,
   PrepareSessionInput,
   SendMessageInput,
 } from './cloud-agent-client';
+import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 
 const mockCreateTRPCClient = jest.fn(() => ({}));
 const mockHttpLink =
@@ -76,12 +79,10 @@ beforeEach(() => {
 
 // Load the real `closeCloudAgentOrgStreams` (the module mock above does not
 // expose it) so the test exercises the actual fetch call, not a stub.
-const { closeCloudAgentOrgStreams, CloudAgentNextClient } = jest.requireActual(
-  './cloud-agent-client'
-) as {
-  closeCloudAgentOrgStreams: (userId: string, organizationId: string) => Promise<void>;
-  CloudAgentNextClient: typeof CloudAgentNextClientType;
-};
+const realCloudAgentClientModule =
+  jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
+  realCloudAgentClientModule;
 
 describe('createCloudAgentNextClientForModel', () => {
   it('returns the default client when the model is paid and has no BYOK', () => {
@@ -112,6 +113,71 @@ describe('createCloudAgentNextClientForModel', () => {
     expect(result).toEqual({ marker: 'appbuilder' });
     expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('createAppBuilderCloudAgentNextClient', () => {
+  it('forwards the original App Builder JWT to Cloud Agent Next with its dedicated policy headers', async () => {
+    const { token } = await signKiloToken({
+      userId: 'synthetic-app-builder-user',
+      pepper: 'synthetic-app-builder-pepper',
+      secret: 'synthetic-app-builder-secret',
+      expiresInSeconds: 60,
+      extra: { tokenSource: 'app-builder' },
+    });
+    const prepareSession = jest.fn(async () => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    }));
+    const getSession = jest.fn<
+      (input: { cloudAgentSessionId: string }) => Promise<Record<string, never>>
+    >(async () => ({}));
+    const interruptSession = jest.fn<
+      (input: {
+        sessionId: string;
+      }) => Promise<{ success: boolean; message: string; processesFound: boolean }>
+    >(async () => ({
+      success: true,
+      message: 'interrupted',
+      processesFound: true,
+    }));
+    const initiateFromKilocodeSessionV2 = jest.fn<
+      (input: { cloudAgentSessionId: string }) => Promise<Record<string, never>>
+    >(async () => ({}));
+    const sendMessageV2 = jest.fn(async () => ({}));
+    mockCreateTRPCClient.mockReturnValueOnce({
+      prepareSession: { mutate: prepareSession },
+      getSession: { query: getSession },
+      interruptSession: { mutate: interruptSession },
+      initiateFromKilocodeSessionV2: { mutate: initiateFromKilocodeSessionV2 },
+      sendMessageV2: { mutate: sendMessageV2 },
+    });
+
+    const client = createAppBuilderCloudAgentNextClient(token);
+    const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+    await client.prepareSession({ prompt: 'Build an app', mode: 'code', model: 'kilo/test-model' });
+    await client.getSession(cloudAgentSessionId);
+    await client.interruptSession(cloudAgentSessionId);
+    await client.initiateFromPreparedSession({ cloudAgentSessionId });
+    await client.sendMessage({
+      cloudAgentSessionId,
+      payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'kilo/test-model' },
+    });
+
+    expect(mockHttpLink).toHaveBeenCalledWith({
+      url: 'http://cloud-agent-next/trpc',
+      headers: expect.any(Function),
+    });
+    expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
+      Authorization: `Bearer ${token}`,
+      'x-skip-balance-check': 'true',
+      'x-internal-api-key': 'test-secret',
+    });
+    expect(prepareSession).toHaveBeenCalledTimes(1);
+    expect(getSession).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(interruptSession).toHaveBeenCalledWith({ sessionId: cloudAgentSessionId });
+    expect(initiateFromKilocodeSessionV2).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(sendMessageV2).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -232,6 +298,123 @@ describe('CloudAgentNextClient sensitive error reporting', () => {
     expect(captured).not.toContain('follow-up-github-secret');
     expect(captured).not.toContain('follow-up-git-secret');
     expect(captured).not.toContain('auth-token');
+  });
+});
+
+describe('CloudAgentNextClient.getComputeBillingStatus', () => {
+  type StatusQuery = (input: GetSessionInput) => Promise<ComputeBillingStatus>;
+  const sessionId = 'agent_12345678-1234-4234-9234-123456789abc';
+  const status: ComputeBillingStatus = {
+    payer: { type: 'user', id: 'user-123' },
+    attribution: 'session',
+    phase: 'idle',
+    estimatedHourlyRateMicrodollars: null,
+    estimatedIntervalAmountMicrodollars: null,
+    billingMode: null,
+    interval: null,
+  };
+  const { TRPCClientError } = jest.requireActual<typeof TrpcClientModule>('@trpc/client');
+  const connectionReset = () =>
+    TRPCClientError.from(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+      })
+    );
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns successful status without retrying', async () => {
+    const query = jest.fn<StatusQuery>().mockResolvedValue(status);
+    mockCreateTRPCClient.mockReturnValueOnce({ getComputeBillingStatus: { query } });
+
+    await expect(
+      new CloudAgentNextClient('token').getComputeBillingStatus(sessionId)
+    ).resolves.toBe(status);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('retries a nested connection reset once after a short delay', async () => {
+    const query = jest
+      .fn<StatusQuery>()
+      .mockRejectedValueOnce(connectionReset())
+      .mockResolvedValueOnce(status);
+    mockCreateTRPCClient.mockReturnValueOnce({ getComputeBillingStatus: { query } });
+
+    const result = new CloudAgentNextClient('token').getComputeBillingStatus(sessionId);
+    await Promise.all([
+      expect(result).resolves.toBe(status),
+      (async () => {
+        await jest.advanceTimersByTimeAsync(99);
+        expect(query).toHaveBeenCalledTimes(1);
+        await jest.advanceTimersByTimeAsync(101);
+      })(),
+    ]);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenNthCalledWith(1, { cloudAgentSessionId: sessionId });
+    expect(query).toHaveBeenNthCalledWith(2, { cloudAgentSessionId: sessionId });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it.each([connectionReset(), new Error('Worker unavailable')])(
+    'propagates the second failure unchanged without a third attempt: %s',
+    async error => {
+      const query = jest
+        .fn<StatusQuery>()
+        .mockRejectedValueOnce(connectionReset())
+        .mockRejectedValueOnce(error);
+      mockCreateTRPCClient.mockReturnValueOnce({ getComputeBillingStatus: { query } });
+
+      const result = new CloudAgentNextClient('token').getComputeBillingStatus(sessionId);
+      await Promise.all([expect(result).rejects.toBe(error), jest.runAllTimersAsync()]);
+
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+  );
+
+  it.each([
+    new TRPCClientError('Forbidden', {
+      result: {
+        error: { code: -32003, message: 'Forbidden', data: { code: 'FORBIDDEN', httpStatus: 403 } },
+      },
+    }),
+    new TypeError('fetch failed'),
+    new Error('read ECONNRESET'),
+    new TypeError('fetch failed', { cause: { code: 'ETIMEDOUT' } }),
+    new Error('Malformed cause', { cause: 'ECONNRESET' }),
+    null,
+    undefined,
+  ])('does not retry unrelated or unstructured errors: %s', async error => {
+    const query = jest.fn<StatusQuery>().mockRejectedValue(error);
+    mockCreateTRPCClient.mockReturnValueOnce({ getComputeBillingStatus: { query } });
+
+    await expect(new CloudAgentNextClient('token').getComputeBillingStatus(sessionId)).rejects.toBe(
+      error
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('terminates cause inspection for cyclic errors', async () => {
+    const error = new Error('Cyclic cause');
+    error.cause = error;
+    const query = jest.fn<StatusQuery>().mockRejectedValue(error);
+    mockCreateTRPCClient.mockReturnValueOnce({ getComputeBillingStatus: { query } });
+
+    await expect(new CloudAgentNextClient('token').getComputeBillingStatus(sessionId)).rejects.toBe(
+      error
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
   });
 });
 

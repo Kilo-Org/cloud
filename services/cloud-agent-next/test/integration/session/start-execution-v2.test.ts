@@ -43,7 +43,7 @@ describe('CloudAgentSession message admission', () => {
     const replayedMetadata = await stub.getMetadata();
 
     expect(first).toEqual({ success: true });
-    expect(metadata?.workspace?.branchName).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z2-7]{8}$/);
+    expect(metadata?.workspace?.branchName).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z0-9]{3}$/);
     expect(branchNameSchema.safeParse(metadata?.workspace?.branchName).success).toBe(true);
     expect(metadata?.repository?.upstreamBranch).toBeUndefined();
     expect(metadata?.lifecycle.preparedAt).toBeUndefined();
@@ -698,7 +698,7 @@ describe('CloudAgentSession message admission', () => {
 
     expect(result.first).toMatchObject({ success: true, messageId, outcome: 'queued' });
     expect(result.second).toEqual(result.first);
-    expect(result.firstBranch).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z2-7]{8}$/);
+    expect(result.firstBranch).toMatch(/^kilo\/[a-z]+-[a-z]+-[a-z0-9]{3}$/);
     expect(result.secondBranch).toBe(result.firstBranch);
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]?.messageId).toBe(messageId);

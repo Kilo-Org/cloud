@@ -156,7 +156,10 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
   );
 }
 
-function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
+function AuditReportView({
+  report,
+  onRetry,
+}: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
     const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
@@ -177,6 +180,13 @@ function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport
 
   return (
     <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+      {onRetry ? (
+        <QueryError
+          placement="top"
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={onRetry}
+        />
+      ) : null}
       <ReportHeader report={report} />
       <ReportSummary report={report} />
       {report.findings.map(finding => (
@@ -190,6 +200,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const query = useSecurityAgentAuditReport(scope);
   const errorCode = query.error?.data?.code;
+  const hasReport = query.data?.status === 'ok' && query.data.report.findings.length > 0;
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.
@@ -213,37 +224,37 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         />
       )}
 
-      {!query.isLoading && query.isError && !forbidden && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.auditReport.couldNotLoad')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+      {!query.isLoading && query.isError && !forbidden && !hasReport && (
+        <QueryError
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
       {!query.isLoading && !query.isError && query.data?.status === 'query_failed' && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.auditReport.queryFailed')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+        <QueryError
+          message={t('securityAgent.auditReport.queryFailed')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
       {query.isPending && query.isPaused && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            variant="offline"
-            message={t('securityAgent.auditReport.checkConnection')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+        <QueryError
+          variant="offline"
+          message={t('securityAgent.auditReport.checkConnection')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
-      {!query.isLoading && !query.isError && query.data?.status === 'ok' && (
-        <AuditReportView report={query.data.report} />
-      )}
+      {!query.isLoading &&
+        !forbidden &&
+        (!query.isError || hasReport) &&
+        query.data?.status === 'ok' && (
+          <AuditReportView
+            report={query.data.report}
+            onRetry={query.isError ? () => void query.refetch() : undefined}
+          />
+        )}
     </View>
   );
 }

@@ -155,77 +155,81 @@ export function ModelPickerContent() {
   }
 
   return (
-    <PickerSheet title={t('agentChat.modelPicker.title')} onDone={closePicker} scrollable={false}>
-      <FlatList
-        className="flex-1 bg-background"
-        data={rows}
-        keyExtractor={item => item.key}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: bottom }}
-        ListHeaderComponent={
-          <View>
-            <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-              <Search size={18} color={colors.mutedForeground} />
-              <TextInput
-                placeholder={t('agentChat.modelPicker.searchPlaceholder')}
-                placeholderTextColor={colors.mutedForeground}
-                autoCapitalize="none"
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-                returnKeyType="search"
-                className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
-                onChangeText={setSearch}
-              />
-            </View>
-            {favoritesError ? (
-              <View className="mx-4 mb-3 flex-row items-center gap-1.5">
-                <AlertCircle size={14} color={colors.destructive} />
-                <Text className="text-xs text-destructive">{favoritesError}</Text>
-              </View>
-            ) : null}
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            icon={search.trim() ? SearchX : Info}
-            placement="top"
-            title={
-              search.trim()
-                ? t('agentChat.repoPicker.noMatches')
-                : t('agentChat.modelPicker.noModels')
-            }
-            description={
-              search.trim()
-                ? t('agentChat.repoPicker.tryDifferentSearch')
-                : t('agentChat.modelPicker.noModelsDescription')
-            }
-          />
-        }
-        renderItem={({ item }) => {
-          if (item.type === 'header') {
-            return (
-              <View className="bg-secondary px-4 py-2">
-                <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {item.title}
-                </Text>
-              </View>
-            );
-          }
-
-          return (
-            <ModelPickerOptionRow
-              option={item.model}
-              selected={item.model.id === selectedModel}
-              selectedVariant={selectedVariant}
-              isFavorite={item.isFavorite}
-              onSelectModel={handleSelectModel}
-              onSelectVariant={handleSelectVariant}
-              onToggleFavorite={handleToggleFavorite}
+    <PickerSheet
+      title={t('agentChat.modelPicker.title')}
+      onDone={closePicker}
+      scrollable={false}
+      headerContent={
+        <View>
+          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
+            <Search size={18} color={colors.mutedForeground} />
+            <TextInput
+              placeholder={t('agentChat.modelPicker.searchPlaceholder')}
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+              className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+              onChangeText={setSearch}
             />
-          );
-        }}
-      />
+          </View>
+          {favoritesError ? (
+            <View className="mx-4 mb-3 flex-row items-center gap-1.5">
+              <AlertCircle size={14} color={colors.destructive} />
+              <Text className="text-xs text-destructive">{favoritesError}</Text>
+            </View>
+          ) : null}
+        </View>
+      }
+    >
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={search.trim() ? SearchX : Info}
+          title={
+            search.trim()
+              ? t('agentChat.repoPicker.noMatches')
+              : t('agentChat.modelPicker.noModels')
+          }
+          description={
+            search.trim()
+              ? t('agentChat.repoPicker.tryDifferentSearch')
+              : t('agentChat.modelPicker.noModelsDescription')
+          }
+        />
+      ) : (
+        <FlatList
+          className="flex-1 bg-background"
+          data={rows}
+          keyExtractor={item => item.key}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: bottom }}
+          renderItem={({ item }) => {
+            if (item.type === 'header') {
+              return (
+                <View className="bg-secondary px-4 py-2">
+                  <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {item.title}
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <ModelPickerOptionRow
+                option={item.model}
+                selected={item.model.id === selectedModel}
+                selectedVariant={selectedVariant}
+                isFavorite={item.isFavorite}
+                onSelectModel={handleSelectModel}
+                onSelectVariant={handleSelectVariant}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            );
+          }}
+        />
+      )}
     </PickerSheet>
   );
 }

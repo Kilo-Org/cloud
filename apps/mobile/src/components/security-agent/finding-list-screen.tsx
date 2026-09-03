@@ -50,7 +50,11 @@ function FindingsListFooter({
   }
   if (error) {
     return (
-      <QueryError message={t('securityAgent.findingList.couldNotLoadMore')} onRetry={onRetry} />
+      <QueryError
+        placement="top"
+        message={t('securityAgent.findingList.couldNotLoadMore')}
+        onRetry={onRetry}
+      />
     );
   }
   return null;
@@ -83,6 +87,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
+  const hasListContent = items.length > 0 || findings.isFetchNextPageError;
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken repository list.
@@ -145,16 +150,44 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         </View>
       )}
 
-      {!findings.isLoading && findings.isError && !findings.data && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.findingList.couldNotLoad')}
-            onRetry={() => void findings.refetch()}
-          />
-        </View>
+      {!findings.isLoading && findings.isError && !hasListContent && (
+        <QueryError
+          message={t('securityAgent.findingList.couldNotLoad')}
+          onRetry={() => void findings.refetch()}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
       )}
 
-      {!findings.isLoading && (!findings.isError || findings.data) && (
+      {!findings.isLoading && !findings.isError && !hasListContent && (
+        <EmptyState
+          icon={ShieldCheck}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          title={
+            filtersActive
+              ? t('securityAgent.findingList.noMatchesTitle')
+              : t('securityAgent.findingList.emptyTitle')
+          }
+          description={
+            filtersActive
+              ? t('securityAgent.findingList.noMatchesDescription')
+              : t('securityAgent.findingList.emptyDescription')
+          }
+          action={
+            filtersActive ? (
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
+                }}
+              >
+                <Text>{t('securityAgent.findingList.clearFilters')}</Text>
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {!findings.isLoading && hasListContent && (
         <FlatList
           data={items}
           keyExtractor={item => item.id}
@@ -183,33 +216,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
             </>
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon={ShieldCheck}
-              title={
-                filtersActive
-                  ? t('securityAgent.findingList.noMatchesTitle')
-                  : t('securityAgent.findingList.emptyTitle')
-              }
-              description={
-                filtersActive
-                  ? t('securityAgent.findingList.noMatchesDescription')
-                  : t('securityAgent.findingList.emptyDescription')
-              }
-              action={
-                filtersActive ? (
-                  <Button
-                    variant="outline"
-                    onPress={() => {
-                      setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
-                    }}
-                  >
-                    <Text>{t('securityAgent.findingList.clearFilters')}</Text>
-                  </Button>
-                ) : undefined
-              }
-            />
           }
         />
       )}

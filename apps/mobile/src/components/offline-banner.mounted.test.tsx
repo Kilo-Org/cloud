@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts React/RN trees without a DOM */
-import { createElement, type ReactElement, type ReactNode, useSyncExternalStore } from 'react';
+import { type ReactElement, useSyncExternalStore } from 'react';
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
@@ -87,15 +87,12 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: ({ description, action }: { description?: ReactNode; action?: ReactNode }) =>
-    createElement('EmptyState', null, description, action),
-}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'TabScreenScrollView',
   useTabBarBottomPadding: () => 0,

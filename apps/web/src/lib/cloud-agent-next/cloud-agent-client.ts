@@ -26,6 +26,18 @@ export type { SendMessagePayload } from './types.js';
 // TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
+function isConnectionResetError(error: unknown): boolean {
+  const seen = new Set<object>();
+  while (typeof error === 'object' && error !== null && !seen.has(error)) {
+    seen.add(error);
+    if ('code' in error && error.code === 'ECONNRESET') {
+      return true;
+    }
+    error = 'cause' in error ? error.cause : undefined;
+  }
+  return false;
+}
+
 // MCP server config types — CLI-native local/remote format.
 // Each env/header value is either a plain string (passed through verbatim)
 // or an RSA+AES envelope (decrypted per-value by the worker when
@@ -786,7 +798,15 @@ export class CloudAgentNextClient {
   }
 
   async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
-    return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    try {
+      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    } catch (error) {
+      if (!isConnectionResetError(error)) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
+      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    }
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

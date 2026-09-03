@@ -3,7 +3,8 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   activeSessionSchema,
@@ -93,7 +94,9 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
     });
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+      audience: SESSION_INGEST_AUDIENCE,
+    });
   const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
 
   let response: Response;
@@ -175,7 +178,9 @@ export const activeSessionsRouter = createTRPCRouter({
       });
     }
 
-    const token = generateInternalServiceToken(ctx.user.id);
+    const token = generateBoundedInternalServiceToken(ctx.user.id, {
+      audience: SESSION_INGEST_AUDIENCE,
+    });
     const url = `${SESSION_INGEST_WORKER_URL}/api/instances/active`;
 
     let response: Response;

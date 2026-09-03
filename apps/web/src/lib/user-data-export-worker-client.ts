@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, USER_DATA_EXPORT_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
   USER_DATA_EXPORT_AUDIENCE,
@@ -47,7 +47,7 @@ async function postExportWorker(
   if (!baseUrl || !INTERNAL_API_SECRET) return null;
 
   const url = new URL(path, baseUrl);
-  const userAssertion = generateInternalServiceToken(kiloUserId, {
+  const userAssertion = generateBoundedInternalServiceToken(kiloUserId, {
     expiresIn: USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
     audience: USER_DATA_EXPORT_AUDIENCE,
   });

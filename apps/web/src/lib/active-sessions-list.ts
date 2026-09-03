@@ -2,7 +2,8 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@/lib/drizzle';
 import {
   cli_sessions_v2,
@@ -304,7 +305,9 @@ export async function listActiveSessions({
       return { sessions: [] as ActiveSession[] };
     }
   } else {
-    const token = generateInternalServiceToken(userId);
+    const token = generateBoundedInternalServiceToken(userId, {
+      audience: SESSION_INGEST_AUDIENCE,
+    });
     const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
 
     try {

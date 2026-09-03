@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, Switch, View } from 'react-native';
 
@@ -194,21 +194,20 @@ export function LowBalanceAlertSheet() {
     return <PermissionDenied description={t('organization.lowBalanceAlert.permissionDenied')} />;
   }
 
-  let body: ReactNode = null;
-  if (orgWithMembers.data) {
-    body = (
-      <LowBalanceAlertForm
-        organizationId={organizationId}
-        settings={orgWithMembers.data.settings}
-      />
-    );
-  } else if (orgWithMembers.isError) {
-    body = (
-      <QueryError
-        onRetry={() => void orgWithMembers.refetch()}
-        isRetrying={orgWithMembers.isFetching}
-        placement="top"
-      />
+  if (orgWithMembers.isError && !orgWithMembers.data) {
+    return (
+      <>
+        <View collapsable={false} className="bg-background px-6 pt-4">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            {t('organization.lowBalanceAlert.title')}
+          </Text>
+        </View>
+        <QueryError
+          className="bg-background"
+          onRetry={() => void orgWithMembers.refetch()}
+          isRetrying={orgWithMembers.isFetching}
+        />
+      </>
     );
   }
 
@@ -223,7 +222,12 @@ export function LowBalanceAlertSheet() {
         {t('organization.lowBalanceAlert.title')}
       </Text>
 
-      {body}
+      {orgWithMembers.data && (
+        <LowBalanceAlertForm
+          organizationId={organizationId}
+          settings={orgWithMembers.data.settings}
+        />
+      )}
     </ScrollView>
   );
 }

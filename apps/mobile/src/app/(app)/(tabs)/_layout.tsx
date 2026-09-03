@@ -6,6 +6,7 @@ import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -117,141 +118,143 @@ export default function TabsLayout() {
   }, [showQuickChatTab, onChatTab, router]);
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        freezeOnBlur: true,
-        tabBarActiveTintColor: colors.foreground,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarBackground: TabBarBackground,
-        tabBarIconStyle: TAB_BAR_ICON_STYLE,
-        tabBarLabelPosition: 'below-icon',
-        tabBarStyle: {
-          backgroundColor: 'transparent',
-          borderTopColor: 'transparent',
-          borderTopWidth: 0,
-          display: hideTabs ? 'none' : 'flex',
-          elevation: 0,
-          height: tabBarHeight,
-          position: 'absolute',
-        },
-        tabBarShowLabel: showTabLabel,
-      }}
-    >
-      <Tabs.Screen
-        name="(0_home)"
-        options={{
-          title: t('tabs.home'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.home'),
-            tabBarPosition('home', tabFlags) ?? 1,
-            tabCount
-          ),
-          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
-          tabBarIcon: ({ color, focused }) => (
-            <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            void Haptics.selectionAsync();
+    <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          freezeOnBlur: true,
+          tabBarActiveTintColor: colors.foreground,
+          tabBarInactiveTintColor: colors.mutedForeground,
+          tabBarBackground: TabBarBackground,
+          tabBarIconStyle: TAB_BAR_ICON_STYLE,
+          tabBarLabelPosition: 'below-icon',
+          tabBarStyle: {
+            backgroundColor: 'transparent',
+            borderTopColor: 'transparent',
+            borderTopWidth: 0,
+            display: hideTabs ? 'none' : 'flex',
+            elevation: 0,
+            height: tabBarHeight,
+            position: 'absolute',
           },
+          tabBarShowLabel: showTabLabel,
         }}
-      />
-      <Tabs.Screen
-        name="(1_kiloclaw)"
-        options={{
-          href: showKiloClawTab ? undefined : null,
-          title: t('tabs.kiloclaw'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.kiloclaw'),
-            tabBarPosition('kiloclaw', tabFlags) ?? 2,
-            tabCount
-          ),
-          tabBarLabel: ({ focused }) => (
-            <TabLabel
-              label={
-                fontScale > TAB_LABEL_WRAP_FONT_SCALE
-                  ? t('tabs.kiloclawWrapped')
-                  : t('tabs.kiloclaw')
-              }
-              focused={focused}
-            />
-          ),
-          tabBarIcon: ({ color, focused }) => (
-            <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-          ),
-        }}
-        listeners={{
-          tabPress: event => {
-            void Haptics.selectionAsync();
-            event.preventDefault();
-            router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
-          },
-        }}
-      />
-      <Tabs.Screen
-        name="(2_agents)"
-        options={{
-          title: t('tabs.agents'),
-          tabBarBadge: needsInputBadge,
-          tabBarAccessibilityLabel: tabAccessibilityLabel(
-            needsInputBadge
-              ? `${t('tabs.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
-              : t('tabs.agents'),
-            tabBarPosition('agents', tabFlags) ?? 2,
-            tabCount
-          ),
-          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
-          tabBarIcon: ({ color, focused }) => (
-            <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            void Haptics.selectionAsync();
-          },
-        }}
-      />
-      <Tabs.Screen
-        name="(4_chat)"
-        options={{
-          href: showQuickChatTab ? undefined : null,
-          title: t('tabs.chat'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(
-            t('tabs.chat'),
-            tabBarPosition('chat', tabFlags) ?? 3,
-            tabCount
-          ),
-          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.chat')} focused={focused} />,
-          tabBarIcon: ({ color, focused }) => (
-            <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            void Haptics.selectionAsync();
-          },
-        }}
-      />
-      <Tabs.Screen
-        name="(3_profile)"
-        options={{
-          title: t('tabs.profile'),
-          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.profile'), tabCount, tabCount),
-          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.profile')} focused={focused} />,
-          tabBarIcon: ({ color, focused }) => (
-            <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-          ),
-        }}
-        listeners={{
-          tabPress: event => {
-            void Haptics.selectionAsync();
-            event.preventDefault();
-            router.navigate(PROFILE_TAB_ROOT);
-          },
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="(0_home)"
+          options={{
+            title: t('tabs.home'),
+            tabBarAccessibilityLabel: tabAccessibilityLabel(
+              t('tabs.home'),
+              tabBarPosition('home', tabFlags) ?? 1,
+              tabCount
+            ),
+            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
+            tabBarIcon: ({ color, focused }) => (
+              <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+            ),
+          }}
+          listeners={{
+            tabPress: () => {
+              void Haptics.selectionAsync();
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="(1_kiloclaw)"
+          options={{
+            href: showKiloClawTab ? undefined : null,
+            title: t('tabs.kiloclaw'),
+            tabBarAccessibilityLabel: tabAccessibilityLabel(
+              t('tabs.kiloclaw'),
+              tabBarPosition('kiloclaw', tabFlags) ?? 2,
+              tabCount
+            ),
+            tabBarLabel: ({ focused }) => (
+              <TabLabel
+                label={
+                  fontScale > TAB_LABEL_WRAP_FONT_SCALE
+                    ? t('tabs.kiloclawWrapped')
+                    : t('tabs.kiloclaw')
+                }
+                focused={focused}
+              />
+            ),
+            tabBarIcon: ({ color, focused }) => (
+              <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+            ),
+          }}
+          listeners={{
+            tabPress: event => {
+              void Haptics.selectionAsync();
+              event.preventDefault();
+              router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="(2_agents)"
+          options={{
+            title: t('tabs.agents'),
+            tabBarBadge: needsInputBadge,
+            tabBarAccessibilityLabel: tabAccessibilityLabel(
+              needsInputBadge
+                ? `${t('tabs.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
+                : t('tabs.agents'),
+              tabBarPosition('agents', tabFlags) ?? 2,
+              tabCount
+            ),
+            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+            ),
+          }}
+          listeners={{
+            tabPress: () => {
+              void Haptics.selectionAsync();
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="(4_chat)"
+          options={{
+            href: showQuickChatTab ? undefined : null,
+            title: t('tabs.chat'),
+            tabBarAccessibilityLabel: tabAccessibilityLabel(
+              t('tabs.chat'),
+              tabBarPosition('chat', tabFlags) ?? 3,
+              tabCount
+            ),
+            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.chat')} focused={focused} />,
+            tabBarIcon: ({ color, focused }) => (
+              <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+            ),
+          }}
+          listeners={{
+            tabPress: () => {
+              void Haptics.selectionAsync();
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="(3_profile)"
+          options={{
+            title: t('tabs.profile'),
+            tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.profile'), tabCount, tabCount),
+            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.profile')} focused={focused} />,
+            tabBarIcon: ({ color, focused }) => (
+              <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
+            ),
+          }}
+          listeners={{
+            tabPress: event => {
+              void Haptics.selectionAsync();
+              event.preventDefault();
+              router.navigate(PROFILE_TAB_ROOT);
+            },
+          }}
+        />
+      </Tabs>
+    </StateSurfaceInsets>
   );
 }

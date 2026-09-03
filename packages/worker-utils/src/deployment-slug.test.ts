@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  generateBranchSlug,
   generateDeploymentSlug,
   generateEphemeralDeploymentSlug,
   slugSchema,
@@ -17,6 +18,71 @@ describe('deployment slug policy', () => {
     expect(validateSlug('dpl-private')).toBe('Subdomain cannot start with "dpl-"');
     expect(validateSlug('qdpl-private')).toBe('Subdomain cannot start with "qdpl-"');
     expect(validateSlug('my--project')).toBe('Subdomain cannot contain consecutive hyphens');
+  });
+});
+
+describe('generateBranchSlug', () => {
+  it('generates readable slugs with exactly three random alphanumeric characters', () => {
+    const generatedSuffixes = new Set<string>();
+
+    for (let i = 0; i < 100; i++) {
+      const slug = generateBranchSlug();
+      generatedSuffixes.add(slug.slice(-3));
+      expect(slug).toMatch(/^[a-z]+-[a-z]+-[a-z0-9]{3}$/);
+      expect(slugSchema.safeParse(slug).success).toBe(true);
+    }
+
+    expect(generatedSuffixes.size).toBeGreaterThan(1);
+  });
+
+  it.each([
+    { value: 0, suffix: '000' },
+    { value: 9, suffix: '009' },
+    { value: 10, suffix: '00a' },
+    { value: 35, suffix: '00z' },
+    { value: 36, suffix: '010' },
+    { value: 1295, suffix: '0zz' },
+    { value: 1296, suffix: '100' },
+    { value: 46655, suffix: 'zzz' },
+  ])('encodes random value $value as the three-character suffix $suffix', ({ value, suffix }) => {
+    const getRandomValues = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementation(values => {
+        if (values instanceof Uint32Array) values.fill(0);
+        return values;
+      })
+      .mockImplementationOnce(values => {
+        if (values instanceof Uint32Array) values[0] = value;
+        return values;
+      });
+
+    try {
+      expect(generateBranchSlug()).toBe(`autumn-birch-${suffix}`);
+    } finally {
+      getRandomValues.mockRestore();
+    }
+  });
+
+  it('offers at least 256 distinct short adjectives and nouns', () => {
+    let wordIndex = 0;
+    const getRandomValues = vi.spyOn(crypto, 'getRandomValues').mockImplementation(values => {
+      if (values instanceof Uint32Array) values.fill(wordIndex);
+      return values;
+    });
+
+    try {
+      const slugs = Array.from({ length: 256 }, (_, index) => {
+        wordIndex = index;
+        const slug = generateBranchSlug();
+        expect(slug).toMatch(/^[a-z]{1,10}-[a-z]{1,10}-[a-z0-9]{3}$/);
+        return slug;
+      });
+
+      expect(new Set(slugs.map(slug => slug.split('-')[0])).size).toBe(256);
+      expect(new Set(slugs.map(slug => slug.split('-')[1])).size).toBe(256);
+    } finally {
+      getRandomValues.mockRestore();
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
 import {
+  confirmGlanceableOrgMembership,
   planOrgFenceAction,
   republishLastSnapshotStale,
   writePrivacySnapshotAndEnd,
@@ -35,6 +36,8 @@ export function useGlanceableOrgFence(): void {
     const action = planOrgFenceAction({ organizationId, orgs, isLoading, isError });
     if (action === 'privacy') {
       writePrivacySnapshotAndEnd();
+    } else if (action === 'confirmed') {
+      confirmGlanceableOrgMembership();
     } else if (action === 'stale' && getLastGlanceableSnapshot() !== null) {
       republishLastSnapshotStale();
     }

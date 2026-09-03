@@ -12331,9 +12331,9 @@ describe('SandboxSession durable message lifecycle', () => {
           directory: '/workspace/shared',
         },
       });
-      const incomingPrompt = nextMessage(wrapper);
+      const receiver = receiveAdmissionPrompt(wrapper, attach);
       respondToWrapperRequest(wrapper, attach, { attached: true });
-      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      const prompt = await receiver.prompt;
       expect(prompt).toMatchObject({
         operation: 'session.prompt',
         session: { sessionId: session.sessionId, kiloSessionId: session.kiloSessionId },
@@ -12374,6 +12374,7 @@ describe('SandboxSession durable message lifecycle', () => {
         });
         expect(persistedSessionEvents(state, ['cloud.message.sent'])).toHaveLength(1);
       });
+      receiver.finish();
     }
 
     for (const session of sessions) {

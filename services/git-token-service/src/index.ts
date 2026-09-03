@@ -416,7 +416,11 @@ function validateGitHubCapabilityUpstream(
   if (url.protocol !== 'https:') return 'invalid_upstream_url';
   if (url.username || url.password || url.hash) return 'invalid_upstream_url';
   if (url.port !== '') return 'upstream_host_not_allowed';
-  if (!['api.github.com', 'uploads.github.com', 'github.com'].includes(url.hostname)) {
+  if (
+    !['api.github.com', 'uploads.github.com', 'github.com', 'npm.pkg.github.com'].includes(
+      url.hostname
+    )
+  ) {
     return 'upstream_host_not_allowed';
   }
   return null;

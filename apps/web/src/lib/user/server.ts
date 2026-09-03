@@ -1234,7 +1234,12 @@ async function resolveUserFromAuth(
     ) {
       return authError(401, 'Invalid API token', user.id);
     }
-    const organizationId = headersList.get(ORGANIZATION_ID_HEADER) || undefined;
+    // A token-bound organization is signed; the request header is mutable.
+    // Legacy and personal tokens intentionally continue to use the header.
+    const organizationId =
+      authorizationValidationResult.organizationId ??
+      headersList.get(ORGANIZATION_ID_HEADER) ??
+      undefined;
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
     const tokenSource = authorizationValidationResult.tokenSource;

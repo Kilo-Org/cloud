@@ -1168,7 +1168,8 @@ async function launchAttempt(params: {
     params.actor,
     nextAuthSecret,
     params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
-    params.env.SHARED_RESOURCE_TOKENS_ENABLED
+    params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+    params.owner.type === 'org' ? params.owner.id : undefined
   );
   const attemptToken = randomUUID();
   const callbackToken = await deriveCallbackToken({
@@ -2486,7 +2487,8 @@ export async function cancelRemediation(params: {
       actor,
       nextAuthSecret,
       params.env.ENVIRONMENT,
-      params.env.SHARED_RESOURCE_TOKENS_ENABLED
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      owner.type === 'org' ? owner.id : undefined
     );
     await interruptCloudAgentSession({
       env: params.env,

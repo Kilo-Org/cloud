@@ -30,6 +30,7 @@ describe('security analysis token issuance', () => {
       createdOnPlatform: 'security-agent',
     });
     expect(decodeJwt(control)).not.toHaveProperty('aud');
+    expect(decodeJwt(control)).not.toHaveProperty('organizationId');
     expect(decodeJwt(triage)).not.toHaveProperty('aud');
     expect(decodeJwt(session)).not.toHaveProperty('aud');
     expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
@@ -54,6 +55,7 @@ describe('security analysis token issuance', () => {
         authorizationPepper: user.api_token_pepper,
       },
     });
+    expect(decodeJwt(control)).not.toHaveProperty('organizationId');
     expect(decodeJwt(triage)).toMatchObject({
       aud: 'kilo-gateway',
       tokenPurpose: 'internal-service',
@@ -69,5 +71,15 @@ describe('security analysis token issuance', () => {
     });
     expect(decodeJwt(session)).not.toHaveProperty('env');
     expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
+  });
+
+  it('includes only the requested organization in modern control assertions', async () => {
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const control = await generateControlToken(user, secret, 'production', true, organizationId);
+
+    expect(decodeJwt(control)).toMatchObject({ organizationId });
+    expect(decodeJwt(control)).not.toMatchObject({
+      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
   });
 });

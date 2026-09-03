@@ -49,7 +49,8 @@ export async function generateControlToken(
   user: TokenUser,
   secret: string,
   environment: string,
-  sharedResourceTokensEnabled: string | boolean | undefined
+  sharedResourceTokensEnabled: string | boolean | undefined,
+  organizationId?: string
 ): Promise<string> {
   if (isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
     const { token } = await signModernKiloToken({
@@ -64,6 +65,7 @@ export async function generateControlToken(
       extra: {
         internalApiUse: true,
         createdOnPlatform: 'security-agent',
+        organizationId,
         runtimeAdmission: {
           source: 'automation',
           authorizationUserId: user.id,

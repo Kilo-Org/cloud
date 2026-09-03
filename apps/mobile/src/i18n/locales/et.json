@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Teavitused",
+    "liveActivities": "Reaalajas tegevused",
+    "liveActivitySubtitle": "Näita aktiivseid agente lukustuskuval",
+    "liveUpdates": "Reaalajas värskendused",
+    "liveUpdateSubtitle": "Näita aktiivseid agente teavitustes",
     "push": "Push",
     "enabled": "Teavitused on lubatud",
     "onDescription": "Push-teavitused on selle seadme jaoks sisse lülitatud.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
     "catalogRetry": "Mudeleid ei õnnestunud laadida",
     "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
+  },
+  "glanceable": {
+    "waiting": "Agentide uuendamine",
+    "empty": "Ühtegi tööd pole pooleli",
+    "stale": "Praegu ei saa uuendada",
+    "expired": "Olek on aegunud",
+    "signedOut": "Agentide nägemiseks logige sisse",
+    "privacy": "Agentide nägemiseks ava Kilo",
+    "openAgents": "Avage agendid",
+    "running": "Töötamine",
+    "needsInput": "vajab sisendit",
+    "idle": "Ooterežiimis",
+    "channelName": "Aktiivsed agendid",
+    "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
   }
 }

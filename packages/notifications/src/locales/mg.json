@@ -7,7 +7,8 @@
       "instanceLifecycle": "Misy fanavaozana ny instance anao",
       "scheduledAction": "Misy fanavaozana ny hetsika voalahatra",
       "lowBalance": "Mila jerena ny balan-nao",
-      "securityFinding": "Misy hitan'ny fiarovana mila jerena"
+      "securityFinding": "Misy hitan'ny fiarovana mila jerena",
+      "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
     }
   },
   "cloudAgentSession": {

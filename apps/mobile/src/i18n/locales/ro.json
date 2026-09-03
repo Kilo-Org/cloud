@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Notificări",
+    "liveActivities": "Activități live",
+    "liveActivitySubtitle": "Afișează agenții activi pe ecranul blocat",
+    "liveUpdates": "Actualizări în timp real",
+    "liveUpdateSubtitle": "Afișează agenții activi în notificări",
     "push": "Push",
     "enabled": "Notificări activate",
     "onDescription": "Notificările push sunt activate pentru acest dispozitiv.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "Nu s-a putut încărca istoricul de chat.",
     "catalogRetry": "Modelele nu au putut fi încărcate",
     "sendError": "Mesajul nu a putut fi trimis. Încercați din nou."
+  },
+  "glanceable": {
+    "waiting": "Se actualizează agenții",
+    "empty": "Nicio sarcină în curs",
+    "stale": "Nu se poate actualiza acum",
+    "expired": "Stare expirată",
+    "signedOut": "Autentifică-te pentru a vedea agenții",
+    "privacy": "Deschide Kilo pentru a vedea agenții",
+    "openAgents": "Deschide agenții",
+    "running": "Se procesează",
+    "needsInput": "necesită introducere",
+    "idle": "Inactiv",
+    "channelName": "Agenți activi",
+    "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."
   }
 }

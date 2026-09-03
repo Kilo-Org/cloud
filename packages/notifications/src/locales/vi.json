@@ -7,7 +7,8 @@
       "instanceLifecycle": "Phiên bản của bạn có bản cập nhật",
       "scheduledAction": "Một hành động đã lên lịch có bản cập nhật",
       "lowBalance": "Số dư của bạn cần được chú ý",
-      "securityFinding": "Một phát hiện bảo mật cần được chú ý"
+      "securityFinding": "Một phát hiện bảo mật cần được chú ý",
+      "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
   },
   "cloudAgentSession": {

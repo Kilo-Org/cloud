@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { toast } from 'sonner-native';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
@@ -175,7 +176,7 @@ export function useRemoteSpawnDispatch({
   onSpawnFailed,
   onSpawnReady,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
-  const router = useRouter();
+  const router = useStackSafeReplace();
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to
   // `useOrganization()` after a later org switch (share-gate keeps zero-arg

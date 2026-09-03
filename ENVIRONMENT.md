@@ -80,6 +80,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
 - `SUPPORT_API_SECRET` - Shared bearer token for Customer Support Automation (CSA) internal API calls. Cloud uses it to authorize CSA → Cloud `apps/web/src/app/api/internal/support/` and Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`. A CSA compromise can also call Cloud deletion and Cloud can scrub CSA-local PII. Leak can look up any email and enqueue deletion for non-admin, non-bot, non-live-subscription customers; access disable is deferred to worker preflight and pending requests can be cancelled. Keep production values off preview deployments; rotate Cloud and CSA together. `[SECRET]`
+- `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` - Set to exact `true` to enable modern, purpose-labelled internal assertions at the Phase 5.1 bounded Git broker, export, deletion, and Session Ingest callsites. Unset or any other value retains their existing legacy token formats. Enable only after compatible readers, including the dedicated GitHub disconnect audience, are deployed; generic human/control/runtime signers are not affected. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
@@ -322,6 +323,18 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
 
 ## Services
+
+### Notifications Worker
+
+- `APNS_TEAM_ID` - Apple Developer team ID for the token-based APNs key used to send Live Activity pushes. Set in `services/notifications/wrangler.jsonc` under `vars`. [SERVER]
+- `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. Set beside `APNS_TEAM_ID`. [SERVER]
+- `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. Stored as one line: the PEM decoder strips every whitespace character, so the newlines are not needed. Store the key in the Secrets Store first, then add its `secrets_store_secrets` binding; a binding for a missing secret fails the deploy. `[SECRET]`
+- `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. Already set in `vars`. [SERVER]
+- `KILO_WEB_API_BASE_URL` - Base origin of the web app, used to reach the internal `glanceable-agents-snapshot` route; `https://app.kilo.ai` in production. [SERVER]
+
+Until all four values reach the worker it logs `APNs Live Activity credentials missing` and skips Live Activity pushes. Every other glanceable delivery, including the Expo aggregate push, keeps working.
+
+The key is team-scoped for all topics and valid in both the sandbox and production APNs environments. A backup of the `.p8` lives in the 1Password "Eng / Product" vault as "Apple AuthKey KRYMZL626P (.p8)"; Apple never serves it a second time.
 
 ### KiloClaw Controller
 

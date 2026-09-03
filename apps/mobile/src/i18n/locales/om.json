@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Beeksisota",
+    "liveActivities": "Sochoota kallattii",
+    "liveActivitySubtitle": "Eejentoota hojjetan gaaffii cufaa irratti agarsiisi",
+    "liveUpdates": "Haaromsa kallattii",
+    "liveUpdateSubtitle": "Ergamtoota hojjetan beeksisa kee keessatti agarsiisi",
     "push": "Push",
     "enabled": "Beeksisni dandeesame",
     "onDescription": "Beeksisni push meeshaa kanaaf jira.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Seenaa chaat fudhachuu hin dandeenye.",
     "catalogRetry": "Modeeloota fe'achuu hin dandeenye",
     "sendError": "Ergaa erguu hin dandeenye. Ammas yaali."
+  },
+  "glanceable": {
+    "waiting": "Eejentoota haaromsaa jira",
+    "empty": "Hojiin hojjetamaa jiru hin jiru",
+    "stale": "Amma haaromsuu hin danda'u",
+    "expired": "Yeroon haalaa darbeera",
+    "signedOut": "Eejentoota arguuf seenaa",
+    "privacy": "Eejentoota ilaaluuf Kilo bani",
+    "openAgents": "Eejentoota banaa",
+    "running": "Hojachaa jira",
+    "needsInput": "seensa barbaada",
+    "idle": "Hojii irraa boqachaa",
+    "channelName": "Eejentoota hojii irra jiran",
+    "activityKitDisabledBody": "Eejentoota hojii irra jiran Iskiriinii Qulfii irratti arguuf, Qindaa'ina keessatti Sochiiwwan Kallattii banaa."
   }
 }

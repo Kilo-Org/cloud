@@ -7,7 +7,8 @@
       "instanceLifecycle": "インスタンスに更新があります",
       "scheduledAction": "スケジュールされたアクションに更新があります",
       "lowBalance": "残高の確認が必要です",
-      "securityFinding": "セキュリティの検出結果の確認が必要です"
+      "securityFinding": "セキュリティの検出結果の確認が必要です",
+      "activeAgentsGlanceable": "アクティブなエージェントに更新があります"
     }
   },
   "cloudAgentSession": {

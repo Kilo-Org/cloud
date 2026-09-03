@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Notificações",
+    "liveActivities": "Atividades em direto",
+    "liveActivitySubtitle": "Mostrar agentes ativos no ecrã bloqueado",
+    "liveUpdates": "Atualizações em direto",
+    "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Push",
     "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativas para este dispositivo.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "Não foi possível carregar o histórico do chat.",
     "catalogRetry": "Não foi possível carregar os modelos",
     "sendError": "Não foi possível enviar a mensagem. Tente novamente."
+  },
+  "glanceable": {
+    "waiting": "A atualizar agentes",
+    "empty": "Nenhum trabalho em curso",
+    "stale": "Não é possível atualizar agora",
+    "expired": "Estado expirado",
+    "signedOut": "Inicie sessão para ver os agentes",
+    "privacy": "Abre o Kilo para ver os agentes",
+    "openAgents": "Abrir agentes",
+    "running": "A trabalhar",
+    "needsInput": "requer entrada",
+    "idle": "Inativo",
+    "channelName": "Agentes ativos",
+    "activityKitDisabledBody": "Ative as Atividades em tempo real nas Definições para ver os agentes ativos no Ecrã bloqueado."
   }
 }

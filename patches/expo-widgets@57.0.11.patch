@@ -1,0 +1,333 @@
+diff --git a/build/ExpoWidgets.d.ts b/build/ExpoWidgets.d.ts
+index 7f139d2..500bdd5 100644
+--- a/build/ExpoWidgets.d.ts
++++ b/build/ExpoWidgets.d.ts
+@@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
+ declare const ExpoWidgetsModule: {
+     widgetsDirectory: string;
+     reloadAllWidgets(): void;
++    areLiveActivitiesEnabled(): boolean;
+     Widget: typeof NativeWidgetObject;
+     LiveActivityFactory: typeof NativeLiveActivityFactory;
+     LiveActivity: typeof NativeLiveActivity;
+diff --git a/build/ExpoWidgets.ios.d.ts b/build/ExpoWidgets.ios.d.ts
+index 7df2b6c..17dacae 100644
+--- a/build/ExpoWidgets.ios.d.ts
++++ b/build/ExpoWidgets.ios.d.ts
+@@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
+ declare class ExpoWidgetsModule extends NativeModule<ExpoWidgetsEvents> {
+     widgetsDirectory: string;
+     reloadAllWidgets(): void;
++    areLiveActivitiesEnabled(): boolean;
+     readonly Widget: typeof NativeWidgetObject;
+     readonly LiveActivityFactory: typeof NativeLiveActivityFactory;
+     readonly LiveActivity: typeof NativeLiveActivity;
+diff --git a/build/ExpoWidgets.js b/build/ExpoWidgets.js
+index 03721af..06cecf8 100644
+--- a/build/ExpoWidgets.js
++++ b/build/ExpoWidgets.js
+@@ -31,6 +31,7 @@ class LiveActivityFactoryStub {
+ const ExpoWidgetsModule = {
+     widgetsDirectory: '',
+     reloadAllWidgets() { },
++    areLiveActivitiesEnabled() { return false; },
+     Widget: WidgetStub,
+     LiveActivityFactory: LiveActivityFactoryStub,
+     LiveActivity: LiveActivityStub,
+diff --git a/build/Widgets.d.ts b/build/Widgets.d.ts
+index 6886a8f..bf9d21d 100644
+--- a/build/Widgets.d.ts
++++ b/build/Widgets.d.ts
+@@ -33,6 +33,8 @@ export declare class LiveActivity<T extends object = object> {
+     /** @hidden */
+     private nativeLiveActivity;
+     constructor(nativeLiveActivity: NativeLiveActivity);
++    /** Native identity and current state, including an external end. */
++    getInfo(): ReturnType<NativeLiveActivity['getInfo']>;
+     /**
+      * Updates the Live Activity's content. The UI reflects the new properties immediately.
+      * @param props The updated content properties.
+@@ -75,8 +77,9 @@ export declare class LiveActivityFactory<T extends object = object> {
+     start(props: T, url?: string): LiveActivity<T>;
+     /**
+      * Returns all currently active instances of this Live Activity type.
++     * Set includeEnded for privacy dismissal of native-retained terminal instances.
+      */
+-    getInstances(): LiveActivity<T>[];
++    getInstances(includeEnded?: boolean): LiveActivity<T>[];
+ }
+ /**
+  * Creates a dismissal policy that removes the Live Activity at the specified time within a four-hour window.
+@@ -116,4 +119,9 @@ export declare function addPushToStartTokenListener(listener: ExpoWidgetsEvents[
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export declare const widgetsDirectory: string;
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export declare function areLiveActivitiesEnabled(): boolean;
+ //# sourceMappingURL=Widgets.d.ts.map
+\ No newline at end of file
+diff --git a/build/Widgets.js b/build/Widgets.js
+index 6cd5127..02a6e56 100644
+--- a/build/Widgets.js
++++ b/build/Widgets.js
+@@ -47,6 +47,10 @@ export class LiveActivity {
+     constructor(nativeLiveActivity) {
+         this.nativeLiveActivity = nativeLiveActivity;
+     }
++    /** Native identity and current state, including an external end. */
++    getInfo() {
++        return this.nativeLiveActivity.getInfo();
++    }
+     /**
+      * Updates the Live Activity's content. The UI reflects the new properties immediately.
+      * @param props The updated content properties.
+@@ -107,10 +111,11 @@ export class LiveActivityFactory {
+     }
+     /**
+      * Returns all currently active instances of this Live Activity type.
++     * Set includeEnded for privacy dismissal of native-retained terminal instances.
+      */
+-    getInstances() {
++    getInstances(includeEnded = false) {
+         return this.nativeLiveActivityFactory
+-            .getInstances()
++            .getInstances(includeEnded)
+             .map((instance) => new LiveActivity(instance));
+     }
+ }
+@@ -160,4 +165,11 @@ export function addPushToStartTokenListener(listener) {
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export function areLiveActivitiesEnabled() {
++    return ExpoWidgetsModule.areLiveActivitiesEnabled();
++}
+ //# sourceMappingURL=Widgets.js.map
+\ No newline at end of file
+diff --git a/build/Widgets.types.d.ts b/build/Widgets.types.d.ts
+index f623ece..e6a5a03 100644
+--- a/build/Widgets.types.d.ts
++++ b/build/Widgets.types.d.ts
+@@ -253,9 +253,10 @@ export declare class NativeWidgetObject extends SharedObject {
+ export declare class NativeLiveActivityFactory extends SharedObject {
+     constructor(name: string, layout: string);
+     start(props: string, url?: string): NativeLiveActivity;
+-    getInstances(): NativeLiveActivity[];
++    getInstances(includeEnded?: boolean): NativeLiveActivity[];
+ }
+ export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
++    getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' };
+     update(props: string): Promise<void>;
+     end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number): Promise<void>;
+     getPushToken(): Promise<string | null>;
+diff --git a/ios/LiveActivity.swift b/ios/LiveActivity.swift
+index c4b5bcc..b444df0 100644
+--- a/ios/LiveActivity.swift
++++ b/ios/LiveActivity.swift
+@@ -5,6 +5,37 @@ final class LiveActivity: SharedObject {
+   let id: String
+   let name: String
+   private var pushTokenObserverTask: Task<Void, Never>?
++  // Native identity survives JS wrapper release/recreation, but not process exit.
++  private static let activitiesLock = NSLock()
++  private static var retainedActivities: [String: AnyObject] = [:]
++
++  @available(iOS 16.1, *)
++  static func currentActivities() -> [Activity<LiveActivityAttributes>] {
++    activitiesLock.withLock {
++      for activity in Activity<LiveActivityAttributes>.activities {
++        retainedActivities[activity.id] = activity
++      }
++      let activities = retainedActivities.values.compactMap { $0 as? Activity<LiveActivityAttributes> }
++      for activity in activities where activity.activityState == .dismissed {
++        retainedActivities.removeValue(forKey: activity.id)
++      }
++      return activities.filter { $0.activityState != .dismissed }
++    }
++  }
++
++  func getInfo() throws -> [String: String] {
++    guard #available(iOS 16.1, *) else { throw LiveActivitiesNotSupportedException() }
++    let state = Self.currentActivities().first(where: { $0.id == id })?.activityState ?? .dismissed
++    let value: String
++    switch state {
++    case .active: value = "active"
++    case .stale: value = "stale"
++    case .ended: value = "ended"
++    case .dismissed: value = "dismissed"
++    @unknown default: value = "dismissed"
++    }
++    return ["id": id, "state": value]
++  }
+ 
+   init(id: String, name: String) {
+     self.id = id
+@@ -26,7 +57,7 @@ final class LiveActivity: SharedObject {
+   func end(dismissalPolicy: LiveActivityDismissalPolicy?, afterDate: Date?, props: String?, contentDate: Date?) async throws {
+     guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+-    guard let activity = Activity<LiveActivityAttributes>.activities.first(where: { $0.id == id }) else {
++    guard let activity = Self.currentActivities().first(where: { $0.id == id }) else {
+       throw LiveActivityNotFoundException(id)
+     }
+ 
+@@ -47,7 +78,7 @@ final class LiveActivity: SharedObject {
+   func getPushToken() throws -> String? {
+     guard #available(iOS 16.1, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+-    guard let activity = Activity<LiveActivityAttributes>.activities.first(where: { $0.id == id }) else {
++    guard let activity = Self.currentActivities().first(where: { $0.id == id }) else {
+       throw LiveActivityNotFoundException(id)
+     }
+ 
+@@ -58,6 +89,9 @@ final class LiveActivity: SharedObject {
+ 
+   @available(iOS 16.1, *)
+   func observePushTokenUpdates(for activity: Activity<LiveActivityAttributes>, pushNotificationsEnabled: Bool) {
++    Self.activitiesLock.withLock {
++      Self.retainedActivities[activity.id] = activity
++    }
+     guard pushNotificationsEnabled else {
+       return
+     }
+diff --git a/ios/LiveActivityFactory.swift b/ios/LiveActivityFactory.swift
+index caf1e05..821fc64 100644
+--- a/ios/LiveActivityFactory.swift
++++ b/ios/LiveActivityFactory.swift
+@@ -39,11 +39,15 @@ final class LiveActivityFactory: SharedObject {
+     }
+   }
+ 
+-  func getInstances() throws -> [LiveActivity] {
++  func getInstances(includeEnded: Bool = false) throws -> [LiveActivity] {
+     guard #available(iOS 16.1, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+-    return Activity<LiveActivityAttributes>.activities.map { activity in
+-      LiveActivity(id: activity.id, name: name)
++    return LiveActivity.currentActivities().filter {
++      $0.activityState == .active || $0.activityState == .stale || (includeEnded && $0.activityState == .ended)
++    }.map { activity in
++      let instance = LiveActivity(id: activity.id, name: name)
++      instance.observePushTokenUpdates(for: activity, pushNotificationsEnabled: LiveActivityFactory.pushNotificationsEnabled)
++      return instance
+     }
+   }
+ }
+diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
+index 678a7d1..bc1aae1 100644
+--- a/ios/WidgetsModule.swift
++++ b/ios/WidgetsModule.swift
+@@ -63,6 +63,14 @@ public final class WidgetsModule: Module {
+       WidgetCenter.shared.reloadAllTimelines()
+     }
+ 
++    // The per-app "Live Activities" switch in Settings. `start` already refuses
++    // when it is off; this lets JavaScript show the state instead of inferring
++    // it from a failed start.
++    Function("areLiveActivitiesEnabled") { () -> Bool in
++      guard #available(iOS 16.2, *) else { return false }
++      return ActivityAuthorizationInfo().areActivitiesEnabled
++    }
++
+     Class("Widget", WidgetObject.self) {
+       Constructor { (name: String, layout: String) in
+         WidgetObject(name: name, layout: layout)
+@@ -90,12 +98,16 @@ public final class WidgetsModule: Module {
+         try liveActivity.start(props: props, url: url)
+       }
+ 
+-      Function("getInstances") { (liveActivity: LiveActivityFactory) in
+-        try liveActivity.getInstances()
++      Function("getInstances") { (liveActivity: LiveActivityFactory, includeEnded: Bool?) in
++        try liveActivity.getInstances(includeEnded: includeEnded ?? false)
+       }
+     }
+ 
+     Class("LiveActivity", LiveActivity.self) {
++      Function("getInfo") { (instance: LiveActivity) in
++        try instance.getInfo()
++      }
++
+       AsyncFunction("update") { (instance: LiveActivity, props: String) in
+         try await instance.update(props: props)
+       }
+diff --git a/src/ExpoWidgets.ts b/src/ExpoWidgets.ts
+index a72c639..4f14fee 100644
+--- a/src/ExpoWidgets.ts
++++ b/src/ExpoWidgets.ts
+@@ -50,6 +50,9 @@ class LiveActivityFactoryStub {
+ const ExpoWidgetsModule = {
+   widgetsDirectory: '',
+   reloadAllWidgets(): void {},
++  areLiveActivitiesEnabled(): boolean {
++    return false;
++  },
+   Widget: WidgetStub as typeof NativeWidgetObject,
+   LiveActivityFactory: LiveActivityFactoryStub as typeof NativeLiveActivityFactory,
+   LiveActivity: LiveActivityStub as typeof NativeLiveActivity,
+diff --git a/src/Widgets.ts b/src/Widgets.ts
+index f5bbbba..a23a95a 100644
+--- a/src/Widgets.ts
++++ b/src/Widgets.ts
+@@ -78,6 +78,11 @@ export class LiveActivity<T extends object = object> {
+     this.nativeLiveActivity = nativeLiveActivity;
+   }
+ 
++  /** Native identity and current state, including an external end. */
++  getInfo(): ReturnType<NativeLiveActivity['getInfo']> {
++    return this.nativeLiveActivity.getInfo();
++  }
++
+   /**
+    * Updates the Live Activity's content. The UI reflects the new properties immediately.
+    * @param props The updated content properties.
+@@ -159,10 +164,11 @@ export class LiveActivityFactory<T extends object = object> {
+ 
+   /**
+    * Returns all currently active instances of this Live Activity type.
++   * Set includeEnded for privacy dismissal of native-retained terminal instances.
+    */
+-  getInstances() {
++  getInstances(includeEnded = false) {
+     return this.nativeLiveActivityFactory
+-      .getInstances()
++      .getInstances(includeEnded)
+       .map((instance) => new LiveActivity<T>(instance));
+   }
+ }
+@@ -231,3 +237,11 @@ export function addPushToStartTokenListener(
+  * The contents of this directory are accessible by both the main app and widgets.
+  */
+ export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
++
++/**
++ * Whether the per-app "Live Activities" switch in Settings is on. False on
++ * every platform and OS version that cannot run one.
++ */
++export function areLiveActivitiesEnabled(): boolean {
++  return ExpoWidgetsModule.areLiveActivitiesEnabled();
++}
+diff --git a/src/Widgets.types.ts b/src/Widgets.types.ts
+index 37a1b14..a1134c3 100644
+--- a/src/Widgets.types.ts
++++ b/src/Widgets.types.ts
+@@ -282,10 +282,11 @@ export declare class NativeWidgetObject extends SharedObject {
+ export declare class NativeLiveActivityFactory extends SharedObject {
+   constructor(name: string, layout: string);
+   start(props: string, url?: string): NativeLiveActivity;
+-  getInstances(): NativeLiveActivity[];
++  getInstances(includeEnded?: boolean): NativeLiveActivity[];
+ }
+ 
+ export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
++  getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' };
+   update(props: string): Promise<void>;
+   end(
+     dismissalPolicy?: string,

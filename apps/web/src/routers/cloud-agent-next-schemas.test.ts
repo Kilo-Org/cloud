@@ -2,8 +2,12 @@ import { describe, expect, it } from '@jest/globals';
 import {
   baseCreateWorktreeChatNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
+  baseGetSandboxStatusNextOutputSchema,
+  baseGetSandboxStatusNextSchema,
   basePrepareSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxStatusSnapshot,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
@@ -12,6 +16,203 @@ import {
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
+
+const sandboxSnapshot = {
+  status: 'active',
+  provider: 'Cloudflare',
+  observedAt: 1_800_000_000_000,
+  detailCode: 'sandbox_ready',
+  inactivityTimeoutMs: 300_000,
+  estimatedSleepAt: null,
+} satisfies SandboxStatusSnapshot;
+
+const sandboxLifecycleCases = [
+  { status: 'active', detailCode: 'sandbox_ready' },
+  { status: 'sleeping', detailCode: 'sandbox_stopped' },
+  { status: 'starting', detailCode: 'sandbox_starting' },
+  { status: 'stopping', detailCode: 'sandbox_stopping' },
+  { status: 'error', detailCode: 'sandbox_failed' },
+  { status: 'unreachable', detailCode: 'connection_unavailable' },
+  { status: 'unknown', detailCode: 'insufficient_evidence' },
+  { status: 'unknown', detailCode: 'status_unavailable' },
+] satisfies Pick<SandboxStatusSnapshot, 'status' | 'detailCode'>[];
+
+describe('baseGetSandboxStatusNextOutputSchema', () => {
+  it.each(sandboxLifecycleCases)('accepts $status with $detailCode', lifecycle => {
+    for (const provider of ['Cloudflare', 'Vercel', 'Unknown']) {
+      const response = { ...sandboxSnapshot, ...lifecycle, provider };
+      expect(baseGetSandboxStatusNextOutputSchema.parse(response)).toEqual(response);
+    }
+  });
+
+  it('strips runtime identity, infrastructure, credentials, and raw errors before serialization', () => {
+    const response = baseGetSandboxStatusNextOutputSchema.parse({
+      ...sandboxSnapshot,
+      cloudAgentSessionId: 'agent_private-session',
+      sandboxId: 'usr-private-sandbox',
+      providerInstanceId: 'private-instance',
+      wrapperRunId: 'private-wrapper',
+      region: 'private-region',
+      url: 'https://private-runtime.invalid',
+      credentials: { token: 'private-credential' },
+      headers: { Authorization: 'Bearer private-credential' },
+      error: { message: 'private-provider-error', stack: 'private-stack' },
+      message: 'private-provider-error',
+    });
+    expect(response).toStrictEqual(sandboxSnapshot);
+    expect(JSON.stringify(response)).not.toContain('private');
+  });
+
+  it.each(['status', 'provider', 'detailCode'] as const)('rejects arbitrary text in %s', field => {
+    expect(
+      baseGetSandboxStatusNextOutputSchema.safeParse({
+        ...sandboxSnapshot,
+        [field]: 'private-provider-error',
+      }).success
+    ).toBe(false);
+  });
+
+  it('does not interpret loading as an authoritative starting state', () => {
+    expect(
+      baseGetSandboxStatusNextOutputSchema.safeParse({
+        ...sandboxSnapshot,
+        status: 'loading',
+        detailCode: 'sandbox_starting',
+      }).success
+    ).toBe(false);
+  });
+
+  it('keeps an observation outage unknown, with distinct safe copy from sandbox failure', () => {
+    const response = baseGetSandboxStatusNextOutputSchema.parse({
+      ...sandboxSnapshot,
+      status: 'unknown',
+      detailCode: 'status_unavailable',
+      inactivityTimeoutMs: null,
+    });
+    expect(SANDBOX_STATUS_DETAIL_MESSAGES[response.detailCode]).toBe(
+      'Sandbox status is temporarily unavailable. This does not mean the sandbox failed.'
+    );
+    expect(
+      baseGetSandboxStatusNextOutputSchema.safeParse({ ...response, status: 'error' }).success
+    ).toBe(false);
+    expect(SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_failed).not.toBe(
+      SANDBOX_STATUS_DETAIL_MESSAGES[response.detailCode]
+    );
+  });
+
+  it.each(['observedAt', 'inactivityTimeoutMs', 'estimatedSleepAt'] as const)(
+    'rejects invalid numeric values in %s',
+    field => {
+      for (const value of [NaN, Infinity, -Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '123']) {
+        expect(
+          baseGetSandboxStatusNextOutputSchema.safeParse({ ...sandboxSnapshot, [field]: value })
+            .success
+        ).toBe(false);
+      }
+    }
+  );
+
+  it('requires a positive inactivity timeout when present', () => {
+    expect(
+      baseGetSandboxStatusNextOutputSchema.safeParse({ ...sandboxSnapshot, inactivityTimeoutMs: 0 })
+        .success
+    ).toBe(false);
+  });
+
+  it('allows null timing but not omitted timing fields', () => {
+    const response = { ...sandboxSnapshot, inactivityTimeoutMs: null };
+    expect(baseGetSandboxStatusNextOutputSchema.parse(response)).toEqual(response);
+    for (const field of ['inactivityTimeoutMs', 'estimatedSleepAt']) {
+      expect(
+        baseGetSandboxStatusNextOutputSchema.safeParse({ ...response, [field]: undefined }).success
+      ).toBe(false);
+    }
+  });
+
+  it('preserves a supported future approximate estimate', () => {
+    const response = {
+      ...sandboxSnapshot,
+      estimatedSleepAt: sandboxSnapshot.observedAt + 60_000,
+    };
+    expect(baseGetSandboxStatusNextOutputSchema.parse(response)).toEqual(response);
+  });
+
+  it.each(sandboxLifecycleCases.filter(lifecycle => lifecycle.status !== 'active'))(
+    'rejects an estimate for $status/$detailCode',
+    lifecycle => {
+      expect(
+        baseGetSandboxStatusNextOutputSchema.safeParse({
+          ...sandboxSnapshot,
+          ...lifecycle,
+          estimatedSleepAt: sandboxSnapshot.observedAt + 60_000,
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('rejects estimates that are expired or lack a supported policy', () => {
+    for (const estimatedSleepAt of [sandboxSnapshot.observedAt - 1, sandboxSnapshot.observedAt]) {
+      expect(
+        baseGetSandboxStatusNextOutputSchema.safeParse({ ...sandboxSnapshot, estimatedSleepAt })
+          .success
+      ).toBe(false);
+    }
+    expect(
+      baseGetSandboxStatusNextOutputSchema.safeParse({
+        ...sandboxSnapshot,
+        estimatedSleepAt: sandboxSnapshot.observedAt + 60_000,
+        inactivityTimeoutMs: null,
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('baseGetSandboxStatusNextSchema', () => {
+  it('accepts a control-plane session reference without runtime overrides', () => {
+    const input = { cloudAgentSessionId: `workspace_${MESSAGE_UUID}` };
+    expect(baseGetSandboxStatusNextSchema.parse(input)).toEqual(input);
+  });
+
+  it.each([
+    `agent_${MESSAGE_UUID}`,
+    `sess_${MESSAGE_UUID}`,
+    KILO_SESSION_ID,
+    MESSAGE_UUID,
+    'workspace_',
+    'workspace_pending',
+    `workspace_${MESSAGE_UUID} `,
+    `workspace_${MESSAGE_UUID}\n`,
+    ` workspace_${MESSAGE_UUID}`,
+    'workspace_../../private',
+    'workspace_zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+  ])('rejects legacy, unrelated, or malformed reference %s', cloudAgentSessionId => {
+    expect(baseGetSandboxStatusNextSchema.safeParse({ cloudAgentSessionId }).success).toBe(false);
+  });
+
+  it.each([
+    'provider',
+    'sandboxId',
+    'providerInstanceId',
+    'userId',
+    'orgId',
+    'estimatedSleepAt',
+    'inactivityTimeoutMs',
+  ])('rejects caller-supplied %s', field => {
+    expect(
+      baseGetSandboxStatusNextSchema.safeParse({
+        cloudAgentSessionId: `workspace_${MESSAGE_UUID}`,
+        [field]: 'private-override',
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires a nonempty session reference', () => {
+    expect(baseGetSandboxStatusNextSchema.safeParse({}).success).toBe(false);
+    expect(baseGetSandboxStatusNextSchema.safeParse({ cloudAgentSessionId: '' }).success).toBe(
+      false
+    );
+  });
+});
 
 describe('cloudAgentGetAttachmentUploadUrlSchema', () => {
   it('preserves the legacy 9-MIME contract when extension is absent', () => {

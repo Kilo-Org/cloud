@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Benachrichtigungen",
+    "liveActivities": "Live-Aktivitäten",
+    "liveActivitySubtitle": "Aktive Agenten auf dem Sperrbildschirm anzeigen",
+    "liveUpdates": "Live-Updates",
+    "liveUpdateSubtitle": "Aktive Agents in deinen Benachrichtigungen anzeigen",
     "push": "Push",
     "enabled": "Benachrichtigungen aktiviert",
     "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Chatverlauf konnte nicht geladen werden.",
     "catalogRetry": "Modelle konnten nicht geladen werden",
     "sendError": "Die Nachricht konnte nicht gesendet werden. Versuchen Sie es erneut."
+  },
+  "glanceable": {
+    "waiting": "Agenten werden aktualisiert",
+    "empty": "Keine laufende Arbeit",
+    "stale": "Aktualisierung derzeit nicht möglich",
+    "expired": "Status abgelaufen",
+    "signedOut": "Melde dich an, um Agenten zu sehen",
+    "privacy": "Öffne Kilo, um Agenten zu sehen",
+    "openAgents": "Agenten öffnen",
+    "running": "Wird bearbeitet",
+    "needsInput": "Eingabe erforderlich",
+    "idle": "Inaktiv",
+    "channelName": "Aktive Agenten",
+    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   }
 }

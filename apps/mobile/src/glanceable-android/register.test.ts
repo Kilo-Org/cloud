@@ -1,0 +1,281 @@
+import {
+  buildGlanceableSnapshot,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  collectText,
+  NOW,
+  runWidgetTask,
+  secureStore,
+  snapshotFor,
+  store,
+} from './register.test-helpers';
+
+const mocks = vi.hoisted(() => {
+  let snapshot: string | null = null;
+  let deadline = 0;
+  return {
+    native: {
+      setWidgetSnapshot: (next: string, expiresAt: number) => {
+        snapshot = next;
+        deadline = expiresAt;
+      },
+      getWidgetSnapshot: () => snapshot,
+      end: vi.fn(),
+    },
+    getDeadline: () => deadline,
+    resetNativeState: () => {
+      snapshot = null;
+      deadline = 0;
+    },
+    language: { value: 'en' },
+  };
+});
+
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => mocks.native }));
+// The widget task resolves the language itself; the real store needs natives.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => mocks.language.value,
+  whenLanguagePreferenceLoaded: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('react-native', () => ({
+  AppState: { addEventListener: vi.fn() },
+  Alert: { alert: vi.fn() },
+  Linking: { openSettings: vi.fn() },
+}));
+vi.mock('react-native-android-widget', () => ({
+  requestWidgetUpdate: vi.fn().mockResolvedValue(undefined),
+  FlexWidget: () => null,
+  TextWidget: () => null,
+  ImageWidget: () => null,
+}));
+
+async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
+  const persist = await import('@/lib/glanceable/persist');
+  persist._setSecureStoreForTests(secureStore);
+  if (snapshot !== null) {
+    persist.persistGlanceableSink.publish(snapshot);
+  }
+
+  // Keep only native storage across the simulated JS process restart.
+  vi.resetModules();
+  const freshPersist = await import('@/lib/glanceable/persist');
+  freshPersist._setSecureStoreForTests(secureStore);
+  const { handleWidgetTask } = await import('./register');
+  return handleWidgetTask;
+}
+
+beforeEach(() => {
+  vi.resetModules();
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+  mocks.resetNativeState();
+  store.clear();
+  secureStore.getItemAsync.mockReset().mockImplementation(async key => {
+    await Promise.resolve();
+    return store.get(key) ?? null;
+  });
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
+
+// A widget redraw runs headless: nothing else applies the language.
+it('applies the resolved language before it renders', async () => {
+  mocks.language.value = 'ar';
+  const handler = await registerAfterRestart(snapshotFor());
+  const { i18n } = await import('@/i18n');
+
+  await runWidgetTask(handler, 250);
+  mocks.language.value = 'en';
+
+  expect(i18n.language).toBe('ar');
+});
+
+describe.each([120, 250])('registered widget handler at %d dp', width => {
+  it('restores unexpired persisted counts after a fresh process starts', async () => {
+    const handler = await registerAfterRestart(snapshotFor());
+    const rendered = await runWidgetTask(handler, width);
+    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Idle'];
+
+    expect(collectText(rendered.light)).toEqual(expected);
+    expect(collectText(rendered.dark)).toEqual(expected);
+    expect(rendered.light.props).toMatchObject({
+      clickAction: 'OPEN_URI',
+      clickActionData: { uri: 'kiloapp:///cloud/sessions' },
+    });
+  });
+
+  it.each([
+    ['happy', 0],
+    ['happy', 1],
+    ['stale', 0],
+    ['stale', 1],
+  ] as const)('hides %s counts %d ms after expiry', async (status, elapsed) => {
+    const stored = snapshotFor(undefined, status);
+    const handler = await registerAfterRestart(stored);
+    vi.setSystemTime(Date.parse(stored.expiresAt) + elapsed);
+
+    const rendered = await runWidgetTask(handler, width);
+
+    expect(collectText(rendered.light)).toEqual(['Status expired']);
+    expect(collectText(rendered.dark)).toEqual(['Status expired']);
+  });
+
+  it('renders the existing placeholder when no snapshot is persisted', async () => {
+    const handler = await registerAfterRestart(null);
+
+    const rendered = await runWidgetTask(handler, width);
+
+    expect(collectText(rendered.light)).toEqual(['No work in progress']);
+    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+  });
+
+  it('renders the existing placeholder when native storage cannot be read', async () => {
+    const handler = await registerAfterRestart(snapshotFor());
+    secureStore.getItemAsync.mockRejectedValueOnce(new Error('SecureStore unavailable'));
+
+    const rendered = await runWidgetTask(handler, width);
+
+    expect(collectText(rendered.light)).toEqual(['No work in progress']);
+    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+  });
+
+  it.each([
+    ['privacy', 'Open Kilo to see agents'],
+    ['signed_out', 'Sign in to see agents'],
+  ] as const)('preserves the %s blank even after expiry', async (status, copy) => {
+    const stored = snapshotFor([], status);
+    const handler = await registerAfterRestart(stored);
+    vi.setSystemTime(Date.parse(stored.expiresAt) + 1);
+
+    const rendered = await runWidgetTask(handler, width);
+
+    expect(collectText(rendered.light)).toEqual([copy]);
+    expect(collectText(rendered.dark)).toEqual([copy]);
+  });
+
+  it('prefers newer live widget props to the persisted snapshot', async () => {
+    const stored = snapshotFor();
+    const handler = await registerAfterRestart(stored);
+    const { androidSink } = await import('./android-sink');
+    androidSink.publish({
+      ...snapshotFor([{ status: 'busy' }]),
+      revision: stored.revision + 1,
+    });
+
+    const rendered = await runWidgetTask(handler, width);
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+
+    expect(collectText(rendered.light)).toEqual(expected);
+    expect(collectText(rendered.dark)).toEqual(expected);
+  });
+
+  it('re-reads native state when an old expiry task reaches newer work', async () => {
+    const old = snapshotFor();
+    const handler = await registerAfterRestart(old);
+    const { androidSink } = await import('./android-sink');
+    androidSink.publish(old);
+    const newer = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u2',
+      organizationId: null,
+      now: NOW + 60_000,
+      previousRevision: old.revision,
+    });
+    mocks.native.setWidgetSnapshot(JSON.stringify(newer), Date.parse(newer.expiresAt));
+    vi.setSystemTime(Date.parse(old.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    expect(collectText(rendered.light)).toEqual(expected);
+    expect(collectText(rendered.dark)).toEqual(expected);
+  });
+
+  it.each([
+    ['privacy', 'Open Kilo to see agents'],
+    ['signed_out', 'Sign in to see agents'],
+  ] as const)('reads a native %s blank instead of stale legacy storage', async (status, copy) => {
+    const old = snapshotFor();
+    const handler = await registerAfterRestart(old);
+    mocks.native.setWidgetSnapshot(JSON.stringify(snapshotFor([], status)), 0);
+    vi.setSystemTime(Date.parse(old.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual([copy]);
+    expect(collectText(rendered.dark)).toEqual([copy]);
+    expect(mocks.getDeadline()).toBe(0);
+  });
+
+  it.each(['happy', 'stale'] as const)(
+    'renders native %s state after a JS reload without extending its expiry',
+    async status => {
+      const snapshot = snapshotFor(undefined, status);
+      const expiresAt = Date.parse(snapshot.expiresAt);
+      mocks.native.setWidgetSnapshot(JSON.stringify(snapshot), expiresAt);
+      vi.setSystemTime(NOW + 7_200_000);
+      const handler = await registerAfterRestart(null);
+
+      const current = await runWidgetTask(handler, width);
+      expect(collectText(current.light)).toEqual(expect.arrayContaining(['2', 'Needs input']));
+      expect(collectText(current.dark)).toEqual(expect.arrayContaining(['2', 'Needs input']));
+      expect(mocks.getDeadline()).toBe(expiresAt);
+
+      vi.setSystemTime(expiresAt);
+      const reloaded = await registerAfterRestart(null);
+      const expired = await runWidgetTask(reloaded, width);
+      expect(collectText(expired.light)).toEqual(['Status expired']);
+      expect(collectText(expired.dark)).toEqual(['Status expired']);
+    }
+  );
+
+  it('expires counts in an already-running handler without a JavaScript timer', async () => {
+    const snapshot = snapshotFor();
+    const handler = await registerAfterRestart(snapshot);
+    await runWidgetTask(handler, width);
+    expect(mocks.getDeadline()).toBe(Date.parse(snapshot.expiresAt));
+    vi.setSystemTime(Date.parse(snapshot.expiresAt));
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual(['Status expired']);
+    expect(collectText(rendered.dark)).toEqual(['Status expired']);
+  });
+
+  it.each([
+    ['invalid JSON', '{'],
+    ['missing fields', JSON.stringify({ status: 'happy' })],
+    ['negative counts', JSON.stringify({ ...snapshotFor(), running: -1 })],
+  ])('rejects a native snapshot with %s', async (_reason, raw) => {
+    const handler = await registerAfterRestart(null);
+    mocks.native.setWidgetSnapshot(raw, 0);
+
+    const rendered = await runWidgetTask(handler, width);
+    expect(collectText(rendered.light)).toEqual(['No work in progress']);
+    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+  });
+
+  it('keeps live widget props published while restoration is pending', async () => {
+    const stored = snapshotFor();
+    const handler = await registerAfterRestart(stored);
+    const { androidSink } = await import('./android-sink');
+    const read = Promise.withResolvers<string | null>();
+    secureStore.getItemAsync.mockReturnValueOnce(read.promise);
+
+    const rendering = runWidgetTask(handler, width);
+    androidSink.publish({
+      ...snapshotFor([{ status: 'busy' }]),
+      revision: stored.revision + 1,
+    });
+    read.resolve(JSON.stringify(stored));
+    const rendered = await rendering;
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+
+    expect(collectText(rendered.light)).toEqual(expected);
+    expect(collectText(rendered.dark)).toEqual(expected);
+  });
+});

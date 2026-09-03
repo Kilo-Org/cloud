@@ -163,6 +163,10 @@
       "securityFindingsSubtitle": "nuovi risultati e promemoria SLA"
     },
     "title": "Notifiche",
+    "liveActivities": "Attività in tempo reale",
+    "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
+    "liveUpdates": "Aggiornamenti live",
+    "liveUpdateSubtitle": "Mostra gli agenti attivi nelle notifiche",
     "push": "Push",
     "enabled": "Notifiche attivate",
     "onDescription": "Le notifiche push sono attive per questo dispositivo.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "Impossibile caricare la cronologia della chat.",
     "catalogRetry": "Impossibile caricare i modelli",
     "sendError": "Impossibile inviare il messaggio. Riprova."
+  },
+  "glanceable": {
+    "waiting": "Aggiornamento degli agenti",
+    "empty": "Nessun lavoro in corso",
+    "stale": "Impossibile aggiornare ora",
+    "expired": "Stato scaduto",
+    "signedOut": "Accedi per vedere gli agenti",
+    "privacy": "Apri Kilo per vedere gli agenti",
+    "openAgents": "Apri agenti",
+    "running": "In corso",
+    "needsInput": "richiede input",
+    "idle": "Inattivo",
+    "channelName": "Agenti attivi",
+    "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."
   }
 }

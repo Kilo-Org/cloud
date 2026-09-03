@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Paziņojumi",
+    "liveActivities": "Tiešās aktivitātes",
+    "liveActivitySubtitle": "Rādīt aktīvos aģentus bloķēšanas ekrānā",
+    "liveUpdates": "Tiešraides atjauninājumi",
+    "liveUpdateSubtitle": "Rādīt aktīvos aģentus paziņojumos",
     "push": "Push",
     "enabled": "Paziņojumi iespējoti",
     "onDescription": "Push paziņojumi šai ierīcei ir ieslēgti.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
     "catalogRetry": "Neizdevās ielādēt modeļus",
     "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
+  },
+  "glanceable": {
+    "waiting": "Atjaunina aģentus",
+    "empty": "Nav darba procesā",
+    "stale": "Pašlaik nevar atjaunināt",
+    "expired": "Statusa derīgums ir beidzies",
+    "signedOut": "Pieraksties, lai redzētu aģentus",
+    "privacy": "Atveriet Kilo, lai redzētu aģentus",
+    "openAgents": "Atvērt aģentus",
+    "running": "Apstrādā",
+    "needsInput": "nepieciešama ievade",
+    "idle": "Dīkstāvē",
+    "channelName": "Aktīvie aģenti",
+    "activityKitDisabledBody": "Ieslēdz tiešraides aktivitātes iestatījumos, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   }
 }

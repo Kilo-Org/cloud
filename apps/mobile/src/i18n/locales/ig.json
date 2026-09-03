@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Ọkwa",
+    "liveActivities": "Ọrụ ndụ",
+    "liveActivitySubtitle": "Gosi ndị ọrụ na-arụ ọrụ na Lock Screen",
+    "liveUpdates": "Mmelite ndụ",
+    "liveUpdateSubtitle": "Gosi ndị ọrụ na-arụ ọrụ na ọkwa gị",
     "push": "Push",
     "enabled": "Ọkwa agbanyela",
     "onDescription": "Ọkwa push dị maka ngwaọrụ a.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Enweghị ike ibutu akụkọ nkata.",
     "catalogRetry": "Enweghị ike ibunye ụdị",
     "sendError": "Enweghị ike izipu ozi ahụ. Nwaa ọzọ."
+  },
+  "glanceable": {
+    "waiting": "Na-emelite ndị ọrụ",
+    "empty": "Enweghị ọrụ na-aga n'ihu",
+    "stale": "Enweghị ike imelite ugbu a",
+    "expired": "Oge ọnọdụ agwụla",
+    "signedOut": "Banye iji hụ ndị ọrụ",
+    "privacy": "Mepee Kilo ka ị hụ ndị ọrụ",
+    "openAgents": "Mepee ndị ọrụ",
+    "running": "Na-arụ ọrụ",
+    "needsInput": "chọrọ ntinye",
+    "idle": "Ọrụ na-agaghị",
+    "channelName": "Ndị ọrụ na-arụ ọrụ",
+    "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
   }
 }

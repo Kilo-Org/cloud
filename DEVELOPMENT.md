@@ -174,15 +174,17 @@ Use `pnpm web:env set EXAMPLE_API_TOKEN --only staging` to rotate just one Verce
 
 Remote updates are sequential rather than transactional. If a provider fails partway through, fix the problem and rerun the same command; it safely upserts every target. After updating Staging or Production, the command explains that existing deployments retain the old value and asks whether to redeploy the latest ready deployment in each affected Vercel project.
 
-### 4. Start the database
+### 4. Prepare the database
 
-The project uses PostgreSQL 18 with pgvector, running via Docker. The compose file is at `dev/docker-compose.yml`:
+The project uses PostgreSQL 18 with pgvector, running via Docker. Prepare the local database with:
 
 ```bash
-docker compose -f dev/docker-compose.yml up -d
+pnpm test:db
 ```
 
-This starts a PostgreSQL container on port 5432 with:
+Despite its name, this command prepares the local development database; it does not run tests. It synchronizes infrastructure environment files for the current worktree's port offset, starts PostgreSQL, waits for it to be ready, and runs migrations.
+
+PostgreSQL uses host port 5432 plus the resolved port offset, with these default credentials:
 
 - User: `postgres`
 - Password: `postgres`
@@ -190,13 +192,7 @@ This starts a PostgreSQL container on port 5432 with:
 
 A worktree with a port offset runs its own container on its own port; see [Multi-worktree support](#multi-worktree-support).
 
-### 5. Run database migrations
-
-```bash
-pnpm drizzle migrate
-```
-
-You need to re-run this every time you pull new migrations from the repository.
+Re-run `pnpm test:db` every time you pull new migrations from the repository.
 
 If you want to fully reset the local dev database first, use:
 
@@ -211,16 +207,15 @@ To smoke-test that migrations still bootstrap correctly from a fresh empty datab
 pnpm drizzle:verify-bootstrap
 ```
 
-### 6. Start the development server
+### 5. Start the development server
 
 ```bash
-KILO_PORT_OFFSET=auto pnpm dev:start
+pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and local infrastructure.
-The automatic offset keeps secondary worktrees from colliding with the root
-checkout. When the Stripe CLI is installed, the command also starts the Stripe
-webhook forwarder. Run `pnpm dev:status` to get the web app's port.
+This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
+When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
 To stop all services:
 

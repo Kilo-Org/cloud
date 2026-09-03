@@ -1,6 +1,9 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
+// The widget gallery's own copy. Native bundle metadata, not app copy — see
+// plugins/withWidgetLocalizations.js.
+import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
@@ -194,6 +197,10 @@ const config: ExpoConfig = {
       {
         icon: './assets/images/android-notification-icon.png',
         color: '#FAF74F',
+        // iOS requires `remote-notification` in UIBackgroundModes for the
+        // headless background task (`registerTaskAsync`) to deliver a data-only
+        // `active_agents_glanceable` push while the app is not in the foreground.
+        enableBackgroundRemoteNotifications: true,
       },
     ],
     'expo-web-browser',
@@ -255,6 +262,59 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Declares the app's languages on the widget extension, which expo-widgets
+    // leaves English-only. This must be registered BEFORE 'expo-widgets':
+    // dangerous mods run in reverse registration order, so the earlier entry
+    // runs last and sees the Info.plist expo-widgets has already written.
+    [
+      './plugins/withWidgetLocalizations',
+      { languages: [...SUPPORTED_LANGUAGES], copy: WIDGET_GALLERY_COPY },
+    ],
+    // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
+    // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
+    // target reuses the existing app group; no second group is created.
+    [
+      'expo-widgets',
+      {
+        groupIdentifier: 'group.com.kilocode.kiloapp',
+        bundleIdentifier: 'com.kilocode.kiloapp.ExpoWidgetsTarget',
+        enablePushNotifications: true,
+        widgets: [
+          {
+            name: 'ActiveAgentsWidget',
+            displayName: WIDGET_GALLERY_COPY.en.displayName,
+            description: WIDGET_GALLERY_COPY.en.description,
+            contentMarginsDisabled: false,
+            // Home Screen: the small square and the medium row. `systemLarge`
+            // is deliberately absent — three counts cannot fill a card that
+            // tall, and the whitespace read as an unfinished widget. Add it
+            // back only with a layout that earns the extra area.
+            supportedFamilies: [
+              'systemSmall',
+              'systemMedium',
+              'accessoryCircular',
+              'accessoryRectangular',
+              'accessoryInline',
+            ],
+          },
+        ],
+      },
+    ],
+    // Local Expo module for Android Live Updates (no-op until slice `and`).
+    './plugins/withActiveAgentsLiveUpdate',
+    // Translates the Android widget-picker entry, which the widget library
+    // leaves English-only. Registered BEFORE the widget plugin for the same
+    // reason as the iOS pair above: mods run in reverse registration order.
+    [
+      './plugins/withAndroidWidgetLocalizations',
+      {
+        widgetName: 'ActiveAgentsWidget',
+        languages: [...SUPPORTED_LANGUAGES],
+        copy: WIDGET_GALLERY_COPY,
+      },
+    ],
+    // No-op until slice `and` writes src/glanceable-android/widget-config.json.
+    './plugins/withActiveAgentsAndroidWidget',
     // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts
     // whose environment does not provide it.
     ...googleSignInPlugins,

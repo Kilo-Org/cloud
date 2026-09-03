@@ -68,6 +68,7 @@ export {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from './internal-service-token-audiences.js';
 export {
@@ -142,6 +143,7 @@ export {
   KILO_TOKEN_PURPOSES,
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   buildModernKiloTokenPayload,
+  signModernKiloToken,
   isKiloCredentialExchangeEligible,
   isKiloResourceAudienceAllowed,
   verifyKiloSessionForPolicy,
@@ -154,6 +156,7 @@ export type {
   KiloTokenPolicyClaims,
   ModernKiloTokenClaims,
   ModernKiloTokenPurpose,
+  SignModernKiloTokenParams,
   VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 

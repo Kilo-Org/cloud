@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "ማሳወቂያዎች",
+    "liveActivities": "የቀጥታ እንቅስቃሴዎች",
+    "liveActivitySubtitle": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ አሳይ",
+    "liveUpdates": "የቀጥታ ዝማኔዎች",
+    "liveUpdateSubtitle": "ንቁ ወኪሎችን በማሳወቂያዎችዎ ውስጥ አሳይ",
     "push": "ግፋ",
     "enabled": "ማሳወቂያዎች ነቅተዋል",
     "onDescription": "የግፋ ማሳወቂያዎች ለዚህ መሣሪያ በርተዋል።",
@@ -3212,5 +3216,19 @@
     "historyRetry": "የውይይት ታሪክ መጫን አልተቻለም።",
     "catalogRetry": "ሞዴሎችን መጫን አልተቻለም",
     "sendError": "መልእክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
+  },
+  "glanceable": {
+    "waiting": "ወኪሎችን በማዘመን ላይ",
+    "empty": "በሂደት ላይ ያለ ስራ የለም",
+    "stale": "አሁን ማዘመን አይቻልም",
+    "expired": "የሁኔታው ጊዜ አልፏል",
+    "signedOut": "ወኪሎችን ለማየት ይግቡ",
+    "privacy": "ወኪሎችን ለማየት Kilo ይክፈቱ",
+    "openAgents": "ወኪሎችን ይክፈቱ",
+    "running": "በመስራት ላይ",
+    "needsInput": "ግብዓት ይፈልጋል",
+    "idle": "በእረፍት",
+    "channelName": "ንቁ ወኪሎች",
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"
   }
 }

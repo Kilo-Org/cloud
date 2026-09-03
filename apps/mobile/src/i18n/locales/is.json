@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Tilkynningar",
+    "liveActivities": "Beinar aðgerðir",
+    "liveActivitySubtitle": "Sýna virk umboð á lásskjánum",
+    "liveUpdates": "Beinar uppfærslur",
+    "liveUpdateSubtitle": "Sýna virka fulltrúa í tilkynningunum þínum",
     "push": "Push",
     "enabled": "Tilkynningar virkjaðar",
     "onDescription": "Push-tilkynningar eru kveiktar á þessu tæki.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
     "catalogRetry": "Ekki tókst að hlaða líkön",
     "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
+  },
+  "glanceable": {
+    "waiting": "Uppfærir umboð",
+    "empty": "Engin vinna í gangi",
+    "stale": "Ekki hægt að uppfæra núna",
+    "expired": "Staða útrunnin",
+    "signedOut": "Skráðu þig inn til að sjá umboð",
+    "privacy": "Opnaðu Kilo til að sjá umboð",
+    "openAgents": "Opna umboð",
+    "running": "Vinnur",
+    "needsInput": "þarfnast inntaks",
+    "idle": "Í bið",
+    "channelName": "Virk umboð",
+    "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."
   }
 }

@@ -55,6 +55,25 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/agent-chat/ses_1?via=push');
   });
 
+  it('routes active_agents_glanceable notifications to the agents tab', () => {
+    expect(
+      notificationPathForData({
+        type: 'active_agents_glanceable',
+        schemaVersion: 1,
+        revision: 1,
+        scopeKey: 'scope-1',
+        organizationBound: false,
+        status: 'happy',
+        running: 1,
+        needsInput: 0,
+        idle: 0,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: '2026-01-01T08:00:00.000Z',
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe('/(app)/(tabs)/(2_agents)');
+  });
+
   it('routes low_balance notifications to organization credit activity with via=push', () => {
     expect(
       notificationPathForData({

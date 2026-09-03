@@ -1,5 +1,8 @@
+/* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
+import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
@@ -14,8 +17,24 @@ import {
   NOTIFICATION_PERMISSION_RESPONDED_EVENT,
   NOTIFICATION_TOKEN_UPDATED_EVENT,
 } from '@kilocode/app-shared/analytics';
+import {
+  buildOpaqueScopeKey,
+  GLANCEABLE_TERMINAL_MS,
+  type GlanceableAgentsSnapshot,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { captureEvent } from '@/lib/analytics/posthog';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import {
+  getLastGlanceableSnapshot,
+  getLocalScopeKey,
+  persistGlanceableSink,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
+import { getGlanceableSinks, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -51,6 +70,150 @@ export function parseNotificationData(data: unknown): PushData | null {
   return parsed.success ? parsed.data : null;
 }
 
+// Fallback terminal end for sinks without a native terminal contract.
+// Native sinks submit dismissal during publish and never receive this later end.
+// A newer eligible snapshot or terminal-blank epoch cancels the fallback.
+let glanceableTerminalTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelGlanceableTerminalEnd(): void {
+  if (glanceableTerminalTimer !== null) {
+    clearTimeout(glanceableTerminalTimer);
+    glanceableTerminalTimer = null;
+  }
+}
+
+function scheduleGlanceableTerminalEnd(): void {
+  cancelGlanceableTerminalEnd();
+  const blankEpoch = getTerminalBlankEpoch();
+  glanceableTerminalTimer = setTimeout(() => {
+    glanceableTerminalTimer = null;
+    // A terminal blank (logout/org switch) that landed during the window
+    // already ended the surface; do not end the new scope's activity.
+    if (getTerminalBlankEpoch() !== blankEpoch) {
+      return;
+    }
+    // Eligible work published during the window restarted the activity (the
+    // in-app publisher owns the foreground path and never cancels this timer);
+    // do not end a restarted activity.
+    const last = getLastGlanceableSnapshot();
+    if (last !== null && isEligibleGlanceableWork(last)) {
+      return;
+    }
+    for (const sink of getGlanceableSinks()) {
+      if (!sink.waitForNativeTerminal) {
+        sink.endImmediate();
+      }
+    }
+  }, GLANCEABLE_TERMINAL_MS);
+}
+
+/**
+ * Apply an `active_agents_glanceable` background push to the glanceable sinks
+ * (widgets, Android ongoing, iOS Live Activity). Returns false when the push
+ * must be dropped: its opaque scope key does not match the persisted local
+ * scope key, or it is not newer than the last applied snapshot.
+ *
+ * The server builds every remote snapshot with revision 1 (it never chains
+ * `previousRevision` across requests), so the revision cannot fence against the
+ * local monotonic sequence. Fence on `updatedAt` instead and rebase the remote
+ * revision onto the local sequence so the sinks' monotonic guards keep
+ * accepting it.
+ *
+ * The server omits `accountEpoch`, so it is set to the current local epoch
+ * before publishing. Never opens a session chat.
+ */
+export async function applyGlanceablePushData(
+  data: Extract<PushData, { type: 'active_agents_glanceable' }>
+): Promise<boolean> {
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  const scopeKey = getLocalScopeKey();
+  const capturedSnapshot = getLastGlanceableSnapshot();
+  if (data.scopeKey !== scopeKey) {
+    return false;
+  }
+
+  const organizationId = await getSelectedOrganizationId();
+  const userId = await getActiveUserId();
+  if (
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    getLocalScopeKey() !== scopeKey ||
+    userId === null ||
+    buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey
+  ) {
+    return false;
+  }
+
+  // Fence and rebase against the latest publication after storage reads.
+  // A publication during the reads also wins a timestamp tie.
+  const { type: _type, ...fields } = data;
+  const current = getLastGlanceableSnapshot();
+  if (
+    current !== null &&
+    (fields.updatedAt < current.updatedAt ||
+      (current !== capturedSnapshot && fields.updatedAt === current.updatedAt))
+  ) {
+    return false;
+  }
+
+  const snapshot: GlanceableAgentsSnapshot = {
+    ...fields,
+    revision: current === null ? fields.revision : current.revision + 1,
+    accountEpoch: authEpoch,
+  };
+
+  const ctx = { userId, organizationId };
+  const eligible = isEligibleGlanceableWork(snapshot);
+  if (eligible) {
+    cancelGlanceableTerminalEnd();
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+      sink.startOrUpdate(snapshot, ctx);
+    }
+  } else {
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+    }
+    // Native sinks already submitted their terminal work during publish.
+    // Keep the existing fallback for other sinks; widgets retain their timeline.
+    scheduleGlanceableTerminalEnd();
+  }
+  // Do not finish a background task before ActivityKit accepts the native end.
+  // All publication happens before this await, so it cannot restore an old scope.
+  if (!eligible) {
+    await Promise.all(
+      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
+    );
+  }
+  return true;
+}
+
+/**
+ * Read the selected organization id for scope validation and token registration.
+ * A missing hint only matches a personal scope; it cannot revive an org scope.
+ */
+async function getSelectedOrganizationId(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the active-user id for scope validation and logout reconciliation.
+ * An unavailable hint drops the push rather than reviving a persisted scope.
+ * The raw id never enters the snapshot.
+ */
+async function getActiveUserId(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
 const shown = {
   shouldPlaySound: true,
   shouldSetBadge: true,
@@ -67,9 +230,16 @@ const suppressed = {
 
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
-    // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
+
+      if (data?.type === 'active_agents_glanceable') {
+        // The aggregate glanceable push is a data carrier for the ongoing
+        // notification/widgets, never a visible banner: the local ongoing owns
+        // the display. Apply it to the sinks regardless of the discard outcome.
+        await applyGlanceablePushData(data);
+        return suppressed;
+      }
 
       if (
         data?.type === 'chat.message' &&
@@ -81,6 +251,119 @@ export function setupNotificationHandler() {
       return shown;
     },
   });
+}
+
+const GLANCEABLE_BACKGROUND_TASK = 'active-agents-glanceable-background-task';
+
+// Expo wraps the data payload of a background notification in a JSON string on
+// both platforms; decode that envelope before parsing the push data itself.
+const headlessTaskDataSchema = z.object({ dataString: z.string() });
+
+// Test-only override so the background-handler suite never loads the platform
+// sink register files (expo-widgets / react-native-android-widget native loads).
+let glanceableSinksLoaderForTests: (() => void) | null = null;
+
+export function _setGlanceableSinksLoaderForTests(loader: (() => void) | null): void {
+  glanceableSinksLoaderForTests = loader;
+}
+
+/**
+ * Register the persist sink and the platform sinks so a headless apply has
+ * somewhere to publish. The root layout imports the platform register files in
+ * the foreground; the headless task context loads only this module, so the
+ * sinks must be registered here before `applyGlanceablePushData` runs.
+ */
+function ensureGlanceableSinksLoaded(): void {
+  if (glanceableSinksLoaderForTests) {
+    glanceableSinksLoaderForTests();
+    return;
+  }
+  registerGlanceableSink(persistGlanceableSink);
+  // Side-effect imports register the platform sinks.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+  require('@/glanceable-ios/register');
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+    require('@/glanceable-android/register');
+  } catch {
+    // react-native-android-widget is absent on iOS; the iOS sink still loaded.
+  }
+}
+
+/** Recover the typed push data from the headless payload envelope. */
+function parseHeadlessPushData(data: unknown): PushData | null {
+  const envelope = headlessTaskDataSchema.safeParse(data);
+  if (!envelope.success) {
+    return parseNotificationData(data);
+  }
+  try {
+    return parseNotificationData(JSON.parse(envelope.data.dataString));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Headless background-notification executor. Runs when a data-only push is
+ * delivered while the app is backgrounded or killed. Reuses
+ * `applyGlanceablePushData` so the scope-key fence, revision discard, and org
+ * re-register behave identically to the foreground path.
+ */
+async function handleBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  const { data, error } = body;
+  if (error) {
+    return Notifications.BackgroundNotificationTaskResult.Failed;
+  }
+  // A notification *response* (a tap) is not a delivered push; the glanceable
+  // apply runs only for a delivered data-only push.
+  if ('actionIdentifier' in data) {
+    return Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  const pushData = parseHeadlessPushData(data.data);
+  if (pushData?.type !== 'active_agents_glanceable') {
+    return Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  // The headless process is fresh: restore the persisted snapshot and scope key
+  // so the fence and revision discard below compare against durable state.
+  await restorePersistedGlanceable();
+  const applied = await applyGlanceablePushData(pushData);
+  // A successful apply delivered new sink data: report NewData so iOS does not
+  // throttle later content-available wakes (repeated NoData reduces them).
+  return applied
+    ? Notifications.BackgroundNotificationTaskResult.NewData
+    : Notifications.BackgroundNotificationTaskResult.NoData;
+}
+
+async function registerBackgroundNotificationTask(): Promise<void> {
+  try {
+    await Notifications.registerTaskAsync(GLANCEABLE_BACKGROUND_TASK);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'register_background_task',
+      },
+    });
+  }
+}
+
+/**
+ * Register the background notification task so a data-only
+ * `active_agents_glanceable` push is applied while the app is backgrounded or
+ * killed. `defineTask` must run at module scope of the root layout, not inside
+ * a React effect.
+ */
+export function setupNotificationBackgroundHandler(): void {
+  ensureGlanceableSinksLoaded();
+  TaskManager.defineTask<Notifications.NotificationTaskPayload>(
+    GLANCEABLE_BACKGROUND_TASK,
+    handleBackgroundNotificationTask
+  );
+  void registerBackgroundNotificationTask();
 }
 
 export function setupNotificationResponseHandler() {
@@ -130,6 +413,7 @@ async function createAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
+        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
       });
     } catch (error) {
       Sentry.captureException(error, {
@@ -163,6 +447,7 @@ const CHANNEL_NAME_KEYS = {
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
+  'active-agents': 'glanceable.channelName',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**
@@ -184,6 +469,7 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
+        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
       });
     } catch (error) {
       Sentry.captureException(error, {

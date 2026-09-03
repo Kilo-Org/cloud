@@ -10,7 +10,7 @@ type SoundToggleButtonProps = {
   /** Callback when toggle is clicked */
   onToggle: () => void;
   /** Size variant - affects icon and button dimensions */
-  size?: 'sm' | 'default';
+  size?: 'sm' | 'default' | 'toolbar';
   /** Additional CSS classes */
   className?: string;
 };
@@ -27,14 +27,17 @@ export function SoundToggleButton({
   className,
 }: SoundToggleButtonProps) {
   const iconSize = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
-  const buttonSize = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8';
+  const buttonClassName =
+    size === 'toolbar'
+      ? 'text-muted-foreground'
+      : cn(size === 'sm' ? 'h-6 w-6' : 'h-8 w-8', 'hover:text-blue-400');
 
   return (
     <Button
-      size="icon"
+      size={size === 'toolbar' ? 'icon-sm' : 'icon'}
       variant="ghost"
       onClick={onToggle}
-      className={cn(buttonSize, 'hover:text-blue-400', className)}
+      className={cn(buttonClassName, className)}
       title={
         enabled
           ? 'Mute completion sounds on this device'

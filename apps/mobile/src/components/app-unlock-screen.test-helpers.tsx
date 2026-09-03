@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
@@ -102,6 +102,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Icon',
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
+  Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',
@@ -129,6 +130,8 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
+vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
+vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({

@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Powiadomienia",
+    "liveActivities": "Aktywności na żywo",
+    "liveActivitySubtitle": "Pokazuj aktywnych agentów na ekranie blokady",
+    "liveUpdates": "Aktualizacje na żywo",
+    "liveUpdateSubtitle": "Pokazuj aktywne agenty w powiadomieniach",
     "push": "Push",
     "enabled": "Powiadomienia włączone",
     "onDescription": "Powiadomienia push są włączone dla tego urządzenia.",
@@ -3256,5 +3260,19 @@
     "historyRetry": "Nie udało się wczytać historii czatu.",
     "catalogRetry": "Nie można załadować modeli",
     "sendError": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
+  },
+  "glanceable": {
+    "waiting": "Aktualizowanie agentów",
+    "empty": "Brak pracy w toku",
+    "stale": "Nie można teraz zaktualizować",
+    "expired": "Status wygasł",
+    "signedOut": "Zaloguj się, aby zobaczyć agentów",
+    "privacy": "Otwórz Kilo, aby zobaczyć agentów",
+    "openAgents": "Otwórz agentów",
+    "running": "Pracuję",
+    "needsInput": "wymaga danych",
+    "idle": "Bezczynny",
+    "channelName": "Aktywni agenci",
+    "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   }
 }

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Din instans har en opdatering",
       "scheduledAction": "En planlagt handling har en opdatering",
       "lowBalance": "Din saldo kræver opmærksomhed",
-      "securityFinding": "Et sikkerhedsfund kræver opmærksomhed"
+      "securityFinding": "Et sikkerhedsfund kræver opmærksomhed",
+      "activeAgentsGlanceable": "Aktive agenter har en opdatering"
     }
   },
   "cloudAgentSession": {

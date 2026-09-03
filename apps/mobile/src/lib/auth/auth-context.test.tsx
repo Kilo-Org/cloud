@@ -101,6 +101,7 @@ const readCacheMock = vi.hoisted(() => ({
 // force it to reject without loading the tRPC/notifications chain.
 const logoutCleanupMock = vi.hoisted(() => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+  unregisterActivityTokensAndTombstone: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Hoisted so sign-out can assert the queued consent outcome is cleared during
@@ -209,6 +210,9 @@ const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFoot
     clearPrReviewFooterPreference: vi.fn(),
   }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
+vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
+  clearLiveActivityPreference: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
@@ -523,6 +527,22 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('unregisters the prior account activity tokens on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The switch unregisters the prior scope's activity tokens (tombstone on
+    // failure) without revoking the device session — runLogoutCleanup must not
+    // run on a plain sign-in.
+    expect(logoutCleanupMock.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
+    expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('clears the trusted hosts and image confirmations on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
@@ -735,7 +755,9 @@ describe('stale sign-in continuation', () => {
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().isSigningOut).toBe(true);
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
-    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    // The account-switch path in signIn clears once, and the sign-out teardown
+    // clears a second time.
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(2);
 
     unmount();
   });
@@ -1464,8 +1486,9 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     });
 
     // Whole-body FIFO: the sign-out's teardown (including the query-client
-    // clear) settled before the sign-in's credential write ran.
-    expect(clearMock).toHaveBeenCalledTimes(1);
+    // clear) settled before the sign-in's credential write ran; the sign-in
+    // account-switch path then clears a second time after its credential write.
+    expect(clearMock).toHaveBeenCalledTimes(2);
     const clearOrder = clearMock.mock.invocationCallOrder[0];
     const setOrder = hoisted.secureStore.setItemAsync.mock.invocationCallOrder[0];
     expect(clearOrder).toBeLessThan(setOrder);

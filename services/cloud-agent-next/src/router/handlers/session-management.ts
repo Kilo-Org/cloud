@@ -20,6 +20,8 @@ import {
   MessageIdSchema,
   GetSessionInput,
   GetSessionOutput,
+  GetSandboxStatusInput,
+  GetSandboxStatusOutput,
   GetSessionHealthInput,
   GetSessionHealthOutput,
   GetMessageResultInput,
@@ -436,6 +438,43 @@ export function createSessionManagementHandlers() {
             latestEventId,
           };
         });
+      }),
+
+    getSandboxStatus: protectedProcedure
+      .input(GetSandboxStatusInput)
+      .output(GetSandboxStatusOutput)
+      .query(async ({ input, ctx }) => {
+        await requireCurrentSessionAccess({
+          env: ctx.env,
+          kiloUserId: ctx.userId,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+        });
+
+        try {
+          return await withDORetry(
+            () => () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
+            async getStub => {
+              try {
+                return GetSandboxStatusOutput.parse(await getStub().getSandboxStatus());
+              } catch (error) {
+                throw Object.assign(new Error('Sandbox status unavailable'), {
+                  retryable:
+                    error instanceof Error && 'retryable' in error && error.retryable === true,
+                });
+              }
+            },
+            'getSandboxStatus'
+          );
+        } catch {
+          return {
+            status: 'unknown',
+            provider: 'Unknown',
+            observedAt: Date.now(),
+            detailCode: 'status_unavailable',
+            inactivityTimeoutMs: null,
+            estimatedSleepAt: null,
+          };
+        }
       }),
 
     getComputeBillingStatus: protectedProcedure

@@ -1,4 +1,6 @@
+import { cli_sessions_v2, cloud_agent_sessions } from '@kilocode/db/schema';
 import { CloudAgentQueueReportSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { eq } from 'drizzle-orm';
 
 import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
@@ -53,7 +55,8 @@ export async function consumeCloudAgentReportBatch(
   batch: MessageBatch<unknown>,
   env: Env
 ): Promise<void> {
-  const reportStore = createCloudAgentReportStore(getPgDb(env));
+  const db = getPgDb(env);
+  const reportStore = createCloudAgentReportStore(db);
 
   for (const message of batch.messages) {
     const parsed = parseReportWithoutInvalidDiagnostic(message.body);
@@ -66,6 +69,34 @@ export async function consumeCloudAgentReportBatch(
     }
     try {
       const result = await reportStore.saveReport(parsed.data);
+      if (result.outcome === 'applied' && env.NOTIFICATIONS) {
+        // Run liveness can change independently of session status. Refresh only after commit.
+        try {
+          const cloudAgentSessionId = parsed.data.session.cloudAgentSessionId;
+          const [session] = await db
+            .select({
+              userId: cli_sessions_v2.kilo_user_id,
+              cliSessionId: cli_sessions_v2.session_id,
+            })
+            .from(cloud_agent_sessions)
+            .innerJoin(
+              cli_sessions_v2,
+              eq(cli_sessions_v2.session_id, cloud_agent_sessions.kilo_session_id)
+            )
+            .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+            .limit(1);
+          if (session) {
+            await env.NOTIFICATIONS.refreshGlanceableSessions({
+              userId: session.userId,
+              cliSessionIds: [session.cliSessionId],
+            });
+          }
+        } catch {
+          console.warn('Cloud Agent glanceable refresh failed', {
+            cloudAgentSessionId: parsed.data.session.cloudAgentSessionId,
+          });
+        }
+      }
       if (result.outcome === 'missing_parent') {
         console.warn('Retrying Cloud Agent run report without a session anchor', {
           cloudAgentSessionId: parsed.data.session.cloudAgentSessionId,

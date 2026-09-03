@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Varsler",
+    "liveActivities": "Sanntidsaktiviteter",
+    "liveActivitySubtitle": "Vis aktive agenter på låseskjermen",
+    "liveUpdates": "Sanntidsoppdateringer",
+    "liveUpdateSubtitle": "Vis aktive agenter i varslene dine",
     "push": "Push",
     "enabled": "Varsler aktivert",
     "onDescription": "Push-varsler er på for denne enheten.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Kunne ikke laste inn chathistorikken.",
     "catalogRetry": "Kunne ikke laste modeller",
     "sendError": "Kunne ikke sende meldingen. Prøv igjen."
+  },
+  "glanceable": {
+    "waiting": "Oppdaterer agenter",
+    "empty": "Ingen arbeid pågår",
+    "stale": "Kan ikke oppdatere nå",
+    "expired": "Statusen er utløpt",
+    "signedOut": "Logg inn for å se agenter",
+    "privacy": "Åpne Kilo for å se agenter",
+    "openAgents": "Åpne agenter",
+    "running": "Jobber",
+    "needsInput": "trenger innspill",
+    "idle": "Ledig",
+    "channelName": "Aktive agenter",
+    "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."
   }
 }

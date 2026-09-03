@@ -151,3 +151,34 @@ Before moving any resource from `allow-legacy` to `required`:
 5. Measure or otherwise retire the relevant legacy population before enforcing `required` mode.
 
 Before wiring a real credential-issuance route, use an application-owned authentication adapter that validates current account state and records session-versus-bearer provenance. A narrower session-only callback or account-authenticated capability belongs at that integration boundary; a generic database-user callback is not proof of a session. Add route regressions for revoked/blocked accounts, rotated peppers, wrong environments, and bearer-capable authentication incorrectly classified as a session. None of those account checks or route integrations is introduced in this infrastructure-only PR.
+
+## Phase 5.1: bounded internal assertion issuance
+
+`signModernKiloToken` signs the validated modern payload with explicit audience, purpose, exchange permission, and positive lifetime. It does not change `signKiloToken` or the web's existing human/organization/shared signers. Web's synchronous `generateBoundedInternalServiceToken` uses the same payload builder, fixes `internal-service` / `credentialExchange: false`, and permits only the enumerated bounded service audiences. It requires a positive explicit lifetime, capped at 3600 seconds for generic Session Ingest and 300 seconds for the other bounded operations, in both rollout modes.
+
+Activation is **default-off**. `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED=true` enables modern payloads at 16 selected web mint sites. Unset, `false`, or any other value retains their existing legacy shape, TTL, and audience behavior. The flag is server configuration, not a request option. No tracked dotenv values or external deployments are changed by this implementation.
+
+| Producer group | Raw mint sites | Lifetime | Audience behavior |
+|---|---:|---|---|
+| Bitbucket repositories and code-review broker helper | 2 | 300 seconds | Existing exact operation audience in both modes |
+| GitLab credential broker and GitHub user access-token broker | 2 | 300 seconds | Existing exact operation audience in both modes |
+| GitHub user-authorization disconnect | 1 | 300 seconds | Legacy absent audience; enabled mode uses `git-token-service:github-user-authorizations:disconnect` |
+| User export client and deletion-queue leaf-session cleanup | 2 | 300 seconds | Existing `user-data-export` and `session-ingest:user-deletion` audiences in both modes |
+| Session Ingest client, active-session/ticket router, rename notification | 9 | 3600 seconds | Legacy absent audience; enabled mode uses `session-ingest` |
+
+These assertions continue to omit pepper and environment, preserving the exact receiver contracts. Organization identity is preserved where already supplied. This is trusted backend assertion issuance for existing authorized operations, not a user-returned token-exchange endpoint or a new general delegation grant. Generic Session Ingest assertions are resource-scoped, not single-session or single-route capabilities; incoming-request authorization and receiver ownership checks still matter. Returned Git provider credentials, opaque web/share tickets, and export responses remain separate credential families.
+
+The disconnect reader accepts its dedicated operation audience or legacy audience-less assertions only on its existing POST route. Other Git broker endpoints retain mandatory operation audiences. Token identity, not a user ID supplied in the body, controls disconnect. Deploy this compatible reader before enabling the new producer; do not use a broad API/gateway/Git-service audience as a substitute.
+
+### Activation and rollback
+
+1. Confirm Phase 4 readers (including the web wrap-up) and the dedicated Git-disconnect reader are merged and deployed to every receiving environment. Building the shared workspace package does not deploy a Worker.
+2. Run issuer/reader and rollback tests with the flag off and on. Verify unchanged TTLs and omissions, exact audiences, internal/non-exchangeable claims, receiver acceptance, and cross-operation/exchange rejection.
+3. An operator can run `pnpm web:env set BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` and choose `true` only after deployment readiness is confirmed. Agents must not execute that interactive, external-system-changing command.
+4. Observe request success and sanitized audience-rejection metrics. Roll back the flag to `false` if required, retaining the defensive readers. Already-issued modern assertions expire after their existing 5-minute/1-hour lifetime and remain accepted by those readers; rollback does not revoke them.
+
+### Explicit PR 5.2 allocation
+
+Gastown/Wasteland control issuers are deferred with their delegation adapters: current paths discard bearer expiry/signed restrictions into a bare user record, and Gastown can derive and renew broader 30-day runtime credentials. A source/audience stamp alone would not close that path. Modern-builder organization roles also require a deliberate compatibility decision for web `admin` memberships; do not cast or promote them to owner. The generic organization-token issuer is not proven attribution-only and is likewise deferred. User/native credentials, Chat fan-out, Cloud Agent/App Builder/automation runtime forwarding, Gastown renewal, and other shared credentials remain PR 5.2 work. The separate Worker-local `services/security-auto-analysis/src/token.ts` snapshot assertion is not one of these 16 web callsites; migrate it with that Worker's other token paths and rollout configuration in PR 5.2. KiloClaw stays minimal for its October EOL. These reallocations keep Phase 5 at exactly two PRs, rather than claiming unsafe control-plane migrations are bounded.
+
+This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.

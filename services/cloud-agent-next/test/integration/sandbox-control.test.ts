@@ -27,7 +27,7 @@ import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
 } from '../../src/execution/types.js';
-import type { AttachSessionInput, SandboxControl } from '../../src/persistence/SandboxControl.js';
+import { type AttachSessionInput, SandboxControl } from '../../src/persistence/SandboxControl.js';
 import {
   serializeSessionMetadata,
   type SessionMetadata,
@@ -46,7 +46,7 @@ import {
 } from '../../src/sandbox-control/session-credentials.js';
 import { findMatchingCredentialInjectionRule } from '../../src/sandbox-control/vercel-network-policy.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../../src/sandbox-id.js';
-import type { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
+import { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
 import {
   SANDBOX_SESSION_LIFECYCLE_KEY,
   SANDBOX_SESSION_METADATA_KEY,
@@ -106,7 +106,11 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SessionAttachPayload,
+  SANDBOX_CONTROL_WS_TAG,
+  sandboxControlSocketAttachmentSchema,
+  type SandboxHeartbeatPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
+import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
 vi.mock('../../src/session-access.js', () => ({
   requireCurrentSessionAccess: vi.fn(),
@@ -356,7 +360,11 @@ async function completeHello(
       type: 'response',
       requestId,
       ok: true,
-      result: { protocolVersion: 1, handshakeComplete: true },
+      result: {
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: { kiloVersionHeartbeat: true },
+      },
     })
   );
   const status = JSON.parse(await nextMessage(ws)) as {
@@ -5952,6 +5960,688 @@ describe('SandboxControl durable remainder', () => {
     await prompt(SECOND_GRANT_SESSION_ID, SECOND_ROOT_ID, '/workspace/b', 'msg_b');
     response.webSocket.close();
   });
+});
+
+const statusOwner = 'owner_status';
+const statusInput = { ownerId: statusOwner, provider: 'cloudflare' as const };
+const statusHeartbeat: SandboxHeartbeatPayload = {
+  state: 'idle',
+  pendingMessages: 0,
+  kilo: { ready: true },
+  sessions: [{ kiloSessionId: 'kilo_status', state: 'idle', idleForMs: 0 }],
+};
+
+function statusSocket(state: DurableObjectState) {
+  const socket = state.getWebSockets(SANDBOX_CONTROL_WS_TAG).find(ws => ws.readyState === 1);
+  if (!socket) throw new Error('Expected an open control socket');
+  return socket;
+}
+
+async function receiveHeartbeat(
+  instance: SandboxControl,
+  state: DurableObjectState,
+  payload: SandboxHeartbeatPayload = statusHeartbeat
+) {
+  await instance.webSocketMessage(
+    statusSocket(state),
+    JSON.stringify({ type: 'event', event: 'sandbox.heartbeat', payload })
+  );
+}
+
+async function seedStatusControl(id: string) {
+  const stub = env.SANDBOX_CONTROL.getByName(id);
+  await runInDurableObject(stub, async (instance, state) => {
+    await instance.initializeOwner(statusOwner);
+    await state.storage.put('provider_kind', 'cloudflare');
+    await seedRunningCloudflare(instance);
+    await saveRouteTable(
+      state.storage,
+      attachRoute(
+        new Map(),
+        {
+          sessionId: 'workspace_status',
+          kiloSessionId: 'kilo_status',
+          directory: '/workspace/status',
+          worktreeId: WORKTREE_ID,
+          ownerId: statusOwner,
+        },
+        statusOwner
+      ).table
+    );
+    instance['provider'].ensureLeaseAtLeast = vi.fn(async () => undefined);
+  });
+  return stub;
+}
+
+async function completeStatusHello(ws: WebSocket, requestId: string) {
+  await completeHello(ws, requestId, { wrapperInstanceId: crypto.randomUUID() });
+  const id = socketSandboxIds.get(ws);
+  if (!id) throw new Error('Missing status sandbox identity');
+  await runInDurableObject(env.SANDBOX_CONTROL.getByName(id), async (instance, state) => {
+    await instance.webSocketMessage(
+      statusSocket(state),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+  });
+}
+
+async function reconstructControl(instance: SandboxControl, state: DurableObjectState) {
+  const callbacks: Promise<unknown>[] = [];
+  const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+    const promise = callback();
+    callbacks.push(promise);
+    return promise;
+  });
+  try {
+    const fresh = new SandboxControl(state, instance['env']);
+    await Promise.all(callbacks);
+    expect(callbacks).toHaveLength(0);
+    return fresh;
+  } finally {
+    block.mockRestore();
+  }
+}
+
+function forbidControlOperations(instance: SandboxControl) {
+  const forbidden = () => {
+    throw new Error('Passive status reached a control operation');
+  };
+  instance['provider'] = {
+    resumable: false,
+    ensureBillingAdmission: forbidden,
+    launch: forbidden,
+    create: forbidden,
+    stop: forbidden,
+    observe: forbidden,
+    ensureLeaseAtLeast: forbidden,
+    logs: forbidden,
+  };
+  instance.ensureReady = forbidden;
+  instance.initializeOwner = forbidden;
+  instance.getStatus = forbidden;
+  instance.request = forbidden;
+  instance['pinProvider'] = forbidden;
+  instance['socketHandler'].sendRequest = forbidden;
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('SandboxControl passive status', () => {
+  it('returns unknown for a cold missing record without synthesizing or storing sleeping', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx_status_empty');
+    expect(await stub.getSandboxStatus(statusInput)).toMatchObject({
+      status: 'unknown',
+      provider: 'Unknown',
+      estimatedSleepAt: null,
+      inactivityTimeoutMs: DEADLINE_MS.idleStop,
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.list()).toEqual(new Map());
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it.each([null, 10_000, 86_400_000])(
+    'preserves records and exact alarm %j on repeated reconstructed reads',
+    async offset => {
+      const stub = await seedStatusControl(`sbx_status_passive_${offset}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        await state.storage.put('wrapper_ready_at', Date.now());
+        await state.storage.put('deadlines', {
+          heartbeatExpiry: Date.now() + DEADLINE_MS.heartbeatExpiry,
+          idleStop: Date.now() + DEADLINE_MS.idleStop,
+        });
+        if (offset === null) await state.storage.deleteAlarm();
+        else await state.storage.setAlarm(Date.now() + offset);
+        const alarm = await state.storage.getAlarm();
+        const records = await state.storage.list();
+        const fresh = await reconstructControl(instance, state);
+        forbidControlOperations(fresh);
+        const put = vi.spyOn(state.storage, 'put');
+        const remove = vi.spyOn(state.storage, 'delete');
+        const setAlarm = vi.spyOn(state.storage, 'setAlarm');
+        const deleteAlarm = vi.spyOn(state.storage, 'deleteAlarm');
+        for (let read = 0; read < 3; read++) {
+          expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+            status: 'unreachable',
+            estimatedSleepAt: null,
+          });
+        }
+        expect(await state.storage.list()).toEqual(records);
+        expect(await state.storage.getAlarm()).toBe(alarm);
+        expect(put).not.toHaveBeenCalled();
+        expect(remove).not.toHaveBeenCalled();
+        expect(setAlarm).not.toHaveBeenCalled();
+        expect(deleteAlarm).not.toHaveBeenCalled();
+      });
+    }
+  );
+
+  it('preserves unhealthy-runtime quarantine through passive reconstruction', async () => {
+    const id = 'sbx_status_false_reconstruction';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-false');
+    await runInDurableObject(stub, async (instance, state) => {
+      const socket = statusSocket(state);
+      await instance.webSocketMessage(
+        socket,
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      instance['provider'].stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
+      await receiveHeartbeat(instance, state, { ...statusHeartbeat, kilo: { ready: false } });
+      await vi.waitFor(async () => {
+        expect((await instance.getPhysicalRecord()).stopTombstone).toMatchObject({
+          reason: 'kilo_unhealthy',
+          attempts: 1,
+        });
+      });
+      expect(await state.storage.get('wrapper_ready_at')).toBeUndefined();
+      expect((await loadDeadlines(state.storage)).heartbeatExpiry).toBeUndefined();
+      const fresh = await reconstructControl(instance, state);
+      expect(fresh['kiloReady']).toBe(false);
+      const records = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const attachment = socket.deserializeAttachment();
+      forbidControlOperations(fresh);
+      const serialize = vi.spyOn(socket, 'serializeAttachment');
+      const send = vi.spyOn(socket, 'send');
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        detailCode: 'sandbox_stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await state.storage.list()).toEqual(records);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+      expect(socket.deserializeAttachment()).toEqual(attachment);
+      expect(serialize).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    });
+    ws.close();
+  });
+
+  it('does not inherit readiness when a same-provider replacement quarantines the runtime', async () => {
+    const id = 'sbx_status_replacement';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const first = await connect(credential, id);
+    await completeStatusHello(first, 'hello-status-old');
+    await runInDurableObject(stub, async (instance, state) => {
+      instance['provider'].stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
+      await receiveHeartbeat(instance, state);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({ status: 'active' });
+    });
+    const second = await connect(credential, id);
+    const closed = new Promise<number>(resolve =>
+      second.addEventListener('close', event => resolve(event.code), { once: true })
+    );
+    sendHello(second, 'hello-status-new', { wrapperInstanceId: crypto.randomUUID() });
+    await expect(closed).resolves.toBe(4001);
+    await vi.waitFor(async () => {
+      expect((await stub.getPhysicalRecord()).stopTombstone).toMatchObject({
+        reason: 'control_replaced',
+        attempts: 1,
+      });
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const fresh = await reconstructControl(instance, state);
+      forbidControlOperations(fresh);
+      const before = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+    });
+  });
+
+  it('requires fresh coherent evidence for all shared routes and leaves ordinary heartbeat scheduling unchanged', async () => {
+    const id = 'sbx_status_shared_idle';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-idle');
+    await runInDurableObject(stub, async (instance, state) => {
+      const renew = vi.fn(async () => undefined);
+      instance['provider'].ensureLeaseAtLeast = renew;
+      await saveRouteTable(
+        state.storage,
+        attachRoute(
+          await loadRouteTable(state.storage),
+          {
+            sessionId: 'workspace_sibling',
+            kiloSessionId: 'kilo_sibling',
+            directory: '/workspace/status',
+            worktreeId: WORKTREE_ID,
+            ownerId: statusOwner,
+          },
+          statusOwner
+        ).table
+      );
+      const socket = statusSocket(state);
+      await instance.webSocketMessage(
+        socket,
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+      const initialDeadline = (await loadDeadlines(state.storage)).idleStop;
+      expect(initialDeadline).toEqual(expect.any(Number));
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      await receiveHeartbeat(instance, state);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        estimatedSleepAt: null,
+      });
+      const sharedIdle: SandboxHeartbeatPayload = {
+        ...statusHeartbeat,
+        sessions: [
+          ...statusHeartbeat.sessions,
+          { kiloSessionId: 'kilo_sibling', state: 'idle', idleForMs: 0 },
+        ],
+      };
+      await receiveHeartbeat(instance, state, sharedIdle);
+      expect((await loadDeadlines(state.storage)).idleStop).toBe(initialDeadline);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: initialDeadline,
+      });
+      const records = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const beforeAttachment = socket.deserializeAttachment();
+      const send = vi.spyOn(socket, 'send');
+      const serialize = vi.spyOn(socket, 'serializeAttachment');
+      const reconstructed = await reconstructControl(instance, state);
+      forbidControlOperations(reconstructed);
+      for (let read = 0; read < 3; read++) {
+        const snapshot = await reconstructed.getSandboxStatus(statusInput);
+        expect(snapshot.estimatedSleepAt).toBe(initialDeadline);
+        expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+      }
+      expect(await state.storage.list()).toEqual(records);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+      expect(socket.deserializeAttachment()).toEqual(beforeAttachment);
+      expect(send).not.toHaveBeenCalled();
+      expect(serialize).not.toHaveBeenCalled();
+      expect(renew).toHaveBeenCalledTimes(2);
+      const active: SandboxHeartbeatPayload = {
+        ...sharedIdle,
+        state: 'active',
+        sessions: [
+          ...statusHeartbeat.sessions,
+          { kiloSessionId: 'kilo_sibling', state: 'active', idleForMs: 0 },
+        ],
+      };
+      await receiveHeartbeat(instance, state, active);
+      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      let heartbeatTime = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => heartbeatTime++);
+      await receiveHeartbeat(instance, state, sharedIdle);
+      const nextDeadline = (await loadDeadlines(state.storage)).idleStop;
+      expect(nextDeadline).toBeGreaterThanOrEqual(initialDeadline ?? 0);
+      const rearmedObservation = sandboxControlSocketAttachmentSchema.parse(
+        socket.deserializeAttachment()
+      ).observation;
+      expect(rearmedObservation?.receivedAt).toBeLessThan(
+        (nextDeadline ?? 0) - DEADLINE_MS.idleStop
+      );
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      expect(renew).toHaveBeenCalledTimes(4);
+      await receiveHeartbeat(instance, state, sharedIdle);
+      expect((await loadDeadlines(state.storage)).idleStop).toBe(nextDeadline);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        estimatedSleepAt: nextDeadline,
+      });
+      expect(renew).toHaveBeenCalledTimes(5);
+      expect(renew).toHaveBeenLastCalledWith(
+        cloudflareRef(id),
+        DEADLINE_MS.idleStop + DEADLINE_MS.idleStopLeaseMargin
+      );
+      const attachment = sandboxControlSocketAttachmentSchema.parse(socket.deserializeAttachment());
+      const expiredAt = Date.now() - DEADLINE_MS.heartbeatExpiry;
+      socket.serializeAttachment({
+        ...attachment,
+        acceptedAt: expiredAt - 1,
+        observation: { ...attachment.observation, receivedAt: expiredAt },
+      });
+      await state.storage.put('deadlines', {
+        heartbeatExpiry: Date.now() + DEADLINE_MS.heartbeatExpiry,
+        idleStop: Date.now() + DEADLINE_MS.idleStop,
+      });
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'unreachable',
+        estimatedSleepAt: null,
+      });
+    });
+    ws.close();
+  });
+
+  it('suppresses an idle estimate after a busy event without changing operational scheduling', async () => {
+    const id = 'usr-b05a1d1e1';
+    const stub = await seedStatusControl(id);
+    const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:workspace_status`);
+    await runInDurableObject(session, async instance => {
+      await instance.registerSession({
+        identity: { sessionId: 'workspace_status', userId: statusOwner },
+        auth: { kiloSessionId: 'kilo_status' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: {
+          sandboxId: id,
+          sandboxProvider: 'cloudflare',
+          workspacePath: '/workspace/status',
+        },
+      });
+    });
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-busy');
+    const runtime = await stub.getStatus();
+    await runInDurableObject(session, (_instance, state) => {
+      state.storage.kv.put('session_messages', [
+        {
+          messageId: 'msg_status_busy',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+          wrapperInstanceId: runtime.wrapperInstanceId,
+        } satisfies SessionMessageRecord,
+      ]);
+    });
+    try {
+      await runInDurableObject(stub, async (instance, state) => {
+        await receiveHeartbeat(instance, state);
+        const deadline = (await loadDeadlines(state.storage)).idleStop;
+        expect(deadline).toEqual(expect.any(Number));
+        expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: deadline,
+        });
+        const fresh = await reconstructControl(instance, state);
+        await fresh.getStatus();
+        const renew = vi.fn(async () => undefined);
+        fresh['provider'].ensureLeaseAtLeast = renew;
+        const socket = statusSocket(state);
+        const before = sandboxControlSocketAttachmentSchema.parse(socket.deserializeAttachment());
+        const records = await state.storage.list();
+        const alarm = await state.storage.getAlarm();
+        const send = vi.spyOn(socket, 'send');
+        await fresh.webSocketMessage(
+          socket,
+          JSON.stringify({
+            type: 'event',
+            event: 'session.event',
+            session: { directory: '/workspace/status', kiloSessionId: 'kilo_status' },
+            payload: {
+              type: 'session.status',
+              properties: { sessionID: 'kilo_status', status: { type: 'busy' } },
+            },
+          })
+        );
+        await Promise.all(fresh['sessionForwardChains'].values());
+        expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: null,
+        });
+        expect(socket.deserializeAttachment()).toEqual({
+          ...before,
+          observation: { ...before.observation, idle: null },
+        });
+        const reconstructed = await reconstructControl(fresh, state);
+        forbidControlOperations(reconstructed);
+        const serialize = vi.spyOn(socket, 'serializeAttachment');
+        expect(await reconstructed.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: null,
+        });
+        expect(await state.storage.list()).toEqual(records);
+        expect(await state.storage.getAlarm()).toBe(alarm);
+        expect(renew).not.toHaveBeenCalled();
+        expect(send).not.toHaveBeenCalled();
+        expect(serialize).not.toHaveBeenCalled();
+        await receiveHeartbeat(fresh, state);
+        expect((await loadDeadlines(state.storage)).idleStop).toBe(deadline);
+        expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: deadline,
+        });
+        expect(renew).toHaveBeenCalledTimes(1);
+      });
+      await runInDurableObject(session, async (_instance, state) => {
+        const events = createEventQueries(
+          drizzle(state.storage, { logger: false }),
+          state.storage.sql
+        ).findByFilters({ eventTypes: ['kilocode'] });
+        expect(events.map(event => JSON.parse(event.payload))).toContainEqual({
+          type: 'session.status',
+          event: 'session.status',
+          properties: { sessionID: 'kilo_status', status: { type: 'busy' } },
+        });
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it.each([
+    { owner: undefined, provider: 'cloudflare' },
+    { owner: 'other-owner', provider: 'cloudflare' },
+    { owner: statusOwner, provider: undefined },
+    { owner: statusOwner, provider: 'vercel' },
+    { owner: statusOwner, provider: 'private-provider' },
+  ])(
+    'does not use missing or disagreeing owner/provider records: %j',
+    async ({ owner, provider }) => {
+      const stub = env.SANDBOX_CONTROL.getByName(`sbx_status_mismatch_${owner}_${provider}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        if (owner !== undefined) await state.storage.put('owner_id', owner);
+        if (provider !== undefined) await state.storage.put('provider_kind', provider);
+        await state.storage.put('physical_record', {
+          state: 'stopped',
+          providerRef: null,
+          createIntent: null,
+          stopTombstone: null,
+          resumable: false,
+        });
+        const before = await state.storage.list();
+        expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'unknown',
+          provider: 'Unknown',
+          estimatedSleepAt: null,
+        });
+        expect(await state.storage.list()).toEqual(before);
+      });
+    }
+  );
+});
+
+describe('SandboxSession passive delegation', () => {
+  it.each(['fence', 'worktree-marker'] as const)(
+    'does not expose or repair retained deleted metadata through %s',
+    async mode => {
+      const sessionId = `workspace_status_deleted_${mode}`;
+      const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          identity: { sessionId, userId: statusOwner },
+          auth: { kiloSessionId: 'kilo_status' },
+          agent: { mode: 'code', model: 'test' },
+          workspace: { sandboxId: 'usr-abcdef123', sandboxProvider: 'cloudflare' },
+        });
+        if (mode === 'fence')
+          state.storage.kv.put(SANDBOX_SESSION_LIFECYCLE_KEY, { state: 'deleted', epoch: 1 });
+        else state.storage.kv.put('deleted_worktree', WORKTREE_ID);
+        const before = await state.storage.list();
+        const callbacks: Promise<unknown>[] = [];
+        const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+          const promise = callback();
+          callbacks.push(promise);
+          return promise;
+        });
+        const fresh = new SandboxSession(state, instance['env']);
+        await Promise.all(callbacks);
+        block.mockRestore();
+        const lookup = vi.spyOn(instance['env'].SANDBOX_CONTROL, 'getByName');
+        expect(await fresh.getMetadata()).toBeNull();
+        expect(await fresh.getSandboxStatus()).toMatchObject({
+          status: 'unknown',
+          estimatedSleepAt: null,
+        });
+        expect(lookup).not.toHaveBeenCalled();
+        expect(await state.storage.list()).toEqual(before);
+      });
+    }
+  );
+
+  it('uses stored assignment and owner without metadata recovery or control initialization', async () => {
+    const id = 'usr-abcdef123';
+    const control = await seedStatusControl(id);
+    await runInDurableObject(control, async (instance, state) => {
+      await instance.beginStop('test');
+      await instance.confirmStopped();
+      await state.storage.deleteAlarm();
+      forbidControlOperations(instance);
+    });
+    const sessionId = 'workspace_status_delegation';
+    const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+    await runInDurableObject(session, async (instance, state) => {
+      await instance.registerSession({
+        identity: { sessionId, userId: statusOwner },
+        auth: { kiloSessionId: 'kilo_status' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: { sandboxId: id, sandboxProvider: 'cloudflare' },
+      });
+      await state.storage.put('session_messages', [{ messageId: 'msg_status', state: 'queued' }]);
+      await state.storage.setAlarm(Date.now() + 86_400_000);
+      const before = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const callbacks: Promise<unknown>[] = [];
+      const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+        const promise = callback();
+        callbacks.push(promise);
+        return promise;
+      });
+      const fresh = new SandboxSession(state, instance['env']);
+      await Promise.all(callbacks);
+      block.mockRestore();
+      fresh.getMetadata = () => {
+        throw new Error('Passive delegation called operational metadata');
+      };
+      fresh['dispatchQueued'] = () => {
+        throw new Error('Passive delegation dispatched');
+      };
+      for (let read = 0; read < 3; read++) {
+        expect(await fresh.getSandboxStatus()).toMatchObject({
+          status: 'sleeping',
+          provider: 'Cloudflare',
+          inactivityTimeoutMs: DEADLINE_MS.idleStop,
+          estimatedSleepAt: null,
+        });
+      }
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+    });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it('sanitizes and bounds failed passive delegation before retry logging', async () => {
+    const sessionId = 'workspace_status_retry';
+    const stub = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession({
+        identity: { sessionId, userId: statusOwner },
+        auth: {},
+        agent: { mode: 'code', model: 'test' },
+        workspace: { sandboxId: 'usr-abcde987', sandboxProvider: 'cloudflare' },
+      });
+      const control = instance['env'].SANDBOX_CONTROL.getByName('usr-abcde987');
+      const failure = vi
+        .spyOn(control, 'getSandboxStatus')
+        .mockRejectedValue(
+          Object.assign(new Error('private-runtime-error-sentinel'), { retryable: true })
+        );
+      const getStub = vi
+        .spyOn(instance['env'].SANDBOX_CONTROL, 'getByName')
+        .mockReturnValue(control);
+      const before = await state.storage.list();
+      const result = await instance.getSandboxStatus();
+      expect(result).toMatchObject({
+        status: 'unknown',
+        detailCode: 'status_unavailable',
+        estimatedSleepAt: null,
+      });
+      expect(getStub).toHaveBeenCalledTimes(3);
+      expect(failure).toHaveBeenCalledTimes(3);
+      expect(JSON.stringify(result)).not.toContain('private-runtime-error-sentinel');
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it.each(['empty', 'missing-assignment', 'invalid', 'wrong-session'] as const)(
+    'does not generate an assignment for %s metadata',
+    async mode => {
+      const sessionId = `workspace_status_${mode}`;
+      const stub = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        if (mode === 'invalid') await state.storage.put('session_metadata', { invalid: true });
+        if (mode === 'missing-assignment' || mode === 'wrong-session') {
+          await instance.registerSession({
+            identity: {
+              sessionId: mode === 'wrong-session' ? 'workspace_other' : sessionId,
+              userId: statusOwner,
+            },
+            auth: {},
+            agent: { mode: 'code', model: 'test' },
+            ...(mode === 'wrong-session' ? { workspace: { sandboxId: 'usr-abcdef123' } } : {}),
+          });
+        }
+        const before = await state.storage.list();
+        const getStub = vi.spyOn(instance['env'].SANDBOX_CONTROL, 'getByName');
+        expect(await instance.getSandboxStatus()).toMatchObject({
+          status: 'unknown',
+          estimatedSleepAt: null,
+        });
+        expect(getStub).not.toHaveBeenCalled();
+        expect(await state.storage.list()).toEqual(before);
+        expect(await state.storage.getAlarm()).toBeNull();
+      });
+    }
+  );
 });
 
 describe('SandboxSession control-plane regressions', () => {

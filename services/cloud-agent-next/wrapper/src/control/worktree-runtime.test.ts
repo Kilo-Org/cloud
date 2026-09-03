@@ -14,7 +14,11 @@ import {
   type SessionEventIdentity,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol';
-import { handleControlRequest, type HandlerDeps } from './sandbox-control-handlers';
+import {
+  buildHeartbeatPayload,
+  handleControlRequest,
+  type HandlerDeps,
+} from './sandbox-control-handlers';
 import type { WrapperKiloClient } from '../kilo-api';
 import {
   ControlTerminalRuntimeError,
@@ -88,7 +92,13 @@ async function rejected(operation: Promise<unknown>): Promise<unknown> {
   throw new Error('Expected runtime operation to fail');
 }
 
-function createKiloStub() {
+function asFetch(
+  fn: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>
+): typeof fetch {
+  return Object.assign(fn, { preconnect: fetch.preconnect });
+}
+
+function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) {
   const requests: Array<{ pathname: string; directory: string | null; body?: unknown }> = [];
   const permissions: Awaited<ReturnType<WrapperKiloClient['getPermissions']>> = [];
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
@@ -127,6 +137,8 @@ function createKiloStub() {
           decodeURIComponent(request.headers.get('x-kilo-directory') ?? ''),
         ...(body ? { body } : {}),
       });
+      if (request.method === 'GET' && url.pathname === '/global/health')
+        return Response.json(health);
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
@@ -229,6 +241,9 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
   return {
     registry: {
       ...registry,
+      get kiloCliVersion() {
+        return registry.kiloCliVersion;
+      },
       async ensure(directory: string, kilo: WorktreeKiloAuth, env?: Record<string, string>) {
         const attachment = registry.attach(rootIdentity(directory), kilo, env);
         try {
@@ -280,6 +295,86 @@ afterEach(async () => {
   for (const registry of registries.splice(0)) registry.shutdown();
   await Promise.all(servers.splice(0).map(server => server.stop()));
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe('observed Kilo runtime version', () => {
+  it('ignores a delayed health response from a retired Kilo process', async () => {
+    const response = Promise.withResolvers<Response>();
+    const requested = Promise.withResolvers<void>();
+    const originalFetch = globalThis.fetch;
+    let delayHealth = true;
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch((request, init) => {
+        const url = request instanceof Request ? request.url : String(request);
+        if (delayHealth && new URL(url).pathname === '/global/health') {
+          delayHealth = false;
+          requested.resolve();
+          return response.promise;
+        }
+        return originalFetch(request, init);
+      })
+    );
+    const { registry } = createRegistry();
+    try {
+      const firstDirectory = path.join(tmpDir, 'first');
+      await registry.ensure(firstDirectory, auth);
+      await requested.promise;
+      registry.detach(rootIdentity(firstDirectory));
+      await registry.ensure(path.join(tmpDir, 'second'), { ...auth, scopeId: 'second' });
+      await waitUntil(() => registry.kiloCliVersion === '7.4.20');
+      response.resolve(Response.json({ healthy: true, version: '9.9.9' }));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(registry.kiloCliVersion).toBe('7.4.20');
+    } finally {
+      response.resolve(Response.json({}));
+      registry.shutdown();
+      fetchSpy.mockRestore();
+    }
+  });
+  it('reports health version in heartbeats without status-time probes and retains it after detach', async () => {
+    const { registry } = createRegistry();
+    const directory = path.join(tmpDir, 'runtime');
+    const deps = createHandlerDeps(registry);
+    expect(buildHeartbeatPayload(deps).kilo.version).toBeNull();
+    await registry.ensure(directory, auth);
+    await waitUntil(() => registry.kiloCliVersion === '7.4.20');
+    for (let i = 0; i < 3; i++) {
+      expect(buildHeartbeatPayload(deps).kilo.version).toBe('7.4.20');
+      await handleControlRequest('sandbox.status', undefined, {}, deps);
+    }
+    expect(
+      servers[0].requests.filter(request => request.pathname === '/global/health')
+    ).toHaveLength(1);
+    registry.detach(rootIdentity(directory));
+    expect(buildHeartbeatPayload(deps).kilo.version).toBe('7.4.20');
+  });
+
+  it.each([
+    { healthy: true, version: '7.5.0' },
+    { healthy: true, version: 'https://private.invalid/credential' },
+    { healthy: false, version: '7.4.20' },
+    {},
+  ])(
+    'does not report one version for inconsistent or unavailable health: %j',
+    async secondHealth => {
+      let count = 0;
+      const { registry } = createRegistry({
+        startServer: async () => {
+          const server = createKiloStub(
+            count++ === 0 ? { healthy: true, version: '7.4.20' } : secondHealth
+          );
+          servers.push(server);
+          return { url: server.url, close() {} };
+        },
+      });
+      await registry.ensure(path.join(tmpDir, 'one'), auth);
+      await waitUntil(() => registry.kiloCliVersion === '7.4.20');
+      await registry.ensure(path.join(tmpDir, 'two'), { ...auth, scopeId: 'worktree_two' });
+      await waitUntil(() => registry.kiloCliVersion === null);
+      expect(buildHeartbeatPayload(createHandlerDeps(registry)).kilo.version).toBeNull();
+      expect(registry.isHealthy()).toBe(true);
+    }
+  );
 });
 
 describe('worktree Kilo environments', () => {
@@ -442,6 +537,7 @@ describe('worktree Kilo runtime registry', () => {
       )
     );
     expect(servers[0]?.requests.map(request => request.pathname).sort()).toEqual([
+      '/global/health',
       '/session/root_one/prompt_async',
       '/session/root_two/prompt_async',
     ]);
@@ -497,7 +593,14 @@ describe('worktree Kilo runtime registry', () => {
         }),
         { headers: { 'Content-Type': 'text/event-stream' } }
       );
-      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(response);
+      const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        asFetch(async request => {
+          const url = request instanceof Request ? request.url : String(request);
+          return new URL(url).pathname === '/global/health'
+            ? Response.json({ healthy: true, version: '7.4.20' })
+            : response;
+        })
+      );
       const failures: unknown[] = [];
       const harness = createRegistry({ onUnexpectedClose: error => failures.push(error) });
       try {
@@ -521,7 +624,12 @@ describe('worktree Kilo runtime registry', () => {
         expect(runtime.signal.aborted).toBe(true);
         expect(harness.registry.isHealthy()).toBe(false);
         expect(harness.registry.get(runtime.directory)).toBeUndefined();
-        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(
+          fetchSpy.mock.calls.filter(
+            ([request]) =>
+              request instanceof Request && new URL(request.url).pathname === '/global/event'
+          )
+        ).toHaveLength(1);
       } finally {
         harness.registry.shutdown();
         fetchSpy.mockRestore();

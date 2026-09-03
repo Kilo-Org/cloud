@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Ilmoitukset",
+    "liveActivities": "Livetoiminnot",
+    "liveActivitySubtitle": "Näytä aktiiviset agentit lukitusnäytöllä",
+    "liveUpdates": "Reaaliaikaiset päivitykset",
+    "liveUpdateSubtitle": "Näytä aktiiviset agentit ilmoituksissa",
     "push": "Push",
     "enabled": "Ilmoitukset käytössä",
     "onDescription": "Push-ilmoitukset ovat päällä tälle laitteelle.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
     "catalogRetry": "Malleja ei voitu ladata",
     "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
+  },
+  "glanceable": {
+    "waiting": "Päivitetään agentteja",
+    "empty": "Ei keskeneräisiä töitä",
+    "stale": "Päivitys ei onnistu nyt",
+    "expired": "Tila vanhentunut",
+    "signedOut": "Kirjaudu sisään nähdäksesi agentit",
+    "privacy": "Avaa Kilo nähdäksesi agentit",
+    "openAgents": "Avaa agentit",
+    "running": "Työstetään",
+    "needsInput": "vaatii syötettä",
+    "idle": "Vapaalla",
+    "channelName": "Aktiiviset agentit",
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön Asetuksissa, niin näet aktiiviset agentit lukitulla näytöllä."
   }
 }

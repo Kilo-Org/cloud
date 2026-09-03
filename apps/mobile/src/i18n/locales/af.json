@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Kennisgewings",
+    "liveActivities": "Live-aktiwiteite",
+    "liveActivitySubtitle": "Wys aktiewe agente op die sluitskerm",
+    "liveUpdates": "Lewendige opdaterings",
+    "liveUpdateSubtitle": "Wys aktiewe agente in jou kennisgewings",
     "push": "Druk",
     "enabled": "Kennisgewings geaktiveer",
     "onDescription": "Drukkennisgewings is aan vir hierdie toestel.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
     "catalogRetry": "Kon nie modelle laai nie",
     "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
+  },
+  "glanceable": {
+    "waiting": "Dateer agente op",
+    "empty": "Geen werk aan die gang nie",
+    "stale": "Kan nie nou opdateer nie",
+    "expired": "Status het verval",
+    "signedOut": "Meld aan om agente te sien",
+    "privacy": "Open Kilo om agente te sien",
+    "openAgents": "Maak agente oop",
+    "running": "Werk",
+    "needsInput": "benodig invoer",
+    "idle": "Onaktief",
+    "channelName": "Aktiewe agente",
+    "activityKitDisabledBody": "Skakel Regstreekse Aktiwiteite in Instellings aan om Aktiewe Agente op die Sluitskerm te sien."
   }
 }

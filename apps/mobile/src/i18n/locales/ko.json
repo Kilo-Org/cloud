@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "알림",
+    "liveActivities": "실시간 활동",
+    "liveActivitySubtitle": "잠금 화면에 활성 에이전트 표시",
+    "liveUpdates": "실시간 업데이트",
+    "liveUpdateSubtitle": "알림에 활성 에이전트 표시",
     "push": "푸시",
     "enabled": "알림 활성화됨",
     "onDescription": "이 기기에서 푸시 알림이 켜져 있습니다.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "채팅 기록을 불러올 수 없습니다.",
     "catalogRetry": "모델을 불러올 수 없습니다",
     "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
+  },
+  "glanceable": {
+    "waiting": "에이전트 업데이트 중",
+    "empty": "진행 중인 작업 없음",
+    "stale": "지금 업데이트할 수 없습니다",
+    "expired": "상태 만료됨",
+    "signedOut": "에이전트를 보려면 로그인하세요",
+    "privacy": "에이전트를 보려면 Kilo를 여세요",
+    "openAgents": "에이전트 열기",
+    "running": "작업 중",
+    "needsInput": "입력 필요",
+    "idle": "유휴",
+    "channelName": "활성 에이전트",
+    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
   }
 }

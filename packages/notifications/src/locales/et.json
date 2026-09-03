@@ -7,7 +7,8 @@
       "instanceLifecycle": "Sinu eksemplaril on uuendus",
       "scheduledAction": "Planeeritud toimingul on uuendus",
       "lowBalance": "Sinu saldo vajab tähelepanu",
-      "securityFinding": "Turbetuvastus vajab tähelepanu"
+      "securityFinding": "Turbetuvastus vajab tähelepanu",
+      "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
   },
   "cloudAgentSession": {

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Misalin naka yana da sabuntawa",
       "scheduledAction": "Wani aiki da aka tsara yana da sabuntawa",
       "lowBalance": "Ma'auninka yana buƙatar kulawa",
-      "securityFinding": "Wani binciken tsaro yana buƙatar kulawa"
+      "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
+      "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
     }
   },
   "cloudAgentSession": {

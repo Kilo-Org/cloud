@@ -71,6 +71,7 @@ import {
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
 import { logger } from '../logger.js';
 import { sandboxControlRpc } from './control-rpc.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
 import { validateControlSessionOptions } from './attach-payload.js';
@@ -98,6 +99,11 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
+  SandboxStatusSnapshotSchema,
+  getSandboxProviderLabel,
+  type SandboxStatusSnapshot,
+} from '../shared/sandbox-status.js';
+import {
   ControlRequestError,
   controlDispatchDisposition,
   controlRequestResult,
@@ -114,6 +120,7 @@ import { createSandboxTerminalBridge, type SandboxTerminalRecord } from './termi
 import {
   createSandboxTerminalLifecycle,
   SANDBOX_SESSION_METADATA_KEY,
+  SANDBOX_SESSION_DELETED_WORKTREE_KEY,
 } from './terminal-lifecycle.js';
 import {
   acceptQueuedMessage,
@@ -138,7 +145,7 @@ import {
 
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
-const DELETED_WORKTREE_KEY = 'deleted_worktree';
+const DELETED_WORKTREE_KEY = SANDBOX_SESSION_DELETED_WORKTREE_KEY;
 const DELETION_COMPLETED_KEY = 'deletion_completed';
 
 type SandboxControlEventInput = {
@@ -222,9 +229,6 @@ export class SandboxSession extends DurableObject<Env> {
       this.deletedWorktreeId = cloudAgentWorktreeIdSchema
         .optional()
         .parse(ctx.storage.kv.get(DELETED_WORKTREE_KEY));
-      if (this.deletedWorktreeId) {
-        this.terminalLifecycle.beginDeletion(this.terminalLifecycle.getStoredMetadata());
-      }
     });
   }
 
@@ -545,6 +549,45 @@ export class SandboxSession extends DurableObject<Env> {
   async getCredentialMetadata(): Promise<SessionMetadata | null> {
     if (this.deletedWorktreeId) return null;
     return this.terminalLifecycle.isBlocked() ? null : this.terminalLifecycle.getStoredMetadata();
+  }
+
+  async getSandboxStatus(): Promise<SandboxStatusSnapshot> {
+    const metadata =
+      this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
+        ? null
+        : this.terminalLifecycle.getStoredMetadata();
+    const provider = metadata ? getSandboxProvider(metadata) : undefined;
+    const unknown: SandboxStatusSnapshot = {
+      status: 'unknown',
+      provider: getSandboxProviderLabel(provider),
+      observedAt: Date.now(),
+      detailCode: 'insufficient_evidence',
+      inactivityTimeoutMs: DEADLINE_MS.idleStop,
+      estimatedSleepAt: null,
+    };
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !sandboxId || !provider || metadata.identity.sessionId !== this.sessionId) {
+      return unknown;
+    }
+    try {
+      return await withDORetry(
+        () => getSandboxControlStub(this.env, sandboxId),
+        async control => {
+          try {
+            return SandboxStatusSnapshotSchema.parse(
+              await control.getSandboxStatus({ ownerId: metadata.identity.userId, provider })
+            );
+          } catch (error) {
+            throw Object.assign(new Error('Sandbox status unavailable'), {
+              retryable: error instanceof Error && 'retryable' in error && error.retryable === true,
+            });
+          }
+        },
+        'getSandboxStatus'
+      );
+    } catch {
+      return { ...unknown, observedAt: Date.now(), detailCode: 'status_unavailable' };
+    }
   }
 
   async validateKiloGlobalFeedProducer(_params: {

@@ -628,6 +628,10 @@
   },
   "notifications": {
     "title": "Obvestila",
+    "liveActivities": "Aktivnosti v živo",
+    "liveActivitySubtitle": "Prikaži aktivne agente na zaklenjenem zaslonu",
+    "liveUpdates": "Posodobitve v živo",
+    "liveUpdateSubtitle": "Prikaži aktivne agente v obvestilih",
     "push": "Potisno",
     "enabled": "Obvestila omogočena",
     "onDescription": "Potisna obvestila so vklopljena za to napravo.",
@@ -3256,5 +3260,19 @@
     "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
     "catalogRetry": "Nalaganje modelov ni uspelo",
     "sendError": "Sporočila ni bilo mogoče poslati. Poskusite znova."
+  },
+  "glanceable": {
+    "waiting": "Posodabljanje agentov",
+    "empty": "Ni dela v teku",
+    "stale": "Trenutno ni mogoče posodobiti",
+    "expired": "Stanje je poteklo",
+    "signedOut": "Prijavite se za ogled agentov",
+    "privacy": "Odpri Kilo za ogled agentov",
+    "openAgents": "Odprite agente",
+    "running": "Delam",
+    "needsInput": "potrebuje vnos",
+    "idle": "Nedejavno",
+    "channelName": "Aktivni agenti",
+    "activityKitDisabledBody": "V Nastavitvah vklopite Dejavnosti v živo, da bodo Aktivni agenti prikazani na zaklenjenem zaslonu."
   }
 }

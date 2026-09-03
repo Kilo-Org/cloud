@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Ngā Pānui",
+    "liveActivities": "Ngā mahi ora",
+    "liveActivitySubtitle": "Whakaatu i ngā māngai kaha ki te Mata Raka",
+    "liveUpdates": "Whakahoutanga mataora",
+    "liveUpdateSubtitle": "Whakaatu i ngā pou mahi i roto i ō pānui",
     "push": "Pana",
     "enabled": "Kua whakahohea ngā pānui",
     "onDescription": "Kei te kā ngā pānui pana mō tēnei pūrere.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Kāore i taea te uta te hītori kōrero.",
     "catalogRetry": "Kāore i taea te uta i ngā tauira",
     "sendError": "I rahua te tuku karere. Whakamātau anō."
+  },
+  "glanceable": {
+    "waiting": "Kei te whakahou i ngā māngai",
+    "empty": "Kāore he mahi e haere ana",
+    "stale": "Kāore e taea te whakahou ināianei",
+    "expired": "Kua pau te mana o te tūnga",
+    "signedOut": "Takiuru kia kite i ngā māngai",
+    "privacy": "Whakatuwherahia Kilo kia kite i ngā māngai",
+    "openAgents": "Whakatuwheratia ngā māngai",
+    "running": "Kei te mahi",
+    "needsInput": "e hiahia ana ki te whakaurunga",
+    "idle": "Kore mahi",
+    "channelName": "Ngā māngai hohe",
+    "activityKitDisabledBody": "Whakakāngia ngā Mahi Mataora i Ngā tautuhinga kia kite i ngā Māngai Hohe i te Mata Maukati."
   }
 }

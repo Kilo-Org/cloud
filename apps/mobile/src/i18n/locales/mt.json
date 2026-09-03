@@ -635,6 +635,10 @@
   },
   "notifications": {
     "title": "Notifiki",
+    "liveActivities": "Attivitajiet diretti",
+    "liveActivitySubtitle": "Uri l-aġenti attivi fuq l-iskrin imsakkar",
+    "liveUpdates": "Aġġornamenti diretti",
+    "liveUpdateSubtitle": "Uri l-aġenti attivi fin-notifiki tiegħek",
     "push": "Push",
     "enabled": "Notifiki attivati",
     "onDescription": "In-notifiki push huma mixgħula għal dan l-apparat.",
@@ -3278,5 +3282,19 @@
     "historyRetry": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
     "catalogRetry": "Ma setgħux jittellgħu l-mudelli",
     "sendError": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
+  },
+  "glanceable": {
+    "waiting": "Qed jaġġorna l-aġenti",
+    "empty": "L-ebda xogħol għaddej",
+    "stale": "Ma jistax jaġġorna bħalissa",
+    "expired": "L-istatus skada",
+    "signedOut": "Idħol biex tara l-aġenti",
+    "privacy": "Iftaħ Kilo biex tara l-aġenti",
+    "openAgents": "Iftaħ l-aġenti",
+    "running": "Qed jaħdem",
+    "needsInput": "jeħtieġ input",
+    "idle": "Idle",
+    "channelName": "Aġenti attivi",
+    "activityKitDisabledBody": "Ixgħel l-Attivitajiet Diretti fis-Settings biex tara l-Aġenti Attivi fuq l-Iskrin Imsakkar."
   }
 }

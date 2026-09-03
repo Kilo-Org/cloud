@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Obaveštenja",
+    "liveActivities": "Aktivnosti uživo",
+    "liveActivitySubtitle": "Prikaži aktivne agente na zaključanom ekranu",
+    "liveUpdates": "Ažuriranja uživo",
+    "liveUpdateSubtitle": "Prikazuj aktivne agente u obaveštenjima",
     "push": "Push",
     "enabled": "Obaveštenja omogućena",
     "onDescription": "Push obaveštenja su uključena za ovaj uređaj.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "Nije moguće učitati istoriju ćaskanja.",
     "catalogRetry": "Nije moguće učitati modele",
     "sendError": "Slanje poruke nije uspelo. Pokušajte ponovo."
+  },
+  "glanceable": {
+    "waiting": "Ažuriranje agenata",
+    "empty": "Nema rada u toku",
+    "stale": "Ažuriranje trenutno nije moguće",
+    "expired": "Status je istekao",
+    "signedOut": "Prijavite se da biste videli agente",
+    "privacy": "Otvorite Kilo da vidite agente",
+    "openAgents": "Otvorite agente",
+    "running": "Radim…",
+    "needsInput": "zahteva unos",
+    "idle": "Neaktivan",
+    "channelName": "Aktivni agenti",
+    "activityKitDisabledBody": "Uključite Aktivnosti uživo u Podešavanjima da biste videli aktivne agente na zaključanom ekranu."
   }
 }

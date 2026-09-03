@@ -1,16 +1,50 @@
 import type { User } from '@kilocode/db/schema';
+import {
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  KILO_API_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
+  USER_DATA_EXPORT_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  buildModernKiloTokenPayload,
+  isKiloResourceAudienceAllowed,
+} from '@kilocode/worker-utils/kilo-token-policy';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { isKiloResourceAudienceAllowed } from '@kilocode/worker-utils/kilo-token-policy';
+import { isBoundedInternalServiceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export const JWT_TOKEN_VERSION = 3;
 
 const jwtSigningAlgorithm = 'HS256';
+
+export const BOUNDED_INTERNAL_SERVICE_AUDIENCES = [
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+  USER_DATA_EXPORT_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
+  SESSION_INGEST_AUDIENCE,
+] as const;
+
+export type BoundedInternalServiceAudience = (typeof BOUNDED_INTERNAL_SERVICE_AUDIENCES)[number];
+
+const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
+  BOUNDED_INTERNAL_SERVICE_AUDIENCES
+);
 
 export type JWTTokenExtraPayload = {
   deviceAuthRequestCode?: string;
@@ -60,6 +94,49 @@ export function generateInternalServiceToken(
       ...(options?.audience ? { audience: options.audience } : {}),
     }
   );
+}
+
+export function generateBoundedInternalServiceToken(
+  userId: string,
+  options: {
+    audience: BoundedInternalServiceAudience;
+    expiresIn: number;
+    organizationId?: string;
+  }
+): string {
+  if (!boundedInternalServiceAudienceSet.has(options.audience)) {
+    throw new Error('Unsupported bounded internal service token audience');
+  }
+  const maximumLifetime =
+    options.audience === SESSION_INGEST_AUDIENCE ? ONE_HOUR_IN_SECONDS : FIVE_MINUTES_IN_SECONDS;
+  if (options.expiresIn > maximumLifetime) {
+    throw new Error('Bounded internal service token lifetime exceeds its audience limit');
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId,
+    audience: options.audience,
+    issuedAt,
+    expiresAt: issuedAt + options.expiresIn,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: options.organizationId ? { organizationId: options.organizationId } : undefined,
+  });
+
+  if (isBoundedInternalServiceTokenIssuanceEnabled()) {
+    return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+  }
+
+  return generateInternalServiceToken(userId, {
+    expiresIn: options.expiresIn,
+    audience:
+      options.audience === SESSION_INGEST_AUDIENCE ||
+      options.audience === GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE
+        ? undefined
+        : options.audience,
+    organizationId: options.organizationId,
+  });
 }
 
 export function generateApiToken(

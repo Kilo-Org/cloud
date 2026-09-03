@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Értesítések",
+    "liveActivities": "Élő tevékenységek",
+    "liveActivitySubtitle": "Aktív ügynökök megjelenítése a zárolási képernyőn",
+    "liveUpdates": "Élő frissítések",
+    "liveUpdateSubtitle": "Aktív ügynökök megjelenítése az értesítésekben",
     "push": "Leküldés",
     "enabled": "Értesítések engedélyezve",
     "onDescription": "A leküldéses értesítések be vannak kapcsolva ehhez az eszközhöz.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
     "catalogRetry": "Nem sikerült betölteni a modelleket",
     "sendError": "Az üzenet küldése nem sikerült. Próbálja újra."
+  },
+  "glanceable": {
+    "waiting": "Ügynökök frissítése",
+    "empty": "Nincs folyamatban lévő munka",
+    "stale": "Most nem frissíthető",
+    "expired": "Az állapot lejárt",
+    "signedOut": "Jelentkezzen be az ügynökök megtekintéséhez",
+    "privacy": "Nyisd meg a Kilót az ügynökök megtekintéséhez",
+    "openAgents": "Ügynökök megnyitása",
+    "running": "Feldolgozás",
+    "needsInput": "bemenetet igényel",
+    "idle": "Tétlen",
+    "channelName": "Aktív ügynökök",
+    "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   }
 }

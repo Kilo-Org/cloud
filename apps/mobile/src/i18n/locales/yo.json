@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Awọn ifitonileti",
+    "liveActivities": "Awọn iṣẹ laaye",
+    "liveActivitySubtitle": "Fi awọn aṣoju to n ṣiṣẹ han lori Iboju Titiipa",
+    "liveUpdates": "Awọn imudojuiwọn taara",
+    "liveUpdateSubtitle": "Fi awọn aṣoju to n ṣiṣẹ han ninu awọn iwifunni rẹ",
     "push": "Titari",
     "enabled": "Awọn ifitonileti mu ṣiṣẹ",
     "onDescription": "Awọn ifitonileti titari wa ni lori ẹ̀rọ yii.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Kò lè ṣagbewọ ìtàn iwiregbe.",
     "catalogRetry": "Kò lè gbé àwọn àwoṣe",
     "sendError": "Kò lè ran ifiranṣẹ náà. Jọ̀wọ́ tún gbìyànjú."
+  },
+  "glanceable": {
+    "waiting": "Ti n ṣe imudojuiwọn awọn aṣoju",
+    "empty": "Ko si iṣẹ ti n lọ lọwọ",
+    "stale": "Ko le ṣe imudojuiwọn bayi",
+    "expired": "Ipo ti pari akoko",
+    "signedOut": "Wọle lati ri awọn aṣoju",
+    "privacy": "Ṣi Kilo lati ri awọn aṣoju",
+    "openAgents": "Ṣii awọn aṣoju",
+    "running": "Nṣiṣẹ́",
+    "needsInput": "nilo igbewọle",
+    "idle": "Ìsinmi",
+    "channelName": "Awọn aṣoju to n ṣiṣẹ",
+    "activityKitDisabledBody": "Tan Awọn Iṣẹ Lọwọlọwọ ninu Eto lati ri Awọn aṣoju to n ṣiṣẹ lori Iboju Titiipa."
   }
 }

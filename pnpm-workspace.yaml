@@ -82,7 +82,7 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.4.6
-  next: 16.2.11
+  next: 16.3.3
   preact: 10.28.4
   glob: '>=13.0.1'
   esbuild: '>=0.28.1'
@@ -138,6 +138,9 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
+  # Direct `@expo/ui@57.0.12` (expo-widgets peer) and expo-router's `^57.0.9`
+  # otherwise resolve to two native-module copies. Force one version.
+  '@expo/ui': 57.0.12
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -157,6 +160,7 @@ packageExtensions:
 patchedDependencies:
   expo-router@57.0.15: patches/expo-router@57.0.15.patch
   expo-server-sdk: patches/expo-server-sdk.patch
+  expo-widgets@57.0.11: patches/expo-widgets@57.0.11.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'

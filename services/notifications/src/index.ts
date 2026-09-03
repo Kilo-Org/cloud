@@ -18,6 +18,8 @@ import {
   badgeBucketForConversation,
   internalDispatchRequestSchema,
   markBadgeReadInputSchema,
+  refreshGlanceableSessionsInputSchema,
+  type RefreshGlanceableSessionsParams,
   type ClearBadgeBucketForUserInput,
   type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
@@ -329,6 +331,43 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult> {
     return dispatchCloudAgentSessionPush(params, this.cloudAgentSessionPushDeps());
+  }
+
+  /** Refresh each affected scope without notification preferences or viewer-presence gates. */
+  async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
+    const { userId, cliSessionIds } = refreshGlanceableSessionsInputSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    // Read ownership too: an absent row is personal, but a foreign row is not authorized.
+    const rows = await db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        userId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
+      })
+      .from(cli_sessions_v2)
+      .where(inArray(cli_sessions_v2.session_id, cliSessionIds));
+    const byId = new Map(rows.map(row => [row.sessionId, row]));
+    const scopes = new Set<string | null>();
+    for (const sessionId of cliSessionIds) {
+      const row = byId.get(sessionId);
+      if (!row) scopes.add(null);
+      else if (row.userId === userId) scopes.add(row.organizationId);
+    }
+
+    // Every entrypoint uses the same user DO. The snapshot route still rechecks membership.
+    const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
+      this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
+    );
+    const results = await Promise.allSettled(
+      [...scopes].map(organizationId => stub.refreshGlanceableSnapshot({ userId, organizationId }))
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.warn('Glanceable aggregate delivery failed', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
   }
 
   /**

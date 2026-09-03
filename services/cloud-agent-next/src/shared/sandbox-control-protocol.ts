@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
 
 export const SANDBOX_CONTROL_PROTOCOL_VERSION = 1;
 
@@ -143,6 +144,7 @@ export const sandboxHelloPayloadSchema = z.object({
 export const sandboxHelloResultSchema = z.object({
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION),
   handshakeComplete: z.literal(true),
+  capabilities: z.object({ kiloVersionHeartbeat: z.boolean().optional() }).optional(),
 });
 
 export type SandboxHelloPayload = z.infer<typeof sandboxHelloPayloadSchema>;
@@ -163,6 +165,7 @@ export const sandboxHeartbeatPayloadSchema = z
     kilo: z
       .object({
         ready: z.boolean(),
+        version: SandboxRuntimeVersionSchema.nullable().optional().catch(undefined),
         reason: z
           .enum([
             'feed_stale',
@@ -576,6 +579,24 @@ export type SessionTerminalConnectResult = z.infer<typeof sessionTerminalConnect
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 export type SessionPreparingPayload = z.infer<typeof sessionPreparingPayloadSchema>;
 
+const observationTimestampSchema = z.number().int().nonnegative().max(8_640_000_000_000_000);
+
+export const sandboxControlObservationSchema = z
+  .object({
+    ready: z.boolean(),
+    receivedAt: observationTimestampSchema,
+    idle: z
+      .object({
+        sessionCount: z.number().int().nonnegative(),
+        sessionIdsHash: z.string().regex(/^[0-9a-f]{64}$/),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export type SandboxControlObservation = z.infer<typeof sandboxControlObservationSchema>;
+
 export const sandboxControlSocketAttachmentSchema = z.object({
   handshakeComplete: z.boolean(),
   acceptedAt: z.number().int().nonnegative(),
@@ -583,6 +604,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
+  observation: sandboxControlObservationSchema.optional(),
 });
 
 export type SandboxControlSocketAttachment = z.infer<typeof sandboxControlSocketAttachmentSchema>;

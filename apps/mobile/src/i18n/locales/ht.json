@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Notifikasyon",
+    "liveActivities": "Aktivite an dirèk",
+    "liveActivitySubtitle": "Montre ajans aktif yo sou ekran vewouye a",
+    "liveUpdates": "Mizajou an dirèk",
+    "liveUpdateSubtitle": "Montre ajan aktif yo nan notifikasyon ou yo",
     "push": "Pouse",
     "enabled": "Notifikasyon aktive",
     "onDescription": "Notifikasyon pouse louvri pou aparèy sa a.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Pa t ka chaje istwa chat la.",
     "catalogRetry": "Pa t ka chaje modèl yo",
     "sendError": "Pa t ka voye mesaj la. Tanpri eseye ankò."
+  },
+  "glanceable": {
+    "waiting": "Ap mete ajans yo ajou",
+    "empty": "Pa gen travay k ap fèt",
+    "stale": "Pa ka mete ajou kounye a",
+    "expired": "Estati a ekspire",
+    "signedOut": "Konekte pou wè ajans yo",
+    "privacy": "Ouvri Kilo pou wè ajans",
+    "openAgents": "Louvri ajans yo",
+    "running": "Ap travay",
+    "needsInput": "bezwen input",
+    "idle": "Anchaj",
+    "channelName": "Ajans aktif yo",
+    "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."
   }
 }

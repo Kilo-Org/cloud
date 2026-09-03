@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import {
+  clearSecretCacheForTest,
+  signKiloToken,
+  signModernKiloToken,
+} from '@kilocode/worker-utils';
 import {
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
@@ -131,6 +135,18 @@ async function signInternalToken(): Promise<string> {
     .setIssuedAt(now)
     .setExpirationTime(now + 3600)
     .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+}
+
+async function signModernInternalToken(audience: string): Promise<string> {
+  const { token } = await signModernKiloToken({
+    userId: 'usr_123',
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: audience === SESSION_INGEST_USER_DELETION_AUDIENCE ? 300 : 3600,
+    audience,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+  });
+  return token;
 }
 
 async function signClaims(
@@ -451,6 +467,29 @@ describe('kiloJwtAuthMiddleware', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user_id: 'usr_123', deletionAudience: true });
+  });
+
+  it('accepts modern internal-service assertions only for their allowed account state and route', async () => {
+    const generic = await signModernInternalToken(SESSION_INGEST_AUDIENCE);
+    const deletion = await signModernInternalToken(SESSION_INGEST_USER_DELETION_AUDIENCE);
+
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const genericResponse = await request(generic, {
+      path: '/api/session/ses_abc',
+      method: 'DELETE',
+    }).response;
+    expect(genericResponse.status).toBe(200);
+    expect(await genericResponse.json()).toEqual({ user_id: 'usr_123', deletionAudience: false });
+
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+    expect((await request(generic).response).status).toBe(401);
+
+    const deletionResponse = await request(deletion, {
+      path: '/api/session/ses_abc',
+      method: 'DELETE',
+    }).response;
+    expect(deletionResponse.status).toBe(200);
+    expect(await deletionResponse.json()).toEqual({ user_id: 'usr_123', deletionAudience: true });
   });
 
   it('rejects a token bound to a different audience', async () => {

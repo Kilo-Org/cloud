@@ -19,11 +19,13 @@ import type {
 import { DEADLINE_MS } from './deadlines.js';
 import { loadDeadlines, loadRouteTable, loadSessionCredentialGrants } from './durable-state.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
+import type * as SocketModule from './socket.js';
 import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
+import { summarizeHeartbeatIdle } from './status-projection.js';
 
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
@@ -59,7 +61,10 @@ vi.mock('./cloudflare-provider.js', async importOriginal => {
     },
   };
 });
-vi.mock('./socket.js', () => ({ createSandboxControlSocketHandler: mocks.socket }));
+vi.mock('./socket.js', async importOriginal => ({
+  ...(await importOriginal<typeof SocketModule>()),
+  createSandboxControlSocketHandler: mocks.socket,
+}));
 vi.mock('../sandbox-session/session-stub.js', () => ({ getSandboxSessionStub: mocks.session }));
 
 const SANDBOX_ID = 'ses-abcdef';
@@ -321,6 +326,7 @@ async function harness(
     },
     storage,
     records,
+    ctx,
     env,
     namespace,
     namespaces,
@@ -353,7 +359,7 @@ async function harness(
         billing: BILLING,
       });
     },
-    async ready() {
+    async ready(runtime?: { wrapperVersion: string | null }) {
       const physical = await control.getPhysicalRecord();
       if (!physical.providerRef) throw new Error('No physical allocation');
       connection = {
@@ -362,7 +368,7 @@ async function harness(
         providerInstanceId: physical.providerRef,
       };
       const identity = connection;
-      await hooks.onHandshakeComplete?.(identity);
+      await hooks.onHandshakeComplete?.(identity, runtime);
       await hooks.onReady?.(identity);
       await control.attachSession(ROUTE);
       return identity;
@@ -374,9 +380,10 @@ async function harness(
       await control.alarm();
       await flush();
     },
-    async evict() {
+    async evict(passive = false) {
       control = new SandboxControl(ctx, env);
       await Promise.all(initializing);
+      if (!passive) await control.getStatus();
     },
   };
 }
@@ -401,6 +408,264 @@ afterEach(() => {
 });
 
 describe('SandboxControl lifecycle boundaries', () => {
+  it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {
+    const h = await harness();
+    const status = () => h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' });
+    await h.create();
+    const empty = {
+      sandboxType: 'isolated-small',
+      wrapperVersion: null,
+      kiloCliVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    };
+    expect((await status()).runtime).toEqual(empty);
+    const identity = await h.ready({ wrapperVersion: '2.4.0' });
+    expect((await status()).runtime).toEqual({ ...empty, wrapperVersion: '2.4.0' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '7.4.20' } },
+      identity
+    );
+    const runtime = { ...empty, wrapperVersion: '2.4.0', kiloCliVersion: '7.4.20' };
+    expect((await status()).runtime).toEqual(runtime);
+    await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+    await h.evict();
+    expect((await status()).runtime).toEqual(runtime);
+    await h.control.beginStop('idle');
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '9.9.9' } },
+      identity
+    );
+    await h.control.confirmStopped();
+    await h.evict(true);
+    expect(await status()).toMatchObject({ status: 'sleeping', runtime });
+    await h.create();
+    expect((await status()).runtime).toEqual(empty);
+    const replacement = await h.ready({ wrapperVersion: '2.5.0' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '7.5.0' } },
+      replacement
+    );
+    await h.hooks.onHandshakeComplete?.(identity, { wrapperVersion: '9.9.9' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '9.9.9' } },
+      identity
+    );
+    expect((await status()).runtime).toEqual({
+      ...empty,
+      wrapperVersion: '2.5.0',
+      kiloCliVersion: '7.5.0',
+    });
+    await h.control.eraseRecord();
+    expect(h.records.has('runtime_metadata')).toBe(false);
+  });
+
+  it('fences a delayed hello against allocation replacement inside its transaction', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready({ wrapperVersion: '2.4.0' });
+    const gate = deferred<void>();
+    const entered = deferred<void>();
+    const replacement = {
+      sandboxType: 'isolated-small',
+      wrapperVersion: null,
+      kiloCliVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    };
+    const blocked = h.storage.transaction(async () => {
+      entered.resolve();
+      await gate.promise;
+      h.records.set('physical_record', {
+        state: 'creating',
+        providerRef: null,
+        createIntent: { intentId: 'replacement', createdAt: Date.now() },
+        stopTombstone: null,
+        resumable: false,
+      });
+      h.records.set('runtime_metadata', replacement);
+    });
+    await entered.promise;
+    const hello = h.hooks.onHandshakeComplete?.(identity, { wrapperVersion: '9.9.9' });
+    await Promise.resolve();
+    gate.resolve();
+    await blocked;
+    await hello;
+    expect(h.records.get('runtime_metadata')).toEqual(replacement);
+  });
+
+  it('omits runtime metadata on owner or provider mismatch without any operational effects', async () => {
+    const h = await harness();
+    await h.create();
+    await h.ready({ wrapperVersion: '2.4.0' });
+    await h.evict(true);
+    const writes = [
+      vi.spyOn(h.storage, 'put'),
+      vi.spyOn(h.storage, 'delete'),
+      vi.spyOn(h.storage, 'setAlarm'),
+      vi.spyOn(h.storage, 'deleteAlarm'),
+    ];
+    const before = structuredClone([...h.records]);
+    for (const input of [
+      { ownerId: 'other-owner', provider: 'cloudflare' },
+      { ownerId: OWNER, provider: 'vercel' },
+    ] as const) {
+      expect(await h.control.getSandboxStatus(input)).not.toHaveProperty('runtime');
+    }
+    expect([...h.records]).toEqual(before);
+    for (const write of writes) expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'stopped', 'creating', 'stopping'] as const)(
+    'keeps cold passive %s reads independent of lifecycle repair and credentials',
+    async state => {
+      const h = await harness();
+      h.records.clear();
+      h.records.set('owner_id', OWNER);
+      h.records.set('provider_kind', 'cloudflare');
+      h.records.set('worktree_credential_grants', [{ untouched: true }]);
+      const runtime = {
+        sandboxType: 'isolated-small',
+        wrapperVersion: '2.4.0',
+        kiloCliVersion: '7.4.20',
+        startedAt: null,
+        stoppedAt: null,
+      };
+      h.records.set('runtime_metadata', runtime);
+      if (state !== 'missing') {
+        h.records.set('physical_record', {
+          state,
+          providerRef: state === 'stopped' ? null : 'instance_pending',
+          resumable: false,
+          createIntent:
+            state === 'creating' ? { intentId: 'pending', createdAt: Date.now() - 10_000 } : null,
+          stopTombstone:
+            state === 'stopping'
+              ? { reason: 'retired', attempts: 5, createdAt: Date.now() - 10_000 }
+              : null,
+        });
+      }
+      await h.storage.setAlarm(Date.now() + 12_345);
+      const before = structuredClone([...h.records]);
+      const alarm = h.alarmAt;
+      const writes = [
+        vi.spyOn(h.storage, 'put'),
+        vi.spyOn(h.storage, 'delete'),
+        vi.spyOn(h.storage, 'setAlarm'),
+        vi.spyOn(h.storage, 'deleteAlarm'),
+      ];
+      const close = vi.fn();
+      h.socket.closeAll = close;
+      await h.evict(true);
+      for (let i = 0; i < 3; i++) {
+        expect(
+          await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+        ).toMatchObject({
+          status: {
+            missing: 'unknown',
+            stopped: 'sleeping',
+            creating: 'starting',
+            stopping: 'stopping',
+          }[state],
+          estimatedSleepAt: null,
+          ...(state === 'missing' ? {} : { runtime }),
+        });
+      }
+      expect([...h.records]).toEqual(before);
+      expect(h.alarmAt).toBe(alarm);
+      for (const write of writes) expect(write).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(h.allocations.size).toBe(0);
+    }
+  );
+
+  it('reads two shared-directory roots after reconstruction without initializing operational state', async () => {
+    const h = await harness();
+    const now = Date.now();
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId: crypto.randomUUID(),
+      providerInstanceId: 'instance_shared',
+    };
+    const first = {
+      ...ROUTE,
+      worktreeId: 'worktree_shared',
+      lastState: 'idle',
+      lastStateAt: now,
+      idleForMs: 0,
+      waitingOn: null,
+    };
+    const sibling = { ...first, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
+    const idle = await summarizeHeartbeatIdle({
+      state: 'idle',
+      pendingMessages: 0,
+      kilo: { ready: true },
+      sessions: [first, sibling].map(route => ({
+        kiloSessionId: route.kiloSessionId,
+        state: 'idle',
+        idleForMs: 0,
+      })),
+    });
+    const attachment = {
+      ...identity,
+      handshakeComplete: true,
+      protocolVersion: 1,
+      acceptedAt: now - 1_000,
+      observation: { ready: true, receivedAt: now, idle },
+    };
+    const socket = {
+      readyState: 1,
+      deserializeAttachment: vi.fn(() => attachment),
+      serializeAttachment: vi.fn(),
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
+    h.records.set('provider_kind', 'cloudflare');
+    h.records.set('physical_record', {
+      state: 'running',
+      providerRef: identity.providerInstanceId,
+      createIntent: null,
+      stopTombstone: null,
+      resumable: false,
+    });
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      readyConnectionId: identity.connectionId,
+    });
+    h.records.set('session_routes', [first, sibling]);
+    h.records.set('deadlines', {
+      idleStop: now + DEADLINE_MS.idleStop,
+      heartbeatExpiry: now + DEADLINE_MS.heartbeatExpiry,
+    });
+    const before = structuredClone([...h.records]);
+    const alarm = h.alarmAt;
+    await h.evict(true);
+    for (let i = 0; i < 3; i++) {
+      expect(
+        await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+      ).toMatchObject({ status: 'active', estimatedSleepAt: now + DEADLINE_MS.idleStop });
+    }
+    expect([...h.records]).toEqual(before);
+    expect(h.alarmAt).toBe(alarm);
+    expect(socket.serializeAttachment).not.toHaveBeenCalled();
+    expect(socket.send).not.toHaveBeenCalled();
+    expect(socket.close).not.toHaveBeenCalled();
+    h.records.set('session_routes', [first, { ...sibling, waitingOn: 'input' }]);
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'active', estimatedSleepAt: null });
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      connectionId: crypto.randomUUID(),
+      readyConnectionId: identity.connectionId,
+    });
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'unknown', estimatedSleepAt: null });
+  });
+
   describe.each(['create', 'acquire'] as const)('%s credential policy', createPath => {
     it.each([false, undefined])(
       'launches and attaches using persisted containment %s',
@@ -1130,11 +1395,18 @@ describe('SandboxControl lifecycle boundaries', () => {
   it('repairs a missing create alarm using the original startup deadline', async () => {
     const h = await harness();
     const claimed = await h.control.claimCreate('intent_repair');
+    h.records.set('provider_kind', 'cloudflare');
     const deadline = (claimed.createIntent?.createdAt ?? 0) + DEADLINE_MS.startup;
     h.records.delete('deadlines');
     await h.storage.deleteAlarm();
     vi.setSystemTime(Date.now() + 30_000);
-    await h.evict();
+    await h.evict(true);
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'starting' });
+    expect(await loadDeadlines(h.storage)).toEqual({});
+    expect(h.alarmAt).toBeNull();
+    await h.control.getStatus();
     expect(await loadDeadlines(h.storage)).toEqual({ startup: deadline });
     expect(h.alarmAt).toBe(deadline);
     expect(h.allocations.size).toBe(0);

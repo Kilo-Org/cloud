@@ -635,6 +635,10 @@
   },
   "notifications": {
     "title": "Fógraí",
+    "liveActivities": "Gníomhaíochtaí beo",
+    "liveActivitySubtitle": "Taispeáin gníomhairí gníomhacha ar an scáileán glasáilte",
+    "liveUpdates": "Nuashonruithe beo",
+    "liveUpdateSubtitle": "Taispeáin gníomhairí gníomhacha i d'fhógraí",
     "push": "Brú",
     "enabled": "Fógraí cumasaithe",
     "onDescription": "Tá brú-fhógraí ar siúl don ghléas seo.",
@@ -3278,5 +3282,19 @@
     "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
     "catalogRetry": "Níorbh fhéidir múnlaí a lódáil",
     "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
+  },
+  "glanceable": {
+    "waiting": "Gníomhairí á nuashonrú",
+    "empty": "Níl aon obair ar siúl",
+    "stale": "Ní féidir nuashonrú anois",
+    "expired": "Stádas imithe in éag",
+    "signedOut": "Sínigh isteach chun gníomhairí a fheiceáil",
+    "privacy": "Oscail Kilo chun gníomhairí a fheiceáil",
+    "openAgents": "Oscail gníomhairí",
+    "running": "Ag obair",
+    "needsInput": "teastaíonn ionchur",
+    "idle": "Díomhaoin",
+    "channelName": "Gníomhairí gníomhacha",
+    "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
   }
 }

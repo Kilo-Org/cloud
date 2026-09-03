@@ -7,7 +7,8 @@
       "instanceLifecycle": "ನಿಮ್ಮ ಇನ್‌ಸ್ಟಾನ್ಸ್‌ಗೆ ನವೀಕರಣವಿದೆ",
       "scheduledAction": "ನಿಗದಿತ ಕ್ರಿಯೆಗೆ ನವೀಕರಣವಿದೆ",
       "lowBalance": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್‌ಗೆ ಗಮನ ಬೇಕು",
-      "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು"
+      "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು",
+      "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ"
     }
   },
   "cloudAgentSession": {

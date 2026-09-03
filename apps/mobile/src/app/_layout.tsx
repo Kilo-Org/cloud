@@ -5,6 +5,12 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
+// Enter the local module's JS in the main process on both platforms. Its
+// Android branch stays a no-op until slice `and` lands; iOS runs the
+// registered glanceable sink below.
+import 'active-agents-live-update';
+// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 
@@ -86,6 +92,7 @@ import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
   renameAndroidNotificationChannels,
+  setupNotificationBackgroundHandler,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -147,6 +154,9 @@ function preloadStartupFonts(): void {
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
 setupNotificationHandler();
+// Applies the aggregate glanceable push while backgrounded/killed via a
+// headless expo-notifications task; see setupNotificationBackgroundHandler.
+setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();

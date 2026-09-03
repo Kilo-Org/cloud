@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Njoftimet",
+    "liveActivities": "Aktivitete të drejtpërdrejta",
+    "liveActivitySubtitle": "Shfaq agjentët aktivë në ekranin e kyçur",
+    "liveUpdates": "Përditësime të drejtpërdrejta",
+    "liveUpdateSubtitle": "Shfaq agjentët aktivë në njoftimet e tua",
     "push": "Shtytje",
     "enabled": "Njoftimet të aktivizuara",
     "onDescription": "Njoftimet shtytëse janë ndezur për këtë pajisje.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Nuk u arrit të ngarkohej historia e bisedës.",
     "catalogRetry": "Nuk u ngarkuan modelet",
     "sendError": "Mesazhi nuk u dërgua. Provoni përsëri."
+  },
+  "glanceable": {
+    "waiting": "Duke përditësuar agjentët",
+    "empty": "Nuk ka punë në vazhdim",
+    "stale": "Nuk mund të përditësohet tani",
+    "expired": "Statusi ka skaduar",
+    "signedOut": "Identifikohuni për të parë agjentët",
+    "privacy": "Hap Kilo për të shikuar agjentët",
+    "openAgents": "Hapni agjentët",
+    "running": "Duke punuar",
+    "needsInput": "ka nevojë për të dhëna",
+    "idle": "I papunë",
+    "channelName": "Agjentët aktivë",
+    "activityKitDisabledBody": "Aktivizoni Aktivitetet e drejtpërdrejta te Cilësimet për të parë Agjentët aktivë në Ekranin e kyçjes."
   }
 }

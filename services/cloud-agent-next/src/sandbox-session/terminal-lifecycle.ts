@@ -24,6 +24,7 @@ import type { SandboxTerminalRecord } from './terminal-bridge.js';
 
 export const SANDBOX_SESSION_METADATA_KEY = 'session_metadata';
 export const SANDBOX_SESSION_LIFECYCLE_KEY = 'session_lifecycle_fence';
+export const SANDBOX_SESSION_DELETED_WORKTREE_KEY = 'deleted_worktree';
 
 const ATTACHED_SESSION_KEY = 'terminal_attached_session';
 const TERMINAL_PREFIX = 'terminal:';
@@ -148,7 +149,11 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
 
   function readFence(): LifecycleFence | undefined {
     const value = storage.kv.get<unknown>(SANDBOX_SESSION_LIFECYCLE_KEY);
-    if (value === undefined) return undefined;
+    if (value === undefined) {
+      return storage.kv.get(SANDBOX_SESSION_DELETED_WORKTREE_KEY) === undefined
+        ? undefined
+        : { epoch: Number.MAX_SAFE_INTEGER, state: 'deleted' };
+    }
     const parsed = lifecycleFenceSchema.safeParse(value);
     return parsed.success ? parsed.data : { epoch: Number.MAX_SAFE_INTEGER, state: 'deleted' };
   }
@@ -721,7 +726,8 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
   }
 
   function beginFence(state: LifecycleFence['state'], metadata: SessionMetadata | null) {
-    const previous = readFence();
+    const previous =
+      storage.kv.get(SANDBOX_SESSION_LIFECYCLE_KEY) === undefined ? undefined : readFence();
     if (previous?.state === 'deleted') return previous;
     const fence: LifecycleFence = {
       epoch: (previous?.epoch ?? 0) + 1,

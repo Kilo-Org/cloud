@@ -18,6 +18,9 @@ const mockHttpLink =
   jest.fn<(options: { url: string; headers: () => Record<string, string> }) => undefined>();
 const mockCaptureException = jest.fn();
 
+import type * as SentryModule from '@sentry/nextjs';
+import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
+
 jest.mock('@/lib/dotenvx', () => ({
   getEnvVariable: jest.fn(() => 'http://cloud-agent-next'),
 }));
@@ -53,6 +56,10 @@ jest.mock('./cloud-agent-client', () => {
     rethrowAsPaymentRequired: jest.fn(),
   };
 });
+
+const { createTRPCClient, TRPCClientError } =
+  jest.requireMock<jest.Mocked<typeof TrpcClientModule>>('@trpc/client');
+const { captureException } = jest.requireMock<jest.Mocked<typeof SentryModule>>('@sentry/nextjs');
 
 const clientModule: {
   createCloudAgentNextClient: jest.Mock;
@@ -600,6 +607,134 @@ describe('CloudAgentNextClient.createWorktreeChat', () => {
       output
     );
     expect(mutate).toHaveBeenCalledWith(input);
+  });
+});
+
+describe('CloudAgentNextClient.getSandboxStatus', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const snapshot = {
+    status: 'active',
+    provider: 'Cloudflare',
+    observedAt: 1_800_000_000_000,
+    detailCode: 'sandbox_ready',
+    inactivityTimeoutMs: 300_000,
+    estimatedSleepAt: 1_800_000_060_000,
+  } satisfies SandboxStatusSnapshot;
+  const query = jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+  const { CloudAgentNextClient } =
+    jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+  let client: InstanceType<typeof CloudAgentNextClient>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    query.mockReset().mockResolvedValue(snapshot);
+    jest.mocked(createTRPCClient).mockReturnValue({ getSandboxStatus: { query } } as never);
+    client = new CloudAgentNextClient('test-token');
+  });
+
+  it('uses the existing transport and returns only the validated public snapshot', async () => {
+    query.mockResolvedValue({
+      ...snapshot,
+      sandboxId: 'private-sandbox',
+      providerInstanceId: 'private-instance',
+      ownerId: 'private-owner',
+      headers: { authorization: 'private-token' },
+      error: 'private-diagnostics',
+    });
+    const response = await client.getSandboxStatus(cloudAgentSessionId);
+    expect(query).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(response).toEqual(snapshot);
+    expect(JSON.stringify(response)).not.toContain('private');
+  });
+
+  it.each([
+    null,
+    {},
+    { ...snapshot, status: 'private-status' },
+    { ...snapshot, provider: 'private-provider' },
+    { ...snapshot, detailCode: 'private-details' },
+    { ...snapshot, observedAt: Infinity },
+    { ...snapshot, inactivityTimeoutMs: 0 },
+    { ...snapshot, estimatedSleepAt: snapshot.observedAt },
+  ])('bounds malformed Worker data without reporting raw diagnostics: %j', async response => {
+    query.mockResolvedValue(response);
+    const result = await client.getSandboxStatus(cloudAgentSessionId);
+    expect(result).toEqual({
+      status: 'unknown',
+      provider: 'Unknown',
+      observedAt: expect.any(Number),
+      detailCode: 'status_unavailable',
+      inactivityTimeoutMs: null,
+      estimatedSleepAt: null,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    new Error('private-network-diagnostics'),
+    new SyntaxError('private-upstream-html is not valid JSON'),
+    new TRPCClientError('private-infrastructure-error'),
+  ])('makes transport failures observation-unavailable without logging the cause', async error => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      query.mockRejectedValue(error);
+      const result = await client.getSandboxStatus(cloudAgentSessionId);
+      expect(result).toMatchObject({ status: 'unknown', detailCode: 'status_unavailable' });
+      expect(JSON.stringify(result)).not.toContain('private');
+      expect(captureException).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it.each([
+    { data: { code: 'UNAUTHORIZED', httpStatus: 401 }, expectedCode: 'UNAUTHORIZED' },
+    { data: { code: 'FORBIDDEN', httpStatus: 403 }, expectedCode: 'FORBIDDEN' },
+    { data: { code: 'NOT_FOUND', httpStatus: 404 }, expectedCode: 'FORBIDDEN' },
+    { data: { httpStatus: 401 }, expectedCode: 'UNAUTHORIZED' },
+    { data: { httpStatus: 403 }, expectedCode: 'FORBIDDEN' },
+    { data: { httpStatus: 404 }, expectedCode: 'FORBIDDEN' },
+  ])('preserves a sanitized denial for $data', async ({ data, expectedCode }) => {
+    query.mockRejectedValue(
+      Object.assign(new TRPCClientError('private-access-diagnostics'), { data })
+    );
+    await expect(client.getSandboxStatus(cloudAgentSessionId)).rejects.toMatchObject({
+      code: expectedCode,
+      message:
+        expectedCode === 'UNAUTHORIZED'
+          ? 'Authentication required'
+          : 'Session not found or access denied',
+      cause: undefined,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not turn unavailable Worker authorization storage into a successful snapshot', async () => {
+    query.mockRejectedValue(
+      Object.assign(new TRPCClientError('private-authorization-storage-diagnostics'), {
+        data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+      })
+    );
+    await expect(client.getSandboxStatus(cloudAgentSessionId)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Sandbox status is temporarily unavailable',
+      cause: undefined,
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('also preserves denials supplied on the tRPC error shape', async () => {
+    query.mockRejectedValue(
+      Object.assign(new TRPCClientError('private-access-diagnostics'), {
+        shape: { data: { code: 'FORBIDDEN', httpStatus: 403 } },
+      })
+    );
+    await expect(client.getSandboxStatus(cloudAgentSessionId)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+      cause: undefined,
+    });
   });
 });
 

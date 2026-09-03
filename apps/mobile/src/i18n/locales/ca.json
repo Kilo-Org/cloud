@@ -621,6 +621,10 @@
   },
   "notifications": {
     "title": "Notificacions",
+    "liveActivities": "Activitats en directe",
+    "liveActivitySubtitle": "Mostra els agents actius a la pantalla de bloqueig",
+    "liveUpdates": "Actualitzacions en directe",
+    "liveUpdateSubtitle": "Mostra els agents actius a les notificacions",
     "push": "Push",
     "enabled": "Notificacions activades",
     "onDescription": "Les notificacions push estan activades per a aquest dispositiu.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "No s'ha pogut carregar l'historial del xat.",
     "catalogRetry": "No s'han pogut carregar els models",
     "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
+  },
+  "glanceable": {
+    "waiting": "Actualitzant els agents",
+    "empty": "No hi ha cap feina en curs",
+    "stale": "Ara no es pot actualitzar",
+    "expired": "Estat caducat",
+    "signedOut": "Inicia la sessió per veure els agents",
+    "privacy": "Obre Kilo per veure els agents",
+    "openAgents": "Obre els agents",
+    "running": "Treballant",
+    "needsInput": "requereix entrada",
+    "idle": "Inactiu",
+    "channelName": "Agents actius",
+    "activityKitDisabledBody": "Activa les activitats en directe a Configuració per veure els agents actius a la pantalla de bloqueig."
   }
 }

@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "התראות",
+    "liveActivities": "פעילויות בזמן אמת",
+    "liveActivitySubtitle": "הצג סוכנים פעילים במסך הנעילה",
+    "liveUpdates": "עדכונים חיים",
+    "liveUpdateSubtitle": "הצג סוכנים פעילים בהתראות שלך",
     "push": "דחיפה",
     "enabled": "התראות מופעלות",
     "onDescription": "התראות דחיפה מופעלות עבור מכשיר זה.",
@@ -3234,5 +3238,19 @@
     "historyRetry": "לא ניתן היה לטעון את היסטוריית השיחה.",
     "catalogRetry": "לא ניתן לטעון דגמים",
     "sendError": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
+  },
+  "glanceable": {
+    "waiting": "מעדכן סוכנים",
+    "empty": "אין עבודה בתהליך",
+    "stale": "לא ניתן לעדכן כעת",
+    "expired": "תוקף המצב פג",
+    "signedOut": "היכנס כדי לראות סוכנים",
+    "privacy": "פתח את Kilo כדי לראות סוכנים",
+    "openAgents": "פתח סוכנים",
+    "running": "עובד",
+    "needsInput": "נדרש קלט",
+    "idle": "בטל",
+    "channelName": "סוכנים פעילים",
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   }
 }

@@ -614,6 +614,10 @@
   },
   "notifications": {
     "title": "Aviseringar",
+    "liveActivities": "Liveaktiviteter",
+    "liveActivitySubtitle": "Visa aktiva agenter på låsskärmen",
+    "liveUpdates": "Liveuppdateringar",
+    "liveUpdateSubtitle": "Visa aktiva agenter i dina aviseringar",
     "push": "Push",
     "enabled": "Aviseringar aktiverade",
     "onDescription": "Pushaviseringar är på för den här enheten.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Det gick inte att läsa in chatthistoriken.",
     "catalogRetry": "Kunde inte läsa in modeller",
     "sendError": "Kunde inte skicka meddelandet. Försök igen."
+  },
+  "glanceable": {
+    "waiting": "Uppdaterar agenter",
+    "empty": "Inget arbete pågår",
+    "stale": "Kan inte uppdatera nu",
+    "expired": "Statusen har gått ut",
+    "signedOut": "Logga in för att se agenter",
+    "privacy": "Öppna Kilo för att se agenter",
+    "openAgents": "Öppna agenter",
+    "running": "Arbetar",
+    "needsInput": "kräver indata",
+    "idle": "Inaktiv",
+    "channelName": "Aktiva agenter",
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."
   }
 }

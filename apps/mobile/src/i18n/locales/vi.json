@@ -160,6 +160,10 @@
   },
   "notifications": {
     "title": "Thông báo",
+    "liveActivities": "Hoạt động trực tiếp",
+    "liveActivitySubtitle": "Hiển thị tác nhân đang hoạt động trên Màn hình khóa",
+    "liveUpdates": "Cập nhật trực tiếp",
+    "liveUpdateSubtitle": "Hiển thị tác nhân đang hoạt động trong thông báo",
     "push": "Đẩy",
     "enabled": "Đã bật thông báo",
     "onDescription": "Thông báo đẩy đang bật cho thiết bị này.",
@@ -3212,5 +3216,19 @@
     "historyRetry": "Không thể tải lịch sử trò chuyện.",
     "catalogRetry": "Không thể tải các mô hình",
     "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
+  },
+  "glanceable": {
+    "waiting": "Đang cập nhật tác nhân",
+    "empty": "Không có công việc đang thực hiện",
+    "stale": "Hiện không thể cập nhật",
+    "expired": "Trạng thái đã hết hạn",
+    "signedOut": "Đăng nhập để xem tác nhân",
+    "privacy": "Mở Kilo để xem tác nhân",
+    "openAgents": "Mở tác nhân",
+    "running": "Đang xử lý",
+    "needsInput": "cần nhập",
+    "idle": "Không hoạt động",
+    "channelName": "Tác nhân đang hoạt động",
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên Màn hình khóa."
   }
 }

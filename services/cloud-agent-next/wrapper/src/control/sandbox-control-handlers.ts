@@ -286,7 +286,12 @@ export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayloa
           : 'active',
     activeKiloSessions: active.length,
     pendingMessages: deps.tasks.size,
-    kilo: { ready: deps.kiloReady && !deps.signal?.aborted },
+    kilo: {
+      ready: deps.kiloReady && !deps.signal?.aborted,
+      ...(deps.kiloRuntimes?.kiloCliVersion !== undefined
+        ? { version: deps.kiloRuntimes.kiloCliVersion }
+        : {}),
+    },
     sessions,
   };
 }

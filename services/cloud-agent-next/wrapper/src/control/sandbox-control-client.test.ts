@@ -1,7 +1,11 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { z } from 'zod';
+import { helloResult } from '../../../src/sandbox-control/frames';
+import { buildHeartbeatPayload } from './sandbox-control-handlers';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  sandboxHeartbeatPayloadSchema,
   sessionEventPayloadSchema,
 } from '../../../src/shared/sandbox-control-protocol';
 import { unfilteredKiloEvents } from './feed';
@@ -73,6 +77,204 @@ function createClientFixture(options: Partial<SandboxControlClientOptions> = {})
   });
   return { client, sockets, openWebSocket, onDisconnected };
 }
+
+const previousHelloResultSchema = z.object({
+  protocolVersion: z.literal(1),
+  handshakeComplete: z.literal(true),
+});
+
+const previousHeartbeatSchema = z
+  .object({
+    state: z.enum(['idle', 'active', 'finalizing']),
+    activeKiloSessions: z.number().int().nonnegative().optional(),
+    pendingMessages: z.number().int().nonnegative().optional(),
+    kilo: z
+      .object({
+        ready: z.boolean(),
+        reason: z
+          .enum([
+            'feed_stale',
+            'feed_reconnected',
+            'feed_ended',
+            'feed_failed',
+            'process_exited',
+            'credential_refresh_failed',
+            'control_disconnected',
+            'shutdown',
+          ])
+          .optional(),
+      })
+      .strict(),
+    sessions: z.array(
+      z
+        .object({
+          kiloSessionId: z.string().min(1),
+          state: z.enum(['idle', 'active', 'finalizing']),
+          idleForMs: z.number().int().nonnegative(),
+          waitingOn: z.enum(['model', 'tool', 'finalizing', 'preparation', 'input']).optional(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+
+function versionHeartbeat(version: string | null) {
+  return buildHeartbeatPayload({
+    kiloRuntimes: {
+      kiloCliVersion: version,
+      attach() {
+        throw new Error('Unexpected attach');
+      },
+      detach: () => false,
+      deleteDirectory: async () => {},
+      get: () => undefined,
+      isHealthy: () => true,
+      shutdown() {},
+    },
+    version: '2.4.0',
+    kiloReady: true,
+    sessions: [],
+    tasks: new Map(),
+    emitSessionEvent() {},
+    retireRuntime() {},
+  });
+}
+
+describe('heartbeat version rollout compatibility', () => {
+  it.each(['7.4.20', null])(
+    'reproduces the previous exact strict contract rejection of version %j',
+    version => {
+      expect(previousHeartbeatSchema.safeParse(versionHeartbeat(version)).success).toBe(false);
+    }
+  );
+
+  it.each(['7.4.20', null])(
+    'new wrapper omits unnegotiated version %j for an old Worker',
+    async version => {
+      const fake = new FakeWebSocket();
+      const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+      try {
+        const connecting = client.connect();
+        await handshake(fake);
+        await connecting;
+        const heartbeat = versionHeartbeat(version);
+        const before = structuredClone(heartbeat);
+        for (const kilo of [
+          heartbeat.kilo,
+          { ...heartbeat.kilo, ready: false, reason: 'shutdown' as const },
+        ]) {
+          expect(client.sendEvent?.('sandbox.heartbeat', { ...heartbeat, kilo })).toBe(true);
+          const frame = JSON.parse(fake.sent.at(-1) ?? '{}');
+          expect(previousHeartbeatSchema.safeParse(frame.payload).success).toBe(true);
+          expect(frame.payload.kilo).not.toHaveProperty('version');
+          expect(frame.payload.kilo.ready).toBe(kilo.ready);
+          expect(frame.payload.kilo.reason).toBe(kilo.reason);
+        }
+        expect(heartbeat).toEqual(before);
+      } finally {
+        client.close();
+      }
+    }
+  );
+
+  it.each([{}, { kiloVersionHeartbeat: false }])(
+    'does not infer support from capabilities %j',
+    async capabilities => {
+      const fake = new FakeWebSocket();
+      const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+      try {
+        const connecting = client.connect();
+        await handshake(fake, { protocolVersion: 1, handshakeComplete: true, capabilities });
+        await connecting;
+        expect(client.sendEvent?.('sandbox.heartbeat', versionHeartbeat('7.4.20'))).toBe(true);
+        const frame = JSON.parse(fake.sent.at(-1) ?? '{}');
+        expect(previousHeartbeatSchema.safeParse(frame.payload).success).toBe(true);
+        expect(frame.payload.kilo).not.toHaveProperty('version');
+      } finally {
+        client.close();
+      }
+    }
+  );
+
+  it('does not retain capability support from a failed connection attempt', async () => {
+    const { client, sockets } = createClientFixture();
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const first = sockets[0];
+      if (!first) throw new Error('Missing first socket');
+      first.open();
+      const hello = JSON.parse(first.sent[0] ?? '{}');
+      first.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: hello.requestId,
+          ok: true,
+          result: helloResult(),
+        })
+      );
+      first.close();
+      await waitForReconnect();
+      const second = sockets[1];
+      await handshake(second);
+      await connecting;
+      if (!second) throw new Error('Missing second socket');
+      const nextHello = JSON.parse(second.sent[0] ?? '{}');
+      second.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: nextHello.requestId,
+          ok: true,
+          result: helloResult(),
+        })
+      );
+      expect(client.sendEvent?.('sandbox.heartbeat', versionHeartbeat('7.4.20'))).toBe(true);
+      const frame = JSON.parse(second.sent.at(-1) ?? '{}');
+      expect(previousHeartbeatSchema.safeParse(frame.payload).success).toBe(true);
+      expect(frame.payload.kilo).not.toHaveProperty('version');
+    } finally {
+      client.close();
+    }
+  });
+
+  it('old wrappers accept new Worker hello acknowledgements and their old heartbeats remain valid', () => {
+    expect(previousHelloResultSchema.parse(helloResult())).toEqual({
+      protocolVersion: 1,
+      handshakeComplete: true,
+    });
+    const heartbeat = previousHeartbeatSchema.parse({
+      state: 'idle',
+      kilo: { ready: true },
+      sessions: [],
+    });
+    expect(sandboxHeartbeatPayloadSchema.parse(heartbeat)).toEqual(heartbeat);
+  });
+
+  it.each(['7.4.20', null])(
+    'new wrapper retains negotiated version %j for a new Worker',
+    async version => {
+      const fake = new FakeWebSocket();
+      const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+      try {
+        const connecting = client.connect();
+        await handshake(fake, helloResult());
+        await connecting;
+        const heartbeat = versionHeartbeat(version);
+        expect(client.sendEvent?.('sandbox.heartbeat', heartbeat)).toBe(true);
+        const frame = JSON.parse(fake.sent.at(-1) ?? '{}');
+        expect(sandboxHeartbeatPayloadSchema.parse(frame.payload)).toEqual(heartbeat);
+        expect(frame.payload.kilo.version).toBe(version);
+        const withoutVersion = { state: 'idle' as const, kilo: { ready: true }, sessions: [] };
+        expect(client.sendEvent?.('sandbox.heartbeat', withoutVersion)).toBe(true);
+        expect(
+          sandboxHeartbeatPayloadSchema.parse(JSON.parse(fake.sent.at(-1) ?? '{}').payload)
+        ).toEqual(withoutVersion);
+      } finally {
+        client.close();
+      }
+    }
+  );
+});
 
 describe('createSandboxControlClient', () => {
   it('opens with an Authorization header and completes sandbox.hello plus status probe', async () => {
@@ -964,7 +1166,10 @@ describe('createSandboxControlClient', () => {
   });
 });
 
-async function handshake(fake: FakeWebSocket | undefined): Promise<void> {
+async function handshake(
+  fake: FakeWebSocket | undefined,
+  result: unknown = { protocolVersion: 1, handshakeComplete: true }
+): Promise<void> {
   if (!fake) throw new Error('missing socket');
   await Promise.resolve();
   fake.open();
@@ -975,7 +1180,7 @@ async function handshake(fake: FakeWebSocket | undefined): Promise<void> {
       type: 'response',
       requestId: hello.requestId,
       ok: true,
-      result: { protocolVersion: 1, handshakeComplete: true },
+      result,
     })
   );
   fake.respond(

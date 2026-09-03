@@ -50,6 +50,19 @@ regression until a measurement says otherwise.
 - Run `pnpm typecheck && pnpm lint && pnpm test` in this directory before you
   commit.
 
+## The kilo gateway
+
+`POST {baseUrl}/api/gateway/v1/messages` takes the Anthropic Messages body, so
+`cache_control` reaches the model.
+
+| Header | Value |
+|---|---|
+| `authorization` | `Bearer {user token}` |
+| `x-kilocode-organizationid` | The organization id. Leave it out for a personal account. |
+
+The route also serves `/chat/completions` and `/responses`, and it accepts the
+older `/api/openrouter` prefix. The package uses `/messages` only.
+
 ## Decisions
 
 ### The session does not write to the store
@@ -83,6 +96,10 @@ local end-to-end run.
 | `src/index.ts` | The public entry point |
 | `src/session.ts` | The session and its append-only turns |
 | `src/turn.ts` | One turn, shaped as one SQLite row |
+| `src/model.ts` | The `ModelClient` plugin point; transport only |
+| `src/kilo-gateway.ts` | The kilo gateway plugin |
+| `src/kilo-gateway-wire.ts` | The Anthropic Messages body and the reply schema |
+| `src/fetch.ts` | The smallest `fetch` the package needs |
 | `src/prompt.ts` | The `PromptAssembler` plugin point and the core assembler |
 | `src/storage.ts` | The `SessionStore` plugin point; no plugin yet |
 | `src/id.ts` | The `IdGenerator` plugin point and the ULID plugin |
@@ -103,6 +120,7 @@ turn one off, and give the reason.
 | `id-length` | Effect names its type parameters `A`, `E`, and `R`. |
 | `vitest/no-importing-vitest-globals` | An explicit import beats a global. |
 | `vitest/prefer-to-be-truthy` | `toBe(true)` states the value; `toBeTruthy` does not. |
+| `promise/prefer-await-to-then` | It flags `Promise.resolve`, and it deadlocks with `require-await`. |
 
 `new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
 `Context.Tag` is a call, not a constructor.

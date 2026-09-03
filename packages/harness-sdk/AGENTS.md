@@ -50,6 +50,32 @@ regression until a measurement says otherwise.
 - Run `pnpm typecheck && pnpm lint && pnpm test` in this directory before you
   commit.
 
+## Decisions
+
+### The session does not write to the store
+
+`appendTurn` is a pure function. It does not touch the `SessionStore` plugin.
+Do not make it write through.
+
+- A pure append has no error channel and no requirement, so no caller inherits
+  a store failure.
+- The runner flushes once per step, so one step is one transaction, not one
+  transaction per turn.
+- A session runs with no store at all. This is what lets the package run in a
+  browser or in a mobile app.
+
+The cost is that a crash drops the turns since the last flush. If that cost
+becomes real, the next step is write-behind: `appendTurn` stays pure and pushes
+to an Effect `Queue`, and a forked fiber drains it. Do not build the queue
+before a crash loses real data.
+
+### A reloaded turn must equal the turn that was written
+
+The prompt prefix is rebuilt from the store. If `load` returns a turn that
+differs from the written turn in one byte or in the order, the prefix changes
+and the model cache misses. The SQLite plugin must prove the round trip with a
+local end-to-end run.
+
 ## Layout
 
 | Path | Purpose |

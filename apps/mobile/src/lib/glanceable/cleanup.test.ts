@@ -3,11 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  confirmGlanceableOrgMembership,
+  getTerminalBlankEpoch,
+  isGlanceableOrgLost,
   planOrgFenceAction,
   republishLastSnapshotStale,
   writePrivacySnapshotAndEnd,
   writeSignedOutSnapshotAndEnd,
 } from './cleanup';
+import { GlanceablePublisher } from './publisher';
 import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
@@ -41,6 +45,8 @@ function makeSink() {
   return { sink, calls };
 }
 
+const PUB_CTX = { userId: 'u1', organizationId: 'revoked-org' };
+
 function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
   const found = [...calls].toReversed().find(call => call.type === 'publish');
   if (found === undefined) {
@@ -51,6 +57,8 @@ function lastSnapshot(calls: SinkCall[]): GlanceableAgentsSnapshot {
 
 afterEach(() => {
   _resetGlanceablePersistForTests();
+  // The lost-org latch is module state: release it so it cannot leak forward.
+  confirmGlanceableOrgMembership();
   vi.useRealTimers();
 });
 
@@ -112,6 +120,44 @@ describe('cleanup', () => {
     }
   });
 
+  it('keeps a rebuilt publisher silent after a lost org until membership returns', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    const options = {
+      sinks: [sink],
+      terminalBlankEpoch: getTerminalBlankEpoch,
+      orgLost: isGlanceableOrgLost,
+    };
+    const publisher = new GlanceablePublisher(options);
+    let rebuilt: GlanceablePublisher | null = null;
+    try {
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
+
+      writePrivacySnapshotAndEnd();
+      expect(lastSnapshot(calls).status).toBe('privacy');
+      const afterBlank = calls.filter(call => call.type === 'publish').length;
+
+      // A token refresh rebuilds the publisher: it captures the new epoch, so
+      // only the latch stops it republishing the revoked org's counts.
+      rebuilt = new GlanceablePublisher(options);
+      rebuilt.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'publish')).toHaveLength(afterBlank);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
+      expect(lastSnapshot(calls).status).toBe('privacy');
+
+      // A successful org list that holds the selection releases the latch.
+      confirmGlanceableOrgMembership();
+      rebuilt.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(2);
+      expect(lastSnapshot(calls).status).toBe('happy');
+    } finally {
+      unregisterGlanceableSink(sink);
+      publisher.dispose();
+      rebuilt?.dispose();
+    }
+  });
+
   it('blanks to privacy only after a successful list misses the selection', () => {
     expect(
       planOrgFenceAction({
@@ -136,10 +182,10 @@ describe('cleanup', () => {
         isLoading: false,
         isError: false,
       })
-    ).toBe('none');
+    ).toBe('confirmed');
     expect(
       planOrgFenceAction({ organizationId: null, orgs: [], isLoading: false, isError: false })
-    ).toBe('none');
+    ).toBe('confirmed');
     // An offline or not-yet-fetched list (orgs undefined) is not a lost org.
     expect(
       planOrgFenceAction({

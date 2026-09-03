@@ -18,6 +18,17 @@ export function getTerminalBlankEpoch(): number {
   return terminalBlankEpoch;
 }
 
+// The epoch alone only gates publishers that already existed at the blank. A
+// confirmed lost org outlives them: a token refresh or a remount builds a new
+// publisher that would republish the revoked org's cached counts. This latch
+// blocks every publisher until a successful org list confirms membership.
+let orgMembershipLost = false;
+
+/** True while a confirmed lost org blocks publication. */
+export function isGlanceableOrgLost(): boolean {
+  return orgMembershipLost;
+}
+
 /**
  * Terminal blanking: signed-out and privacy states are written to every sink
  * (publish) and then every sink ends immediately. The 8 s terminal window is
@@ -32,9 +43,13 @@ export type GlanceableOrgFenceState = {
   isError: boolean;
 };
 
-export type GlanceableOrgFenceAction = 'privacy' | 'stale' | 'none';
+export type GlanceableOrgFenceAction = 'privacy' | 'stale' | 'confirmed' | 'none';
 
-/** Pure org-fence decision: lost org only after a successful list misses the selection. */
+/**
+ * Pure org-fence decision: lost org only after a successful list misses the
+ * selection, `confirmed` only after a successful list holds it. A loading,
+ * errored, or absent list is `none` or `stale`, never a confirmation.
+ */
 export function planOrgFenceAction(state: GlanceableOrgFenceState): GlanceableOrgFenceAction {
   if (state.isLoading) {
     return 'none';
@@ -42,14 +57,16 @@ export function planOrgFenceAction(state: GlanceableOrgFenceState): GlanceableOr
   if (state.isError) {
     return 'stale';
   }
+  if (state.orgs === undefined) {
+    return 'none';
+  }
   if (
     state.organizationId !== null &&
-    state.orgs !== undefined &&
     !state.orgs.some(entry => entry.organizationId === state.organizationId)
   ) {
     return 'privacy';
   }
-  return 'none';
+  return 'confirmed';
 }
 
 function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgentsSnapshot {
@@ -94,9 +111,15 @@ export function writeSignedOutSnapshotAndEnd(): void {
   writeTerminalAndEnd('signed_out');
 }
 
-/** Blank on org switch or confirmed lost org. */
+/** Blank on org switch or confirmed lost org, and latch publication off. */
 export function writePrivacySnapshotAndEnd(): void {
+  orgMembershipLost = true;
   writeTerminalAndEnd('privacy');
+}
+
+/** A successful org list holds the selection: release the lost-org latch. */
+export function confirmGlanceableOrgMembership(): void {
+  orgMembershipLost = false;
 }
 
 /**

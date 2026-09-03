@@ -77,12 +77,6 @@ export type AgentRuntime = {
   interruptWrapper(): Promise<{ commandSent: boolean }>;
   sendPing(ingestTagId: string): void;
   keepSandboxAlive(): Promise<void>;
-  updateRuntimeCredential?(input: {
-    credential: string;
-    authorizationId: string;
-    fence: string;
-    scope?: string;
-  }): Promise<void>;
 };
 
 export type AgentRuntimeDependencies = {
@@ -102,12 +96,6 @@ export type AgentRuntimeDependencies = {
   discoverSessionWrappers?: (metadata: SessionMetadata) => Promise<WrapperObservation>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   checkBillingAdmission?: () => Promise<AdmissionFailure | null>;
-  updateRunningWrapperCredential?: (input: {
-    credential: string;
-    authorizationId: string;
-    fence: string;
-    scope?: string;
-  }) => Promise<void>;
 };
 
 function cleanupBlockedError(lease: WrapperLease): WrapperCleanupBlockedError {
@@ -603,13 +591,5 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     interruptWrapper,
     sendPing,
     keepSandboxAlive,
-    async updateRuntimeCredential(input) {
-      if (!dependencies.updateRunningWrapperCredential) {
-        throw ExecutionError.sandboxCapabilityUnavailable(
-          'Running wrapper credential update is unavailable'
-        );
-      }
-      await dependencies.updateRunningWrapperCredential(input);
-    },
   };
 }

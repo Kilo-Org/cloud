@@ -2,6 +2,10 @@ import jwt from 'jsonwebtoken';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import { resolveSecret } from './auth.js';
+import {
+  resolveRuntimeCredentialProxyRoute,
+  type RuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
 import type { Env } from './types.js';
 
 const AUDIENCE = 'cloud-agent-next:runtime-credential-proxy';
@@ -15,7 +19,12 @@ const claimsSchema = z
     userId: z.string().min(1),
     nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   })
-  .passthrough();
+  .extend({
+    iat: z.number().int().positive(),
+    exp: z.number().int().positive(),
+  })
+  .strict()
+  .refine(claims => claims.exp > claims.iat);
 
 export const RUNTIME_PROXY_GRANT_KEY = 'runtime_proxy_grant';
 export const runtimeProxyGrantSchema = z
@@ -50,30 +59,28 @@ export function createRuntimeProxyGrant(
 
 export async function issueRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
-  input: RuntimeProxyGrant | { sessionId: string; userId: string }
+  input: RuntimeProxyGrant
 ): Promise<string> {
-  if (!('grantId' in input)) {
-    const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return jwt.sign({ sessionId: input.sessionId, userId: input.userId }, secret, {
-      algorithm: 'HS256',
-      noTimestamp: true,
-    });
-  }
+  const grant = runtimeProxyGrantSchema.parse(input);
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) throw new Error('Authentication unavailable');
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = Math.floor(grant.leaseExpiresAt / 1000);
+  if (exp <= iat) throw new Error('Runtime proxy grant has expired');
   return jwt.sign(
     {
       aud: AUDIENCE,
-      grantId: input.grantId,
-      authorizationId: input.authorizationId,
-      sessionId: input.sessionId,
-      kiloSessionId: input.kiloSessionId,
-      userId: input.userId,
-      nonce: input.nonce,
+      grantId: grant.grantId,
+      authorizationId: grant.authorizationId,
+      sessionId: grant.sessionId,
+      kiloSessionId: grant.kiloSessionId,
+      userId: grant.userId,
+      nonce: grant.nonce,
+      iat,
+      exp,
     },
     secret,
-    { algorithm: 'HS256', noTimestamp: true }
+    { algorithm: 'HS256' }
   );
 }
 
@@ -86,16 +93,7 @@ export async function verifyRuntimeCredentialProxyHandle(
   try {
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'] });
     const claims = claimsSchema.safeParse(verified);
-    if (claims.success) return claims.data;
-    if (
-      typeof verified === 'object' &&
-      verified !== null &&
-      typeof verified.sessionId === 'string' &&
-      typeof verified.userId === 'string'
-    ) {
-      return verified as z.infer<typeof claimsSchema>;
-    }
-    return null;
+    return claims.success ? claims.data : null;
   } catch {
     return null;
   }
@@ -121,6 +119,7 @@ export function matchesRuntimeProxyGrant(
   return (
     current.state === 'active' &&
     current.leaseExpiresAt > context.now &&
+    Math.floor(current.leaseExpiresAt / 1000) === handle.exp &&
     current.grantId === handle.grantId &&
     current.authorizationId === handle.authorizationId &&
     current.sessionId === handle.sessionId &&
@@ -192,55 +191,20 @@ export function runtimeCredentialProxyBaseUrl(workerUrl: string): string | null 
 
 export function runtimeCredentialProxyUpstream(
   targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string },
-  route: 'backend' | 'provider' | 'ingest',
+  route: RuntimeCredentialProxyRoute,
+  method: string,
   pathname: string,
   search: string,
-  sessionId: string
+  kiloSessionId: string,
+  organizationId?: string
 ): URL | null {
-  const path = `/${pathname.replace(/^\/+/, '')}`;
-  if (!isAllowedRoute(route, path, sessionId)) return null;
-  const base =
-    route === 'backend'
-      ? targets.backendBaseUrl
-      : route === 'provider'
-        ? targets.providerBaseUrl
-        : targets.sessionIngestBaseUrl;
-  try {
-    const target = new URL(base);
-    target.pathname = `${target.pathname.replace(/\/+$/, '')}${path}`;
-    target.search = search;
-    return target;
-  } catch {
-    return null;
-  }
-}
-
-function isAllowedRoute(
-  route: 'backend' | 'provider' | 'ingest',
-  path: string,
-  sessionId: string
-): boolean {
-  if (route === 'provider') {
-    return (
-      path === '/models' ||
-      path === '/models/validate' ||
-      path === '/chat/completions' ||
-      path === '/responses'
-    );
-  }
-  if (route === 'backend') {
-    return (
-      [
-        '/api/user',
-        '/api/profile',
-        '/api/profile/balance',
-        '/api/defaults',
-        '/api/users/notifications',
-      ].includes(path) ||
-      /^\/api\/organizations\/[A-Za-z0-9._-]+\/(?:models|defaults|modes|models\/validate)$/.test(
-        path
-      )
-    );
-  }
-  return path === `/api/session/${sessionId}/export` || path === `/api/session/${sessionId}/ingest`;
+  return resolveRuntimeCredentialProxyRoute({
+    targets,
+    route,
+    method,
+    pathname: `/${pathname.replace(/^\/+/, '')}`,
+    search,
+    kiloSessionId,
+    organizationId,
+  });
 }

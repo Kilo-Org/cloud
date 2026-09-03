@@ -9,7 +9,7 @@ import {
   confirmGlanceableOrgMembership,
   planOrgFenceAction,
   republishLastSnapshotStale,
-  writePrivacySnapshotAndEnd,
+  writeLostOrgSnapshotAndEnd,
 } from './cleanup';
 import { getLastGlanceableSnapshot } from './persist';
 
@@ -35,7 +35,7 @@ export function useGlanceableOrgFence(): void {
   useEffect(() => {
     const action = planOrgFenceAction({ organizationId, orgs, isLoading, isError });
     if (action === 'privacy') {
-      writePrivacySnapshotAndEnd();
+      writeLostOrgSnapshotAndEnd();
     } else if (action === 'confirmed') {
       confirmGlanceableOrgMembership();
     } else if (action === 'stale' && getLastGlanceableSnapshot() !== null) {

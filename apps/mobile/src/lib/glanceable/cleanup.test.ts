@@ -8,6 +8,7 @@ import {
   isGlanceableOrgLost,
   planOrgFenceAction,
   republishLastSnapshotStale,
+  writeLostOrgSnapshotAndEnd,
   writePrivacySnapshotAndEnd,
   writeSignedOutSnapshotAndEnd,
 } from './cleanup';
@@ -90,6 +91,27 @@ describe('cleanup', () => {
     }
   });
 
+  it('does not latch publication off for an intentional org switch', () => {
+    const { sink, calls } = makeSink();
+    registerGlanceableSink(sink);
+    writePrivacySnapshotAndEnd();
+    expect(isGlanceableOrgLost()).toBe(false);
+    // The org change rebuilds the publisher, which must emit for the new org
+    // without waiting for the fence to confirm membership.
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      terminalBlankEpoch: getTerminalBlankEpoch,
+      orgLost: isGlanceableOrgLost,
+    });
+    try {
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+      expect(lastSnapshot(calls).status).toBe('happy');
+    } finally {
+      unregisterGlanceableSink(sink);
+      publisher.dispose();
+    }
+  });
+
   it('keeps a rebuilt publisher silent after a lost org until membership returns', () => {
     const { sink, calls } = makeSink();
     registerGlanceableSink(sink);
@@ -104,7 +126,7 @@ describe('cleanup', () => {
       publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
       expect(calls.filter(call => call.type === 'startOrUpdate')).toHaveLength(1);
 
-      writePrivacySnapshotAndEnd();
+      writeLostOrgSnapshotAndEnd();
       expect(lastSnapshot(calls).status).toBe('privacy');
       const afterBlank = calls.filter(call => call.type === 'publish').length;
 

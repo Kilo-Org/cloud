@@ -40,6 +40,8 @@ export const runtimeProxyGrantSchema = z
     mode: z.enum(['direct', 'contained']),
     generation: z.number().int().nonnegative(),
     allocationId: z.string().min(1),
+    wrapperRunId: z.string().min(1),
+    wrapperConnectionId: z.string().min(1),
     leaseExpiresAt: z.number().int().positive(),
     state: z.literal('active'),
   })
@@ -110,6 +112,8 @@ export function matchesRuntimeProxyGrant(
     orgId?: string;
     generation: number;
     allocationId: string;
+    wrapperRunId: string;
+    wrapperConnectionId: string;
     now: number;
   }
 ): value is RuntimeProxyGrant {
@@ -132,7 +136,9 @@ export function matchesRuntimeProxyGrant(
     current.userId === context.userId &&
     current.orgId === context.orgId &&
     current.generation === context.generation &&
-    current.allocationId === context.allocationId
+    current.allocationId === context.allocationId &&
+    current.wrapperRunId === context.wrapperRunId &&
+    current.wrapperConnectionId === context.wrapperConnectionId
   );
 }
 
@@ -148,6 +154,8 @@ export async function resolveRuntimeProxyCredential(input: {
     orgId?: string;
     generation: number;
     allocationId: string;
+    wrapperRunId: string;
+    wrapperConnectionId: string;
   };
   now?: number;
   token: string;
@@ -196,7 +204,9 @@ export function runtimeCredentialProxyUpstream(
   pathname: string,
   search: string,
   kiloSessionId: string,
-  organizationId?: string
+  organizationId?: string,
+  contentType?: string | null,
+  bodyText?: string
 ): URL | null {
   return resolveRuntimeCredentialProxyRoute({
     targets,
@@ -206,5 +216,7 @@ export function runtimeCredentialProxyUpstream(
     search,
     kiloSessionId,
     organizationId,
+    contentType,
+    bodyText,
   });
 }

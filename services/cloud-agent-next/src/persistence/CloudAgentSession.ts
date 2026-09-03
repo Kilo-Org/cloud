@@ -111,6 +111,11 @@ import {
   renewStoredRuntimeAuthorization,
   RUNTIME_AUTHORIZATION_KEY,
 } from '../session/runtime-authorization-persistence.js';
+import { getEffectiveCredentialContainment } from './session-metadata.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../runtime-credential-proxy-rpc.js';
 
 import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
@@ -1703,6 +1708,67 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return getRuntimeAuthorizationStatus({
       metadata: await this.getMetadata(),
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  private async runtimeProxyFence() {
+    const [metadata, runtime, lease] = await Promise.all([
+      this.getMetadata(),
+      getWrapperRuntimeState(this.ctx.storage),
+      getWrapperLease(this.ctx.storage),
+    ]);
+    if (
+      !metadata ||
+      !metadata.workspace?.sandboxId ||
+      !runtime.wrapperRunId ||
+      !runtime.wrapperConnectionId ||
+      lease.state !== 'owns_wrapper' ||
+      lease.instance.instanceGeneration !== runtime.wrapperGeneration
+    ) {
+      return null;
+    }
+    return {
+      generation: runtime.wrapperGeneration,
+      allocationId: lease.instance.instanceId,
+      wrapperRunId: runtime.wrapperRunId,
+      wrapperConnectionId: runtime.wrapperConnectionId,
+    };
+  }
+
+  async issueRuntimeCredentialProxyGrant(): Promise<string | null> {
+    const token = await this.getRuntimeToken();
+    const metadata = await this.getMetadata();
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence: await this.runtimeProxyFence(),
+      token,
+      mode:
+        metadata && getEffectiveCredentialContainment(metadata).kilocode ? 'contained' : 'direct',
+    });
+  }
+
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string
+  ): Promise<{ token: string; organizationId?: string } | null> {
+    return resolvePersistedRuntimeProxyCredential({
+      env: this.env,
+      storage: this.ctx.storage,
+      handle,
+      metadata: () => this.getMetadata(),
+      authorization: async () => {
+        const parsed = RuntimeAuthorizationSchema.safeParse(
+          await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        return parsed.success ? parsed.data : null;
+      },
+      fence: () => this.runtimeProxyFence(),
+      token: () => this.getRuntimeToken(),
     });
   }
 

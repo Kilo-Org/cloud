@@ -7,6 +7,8 @@ export type SessionClient = Pick<
   | 'closeOrgStreams'
   | 'getMetadata'
   | 'getRuntimeAuthorizationStatus'
+  | 'issueRuntimeCredentialProxyGrant'
+  | 'resolveRuntimeCredentialProxyGrant'
   | 'validateKiloGlobalFeedProducer'
   | 'getLatestAssistantMessage'
   | 'getLatestEventId'

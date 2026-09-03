@@ -589,6 +589,21 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
+  /**
+   * The control plane persists only a wrapper instance ID, not the complete
+   * allocation generation plus wrapper run/connection tuple required to fence
+   * a bearer credential. Keep this RPC fail-closed until that lifecycle exists.
+   */
+  async issueRuntimeCredentialProxyGrant(): Promise<string | null> {
+    return null;
+  }
+
+  async resolveRuntimeCredentialProxyGrant(
+    _handle: string
+  ): Promise<{ token: string; organizationId?: string } | null> {
+    return null;
+  }
+
   async reauthorizeRuntimeAuthorization(input: {
     ownerId: string;
     expectedOldId: string;

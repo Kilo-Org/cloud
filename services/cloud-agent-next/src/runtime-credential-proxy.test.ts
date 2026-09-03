@@ -28,6 +28,8 @@ describe('runtime credential proxy', () => {
       mode: 'contained',
       generation: 1,
       allocationId: 'allocation_1',
+      wrapperRunId: 'run_1',
+      wrapperConnectionId: 'connection_1',
       leaseExpiresAt: now + 60_000,
       state: 'active',
     });
@@ -54,6 +56,8 @@ describe('runtime credential proxy', () => {
           userId: grant.userId,
           generation: grant.generation,
           allocationId: grant.allocationId,
+          wrapperRunId: grant.wrapperRunId,
+          wrapperConnectionId: grant.wrapperConnectionId,
           now,
         })
     ).toBe(true);
@@ -70,6 +74,8 @@ describe('runtime credential proxy', () => {
       mode: 'direct',
       generation: 1,
       allocationId: 'allocation_1',
+      wrapperRunId: 'run_1',
+      wrapperConnectionId: 'connection_1',
       leaseExpiresAt: Date.now() - 1,
       state: 'active',
     });

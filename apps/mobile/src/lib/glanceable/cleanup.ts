@@ -111,8 +111,13 @@ export function writeSignedOutSnapshotAndEnd(): void {
   writeTerminalAndEnd('signed_out');
 }
 
-/** Blank on org switch or confirmed lost org, and latch publication off. */
+/** Blank on an intentional org switch. The next org may publish at once. */
 export function writePrivacySnapshotAndEnd(): void {
+  writeTerminalAndEnd('privacy');
+}
+
+/** Blank on a confirmed lost org, and latch publication off until it returns. */
+export function writeLostOrgSnapshotAndEnd(): void {
   orgMembershipLost = true;
   writeTerminalAndEnd('privacy');
 }

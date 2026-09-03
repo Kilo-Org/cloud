@@ -1,0 +1,26 @@
+{
+  "name": "@kilocode/harness-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src"
+  },
+  "dependencies": {
+    "effect": "3.22.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

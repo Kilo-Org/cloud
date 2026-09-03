@@ -1,0 +1,51 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["oxc", "typescript", "unicorn", "import", "promise", "node", "vitest"],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error"
+  },
+  "env": {
+    "builtin": true,
+    "node": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-console": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/explicit-module-boundary-types": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ],
+    "import/no-named-export": "off",
+    "import/no-default-export": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/explicit-module-boundary-types": "off"
+      }
+    },
+    {
+      "files": ["src/index.ts"],
+      "rules": {
+        "unicorn/require-module-specifiers": "off"
+      }
+    }
+  ]
+}

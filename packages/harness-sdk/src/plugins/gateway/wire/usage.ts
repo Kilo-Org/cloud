@@ -1,4 +1,4 @@
-import type { ModelUsage } from '../model.js';
+import type { ModelUsage } from '../../../core/model.js';
 
 type Counts = { -readonly [K in keyof ModelUsage]?: number };
 

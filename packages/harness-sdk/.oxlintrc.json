@@ -51,7 +51,8 @@
     "promise/prefer-await-to-then": "off",
     "require-await": "off",
     "typescript/require-await": "off",
-    "unicorn/no-array-callback-reference": "off"
+    "unicorn/no-array-callback-reference": "off",
+    "import/prefer-default-export": "off"
   },
   "overrides": [
     {

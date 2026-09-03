@@ -1,6 +1,7 @@
 import { Chunk, Effect } from 'effect';
 import { expect, it } from 'vitest';
-import { type IdGenerator, layerUlid } from './id.js';
+import type { IdGenerator } from './id.js';
+import { layerUlid } from '../plugins/id/ulid.js';
 import { appendTurn, makeSession } from './session.js';
 import { makeTurn } from './turn.js';
 

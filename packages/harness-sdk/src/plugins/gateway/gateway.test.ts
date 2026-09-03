@@ -1,10 +1,10 @@
 import { Effect, Either } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from './api-kind.js';
-import { fakeFetch, type Reply, sampleRequest } from './kilo-gateway-fake.js';
-import { layerKiloGateway } from './kilo-gateway.js';
-import type { OrgContext } from './kilo-gateway-http.js';
-import { ModelClient } from './model.js';
+import { fakeFetch, type Reply, sampleRequest } from './fake.js';
+import { layerKiloGateway } from './index.js';
+import type { OrgContext } from './http.js';
+import { ModelClient } from '../../core/model.js';
 
 const reply: Reply = {
   ok: true,

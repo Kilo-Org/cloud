@@ -1,9 +1,9 @@
 import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from './api-kind.js';
-import { fakeFetch, type Reply, sampleRequest } from './kilo-gateway-fake.js';
-import { layerKiloGateway } from './kilo-gateway.js';
-import { ModelClient, type ModelEvent } from './model.js';
+import { fakeFetch, type Reply, sampleRequest } from './fake.js';
+import { layerKiloGateway } from './index.js';
+import { ModelClient, type ModelEvent } from '../../core/model.js';
 
 const sse = (...events: readonly unknown[]): readonly string[] =>
   events.map(event => `data: ${JSON.stringify(event)}\n\n`);

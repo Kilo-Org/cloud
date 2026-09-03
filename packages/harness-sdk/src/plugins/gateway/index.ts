@@ -1,6 +1,6 @@
 import { Effect, Layer, Option, Ref, Stream } from 'effect';
 import { type ApiKind, pickKind } from './api-kind.js';
-import { type HttpConfig, post } from './kilo-gateway-http.js';
+import { type HttpConfig, post } from './http.js';
 import {
   ModelClient,
   ModelError,
@@ -9,7 +9,7 @@ import {
   type ModelRequest,
   type ModelUsage,
   zeroUsage,
-} from './model.js';
+} from '../../core/model.js';
 import { dataOf, frames } from './sse.js';
 import { completionsWire } from './wire/completions.js';
 import { messagesWire } from './wire/messages.js';

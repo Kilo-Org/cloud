@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ModelReply, ModelRequest, ModelUsage } from '../model.js';
+import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 
 /**

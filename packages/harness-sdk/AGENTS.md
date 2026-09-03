@@ -47,8 +47,8 @@ regression until a measurement says otherwise.
 - Do not add a dependency for work that a few lines do.
 - Keep the file count low. Put one plugin point in one file.
 - Name a file in kebab case. Export a type with `export type`.
-- Run `pnpm typecheck && pnpm lint && pnpm test` in this directory before you
-  commit.
+- Run `pnpm check` in this directory before you commit. It runs the compiler,
+  the linter, the boundary check, and the tests.
 
 ## The kilo gateway
 
@@ -107,24 +107,40 @@ local end-to-end run.
 
 ## Layout
 
+`core/` holds the contracts and the pure domain. `plugins/` holds the
+implementations, including the ones this package owns. **A file in `core/` must
+never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
+
 | Path | Purpose |
 |---|---|
-| `src/index.ts` | The public entry point |
-| `src/session.ts` | The session and its append-only turns |
-| `src/turn.ts` | One turn, shaped as one SQLite row |
-| `src/model.ts` | The `ModelClient` plugin point; transport only |
-| `src/api-kind.ts` | The three gateway shapes and which one to pick |
-| `src/kilo-gateway.ts` | The kilo gateway plugin: shape choice, send, stream |
-| `src/kilo-gateway-http.ts` | The post, the headers, and the retry |
-| `src/kilo-gateway-fake.ts` | The fake `fetch` the gateway tests share |
-| `src/wire/*.ts` | One file per gateway shape, plus the shared `Wire` |
-| `src/sse.ts` | Server-sent events framing |
-| `src/fetch.ts` | The smallest `fetch` the package needs |
-| `src/prompt.ts` | The `PromptAssembler` plugin point and the core assembler |
-| `src/storage.ts` | The `SessionStore` plugin point; no plugin yet |
-| `src/id.ts` | The `IdGenerator` plugin point and the ULID plugin |
+| `src/index.ts` | The public entry point; core and every owned plugin |
+| `src/core/session.ts` | The session and its append-only turns |
+| `src/core/turn.ts` | One turn, shaped as one SQLite row |
+| `src/core/prompt.ts` | The `Prompt` shape and the `PromptAssembler` plugin point |
+| `src/core/model.ts` | The `ModelClient` plugin point; transport only |
+| `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
+| `src/core/id.ts` | The `IdGenerator` plugin point |
+| `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
+| `src/plugins/id/ulid.ts` | The identifier plugin |
+| `src/plugins/prompt/default.ts` | The assembler plugin |
+| `src/plugins/gateway/` | The kilo gateway plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config; stricter than the root config |
+
+Inside `src/plugins/gateway/`:
+
+| Path | Purpose |
+|---|---|
+| `index.ts` | The layer: shape choice, send, stream |
+| `http.ts` | The post, the headers, and the retry |
+| `api-kind.ts` | The three shapes and which one to pick |
+| `sse.ts` | Server-sent events framing |
+| `wire/` | One file per shape, plus the shared `Wire` |
+| `fake.ts` | The fake `fetch` the gateway tests share |
+
+Each plugin has its own entry point, so a consumer takes only what it uses:
+`@kilocode/harness-sdk/core`, `/plugins/gateway`, `/plugins/id`,
+`/plugins/prompt`.
 
 ## Recorded deviations
 
@@ -146,6 +162,7 @@ turn one off, and give the reason.
 | `no-magic-numbers` | An HTTP status and a token count are not magic. |
 | `max-classes-per-file` | A tag and its error belong in one file. |
 | `sort-keys` | Field order carries meaning; alphabetical order does not. |
+| `import/prefer-default-export` | It deadlocks with `import/no-default-export`. |
 
 `new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
 `Context.Tag` is a call, not a constructor.

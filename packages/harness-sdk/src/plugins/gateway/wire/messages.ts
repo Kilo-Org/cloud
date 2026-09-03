@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { ModelReply, ModelRequest, ModelUsage } from '../model.js';
-import type { TurnRole } from '../turn.js';
+import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { TurnRole } from '../../../core/turn.js';
 import type { Wire } from './wire.js';
 import { type Counts, set } from './usage.js';
 

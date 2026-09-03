@@ -1,4 +1,4 @@
-import type { ModelReply, ModelRequest, ModelUsage } from '../model.js';
+import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 
 /**
  * One gateway shape. A wire maps a request onto a body and maps the reply back.

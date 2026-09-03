@@ -1,4 +1,4 @@
-import { Chunk, Context, Layer } from 'effect';
+import { type Chunk, Context } from 'effect';
 import type { Turn, TurnRole } from './turn.js';
 
 /**
@@ -42,24 +42,5 @@ class PromptAssembler extends Context.Tag('harness/PromptAssembler')<
   PromptAssemblerService
 >() {}
 
-/**
- * The core plugin. It sets two breakpoints: one after the system prompt, which
- * every request of every session reads, and one on the last turn, which the
- * next request of this session reads.
- */
-const assemble = ({ system, turns }: PromptInput): Prompt => {
-  const count = Chunk.size(turns);
-  return {
-    system: [{ text: system, cache: true }],
-    messages: Chunk.toReadonlyArray(turns).map((turn, index) => ({
-      role: turn.role,
-      text: turn.content,
-      cache: index === count - 1,
-    })),
-  };
-};
-
-const layerDefault: Layer.Layer<PromptAssembler> = Layer.succeed(PromptAssembler, { assemble });
-
 export type { Prompt, PromptAssemblerService, PromptBlock, PromptInput, PromptMessage };
-export { assemble, layerDefault, PromptAssembler };
+export { PromptAssembler };

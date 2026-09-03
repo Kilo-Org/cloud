@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import { type IdGenerator, layerUlid } from './id.js';
+import type { IdGenerator } from './id.js';
+import { layerUlid } from '../plugins/id/ulid.js';
 import { makeSession } from './session.js';
 
 const run = <A>(effect: Effect.Effect<A, never, IdGenerator>): A =>

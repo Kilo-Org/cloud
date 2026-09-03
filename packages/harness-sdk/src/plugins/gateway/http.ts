@@ -1,6 +1,6 @@
 import { Effect, Schedule } from 'effect';
-import type { FetchLike, HttpResponse } from './fetch.js';
-import { ModelError } from './model.js';
+import type { FetchLike, HttpResponse } from '../../core/fetch.js';
+import { ModelError } from '../../core/model.js';
 
 /** Whose credit pays for the call. */
 type OrgContext =

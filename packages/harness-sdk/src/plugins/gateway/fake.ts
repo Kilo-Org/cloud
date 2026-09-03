@@ -1,8 +1,8 @@
 import { Chunk } from 'effect';
-import type { FetchLike, HttpRequest } from './fetch.js';
-import { assemble } from './prompt.js';
-import type { ModelRequest } from './model.js';
-import type { Turn } from './turn.js';
+import type { FetchLike, HttpRequest } from '../../core/fetch.js';
+import { assemble } from '../prompt/default.js';
+import type { ModelRequest } from '../../core/model.js';
+import type { Turn } from '../../core/turn.js';
 
 interface Call {
   readonly url: string;

@@ -43,14 +43,21 @@ file before you change any file in this package.
     `ttsc` compiles the file, so no schema object exists at run time.
 
     Prefer a boolean check on a hot path. Building an error is far more
-    expensive than answering no: an is-check that misses costs about 0.005 us,
-    an assert that throws costs about 0.2 us.
+    expensive than answering no: an is-check that misses costs 0.004 us, and
+    an assert that throws costs 2.8 us, which is 700 times as much. Measured
+    2026-09-03, Node v24.14.1, macOS arm64, median of 7 runs.
 11. Keep the package maintainable. Keep a file small and give it one job. If a
     file passes about 100 lines, split it.
-12. Keep the core free of a runtime. The package must run on Node, in a
-    browser, and in a mobile app. Do not import `node:`, `Buffer`, `process`,
-    or a DOM type. A runtime belongs in a plugin. `tsconfig.json` sets
-    `"types": []` to enforce this.
+12. Keep the core free of a runtime. Do not import `node:`, `Buffer`,
+    `process`, or a DOM type. A runtime belongs in a plugin.
+
+    `tsconfig.json` sets `"types": []`, which removes the ambient Node globals
+    and so makes first-party `process` or `Buffer` a compile error. It stops
+    there. It cannot see a dependency's own imports, and `skipLibCheck: true`
+    removes the rest of the leverage. `core/id.ts` imports `ulid`, which
+    resolves to `node:crypto` on Node, so the core does not yet meet this rule
+    for a browser or a mobile build. The package targets Node and Bun today;
+    fix this when a third target is real, not before.
 13. Measure, do not guess. A decision about performance is made from data.
     Write the benchmark, run it, and put the number in the commit message or
     in this file. "This looks slow" is not a finding, and neither is "this
@@ -62,32 +69,70 @@ file before you change any file in this package.
     for one of them was twice as slow as the code it replaced.
 
     Measure the environment too, not just the machine in front of you. A
-    validator that is fast on Node can be three times slower in a worker,
-    and the benchmark that misses that ships the wrong library.
+    validator that is fast on Node is slower where `new Function()` is
+    forbidden, so a benchmark run only on Node can ship the wrong library.
+
+    Measure the whole path before you optimise a part of it. This package
+    spent its first pass making validation 43 times faster, which was 0.005 us
+    of a 7 us path, and did not measure the other 99.9 percent until an
+    adversarial review did. Being right about the small number is not the same
+    as being right about where the cost is.
 
 ## Performance
 
-These are requirements, not goals:
+These are requirements:
 
 - Use the least CPU.
 - Use the least RAM.
-- Keep the model cache hit ratio above 95 percent.
 
 A change that adds an allocation on a hot path needs a measurement. A change
 that reorders or rewrites the prompt prefix breaks the cache; treat it as a
 regression until a measurement says otherwise.
 
-Measured on the SSE hot path, per streamed token, 200k events:
+The cache hit ratio is a requirement on this package's own work: place the
+breakpoints so the prefix stays byte-identical as the session grows. It is not
+a requirement on the number a given provider returns, which the package does
+not control. See the model run below, where served models range from 0.61 to
+0.9997 on identical breakpoints.
+
+### The validator
+
+Measured on the SSE hot path, per streamed token, 200k events, Node v24.14.1,
+macOS arm64:
 
 | | codegen allowed | codegen blocked |
 |---|---|---|
-| zod 4, three schemas per event | 10.34 us | — |
-| typia, boolean checks | 0.241 us | 0.220 us |
+| zod 4, three schemas per event | 11.3 us | not measured |
+| typia, boolean checks | 0.25 us | 0.25 us |
+
+Read the typia row carefully. `JSON.parse` is 0.250 us of it and the checks
+are 0.005 us: the row is very nearly the cost of parsing, not of validating.
 
 The second column is what a Cloudflare Worker, an MV3 extension and a React
 Native release build see, because all three reject `new Function()`. typia
-costs the same in both because its checks are generated at compile time. Do
-not reintroduce a validator that builds its checks at run time.
+costs the same in both because its checks are generated at compile time. zod
+is slower there, and by how much was never measured — do not quote a figure
+for that cell until someone runs it. Do not reintroduce a validator that
+builds its checks at run time.
+
+### What a streamed token actually costs
+
+Marginal cost through `openSession`, `ask`, the gateway and a fake transport,
+200 turns of history:
+
+| | us / token |
+|---|---:|
+| the whole path | 7.1 |
+| the Effect operator chain in `gateway/index.ts` | 4.7 |
+| the same work in one plain loop, no Effect | 0.46 |
+| SSE parse and wire read (the validator table above) | 0.25 |
+| typia validation alone | 0.005 |
+
+Nothing here is being changed. 7 us per token is 7 ms on a thousand token
+answer, against seconds of model latency, and collapsing the operator chain
+would trade the package's one idiom for 2 ms. The numbers are recorded so the
+next change to this path argues from data rather than from instinct — in
+either direction.
 
 ## The toolchain
 
@@ -202,6 +247,12 @@ Measured on 2026-09-03, five turns each, the Kilo organization:
 | `nvidia/nemotron-3-ultra-550b-a55b` | yes | 40960 | 17899 | 0.6959 |
 | `google/gemini-3.7-flash` | yes | 40755 | 17884 | 0.6950 |
 
+**This table is suspect and needs a re-run.** It was measured before the
+usage merge was fixed: the gateway overwrote counts instead of raising them, so
+a provider that echoes zeros in its last frame recorded a ratio near zero from
+counts that were never wrong. The three low rows carry exactly that signature.
+Re-run `pnpm test:e2e:models` and replace this table before citing it.
+
 Every served model took the `messages` shape. Two lessons hold beyond this run:
 
 - **The ratio is the provider's, not the package's.** The package places the
@@ -250,16 +301,18 @@ cache. Three places may set it, and the nearest one wins:
 
 1. The question: `session.ask(text, { maxTokens })`.
 2. The session: `openSession({ maxTokens })`.
-3. The `TokenCeiling` plugin, when neither names a number.
+3. The `ModelCatalog` plugin's `maxOutputTokens`, when neither names one.
+4. `4096`, when the catalog names none either.
 
-The right ceiling belongs to the application, not to the package, which is why
-it is a plugin. The package ships `layerFixedCeiling(4096)` and no opinion
-beyond it. A model-aware plugin that reads a model's own output limit is the
-obvious next one.
+One session answers one question at a time, because two answers built on one
+prefix means the second one misses the cache. A second question asked while
+the first still streams fails with `SessionBusyError`.
 
-One session answers one question at a time. A semaphore holds the second
-question until the first is finished, because two answers built on one prefix
-means the second one misses the cache.
+It is refused rather than queued. Queueing cannot work: under `Stream.merge`
+the merged stream holds every child resource until all children finish, so the
+first question cannot release what the second waits on, and the acquire is
+uninterruptible, so `Effect.timeout` cannot break the deadlock either. Four
+acquire shapes were tried and every one that waits deadlocks.
 
 An answer turn is added only when the stream reaches `done`. A half written turn
 would sit in the prefix of every later request.
@@ -312,10 +365,12 @@ when nobody named a number.
 `core/` holds the contracts and the pure domain. `plugins/` holds the
 implementations, including the ones this package owns. **A file in `core/` must
 never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
+It exempts `*.test.ts`: a core test needs a plugin to run against.
 
 | Path | Purpose |
 |---|---|
 | `src/index.ts` | The public entry point; core and every owned plugin |
+| `src/core/index.ts` | The `/core` entry point; every core module, no plugin |
 | `src/core/run.ts` | `openSession`: the handle a consumer drives |
 | `src/core/ask.ts` | One question and one answer, with the turn rules |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
@@ -329,14 +384,14 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
-| `src/plugins/model/fake.ts` | A scripted model, for tests without a network |
+| `src/plugins/model/fake.ts` | A scripted model, for this package's tests. Excluded from `dist/` |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/catalog/table.ts` | A catalog the caller writes down |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/gateway/` | The kilo gateway plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
-| `tsconfig.json` | The package compiler config; stricter than the root config |
+| `tsconfig.json` | The package compiler config. The repo has no root `tsconfig.json`; this one stands alone |
 
 Inside `src/plugins/gateway/`:
 
@@ -344,16 +399,20 @@ Inside `src/plugins/gateway/`:
 |---|---|
 | `index.ts` | The layer: send, stream, and the resolved plugins |
 | `wires.ts` | Asks the catalog and picks the best wire for a model |
-| `test-gateway.ts` | The gateway with test plugins, for the unit tests |
+| `test-gateway.ts` | The gateway with test plugins, for the unit tests. Excluded from `dist/` |
 | `http.ts` | The post, the headers, and the retry |
 | `api-kind.ts` | The three shapes and which one to pick |
 | `sse.ts` | A reader over `eventsource-parser` |
 | `wire/` | One file per shape, plus the shared `Wire` |
-| `fake.ts` | The fake `fetch` the gateway tests share |
+| `fake.ts` | The fake `fetch` the gateway tests share. Excluded from `dist/` |
 
-Each plugin has its own entry point, so a consumer takes only what it uses:
-`@kilocode/harness-sdk/core`, `/plugins/gateway`, `/plugins/id`,
-`/plugins/prompt`.
+There are four entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/gateway` and `/plugins/prompt`. The catalog, token and retry plugins
+have none — a consumer reaches them through the root barrel, which also pulls
+the gateway. Add a subpath when one of them is wanted on its own.
+
+`pnpm build` empties `dist/` first. It once did not, and a subpath whose source
+had been deleted went on resolving against a stale artifact.
 
 ## Recorded deviations
 
@@ -378,9 +437,18 @@ turn one off, and give the reason.
 | `max-classes-per-file` | A tag and its error belong in one file. |
 | `sort-keys` | Field order carries meaning; alphabetical order does not. |
 | `import/prefer-default-export` | It deadlocks with `import/no-default-export`. |
+| `typescript/require-await` | The same false positive as `require-await`, on the TypeScript side. |
+| `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
+| `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
+| `unicorn/require-module-specifiers` | Off for the config files, which use bare re-exports. |
 
-`new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
-`Context.Tag` is a call, not a constructor.
+`skipLibCheck` is on in `tsconfig.json`. `effect` and the two model SDKs ship
+declarations this compiler rejects, and the package cannot fix them. It is the
+one relaxed compiler flag, and it is the reason principle 12 cannot be enforced
+by the type system alone.
+
+`new-cap` stays on with `Tag`, `GenericTag`, `TaggedError` and `TaggedClass`
+as exceptions, because each is a call, not a constructor.
 
 `isolatedDeclarations` is off. It cannot infer a typia validator's type.
 

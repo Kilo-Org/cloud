@@ -33,6 +33,7 @@ import {
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -183,6 +184,9 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  // Session-route navigation only: `replace` in one native-stack commit crashes
+  // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
+  const sessionRouter = useStackSafeReplace();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -1293,27 +1297,27 @@ export function SessionDetailContent({
     // tick, and the agents tab refetches on focus.
     const result = await createAndNavigateAgentSession({
       create: manager.createRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId]);
 
   const handleRestartSession = useCallback(async () => {
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId]);
 
   const handleExitSession = useCallback(
     async (

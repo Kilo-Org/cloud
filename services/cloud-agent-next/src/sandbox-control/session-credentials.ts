@@ -23,6 +23,7 @@ import {
   resolveManagedBitbucketToken,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
+import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
@@ -69,6 +70,12 @@ const targetsSchema = z
     backendBaseUrl: z.string().url(),
     providerBaseUrl: z.string().url(),
     sessionIngestBaseUrl: z.string().url(),
+  })
+  .strict();
+const runtimeProxySchema = z
+  .object({
+    targets: targetsSchema,
+    handle: tokenSchema.max(4096).optional(),
   })
   .strict();
 const capabilitySchema = z
@@ -175,6 +182,7 @@ export const sessionCredentialGrantSchema = z
         token: realTokenSchema,
         tokenSelectedAt: timestampSchema.optional(),
         targets: targetsSchema,
+        runtimeProxy: runtimeProxySchema.optional(),
         capabilities: z.record(z.string(), capabilitySchema),
       })
       .strict(),
@@ -198,7 +206,11 @@ export const sessionCredentialGrantSchema = z
       reject();
     }
     if (grant.containmentEnabled === false) {
-      if (grant.kilo.alias !== undefined || Object.keys(grant.kilo.capabilities).length > 0)
+      if (
+        grant.kilo.alias !== undefined ||
+        grant.kilo.runtimeProxy !== undefined ||
+        Object.keys(grant.kilo.capabilities).length > 0
+      )
         reject();
     } else {
       const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
@@ -260,6 +272,10 @@ export const sessionCredentialGrantSchema = z
       ) {
         reject();
       }
+      if (grant.kilo.runtimeProxy) {
+        const targets = deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets);
+        if (!targets) reject();
+      }
     } else {
       const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
       if (
@@ -294,7 +310,7 @@ export function isContainedSessionCredentialGrant(
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
-  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET'>> &
+  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET' | 'WORKER_URL'>> &
   KiloTargetEnv;
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {
@@ -327,6 +343,65 @@ function safeUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+function deriveRuntimeProxyTargets(
+  targets: z.infer<typeof targetsSchema>
+): { backend: URL; provider: URL; ingest: URL } | null {
+  const parsed = [
+    targets.backendBaseUrl,
+    targets.providerBaseUrl,
+    targets.sessionIngestBaseUrl,
+  ].map(safeUrl);
+  const [backend, provider, ingest] = parsed;
+  if (
+    !backend ||
+    !provider ||
+    !ingest ||
+    backend.protocol !== 'https:' ||
+    backend.port !== '' ||
+    provider.protocol !== 'https:' ||
+    provider.port !== '' ||
+    ingest.protocol !== 'https:' ||
+    ingest.port !== '' ||
+    backend.origin !== provider.origin ||
+    backend.origin !== ingest.origin ||
+    backend.search ||
+    provider.search ||
+    ingest.search ||
+    backend.pathname !== '/api/runtime-credential-proxy/backend' ||
+    provider.pathname !== '/api/runtime-credential-proxy/provider' ||
+    ingest.pathname !== '/api/runtime-credential-proxy/ingest'
+  ) {
+    return null;
+  }
+  return { backend, provider, ingest };
+}
+
+function runtimeProxyTargets(env: CredentialEnv): z.infer<typeof targetsSchema> | null {
+  if (!env.WORKER_URL) return null;
+  let worker: URL;
+  try {
+    worker = new URL(env.WORKER_URL);
+  } catch {
+    return null;
+  }
+  if (
+    worker.protocol !== 'https:' ||
+    worker.username ||
+    worker.password ||
+    worker.search ||
+    worker.hash
+  ) {
+    return null;
+  }
+  const base = `${worker.origin}${worker.pathname.replace(/\/+$/, '')}/api/runtime-credential-proxy`;
+  const targets = {
+    backendBaseUrl: `${base}/backend`,
+    providerBaseUrl: `${base}/provider`,
+    sessionIngestBaseUrl: `${base}/ingest`,
+  };
+  return deriveRuntimeProxyTargets(targets) ? targets : null;
 }
 
 function canonicalRepositoryUrl(value: string, managed = false): string {
@@ -856,6 +931,18 @@ export async function prepareSessionCredentials(input: {
   const kiloToken = containmentEnabled
     ? token.data
     : await selectDirectKiloToken(env, token.data, existing, now);
+  const modernRuntimeProxy =
+    provider === 'vercel' && containmentEnabled && hasModernRuntimeAuthorization(metadata)
+      ? runtimeProxyTargets(env)
+      : null;
+  if (
+    provider === 'vercel' &&
+    containmentEnabled &&
+    hasModernRuntimeAuthorization(metadata) &&
+    !modernRuntimeProxy
+  ) {
+    invalidCredentials();
+  }
   let grant: SessionCredentialGrant = {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
@@ -884,6 +971,16 @@ export async function prepareSessionCredentials(input: {
           }
         : {}),
       targets: targets.targets,
+      ...(modernRuntimeProxy
+        ? {
+            runtimeProxy: {
+              targets: modernRuntimeProxy,
+              ...(existing?.kilo.runtimeProxy?.handle
+                ? { handle: existing.kilo.runtimeProxy.handle }
+                : {}),
+            },
+          }
+        : {}),
       capabilities: existing?.kilo.token === kiloToken ? existing.kilo.capabilities : {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
@@ -984,6 +1081,7 @@ export function buildControlNetworkPolicy(
         targets: grant.kilo.targets,
         rootSessionIds: grant.members.map(member => member.kiloSessionId),
         organizationId: grant.orgId,
+        ...(grant.kilo.runtimeProxy ? { runtimeProxy: grant.kilo.runtimeProxy } : {}),
       },
       ...(grant.repository?.type === 'github' && grant.scm?.nativeToken
         ? {
@@ -1004,7 +1102,10 @@ export function buildControlNetworkPolicy(
   const injectionRules = policies.flatMap(policy => policy.injectionRules);
   return {
     mode: 'custom',
-    allowedDomains: [...new Set(injectionRules.map(rule => rule.domain)), '*'],
+    allowedDomains: [
+      ...new Set(policies.flatMap(policy => policy.allowedDomains)),
+      ...(policies.length === 0 ? ['*'] : []),
+    ],
     injectionRules,
   };
 }

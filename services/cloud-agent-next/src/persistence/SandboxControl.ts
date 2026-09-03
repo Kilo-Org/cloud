@@ -529,22 +529,34 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const [ownerId, routes, physical] = await Promise.all([
+    const [ownerId, routes, physical, grants] = await Promise.all([
       this.readOwner(),
       loadRouteTable(this.ctx.storage),
       loadPhysicalRecord(this.ctx.storage),
+      loadSessionCredentialGrants(this.ctx.storage),
     ]);
     if (ownerId !== input.ownerId) return null;
     const route = routes.get(input.sessionId);
+    const provisioned = grants.some(
+      grant =>
+        grant.userId === input.ownerId &&
+        grant.directory === input.directory &&
+        grant.expiresAt > Date.now() &&
+        grant.members.some(
+          member =>
+            member.sessionId === input.sessionId && member.kiloSessionId === input.kiloSessionId
+        )
+    );
     if (
-      !route ||
-      route.ownerId !== input.ownerId ||
-      route.kiloSessionId !== input.kiloSessionId ||
-      route.directory !== input.directory
+      (!route && !provisioned) ||
+      (route &&
+        (route.ownerId !== input.ownerId ||
+          route.kiloSessionId !== input.kiloSessionId ||
+          route.directory !== input.directory))
     ) {
       return null;
     }
-    const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+    const worktreeId = route?.worktreeId ?? this.worktreeIdFromDirectory(input.directory);
     if (
       this.runtimeDeleted ||
       this.exclusiveDeletionWorktreeId ||
@@ -1353,6 +1365,70 @@ export class SandboxControl extends DurableObject<Env> {
         );
       }
       return result.route;
+    });
+  }
+
+  async bindRuntimeCredentialProxyHandle(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+    handle: string;
+  }): Promise<void> {
+    await this.withCredentialUpdate(async () => {
+      if (
+        typeof input.handle !== 'string' ||
+        input.handle.length === 0 ||
+        input.handle.length > 4096
+      ) {
+        throw new Error('Invalid runtime credential proxy handle');
+      }
+      const ownerId = await this.requireOwner();
+      if (ownerId !== input.ownerId) throw new Error('Sandbox owner mismatch');
+      const physical = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        this.providerKind !== 'vercel' ||
+        physical.state !== 'running' ||
+        !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+      ) {
+        throw new Error('Sandbox credential containment mismatch');
+      }
+      const grants = await loadSessionCredentialGrants(this.ctx.storage);
+      const now = Date.now();
+      const index = grants.findIndex(
+        grant =>
+          grant.userId === ownerId &&
+          grant.directory === input.directory &&
+          grant.expiresAt > now &&
+          grant.members.some(
+            member =>
+              member.sessionId === input.sessionId && member.kiloSessionId === input.kiloSessionId
+          ) &&
+          grant.kilo.runtimeProxy !== undefined
+      );
+      if (index < 0) throw new Error('Session has no matching runtime proxy credential grant');
+      const grant = grants[index];
+      if (!grant) throw new Error('Session has no matching runtime proxy credential grant');
+      const updated = grants.map((value, current) =>
+        current === index
+          ? {
+              ...value,
+              kilo: {
+                ...value.kilo,
+                runtimeProxy: value.kilo.runtimeProxy
+                  ? { ...value.kilo.runtimeProxy, handle: input.handle }
+                  : undefined,
+              },
+            }
+          : value
+      );
+      await saveSessionCredentialGrants(this.ctx.storage, updated);
+      await this.updateNetworkPolicy({
+        ownerId,
+        networkPolicy: buildControlNetworkPolicy(updated.filter(value => value.expiresAt > now)),
+        requiredContainment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      });
+      await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
     });
   }
 

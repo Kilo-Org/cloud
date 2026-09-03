@@ -12,6 +12,10 @@ export type VercelCredentialPolicyInput = {
     targets: KiloSandboxTargets;
     rootSessionIds: string[];
     organizationId?: string;
+    runtimeProxy?: {
+      handle?: string;
+      targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
+    };
   };
   github?: {
     token: string;
@@ -200,6 +204,86 @@ export function buildKiloCredentialInjectionRules(
   return rules;
 }
 
+function runtimeProxyInjectionRules(
+  kilo: NonNullable<VercelCredentialPolicyInput['kilo']>,
+  organizationId: string | undefined
+): VercelSandboxInjectionRule[] {
+  const input = kilo.runtimeProxy;
+  if (!input?.handle) return [];
+  const targets = [
+    new URL(input.targets.backendBaseUrl),
+    new URL(input.targets.providerBaseUrl),
+    new URL(input.targets.sessionIngestBaseUrl),
+  ];
+  if (
+    targets.some(
+      target =>
+        target.protocol !== 'https:' ||
+        target.port !== '' ||
+        target.username ||
+        target.password ||
+        target.search ||
+        target.hash
+    )
+  ) {
+    invalidPolicy();
+  }
+  const [backend, provider, ingest] = targets;
+  const authorization = `Bearer ${input.handle}`;
+  const rules: VercelSandboxInjectionRule[] = [];
+  const add = (target: URL, path: string, methods: string[]) =>
+    rules.push(
+      createCredentialRule({
+        target,
+        path: { exact: path },
+        methods,
+        expectedAuthorization: authorization,
+        injectedAuthorization: authorization,
+      })
+    );
+  for (const path of [
+    '/api/user',
+    '/api/profile',
+    '/api/profile/balance',
+    '/api/defaults',
+    '/api/users/notifications',
+  ]) {
+    add(backend, `${basePath(backend)}${path}`, ['GET']);
+  }
+  if (organizationId !== undefined) {
+    for (const path of ['models', 'defaults', 'modes']) {
+      add(backend, `${basePath(backend)}/api/organizations/${organizationId}/${path}`, ['GET']);
+    }
+    add(backend, `${basePath(backend)}/api/organizations/${organizationId}/models/validate`, [
+      'POST',
+    ]);
+  }
+  for (const [path, methods] of [
+    ['/models', ['GET']],
+    ['/models/validate', ['POST']],
+    ['/chat/completions', ['POST']],
+    ['/messages', ['POST']],
+    ['/responses', ['POST']],
+    ['/embeddings', ['POST']],
+  ] as const) {
+    add(provider, `${basePath(provider)}${path}`, [...methods]);
+  }
+  if (organizationId !== undefined) {
+    add(provider, `${basePath(provider)}/api/organizations/${organizationId}/models`, ['GET']);
+  }
+  add(ingest, `${basePath(ingest)}/api/session`, ['POST']);
+  for (const sessionId of kilo.rootSessionIds) {
+    for (const [suffix, methods] of [
+      ['export', ['GET']],
+      ['ingest', ['POST']],
+      ['title', ['POST']],
+    ] as const) {
+      add(ingest, `${basePath(ingest)}/api/session/${sessionId}/${suffix}`, [...methods]);
+    }
+  }
+  return rules;
+}
+
 function githubInjectionRules(
   input: NonNullable<VercelCredentialPolicyInput['github']>
 ): VercelSandboxInjectionRule[] {
@@ -299,13 +383,25 @@ export function buildVercelCredentialNetworkPolicy(
   }
 
   const injectionRules = [
-    ...(input.kilo === undefined ? [] : buildKiloCredentialInjectionRules(input.kilo)),
+    ...(input.kilo === undefined
+      ? []
+      : input.kilo.runtimeProxy
+        ? runtimeProxyInjectionRules(input.kilo, input.kilo.organizationId)
+        : buildKiloCredentialInjectionRules(input.kilo)),
     ...(input.github === undefined ? [] : githubInjectionRules(input.github)),
   ];
 
   return {
     mode: 'custom',
-    allowedDomains: [...new Set(injectionRules.map(rule => rule.domain)), '*'],
+    allowedDomains: [
+      ...new Set([
+        ...injectionRules.map(rule => rule.domain),
+        ...(input.kilo?.runtimeProxy
+          ? [new URL(input.kilo.runtimeProxy.targets.backendBaseUrl).hostname]
+          : []),
+      ]),
+      '*',
+    ],
     injectionRules,
   };
 }

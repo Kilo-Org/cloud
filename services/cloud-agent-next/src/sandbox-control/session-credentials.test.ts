@@ -1823,6 +1823,61 @@ describe('credential resolution boundaries', () => {
 });
 
 describe('native Vercel worktree policies', () => {
+  it('uses only Worker proxy targets for a modern runtime and never serializes its backing authority', async () => {
+    const { broker } = createBroker();
+    const backingToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'backing-secret'
+    );
+    const env = { ...environment(broker), WORKER_URL: 'https://worker.example.test' };
+    const { grant } = await prepare(
+      env,
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: backingToken } })
+    );
+
+    const staticPolicy = buildControlNetworkPolicy([grant]);
+    expect(JSON.stringify(staticPolicy)).not.toContain(backingToken);
+    expect(staticPolicy.allowedDomains).toContain('worker.example.test');
+    expect(staticPolicy.injectionRules).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: expect.stringContaining('backing-secret'),
+          }),
+        }),
+      ])
+    );
+
+    const handle = 'opaque-runtime-proxy-handle';
+    const policy = buildControlNetworkPolicy([
+      {
+        ...grant,
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: { ...grant.kilo.runtimeProxy!, handle },
+        },
+      },
+    ]);
+    const serialized = JSON.stringify(policy);
+    expect(serialized).toContain(handle);
+    expect(serialized).not.toContain(backingToken);
+    expect(serialized).not.toContain('runtimeAuthorization');
+    expect(
+      policy.injectionRules
+        .filter(rule => rule.headers.authorization === `Bearer ${handle}`)
+        .every(rule => rule.domain === 'worker.example.test')
+    ).toBe(true);
+    expect(
+      findMatchingCredentialInjectionRule(policy.injectionRules, {
+        url: new URL(
+          'https://worker.example.test/api/runtime-credential-proxy/provider/anything-else'
+        ),
+        method: 'POST',
+        headers: new Headers({ authorization: `Bearer ${handle}` }),
+      })
+    ).toBeUndefined();
+  });
+
   it('composes sibling worktree rules without losing registered roots or broadening aliases', async () => {
     const { broker } = createBroker();
     const env = environment(broker);

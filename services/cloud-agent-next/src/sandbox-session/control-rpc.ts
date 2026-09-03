@@ -52,6 +52,13 @@ type SandboxControlRpc = {
     reason: string;
   }): Promise<{ quarantined: boolean }>;
   attachSession(input: AttachRouteInput): Promise<unknown>;
+  bindRuntimeCredentialProxyHandle(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+    handle: string;
+  }): Promise<void>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
@@ -82,6 +89,7 @@ export function sandboxControlRpc(env: Env, sandboxId: string): SandboxControlRp
       ),
     quarantineRuntime: input => stub().quarantineRuntime(input),
     attachSession: input => stub().attachSession(input),
+    bindRuntimeCredentialProxyHandle: input => stub().bindRuntimeCredentialProxyHandle(input),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
     validateTerminalAccess: input =>

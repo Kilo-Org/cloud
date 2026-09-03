@@ -1808,23 +1808,6 @@ export class SandboxSession extends DurableObject<Env> {
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
         };
-        phase = 'attach';
-        await wait(() =>
-          control.attachSession({
-            ...(metadata.workspace?.worktreeId
-              ? { worktreeId: metadata.workspace.worktreeId }
-              : {}),
-            sessionId,
-            kiloSessionId,
-            directory: session.directory,
-            ownerId: metadata.identity.userId,
-          })
-        );
-        if (!isCurrent()) {
-          if (!this.terminalLifecycle.isCurrent(epoch))
-            await this.compensateSessionAttachment(metadata);
-          return;
-        }
         const authorization = RuntimeAuthorizationSchema.safeParse(
           this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
         );
@@ -1873,6 +1856,34 @@ export class SandboxSession extends DurableObject<Env> {
               sessionIngestBaseUrl: `${proxyBaseUrl}/ingest`,
             },
           };
+          if (getSandboxProvider(metadata) === 'vercel') {
+            await wait(() =>
+              control.bindRuntimeCredentialProxyHandle({
+                ownerId: metadata.identity.userId,
+                sessionId,
+                kiloSessionId,
+                directory: session.directory,
+                handle,
+              })
+            );
+          }
+        }
+        phase = 'attach';
+        await wait(() =>
+          control.attachSession({
+            ...(metadata.workspace?.worktreeId
+              ? { worktreeId: metadata.workspace.worktreeId }
+              : {}),
+            sessionId,
+            kiloSessionId,
+            directory: session.directory,
+            ownerId: metadata.identity.userId,
+          })
+        );
+        if (!isCurrent()) {
+          if (!this.terminalLifecycle.isCurrent(epoch))
+            await this.compensateSessionAttachment(metadata);
+          return;
         }
         await dispatch('attach', () =>
           wait(

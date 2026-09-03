@@ -8,6 +8,7 @@ import {
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
@@ -319,6 +320,53 @@ export function generateCloudAgentWorkflowToken(
         authorizationUserId: authorizationUser.id,
         authorizationPepper: authorizationUser.api_token_pepper,
       },
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+}
+
+/**
+ * Generates a gateway credential for a server-side workflow. Unlike resource
+ * delegation from an HTTP request, queued workflows have no browser bearer
+ * token to delegate from. The workflow owner is therefore the authority and
+ * the token is deliberately limited to the gateway and one hour.
+ */
+export function generateWorkflowGatewayToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    expiresIn?: number;
+    authorizationUser?: User;
+  }
+): string {
+  if (!isSharedResourceTokenIssuanceEnabled()) {
+    return generateApiToken(user, { tokenSource: options.tokenSource });
+  }
+  if (!user.api_token_pepper) {
+    throw new Error('Workflow gateway tokens require a current user pepper');
+  }
+  const authorizationUser = options.authorizationUser ?? user;
+  if (!authorizationUser.api_token_pepper) {
+    throw new Error('Workflow gateway tokens require a current authorization pepper');
+  }
+  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow gateway token expiry must be positive');
+  }
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: KILO_GATEWAY_AUDIENCE,
+    issuedAt,
+    expiresAt: issuedAt + expiresIn,
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
     },
   });
   return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });

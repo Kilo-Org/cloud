@@ -1,6 +1,6 @@
 import { Context, Data, type Effect } from 'effect';
 
-class TokenError extends Data.TaggedError('TokenError')<{
+class TokenError extends Data.TaggedError('harness/TokenError')<{
   readonly cause: unknown;
 }> {}
 

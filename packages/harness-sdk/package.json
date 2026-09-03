@@ -13,12 +13,15 @@
   },
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",
-    "check": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm test && pnpm build",
-    "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
+    "check": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm test && pnpm test:perf && pnpm build",
+    "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v -e '\\.test\\.ts$' -e '\\-fixture\\.ts$'",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
     "test": "vitest run --passWithNoTests",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:e2e": "ttsx e2e/live.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
+    "test:e2e:shapes": "ttsx e2e/shapes.ts",
+    "test:e2e:session": "ttsx e2e/session.ts",
     "test:watch": "vitest",
     "typecheck": "ttsc --noEmit",
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"

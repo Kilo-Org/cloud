@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest } from './fake.js';
 import { testGateway } from './test-gateway.js';
+import type { FetchLike } from '../../core/fetch.js';
 import type { OrgContext } from './http.js';
 import { ModelClient } from '../../core/model.js';
 
@@ -120,6 +121,40 @@ it('reports the status when the gateway rejects the call', async () => {
 it('tries again after a rate limit and then succeeds', async () => {
   const limited: Reply = { ok: false, status: 429, body: 'slow down' };
   const { calls, result } = await call({ replies: [limited, limited, reply] });
+  expect(calls).toHaveLength(3);
+  expect(Either.getOrThrow(result).content).toBe('hi');
+});
+
+it('gives up after the retry budget and reports the last status', async () => {
+  const limited: Reply = { ok: false, status: 429, body: 'slow down' };
+  const { calls, result } = await call({ replies: [limited] });
+
+  /* Two retries on top of the first attempt. A budget that never ran out
+     would hold the caller forever on an outage that does not clear. */
+  expect(calls).toHaveLength(3);
+  expect(result).toMatchObject({ left: { reason: 'status', status: 429 } });
+});
+
+it('retries a transport failure, which carries no status to judge', async () => {
+  const calls: string[] = [];
+  const failing: FetchLike = (url, request) => {
+    calls.push(url);
+    return calls.length < 3
+      ? Promise.reject(new Error('socket hang up'))
+      : Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(reply.body),
+          request,
+        });
+  };
+  const result = await ModelClient.pipe(
+    Effect.flatMap(client => client.send(sampleRequest(false))),
+    Effect.either,
+    Effect.provide(testGateway({ fetch: failing, retries: 2 })),
+    Effect.runPromise
+  );
+
   expect(calls).toHaveLength(3);
   expect(Either.getOrThrow(result).content).toBe('hi');
 });

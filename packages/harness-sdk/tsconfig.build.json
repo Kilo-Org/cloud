@@ -5,6 +5,7 @@
     "dist",
     "src/**/*.test.ts",
     "src/plugins/**/fake.ts",
-    "src/plugins/**/test-gateway.ts"
+    "src/plugins/**/test-gateway.ts",
+    "src/**/*-fixture.ts"
   ]
 }

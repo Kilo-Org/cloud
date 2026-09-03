@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [ttsc()],
   test: {
     include: ['src/**/*.test.ts'],
+    // The timing tests are a separate gate: `pnpm test:perf`.
+    exclude: ['src/**/*.perf.test.ts'],
     environment: 'node',
   },
 });

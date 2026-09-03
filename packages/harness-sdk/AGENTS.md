@@ -175,7 +175,14 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Typecheck | `pnpm typecheck` (`ttsc --noEmit`) |
 | Build | `pnpm build` (`ttsc -p tsconfig.build.json`) |
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
+| Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
+
+`pnpm test:perf` is a separate config because its files must not run beside the
+unit tests: parallel workers compete for the CPU being measured. Its ceilings
+are about five times the recorded numbers, so it catches a regression in order
+of magnitude and not a busy laptop. A timing test that fails on a loaded
+machine would be turned off within a week, which is worth less than no test.
 
 Because the transform rewrites source, the package ships `dist/` and not
 `src/`. A consumer importing the TypeScript directly would get the throwing
@@ -184,6 +191,14 @@ package reads a stale check.
 
 The first `ttsc` run on a machine compiles typia's plugin from Go and takes
 minutes. Later runs read a cache and take about a second.
+
+**A type error anywhere in `src/` disables the transform everywhere.** typia
+bails when the program does not compile, and every `createIs` and
+`createAssert` then throws `no transform has been configured` — including in
+files that have nothing to do with the error. One unused import in a test file
+made `pnpm test:e2e` fail inside `wire/completions.ts`. If a `ttsx` run throws
+that message, run `pnpm typecheck` first and read the error it reports, not the
+stack it printed.
 
 ## Rules
 
@@ -214,6 +229,22 @@ caller gives the plugin an `apiKinds` function.
 | `messages` | `/api/gateway/v1/messages` | An explicit `cache_control` breakpoint |
 | `responses` | `/api/gateway/v1/responses` | A `prompt_cache_key` the caller names |
 | `chat_completions` | `/api/gateway/v1/chat/completions` | Whatever the provider does on its own |
+
+**The hit ratio is not comparable between shapes.** `pnpm test:e2e:shapes` asks
+the same two questions of the same model through each one:
+
+| Shape | Cache read | Input | Ratio |
+|---|---:|---:|---:|
+| `messages` | 11224 | 6 | 0.9995 |
+| `responses` | 11224 | 11247 | 0.4995 |
+| `chat_completions` | 11224 | 11246 | 0.4995 |
+
+All three read the same 11224 tokens, so all three cached equally well. What
+differs is the billing of the cold call: `messages` reports the first prefix as
+`cache_creation`, and the other two report it as plain input, which the ratio
+then divides by. So the ratio measures caching *and* how a provider books a
+cache write, and only the `messages` column can be read as a cache figure. Hold
+a shape to `cacheReadTokens > 0`, not to a ratio, unless it is `messages`.
 
 The plugin picks `messages` first, then `responses`, then `chat_completions`.
 That order is the cache order: an explicit breakpoint beats a key, and a key
@@ -252,6 +283,31 @@ or a repeated large `cache write` means the prefix moved.
 
 `e2e/node-fetch.ts` is the whole Node adapter, about ten lines. That is the
 measure of what `FetchLike` asks of a caller.
+
+### The shapes, and a session that grows
+
+`pnpm test:e2e:shapes` forces each of the three shapes by telling the catalog a
+model speaks only that one. It exists because every model in the model run
+picks `messages`, so the other two shapes had only ever run against a fake
+`fetch`.
+
+`pnpm test:e2e:session` asks ten questions of one session and reads the counts
+per call. It is the live form of the append-only invariant: the unit test
+proves `assemble` does not rewrite an earlier message, and this proves the
+provider agrees. Measured on 2026-09-03 with `anthropic/claude-haiku-4.5`:
+
+| Call | input | cache read | cache write |
+|---|---:|---:|---:|
+| 1 | 3 | 11822 | 0 |
+| 2 | 3 | 11835 | 0 |
+| 3 | 3 | 11835 | 13 |
+| … | 3 | +13 each | 13 |
+| 10 | 3 | 11926 | 13 |
+
+Cache read grows by exactly one exchange per call and cache write stays at
+exactly that exchange. A prefix that moved would show as a large write on a
+late call, which is what the run asserts. It also asks a second question while
+the first is still streaming, and requires `SessionBusyError`.
 
 ### Many models, a longer conversation
 
@@ -409,6 +465,8 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
 | `src/core/id.ts` | `{prefix}_{ulid}`; the encoding, and the monotonic order |
 | `src/core/entropy.ts` | The `EntropySource` plugin point; random bytes |
+| `src/core/session-fixture.ts` | What the session tests share. Excluded from `dist/` |
+| `src/perf.perf.test.ts` | The timing gate; run by `pnpm test:perf`, not `pnpm test` |
 | `src/core/catalog.ts` | The `ModelCatalog` plugin point; shapes and output limit |
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
@@ -471,6 +529,10 @@ Add a row when you turn one off, and give the reason.
 | `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
 | `unicorn/require-module-specifiers` | Off for the config files, which use bare re-exports. |
+
+The `**/*.test.ts` override also covers `**/*-fixture.ts`, and
+`pnpm check:boundaries` exempts both. A fixture is test code: it may reach for a
+plugin, and it may import more than ten things to wire one.
 
 `skipLibCheck` is on in `tsconfig.json`. `effect` and the two model SDKs ship
 declarations this compiler rejects, and the package cannot fix them. It is the

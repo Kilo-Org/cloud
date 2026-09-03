@@ -11,7 +11,7 @@ interface ModelFacts {
   readonly maxOutputTokens?: number;
 }
 
-class CatalogError extends Data.TaggedError('CatalogError')<{
+class CatalogError extends Data.TaggedError('harness/CatalogError')<{
   readonly model: string;
   readonly cause: unknown;
 }> {}

@@ -6,6 +6,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  glanceableSpokenLabel,
   glanceableSpokenLabelKeys,
   glanceableStatusCopyKey,
   primaryGlanceableCount,
@@ -104,5 +105,65 @@ describe('spoken label shape', () => {
       'glanceable.signedOut',
       'glanceable.openAgents',
     ]);
+  });
+});
+
+describe('numeric spoken label', () => {
+  const copy: Record<string, string> = {
+    'glanceable.needsInput': 'Needs input',
+    'glanceable.reconnecting': 'Reconnecting',
+    'glanceable.running': 'Running',
+    'glanceable.waiting': 'Waiting for agents',
+    'glanceable.empty': 'No work in progress',
+    'glanceable.stale': 'Updates delayed',
+    'glanceable.expired': 'Status expired',
+    'glanceable.signedOut': 'Sign in to see agents',
+    'glanceable.privacy': 'Agents hidden',
+    'glanceable.openAgents': 'Open agents',
+  };
+  const translate = (key: string): string => copy[key] ?? key;
+  const mixed = {
+    ...snapshot({ status: 'happy' }),
+    needsInput: 2,
+    reconnecting: 3,
+    running: 4,
+  };
+
+  it('speaks each numeric count in rank order before Open agents', () => {
+    expect(glanceableSpokenLabel(mixed, {}, translate)).toBe(
+      '2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+    );
+  });
+
+  it('speaks the translated stale warning before retained numeric counts', () => {
+    expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate)).toBe(
+      'Updates delayed, 2 Needs input, 3 Reconnecting, 4 Running, Open agents'
+    );
+  });
+
+  it('speaks stale copy without inventing counts when none remain', () => {
+    expect(glanceableSpokenLabel(snapshot({ status: 'stale' }), {}, translate)).toBe(
+      'Updates delayed, Open agents'
+    );
+  });
+
+  it.each([
+    ['waiting', 'Waiting for agents, Open agents'],
+    ['empty', 'No work in progress, Open agents'],
+    ['expired', 'Status expired, Open agents'],
+    ['signed_out', 'Sign in to see agents, Open agents'],
+    ['privacy', 'Agents hidden, Open agents'],
+  ] as const)('hides numeric counts when the status is %s', (status, expected) => {
+    expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate)).toBe(expected);
+  });
+
+  it('keeps signed-out and privacy overrides ahead of stale counts', () => {
+    const stale = { ...mixed, status: 'stale' as const };
+    expect(glanceableSpokenLabel(stale, { signedOut: true, orgInvalid: true }, translate)).toBe(
+      'Sign in to see agents, Open agents'
+    );
+    expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate)).toBe(
+      'Agents hidden, Open agents'
+    );
   });
 });

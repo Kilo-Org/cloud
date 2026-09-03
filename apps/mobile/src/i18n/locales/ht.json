@@ -3223,6 +3223,7 @@
     "openAgents": "Louvri ajans yo",
     "running": "AP KOURI",
     "needsInput": "bezwen input",
-    "reconnecting": "Ap rekonekte"
+    "reconnecting": "Ap rekonekte",
+    "channelName": "Ajans aktif yo"
   }
 }

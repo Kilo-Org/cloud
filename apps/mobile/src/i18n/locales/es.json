@@ -3245,6 +3245,7 @@
     "openAgents": "Abrir agentes",
     "running": "EN EJECUCIÓN",
     "needsInput": "requiere entrada",
-    "reconnecting": "Reconectando"
+    "reconnecting": "Reconectando",
+    "channelName": "Agentes activos"
   }
 }

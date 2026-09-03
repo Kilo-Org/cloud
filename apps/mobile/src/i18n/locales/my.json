@@ -3223,6 +3223,7 @@
     "openAgents": "agent များကို ဖွင့်ပါ",
     "running": "လည်ပတ်နေသည်",
     "needsInput": "ထည့်သွင်းမှု လိုအပ်သည်",
-    "reconnecting": "ပြန်ချိတ်ဆက်နေသည်"
+    "reconnecting": "ပြန်ချိတ်ဆက်နေသည်",
+    "channelName": "လုပ်ဆောင်နေသော agent များ"
   }
 }

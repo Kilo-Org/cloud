@@ -3223,6 +3223,7 @@
     "openAgents": "Mepee ndị ọrụ",
     "running": "NA-AGBA",
     "needsInput": "chọrọ ntinye",
-    "reconnecting": "Na-ejikọ ọzọ"
+    "reconnecting": "Na-ejikọ ọzọ",
+    "channelName": "Ndị ọrụ na-arụ ọrụ"
   }
 }

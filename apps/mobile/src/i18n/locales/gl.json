@@ -3223,6 +3223,7 @@
     "openAgents": "Abrir axentes",
     "running": "Executando",
     "needsInput": "precisa entrada",
-    "reconnecting": "Reconectando"
+    "reconnecting": "Reconectando",
+    "channelName": "Axentes activos"
   }
 }

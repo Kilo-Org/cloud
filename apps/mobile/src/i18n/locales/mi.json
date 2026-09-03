@@ -3223,6 +3223,7 @@
     "openAgents": "Whakatuwheratia ngā māngai",
     "running": "Kei te oma",
     "needsInput": "e hiahia ana ki te whakaurunga",
-    "reconnecting": "Kei te hono anō"
+    "reconnecting": "Kei te hono anō",
+    "channelName": "Ngā māngai hohe"
   }
 }

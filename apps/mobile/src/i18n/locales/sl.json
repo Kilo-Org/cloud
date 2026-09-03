@@ -3267,6 +3267,7 @@
     "openAgents": "Odprite agente",
     "running": "DELUJE",
     "needsInput": "potrebuje vnos",
-    "reconnecting": "Ponovno povezovanje"
+    "reconnecting": "Ponovno povezovanje",
+    "channelName": "Aktivni agenti"
   }
 }

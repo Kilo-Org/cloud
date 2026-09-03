@@ -3245,6 +3245,7 @@
     "openAgents": "Atvērt aģentus",
     "running": "DARBOJAS",
     "needsInput": "nepieciešama ievade",
-    "reconnecting": "Atkārtoti izveido savienojumu"
+    "reconnecting": "Atkārtoti izveido savienojumu",
+    "channelName": "Aktīvie aģenti"
   }
 }

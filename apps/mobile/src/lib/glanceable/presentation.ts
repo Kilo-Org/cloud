@@ -105,3 +105,23 @@ export function glanceableSpokenLabelKeys(
   parts.push('glanceable.openAgents');
   return parts;
 }
+
+/** Translated status, numeric counts in rank order, then the Open agents action. */
+export function glanceableSpokenLabel(
+  snapshot: GlanceableAgentsSnapshot,
+  flags: GlanceableSurfaceFlags,
+  translate: (key: string) => string
+): string {
+  const status = resolveGlanceableStatus(snapshot, flags);
+  const parts: string[] = [];
+  if (status !== 'happy') {
+    parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
+  }
+  if (status === 'happy' || status === 'stale') {
+    for (const { key, count } of glanceableCountLines(snapshot)) {
+      parts.push(`${count} ${translate(key)}`);
+    }
+  }
+  parts.push(translate('glanceable.openAgents'));
+  return parts.join(', ');
+}

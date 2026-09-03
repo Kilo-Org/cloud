@@ -3223,6 +3223,7 @@
     "openAgents": "Mở tác nhân",
     "running": "ĐANG CHẠY",
     "needsInput": "cần nhập",
-    "reconnecting": "Đang kết nối lại"
+    "reconnecting": "Đang kết nối lại",
+    "channelName": "Tác nhân đang hoạt động"
   }
 }

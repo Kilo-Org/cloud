@@ -3223,6 +3223,7 @@
     "openAgents": "Eejentoota banaa",
     "running": "Hojii irra jira",
     "needsInput": "seensa barbaada",
-    "reconnecting": "Irra deebi'ee walqabachaa jira"
+    "reconnecting": "Irra deebi'ee walqabachaa jira",
+    "channelName": "Eejentoota hojii irra jiran"
   }
 }

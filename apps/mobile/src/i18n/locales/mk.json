@@ -3223,6 +3223,7 @@
     "openAgents": "Отворете ги агентите",
     "running": "Во тек",
     "needsInput": "бара внес",
-    "reconnecting": "Повторно поврзување"
+    "reconnecting": "Повторно поврзување",
+    "channelName": "Активни агенти"
   }
 }

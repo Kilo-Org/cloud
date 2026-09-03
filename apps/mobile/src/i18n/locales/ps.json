@@ -3223,6 +3223,7 @@
     "openAgents": "اجنټان پرانیزئ",
     "running": "روان",
     "needsInput": "ورودی ته اړتیا لري",
-    "reconnecting": "بیا نښلېږي"
+    "reconnecting": "بیا نښلېږي",
+    "channelName": "فعال اجنټان"
   }
 }

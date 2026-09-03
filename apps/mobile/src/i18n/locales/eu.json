@@ -3223,6 +3223,7 @@
     "openAgents": "Ireki agenteak",
     "running": "Exekutatzen",
     "needsInput": "sarreraren zain",
-    "reconnecting": "Berriro konektatzen"
+    "reconnecting": "Berriro konektatzen",
+    "channelName": "Agente aktiboak"
   }
 }

@@ -3289,6 +3289,7 @@
     "openAgents": "Iftaħ l-aġenti",
     "running": "Għaddej",
     "needsInput": "jeħtieġ input",
-    "reconnecting": "Qed jerġa' jaqbad"
+    "reconnecting": "Qed jerġa' jaqbad",
+    "channelName": "Aġenti attivi"
   }
 }

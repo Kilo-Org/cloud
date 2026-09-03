@@ -3223,6 +3223,7 @@
     "openAgents": "Maak agente oop",
     "running": "LOOP",
     "needsInput": "benodig invoer",
-    "reconnecting": "Verbind tans weer"
+    "reconnecting": "Verbind tans weer",
+    "channelName": "Aktiewe agente"
   }
 }

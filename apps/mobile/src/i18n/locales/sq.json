@@ -3223,6 +3223,7 @@
     "openAgents": "Hapni agjentët",
     "running": "Në ekzekutim",
     "needsInput": "ka nevojë për të dhëna",
-    "reconnecting": "Duke u rilidhur"
+    "reconnecting": "Duke u rilidhur",
+    "channelName": "Agjentët aktivë"
   }
 }

@@ -3245,6 +3245,7 @@
     "openAgents": "Abrir agentes",
     "running": "EM EXECUÇÃO",
     "needsInput": "requer entrada",
-    "reconnecting": "A restabelecer ligação"
+    "reconnecting": "A restabelecer ligação",
+    "channelName": "Agentes ativos"
   }
 }

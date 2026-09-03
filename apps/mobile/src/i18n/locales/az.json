@@ -3223,6 +3223,7 @@
     "openAgents": "Agentləri açın",
     "running": "İŞLƏYİR",
     "needsInput": "GİRİŞ TƏLƏB OLUNUR",
-    "reconnecting": "Yenidən qoşulur"
+    "reconnecting": "Yenidən qoşulur",
+    "channelName": "Aktiv agentlər"
   }
 }

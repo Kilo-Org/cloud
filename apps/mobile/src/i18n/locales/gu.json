@@ -3223,6 +3223,7 @@
     "openAgents": "એજન્ટો ખોલો",
     "running": "ચાલી રહ્યું છે",
     "needsInput": "ઇનપુટ જરૂરી",
-    "reconnecting": "ફરી કનેક્ટ થઈ રહ્યું છે"
+    "reconnecting": "ફરી કનેક્ટ થઈ રહ્યું છે",
+    "channelName": "સક્રિય એજન્ટો"
   }
 }

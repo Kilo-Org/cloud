@@ -3223,6 +3223,7 @@
     "openAgents": "Vula ama-agent",
     "running": "IYASEBENZA",
     "needsInput": "idinga okokufaka",
-    "reconnecting": "Ixhuma kabusha"
+    "reconnecting": "Ixhuma kabusha",
+    "channelName": "Ama-agent asebenzayo"
   }
 }

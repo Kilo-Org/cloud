@@ -3245,6 +3245,7 @@
     "openAgents": "Deschide agenții",
     "running": "Rulează",
     "needsInput": "necesită introducere",
-    "reconnecting": "Se reconectează"
+    "reconnecting": "Se reconectează",
+    "channelName": "Agenți activi"
   }
 }

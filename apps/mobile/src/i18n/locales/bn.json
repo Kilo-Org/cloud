@@ -3223,6 +3223,7 @@
     "openAgents": "এজেন্টগুলি খুলুন",
     "running": "চলছে",
     "needsInput": "ইনপুট প্রয়োজন",
-    "reconnecting": "পুনরায় সংযোগ করা হচ্ছে"
+    "reconnecting": "পুনরায় সংযোগ করা হচ্ছে",
+    "channelName": "সক্রিয় এজেন্ট"
   }
 }

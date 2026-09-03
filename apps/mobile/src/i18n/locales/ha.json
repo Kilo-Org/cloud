@@ -3223,6 +3223,7 @@
     "openAgents": "Buɗe wakilai",
     "running": "Ana gudana",
     "needsInput": "yana buƙatar bayani",
-    "reconnecting": "Ana sake haɗawa"
+    "reconnecting": "Ana sake haɗawa",
+    "channelName": "Wakilai da ke aiki"
   }
 }

@@ -3223,6 +3223,7 @@
     "openAgents": "Agenten öffnen",
     "running": "LÄUFT",
     "needsInput": "Eingabe erforderlich",
-    "reconnecting": "Verbindung wird wiederhergestellt"
+    "reconnecting": "Verbindung wird wiederhergestellt",
+    "channelName": "Aktive Agenten"
   }
 }

@@ -3223,6 +3223,7 @@
     "openAgents": "エージェントを開く",
     "running": "実行中",
     "needsInput": "入力が必要",
-    "reconnecting": "再接続中"
+    "reconnecting": "再接続中",
+    "channelName": "アクティブなエージェント"
   }
 }

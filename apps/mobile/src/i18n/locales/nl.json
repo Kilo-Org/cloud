@@ -3223,6 +3223,7 @@
     "openAgents": "Agents openen",
     "running": "Bezig",
     "needsInput": "heeft invoer nodig",
-    "reconnecting": "Opnieuw verbinden"
+    "reconnecting": "Opnieuw verbinden",
+    "channelName": "Actieve agents"
   }
 }

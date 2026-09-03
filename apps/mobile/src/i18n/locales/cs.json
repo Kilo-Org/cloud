@@ -3267,6 +3267,7 @@
     "openAgents": "Otevřít agenty",
     "running": "BĚŽÍ",
     "needsInput": "vyžaduje vstup",
-    "reconnecting": "Obnovování připojení"
+    "reconnecting": "Obnovování připojení",
+    "channelName": "Aktivní agenti"
   }
 }

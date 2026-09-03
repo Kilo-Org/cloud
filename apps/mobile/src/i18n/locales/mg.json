@@ -3223,6 +3223,7 @@
     "openAgents": "Sokafy ny agent",
     "running": "MANDEHA",
     "needsInput": "mila fampidirana",
-    "reconnecting": "Mampifandray indray"
+    "reconnecting": "Mampifandray indray",
+    "channelName": "Agent mavitrika"
   }
 }

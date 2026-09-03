@@ -3223,6 +3223,7 @@
     "openAgents": "Агенттерді ашу",
     "running": "Орындалуда",
     "needsInput": "енгізу қажет",
-    "reconnecting": "Қайта қосылуда"
+    "reconnecting": "Қайта қосылуда",
+    "channelName": "Белсенді агенттер"
   }
 }

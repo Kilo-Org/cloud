@@ -3223,6 +3223,7 @@
     "openAgents": "Fungua mawakala",
     "running": "Inaendelea",
     "needsInput": "inahitaji mchango",
-    "reconnecting": "Inaunganisha tena"
+    "reconnecting": "Inaunganisha tena",
+    "channelName": "Mawakala wanaofanya kazi"
   }
 }

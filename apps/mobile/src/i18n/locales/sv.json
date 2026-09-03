@@ -3223,6 +3223,7 @@
     "openAgents": "Öppna agenter",
     "running": "KÖRS",
     "needsInput": "kräver indata",
-    "reconnecting": "Återansluter"
+    "reconnecting": "Återansluter",
+    "channelName": "Aktiva agenter"
   }
 }

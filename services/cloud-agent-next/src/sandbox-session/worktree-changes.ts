@@ -46,13 +46,6 @@ const idleStatusSchema = z.object({ status: z.object({ type: z.literal('idle') }
 
 export function worktreeChangesBaseRef(branch: string | undefined): string | undefined {
   if (branch === undefined) return undefined;
-  if (branch.startsWith('refs/remotes/')) return branch;
-  if (branch.startsWith('remotes/')) return `refs/${branch}`;
-  if (branch.startsWith('origin/')) return `refs/remotes/${branch}`;
-  if (branch.startsWith('refs/heads/')) {
-    return `refs/remotes/origin/${branch.slice('refs/heads/'.length)}`;
-  }
-  if (branch.startsWith('refs/')) throw new Error('Unsupported worktree comparison ref');
   return `refs/remotes/origin/${branch}`;
 }
 

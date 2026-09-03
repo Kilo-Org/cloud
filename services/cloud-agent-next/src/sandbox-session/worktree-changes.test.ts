@@ -115,16 +115,13 @@ describe('worktree comparison context', () => {
     [undefined, undefined],
     ['main', 'refs/remotes/origin/main'],
     ['feature/a', 'refs/remotes/origin/feature/a'],
-    ['refs/heads/release', 'refs/remotes/origin/release'],
-    ['origin/release', 'refs/remotes/origin/release'],
-    ['remotes/origin/release', 'refs/remotes/origin/release'],
-    ['refs/remotes/upstream/release', 'refs/remotes/upstream/release'],
-  ])('normalizes %s to %s', (branch, expected) => {
+    ['refs/heads/release', 'refs/remotes/origin/refs/heads/release'],
+    ['origin/release', 'refs/remotes/origin/origin/release'],
+    ['remotes/origin/release', 'refs/remotes/origin/remotes/origin/release'],
+    ['refs/remotes/upstream/release', 'refs/remotes/origin/refs/remotes/upstream/release'],
+    ['refs/tags/v1', 'refs/remotes/origin/refs/tags/v1'],
+  ])('maps the literal branch %s to %s', (branch, expected) => {
     expect(worktreeChangesBaseRef(branch)).toBe(expected);
-  });
-
-  it('rejects non-branch refs instead of silently changing the comparison', () => {
-    expect(() => worktreeChangesBaseRef('refs/tags/v1')).toThrow('Unsupported');
   });
 
   it('uses selected upstream metadata and never the moving workspace branch or credentials', () => {
@@ -142,6 +139,15 @@ describe('worktree comparison context', () => {
       lifecycle: { version: 1, timestamp: 1 },
     } as SessionMetadata;
     expect(worktreeChangesContext(metadata, '/workspace/test')).toEqual(context);
+    expect(
+      worktreeChangesContext(
+        {
+          ...metadata,
+          repository: { type: 'github', repo: 'acme/demo', upstreamBranch: 'origin/release' },
+        },
+        '/workspace/test'
+      )
+    ).toEqual({ ...context, baseRef: 'refs/remotes/origin/origin/release' });
     const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
     expect(
       worktreeChangesContext(

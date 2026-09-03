@@ -83,8 +83,8 @@ export class TokenMintingService {
         throw new Error(`User not found: ${params.userId}`);
       }
 
-      if (user.blocked_reason) {
-        throw new Error(`User is blocked: ${user.blocked_reason}`);
+      if (user.blocked_at || user.blocked_reason) {
+        throw new Error('User is blocked');
       }
 
       const token = await this.signToken({

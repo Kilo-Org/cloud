@@ -291,7 +291,14 @@ export function generateCloudAgentWorkflowToken(
   if (!user.api_token_pepper) {
     throw new Error('Workflow control tokens require a current user pepper');
   }
+  const expiresIn = Math.min(options.expiresIn, 60 * 60);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow control token expiry must be positive');
+  }
   const authorizationUser = options.authorizationUser ?? user;
+  if (!authorizationUser.api_token_pepper) {
+    throw new Error('Workflow control tokens require a current authorization pepper');
+  }
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({
     userId: user.id,
@@ -299,7 +306,7 @@ export function generateCloudAgentWorkflowToken(
     env: process.env.NODE_ENV,
     audience: 'cloud-agent-next',
     issuedAt,
-    expiresAt: issuedAt + options.expiresIn,
+    expiresAt: issuedAt + expiresIn,
     tokenPurpose: 'internal-service',
     credentialExchange: false,
     extra: {

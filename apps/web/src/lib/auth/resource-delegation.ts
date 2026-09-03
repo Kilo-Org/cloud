@@ -115,6 +115,10 @@ export function isDelegableResource(value: unknown): value is DelegableResource 
   );
 }
 
+export function canIssueLegacyOrganizationToken(requestHeaders: Headers): boolean {
+  return !requestHeaders.has('authorization');
+}
+
 function tokenFromHeaders(requestHeaders: Headers): string | null {
   const value = requestHeaders.get('authorization');
   if (!value || !value.toLowerCase().startsWith('bearer ')) return null;

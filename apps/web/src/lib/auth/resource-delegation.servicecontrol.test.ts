@@ -33,6 +33,30 @@ describe('workflow service control tokens', () => {
     expect(claims.exp! - claims.iat!).toBe(300);
   });
 
+  test('caps modern workflow admission to one hour', () => {
+    const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
+    const token = generateCloudAgentWorkflowToken(user, {
+      expiresIn: 5 * 365 * 24 * 60 * 60,
+      tokenSource: 'reviewer',
+    });
+    const claims = jwt.decode(token) as jwt.JwtPayload;
+
+    expect(claims.exp! - claims.iat!).toBe(60 * 60);
+  });
+
+  test('requires an authorization pepper for modern workflow admission', () => {
+    const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
+    const authorizationUser = defineTestUser({ api_token_pepper: null });
+
+    expect(() =>
+      generateCloudAgentWorkflowToken(user, {
+        expiresIn: 300,
+        tokenSource: 'reviewer',
+        authorizationUser,
+      })
+    ).toThrow('current authorization pepper');
+  });
+
   test('preserves the legacy workflow token shape when shared issuance is disabled', () => {
     shared.enabled = false;
     const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });

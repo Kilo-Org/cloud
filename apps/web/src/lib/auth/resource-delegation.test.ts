@@ -14,6 +14,7 @@ jest.mock('@/lib/user/server', () => ({
 }));
 
 import {
+  canIssueLegacyOrganizationToken,
   createControlTokenForRequest,
   createDelegatedResourceToken,
   getResourceDelegationAuthority,
@@ -43,6 +44,14 @@ async function user() {
 function bearer(token: string) {
   return new Headers({ authorization: `Bearer ${token}` });
 }
+
+describe('legacy organization token compatibility', () => {
+  test('allows only requests without an Authorization header', () => {
+    expect(canIssueLegacyOrganizationToken(new Headers())).toBe(true);
+    expect(canIssueLegacyOrganizationToken(bearer('restricted-token'))).toBe(false);
+    expect(canIssueLegacyOrganizationToken(new Headers({ authorization: '' }))).toBe(false);
+  });
+});
 
 function modernToken(
   user: { id: string; api_token_pepper: string | null },

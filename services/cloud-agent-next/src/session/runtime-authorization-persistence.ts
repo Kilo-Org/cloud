@@ -7,6 +7,12 @@ import {
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 
 export const RUNTIME_AUTHORIZATION_KEY = 'runtime_authorization';
+const RUNTIME_TOKEN_RENEWAL_WINDOW_MS = 5 * 60_000;
+
+function runtimeAuthorizationId(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || !('id' in value)) return null;
+  return typeof value.id === 'string' ? value.id : null;
+}
 
 export function hasModernRuntimeAuthorization(metadata: SessionMetadata): boolean {
   const token = metadata.auth.kilocodeToken;
@@ -37,6 +43,7 @@ export async function renewStoredRuntimeAuthorization(input: {
   getMetadata: () => Promise<SessionMetadata | null>;
   putMetadata: (metadata: SessionMetadata) => Promise<void>;
   renew: (authorization: RuntimeAuthorization) => Promise<{ token: string }>;
+  now?: number;
 }): Promise<string | null> {
   const metadata = input.metadata;
   if (!metadata) return null;
@@ -44,6 +51,18 @@ export async function renewStoredRuntimeAuthorization(input: {
   if (!authorization.success) {
     if (hasModernRuntimeAuthorization(metadata)) throw new RuntimeAuthorizationRevokedError();
     return metadata.auth.kilocodeToken ?? null;
+  }
+  if (authorization.data.state !== 'active') throw new RuntimeAuthorizationRevokedError();
+  const token = metadata.auth.kilocodeToken;
+  const decoded = token ? jwt.decode(token) : null;
+  if (
+    typeof decoded === 'object' &&
+    decoded !== null &&
+    typeof decoded.exp === 'number' &&
+    decoded.exp * 1000 > (input.now ?? Date.now()) + RUNTIME_TOKEN_RENEWAL_WINDOW_MS &&
+    runtimeAuthorizationId(decoded.runtimeAuthorization) === authorization.data.id
+  ) {
+    return token ?? null;
   }
   try {
     const renewed = await input.renew(authorization.data);

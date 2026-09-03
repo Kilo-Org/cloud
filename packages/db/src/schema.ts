@@ -136,6 +136,7 @@ import type {
   KiloClawScheduledActionNotificationKind,
   CustomLlmMetadata,
   CustomLlmApiConfig,
+  DirectByokModel,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -5396,6 +5397,12 @@ export const modelsByProvider = pgTable('models_by_provider', {
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
   openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
+});
+
+export const direct_byok_model_lists = pgTable('direct_byok_model_lists', {
+  provider_id: text().primaryKey(),
+  models: jsonb().$type<DirectByokModel[]>().notNull(),
+  synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const cloud_agent_code_reviews = pgTable(

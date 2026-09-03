@@ -60,8 +60,24 @@ regression until a measurement says otherwise.
 | `authorization` | `Bearer {user token}` |
 | `x-kilocode-organizationid` | The organization id. Leave it out for a personal account. |
 
-The route also serves `/chat/completions` and `/responses`, and it accepts the
-older `/api/openrouter` prefix. The package uses `/messages` only.
+The route serves three shapes. A model does not always speak all three, and the
+gateway resolves that from the serving provider without publishing it, so the
+caller gives the plugin an `apiKinds` function.
+
+| Shape | Path | How it caches |
+|---|---|---|
+| `messages` | `/api/gateway/v1/messages` | An explicit `cache_control` breakpoint |
+| `responses` | `/api/gateway/v1/responses` | A `prompt_cache_key` the caller names |
+| `chat_completions` | `/api/gateway/v1/chat/completions` | Whatever the provider does on its own |
+
+The plugin picks `messages` first, then `responses`, then `chat_completions`.
+That order is the cache order: an explicit breakpoint beats a key, and a key
+beats no control at all.
+
+A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
+502, 503, and 504. The retry stops as soon as the status is good, before the
+body is read, so a second try never repeats text the caller has already seen.
+The older `/api/openrouter` prefix also works; the package does not use it.
 
 ## Decisions
 
@@ -97,8 +113,12 @@ local end-to-end run.
 | `src/session.ts` | The session and its append-only turns |
 | `src/turn.ts` | One turn, shaped as one SQLite row |
 | `src/model.ts` | The `ModelClient` plugin point; transport only |
-| `src/kilo-gateway.ts` | The kilo gateway plugin |
-| `src/kilo-gateway-wire.ts` | The Anthropic Messages body and the reply schema |
+| `src/api-kind.ts` | The three gateway shapes and which one to pick |
+| `src/kilo-gateway.ts` | The kilo gateway plugin: shape choice, send, stream |
+| `src/kilo-gateway-http.ts` | The post, the headers, and the retry |
+| `src/kilo-gateway-fake.ts` | The fake `fetch` the gateway tests share |
+| `src/wire/*.ts` | One file per gateway shape, plus the shared `Wire` |
+| `src/sse.ts` | Server-sent events framing |
 | `src/fetch.ts` | The smallest `fetch` the package needs |
 | `src/prompt.ts` | The `PromptAssembler` plugin point and the core assembler |
 | `src/storage.ts` | The `SessionStore` plugin point; no plugin yet |
@@ -120,7 +140,12 @@ turn one off, and give the reason.
 | `id-length` | Effect names its type parameters `A`, `E`, and `R`. |
 | `vitest/no-importing-vitest-globals` | An explicit import beats a global. |
 | `vitest/prefer-to-be-truthy` | `toBe(true)` states the value; `toBeTruthy` does not. |
-| `promise/prefer-await-to-then` | It flags `Promise.resolve`, and it deadlocks with `require-await`. |
+| `promise/prefer-await-to-then` | It flags `Promise.resolve`. |
+| `require-await` | It flags an async generator, which needs no await. |
+| `unicorn/no-array-callback-reference` | Effect pipes pass a function by name on every line. |
+| `no-magic-numbers` | An HTTP status and a token count are not magic. |
+| `max-classes-per-file` | A tag and its error belong in one file. |
+| `sort-keys` | Field order carries meaning; alphabetical order does not. |
 
 `new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
 `Context.Tag` is a call, not a constructor.

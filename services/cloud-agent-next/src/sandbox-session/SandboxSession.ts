@@ -17,6 +17,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { getSandboxAllocationResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveSecret } from '../auth.js';
 import {
   issuePersistedRuntimeProxyGrant,
@@ -3360,6 +3361,7 @@ export class SandboxSession extends DurableObject<Env> {
               ownerId: metadata.identity.userId,
               sessionId,
               provider,
+              resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }

@@ -302,6 +302,17 @@ const config: ExpoConfig = {
     ],
     // Local Expo module for Android Live Updates (no-op until slice `and`).
     './plugins/withActiveAgentsLiveUpdate',
+    // Translates the Android widget-picker entry, which the widget library
+    // leaves English-only. Registered BEFORE the widget plugin for the same
+    // reason as the iOS pair above: mods run in reverse registration order.
+    [
+      './plugins/withAndroidWidgetLocalizations',
+      {
+        widgetName: 'ActiveAgentsWidget',
+        languages: [...SUPPORTED_LANGUAGES],
+        copy: WIDGET_GALLERY_COPY,
+      },
+    ],
     // No-op until slice `and` writes src/glanceable-android/widget-config.json.
     './plugins/withActiveAgentsAndroidWidget',
     // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts

@@ -162,6 +162,8 @@
     "title": "התראות",
     "liveActivities": "פעילויות בזמן אמת",
     "liveActivitySubtitle": "הצג סוכנים פעילים במסך הנעילה",
+    "liveUpdates": "עדכונים חיים",
+    "liveUpdateSubtitle": "הצג סוכנים פעילים בהתראות שלך",
     "push": "דחיפה",
     "enabled": "התראות מופעלות",
     "onDescription": "התראות דחיפה מופעלות עבור מכשיר זה.",

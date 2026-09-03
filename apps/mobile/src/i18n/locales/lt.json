@@ -630,6 +630,8 @@
     "title": "Pranešimai",
     "liveActivities": "Tiesioginės veiklos",
     "liveActivitySubtitle": "Rodyti aktyvius agentus užrakinimo ekrane",
+    "liveUpdates": "Tiesioginiai naujinimai",
+    "liveUpdateSubtitle": "Rodyti aktyvius agentus pranešimuose",
     "push": "Push",
     "enabled": "Pranešimai įjungti",
     "onDescription": "Push pranešimai šiame įrenginyje įjungti.",

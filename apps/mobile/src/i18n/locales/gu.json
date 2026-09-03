@@ -616,6 +616,8 @@
     "title": "સૂચનાઓ",
     "liveActivities": "લાઇવ પ્રવૃત્તિઓ",
     "liveActivitySubtitle": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો બતાવો",
+    "liveUpdates": "લાઇવ અપડેટ્સ",
+    "liveUpdateSubtitle": "તમારી સૂચનાઓમાં સક્રિય એજન્ટ બતાવો",
     "push": "પુશ",
     "enabled": "સૂચનાઓ સક્ષમ",
     "onDescription": "આ ઉપકરણ માટે પુશ સૂચનાઓ ચાલુ છે.",

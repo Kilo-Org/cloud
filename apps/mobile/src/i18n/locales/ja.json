@@ -162,6 +162,8 @@
     "title": "通知",
     "liveActivities": "ライブアクティビティ",
     "liveActivitySubtitle": "ロック画面に稼働中のエージェントを表示",
+    "liveUpdates": "ライブアップデート",
+    "liveUpdateSubtitle": "通知にアクティブなエージェントを表示",
     "push": "プッシュ",
     "enabled": "通知が有効です",
     "onDescription": "このデバイスではプッシュ通知がオンです。",

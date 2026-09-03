@@ -185,6 +185,8 @@
     "title": "Meldingen",
     "liveActivities": "Live activiteiten",
     "liveActivitySubtitle": "Actieve agents tonen op het toegangsscherm",
+    "liveUpdates": "Live-updates",
+    "liveUpdateSubtitle": "Actieve agents in je meldingen tonen",
     "push": "Push",
     "enabled": "Meldingen ingeschakeld",
     "onDescription": "Pushmeldingen staan aan voor dit apparaat.",

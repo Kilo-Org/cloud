@@ -644,6 +644,8 @@
     "title": "Hysbysiadau",
     "liveActivities": "Gweithgareddau byw",
     "liveActivitySubtitle": "Dangos asiantau gweithredol ar y sgrin clo",
+    "liveUpdates": "Diweddariadau byw",
+    "liveUpdateSubtitle": "Dangos asiantau gweithredol yn eich hysbysiadau",
     "push": "Gwthio",
     "enabled": "Hysbysiadau wedi'u galluogi",
     "onDescription": "Mae hysbysiadau gwthio ymlaen ar gyfer y ddyfais hon.",

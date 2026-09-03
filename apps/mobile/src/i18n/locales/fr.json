@@ -165,6 +165,8 @@
     "title": "Notifications",
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
+    "liveUpdates": "Mises à jour en direct",
+    "liveUpdateSubtitle": "Afficher les agents actifs dans vos notifications",
     "push": "Push",
     "enabled": "Notifications activées",
     "onDescription": "Les notifications push sont activées pour cet appareil.",

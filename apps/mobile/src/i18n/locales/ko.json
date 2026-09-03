@@ -162,6 +162,8 @@
     "title": "알림",
     "liveActivities": "실시간 활동",
     "liveActivitySubtitle": "잠금 화면에 활성 에이전트 표시",
+    "liveUpdates": "실시간 업데이트",
+    "liveUpdateSubtitle": "알림에 활성 에이전트 표시",
     "push": "푸시",
     "enabled": "알림 활성화됨",
     "onDescription": "이 기기에서 푸시 알림이 켜져 있습니다.",

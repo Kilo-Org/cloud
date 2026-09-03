@@ -616,6 +616,8 @@
     "title": "Sanarwa",
     "liveActivities": "Ayyukan kai tsaye",
     "liveActivitySubtitle": "Nuna wakilai masu aiki a allon kulle",
+    "liveUpdates": "Sabuntawa kai tsaye",
+    "liveUpdateSubtitle": "Nuna wakilai masu aiki a cikin sanarwarka",
     "push": "Turawa",
     "enabled": "Sanarwa suna aiki",
     "onDescription": "Sanarwar turawa suna aiki ga wannan na'ura.",

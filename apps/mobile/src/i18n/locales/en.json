@@ -616,6 +616,8 @@
     "title": "Notifications",
     "liveActivities": "Live Activities",
     "liveActivitySubtitle": "Show active agents on the Lock Screen",
+    "liveUpdates": "Live Updates",
+    "liveUpdateSubtitle": "Show active agents in your notifications",
     "push": "Push",
     "enabled": "Notifications enabled",
     "onDescription": "Push notifications are on for this device.",

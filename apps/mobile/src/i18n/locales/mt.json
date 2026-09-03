@@ -637,6 +637,8 @@
     "title": "Notifiki",
     "liveActivities": "Attivitajiet diretti",
     "liveActivitySubtitle": "Uri l-aġenti attivi fuq l-iskrin imsakkar",
+    "liveUpdates": "Aġġornamenti diretti",
+    "liveUpdateSubtitle": "Uri l-aġenti attivi fin-notifiki tiegħek",
     "push": "Push",
     "enabled": "Notifiki attivati",
     "onDescription": "In-notifiki push huma mixgħula għal dan l-apparat.",

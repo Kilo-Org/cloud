@@ -637,6 +637,8 @@
     "title": "Fógraí",
     "liveActivities": "Gníomhaíochtaí beo",
     "liveActivitySubtitle": "Taispeáin gníomhairí gníomhacha ar an scáileán glasáilte",
+    "liveUpdates": "Nuashonruithe beo",
+    "liveUpdateSubtitle": "Taispeáin gníomhairí gníomhacha i d'fhógraí",
     "push": "Brú",
     "enabled": "Fógraí cumasaithe",
     "onDescription": "Tá brú-fhógraí ar siúl don ghléas seo.",

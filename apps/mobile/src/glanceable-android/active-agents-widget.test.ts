@@ -4,6 +4,8 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { describe, expect, it, vi } from 'vitest';
 
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
+
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { buildAndroidWidgetProps } from './widget-props';
 
@@ -12,6 +14,7 @@ import { buildAndroidWidgetProps } from './widget-props';
 vi.mock('react-native-android-widget', () => ({
   FlexWidget: (props: Record<string, unknown>) => ({ kind: 'FlexWidget', props }),
   TextWidget: (props: Record<string, unknown>) => ({ kind: 'TextWidget', props }),
+  ImageWidget: (props: Record<string, unknown>) => ({ kind: 'ImageWidget', props }),
   requestWidgetUpdate: () => undefined,
 }));
 
@@ -97,8 +100,10 @@ describe('renderActiveAgentsWidget', () => {
     expect(rep.light).toBeDefined();
     expect(rep.dark).toBeDefined();
     expect(rep.light).not.toBe(rep.dark);
-    expect(rep.light.props.style?.backgroundColor).toBe('#FFFFFF');
-    expect(rep.dark.props.style?.backgroundColor).toBe('#0B0F19');
+    // The app's own palette, not a widget-local one: a card that does not match
+    // the app it opens reads as a different product.
+    expect(rep.light.props.style?.backgroundColor).toBe(lightColors.background);
+    expect(rep.dark.props.style?.backgroundColor).toBe(darkColors.background);
   });
 
   it('shows only the primary count at a small width', () => {
@@ -110,7 +115,7 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, 120);
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1 Needs input']);
+    expect(text).toEqual(['1', 'Needs input']);
   });
 
   it('shows every count, zeros included, and the Open agents affordance at a wide width', () => {
@@ -123,14 +128,23 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
-    expect(text).toEqual(['1 Needs input', '1 Working', '0 Idle', 'Open agents']);
+    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents']);
   });
 
   it.each([
-    { width: 120, visibleText: ['2 Needs input'] },
+    { width: 120, visibleText: ['2', 'Needs input'] },
     {
       width: 250,
-      visibleText: ['2 Needs input', '4 Working', '3 Idle', 'Updates delayed', 'Open agents'],
+      visibleText: [
+        '2',
+        'Needs input',
+        '4',
+        'Working',
+        '3',
+        'Idle',
+        'Updates delayed',
+        'Open agents',
+      ],
     },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',

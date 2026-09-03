@@ -616,6 +616,8 @@
     "title": "বিজ্ঞপ্তি",
     "liveActivities": "লাইভ অ্যাক্টিভিটি",
     "liveActivitySubtitle": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখান",
+    "liveUpdates": "লাইভ আপডেট",
+    "liveUpdateSubtitle": "আপনার বিজ্ঞপ্তিতে সক্রিয় এজেন্ট দেখান",
     "push": "পুশ",
     "enabled": "বিজ্ঞপ্তি সক্রিয়",
     "onDescription": "এই ডিভাইসে পুশ বিজ্ঞপ্তি চালু আছে।",

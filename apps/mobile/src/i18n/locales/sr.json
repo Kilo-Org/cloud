@@ -623,6 +623,8 @@
     "title": "Obaveštenja",
     "liveActivities": "Aktivnosti uživo",
     "liveActivitySubtitle": "Prikaži aktivne agente na zaključanom ekranu",
+    "liveUpdates": "Ažuriranja uživo",
+    "liveUpdateSubtitle": "Prikazuj aktivne agente u obaveštenjima",
     "push": "Push",
     "enabled": "Obaveštenja omogućena",
     "onDescription": "Push obaveštenja su uključena za ovaj uređaj.",

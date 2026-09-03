@@ -616,6 +616,8 @@
     "title": "Teavitused",
     "liveActivities": "Reaalajas tegevused",
     "liveActivitySubtitle": "Näita aktiivseid agente lukustuskuval",
+    "liveUpdates": "Reaalajas värskendused",
+    "liveUpdateSubtitle": "Näita aktiivseid agente teavitustes",
     "push": "Push",
     "enabled": "Teavitused on lubatud",
     "onDescription": "Push-teavitused on selle seadme jaoks sisse lülitatud.",

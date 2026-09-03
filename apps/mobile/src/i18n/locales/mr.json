@@ -616,6 +616,8 @@
     "title": "सूचना",
     "liveActivities": "लाइव्ह क्रियाकलाप",
     "liveActivitySubtitle": "लॉक स्क्रीनवर सक्रिय एजंट दाखवा",
+    "liveUpdates": "थेट अद्यतने",
+    "liveUpdateSubtitle": "तुमच्या सूचनांमध्ये सक्रिय एजंट दाखवा",
     "push": "पुश",
     "enabled": "सूचना सक्षम केल्या",
     "onDescription": "या डिव्हाइससाठी पुश सूचना चालू आहेत.",

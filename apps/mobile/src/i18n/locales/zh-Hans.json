@@ -162,6 +162,8 @@
     "title": "通知",
     "liveActivities": "实时活动",
     "liveActivitySubtitle": "在锁定屏幕上显示活跃代理",
+    "liveUpdates": "实时更新",
+    "liveUpdateSubtitle": "在通知中显示活跃代理",
     "push": "推送",
     "enabled": "通知已启用",
     "onDescription": "此设备的推送通知已开启。",

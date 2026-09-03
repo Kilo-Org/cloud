@@ -623,6 +623,8 @@
     "title": "Notificações",
     "liveActivities": "Atividades em direto",
     "liveActivitySubtitle": "Mostrar agentes ativos no ecrã bloqueado",
+    "liveUpdates": "Atualizações em direto",
+    "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Push",
     "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativas para este dispositivo.",

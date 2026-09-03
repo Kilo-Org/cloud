@@ -162,6 +162,8 @@
     "title": "Bildirimler",
     "liveActivities": "Canlı etkinlikler",
     "liveActivitySubtitle": "Etkin ajanları Kilit Ekranı’nda göster",
+    "liveUpdates": "Canlı güncellemeler",
+    "liveUpdateSubtitle": "Etkin aracıları bildirimlerinizde göster",
     "push": "Anlık",
     "enabled": "Bildirimler etkin",
     "onDescription": "Anlık bildirimler bu cihaz için açık.",

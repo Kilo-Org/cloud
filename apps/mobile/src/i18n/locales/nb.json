@@ -616,6 +616,8 @@
     "title": "Varsler",
     "liveActivities": "Sanntidsaktiviteter",
     "liveActivitySubtitle": "Vis aktive agenter på låseskjermen",
+    "liveUpdates": "Sanntidsoppdateringer",
+    "liveUpdateSubtitle": "Vis aktive agenter i varslene dine",
     "push": "Push",
     "enabled": "Varsler aktivert",
     "onDescription": "Push-varsler er på for denne enheten.",

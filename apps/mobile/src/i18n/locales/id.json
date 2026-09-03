@@ -162,6 +162,8 @@
     "title": "Notifikasi",
     "liveActivities": "Aktivitas langsung",
     "liveActivitySubtitle": "Tampilkan agen aktif di Layar Terkunci",
+    "liveUpdates": "Pembaruan langsung",
+    "liveUpdateSubtitle": "Tampilkan agen aktif di notifikasi Anda",
     "push": "Push",
     "enabled": "Notifikasi diaktifkan",
     "onDescription": "Notifikasi push aktif untuk perangkat ini.",

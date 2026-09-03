@@ -616,6 +616,8 @@
     "title": "Mga Notipikasyon",
     "liveActivities": "Mga live na aktibidad",
     "liveActivitySubtitle": "Ipakita ang mga aktibong agent sa Lock Screen",
+    "liveUpdates": "Live na update",
+    "liveUpdateSubtitle": "Ipakita ang mga aktibong agent sa iyong mga notification",
     "push": "Push",
     "enabled": "Pinagana ang mga notipikasyon",
     "onDescription": "Naka-on ang push notifications para sa device na ito.",

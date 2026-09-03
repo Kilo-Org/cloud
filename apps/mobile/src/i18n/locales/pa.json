@@ -616,6 +616,8 @@
     "title": "ਸੂਚਨਾਵਾਂ",
     "liveActivities": "ਲਾਈਵ ਸਰਗਰਮੀਆਂ",
     "liveActivitySubtitle": "ਲਾਕ ਸਕ੍ਰੀਨ ਉੱਤੇ ਸਰਗਰਮ ਏਜੰਟ ਦਿਖਾਓ",
+    "liveUpdates": "ਲਾਈਵ ਅੱਪਡੇਟ",
+    "liveUpdateSubtitle": "ਆਪਣੀਆਂ ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਸਰਗਰਮ ਏਜੰਟ ਦਿਖਾਓ",
     "push": "ਪੁਸ਼",
     "enabled": "ਸੂਚਨਾਵਾਂ ਸਮਰੱਥ ਹਨ",
     "onDescription": "ਇਸ ਡਿਵਾਈਸ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਹਨ।",

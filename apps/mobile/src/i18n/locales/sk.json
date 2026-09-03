@@ -630,6 +630,8 @@
     "title": "Upozornenia",
     "liveActivities": "Živé aktivity",
     "liveActivitySubtitle": "Zobrazovať aktívnych agentov na uzamknutej obrazovke",
+    "liveUpdates": "Živé aktualizácie",
+    "liveUpdateSubtitle": "Zobrazovať aktívnych agentov v upozorneniach",
     "push": "Push",
     "enabled": "Upozornenia povolené",
     "onDescription": "Push upozornenia sú pre toto zariadenie zapnuté.",

@@ -616,6 +616,8 @@
     "title": "Tilkynningar",
     "liveActivities": "Beinar aðgerðir",
     "liveActivitySubtitle": "Sýna virk umboð á lásskjánum",
+    "liveUpdates": "Beinar uppfærslur",
+    "liveUpdateSubtitle": "Sýna virka fulltrúa í tilkynningunum þínum",
     "push": "Push",
     "enabled": "Tilkynningar virkjaðar",
     "onDescription": "Push-tilkynningar eru kveiktar á þessu tæki.",

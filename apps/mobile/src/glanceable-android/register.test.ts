@@ -38,6 +38,7 @@ vi.mock('react-native-android-widget', () => ({
   requestWidgetUpdate: vi.fn().mockResolvedValue(undefined),
   FlexWidget: () => null,
   TextWidget: () => null,
+  ImageWidget: () => null,
 }));
 
 const NOW = 1_750_000_000_000;
@@ -143,7 +144,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
     const expected =
-      width === 120 ? ['2 Needs input'] : ['2 Needs input', '2 Working', '0 Idle', 'Open agents'];
+      width === 120
+        ? ['2', 'Needs input']
+        : ['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -210,7 +213,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
     const expected =
-      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
+      width === 120
+        ? ['1', 'Working']
+        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -233,7 +238,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
     const expected =
-      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
+      width === 120
+        ? ['1', 'Working']
+        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -263,8 +270,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       const handler = await registerAfterRestart(null);
 
       const current = await runWidgetTask(handler, width);
-      expect(collectText(current.light)).toContain('2 Needs input');
-      expect(collectText(current.dark)).toContain('2 Needs input');
+      expect(collectText(current.light)).toEqual(expect.arrayContaining(['2', 'Needs input']));
+      expect(collectText(current.dark)).toEqual(expect.arrayContaining(['2', 'Needs input']));
       expect(mocks.getDeadline()).toBe(expiresAt);
 
       vi.setSystemTime(expiresAt);
@@ -312,7 +319,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
     const expected =
-      width === 120 ? ['1 Working'] : ['0 Needs input', '1 Working', '0 Idle', 'Open agents'];
+      width === 120
+        ? ['1', 'Working']
+        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);

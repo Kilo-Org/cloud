@@ -162,6 +162,8 @@
     "title": "सूचनाएँ",
     "liveActivities": "लाइव गतिविधियाँ",
     "liveActivitySubtitle": "लॉक स्क्रीन पर सक्रिय एजेंट दिखाएँ",
+    "liveUpdates": "लाइव अपडेट",
+    "liveUpdateSubtitle": "अपनी सूचनाओं में सक्रिय एजेंट दिखाएँ",
     "push": "पुश",
     "enabled": "सूचनाएँ सक्षम",
     "onDescription": "इस डिवाइस के लिए पुश सूचनाएँ चालू हैं।",

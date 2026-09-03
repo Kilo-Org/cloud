@@ -162,6 +162,8 @@
     "title": "Benachrichtigungen",
     "liveActivities": "Live-Aktivitäten",
     "liveActivitySubtitle": "Aktive Agenten auf dem Sperrbildschirm anzeigen",
+    "liveUpdates": "Live-Updates",
+    "liveUpdateSubtitle": "Aktive Agents in deinen Benachrichtigungen anzeigen",
     "push": "Push",
     "enabled": "Benachrichtigungen aktiviert",
     "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",

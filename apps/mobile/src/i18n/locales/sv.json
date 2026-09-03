@@ -616,6 +616,8 @@
     "title": "Aviseringar",
     "liveActivities": "Liveaktiviteter",
     "liveActivitySubtitle": "Visa aktiva agenter på låsskärmen",
+    "liveUpdates": "Liveuppdateringar",
+    "liveUpdateSubtitle": "Visa aktiva agenter i dina aviseringar",
     "push": "Push",
     "enabled": "Aviseringar aktiverade",
     "onDescription": "Pushaviseringar är på för den här enheten.",

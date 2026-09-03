@@ -53,11 +53,12 @@ describe('buildAndroidWidgetProps', () => {
   it('ranks the compact primary count and keeps all expanded numeric counts', () => {
     const props = buildAndroidWidgetProps(MIXED, {}, translate);
     expect(props.primaryLabel).toBe('Needs input');
-    expect(props.primaryCount).toBe(2);
+    expect(props.primaryCount).toBe('2');
+    expect(props.primaryKind).toBe('needsInput');
     expect(props.countLines).toEqual([
-      { label: 'Needs input', count: 2 },
-      { label: 'Working', count: 4 },
-      { label: 'Idle', count: 3 },
+      { label: 'Needs input', kind: 'needsInput', count: '2' },
+      { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Idle', kind: 'idle', count: '3' },
     ]);
   });
 
@@ -113,6 +114,7 @@ describe('buildAndroidWidgetProps', () => {
       'countLines',
       'openAgentsLabel',
       'primaryCount',
+      'primaryKind',
       'primaryLabel',
       'showOpenAgents',
       'statusLine',
@@ -217,7 +219,7 @@ describe('status precedence and count hiding', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe(0);
+    expect(props.primaryCount).toBe('0');
     expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, {})).toBeNull();
@@ -232,7 +234,7 @@ describe('status precedence and count hiding', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe(0);
+    expect(props.primaryCount).toBe('0');
     expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, flags, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, flags)).toBeNull();

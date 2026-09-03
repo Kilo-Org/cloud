@@ -165,6 +165,8 @@
     "title": "Notifiche",
     "liveActivities": "Attività in tempo reale",
     "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
+    "liveUpdates": "Aggiornamenti live",
+    "liveUpdateSubtitle": "Mostra gli agenti attivi nelle notifiche",
     "push": "Push",
     "enabled": "Notifiche attivate",
     "onDescription": "Le notifiche push sono attive per questo dispositivo.",

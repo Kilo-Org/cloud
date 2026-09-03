@@ -616,6 +616,8 @@
     "title": "Ọkwa",
     "liveActivities": "Ọrụ ndụ",
     "liveActivitySubtitle": "Gosi ndị ọrụ na-arụ ọrụ na Lock Screen",
+    "liveUpdates": "Mmelite ndụ",
+    "liveUpdateSubtitle": "Gosi ndị ọrụ na-arụ ọrụ na ọkwa gị",
     "push": "Push",
     "enabled": "Ọkwa agbanyela",
     "onDescription": "Ọkwa push dị maka ngwaọrụ a.",

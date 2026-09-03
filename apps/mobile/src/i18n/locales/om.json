@@ -616,6 +616,8 @@
     "title": "Beeksisota",
     "liveActivities": "Sochoota kallattii",
     "liveActivitySubtitle": "Eejentoota hojjetan gaaffii cufaa irratti agarsiisi",
+    "liveUpdates": "Haaromsa kallattii",
+    "liveUpdateSubtitle": "Ergamtoota hojjetan beeksisa kee keessatti agarsiisi",
     "push": "Push",
     "enabled": "Beeksisni dandeesame",
     "onDescription": "Beeksisni push meeshaa kanaaf jira.",

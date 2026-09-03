@@ -6,6 +6,7 @@ import {
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
+import { formatGlanceableCount } from './count-format';
 import {
   end as endLiveUpdate,
   setWidgetSnapshot,
@@ -51,7 +53,7 @@ let terminalExpiresAt: number | null = null;
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
   return lastWidgetSnapshot === null
     ? null
-    : buildCurrentWidgetProps(lastWidgetSnapshot, translate);
+    : buildCurrentWidgetProps(lastWidgetSnapshot, translate, formatGlanceableCount);
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -86,7 +88,10 @@ async function tryStartOrUpdate(
   snapshot: GlanceableAgentsSnapshot,
   ctx: GlanceableSinkContext
 ): Promise<void> {
-  if (!hasCurrentWork(snapshot)) {
+  // The in-app switch is checked first: it is the one the user set here, and
+  // honoring it costs no native call. The notification permission still decides
+  // the rest. The widget is deliberately not gated — placing one is the opt-in.
+  if (!getLiveActivityEnabled() || !hasCurrentWork(snapshot)) {
     pending = null;
     return;
   }
@@ -94,9 +99,9 @@ async function tryStartOrUpdate(
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
-  const text = buildOngoingNotificationText(snapshot, {}, translate);
+  const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
   const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
-  const compactText = buildCompactNotificationText(snapshot, {});
+  const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
 
   if (notificationActive) {
     updateLiveUpdate(title, text, openAgentsLabel, compactText);
@@ -134,15 +139,15 @@ async function tryStartOrUpdate(
 /** Retry a pending start after permission turns granted. Caller owns the check. */
 function retryPendingStart(): void {
   const p = pending;
-  if (p === null || notificationActive || !hasCurrentWork(p.snapshot)) {
+  if (p === null || notificationActive || !getLiveActivityEnabled() || !hasCurrentWork(p.snapshot)) {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
   startLiveUpdate(
     title,
-    buildOngoingNotificationText(p.snapshot, {}, translate),
+    buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
     translate(OPEN_AGENTS_LABEL_KEY),
-    buildCompactNotificationText(p.snapshot, {})
+    buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount)
   );
   notificationActive = true;
   terminalExpiresAt = null;
@@ -171,7 +176,7 @@ export const androidSink: GlanceableSink = {
   publish(snapshot) {
     lastWidgetSnapshot = snapshot;
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(snapshot, translate);
+    const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {
@@ -198,10 +203,10 @@ export const androidSink: GlanceableSink = {
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
         eligible
-          ? buildOngoingNotificationText(snapshot, {}, translate)
+          ? buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount)
           : (props.statusLine ?? translate('glanceable.empty')),
         translate(OPEN_AGENTS_LABEL_KEY),
-        eligible ? buildCompactNotificationText(snapshot, {}) : null,
+        eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
         terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
       );
       revision = snapshot.revision;

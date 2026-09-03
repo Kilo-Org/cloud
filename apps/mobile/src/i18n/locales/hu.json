@@ -616,6 +616,8 @@
     "title": "Értesítések",
     "liveActivities": "Élő tevékenységek",
     "liveActivitySubtitle": "Aktív ügynökök megjelenítése a zárolási képernyőn",
+    "liveUpdates": "Élő frissítések",
+    "liveUpdateSubtitle": "Aktív ügynökök megjelenítése az értesítésekben",
     "push": "Leküldés",
     "enabled": "Értesítések engedélyezve",
     "onDescription": "A leküldéses értesítések be vannak kapcsolva ehhez az eszközhöz.",

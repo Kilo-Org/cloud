@@ -616,6 +616,8 @@
     "title": "Meddelelser",
     "liveActivities": "Live-aktiviteter",
     "liveActivitySubtitle": "Vis aktive agenter på låseskærmen",
+    "liveUpdates": "Liveopdateringer",
+    "liveUpdateSubtitle": "Vis aktive agenter i dine notifikationer",
     "push": "Push",
     "enabled": "Meddelelser aktiveret",
     "onDescription": "Push-meddelelser er til for denne enhed.",

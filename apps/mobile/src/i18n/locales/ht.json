@@ -616,6 +616,8 @@
     "title": "Notifikasyon",
     "liveActivities": "Aktivite an dirèk",
     "liveActivitySubtitle": "Montre ajans aktif yo sou ekran vewouye a",
+    "liveUpdates": "Mizajou an dirèk",
+    "liveUpdateSubtitle": "Montre ajan aktif yo nan notifikasyon ou yo",
     "push": "Pouse",
     "enabled": "Notifikasyon aktive",
     "onDescription": "Notifikasyon pouse louvri pou aparèy sa a.",

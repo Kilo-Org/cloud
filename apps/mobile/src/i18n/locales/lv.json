@@ -623,6 +623,8 @@
     "title": "Paziņojumi",
     "liveActivities": "Tiešās aktivitātes",
     "liveActivitySubtitle": "Rādīt aktīvos aģentus bloķēšanas ekrānā",
+    "liveUpdates": "Tiešraides atjauninājumi",
+    "liveUpdateSubtitle": "Rādīt aktīvos aģentus paziņojumos",
     "push": "Push",
     "enabled": "Paziņojumi iespējoti",
     "onDescription": "Push paziņojumi šai ierīcei ir ieslēgti.",

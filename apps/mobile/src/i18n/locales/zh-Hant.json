@@ -162,6 +162,8 @@
     "title": "通知",
     "liveActivities": "即時動態",
     "liveActivitySubtitle": "在鎖定畫面上顯示使用中的代理",
+    "liveUpdates": "即時更新",
+    "liveUpdateSubtitle": "在通知中顯示活躍代理",
     "push": "推播",
     "enabled": "已啟用通知",
     "onDescription": "此裝置的推播通知已開啟。",

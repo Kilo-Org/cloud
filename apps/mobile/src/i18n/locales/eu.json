@@ -616,6 +616,8 @@
     "title": "Jakinarazpenak",
     "liveActivities": "Zuzeneko jarduerak",
     "liveActivitySubtitle": "Erakutsi agente aktiboak blokeo-pantailan",
+    "liveUpdates": "Zuzeneko eguneratzeak",
+    "liveUpdateSubtitle": "Erakutsi agente aktiboak zure jakinarazpenetan",
     "push": "Bultzadazkoak",
     "enabled": "Jakinarazpenak gaituta",
     "onDescription": "Bultzadazko jakinarazpenak piztuta daude gailu honetan.",

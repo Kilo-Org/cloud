@@ -616,6 +616,8 @@
     "title": "Bildirişlər",
     "liveActivities": "Canlı fəaliyyətlər",
     "liveActivitySubtitle": "Aktiv agentləri kilid ekranında göstərin",
+    "liveUpdates": "Canlı yeniləmələr",
+    "liveUpdateSubtitle": "Aktiv agentləri bildirişlərinizdə göstərin",
     "push": "Push",
     "enabled": "Bildirişlər aktivdir",
     "onDescription": "Push bildirişləri bu cihaz üçün açıqdır.",

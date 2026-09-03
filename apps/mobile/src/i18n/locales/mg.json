@@ -616,6 +616,8 @@
     "title": "Fampandrenesana",
     "liveActivities": "Hetsika mivantana",
     "liveActivitySubtitle": "Asehoy ny agent miasa eo amin’ny efijery mihidy",
+    "liveUpdates": "Fanavaozana mivantana",
+    "liveUpdateSubtitle": "Asehoy ao amin'ny fampahafantarana ny mpandraharaha miasa",
     "push": "Push",
     "enabled": "Alefa ny fampandrenesana",
     "onDescription": "Miasa amin'ity fitaovana ity ny fampandrenesana push.",

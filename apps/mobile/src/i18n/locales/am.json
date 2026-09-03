@@ -616,6 +616,8 @@
     "title": "ማሳወቂያዎች",
     "liveActivities": "የቀጥታ እንቅስቃሴዎች",
     "liveActivitySubtitle": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ አሳይ",
+    "liveUpdates": "የቀጥታ ዝማኔዎች",
+    "liveUpdateSubtitle": "ንቁ ወኪሎችን በማሳወቂያዎችዎ ውስጥ አሳይ",
     "push": "ግፋ",
     "enabled": "ማሳወቂያዎች ነቅተዋል",
     "onDescription": "የግፋ ማሳወቂያዎች ለዚህ መሣሪያ በርተዋል።",

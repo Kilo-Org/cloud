@@ -616,6 +616,8 @@
     "title": "Arifa",
     "liveActivities": "Shughuli za moja kwa moja",
     "liveActivitySubtitle": "Onyesha mawakala hai kwenye Skrini ya Kufunga",
+    "liveUpdates": "Masasisho ya moja kwa moja",
+    "liveUpdateSubtitle": "Onyesha mawakala wanaotumika katika arifa zako",
     "push": "Push",
     "enabled": "Arifa zimewashwa",
     "onDescription": "Arifa za push zimewashwa kwa kifaa hiki.",

@@ -162,6 +162,8 @@
     "title": "Powiadomienia",
     "liveActivities": "Aktywności na żywo",
     "liveActivitySubtitle": "Pokazuj aktywnych agentów na ekranie blokady",
+    "liveUpdates": "Aktualizacje na żywo",
+    "liveUpdateSubtitle": "Pokazuj aktywne agenty w powiadomieniach",
     "push": "Push",
     "enabled": "Powiadomienia włączone",
     "onDescription": "Powiadomienia push są włączone dla tego urządzenia.",

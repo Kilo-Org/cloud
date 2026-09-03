@@ -616,6 +616,8 @@
     "title": "Ngā Pānui",
     "liveActivities": "Ngā mahi ora",
     "liveActivitySubtitle": "Whakaatu i ngā māngai kaha ki te Mata Raka",
+    "liveUpdates": "Whakahoutanga mataora",
+    "liveUpdateSubtitle": "Whakaatu i ngā pou mahi i roto i ō pānui",
     "push": "Pana",
     "enabled": "Kua whakahohea ngā pānui",
     "onDescription": "Kei te kā ngā pānui pana mō tēnei pūrere.",

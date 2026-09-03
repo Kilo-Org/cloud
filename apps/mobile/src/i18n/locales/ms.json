@@ -616,6 +616,8 @@
     "title": "Pemberitahuan",
     "liveActivities": "Aktiviti langsung",
     "liveActivitySubtitle": "Tunjukkan ejen aktif pada Skrin Kunci",
+    "liveUpdates": "Kemas kini langsung",
+    "liveUpdateSubtitle": "Tunjukkan ejen aktif dalam pemberitahuan anda",
     "push": "Push",
     "enabled": "Pemberitahuan didayakan",
     "onDescription": "Pemberitahuan push dihidupkan untuk peranti ini.",

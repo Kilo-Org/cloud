@@ -623,6 +623,8 @@
     "title": "Notificacions",
     "liveActivities": "Activitats en directe",
     "liveActivitySubtitle": "Mostra els agents actius a la pantalla de bloqueig",
+    "liveUpdates": "Actualitzacions en directe",
+    "liveUpdateSubtitle": "Mostra els agents actius a les notificacions",
     "push": "Push",
     "enabled": "Notificacions activades",
     "onDescription": "Les notificacions push estan activades per a aquest dispositiu.",

@@ -630,6 +630,8 @@
     "title": "Obvestila",
     "liveActivities": "Aktivnosti v živo",
     "liveActivitySubtitle": "Prikaži aktivne agente na zaklenjenem zaslonu",
+    "liveUpdates": "Posodobitve v živo",
+    "liveUpdateSubtitle": "Prikaži aktivne agente v obvestilih",
     "push": "Potisno",
     "enabled": "Obvestila omogočena",
     "onDescription": "Potisna obvestila so vklopljena za to napravo.",

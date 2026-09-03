@@ -616,6 +616,8 @@
     "title": "Bildirishnomalar",
     "liveActivities": "Jonli faoliyatlar",
     "liveActivitySubtitle": "Faol agentlarni qulflash ekranida ko‘rsatish",
+    "liveUpdates": "Jonli yangilanishlar",
+    "liveUpdateSubtitle": "Faol agentlarni bildirishnomalaringizda ko'rsatish",
     "push": "Push",
     "enabled": "Bildirishnomalar yoqilgan",
     "onDescription": "Push bildirishnomalari bu qurilmada yoqilgan.",

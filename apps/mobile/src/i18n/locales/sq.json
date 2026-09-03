@@ -616,6 +616,8 @@
     "title": "Njoftimet",
     "liveActivities": "Aktivitete të drejtpërdrejta",
     "liveActivitySubtitle": "Shfaq agjentët aktivë në ekranin e kyçur",
+    "liveUpdates": "Përditësime të drejtpërdrejta",
+    "liveUpdateSubtitle": "Shfaq agjentët aktivë në njoftimet e tua",
     "push": "Shtytje",
     "enabled": "Njoftimet të aktivizuara",
     "onDescription": "Njoftimet shtytëse janë ndezur për këtë pajisje.",

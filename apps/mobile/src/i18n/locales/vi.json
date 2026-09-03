@@ -162,6 +162,8 @@
     "title": "Thông báo",
     "liveActivities": "Hoạt động trực tiếp",
     "liveActivitySubtitle": "Hiển thị tác nhân đang hoạt động trên Màn hình khóa",
+    "liveUpdates": "Cập nhật trực tiếp",
+    "liveUpdateSubtitle": "Hiển thị tác nhân đang hoạt động trong thông báo",
     "push": "Đẩy",
     "enabled": "Đã bật thông báo",
     "onDescription": "Thông báo đẩy đang bật cho thiết bị này.",

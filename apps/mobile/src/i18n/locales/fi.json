@@ -616,6 +616,8 @@
     "title": "Ilmoitukset",
     "liveActivities": "Livetoiminnot",
     "liveActivitySubtitle": "Näytä aktiiviset agentit lukitusnäytöllä",
+    "liveUpdates": "Reaaliaikaiset päivitykset",
+    "liveUpdateSubtitle": "Näytä aktiiviset agentit ilmoituksissa",
     "push": "Push",
     "enabled": "Ilmoitukset käytössä",
     "onDescription": "Push-ilmoitukset ovat päällä tälle laitteelle.",

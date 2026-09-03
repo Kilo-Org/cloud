@@ -5,11 +5,16 @@ import {
 } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import {
+  getLiveActivityEnabled,
+  subscribeLiveActivityEnabled,
+} from '@/lib/glanceable/live-activity-switch';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
+import { formatGlanceableCount } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
 import { buildCurrentWidgetProps, buildGenericWidgetProps } from './widget-props';
 
@@ -26,6 +31,18 @@ AppState.addEventListener('change', state => {
   }
 });
 
+// Turning the in-app switch off must clear the Live Update already in the
+// shade, not just stop the next start. `startOrUpdate` holds the guard for
+// everything after this.
+let liveUpdateAllowed = getLiveActivityEnabled();
+subscribeLiveActivityEnabled(() => {
+  const next = getLiveActivityEnabled();
+  if (liveUpdateAllowed && !next) {
+    androidSink.endImmediate();
+  }
+  liveUpdateAllowed = next;
+});
+
 function translate(key: string): string {
   return i18n.t(key);
 }
@@ -37,7 +54,7 @@ registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
   // queued this task when newer work or a privacy blank replaces its deadline.
   const stored = getStoredWidgetSnapshot();
   let props =
-    stored === null ? getCurrentWidgetProps() : buildCurrentWidgetProps(stored, translate);
+    stored === null ? getCurrentWidgetProps() : buildCurrentWidgetProps(stored, translate, formatGlanceableCount);
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
@@ -47,8 +64,8 @@ registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
     }
     props =
       snapshot === null
-        ? buildGenericWidgetProps(translate)
-        : buildCurrentWidgetProps(snapshot, translate);
+        ? buildGenericWidgetProps(translate, formatGlanceableCount)
+        : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
     // A live publish during restoration owns the widget.
     props = getCurrentWidgetProps() ?? props;
   }

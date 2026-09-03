@@ -83,6 +83,7 @@ local end-to-end run.
 | `src/index.ts` | The public entry point |
 | `src/session.ts` | The session and its append-only turns |
 | `src/turn.ts` | One turn, shaped as one SQLite row |
+| `src/prompt.ts` | The `PromptAssembler` plugin point and the core assembler |
 | `src/storage.ts` | The `SessionStore` plugin point; no plugin yet |
 | `src/id.ts` | The `IdGenerator` plugin point and the ULID plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |

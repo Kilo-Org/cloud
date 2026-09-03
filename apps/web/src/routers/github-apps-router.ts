@@ -31,6 +31,7 @@ import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   canManageOrganization,
+  canManageOrganizationBilling,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
 import {
@@ -60,6 +61,7 @@ export const githubAppsRouter = createTRPCRouter({
         id: input.organizationId,
       });
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
+      const canManageModel = canManageOrganizationBilling(role);
 
       return {
         canAdd:
@@ -82,6 +84,7 @@ export const githubAppsRouter = createTRPCRouter({
               role === 'owner' ||
               role === 'admin' ||
               integration.kilo_requester_user_id === ctx.user.id);
+          const metadata = integration.metadata as Record<string, unknown> | null;
 
           return {
             id: integration.id,
@@ -94,6 +97,8 @@ export const githubAppsRouter = createTRPCRouter({
             canRefresh: status !== 'pending',
             canUninstall: ctx.user.is_admin || role === 'owner' || role === 'admin',
             canCancel,
+            modelSlug: (metadata?.model_slug as string) || null,
+            canManageModel,
           };
         }),
       };
@@ -229,6 +234,7 @@ export const githubAppsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid().optional(),
         modelSlug: z.string(),
       })
     )
@@ -237,7 +243,11 @@ export const githubAppsRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
-      const result = await githubAppsService.updateModel(owner, input.modelSlug);
+      const result = await githubAppsService.updateModel(
+        owner,
+        input.modelSlug,
+        input.integrationId
+      );
 
       if (input.organizationId && result.success) {
         await createAuditLog({
@@ -246,7 +256,9 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          message: `Updated GitHub App integration model to ${input.modelSlug}`,
+          message: input.integrationId
+            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}`
+            : `Updated GitHub App integration model to ${input.modelSlug}`,
         });
       }
 

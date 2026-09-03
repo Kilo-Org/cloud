@@ -82,7 +82,7 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.4.6
-  next: 16.2.11
+  next: 16.3.3
   preact: 10.28.4
   glob: '>=13.0.1'
   esbuild: '>=0.28.1'

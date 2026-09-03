@@ -7,9 +7,13 @@
  * via `deps` so tests substitute in-memory fakes.
  */
 
-import { type GlanceableLiveActivityContentState, type PushData } from '@kilocode/notifications';
+import {
+  type GlanceableLiveActivityContentState,
+  type PushData,
+  translatePush,
+} from '@kilocode/notifications';
 
-import type { LiveActivityEvent } from './apns-live-activity';
+import type { LiveActivityAlert, LiveActivityEvent } from './apns-live-activity';
 import type { ExpoPushMessage } from './expo-push';
 
 export type ActiveAgentsGlanceable = Extract<PushData, { type: 'active_agents_glanceable' }>;
@@ -110,6 +114,7 @@ export type GlanceableDeliveryDeps = {
   sendIosLiveActivity: (
     tokens: readonly { token: string; event: LiveActivityEvent }[],
     contentState: GlanceableApnsContentState,
+    startAlert: LiveActivityAlert,
     timestampSeconds: number,
     isCurrent?: () => Promise<boolean>,
     beforeEnd?: (token: string) => Promise<boolean>,
@@ -142,6 +147,12 @@ export async function deliverGlanceableSnapshot(
   }
   const contentState = toGlanceableContentState(snapshot);
 
+  // Read the iOS Expo rows first: they carry the only per-user locale on this
+  // path, and APNs requires a localized alert on a push-to-start. The
+  // data-only wake below reuses the same rows, so this costs no extra query.
+  const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
+  const locale = iosExpoTokens.find(row => row.locale !== null)?.locale ?? null;
+
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
@@ -150,6 +161,15 @@ export async function deliverGlanceableSnapshot(
     await deps.sendIosLiveActivity(
       iosSends,
       contentState,
+      {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.activeAgentsGlanceable',
+          undefined,
+          'Active agents have an update'
+        ),
+      },
       deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
       deps.isCurrent,
       deps.beforeIosEnd,
@@ -159,7 +179,6 @@ export async function deliverGlanceableSnapshot(
 
   // iOS Expo tokens always need the data-only wake: it drives the widget
   // timeline through the background task while the app is not foregrounded.
-  const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
     await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);

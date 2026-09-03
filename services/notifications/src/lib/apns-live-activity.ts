@@ -31,10 +31,10 @@ const LIVE_ACTIVITY_ATTRIBUTES_TYPE = 'LiveActivityAttributes';
 /**
  * Apple requires an alert on every push-to-start payload; a start without one
  * is rejected. Only Apple Watch renders the title and body — iPhone and iPad
- * show the Live Activity itself. The token row carries no locale, so this copy
- * stays English until a locale reaches this path.
+ * show the Live Activity itself. The caller resolves the copy, so this module
+ * stays a pure transport with no catalog dependency.
  */
-const START_ALERT = { title: 'Kilo', body: 'Your agents are running.' } as const;
+export type LiveActivityAlert = { title: string; body: string };
 
 const encoder = new TextEncoder();
 
@@ -93,7 +93,11 @@ export function buildLiveActivityApnsRequest(
     credentials: ApnsCredentials;
     authorizationJwt: string;
     timestampSeconds: number;
-  } & ({ event: 'start' | 'update' } | { event: 'end'; dismissalDateSeconds: number })
+  } & (
+    | { event: 'start'; startAlert: LiveActivityAlert }
+    | { event: 'update' }
+    | { event: 'end'; dismissalDateSeconds: number }
+  )
 ): { url: string; headers: Record<string, string>; body: string } {
   return {
     url: `${APNS_BASE_URL}/3/device/${params.token}`,
@@ -115,7 +119,7 @@ export function buildLiveActivityApnsRequest(
           ? {
               'attributes-type': LIVE_ACTIVITY_ATTRIBUTES_TYPE,
               attributes: {},
-              alert: START_ALERT,
+              alert: params.startAlert,
             }
           : {}),
         'content-state': params.contentState,
@@ -136,6 +140,8 @@ export async function sendLiveActivityApns(params: {
   credentials: ApnsCredentials;
   tokens: readonly { token: string; event: LiveActivityEvent }[];
   contentState: Record<string, unknown>;
+  /** Required by APNs on a start; resolved by the caller in the user's locale. */
+  startAlert: LiveActivityAlert;
   nowSeconds: number;
   /** Snapshot ordering time, independent of the provider token's signing time. */
   timestampSeconds?: number;
@@ -164,7 +170,9 @@ export async function sendLiveActivityApns(params: {
         token,
         ...(event === 'end'
           ? { event, dismissalDateSeconds: Math.floor(Date.now() / 1000) + TERMINAL_SECONDS }
-          : { event }),
+          : event === 'start'
+            ? { event, startAlert: params.startAlert }
+            : { event }),
         contentState: params.contentState,
         credentials: params.credentials,
         authorizationJwt,

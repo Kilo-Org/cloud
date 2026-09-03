@@ -10,6 +10,7 @@ import {
 const TEAM_ID = 'TEAM123456';
 const KEY_ID = 'KEY123456';
 const TOPIC = 'com.kilocode.kiloapp';
+const START_ALERT = { title: 'Kilo', body: 'Active agents have an update' };
 
 async function generateTestPrivateKeyPem(): Promise<string> {
   const keyPair = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
@@ -67,6 +68,7 @@ describe('buildLiveActivityApnsRequest', () => {
     const request = buildLiveActivityApnsRequest({
       token: 'device-token-1',
       event: 'start',
+      startAlert: START_ALERT,
       contentState: { name: 'ActiveAgentsLiveActivity', props: '{"running":1}' },
       credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem: 'pem', topic: TOPIC },
       authorizationJwt: 'header.payload.sig',
@@ -87,7 +89,7 @@ describe('buildLiveActivityApnsRequest', () => {
     expect(body.aps['attributes-type']).toBe('LiveActivityAttributes');
     expect(body.aps.attributes).toEqual({});
     // Apple rejects a push-to-start payload that carries no alert.
-    expect(body.aps.alert).toEqual({ title: 'Kilo', body: 'Your agents are running.' });
+    expect(body.aps.alert).toEqual(START_ALERT);
     expect(body.aps['content-state']).toEqual({
       name: 'ActiveAgentsLiveActivity',
       props: '{"running":1}',
@@ -128,6 +130,7 @@ describe('APNs terminal contract', () => {
         credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
         tokens: [{ token: 'ending-activity', event: 'end' }],
         contentState: { running: 0 },
+        startAlert: START_ALERT,
         nowSeconds: 1_750_000_000,
         timestampSeconds: 1_750_000_001,
         isCurrent: async () => true,
@@ -195,6 +198,7 @@ describe('sendLiveActivityApns', () => {
         { token: 'token-b', event: 'update' },
       ],
       contentState: { revision: 1, running: 1 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_000,
       fetchFn,
     });
@@ -226,6 +230,7 @@ describe('sendLiveActivityApns', () => {
       credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
       tokens: [{ token: 'token-delayed', event: 'update' }],
       contentState: { running: 1 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_100,
       timestampSeconds: 1_750_000_000,
       fetchFn: async (_url, init) => {
@@ -257,6 +262,7 @@ describe('sendLiveActivityApns', () => {
         { token: 'token-superseded', event: 'start' },
       ],
       contentState: { running: 1 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_000,
       isCurrent: async () => {
         if (!first) return secondCheck.promise;
@@ -282,6 +288,7 @@ describe('sendLiveActivityApns', () => {
       credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
       tokens: [{ token: 'ending-activity', event: 'end' }],
       contentState: { running: 0 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_000,
       isCurrent: async () => true,
       beforeEnd: async () => false,
@@ -309,6 +316,7 @@ describe('sendLiveActivityApns', () => {
         { token: 'token-bad', event: 'update' },
       ],
       contentState: { revision: 2, running: 0 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_000,
       fetchFn,
     });
@@ -322,6 +330,7 @@ describe('sendLiveActivityApns', () => {
       credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem: 'not-a-key', topic: TOPIC },
       tokens: [],
       contentState: { revision: 3, running: 0 },
+      startAlert: START_ALERT,
       nowSeconds: 1_750_000_000,
       fetchFn,
     });

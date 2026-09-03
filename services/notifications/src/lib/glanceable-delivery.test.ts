@@ -52,8 +52,8 @@ function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
   const deps: GlanceableDeliveryDeps = {
     buildSnapshot: vi.fn(async () => snapshot),
     listIosActivityTokens: vi.fn(async () => []),
-    sendIosLiveActivity: vi.fn(async (_tokens, _contentState) => {
-      calls.iosSends.push([_tokens, _contentState]);
+    sendIosLiveActivity: vi.fn(async (_tokens, _contentState, _startAlert) => {
+      calls.iosSends.push([_tokens, _contentState, _startAlert]);
     }),
     listIosExpoTokens: vi.fn(async () => []),
     listAndroidExpoTokens: vi.fn(async () => []),
@@ -1793,6 +1793,51 @@ describe('deliverGlanceableSnapshot', () => {
 
     expect(deps.sendExpoPush).not.toHaveBeenCalled();
     expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('translates the push-to-start alert with the locale on the iOS Expo rows', async () => {
+    const { deps, calls } = fakeDeps({
+      listIosActivityTokens: vi.fn(async () => [
+        {
+          token: 'start-token',
+          kind: 'ios_push_to_start' as const,
+          id: 'row-0',
+          updated_at: '2026-08-27 10:00:00+00',
+        },
+      ]),
+      listIosExpoTokens: vi.fn(async () => [
+        { token: 'ExponentPushToken[a]', locale: null },
+        { token: 'ExponentPushToken[b]', locale: 'de' },
+      ]),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+    expect(calls.iosSends[0][2]).toEqual({
+      title: 'Kilo',
+      body: 'Aktive Agenten haben ein Update',
+    });
+  });
+
+  it('falls back to English when no iOS Expo row carries a locale', async () => {
+    const { deps, calls } = fakeDeps({
+      listIosActivityTokens: vi.fn(async () => [
+        {
+          token: 'start-token',
+          kind: 'ios_push_to_start' as const,
+          id: 'row-0',
+          updated_at: '2026-08-27 10:00:00+00',
+        },
+      ]),
+      listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[a]', locale: null }]),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+    expect(calls.iosSends[0][2]).toEqual({
+      title: 'Kilo',
+      body: 'Active agents have an update',
+    });
   });
 
   it('sends the data-only iOS Expo push regardless of the android_ongoing token', async () => {

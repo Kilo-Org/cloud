@@ -91,6 +91,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
     sendIosLiveActivity: async (
       tokens,
       contentState,
+      startAlert,
       timestampSeconds,
       isCurrent,
       beforeEnd,
@@ -102,6 +103,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         credentials,
         tokens,
         contentState,
+        startAlert,
         nowSeconds: Math.floor(Date.now() / 1000),
         timestampSeconds,
         isCurrent,

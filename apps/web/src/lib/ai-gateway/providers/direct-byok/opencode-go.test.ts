@@ -1,3 +1,4 @@
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
@@ -30,7 +31,7 @@ describe('OpenCode Go session headers', () => {
       },
       model: 'opencode-go/qwen3.7-plus',
       request: requests[0],
-      originalHeaders: {},
+      originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},
       userByok: null,
       kilo_user_id: 'oauth/test-user',

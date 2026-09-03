@@ -1,6 +1,6 @@
 import { Effect, Layer, Option, Ref, Stream } from 'effect';
-import { type ApiKind, pickKind } from './api-kind.js';
-import { type HttpConfig, post } from './http.js';
+import { type HttpCaller, type HttpConfig, post } from './http.js';
+import { ModelCatalog, type ModelCatalogService } from '../../core/catalog.js';
 import {
   ModelClient,
   ModelError,
@@ -10,40 +10,25 @@ import {
   type ModelUsage,
   zeroUsage,
 } from '../../core/model.js';
+import { RetryPolicy } from '../../core/retry.js';
+import { TokenSource } from '../../core/token.js';
 import { sseReader } from './sse.js';
-import { completionsWire } from './wire/completions.js';
-import { messagesWire } from './wire/messages.js';
-import { responsesWire } from './wire/responses.js';
 import type { Wire } from './wire/wire.js';
+import { wireFor } from './wires.js';
 
-interface KiloGatewayConfig extends HttpConfig {
-  /**
-   * Which shapes a model speaks. The gateway resolves this from the serving
-   * provider and publishes it nowhere, so the caller supplies it.
-   */
-  readonly apiKinds: (model: string) => readonly ApiKind[];
+/** Everything the gateway resolved once, at layer build. */
+interface Gateway extends HttpCaller {
+  readonly catalog: ModelCatalogService;
 }
 
-const wires: Readonly<Record<ApiKind, Wire>> = {
-  messages: messagesWire,
-  responses: responsesWire,
-  chat_completions: completionsWire,
-};
+/** `request.stream` is already set by the caller; the wire reads it. */
+const bodyFor = (gateway: Gateway, wire: Wire, request: ModelRequest) =>
+  post(gateway, wire.path, JSON.stringify(wire.toBody(request)));
 
-const wireFor = (config: KiloGatewayConfig, model: string): Effect.Effect<Wire, ModelError> => {
-  const kind = pickKind(config.apiKinds(model));
-  return kind === undefined
-    ? Effect.fail(new ModelError({ reason: 'unsupported', cause: model }))
-    : Effect.succeed(wires[kind]);
-};
-
-const send = (
-  config: KiloGatewayConfig,
-  request: ModelRequest
-): Effect.Effect<ModelReply, ModelError> =>
-  wireFor(config, request.model).pipe(
+const send = (gateway: Gateway, request: ModelRequest): Effect.Effect<ModelReply, ModelError> =>
+  wireFor(gateway.catalog, request.model).pipe(
     Effect.flatMap(wire =>
-      post(config, wire.path, JSON.stringify(wire.toBody({ ...request, stream: false }))).pipe(
+      bodyFor(gateway, wire, { ...request, stream: false }).pipe(
         Effect.flatMap(response =>
           Effect.tryPromise({
             try: () => response.text(),
@@ -79,18 +64,13 @@ const eventsOf = (wire: Wire, usage: Ref.Ref<ModelUsage>, data: string) =>
     Effect.map(event => Option.fromNullable(wire.toDelta(event)))
   );
 
-const stream = (
-  config: KiloGatewayConfig,
-  request: ModelRequest
-): Stream.Stream<ModelEvent, ModelError> =>
+const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEvent, ModelError> =>
   Stream.unwrap(
     Effect.map(Ref.make(zeroUsage), usage => {
       const read = sseReader();
       return Stream.unwrap(
-        Effect.map(wireFor(config, request.model), wire =>
-          Stream.fromEffect(
-            post(config, wire.path, JSON.stringify(wire.toBody({ ...request, stream: true })))
-          ).pipe(
+        Effect.map(wireFor(gateway.catalog, request.model), wire =>
+          Stream.fromEffect(bodyFor(gateway, wire, { ...request, stream: true })).pipe(
             Stream.flatMap(chunksOf),
             Stream.mapConcat(chunk => read(chunk)),
             Stream.mapEffect(data => eventsOf(wire, usage, data)),
@@ -107,12 +87,30 @@ const stream = (
     })
   );
 
-/** The kilo gateway plugin. It picks the best shape the model speaks. */
-const layerKiloGateway = (config: KiloGatewayConfig): Layer.Layer<ModelClient> =>
-  Layer.succeed(ModelClient, {
-    send: request => send(config, request),
-    stream: request => stream(config, request),
-  });
+/**
+ * The kilo gateway plugin. It picks the best shape the model speaks.
+ *
+ * The catalog, the token and the retry policy are resolved once here, so the
+ * request path carries no lookup and the returned client needs no context.
+ */
+const layerKiloGateway = (
+  config: HttpConfig
+): Layer.Layer<ModelClient, never, ModelCatalog | TokenSource | RetryPolicy> =>
+  Layer.effect(
+    ModelClient,
+    Effect.gen(function* () {
+      const gateway: Gateway = {
+        config,
+        catalog: yield* ModelCatalog,
+        token: yield* TokenSource,
+        retry: yield* RetryPolicy,
+      };
+      return {
+        send: request => send(gateway, request),
+        stream: request => stream(gateway, request),
+      };
+    })
+  );
 
-export type { KiloGatewayConfig };
+export type { HttpConfig as KiloGatewayConfig };
 export { layerKiloGateway };

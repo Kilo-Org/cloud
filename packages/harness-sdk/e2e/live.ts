@@ -7,6 +7,9 @@ import { layerKiloGateway } from '../src/plugins/gateway/index.js';
 import { layerFixedCeiling } from '../src/plugins/ceiling/fixed.js';
 import { layerUlid } from '../src/plugins/id/ulid.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
+import { layerTableCatalog } from '../src/plugins/catalog/table.js';
+import { layerStaticToken } from '../src/plugins/token/static.js';
+import { layerBackoff } from '../src/plugins/retry/backoff.js';
 import { kiloToken, nodeFetch } from './node-fetch.js';
 
 const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
@@ -53,11 +56,17 @@ const layers = Layer.mergeAll(
   layerFixedCeiling(),
   layerKiloGateway({
     baseUrl,
-    token: await kiloToken(),
     org: { kind: 'organization', id: organizationId },
     fetch: nodeFetch,
-    apiKinds: () => ['messages', 'responses', 'chat_completions'],
-  })
+  }).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        layerTableCatalog({}, { apiKinds: ['messages', 'responses', 'chat_completions'] }),
+        layerStaticToken(await kiloToken()),
+        layerBackoff()
+      )
+    )
+  )
 );
 
 const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));

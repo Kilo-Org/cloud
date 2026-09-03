@@ -136,6 +136,12 @@ The older `/api/openrouter` prefix also works; the package does not use it.
 
 ## The local end-to-end run
 
+`pnpm test:e2e` writes a cache entry on the first call and expects the second
+call to read it. About one run in five fails with a ratio of 0, because the
+provider has not made the entry readable yet. Re-run before you go looking for
+a bug; a real prefix regression fails every time, not one time in five.
+
+
 `pnpm test:e2e` calls the real gateway with the kilo CLI token from
 `~/.local/share/kilo/auth.json`. It never prints the token. It spends a small
 amount of real credit.
@@ -284,11 +290,17 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
 | `src/core/id.ts` | The `IdGenerator` plugin point |
 | `src/core/ceiling.ts` | The `TokenCeiling` plugin point |
+| `src/core/catalog.ts` | The `ModelCatalog` plugin point; what a model can do |
+| `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
+| `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
 | `src/plugins/id/ulid.ts` | The identifier plugin |
 | `src/plugins/ceiling/fixed.ts` | One ceiling for every model |
 | `src/plugins/model/fake.ts` | A scripted model, for tests without a network |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
+| `src/plugins/catalog/table.ts` | A catalog the caller writes down |
+| `src/plugins/token/static.ts` | One token for the life of the process |
+| `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/gateway/` | The kilo gateway plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config; stricter than the root config |
@@ -297,7 +309,9 @@ Inside `src/plugins/gateway/`:
 
 | Path | Purpose |
 |---|---|
-| `index.ts` | The layer: shape choice, send, stream |
+| `index.ts` | The layer: send, stream, and the resolved plugins |
+| `wires.ts` | Asks the catalog and picks the best wire for a model |
+| `test-gateway.ts` | The gateway with test plugins, for the unit tests |
 | `http.ts` | The post, the headers, and the retry |
 | `api-kind.ts` | The three shapes and which one to pick |
 | `sse.ts` | A reader over `eventsource-parser` |

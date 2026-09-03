@@ -1,8 +1,8 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { ApiKind } from './api-kind.js';
+import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest } from './fake.js';
-import { layerKiloGateway } from './index.js';
+import { testGateway } from './test-gateway.js';
 import { ModelClient } from '../../core/model.js';
 
 const reply: Reply = {
@@ -26,15 +26,7 @@ const bodyOf = async (kinds: readonly ApiKind[], effort: 'low' | 'high') => {
   await ModelClient.pipe(
     Effect.flatMap(client => client.send({ ...sampleRequest(false), effort })),
     Effect.either,
-    Effect.provide(
-      layerKiloGateway({
-        baseUrl: 'https://app.kilo.ai',
-        token: 'tok',
-        org: { kind: 'personal' },
-        fetch,
-        apiKinds: () => kinds,
-      })
-    ),
+    Effect.provide(testGateway({ fetch, kinds })),
     Effect.runPromise
   );
   return JSON.parse(calls[0]?.request.body ?? '') as unknown;

@@ -1,8 +1,8 @@
 import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
-import type { ApiKind } from './api-kind.js';
+import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest } from './fake.js';
-import { layerKiloGateway } from './index.js';
+import { testGateway } from './test-gateway.js';
 import { ModelClient, type ModelEvent } from '../../core/model.js';
 
 const sse = (...events: readonly unknown[]): readonly string[] =>
@@ -16,15 +16,7 @@ const collect = async (kinds: readonly ApiKind[], chunks: readonly string[]) => 
     Stream.unwrap,
     Stream.runCollect,
     Effect.map(chunk => [...chunk]),
-    Effect.provide(
-      layerKiloGateway({
-        baseUrl: 'https://app.kilocode.ai',
-        token: 'tok',
-        org: { kind: 'personal' },
-        fetch,
-        apiKinds: () => kinds,
-      })
-    ),
+    Effect.provide(testGateway({ fetch, kinds })),
     Effect.runPromise
   );
   return { calls, events };

@@ -1,6 +1,6 @@
 import { Effect, Layer, Stream } from 'effect';
 import { Chunk } from 'effect';
-import type { ApiKind } from '../src/plugins/gateway/api-kind.js';
+import type { ApiKind } from '../src/core/catalog.js';
 import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession, type SessionHandle } from '../src/core/run.js';
 import { hitRatio } from '../src/core/usage.js';
@@ -8,6 +8,9 @@ import { layerKiloGateway } from '../src/plugins/gateway/index.js';
 import { layerFixedCeiling } from '../src/plugins/ceiling/fixed.js';
 import { layerUlid } from '../src/plugins/id/ulid.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
+import { layerTableCatalog } from '../src/plugins/catalog/table.js';
+import { layerStaticToken } from '../src/plugins/token/static.js';
+import { layerBackoff } from '../src/plugins/retry/backoff.js';
 import { kiloToken, nodeFetch } from './node-fetch.js';
 
 /**
@@ -95,14 +98,20 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
         layerFixedCeiling(),
         layerKiloGateway({
           baseUrl: process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai',
-          token,
           org: {
             kind: 'organization',
             id: process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56',
           },
           fetch: nodeFetch,
-          apiKinds: () => kinds,
-        })
+        }).pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              layerTableCatalog({}, { apiKinds: kinds }),
+              layerStaticToken(token),
+              layerBackoff()
+            )
+          )
+        )
       )
     )
   );

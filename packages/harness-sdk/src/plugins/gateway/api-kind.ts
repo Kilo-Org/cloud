@@ -1,5 +1,4 @@
-/** The three shapes the gateway speaks. A model does not always speak all three. */
-type ApiKind = 'messages' | 'responses' | 'chat_completions';
+import type { ApiKind } from '../../core/catalog.js';
 
 /**
  * Ranked best first. `messages` wins because it takes explicit cache
@@ -13,5 +12,4 @@ const ranked: readonly ApiKind[] = ['messages', 'responses', 'chat_completions']
 const pickKind = (supported: readonly ApiKind[]): ApiKind | undefined =>
   ranked.find(kind => supported.includes(kind));
 
-export type { ApiKind };
 export { pickKind, ranked };

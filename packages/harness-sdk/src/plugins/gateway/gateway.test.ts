@@ -1,8 +1,8 @@
 import { Effect, Either } from 'effect';
 import { expect, it } from 'vitest';
-import type { ApiKind } from './api-kind.js';
+import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest } from './fake.js';
-import { layerKiloGateway } from './index.js';
+import { testGateway } from './test-gateway.js';
 import type { OrgContext } from './http.js';
 import { ModelClient } from '../../core/model.js';
 
@@ -30,13 +30,12 @@ const call = async (options: {
     Effect.flatMap(client => client.send(sampleRequest(false))),
     Effect.either,
     Effect.provide(
-      layerKiloGateway({
+      testGateway({
         baseUrl: 'https://app.kilocode.ai/',
-        token: 'tok',
-        org: options.org ?? { kind: 'personal' },
         fetch,
         retries: 2,
-        apiKinds: () => options.kinds ?? ['messages'],
+        ...(options.org === undefined ? {} : { org: options.org }),
+        ...(options.kinds === undefined ? {} : { kinds: options.kinds }),
       })
     ),
     Effect.runPromise

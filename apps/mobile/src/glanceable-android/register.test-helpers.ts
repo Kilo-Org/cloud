@@ -75,4 +75,3 @@ export function collectText(node: ReactNode): string[] {
   const text = node.props.text === undefined ? [] : [node.props.text];
   return [...text, ...collectText(node.props.children)];
 }
-

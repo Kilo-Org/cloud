@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { withAppBuildGradle } = require('expo/config-plugins');
+
 const GALLERY_COPY = require('./widget-gallery-copy.json');
 
 // Wraps react-native-android-widget so its config plugin only applies once the
@@ -15,6 +17,31 @@ const GALLERY_COPY = require('./widget-gallery-copy.json');
 // translations. The description is passed as text because the library already
 // wraps it in a string resource of its own.
 const WIDGET_CONFIG_PATH = path.resolve(__dirname, '../src/glanceable-android/widget-config.json');
+
+const WORK_FORCE_MARKER = 'kilo-work-runtime-alignment';
+
+// expo-widgets pulls androidx.glance, which depends on work-runtime-ktx 2.7.1,
+// while react-native-android-widget depends on work-runtime 2.8.1. Version
+// 2.8.0 folded the ktx classes into the main artifact, so the two together fail
+// :app:checkDebugDuplicateClasses. Pin both to 2.8.1, where the ktx artifact is
+// an empty shim.
+function withWorkRuntimeAlignment(config) {
+  return withAppBuildGradle(config, cfg => {
+    if (cfg.modResults.contents.includes(WORK_FORCE_MARKER)) {
+      return cfg;
+    }
+    cfg.modResults.contents += `
+// ${WORK_FORCE_MARKER}
+configurations.configureEach {
+    resolutionStrategy {
+        force 'androidx.work:work-runtime:2.8.1'
+        force 'androidx.work:work-runtime-ktx:2.8.1'
+    }
+}
+`;
+    return cfg;
+  });
+}
 
 function loadAndroidWidgetsPlugin() {
   const resolved = require.resolve('react-native-android-widget/app.plugin.js');
@@ -37,5 +64,5 @@ module.exports = function withActiveAgentsAndroidWidget(config) {
     label: `@string/widget_${widget.name.toLowerCase()}_label`,
     description: GALLERY_COPY.en.description,
   }));
-  return loadAndroidWidgetsPlugin()(config, { widgets: described });
+  return withWorkRuntimeAlignment(loadAndroidWidgetsPlugin()(config, { widgets: described }));
 };

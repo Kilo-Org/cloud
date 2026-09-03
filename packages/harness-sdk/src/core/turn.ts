@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { z } from 'zod';
+import { createIs } from 'typia';
 import { IdGenerator } from './id.js';
 
 /**
@@ -8,15 +8,20 @@ import { IdGenerator } from './id.js';
  * primary key and the sort order; a separate timestamp column would repeat what
  * the identifier already holds.
  */
-const TurnSchema = z.object({
-  id: z.string(),
-  sessionId: z.string(),
-  role: z.enum(['user', 'assistant']),
-  content: z.string(),
-});
+interface Turn {
+  readonly id: string;
+  readonly sessionId: string;
+  readonly role: TurnRole;
+  readonly content: string;
+}
 
-type Turn = z.infer<typeof TurnSchema>;
-type TurnRole = Turn['role'];
+type TurnRole = 'user' | 'assistant';
+
+/**
+ * Rows read back from a storage plugin are an edge: the package did not write
+ * them this run, and no storage engine promises the shape it returns.
+ */
+const isTurn = createIs<Turn>();
 
 const idPrefix = 'trn';
 
@@ -31,4 +36,4 @@ const makeTurn = (
   );
 
 export type { Turn, TurnRole };
-export { makeTurn, TurnSchema };
+export { isTurn, makeTurn };

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import { z } from 'zod';
+import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 
@@ -30,58 +30,34 @@ const toBody = ({
   })),
 });
 
-const ReplySchema = z.object({
-  output: z.array(
-    z.object({ content: z.array(z.object({ text: z.string().optional() })).nullish() })
-  ),
-  usage: z.object({
-    input_tokens: z.number(),
-    output_tokens: z.number(),
-    input_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-  }),
-});
+interface Counts {
+  input_tokens: number;
+  output_tokens: number;
+  input_tokens_details?: { cached_tokens?: number | null } | null;
+}
 
-const toReply = (raw: unknown): ModelReply => {
-  const parsed = ReplySchema.parse(raw);
-  const cacheReadTokens = parsed.usage.input_tokens_details?.cached_tokens ?? 0;
-  return {
-    content: parsed.output
-      .flatMap(item => item.content ?? [])
-      .map(part => part.text ?? '')
-      .join(''),
-    usage: {
-      inputTokens: parsed.usage.input_tokens - cacheReadTokens,
-      outputTokens: parsed.usage.output_tokens,
-      cacheReadTokens,
-      cacheWriteTokens: 0,
-    },
-  };
-};
+interface Reply {
+  output: { content?: { text?: string }[] | null }[];
+  usage: Counts;
+}
 
-const DeltaEvent = z.object({ type: z.literal('response.output_text.delta'), delta: z.string() });
+/** This shape names its frames, so the two events are matched on `type`. */
+interface DeltaEvent {
+  type: 'response.output_text.delta';
+  delta: string;
+}
 
-const CompletedEvent = z.object({
-  type: z.literal('response.completed'),
-  response: z.object({
-    usage: z.object({
-      input_tokens: z.number(),
-      output_tokens: z.number(),
-      input_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-    }),
-  }),
-});
+interface CompletedEvent {
+  type: 'response.completed';
+  response: { usage: Counts };
+}
 
-const toDelta = (event: unknown): string | undefined => {
-  const parsed = DeltaEvent.safeParse(event);
-  return parsed.success ? parsed.data.delta : undefined;
-};
+const assertReply = createAssert<Reply>();
+const isDelta = createIs<DeltaEvent>();
+const isCompleted = createIs<CompletedEvent>();
 
-const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
-  const parsed = CompletedEvent.safeParse(event);
-  if (!parsed.success) {
-    return undefined;
-  }
-  const { usage } = parsed.data.response;
+/** The cached count is reported inside the input total, so it is subtracted out. */
+const readUsage = (usage: Counts): Partial<ModelUsage> => {
   const cacheReadTokens = usage.input_tokens_details?.cached_tokens ?? 0;
   return {
     inputTokens: usage.input_tokens - cacheReadTokens,
@@ -89,6 +65,28 @@ const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
     cacheReadTokens,
   };
 };
+
+const toReply = (raw: unknown): ModelReply => {
+  const parsed = assertReply(raw);
+  const counts = readUsage(parsed.usage);
+  return {
+    content: parsed.output
+      .flatMap(item => item.content ?? [])
+      .map(part => part.text ?? '')
+      .join(''),
+    usage: {
+      inputTokens: counts.inputTokens ?? 0,
+      outputTokens: counts.outputTokens ?? 0,
+      cacheReadTokens: counts.cacheReadTokens ?? 0,
+      cacheWriteTokens: 0,
+    },
+  };
+};
+
+const toDelta = (event: unknown): string | undefined => (isDelta(event) ? event.delta : undefined);
+
+const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
+  isCompleted(event) ? readUsage(event.response.usage) : undefined;
 
 const responsesWire: Wire = {
   path: '/api/gateway/v1/responses',

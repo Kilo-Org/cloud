@@ -3,38 +3,43 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./core": "./src/core/index.ts",
-    "./plugins/gateway": "./src/plugins/gateway/index.ts",
-    "./plugins/id": "./src/plugins/id/ulid.ts",
-    "./plugins/prompt": "./src/plugins/prompt/default.ts"
+    ".": "./dist/index.js",
+    "./core": "./dist/core/index.js",
+    "./plugins/gateway": "./dist/plugins/gateway/index.js",
+    "./plugins/id": "./dist/plugins/id/ulid.js",
+    "./plugins/prompt": "./dist/plugins/prompt/default.js"
   },
   "scripts": {
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest",
-    "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
+    "build": "ttsc -p tsconfig.build.json",
+    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test && pnpm build",
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
-    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test",
-    "test:e2e": "tsx e2e/live.ts",
-    "typecheck:e2e": "tsgo --noEmit -p e2e/tsconfig.json",
-    "test:e2e:models": "tsx e2e/models.ts"
+    "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "ttsx e2e/live.ts",
+    "test:e2e:models": "ttsx e2e/models.ts",
+    "test:watch": "vitest",
+    "typecheck": "ttsc --noEmit",
+    "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.104.1",
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",
     "openai": "6.49.0",
-    "ulid": "catalog:",
-    "zod": "catalog:"
+    "typia": "14.0.4",
+    "ulid": "catalog:"
   },
   "devDependencies": {
+    "@ttsc/unplugin": "0.28.3",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
-    "typescript": "catalog:",
+    "ttsc": "0.28.3",
+    "typescript": "7.0.2",
     "vitest": "catalog:"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

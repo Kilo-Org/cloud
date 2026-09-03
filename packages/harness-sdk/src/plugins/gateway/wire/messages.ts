@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { z } from 'zod';
+import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 import { type Counts, set } from './usage.js';
@@ -25,19 +25,49 @@ const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): Mes
   })),
 });
 
+/**
+ * The shapes are matched structurally, not by a `type` discriminator: gateways
+ * relay a dozen models and only agree on where the numbers sit, not on how the
+ * frames are named. Extra fields are allowed; typia's `is` ignores them.
+ */
+interface WireUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
+interface Reply {
+  content: { type: string; text?: string }[];
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens?: number | null;
+    cache_creation_input_tokens?: number | null;
+  };
+}
+
+interface DeltaEvent {
+  delta: { text: string };
+}
+
+interface UsageEvent {
+  usage: WireUsage;
+}
+
+/** `message_start` carries the input counts and `message_delta` the output count. */
+interface StartEvent {
+  message: UsageEvent;
+}
+
 /** The reply is an edge, so it is validated before the package believes it. */
-const ReplySchema = z.object({
-  content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
-  usage: z.object({
-    input_tokens: z.number(),
-    output_tokens: z.number(),
-    cache_read_input_tokens: z.number().nullish(),
-    cache_creation_input_tokens: z.number().nullish(),
-  }),
-});
+const assertReply = createAssert<Reply>();
+const isDelta = createIs<DeltaEvent>();
+const isUsage = createIs<UsageEvent>();
+const isStart = createIs<StartEvent>();
 
 const toReply = (raw: unknown): ModelReply => {
-  const parsed = ReplySchema.parse(raw);
+  const parsed = assertReply(raw);
   return {
     content: parsed.content.map(part => part.text ?? '').join(''),
     usage: {
@@ -49,26 +79,10 @@ const toReply = (raw: unknown): ModelReply => {
   };
 };
 
-const DeltaEvent = z.object({ delta: z.object({ text: z.string() }) });
+const toDelta = (event: unknown): string | undefined =>
+  isDelta(event) ? event.delta.text : undefined;
 
-const UsageEvent = z.object({
-  usage: z.object({
-    input_tokens: z.number().nullish(),
-    output_tokens: z.number().nullish(),
-    cache_read_input_tokens: z.number().nullish(),
-    cache_creation_input_tokens: z.number().nullish(),
-  }),
-});
-
-/** `message_start` carries the input counts and `message_delta` the output count. */
-const StartEvent = z.object({ message: UsageEvent });
-
-const toDelta = (event: unknown): string | undefined => {
-  const parsed = DeltaEvent.safeParse(event);
-  return parsed.success ? parsed.data.delta.text : undefined;
-};
-
-const readUsage = (usage: z.infer<typeof UsageEvent>['usage']): Partial<ModelUsage> => {
+const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
   const counts: Counts = {};
   set(counts, 'inputTokens', usage.input_tokens);
   set(counts, 'outputTokens', usage.output_tokens);
@@ -78,12 +92,10 @@ const readUsage = (usage: z.infer<typeof UsageEvent>['usage']): Partial<ModelUsa
 };
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
-  const start = StartEvent.safeParse(event);
-  if (start.success) {
-    return readUsage(start.data.message.usage);
+  if (isStart(event)) {
+    return readUsage(event.message.usage);
   }
-  const delta = UsageEvent.safeParse(event);
-  return delta.success ? readUsage(delta.data.usage) : undefined;
+  return isUsage(event) ? readUsage(event.usage) : undefined;
 };
 
 const messagesWire: Wire = {
@@ -94,5 +106,5 @@ const messagesWire: Wire = {
   toUsage,
 };
 
-export type { ContentBlock, MessagesBody };
-export { messagesWire, ReplySchema };
+export type { ContentBlock, MessagesBody, WireUsage };
+export { assertReply, messagesWire };

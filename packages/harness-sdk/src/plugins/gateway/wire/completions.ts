@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import { z } from 'zod';
+import { createAssert, createIs } from 'typia';
 import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 import type { ContentBlock } from './messages.js';
@@ -41,58 +41,59 @@ const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): Com
   ],
 });
 
-const ReplySchema = z.object({
-  choices: z.array(z.object({ message: z.object({ content: z.string().nullish() }) })),
-  usage: z.object({
-    prompt_tokens: z.number(),
-    completion_tokens: z.number(),
-    prompt_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-  }),
-});
+interface Counts {
+  prompt_tokens: number;
+  completion_tokens: number;
+  prompt_tokens_details?: { cached_tokens?: number | null } | null;
+}
+
+interface Reply {
+  choices: { message: { content?: string | null } }[];
+  usage: Counts;
+}
+
+interface DeltaEvent {
+  /** A tuple with a rest element: the frame is only a delta if a choice is present. */
+  choices: [{ delta: { content?: string | null } }, ...{ delta: { content?: string | null } }[]];
+}
+
+interface UsageEvent {
+  usage: Counts;
+}
+
+const assertReply = createAssert<Reply>();
+const isDelta = createIs<DeltaEvent>();
+const isUsage = createIs<UsageEvent>();
+
+/** The cached count is reported inside the prompt total, so it is subtracted out. */
+const readUsage = (usage: Counts): Partial<ModelUsage> => {
+  const cacheReadTokens = usage.prompt_tokens_details?.cached_tokens ?? 0;
+  return {
+    inputTokens: usage.prompt_tokens - cacheReadTokens,
+    outputTokens: usage.completion_tokens,
+    cacheReadTokens,
+  };
+};
 
 const toReply = (raw: unknown): ModelReply => {
-  const parsed = ReplySchema.parse(raw);
-  const cacheReadTokens = parsed.usage.prompt_tokens_details?.cached_tokens ?? 0;
+  const parsed = assertReply(raw);
+  const counts = readUsage(parsed.usage);
   return {
     content: parsed.choices.map(choice => choice.message.content ?? '').join(''),
     usage: {
-      inputTokens: parsed.usage.prompt_tokens - cacheReadTokens,
-      outputTokens: parsed.usage.completion_tokens,
-      cacheReadTokens,
+      inputTokens: counts.inputTokens ?? 0,
+      outputTokens: counts.outputTokens ?? 0,
+      cacheReadTokens: counts.cacheReadTokens ?? 0,
       cacheWriteTokens: 0,
     },
   };
 };
 
-const DeltaEvent = z.object({
-  choices: z.array(z.object({ delta: z.object({ content: z.string().nullish() }) })).nonempty(),
-});
+const toDelta = (event: unknown): string | undefined =>
+  isDelta(event) ? (event.choices[0].delta.content ?? undefined) : undefined;
 
-const UsageEvent = z.object({
-  usage: z.object({
-    prompt_tokens: z.number(),
-    completion_tokens: z.number(),
-    prompt_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
-  }),
-});
-
-const toDelta = (event: unknown): string | undefined => {
-  const parsed = DeltaEvent.safeParse(event);
-  return parsed.success ? (parsed.data.choices[0]?.delta.content ?? undefined) : undefined;
-};
-
-const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
-  const parsed = UsageEvent.safeParse(event);
-  if (!parsed.success) {
-    return undefined;
-  }
-  const cacheReadTokens = parsed.data.usage.prompt_tokens_details?.cached_tokens ?? 0;
-  return {
-    inputTokens: parsed.data.usage.prompt_tokens - cacheReadTokens,
-    outputTokens: parsed.data.usage.completion_tokens,
-    cacheReadTokens,
-  };
-};
+const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
+  isUsage(event) ? readUsage(event.usage) : undefined;
 
 const completionsWire: Wire = {
   path: '/api/gateway/v1/chat/completions',

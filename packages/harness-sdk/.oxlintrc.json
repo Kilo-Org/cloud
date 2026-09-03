@@ -52,7 +52,9 @@
     "require-await": "off",
     "typescript/require-await": "off",
     "unicorn/no-array-callback-reference": "off",
-    "import/prefer-default-export": "off"
+    "import/prefer-default-export": "off",
+    "func-names": "off",
+    "unicorn/no-array-method-this-argument": "off"
   },
   "overrides": [
     {

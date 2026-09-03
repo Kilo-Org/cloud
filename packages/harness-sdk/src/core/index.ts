@@ -2,6 +2,8 @@ export * from './fetch.js';
 export * from './id.js';
 export * from './model.js';
 export * from './prompt.js';
+export * from './run.js';
+export * from './usage.js';
 export * from './session.js';
 export * from './storage.js';
 export * from './turn.js';

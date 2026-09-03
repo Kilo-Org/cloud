@@ -94,6 +94,25 @@ The older `/api/openrouter` prefix also works; the package does not use it.
 
 ## Decisions
 
+### The session bridges; the plugin decides
+
+`openSession` resolves every plugin once, at open, so the handle it returns
+carries no requirement. It then tells each plugin what happened and lets the
+plugin decide what to do about it. The session never decides when a store
+writes, how a transport retries, or how an identifier is made.
+
+Two values are frozen for the life of a session: the system prompt and the
+model. The system prompt is the front of the cached prefix, and a cache belongs
+to one model. Changing either one mid-session throws the cache away, so the type
+does not allow it.
+
+One session answers one question at a time. A semaphore holds the second
+question until the first is finished, because two answers built on one prefix
+means the second one misses the cache.
+
+An answer turn is added only when the stream reaches `done`. A half written turn
+would sit in the prefix of every later request.
+
 ### The session does not write to the store
 
 `appendTurn` is a pure function. It does not touch the `SessionStore` plugin.
@@ -106,10 +125,9 @@ Do not make it write through.
 - A session runs with no store at all. This is what lets the package run in a
   browser or in a mobile app.
 
-The cost is that a crash drops the turns since the last flush. If that cost
-becomes real, the next step is write-behind: `appendTurn` stays pure and pushes
-to an Effect `Queue`, and a forked fiber drains it. Do not build the queue
-before a crash loses real data.
+The cost is that a crash drops whatever the store still holds. That is the
+store plugin's call: it is told about every turn as it happens, and about the
+close, and it decides whether to write at once, to batch, or to buffer.
 
 ### A reloaded turn must equal the turn that was written
 
@@ -127,6 +145,9 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | Path | Purpose |
 |---|---|
 | `src/index.ts` | The public entry point; core and every owned plugin |
+| `src/core/run.ts` | `openSession`: the handle a consumer drives |
+| `src/core/ask.ts` | One question and one answer, with the turn rules |
+| `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
 | `src/core/turn.ts` | One turn, shaped as one SQLite row |
 | `src/core/prompt.ts` | The `Prompt` shape and the `PromptAssembler` plugin point |
@@ -135,6 +156,7 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | `src/core/id.ts` | The `IdGenerator` plugin point |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
 | `src/plugins/id/ulid.ts` | The identifier plugin |
+| `src/plugins/model/fake.ts` | A scripted model, for tests without a network |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/gateway/` | The kilo gateway plugin |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
@@ -172,6 +194,8 @@ turn one off, and give the reason.
 | `promise/prefer-await-to-then` | It flags `Promise.resolve`. |
 | `require-await` | It flags an async generator, which needs no await. |
 | `unicorn/no-array-callback-reference` | Effect pipes pass a function by name on every line. |
+| `unicorn/no-array-method-this-argument` | It reads `Effect.map(a, b)` as an array method. |
+| `func-names` | `Effect.gen` takes an anonymous generator. |
 | `no-magic-numbers` | An HTTP status and a token count are not magic. |
 | `max-classes-per-file` | A tag and its error belong in one file. |
 | `sort-keys` | Field order carries meaning; alphabetical order does not. |

@@ -1735,18 +1735,41 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     };
   }
 
-  async issueRuntimeCredentialProxyGrant(): Promise<string | null> {
+  async issueRuntimeCredentialProxyGrant(fence: {
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<string | null> {
+    const currentFence = await this.runtimeProxyFence();
+    if (
+      !currentFence ||
+      currentFence.wrapperRunId !== fence.wrapperRunId ||
+      currentFence.generation !== fence.wrapperGeneration ||
+      currentFence.wrapperConnectionId !== fence.wrapperConnectionId
+    ) {
+      return null;
+    }
     const token = await this.getRuntimeToken();
-    const metadata = await this.getMetadata();
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
+    const [metadata, storedAuthorization, latestFence] = await Promise.all([
+      this.getMetadata(),
+      this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      this.runtimeProxyFence(),
+    ]);
+    if (
+      !latestFence ||
+      latestFence.wrapperRunId !== fence.wrapperRunId ||
+      latestFence.generation !== fence.wrapperGeneration ||
+      latestFence.wrapperConnectionId !== fence.wrapperConnectionId
+    ) {
+      return null;
+    }
+    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
       metadata,
       authorization: authorization.success ? authorization.data : null,
-      fence: await this.runtimeProxyFence(),
+      fence: latestFence,
       token,
       mode:
         metadata && getEffectiveCredentialContainment(metadata).kilocode ? 'contained' : 'direct',

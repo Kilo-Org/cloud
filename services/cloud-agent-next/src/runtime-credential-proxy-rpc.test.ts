@@ -53,8 +53,10 @@ function fence(generation = 1): Fence {
   };
 }
 
-function signedToken(expiresAt: number): string {
-  return jwt.sign({ exp: Math.floor(expiresAt / 1000) }, secret, { noTimestamp: true });
+function signedToken(expiresAt: number, nonce?: string): string {
+  return jwt.sign({ exp: Math.floor(expiresAt / 1000), ...(nonce ? { nonce } : {}) }, secret, {
+    noTimestamp: true,
+  });
 }
 
 function storage() {
@@ -103,6 +105,23 @@ describe('persisted runtime credential proxy RPC', () => {
     ]) {
       await expect(issue({ store: storage(), ...input })).resolves.toBeNull();
     }
+    vi.useRealTimers();
+  });
+
+  it('returns the same stable handle across backing-token renewal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const store = storage();
+    const first = await issue({
+      store,
+      token: signedToken(Date.now() + 2 * 60 * 60_000, 'backing-token-before-renewal'),
+    });
+    vi.advanceTimersByTime(60_000);
+    const second = await issue({
+      store,
+      token: signedToken(Date.now() + 4 * 60 * 60_000, 'backing-token-after-renewal'),
+    });
+    expect(second).toBe(first);
     vi.useRealTimers();
   });
 
@@ -206,7 +225,7 @@ describe('persisted runtime credential proxy RPC', () => {
   });
 
   it.each(['fence', 'grant'] as const)(
-    'denies renewal when the %s is replaced before the durable re-read',
+    '%s changes are handled according to the stable grant fence',
     async replacement => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
@@ -217,24 +236,29 @@ describe('persisted runtime credential proxy RPC', () => {
       let currentFence = fence();
       let calls = 0;
 
-      await expect(
-        resolvePersistedRuntimeProxyCredential({
-          env,
-          storage: store,
-          handle: handle!,
-          metadata: async () => metadata(),
-          authorization: async () => authorization(),
-          fence: async () => currentFence,
-          token: async () => {
-            calls += 1;
-            if (calls === 2 && replacement === 'fence') currentFence = fence(2);
-            if (calls === 2 && replacement === 'grant') {
-              await issue({ store, token: renewed });
-            }
-            return calls === 1 ? nearExpiry : renewed;
-          },
-        })
-      ).resolves.toBeNull();
+      const resolved = await resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle: handle!,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => currentFence,
+        token: async () => {
+          calls += 1;
+          if (calls === 2 && replacement === 'fence') currentFence = fence(2);
+          if (calls === 2 && replacement === 'grant') {
+            await issue({ store, token: renewed });
+          }
+          return calls === 1 ? nearExpiry : renewed;
+        },
+      });
+      if (replacement === 'fence') {
+        expect(resolved).toBeNull();
+      } else {
+        // Reissuing against the same runtime fence returns the original handle
+        // and does not invalidate a request that is concurrently renewing.
+        expect(resolved).toMatchObject({ token: renewed });
+      }
       vi.useRealTimers();
     }
   );

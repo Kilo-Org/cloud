@@ -6,6 +6,7 @@ import {
   matchesRuntimeProxyGrant,
   resolveRuntimeProxyCredential,
   RUNTIME_PROXY_GRANT_KEY,
+  runtimeProxyGrantSchema,
   verifyRuntimeCredentialProxyHandle,
   type RuntimeProxyGrant,
 } from './runtime-credential-proxy.js';
@@ -67,15 +68,40 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     input.authorization?.state !== 'active'
   )
     return null;
+  const existing = await input.storage.get<unknown>(RUNTIME_PROXY_GRANT_KEY);
+  const parsedExisting = runtimeProxyGrantSchema.safeParse(existing);
+  if (
+    parsedExisting.success &&
+    parsedExisting.data.issuedAt !== undefined &&
+    parsedExisting.data.authorizationId === input.authorization.id &&
+    parsedExisting.data.sessionId === current.sessionId &&
+    parsedExisting.data.kiloSessionId === current.kiloSessionId &&
+    parsedExisting.data.userId === current.userId &&
+    parsedExisting.data.orgId === current.orgId &&
+    parsedExisting.data.generation === current.generation &&
+    parsedExisting.data.allocationId === current.allocationId &&
+    parsedExisting.data.wrapperRunId === current.wrapperRunId &&
+    parsedExisting.data.wrapperConnectionId === current.wrapperConnectionId &&
+    parsedExisting.data.mode === input.mode &&
+    parsedExisting.data.leaseExpiresAt > Date.now()
+  ) {
+    return issueRuntimeCredentialProxyHandle(
+      input.env as never,
+      parsedExisting.data,
+      parsedExisting.data.issuedAt
+    );
+  }
+  const issuedAt = Date.now();
   const grant = createRuntimeProxyGrant({
     authorizationId: input.authorization.id,
     ...current,
     mode: input.mode,
-    leaseExpiresAt: Date.now() + RUNTIME_PROXY_LEASE_MS,
+    leaseExpiresAt: issuedAt + RUNTIME_PROXY_LEASE_MS,
     state: 'active',
+    issuedAt,
   });
   await input.storage.put(RUNTIME_PROXY_GRANT_KEY, grant);
-  return issueRuntimeCredentialProxyHandle(input.env as never, grant);
+  return issueRuntimeCredentialProxyHandle(input.env as never, grant, issuedAt);
 }
 
 export async function resolvePersistedRuntimeProxyCredential(input: {

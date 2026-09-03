@@ -42,6 +42,7 @@ export const runtimeProxyGrantSchema = z
     allocationId: z.string().min(1),
     wrapperRunId: z.string().min(1),
     wrapperConnectionId: z.string().min(1),
+    issuedAt: z.number().int().positive().optional(),
     leaseExpiresAt: z.number().int().positive(),
     state: z.literal('active'),
   })
@@ -61,12 +62,13 @@ export function createRuntimeProxyGrant(
 
 export async function issueRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
-  input: RuntimeProxyGrant
+  input: RuntimeProxyGrant,
+  issuedAt = Date.now()
 ): Promise<string> {
   const grant = runtimeProxyGrantSchema.parse(input);
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) throw new Error('Authentication unavailable');
-  const iat = Math.floor(Date.now() / 1000);
+  const iat = Math.floor(issuedAt / 1000);
   const exp = Math.floor(grant.leaseExpiresAt / 1000);
   if (exp <= iat) throw new Error('Runtime proxy grant has expired');
   return jwt.sign(

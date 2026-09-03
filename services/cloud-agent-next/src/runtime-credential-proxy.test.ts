@@ -189,7 +189,7 @@ describe('runtime credential proxy', () => {
         targets,
         'provider',
         'POST',
-        'chat/completions',
+        'api/openrouter/chat/completions',
         '?stream=true',
         'agent_1'
       )?.toString()
@@ -264,7 +264,16 @@ describe('runtime credential proxy', () => {
   });
 
   it('fails closed for ambiguous paths and mismatched organization routes', () => {
-    for (const pathname of ['/chat%2fcompletions', '/chat%252fcompletions']) {
+    for (const pathname of [
+      '/api/openrouter',
+      '/chat/completions',
+      '/api/gateway/chat/completions',
+      '/api/organizations/allowed/models',
+      '/api/openrouter/unknown',
+      '/api/openrouter/chat%2fcompletions',
+      '/api/openrouter/chat%252fcompletions',
+      '/api/openrouter/../chat/completions',
+    ]) {
       expect(
         resolveRuntimeCredentialProxyRoute({
           targets,
@@ -276,6 +285,16 @@ describe('runtime credential proxy', () => {
         })
       ).toBeNull();
     }
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets: { ...targets, providerBaseUrl: 'https://api.kilo.ai' },
+        route: 'provider',
+        method: 'POST',
+        pathname: '/api/openrouter/chat/completions',
+        search: '?stream=true',
+        kiloSessionId: 'kilo_1',
+      })?.toString()
+    ).toBe('https://api.kilo.ai/api/gateway/chat/completions?stream=true');
     expect(
       resolveRuntimeCredentialProxyRoute({
         targets,
@@ -292,7 +311,7 @@ describe('runtime credential proxy', () => {
         targets,
         route: 'provider',
         method: 'POST',
-        pathname: '/embeddings',
+        pathname: '/api/openrouter/embeddings',
         search: '',
         kiloSessionId: 'kilo_1',
       })?.toString()
@@ -302,7 +321,7 @@ describe('runtime credential proxy', () => {
         targets: { ...targets, providerBaseUrl: 'ftp://provider.example.test/api/openrouter' },
         route: 'provider',
         method: 'POST',
-        pathname: '/embeddings',
+        pathname: '/api/openrouter/embeddings',
         search: '',
         kiloSessionId: 'kilo_1',
       })

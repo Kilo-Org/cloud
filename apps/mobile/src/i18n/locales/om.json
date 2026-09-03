@@ -3212,5 +3212,17 @@
     "historyRetry": "Seenaa chaat fudhachuu hin dandeenye.",
     "catalogRetry": "Modeeloota fe'achuu hin dandeenye",
     "sendError": "Ergaa erguu hin dandeenye. Ammas yaali."
+  },
+  "glanceable": {
+    "waiting": "Eejentoota haaromsaa jira",
+    "empty": "Hojiin hojjetamaa jiru hin jiru",
+    "stale": "Amma haaromsuu hin danda'u",
+    "expired": "Yeroon haalaa darbeera",
+    "signedOut": "Eejentoota arguuf seenaa",
+    "privacy": "Eejentoonni dhokamaniiru",
+    "openAgents": "Eejentoota banaa",
+    "running": "Hojii irra jira",
+    "needsInput": "seensa barbaada",
+    "reconnecting": "Irra deebi'ee walqabachaa jira"
   }
 }

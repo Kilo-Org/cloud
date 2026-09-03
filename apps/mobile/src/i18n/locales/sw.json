@@ -3212,5 +3212,17 @@
     "historyRetry": "Haikuweza kupakia historia ya mazungumzo.",
     "catalogRetry": "Imeshindwa kupakia miundo",
     "sendError": "Haikuweza kutuma ujumbe. Jaribu tena."
+  },
+  "glanceable": {
+    "waiting": "Inasasisha mawakala",
+    "empty": "Hakuna kazi inayoendelea",
+    "stale": "Haiwezi kusasisha sasa",
+    "expired": "Muda wa hali umeisha",
+    "signedOut": "Ingia ili uone mawakala",
+    "privacy": "Mawakala wamefichwa",
+    "openAgents": "Fungua mawakala",
+    "running": "Inaendelea",
+    "needsInput": "inahitaji mchango",
+    "reconnecting": "Inaunganisha tena"
   }
 }

@@ -3234,5 +3234,17 @@
     "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
     "catalogRetry": "Neizdevās ielādēt modeļus",
     "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
+  },
+  "glanceable": {
+    "waiting": "Atjaunina aģentus",
+    "empty": "Nav darba procesā",
+    "stale": "Pašlaik nevar atjaunināt",
+    "expired": "Statusa derīgums ir beidzies",
+    "signedOut": "Pieraksties, lai redzētu aģentus",
+    "privacy": "Aģenti ir paslēpti",
+    "openAgents": "Atvērt aģentus",
+    "running": "DARBOJAS",
+    "needsInput": "nepieciešama ievade",
+    "reconnecting": "Atkārtoti izveido savienojumu"
   }
 }

@@ -3212,5 +3212,17 @@
     "historyRetry": "Tsy afaka nampidirina ny tantaran'ny resaka.",
     "catalogRetry": "Tsy afaka namaky ny modely",
     "sendError": "Tsy afaka nalefa ny hafatra. Andramo indray."
+  },
+  "glanceable": {
+    "waiting": "Manavao ny agent",
+    "empty": "Tsy misy asa mandeha",
+    "stale": "Tsy afaka manavao izao",
+    "expired": "Lany daty ny sata",
+    "signedOut": "Midira mba hahitana ny agent",
+    "privacy": "Nafenina ny agent",
+    "openAgents": "Sokafy ny agent",
+    "running": "MANDEHA",
+    "needsInput": "mila fampidirana",
+    "reconnecting": "Mampifandray indray"
   }
 }

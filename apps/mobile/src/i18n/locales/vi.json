@@ -3212,5 +3212,17 @@
     "historyRetry": "Không thể tải lịch sử trò chuyện.",
     "catalogRetry": "Không thể tải các mô hình",
     "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
+  },
+  "glanceable": {
+    "waiting": "Đang cập nhật tác nhân",
+    "empty": "Không có công việc đang thực hiện",
+    "stale": "Hiện không thể cập nhật",
+    "expired": "Trạng thái đã hết hạn",
+    "signedOut": "Đăng nhập để xem tác nhân",
+    "privacy": "Đã ẩn tác nhân",
+    "openAgents": "Mở tác nhân",
+    "running": "ĐANG CHẠY",
+    "needsInput": "cần nhập",
+    "reconnecting": "Đang kết nối lại"
   }
 }

@@ -3212,5 +3212,17 @@
       "xhigh": "Extra High",
       "max": "Max"
     }
+  },
+  "glanceable": {
+    "waiting": "Updating agents",
+    "empty": "No work in progress",
+    "stale": "Can't update now",
+    "expired": "Status expired",
+    "signedOut": "Sign in to see agents",
+    "privacy": "Agents hidden",
+    "openAgents": "Open agents",
+    "running": "Running",
+    "needsInput": "Needs input",
+    "reconnecting": "Reconnecting"
   }
 }

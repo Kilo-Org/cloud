@@ -3212,5 +3212,17 @@
     "historyRetry": "Kunne ikke laste inn chathistorikken.",
     "catalogRetry": "Kunne ikke laste modeller",
     "sendError": "Kunne ikke sende meldingen. Prøv igjen."
+  },
+  "glanceable": {
+    "waiting": "Oppdaterer agenter",
+    "empty": "Ingen arbeid pågår",
+    "stale": "Kan ikke oppdatere nå",
+    "expired": "Statusen er utløpt",
+    "signedOut": "Logg inn for å se agenter",
+    "privacy": "Agenter er skjult",
+    "openAgents": "Åpne agenter",
+    "running": "KJØRER",
+    "needsInput": "trenger innspill",
+    "reconnecting": "Kobler til på nytt"
   }
 }

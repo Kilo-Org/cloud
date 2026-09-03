@@ -3212,5 +3212,17 @@
     "historyRetry": "無法載入聊天記錄。",
     "catalogRetry": "無法載入模型",
     "sendError": "無法傳送訊息。請再試一次。"
+  },
+  "glanceable": {
+    "waiting": "正在更新代理",
+    "empty": "沒有進行中的工作",
+    "stale": "目前無法更新",
+    "expired": "狀態已過期",
+    "signedOut": "請登入以查看代理",
+    "privacy": "代理已隱藏",
+    "openAgents": "開啟代理",
+    "running": "執行中",
+    "needsInput": "需要輸入",
+    "reconnecting": "正在重新連線"
   }
 }

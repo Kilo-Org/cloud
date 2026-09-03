@@ -3212,5 +3212,17 @@
     "historyRetry": "Non se puido cargar o historial do chat.",
     "catalogRetry": "Non se puideron cargar os modelos",
     "sendError": "Non se puido enviar a mensaxe. Téntao de novo."
+  },
+  "glanceable": {
+    "waiting": "Actualizando axentes",
+    "empty": "Non hai traballo en curso",
+    "stale": "Non se pode actualizar agora",
+    "expired": "Estado caducado",
+    "signedOut": "Inicia sesión para ver os axentes",
+    "privacy": "Axentes ocultos",
+    "openAgents": "Abrir axentes",
+    "running": "Executando",
+    "needsInput": "precisa entrada",
+    "reconnecting": "Reconectando"
   }
 }

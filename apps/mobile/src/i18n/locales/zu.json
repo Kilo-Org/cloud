@@ -3212,5 +3212,17 @@
     "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
     "catalogRetry": "Akukwazanga ukulayisha amamodeli",
     "sendError": "Asikwazanga ukuthumela umlayezo. Uzama futhi."
+  },
+  "glanceable": {
+    "waiting": "Ibuyekeza ama-agent",
+    "empty": "Awukho umsebenzi oqhubekayo",
+    "stale": "Akukwazi ukubuyekeza manje",
+    "expired": "Isimo siphelelwe yisikhathi",
+    "signedOut": "Ngena ngemvume ukuze ubone ama-agent",
+    "privacy": "Ama-agent afihliwe",
+    "openAgents": "Vula ama-agent",
+    "running": "IYASEBENZA",
+    "needsInput": "idinga okokufaka",
+    "reconnecting": "Ixhuma kabusha"
   }
 }

@@ -3278,5 +3278,17 @@
     "historyRetry": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
     "catalogRetry": "Ma setgħux jittellgħu l-mudelli",
     "sendError": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
+  },
+  "glanceable": {
+    "waiting": "Qed jaġġorna l-aġenti",
+    "empty": "L-ebda xogħol għaddej",
+    "stale": "Ma jistax jaġġorna bħalissa",
+    "expired": "L-istatus skada",
+    "signedOut": "Idħol biex tara l-aġenti",
+    "privacy": "Aġenti moħbija",
+    "openAgents": "Iftaħ l-aġenti",
+    "running": "Għaddej",
+    "needsInput": "jeħtieġ input",
+    "reconnecting": "Qed jerġa' jaqbad"
   }
 }

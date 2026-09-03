@@ -3234,5 +3234,17 @@
     "historyRetry": "Impossibile caricare la cronologia della chat.",
     "catalogRetry": "Impossibile caricare i modelli",
     "sendError": "Impossibile inviare il messaggio. Riprova."
+  },
+  "glanceable": {
+    "waiting": "Aggiornamento degli agenti",
+    "empty": "Nessun lavoro in corso",
+    "stale": "Impossibile aggiornare ora",
+    "expired": "Stato scaduto",
+    "signedOut": "Accedi per vedere gli agenti",
+    "privacy": "Agenti nascosti",
+    "openAgents": "Apri agenti",
+    "running": "IN ESECUZIONE",
+    "needsInput": "richiede input",
+    "reconnecting": "Riconnessione in corso"
   }
 }

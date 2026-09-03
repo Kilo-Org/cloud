@@ -3256,5 +3256,17 @@
     "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
     "catalogRetry": "Nepavyko įkelti modelių",
     "sendError": "Nepavyko išsiųsti žinutės. Bandykite dar kartą."
+  },
+  "glanceable": {
+    "waiting": "Atnaujinami agentai",
+    "empty": "Nėra vykdomų darbų",
+    "stale": "Dabar nepavyksta atnaujinti",
+    "expired": "Būsenos galiojimas baigėsi",
+    "signedOut": "Prisijunkite, kad matytumėte agentus",
+    "privacy": "Agentai paslėpti",
+    "openAgents": "Atidaryti agentus",
+    "running": "Vykdoma",
+    "needsInput": "reikia įvesties",
+    "reconnecting": "Jungiamasi iš naujo"
   }
 }

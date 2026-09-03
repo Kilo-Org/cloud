@@ -3212,5 +3212,17 @@
     "historyRetry": "채팅 기록을 불러올 수 없습니다.",
     "catalogRetry": "모델을 불러올 수 없습니다",
     "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
+  },
+  "glanceable": {
+    "waiting": "에이전트 업데이트 중",
+    "empty": "진행 중인 작업 없음",
+    "stale": "지금 업데이트할 수 없습니다",
+    "expired": "상태 만료됨",
+    "signedOut": "에이전트를 보려면 로그인하세요",
+    "privacy": "에이전트 숨겨짐",
+    "openAgents": "에이전트 열기",
+    "running": "실행 중",
+    "needsInput": "입력 필요",
+    "reconnecting": "다시 연결 중"
   }
 }

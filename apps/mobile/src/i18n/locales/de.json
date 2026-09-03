@@ -3212,5 +3212,17 @@
     "historyRetry": "Chatverlauf konnte nicht geladen werden.",
     "catalogRetry": "Modelle konnten nicht geladen werden",
     "sendError": "Die Nachricht konnte nicht gesendet werden. Versuchen Sie es erneut."
+  },
+  "glanceable": {
+    "waiting": "Agenten werden aktualisiert",
+    "empty": "Keine laufende Arbeit",
+    "stale": "Aktualisierung derzeit nicht möglich",
+    "expired": "Status abgelaufen",
+    "signedOut": "Melde dich an, um Agenten zu sehen",
+    "privacy": "Agenten ausgeblendet",
+    "openAgents": "Agenten öffnen",
+    "running": "LÄUFT",
+    "needsInput": "Eingabe erforderlich",
+    "reconnecting": "Verbindung wird wiederhergestellt"
   }
 }

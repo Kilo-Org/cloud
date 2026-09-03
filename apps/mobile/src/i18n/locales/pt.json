@@ -3234,5 +3234,17 @@
     "historyRetry": "Não foi possível carregar o histórico do chat.",
     "catalogRetry": "Não foi possível carregar os modelos",
     "sendError": "Não foi possível enviar a mensagem. Tente novamente."
+  },
+  "glanceable": {
+    "waiting": "A atualizar agentes",
+    "empty": "Nenhum trabalho em curso",
+    "stale": "Não é possível atualizar agora",
+    "expired": "Estado expirado",
+    "signedOut": "Inicie sessão para ver os agentes",
+    "privacy": "Agentes ocultos",
+    "openAgents": "Abrir agentes",
+    "running": "EM EXECUÇÃO",
+    "needsInput": "requer entrada",
+    "reconnecting": "A restabelecer ligação"
   }
 }

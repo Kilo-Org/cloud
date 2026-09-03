@@ -3212,5 +3212,17 @@
     "historyRetry": "Taariikhda wada sheekaysiga lama soo gelin karin.",
     "catalogRetry": "Moodeelada lama soo dejin karin",
     "sendError": "Fariinta lama diri karin. Mar kale isku day."
+  },
+  "glanceable": {
+    "waiting": "Cusboonaysiinaya wakiillada",
+    "empty": "Ma jirto hawl socota",
+    "stale": "Hadda lama cusboonaysiin karo",
+    "expired": "Xaaladdu way dhacday",
+    "signedOut": "Soo gal si aad u aragto wakiillada",
+    "privacy": "Wakiillada waa la qariyay",
+    "openAgents": "Fur wakiillada",
+    "running": "Socodaya",
+    "needsInput": "u baahan wax-soo-gal",
+    "reconnecting": "Dib u xiriirinaya"
   }
 }

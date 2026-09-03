@@ -3234,5 +3234,17 @@
     "historyRetry": "Impossible de charger l'historique de la conversation.",
     "catalogRetry": "Impossible de charger les modèles",
     "sendError": "Impossible d'envoyer le message. Veuillez réessayer."
+  },
+  "glanceable": {
+    "waiting": "Mise à jour des agents",
+    "empty": "Aucun travail en cours",
+    "stale": "Mise à jour impossible pour le moment",
+    "expired": "Statut expiré",
+    "signedOut": "Connectez-vous pour voir les agents",
+    "privacy": "Agents masqués",
+    "openAgents": "Ouvrir les agents",
+    "running": "EN COURS",
+    "needsInput": "saisie requise",
+    "reconnecting": "Reconnexion en cours"
   }
 }

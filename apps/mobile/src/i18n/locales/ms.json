@@ -3212,5 +3212,17 @@
     "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
     "catalogRetry": "Tidak dapat memuatkan model",
     "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
+  },
+  "glanceable": {
+    "waiting": "Mengemas kini ejen",
+    "empty": "Tiada kerja sedang dijalankan",
+    "stale": "Tidak dapat mengemas kini sekarang",
+    "expired": "Status tamat tempoh",
+    "signedOut": "Log masuk untuk melihat ejen",
+    "privacy": "Ejen disembunyikan",
+    "openAgents": "Buka ejen",
+    "running": "Sedang berjalan",
+    "needsInput": "perlu input",
+    "reconnecting": "Menyambung semula"
   }
 }

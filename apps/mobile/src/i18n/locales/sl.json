@@ -3256,5 +3256,17 @@
     "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
     "catalogRetry": "Nalaganje modelov ni uspelo",
     "sendError": "Sporočila ni bilo mogoče poslati. Poskusite znova."
+  },
+  "glanceable": {
+    "waiting": "Posodabljanje agentov",
+    "empty": "Ni dela v teku",
+    "stale": "Trenutno ni mogoče posodobiti",
+    "expired": "Stanje je poteklo",
+    "signedOut": "Prijavite se za ogled agentov",
+    "privacy": "Agenti so skriti",
+    "openAgents": "Odprite agente",
+    "running": "DELUJE",
+    "needsInput": "potrebuje vnos",
+    "reconnecting": "Ponovno povezovanje"
   }
 }

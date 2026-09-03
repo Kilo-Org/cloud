@@ -3212,5 +3212,17 @@
     "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
     "catalogRetry": "Kon nie modelle laai nie",
     "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
+  },
+  "glanceable": {
+    "waiting": "Dateer agente op",
+    "empty": "Geen werk aan die gang nie",
+    "stale": "Kan nie nou opdateer nie",
+    "expired": "Status het verval",
+    "signedOut": "Meld aan om agente te sien",
+    "privacy": "Agente versteek",
+    "openAgents": "Maak agente oop",
+    "running": "LOOP",
+    "needsInput": "benodig invoer",
+    "reconnecting": "Verbind tans weer"
   }
 }

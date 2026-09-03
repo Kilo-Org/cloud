@@ -3212,5 +3212,17 @@
     "historyRetry": "Pa t ka chaje istwa chat la.",
     "catalogRetry": "Pa t ka chaje modèl yo",
     "sendError": "Pa t ka voye mesaj la. Tanpri eseye ankò."
+  },
+  "glanceable": {
+    "waiting": "Ap mete ajans yo ajou",
+    "empty": "Pa gen travay k ap fèt",
+    "stale": "Pa ka mete ajou kounye a",
+    "expired": "Estati a ekspire",
+    "signedOut": "Konekte pou wè ajans yo",
+    "privacy": "Ajans yo kache",
+    "openAgents": "Louvri ajans yo",
+    "running": "AP KOURI",
+    "needsInput": "bezwen input",
+    "reconnecting": "Ap rekonekte"
   }
 }

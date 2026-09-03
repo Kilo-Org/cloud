@@ -3300,5 +3300,17 @@
     "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
     "catalogRetry": "Methodd llwytho modelau",
     "sendError": "Methodd anfon neges. Ceisiwch eto."
+  },
+  "glanceable": {
+    "waiting": "Yn diweddaru asiantau",
+    "empty": "Dim gwaith ar y gweill",
+    "stale": "Methu diweddaru nawr",
+    "expired": "Mae'r statws wedi dod i ben",
+    "signedOut": "Mewngofnodwch i weld asiantau",
+    "privacy": "Asiantau wedi'u cuddio",
+    "openAgents": "Agorwch asiantau",
+    "running": "YN RHEDEG",
+    "needsInput": "angen mewnbwn",
+    "reconnecting": "Yn ailgysylltu"
   }
 }

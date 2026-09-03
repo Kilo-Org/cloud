@@ -735,7 +735,9 @@ describe('stale sign-in continuation', () => {
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().isSigningOut).toBe(true);
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
-    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
+    // The account-switch path in signIn clears once, and the sign-out teardown
+    // clears a second time.
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(2);
 
     unmount();
   });
@@ -1464,8 +1466,9 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     });
 
     // Whole-body FIFO: the sign-out's teardown (including the query-client
-    // clear) settled before the sign-in's credential write ran.
-    expect(clearMock).toHaveBeenCalledTimes(1);
+    // clear) settled before the sign-in's credential write ran; the sign-in
+    // account-switch path then clears a second time after its credential write.
+    expect(clearMock).toHaveBeenCalledTimes(2);
     const clearOrder = clearMock.mock.invocationCallOrder[0];
     const setOrder = hoisted.secureStore.setItemAsync.mock.invocationCallOrder[0];
     expect(clearOrder).toBeLessThan(setOrder);

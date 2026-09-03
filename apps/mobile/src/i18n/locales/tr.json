@@ -3212,5 +3212,17 @@
     "historyRetry": "Sohbet geçmişi yüklenemedi.",
     "catalogRetry": "Modeller yüklenemedi",
     "sendError": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
+  },
+  "glanceable": {
+    "waiting": "Ajanlar güncelleniyor",
+    "empty": "Devam eden iş yok",
+    "stale": "Şu anda güncellenemiyor",
+    "expired": "Durumun süresi doldu",
+    "signedOut": "Ajanları görmek için oturum açın",
+    "privacy": "Ajanlar gizli",
+    "openAgents": "Ajanları açın",
+    "running": "Çalışıyor",
+    "needsInput": "Girdi gerekli",
+    "reconnecting": "Yeniden bağlanılıyor"
   }
 }

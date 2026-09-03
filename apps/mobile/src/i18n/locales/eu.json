@@ -3212,5 +3212,17 @@
     "historyRetry": "Ezin izan da txat-historia kargatu.",
     "catalogRetry": "Modeloak ezin izan dira kargatu",
     "sendError": "Ezin izan da mezua bidali. Saiatu berriro."
+  },
+  "glanceable": {
+    "waiting": "Agenteak eguneratzen",
+    "empty": "Ez dago lanik abian",
+    "stale": "Ezin da orain eguneratu",
+    "expired": "Egoera iraungi da",
+    "signedOut": "Hasi saioa agenteak ikusteko",
+    "privacy": "Agenteak ezkutatuta",
+    "openAgents": "Ireki agenteak",
+    "running": "Exekutatzen",
+    "needsInput": "sarreraren zain",
+    "reconnecting": "Berriro konektatzen"
   }
 }

@@ -3212,5 +3212,17 @@
     "historyRetry": "Kon de chatgeschiedenis niet laden.",
     "catalogRetry": "Kon modellen niet laden",
     "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
+  },
+  "glanceable": {
+    "waiting": "Agents bijwerken",
+    "empty": "Geen werk in uitvoering",
+    "stale": "Kan nu niet bijwerken",
+    "expired": "Status verlopen",
+    "signedOut": "Log in om agents te zien",
+    "privacy": "Agents verborgen",
+    "openAgents": "Agents openen",
+    "running": "Bezig",
+    "needsInput": "heeft invoer nodig",
+    "reconnecting": "Opnieuw verbinden"
   }
 }

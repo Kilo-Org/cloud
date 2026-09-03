@@ -12,10 +12,7 @@ import {
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import {
-  FRIENDLI_GLM_PUBLIC_ID,
-  PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 
 function makeRequest(model: string, models?: string[]): GatewayRequest {
   return {
@@ -46,7 +43,7 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each([FRIENDLI_GLM_PUBLIC_ID, PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
+  it.each(['z-ai/glm-5.2', PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
     'disables implicit thinking for %s',
     model => {
       const request = makeMessagesRequest(model);
@@ -60,9 +57,9 @@ describe('applyAnthropicThinkingDefault', () => {
   it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
     'preserves explicitly enabled thinking %p',
     thinking => {
-      const request = makeMessagesRequest(FRIENDLI_GLM_PUBLIC_ID, thinking);
+      const request = makeMessagesRequest('z-ai/glm-5.2', thinking);
 
-      applyAnthropicThinkingDefault(FRIENDLI_GLM_PUBLIC_ID, request);
+      applyAnthropicThinkingDefault('z-ai/glm-5.2', request);
 
       expect(request.body.thinking).toEqual(thinking);
     }
@@ -91,7 +88,7 @@ describe('applyAnthropicThinkingDefault', () => {
 describe('applyReasoningDetailsTransform', () => {
   function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
     return {
-      id: 'friendli',
+      id: 'perplexity',
       apiUrl: 'https://example.com/v1',
       apiUrlOverrides: {},
       apiKey: 'test-key',

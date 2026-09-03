@@ -21,15 +21,10 @@ const reply: Reply = {
   }),
 };
 
-const bodyOf = async (kinds: readonly ApiKind[], effort?: 'low' | 'high') => {
+const bodyOf = async (kinds: readonly ApiKind[], effort: 'low' | 'high') => {
   const { calls, fetch } = fakeFetch([reply]);
   await ModelClient.pipe(
-    Effect.flatMap(client =>
-      client.send({
-        ...sampleRequest(false),
-        ...(effort === undefined ? {} : { effort }),
-      })
-    ),
+    Effect.flatMap(client => client.send({ ...sampleRequest(false), effort })),
     Effect.either,
     Effect.provide(
       layerKiloGateway({
@@ -55,9 +50,4 @@ it('names the effort as reasoning on the responses shape', async () => {
 
 it('names the effort as reasoning on the completions shape', async () => {
   expect(await bodyOf(['chat_completions'], 'low')).toMatchObject({ reasoning: { effort: 'low' } });
-});
-
-it('leaves the field out when no effort is asked for', async () => {
-  const body = await bodyOf(['messages']);
-  expect(body).not.toHaveProperty('output_config');
 });

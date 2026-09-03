@@ -15,7 +15,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from './persist';
-import { getTerminalBlankEpoch } from './cleanup';
+import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { GlanceablePublisher } from './publisher';
 import { getGlanceableSinks, registerGlanceableSink } from './sink-registry';
 
@@ -68,6 +68,7 @@ export function GlanceablePublisherMount(): null {
       sinks: getGlanceableSinks(),
       initial: getLastGlanceableSnapshot(),
       terminalBlankEpoch: getTerminalBlankEpoch,
+      orgLost: isGlanceableOrgLost,
     });
     const ctx = { userId, organizationId };
 

@@ -550,7 +550,22 @@
       "commit_other": "കമ്മിറ്റുകൾ",
       "file_one": "ഫയൽ",
       "file": "ഫയലുകൾ",
-      "file_other": "ഫയലുകൾ"
+      "file_other": "ഫയലുകൾ",
+      "openedAgo": "തുറന്നത് {{time}}",
+      "updatedAgo": "പുതുക്കിയത് {{time}}",
+      "mergedAgo": "മെർജ് ചെയ്തു {{time}}",
+      "mergedByAgo": "{{login}} ലയിപ്പിച്ചത് {{time}}",
+      "closedAgo": "അടച്ചു {{time}}",
+      "labels": "ലേബലുകൾ",
+      "reviewers": "അവലോകകർ",
+      "assignees": "ചുമതലപ്പെടുത്തിയവർ",
+      "linkedIssues": "ബന്ധിപ്പിച്ച പ്രശ്നങ്ങൾ",
+      "reviewApproved": "അംഗീകരിച്ചു",
+      "reviewChangesRequested": "മാറ്റങ്ങൾ ആവശ്യപ്പെട്ടു",
+      "reviewCommented": "അഭിപ്രായം രേഖപ്പെടുത്തി",
+      "reviewPending": "അവലോകനത്തിനായി കാത്തിരിക്കുന്നു",
+      "openIssueA11y": "GitHub-ൽ പ്രശ്നം #{{number}} തുറക്കുക",
+      "reviewDismissed": "നിരസിച്ചു"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-ലെ കാലഹരണപ്പെട്ട തീർച്ചയാകാത്ത അഭിപ്രായം എഡിറ്റ് ചെയ്യുക",

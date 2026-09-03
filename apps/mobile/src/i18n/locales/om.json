@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "faayilii",
       "file": "faayiloota",
-      "file_other": "faayiloota"
+      "file_other": "faayiloota",
+      "openedAgo": "Banameera {{time}}",
+      "updatedAgo": "Haaromsameera {{time}}",
+      "mergedAgo": "Maksame {{time}}",
+      "mergedByAgo": "{{login}} walitti make {{time}}",
+      "closedAgo": "Cufame {{time}}",
+      "labels": "Asxaawwan",
+      "reviewers": "Qorattoota",
+      "assignees": "Itti gaafatamtoota",
+      "linkedIssues": "Rakkoolee walqabatan",
+      "reviewApproved": "Mirkanaa'eera",
+      "reviewChangesRequested": "Jijjiiramni gaafatameera",
+      "reviewCommented": "Yaadni kennameera",
+      "reviewPending": "Qorannoo eeggachaa jira",
+      "openIssueA11y": "Rakkoo #{{number}} GitHub irratti bani",
+      "reviewDismissed": "Dhiifame"
     },
     "pendingComment": {
       "editOutdatedA11y": "Yaada eeggate dheeraa {{location}} irratti gulaali",

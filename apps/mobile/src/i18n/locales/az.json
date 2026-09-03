@@ -550,7 +550,22 @@
       "commit_other": "commit",
       "file_one": "fayl",
       "file": "fayl",
-      "file_other": "fayl"
+      "file_other": "fayl",
+      "openedAgo": "Açılıb {{time}}",
+      "updatedAgo": "Yenilənib {{time}}",
+      "mergedAgo": "Mergeləndi {{time}}",
+      "mergedByAgo": "{{login}} tərəfindən birləşdirilib {{time}}",
+      "closedAgo": "Bağlıdır {{time}}",
+      "labels": "Etiketlər",
+      "reviewers": "Baxış keçirənlər",
+      "assignees": "Təyin olunanlar",
+      "linkedIssues": "Bağlı məsələlər",
+      "reviewApproved": "Təsdiqlənib",
+      "reviewChangesRequested": "Dəyişikliklər tələb olunub",
+      "reviewCommented": "Şərh yazılıb",
+      "reviewPending": "Baxış gözlənilir",
+      "openIssueA11y": "#{{number}} məsələsini GitHub-da aç",
+      "reviewDismissed": "Rədd edilib"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} üzərində köhnəlmiş gözləyən şərhi redaktə et",

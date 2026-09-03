@@ -2930,7 +2930,22 @@
       "commit_few": "commity",
       "commit_many": "commitów",
       "file_few": "pliki",
-      "file_many": "plików"
+      "file_many": "plików",
+      "openedAgo": "Otwarto {{time}}",
+      "updatedAgo": "Zaktualizowano {{time}}",
+      "mergedAgo": "Scalony {{time}}",
+      "mergedByAgo": "Scalone przez {{login}} {{time}}",
+      "closedAgo": "Zamknięty {{time}}",
+      "labels": "Etykiety",
+      "reviewers": "Recenzenci",
+      "assignees": "Przypisani",
+      "linkedIssues": "Powiązane zgłoszenia",
+      "reviewApproved": "Zatwierdzono",
+      "reviewChangesRequested": "Poproszono o zmiany",
+      "reviewCommented": "Skomentowano",
+      "reviewPending": "Oczekuje na recenzję",
+      "openIssueA11y": "Otwórz zgłoszenie #{{number}} w GitHub",
+      "reviewDismissed": "Odrzucone"
     },
     "pendingComment": {
       "allQueuedHint": "Wszystkie komentarze zostaną wysłane w jednym zbiorczym żądaniu.",

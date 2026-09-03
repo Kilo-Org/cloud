@@ -2910,7 +2910,22 @@
       "stateOpenReviewRequired": "פתוח · נדרשת סקירה",
       "unknownAuthor": "מחבר לא ידוע",
       "commit_two": "commits",
-      "file_two": "קבצים"
+      "file_two": "קבצים",
+      "openedAgo": "נפתחה {{time}}",
+      "updatedAgo": "עודכנה {{time}}",
+      "mergedAgo": "מוזג {{time}}",
+      "mergedByAgo": "מוזגה על ידי {{login}} {{time}}",
+      "closedAgo": "סגור {{time}}",
+      "labels": "תוויות",
+      "reviewers": "סוקרים",
+      "assignees": "אחראים",
+      "linkedIssues": "סוגיות מקושרות",
+      "reviewApproved": "אושרה",
+      "reviewChangesRequested": "התבקשו שינויים",
+      "reviewCommented": "הוגשה תגובה",
+      "reviewPending": "ממתינה לסקירה",
+      "openIssueA11y": "פתח סוגיה #{{number}} ב-GitHub",
+      "reviewDismissed": "נדחה"
     },
     "pendingComment": {
       "allQueuedHint": "כל התגובות יישלחו בבקשה אצווה אחת.",

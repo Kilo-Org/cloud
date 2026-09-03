@@ -557,7 +557,22 @@
       "file": "faili",
       "file_other": "faili",
       "commit_zero": "commits",
-      "file_zero": "failu"
+      "file_zero": "failu",
+      "openedAgo": "Atvērts {{time}}",
+      "updatedAgo": "Atjaunināts {{time}}",
+      "mergedAgo": "Apvienots {{time}}",
+      "mergedByAgo": "Sapludināja {{login}} {{time}}",
+      "closedAgo": "Slēgts {{time}}",
+      "labels": "Etiķetes",
+      "reviewers": "Recenzenti",
+      "assignees": "Atbildīgie",
+      "linkedIssues": "Saistītie pieteikumi",
+      "reviewApproved": "Apstiprināts",
+      "reviewChangesRequested": "Pieprasītas izmaiņas",
+      "reviewCommented": "Komentēts",
+      "reviewPending": "Gaida recenziju",
+      "openIssueA11y": "Atvērt pieteikumu #{{number}} vietnē GitHub",
+      "reviewDismissed": "Noraidīts"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediģēt novecojušo gaidīto komentāru uz {{location}}",

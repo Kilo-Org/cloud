@@ -571,7 +571,22 @@
       "commit_many": "tiomantais",
       "file_two": "chomhad",
       "file_few": "chomhad",
-      "file_many": "comhaid"
+      "file_many": "comhaid",
+      "openedAgo": "Oscailte {{time}}",
+      "updatedAgo": "Nuashonraithe {{time}}",
+      "mergedAgo": "Cumascaithe {{time}}",
+      "mergedByAgo": "Cumaiscthe ag {{login}} {{time}}",
+      "closedAgo": "Dúnta {{time}}",
+      "labels": "Lipéid",
+      "reviewers": "Athbhreithneoirí",
+      "assignees": "Sannaithe",
+      "linkedIssues": "Ceisteanna nasctha",
+      "reviewApproved": "Ceadaithe",
+      "reviewChangesRequested": "Iarradh athruithe",
+      "reviewCommented": "Trácht déanta",
+      "reviewPending": "Ag fanacht le hathbhreithniú",
+      "openIssueA11y": "Oscail ceist #{{number}} ar GitHub",
+      "reviewDismissed": "Díbithe"
     },
     "pendingComment": {
       "editOutdatedA11y": "Cuir trácht seanchaithe ar feitheamh in eagar ar {{location}}",

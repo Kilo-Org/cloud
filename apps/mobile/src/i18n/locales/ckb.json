@@ -550,7 +550,22 @@
       "commit_other": "کۆمیتەکان",
       "file_one": "فایل",
       "file": "فایلەکان",
-      "file_other": "فایلەکان"
+      "file_other": "فایلەکان",
+      "openedAgo": "کرایەوە {{time}}",
+      "updatedAgo": "نوێکرایەوە {{time}}",
+      "mergedAgo": "تێکەڵ کرا {{time}}",
+      "mergedByAgo": "{{login}} تێکەڵی کرد {{time}}",
+      "closedAgo": "داخراو {{time}}",
+      "labels": "پێناسەکان",
+      "reviewers": "پێداچوونەوەکاران",
+      "assignees": "دیاریکراوان",
+      "linkedIssues": "کێشە بەستراوەکان",
+      "reviewApproved": "پەسەندکرا",
+      "reviewChangesRequested": "گۆڕانکاری داواکرا",
+      "reviewCommented": "لێدوان درا",
+      "reviewPending": "چاوەڕێی پێداچوونەوە",
+      "openIssueA11y": "کێشەی #{{number}} لە GitHub بکەرەوە",
+      "reviewDismissed": "لابراو"
     },
     "pendingComment": {
       "editOutdatedA11y": "دەستکاریکردنی بۆچوونی چاوەڕوانی بەسەرچوو لەسەر {{location}}",

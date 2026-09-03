@@ -550,7 +550,22 @@
       "commit_other": "कमिटहरू",
       "file_one": "फाइल",
       "file": "फाइलहरू",
-      "file_other": "फाइलहरू"
+      "file_other": "फाइलहरू",
+      "openedAgo": "खोलिएको {{time}}",
+      "updatedAgo": "अद्यावधिक गरिएको {{time}}",
+      "mergedAgo": "मर्ज गरियो {{time}}",
+      "mergedByAgo": "{{login}} ले मर्ज गरेको {{time}}",
+      "closedAgo": "बन्द {{time}}",
+      "labels": "लेबलहरू",
+      "reviewers": "समीक्षकहरू",
+      "assignees": "जिम्मेवारहरू",
+      "linkedIssues": "जोडिएका मुद्दाहरू",
+      "reviewApproved": "स्वीकृत",
+      "reviewChangesRequested": "परिवर्तन अनुरोध गरियो",
+      "reviewCommented": "टिप्पणी गरियो",
+      "reviewPending": "समीक्षाको प्रतीक्षामा",
+      "openIssueA11y": "GitHub मा मुद्दा #{{number}} खोल्नुहोस्",
+      "reviewDismissed": "खारेज गरियो"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} मा पुरानो प्रतीक्षामा रहेको टिप्पणी सम्पादन गर्नुहोस्",

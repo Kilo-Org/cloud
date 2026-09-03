@@ -564,7 +564,22 @@
       "commit_two": "commit-a",
       "commit_few": "commit-i",
       "file_two": "datoteki",
-      "file_few": "datoteke"
+      "file_few": "datoteke",
+      "openedAgo": "Odprto {{time}}",
+      "updatedAgo": "Posodobljeno {{time}}",
+      "mergedAgo": "Združeno {{time}}",
+      "mergedByAgo": "Združil {{login}} {{time}}",
+      "closedAgo": "Zaprto {{time}}",
+      "labels": "Oznake",
+      "reviewers": "Pregledovalci",
+      "assignees": "Dodeljeni",
+      "linkedIssues": "Povezane težave",
+      "reviewApproved": "Odobreno",
+      "reviewChangesRequested": "Zahtevane spremembe",
+      "reviewCommented": "Komentirano",
+      "reviewPending": "Čaka na pregled",
+      "openIssueA11y": "Odpri težavo #{{number}} na GitHubu",
+      "reviewDismissed": "Zavrženo"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",

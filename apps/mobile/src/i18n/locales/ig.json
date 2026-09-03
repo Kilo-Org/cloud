@@ -550,7 +550,22 @@
       "commit_other": "commit",
       "file_one": "faịlụ",
       "file": "faịlụ",
-      "file_other": "faịlụ"
+      "file_other": "faịlụ",
+      "openedAgo": "Emepere ya {{time}}",
+      "updatedAgo": "Emelitere ya {{time}}",
+      "mergedAgo": "Ejikọtara {{time}}",
+      "mergedByAgo": "{{login}} jikọtara ya {{time}}",
+      "closedAgo": "Emechiri {{time}}",
+      "labels": "Akara",
+      "reviewers": "Ndị nyocha",
+      "assignees": "Ndị e kenyere ọrụ",
+      "linkedIssues": "Okwu ejikọtara",
+      "reviewApproved": "Akwadoro ya",
+      "reviewChangesRequested": "Arịọrọ mgbanwe",
+      "reviewCommented": "Ekwuru okwu",
+      "reviewPending": "Na-echere nyocha",
+      "openIssueA11y": "Mepee okwu #{{number}} na GitHub",
+      "reviewDismissed": "Ekagburu"
     },
     "pendingComment": {
       "editOutdatedA11y": "Dezie nkọwa na-echere ochie na {{location}}",

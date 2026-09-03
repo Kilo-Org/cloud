@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "ไฟล์",
       "file": "ไฟล์",
-      "file_other": "ไฟล์"
+      "file_other": "ไฟล์",
+      "openedAgo": "เปิดเมื่อ {{time}}",
+      "updatedAgo": "อัปเดตเมื่อ {{time}}",
+      "mergedAgo": "รวมแล้ว {{time}}",
+      "mergedByAgo": "{{login}} ผสานเมื่อ {{time}}",
+      "closedAgo": "ปิดแล้ว {{time}}",
+      "labels": "ป้ายกำกับ",
+      "reviewers": "ผู้ตรวจทาน",
+      "assignees": "ผู้รับผิดชอบ",
+      "linkedIssues": "ปัญหาที่เชื่อมโยง",
+      "reviewApproved": "อนุมัติแล้ว",
+      "reviewChangesRequested": "ขอให้แก้ไข",
+      "reviewCommented": "แสดงความคิดเห็นแล้ว",
+      "reviewPending": "รอการตรวจทาน",
+      "openIssueA11y": "เปิดปัญหา #{{number}} บน GitHub",
+      "reviewDismissed": "ละเว้นแล้ว"
     },
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอดำเนินการที่ล้าสมัยบน {{location}}",

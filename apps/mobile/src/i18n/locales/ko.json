@@ -2890,7 +2890,22 @@
       "stateOpenApproved": "열림 · 승인됨",
       "stateOpenChangesRequested": "열림 · 변경 요청됨",
       "stateOpenReviewRequired": "열림 · 리뷰 필요",
-      "unknownAuthor": "알 수 없는 작성자"
+      "unknownAuthor": "알 수 없는 작성자",
+      "openedAgo": "열림 {{time}}",
+      "updatedAgo": "업데이트됨 {{time}}",
+      "mergedAgo": "병합됨 {{time}}",
+      "mergedByAgo": "{{login}} 님이 병합함 {{time}}",
+      "closedAgo": "닫힘 {{time}}",
+      "labels": "라벨",
+      "reviewers": "검토자",
+      "assignees": "담당자",
+      "linkedIssues": "연결된 이슈",
+      "reviewApproved": "승인됨",
+      "reviewChangesRequested": "변경 요청됨",
+      "reviewCommented": "댓글 남김",
+      "reviewPending": "검토 대기 중",
+      "openIssueA11y": "GitHub에서 이슈 #{{number}} 열기",
+      "reviewDismissed": "해제됨"
     },
     "pendingComment": {
       "allQueuedHint": "모든 댓글은 단일 일괄 요청으로 전송됩니다.",

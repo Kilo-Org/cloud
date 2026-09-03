@@ -550,7 +550,22 @@
       "commit_other": "mga commit",
       "file_one": "file",
       "file": "mga file",
-      "file_other": "mga file"
+      "file_other": "mga file",
+      "openedAgo": "Binuksan {{time}}",
+      "updatedAgo": "In-update {{time}}",
+      "mergedAgo": "Na-merge {{time}}",
+      "mergedByAgo": "Isinama ni {{login}} {{time}}",
+      "closedAgo": "Sarado {{time}}",
+      "labels": "Mga label",
+      "reviewers": "Mga tagasuri",
+      "assignees": "Mga naatasan",
+      "linkedIssues": "Mga naka-link na isyu",
+      "reviewApproved": "Naaprubahan",
+      "reviewChangesRequested": "Humiling ng mga pagbabago",
+      "reviewCommented": "May komento",
+      "reviewPending": "Naghihintay ng pagsusuri",
+      "openIssueA11y": "Buksan ang isyu #{{number}} sa GitHub",
+      "reviewDismissed": "Na-dismiss"
     },
     "pendingComment": {
       "editOutdatedA11y": "I-edit ang lumang nakabinbing komento sa {{location}}",

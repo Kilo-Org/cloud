@@ -52,6 +52,7 @@ describe('buildLiveActivityApnsRequest', () => {
         'content-state': Record<string, unknown>;
         'attributes-type'?: string;
         attributes?: Record<string, unknown>;
+        alert?: { title: string; body: string };
       };
     };
     expect(body.aps.timestamp).toBe(1_750_000_000);
@@ -59,9 +60,10 @@ describe('buildLiveActivityApnsRequest', () => {
     expect(body.aps['content-state']).toEqual({ revision: 7, running: 1 });
     expect(body.aps['attributes-type']).toBeUndefined();
     expect(body.aps.attributes).toBeUndefined();
+    expect(body.aps.alert).toBeUndefined();
   });
 
-  it('adds attributes-type and attributes to a push-to-start payload', () => {
+  it('adds attributes-type, attributes, and the required alert to a push-to-start payload', () => {
     const request = buildLiveActivityApnsRequest({
       token: 'device-token-1',
       event: 'start',
@@ -78,11 +80,14 @@ describe('buildLiveActivityApnsRequest', () => {
         'content-state': Record<string, unknown>;
         'attributes-type'?: string;
         attributes?: Record<string, unknown>;
+        alert?: { title: string; body: string };
       };
     };
     expect(body.aps.event).toBe('start');
     expect(body.aps['attributes-type']).toBe('LiveActivityAttributes');
     expect(body.aps.attributes).toEqual({});
+    // Apple rejects a push-to-start payload that carries no alert.
+    expect(body.aps.alert).toEqual({ title: 'Kilo', body: 'Your agents are running.' });
     expect(body.aps['content-state']).toEqual({
       name: 'ActiveAgentsLiveActivity',
       props: '{"running":1}',

@@ -28,6 +28,14 @@ const APNS_KEY_SUFFIX = '-----END PRIVATE KEY-----';
  */
 const LIVE_ACTIVITY_ATTRIBUTES_TYPE = 'LiveActivityAttributes';
 
+/**
+ * Apple requires an alert on every push-to-start payload; a start without one
+ * is rejected. Only Apple Watch renders the title and body — iPhone and iPad
+ * show the Live Activity itself. The token row carries no locale, so this copy
+ * stays English until a locale reaches this path.
+ */
+const START_ALERT = { title: 'Kilo', body: 'Your agents are running.' } as const;
+
 const encoder = new TextEncoder();
 
 function base64Url(bytes: Uint8Array): string {
@@ -104,7 +112,11 @@ export function buildLiveActivityApnsRequest(
         // Push-to-start must name the attributes type and supply its values so
         // iOS can create the activity. Updates only replace the content-state.
         ...(params.event === 'start'
-          ? { 'attributes-type': LIVE_ACTIVITY_ATTRIBUTES_TYPE, attributes: {} }
+          ? {
+              'attributes-type': LIVE_ACTIVITY_ATTRIBUTES_TYPE,
+              attributes: {},
+              alert: START_ALERT,
+            }
           : {}),
         'content-state': params.contentState,
         ...(params.event === 'end' ? { 'dismissal-date': params.dismissalDateSeconds } : {}),

@@ -2,7 +2,6 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type WidgetTaskHandler } from 'react-native-android-widget';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -18,7 +17,6 @@ const mocks = vi.hoisted(() => {
   let snapshot: string | null = null;
   let deadline = 0;
   return {
-    registerWidgetTaskHandler: vi.fn<(handler: WidgetTaskHandler) => void>(),
     native: {
       setWidgetSnapshot: (next: string, expiresAt: number) => {
         snapshot = next;
@@ -48,7 +46,6 @@ vi.mock('react-native', () => ({
   Linking: { openSettings: vi.fn() },
 }));
 vi.mock('react-native-android-widget', () => ({
-  registerWidgetTaskHandler: mocks.registerWidgetTaskHandler,
   requestWidgetUpdate: vi.fn().mockResolvedValue(undefined),
   FlexWidget: () => null,
   TextWidget: () => null,
@@ -66,12 +63,8 @@ async function registerAfterRestart(snapshot: GlanceableAgentsSnapshot | null) {
   vi.resetModules();
   const freshPersist = await import('@/lib/glanceable/persist');
   freshPersist._setSecureStoreForTests(secureStore);
-  await import('./register');
-  const handler = mocks.registerWidgetTaskHandler.mock.lastCall?.[0];
-  if (handler === undefined) {
-    throw new Error('The widget task handler was not registered');
-  }
-  return handler;
+  const { handleWidgetTask } = await import('./register');
+  return handleWidgetTask;
 }
 
 beforeEach(() => {

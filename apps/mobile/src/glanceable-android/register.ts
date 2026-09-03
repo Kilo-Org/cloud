@@ -1,8 +1,5 @@
 import { AppState } from 'react-native';
-import {
-  registerWidgetTaskHandler,
-  type WidgetTaskHandlerProps,
-} from 'react-native-android-widget';
+import { type WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
 import {
@@ -66,7 +63,12 @@ async function applyWidgetLanguage(): Promise<void> {
   }
 }
 
-registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
+/**
+ * Redraw a placed widget. Registered from the app entry, which loads this
+ * module only when a task fires: a widget redraw runs headless, so nothing
+ * else has loaded the Android sink by then.
+ */
+export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<void> {
   const { widgetInfo, renderWidget } = task;
 
   await applyWidgetLanguage();
@@ -93,4 +95,4 @@ registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
     props = getCurrentWidgetProps() ?? props;
   }
   renderWidget(renderActiveAgentsWidget(props, widgetInfo, isWidgetRtl()));
-});
+}

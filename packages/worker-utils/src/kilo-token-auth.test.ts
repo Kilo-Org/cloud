@@ -6,6 +6,11 @@ import { signKiloToken } from './kilo-token';
 import { verifyKiloBearerAgainstCurrentPepper, type KiloUserPepperResult } from './kilo-token-auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
+const reviewTokenConstraints = {
+  requirePepper: true,
+  requiredTokenSource: 'isolate-review',
+  maxTokenLifetimeSeconds: 3600,
+};
 
 const userResultByUserId = new Map<string, KiloUserPepperResult>();
 
@@ -18,23 +23,32 @@ async function getUserPepper(
 
 async function signToken(params: {
   pepper: string | null;
-  tokenSource: 'kilo-chat' | 'cloud-agent';
+  tokenSource: 'kilo-chat' | 'cloud-agent' | 'isolate-review';
+  expiresInSeconds?: number;
 }) {
   return signKiloToken({
     userId: 'user-xyz-789',
     pepper: params.pepper,
     secret: TEST_JWT_SECRET,
-    expiresInSeconds: 3600,
+    expiresInSeconds: params.expiresInSeconds ?? 3600,
     env: 'production',
     extra: { tokenSource: params.tokenSource },
   });
 }
 
-function verifyToken(token: string | null) {
+function verifyToken(
+  token: string | null,
+  constraints: {
+    requirePepper?: boolean;
+    requiredTokenSource?: string;
+    maxTokenLifetimeSeconds?: number;
+  } = {}
+) {
   return verifyKiloBearerAgainstCurrentPepper({
     token,
     nextAuthSecret: { get: async () => TEST_JWT_SECRET },
     workerEnv: 'production',
+    ...constraints,
     connectionString: 'postgres://test',
     getUserPepper,
   });
@@ -480,6 +494,126 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
         resourceAudience: { audience: 'resource-audience', mode: 'required' },
       } as never)
     ).rejects.toThrow('mutually exclusive');
+  });
+});
+
+describe('optional Kilo bearer constraints', () => {
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    userResultByUserId.clear();
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+  });
+
+  it('rejects matching-environment pepper-less tokens only when a pepper is required', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      env: 'production',
+      tokenSource: 'isolate-review',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+    await expect(verifyToken(token, reviewTokenConstraints)).resolves.toBeNull();
+  });
+
+  it('accepts an explicitly null pepper when the stored pepper is null', async () => {
+    userResultByUserId.set('user-xyz-789', { pepper: null, blockedReason: null });
+    const { token } = await signToken({ pepper: null, tokenSource: 'isolate-review' });
+
+    await expect(verifyToken(token, reviewTokenConstraints)).resolves.toEqual({
+      userId: 'user-xyz-789',
+    });
+  });
+
+  it.each([{ tokenSource: 'cloud-agent' }, { tokenSource: undefined }])(
+    'rejects a token with tokenSource $tokenSource when isolate-review is required',
+    async ({ tokenSource }) => {
+      const { token } = await signKiloToken({
+        userId: 'user-xyz-789',
+        pepper: 'pepper-current',
+        secret: TEST_JWT_SECRET,
+        expiresInSeconds: 3600,
+        env: 'production',
+        ...(tokenSource === undefined ? {} : { extra: { tokenSource } }),
+      });
+
+      await expect(verifyToken(token, reviewTokenConstraints)).resolves.toBeNull();
+    }
+  );
+
+  it('rejects a signed lifetime longer than the configured maximum', async () => {
+    const { token } = await signToken({
+      pepper: 'pepper-current',
+      tokenSource: 'isolate-review',
+      expiresInSeconds: 3601,
+    });
+
+    await expect(verifyToken(token, reviewTokenConstraints)).resolves.toBeNull();
+  });
+
+  it.each(['iat', 'exp'] as const)(
+    'rejects a token without %s when its signed lifetime is bounded',
+    async missingClaim => {
+      const now = Math.floor(Date.now() / 1000);
+      let signer = new SignJWT({
+        version: 3,
+        kiloUserId: 'user-xyz-789',
+        apiTokenPepper: 'pepper-current',
+        env: 'production',
+        tokenSource: 'isolate-review',
+      }).setProtectedHeader({ alg: 'HS256' });
+      if (missingClaim !== 'iat') signer = signer.setIssuedAt(now);
+      if (missingClaim !== 'exp') signer = signer.setExpirationTime(now + 3600);
+      const token = await signer.sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+      await expect(verifyToken(token, reviewTokenConstraints)).resolves.toBeNull();
+    }
+  );
+
+  it('rejects a future-issued token that remains valid longer than the configured maximum', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const futureIssuedAt = now + 365 * 24 * 60 * 60;
+    const token = await new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+      tokenSource: 'isolate-review',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(futureIssuedAt)
+      .setExpirationTime(futureIssuedAt + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+    await expect(verifyToken(token, reviewTokenConstraints)).resolves.toBeNull();
+  });
+
+  it('accepts an isolate-review token whose signed lifetime is exactly one hour', async () => {
+    const { token } = await signToken({
+      pepper: 'pepper-current',
+      tokenSource: 'isolate-review',
+      expiresInSeconds: 3600,
+    });
+
+    await expect(verifyToken(token, reviewTokenConstraints)).resolves.toEqual({
+      userId: 'user-xyz-789',
+    });
+  });
+
+  it('preserves long-lived tokens from other sources without constraint opt-in', async () => {
+    const { token } = await signToken({
+      pepper: 'pepper-current',
+      tokenSource: 'cloud-agent',
+      expiresInSeconds: 24 * 60 * 60,
+    });
+
+    await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 });
 

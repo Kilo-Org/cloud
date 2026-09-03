@@ -8,6 +8,24 @@ const mockEnsureBitbucketCodeReviewWorkspaceWebhook = jest.fn();
 const mockDeleteBitbucketCodeReviewWorkspaceWebhooksBestEffort = jest.fn();
 const mockEnsureBotUserForOrg = jest.fn();
 const mockFetchBitbucketPullRequest = jest.fn();
+const mockCreateManualIsolateReview = jest.fn();
+const mockCreateIsolateReviewWorkerClientForUser = jest.fn();
+const mockGetIsolateReview = jest.fn();
+const mockGetIsolateReviewTranscript = jest.fn();
+
+jest.mock('@/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/config.server'),
+  ISOLATE_REVIEW_WORKER_URL: 'http://127.0.0.1:9019',
+}));
+jest.mock('@/lib/code-reviews/manual-isolate-reviews', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/code-reviews/manual-isolate-reviews'),
+  createManualIsolateReview: (...args: unknown[]) => mockCreateManualIsolateReview(...args),
+}));
+jest.mock('@/lib/isolate-review-worker-client', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/isolate-review-worker-client'),
+  createIsolateReviewWorkerClientForUser: (...args: unknown[]) =>
+    mockCreateIsolateReviewWorkerClientForUser(...args),
+}));
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -3778,5 +3796,164 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(result.webhookSync.errors).toHaveLength(1);
     expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+});
+
+describe('personalReviewAgent isolate review API', () => {
+  let user: User;
+  let otherUser: User;
+  const runId = '92a4b514-fb5b-44d7-9cd6-5eaf6c5cc74c';
+  const url = 'https://github.com/owner/repo/pull/42';
+
+  beforeAll(async () => {
+    user = await insertTestUser();
+    otherUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development' };
+    delete env.VERCEL_ENV;
+    jest.replaceProperty(process, 'env', env);
+    mockCreateManualIsolateReview.mockReset().mockResolvedValue({ runId });
+    mockGetIsolateReview.mockReset().mockResolvedValue({
+      runId,
+      userId: user.id,
+      status: 'running',
+      requestedModel: 'model',
+      dryRun: true,
+    });
+    mockGetIsolateReviewTranscript
+      .mockReset()
+      .mockResolvedValue({ runId, messages: [], toolCalls: [] });
+    mockCreateIsolateReviewWorkerClientForUser.mockReset().mockReturnValue({
+      getReview: mockGetIsolateReview,
+      getTranscript: mockGetIsolateReviewTranscript,
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [user.id, otherUser.id]));
+  });
+
+  it('binds creation to the authenticated human and defaults to dry-run', async () => {
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.personalReviewAgent.createIsolateReview({ url })).resolves.toEqual({
+      runId,
+    });
+    expect(mockCreateManualIsolateReview).toHaveBeenCalledWith({
+      user: expect.objectContaining({ id: user.id }),
+      input: { url, reviewMode: 'full', dryRun: true },
+    });
+  });
+
+  it.each([
+    'userId',
+    'organizationId',
+    'userPrompt',
+    'credentials',
+    'installationId',
+    'council',
+    'previousSHA',
+    'previousHeadSha',
+    'previousSummaryBody',
+    'summaryContent',
+    'effectiveMode',
+    'fallbackReason',
+    'reviewSelection',
+  ])('rejects the caller-controlled %s field before creation', async field => {
+    const caller = await createCallerForUser(user.id);
+    const input = { url, [field]: 'injected' };
+    await expect(caller.personalReviewAgent.createIsolateReview(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+  });
+
+  it('requires a baseline UUID for explicit incremental mode but preserves previousRunId-only full requests', async () => {
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.personalReviewAgent.createIsolateReview({ url, reviewMode: 'incremental' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.personalReviewAgent.createIsolateReview({
+        url,
+        reviewMode: 'incremental',
+        previousRunId: 'not-a-uuid',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateManualIsolateReview).not.toHaveBeenCalled();
+
+    await caller.personalReviewAgent.createIsolateReview({
+      url,
+      reviewMode: 'incremental',
+      previousRunId: runId,
+    });
+    expect(mockCreateManualIsolateReview).toHaveBeenLastCalledWith({
+      user: expect.objectContaining({ id: user.id }),
+      input: { url, reviewMode: 'incremental', previousRunId: runId, dryRun: true },
+    });
+    await caller.personalReviewAgent.createIsolateReview({ url, previousRunId: runId });
+    expect(mockCreateManualIsolateReview).toHaveBeenLastCalledWith({
+      user: expect.objectContaining({ id: user.id }),
+      input: { url, reviewMode: 'full', previousRunId: runId, dryRun: true },
+    });
+  });
+
+  it('reauthorizes status and transcript for the same human', async () => {
+    const caller = await createCallerForUser(user.id);
+    expect(await caller.personalReviewAgent.getIsolateReview({ runId })).toMatchObject({
+      userId: user.id,
+    });
+    expect(await caller.personalReviewAgent.getIsolateReviewTranscript({ runId })).toEqual({
+      runId,
+      messages: [],
+      toolCalls: [],
+    });
+    expect(mockCreateIsolateReviewWorkerClientForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: user.id })
+    );
+  });
+
+  it('refuses cross-human status and transcript even if the Worker returns mismatched state', async () => {
+    const caller = await createCallerForUser(otherUser.id);
+    await expect(caller.personalReviewAgent.getIsolateReview({ runId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      caller.personalReviewAgent.getIsolateReviewTranscript({ runId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetIsolateReviewTranscript).not.toHaveBeenCalled();
+  });
+
+  it('does not expose organization runs through the personal read endpoints', async () => {
+    mockGetIsolateReview.mockResolvedValue({
+      runId,
+      userId: user.id,
+      organizationId: crypto.randomUUID(),
+    });
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.personalReviewAgent.getIsolateReview({ runId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      caller.personalReviewAgent.getIsolateReviewTranscript({ runId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetIsolateReviewTranscript).not.toHaveBeenCalled();
+  });
+
+  it('makes read endpoints unavailable outside local development', async () => {
+    jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: 'production' });
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.personalReviewAgent.getIsolateReview({ runId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      caller.personalReviewAgent.getIsolateReviewTranscript({ runId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockCreateIsolateReviewWorkerClientForUser).not.toHaveBeenCalled();
   });
 });

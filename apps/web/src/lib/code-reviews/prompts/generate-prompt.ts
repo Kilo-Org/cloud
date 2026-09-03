@@ -95,6 +95,10 @@ function getPromptTemplate(platform: CodeReviewPlatform): PromptTemplate {
   }
 }
 
+export function getReviewPromptVersion(platform: CodeReviewPlatform): string {
+  return getPromptTemplate(platform).version;
+}
+
 function escapeMarkdownTableCell(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 }
@@ -124,6 +128,7 @@ export type GenerateReviewPromptOptions = {
   gitlabContext?: GitLabDiffContext;
   /** HEAD SHA from a previous completed review (enables incremental mode) */
   previousHeadSha?: string | null;
+  previousSummaryBody?: string | null;
   /** Root REVIEW.md instructions from the base branch, replacing built-in review policy */
   repositoryReviewInstructions?: string | null;
   /** One-off instructions for a manually created review job. */
@@ -161,6 +166,7 @@ export async function generateReviewPrompt(
     platform = 'github',
     gitlabContext,
     previousHeadSha,
+    previousSummaryBody,
     repositoryReviewInstructions,
     manualInstructions,
     outputMode = 'provider',
@@ -247,21 +253,20 @@ export async function generateReviewPrompt(
   }
 
   // 5. Workflow with placeholders replaced
-  // Use incremental workflow when we have a previous completed review SHA and a summary comment
   if (
     previousHeadSha &&
     template.incrementalReviewWorkflow &&
-    existingReviewState?.summaryComment
+    (previousSummaryBody || existingReviewState?.summaryComment)
   ) {
-    const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
+    const activeCount = existingReviewState?.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
     const previousSummary = getCurrentReviewSummaryForContext(
-      existingReviewState.summaryComment.body
+      previousSummaryBody ?? existingReviewState?.summaryComment?.body ?? ''
     );
-    const incrementalWorkflow = template.incrementalReviewWorkflow
-      .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
-      .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
-      .replace(/{ACTIVE_COMMENT_COUNT}/g, String(activeCount));
-    prompt += replacePlaceholders(incrementalWorkflow) + '\n\n';
+    const incrementalWorkflow = replacePlaceholders(template.incrementalReviewWorkflow)
+      .replace(/{PREVIOUS_SHA}/g, () => previousHeadSha)
+      .replace(/{ACTIVE_COMMENT_COUNT}/g, String(activeCount))
+      .replace(/{PREVIOUS_SUMMARY}/g, () => previousSummary);
+    prompt += incrementalWorkflow + '\n\n';
     logExceptInTest('[generateReviewPrompt] Using incremental workflow', {
       reviewId,
       previousHeadSha: previousHeadSha.substring(0, 8),

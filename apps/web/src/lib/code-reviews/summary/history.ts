@@ -1,7 +1,12 @@
+import {
+  REVIEW_SUMMARY_HISTORY_START,
+  REVIEW_SUMMARY_HISTORY_END,
+  createReviewSummaryHistoryBlockPattern,
+  stripReviewSummaryHistory,
+} from '@kilocode/worker-utils/review-summary-cleaning';
 import { stripReviewSummaryFooter } from './usage-footer';
 
-export const REVIEW_SUMMARY_HISTORY_START = '<!-- kilo-review-history -->';
-export const REVIEW_SUMMARY_HISTORY_END = '<!-- /kilo-review-history -->';
+export { REVIEW_SUMMARY_HISTORY_START, REVIEW_SUMMARY_HISTORY_END, stripReviewSummaryHistory };
 export const REVIEW_SUMMARY_HISTORY_ENTRY = '<!-- kilo-review-history-entry -->';
 
 const KILO_REVIEW_MARKER = '<!-- kilo-review -->';
@@ -22,10 +27,6 @@ type HistoryEntry = {
   heading: string;
   body: string;
 };
-
-export function stripReviewSummaryHistory(body: string): string {
-  return body.replace(createHistoryBlockPattern(), '').trimEnd();
-}
 
 export function getCurrentReviewSummaryForContext(body: string): string {
   return stripLeadingKiloReviewMarker(
@@ -97,13 +98,6 @@ export function buildPreviousReviewSummaryHistory(
   });
 }
 
-function createHistoryBlockPattern(): RegExp {
-  return new RegExp(
-    `^[ \\t]*${escapeRegExp(REVIEW_SUMMARY_HISTORY_START)}[ \\t]*(?:\\r?\\n)[\\s\\S]*?^[ \\t]*${escapeRegExp(REVIEW_SUMMARY_HISTORY_END)}[ \\t]*(?:\\r?\\n)?`,
-    'gm'
-  );
-}
-
 function prepareVisibleSummaryForHistory(body: string): string {
   return stripFixLinkSection(
     stripLeadingCodeReviewHeading(getCurrentReviewSummaryForContext(body))
@@ -111,7 +105,7 @@ function prepareVisibleSummaryForHistory(body: string): string {
 }
 
 function extractExistingHistoryEntries(body: string): HistoryEntry[] {
-  return Array.from(body.matchAll(createHistoryBlockPattern())).flatMap(match => {
+  return Array.from(body.matchAll(createReviewSummaryHistoryBlockPattern())).flatMap(match => {
     const block = match[0];
     const withoutOuterMarkers = block
       .replace(createLineMarkerPattern(REVIEW_SUMMARY_HISTORY_START), '')

@@ -1,0 +1,17 @@
+{
+  "title": "Collect variadic with push, add tests (#2410)",
+  "body": "Collect variadic option and argument values with push, and add tests.",
+  "user": {
+    "login": "e2e"
+  },
+  "base": {
+    "ref": "base",
+    "sha": "201d93249b1d38c0d1b3b5960865fdf4f84990b9"
+  },
+  "head": {
+    "ref": "pr-head",
+    "sha": "c635fad50bbe19b28cb3f68719f832c73cafe30f"
+  },
+  "state": "open",
+  "draft": false
+}

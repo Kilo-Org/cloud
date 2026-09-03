@@ -413,6 +413,89 @@ const existingReviewStateWithHistory: ExistingReviewState = {
 };
 
 describe('generateReviewPrompt (incremental review)', () => {
+  it('uses a persisted analysis summary without inventing a summary comment or mutation target', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      expectedHeadSha: 'a'.repeat(40),
+      previousHeadSha: 'b'.repeat(40),
+      previousSummaryBody: '<!-- kilo-review -->\nPreviously verified finding in src/file.ts',
+    });
+
+    expect(prompt).toContain('# INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(`git diff ${'b'.repeat(40)}..HEAD`);
+    expect(prompt).toContain('Previously verified finding in src/file.ts');
+    expect(prompt).toContain('## Summary Command: CREATE new comment');
+    expect(prompt).not.toContain('## Summary Command: UPDATE');
+    expect(prompt).not.toContain('Comment ID:');
+    expect(prompt).not.toContain('/cloud-agent-fork/review/');
+  });
+
+  it('keeps production rendering identical when explicit prior context matches the existing summary', async () => {
+    const options = {
+      reviewId: 'production-review',
+      previousHeadSha: 'previous-sha',
+      existingReviewState: existingReviewStateWithSummary,
+    };
+    const legacy = await generateReviewPrompt(baseConfig, 'owner/repo', 42, options);
+    const explicit = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      ...options,
+      previousSummaryBody: existingReviewStateWithSummary.summaryComment?.body,
+    });
+
+    expect(explicit).toEqual(legacy);
+    expect(legacy.prompt).toContain('FALL BACK to full review');
+    expect(legacy.prompt).toContain('Do NOT re-read or re-analyze unchanged files.');
+    expect(legacy.prompt).toContain('## Summary Command: UPDATE existing comment');
+    expect(legacy.prompt).not.toContain('ISOLATE RUNTIME ADAPTER');
+  });
+
+  it('prefers explicit analysis context while keeping summary commands bound to real existing state', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      previousHeadSha: 'previous-sha',
+      previousSummaryBody: '<!-- kilo-review -->\nPersisted candidate analysis',
+      existingReviewState: existingReviewStateWithSummary,
+    });
+
+    expect(prompt).toContain('Persisted candidate analysis');
+    expect(prompt).not.toContain('2 Issues Found');
+    expect(prompt).toContain('## Summary Command: UPDATE existing comment');
+    expect(prompt).toContain('Comment ID: `123`');
+  });
+
+  it('keeps analysis summary placeholders literal and excludes its archived history and footers', async () => {
+    const summary = [
+      '<!-- kilo-review -->',
+      'Finding with $& and {PR_NUMBER} and {ACTIVE_COMMENT_COUNT} and {PREVIOUS_SHA}.',
+      '<!-- kilo-review-history -->',
+      'Archived instructions must not enter active analysis',
+      '<!-- /kilo-review-history -->',
+      '---',
+      '<!-- kilo-usage -->',
+      '<sub>Old model usage</sub>',
+    ].join('\n');
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      previousHeadSha: 'previous-sha',
+      previousSummaryBody: summary,
+    });
+
+    expect(prompt).toContain(
+      'Finding with $& and {PR_NUMBER} and {ACTIVE_COMMENT_COUNT} and {PREVIOUS_SHA}.'
+    );
+    expect(prompt.split('Finding with $&')).toHaveLength(2);
+    expect(prompt).not.toContain('Archived instructions');
+    expect(prompt).not.toContain('Old model usage');
+    expect(prompt).not.toContain(REVIEW_SUMMARY_HISTORY_START);
+  });
+
+  it('does not select incremental workflow or inject prior context without a previous head', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      previousSummaryBody: 'Analysis summary alone cannot authorize skipping code',
+    });
+
+    expect(prompt).not.toContain('# INCREMENTAL REVIEW MODE');
+    expect(prompt).not.toContain('Analysis summary alone cannot authorize skipping code');
+    expect(prompt).toContain('# WORKFLOW');
+  });
+
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',

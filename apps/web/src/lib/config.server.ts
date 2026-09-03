@@ -68,6 +68,7 @@ export const USER_DATA_EXPORT_WORKER_URL =
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
 export const CALLBACK_TOKEN_SECRET = getEnvVariable('CALLBACK_TOKEN_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
+export const ISOLATE_REVIEW_WORKER_URL = getEnvVariable('ISOLATE_REVIEW_WORKER_URL') || '';
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';

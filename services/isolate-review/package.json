@@ -1,0 +1,42 @@
+{
+  "name": "kilo-isolate-review-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "tail": "wrangler tail",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/isolate-review/src",
+    "test": "node test/run-tests.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:",
+    "workerd": "1.20260714.1"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "4.0.15",
+    "@ai-sdk/openai": "4.0.15",
+    "@ai-sdk/openai-compatible": "3.0.11",
+    "@cloudflare/computer": "^0.2.1",
+    "@cloudflare/think": "0.16.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@kilocode/worker-utils": "workspace:*",
+    "@openrouter/ai-sdk-provider": "3.0.0",
+    "@platformatic/vfs": "^0.4.0",
+    "agents": "^0.21.0",
+    "ai": "7.0.29",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "isomorphic-git": "^1.38.5",
+    "re2js": "1.3.3",
+    "zod": "catalog:"
+  }
+}

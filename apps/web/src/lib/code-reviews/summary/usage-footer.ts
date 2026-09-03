@@ -3,8 +3,13 @@
  * Appends model + token count info to the review summary posted on GitHub/GitLab.
  */
 
-const USAGE_FOOTER_MARKER = '<!-- kilo-usage -->';
-const REVIEW_GUIDANCE_FOOTER_MARKER = '<!-- kilo-review-guidance -->';
+import {
+  USAGE_FOOTER_MARKER,
+  REVIEW_GUIDANCE_FOOTER_MARKER,
+  stripReviewSummaryFooter,
+} from '@kilocode/worker-utils/review-summary-cleaning';
+
+export { stripReviewSummaryFooter };
 
 type UsageFooterData = {
   model: string;
@@ -88,22 +93,6 @@ export function appendReviewSummaryFooter(
   return `${stripReviewSummaryFooter(existingBody)}${buildReviewSummaryFooter(footer)}`;
 }
 
-export function stripReviewSummaryFooter(existingBody: string): string {
-  const markers = [USAGE_FOOTER_MARKER, REVIEW_GUIDANCE_FOOTER_MARKER];
-  const markerIdx = Math.max(...markers.map(marker => existingBody.lastIndexOf(marker)));
-
-  if (markerIdx === -1) {
-    return existingBody;
-  }
-
-  const footerStart = findBackendFooterStart(existingBody, markerIdx);
-  if (footerStart === null) {
-    return existingBody;
-  }
-
-  return existingBody.substring(0, footerStart).trimEnd();
-}
-
 /**
  * Append usage footer to an existing review comment body.
  * If a footer already exists (from a previous review pass), it is replaced.
@@ -116,54 +105,6 @@ export function appendUsageFooter(
 ): string {
   return appendReviewSummaryFooter(existingBody, {
     usage: { model, tokensIn, tokensOut, cachedTokens: 0 },
-  });
-}
-
-function findBackendFooterStart(body: string, markerIdx: number): number | null {
-  const beforeMarker = body.substring(0, markerIdx);
-  const horizontalRuleMatches = Array.from(beforeMarker.matchAll(/^[ \t]*---[ \t]*$/gm));
-
-  for (const horizontalRuleMatch of horizontalRuleMatches.reverse()) {
-    const horizontalRuleIdx = horizontalRuleMatch.index;
-    if (horizontalRuleIdx === undefined) {
-      continue;
-    }
-
-    let footerContentStart = horizontalRuleIdx + horizontalRuleMatch[0].length;
-    if (body[footerContentStart] === '\n') {
-      footerContentStart += 1;
-    }
-
-    const footerContent = body.substring(footerContentStart).trim();
-    if (footerContent.length > 2_000) {
-      continue;
-    }
-    if (
-      !footerContent.includes(USAGE_FOOTER_MARKER) &&
-      !footerContent.includes(REVIEW_GUIDANCE_FOOTER_MARKER)
-    ) {
-      continue;
-    }
-    if (isBackendFooterContent(footerContent)) {
-      return horizontalRuleIdx;
-    }
-  }
-
-  return null;
-}
-
-function isBackendFooterContent(content: string): boolean {
-  const allowedMarkers = new Set([USAGE_FOOTER_MARKER, REVIEW_GUIDANCE_FOOTER_MARKER]);
-  const lines = content.split('\n').map(line => line.trim());
-
-  return lines.every(line => {
-    if (!line) {
-      return true;
-    }
-    if (allowedMarkers.has(line)) {
-      return true;
-    }
-    return line.startsWith('<sub>') && line.endsWith('</sub>');
   });
 }
 

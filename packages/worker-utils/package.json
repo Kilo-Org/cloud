@@ -36,6 +36,7 @@
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
     "./client-error": "./src/client-error.ts",
     "./review-agents": "./src/review-agents.ts",
+    "./review-summary-cleaning": "./src/review-summary-cleaning.ts",
     "./code-review-council": "./src/code-review-council.ts",
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts"

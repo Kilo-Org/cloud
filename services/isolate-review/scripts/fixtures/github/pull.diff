@@ -1,0 +1,110 @@
+diff --git a/lib/argument.js b/lib/argument.js
+index 33493d4..2c2f840 100644
+--- a/lib/argument.js
++++ b/lib/argument.js
+@@ -53,12 +53,13 @@ class Argument {
+    * @package
+    */
+ 
+-  _concatValue(value, previous) {
++  _collectValue(value, previous) {
+     if (previous === this.defaultValue || !Array.isArray(previous)) {
+       return [value];
+     }
+ 
+-    return previous.concat(value);
++    previous.push(value);
++    return previous;
+   }
+ 
+   /**
+@@ -103,7 +104,7 @@ class Argument {
+         );
+       }
+       if (this.variadic) {
+-        return this._concatValue(arg, previous);
++        return this._collectValue(arg, previous);
+       }
+       return arg;
+     };
+diff --git a/lib/command.js b/lib/command.js
+index bb6529e..a176dfb 100644
+--- a/lib/command.js
++++ b/lib/command.js
+@@ -701,7 +701,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
+       if (val !== null && option.parseArg) {
+         val = this._callParseArg(option, val, oldValue, invalidValueMessage);
+       } else if (val !== null && option.variadic) {
+-        val = option._concatValue(val, oldValue);
++        val = option._collectValue(val, oldValue);
+       }
+ 
+       // Fill-in appropriate missing values. Long winded but easy to follow.
+diff --git a/lib/option.js b/lib/option.js
+index 715c6cf..4a0bd7f 100644
+--- a/lib/option.js
++++ b/lib/option.js
+@@ -162,12 +162,13 @@ class Option {
+    * @package
+    */
+ 
+-  _concatValue(value, previous) {
++  _collectValue(value, previous) {
+     if (previous === this.defaultValue || !Array.isArray(previous)) {
+       return [value];
+     }
+ 
+-    return previous.concat(value);
++    previous.push(value);
++    return previous;
+   }
+ 
+   /**
+@@ -186,7 +187,7 @@ class Option {
+         );
+       }
+       if (this.variadic) {
+-        return this._concatValue(arg, previous);
++        return this._collectValue(arg, previous);
+       }
+       return arg;
+     };
+diff --git a/tests/argument.variadic.test.js b/tests/argument.variadic.test.js
+index 07732e5..a74c9be 100644
+--- a/tests/argument.variadic.test.js
++++ b/tests/argument.variadic.test.js
+@@ -101,4 +101,17 @@ describe('variadic argument', () => {
+     program.parse(['one', 'two'], { from: 'user' });
+     expect(passedArg).toEqual(['one', 'two']);
+   });
++
++  test('when variadic has default array then specified value is used instead of default (not appended)', () => {
++    const program = new commander.Command();
++    let passedArg;
++    program
++      .addArgument(new commander.Argument('[value...]').default(['DEFAULT']))
++      .action((value) => {
++        passedArg = value;
++      });
++
++    program.parse(['one', 'two'], { from: 'user' });
++    expect(passedArg).toEqual(['one', 'two']);
++  });
+ });
+diff --git a/tests/options.variadic.test.js b/tests/options.variadic.test.js
+index de2f18c..0fe4194 100644
+--- a/tests/options.variadic.test.js
++++ b/tests/options.variadic.test.js
+@@ -162,4 +162,12 @@ describe('variadic special cases', () => {
+ 
+     expect(program.options[0].variadic).toBeFalsy();
+   });
++
++  test('when option has default array then specified value is used instead of default (not appended)', () => {
++    const program = new commander.Command();
++    program.option('-c,--comma [value...]', 'values', ['default']);
++    program.parse(['--comma', 'CCC'], { from: 'user' });
++
++    expect(program.opts().comma).toEqual(['CCC']);
++  });
+ });

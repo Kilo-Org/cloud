@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: inputs.worker != ''
+    if: inputs.worker != '' && inputs.worker != 'services/isolate-review'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
@@ -50,6 +50,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Validate requested Worker
+        env:
+          WORKER_DIRECTORY: ${{ inputs.worker }}
+        run: |
+          SERVICES_DIRECTORY="$(realpath "$GITHUB_WORKSPACE/services")"
+          WORKER_DIRECTORY="$(realpath "$WORKER_DIRECTORY")"
+          EXCLUDED_DIRECTORY="$(realpath "$SERVICES_DIRECTORY/isolate-review")"
+          if [[ "$WORKER_DIRECTORY" != "$SERVICES_DIRECTORY/"* || "$WORKER_DIRECTORY" == "$EXCLUDED_DIRECTORY" || "$WORKER_DIRECTORY" == "$EXCLUDED_DIRECTORY/"* ]]; then
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -158,6 +169,7 @@ jobs:
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
+            services/isolate-review
             services/kiloclaw  # Docker-based deploy in deploy-production.yml
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately

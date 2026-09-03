@@ -136,3 +136,6 @@ run-milvus-test.sh
 !.env.test
 !.envrc
 .playwright-mcp
+
+# isolate-review e2e artifacts
+services/isolate-review/scripts/last-e2e/

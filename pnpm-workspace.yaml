@@ -70,6 +70,10 @@ minimumReleaseAgeExclude:
   - '@kilocode/sdk'
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
   - openclaw
+  # Isolate-review preview packages; 0.2.1 / 0.16.0 are the versions the POC was verified against.
+  - '@cloudflare/computer'
+  - '@cloudflare/think'
+  - agents
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
@@ -170,12 +174,14 @@ allowBuilds:
   esbuild: true
   libpq: true
   workerd: true
+  '@mongodb-js/zstd': false
   '@sentry/cli': false
   bufferutil: false
   core-js: false
   core-js-pure: false
   es5-ext: false
   msgpackr-extract: false
+  node-liblzma: false
   oxc-resolver: false
   protobufjs: false
   sharp: false

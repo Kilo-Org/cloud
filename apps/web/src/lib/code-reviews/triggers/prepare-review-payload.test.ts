@@ -73,7 +73,11 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, or } from 'drizzle-orm';
-import { prepareReviewPayload } from './prepare-review-payload';
+import {
+  prepareReviewPayload,
+  prepareGitHubReviewContext,
+  readRepositoryReviewInstructions,
+} from './prepare-review-payload';
 
 const REPO = `test-org/prepare-review-payload-${Date.now()}`;
 const BITBUCKET_WORKSPACE_UUID = 'a07d5c40-2d2d-4e79-a812-6a47824a77d6';
@@ -978,5 +982,117 @@ describe('prepareReviewPayload', () => {
       platform: 'github',
       upstreamBranch: 'refs/pull/1235/head',
     });
+  });
+});
+
+describe('read-only review preparation', () => {
+  const params = {
+    installationId: 'installation-1',
+    repoOwner: 'owner',
+    repoName: 'repo',
+    prNumber: 42,
+    appType: 'standard' as const,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindKiloReviewComment.mockResolvedValue(null);
+    mockFetchPRInlineComments.mockResolvedValue([]);
+    mockGetPRHeadCommit.mockResolvedValue('a'.repeat(40));
+  });
+
+  it('reads full current context without updating a review row or generating a prompt', async () => {
+    const summaryComment = {
+      commentId: 88,
+      body: '<!-- kilo-review -->\nNo Issues Found\n' + 'Full context. '.repeat(200),
+    };
+    const inlineComments = [
+      {
+        id: 90,
+        path: 'src/auth.ts',
+        line: 12,
+        body: 'Full finding. '.repeat(200),
+        isOutdated: false,
+      },
+      { id: 91, path: 'src/auth.ts', line: null, body: 'Outdated finding', isOutdated: true },
+    ];
+    mockFindKiloReviewComment.mockResolvedValue(summaryComment);
+    mockFetchPRInlineComments.mockResolvedValue(inlineComments);
+    expect(await prepareGitHubReviewContext(params)).toEqual({
+      summaryComment,
+      inlineComments,
+      headCommitSha: 'a'.repeat(40),
+      previousStatus: 'no-issues',
+    });
+    expect(mockUpdatePreviousReviewSummary).not.toHaveBeenCalled();
+    expect(mockUpdateRepositoryReviewInstructionsMetadata).not.toHaveBeenCalled();
+    expect(mockGenerateReviewPrompt).not.toHaveBeenCalled();
+    expect(mockFindPreviousCompletedReview).not.toHaveBeenCalled();
+  });
+
+  it.each(['summary', 'inline', 'head'] as const)(
+    'fails a required %s read rather than returning empty context',
+    async read => {
+      const mockRead = {
+        summary: mockFindKiloReviewComment,
+        inline: mockFetchPRInlineComments,
+        head: mockGetPRHeadCommit,
+      }[read];
+      mockRead.mockRejectedValueOnce(new Error('required context unavailable'));
+      await expect(prepareGitHubReviewContext(params)).rejects.toThrow(
+        'required context unavailable'
+      );
+    }
+  );
+
+  it('normalizes REVIEW.md at the caller-provided immutable ref without expanding imports', async () => {
+    const fetchInstructions = jest.fn().mockResolvedValue(' \u0000Check billing.\r\n@other.md\r ');
+    expect(
+      await readRepositoryReviewInstructions({ ref: 'b'.repeat(40), fetchInstructions })
+    ).toEqual({
+      content: 'Check billing.\n@other.md',
+      used: true,
+      ref: 'b'.repeat(40),
+      truncated: false,
+    });
+  });
+
+  it('preserves the canonical 10k REVIEW.md cap and explicit truncation metadata', async () => {
+    const result = await readRepositoryReviewInstructions({
+      ref: 'b'.repeat(40),
+      fetchInstructions: async () => 'x'.repeat(10_001),
+    });
+    expect(result.truncated).toBe(true);
+    expect(result.content).toBe(
+      'x'.repeat(10_000) + '\n\n[REVIEW.md truncated after 10000 characters.]'
+    );
+  });
+
+  it.each([null, '', ' \r\n '])(
+    'distinguishes absent instructions %j from a failed lookup',
+    async content => {
+      expect(
+        await readRepositoryReviewInstructions({
+          ref: 'b'.repeat(40),
+          fetchInstructions: async () => content,
+        })
+      ).toEqual({
+        content: null,
+        used: false,
+        ref: null,
+        truncated: false,
+      });
+    }
+  );
+
+  it('propagates instruction lookup errors for strict callers', async () => {
+    await expect(
+      readRepositoryReviewInstructions({
+        ref: 'b'.repeat(40),
+        fetchInstructions: async () => {
+          throw new Error('instructions unavailable');
+        },
+      })
+    ).rejects.toThrow('instructions unavailable');
   });
 });

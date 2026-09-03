@@ -31,6 +31,7 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
+  { id: 'isolate-review', label: 'Isolate Review', alwaysOn: false },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
@@ -168,6 +169,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'code-review',
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
+  },
+  'cloudflare-isolate-review': {
+    group: 'isolate-review',
+    dependsOn: ['nextjs', 'cloudflare-git-token-service'],
+    dir: 'services/isolate-review',
   },
   // auto-triage
   'cloudflare-auto-triage-infra': {

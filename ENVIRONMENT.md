@@ -389,6 +389,15 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
 - `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
 
+### Isolate Review
+
+- `KILO_GATEWAY_URL` - OpenRouter-compatible gateway base URL for `services/isolate-review`. Local `dev:env` points it at Next.js `/api/openrouter`. Production omits it and defaults to `https://api.kilo.ai/api/openrouter`. [SERVER]
+- `GITHUB_API_URL` - Optional GitHub REST API origin for `services/isolate-review`. Blank or omitted defaults to `https://api.github.com`. [SERVER]
+- `GIT_CLONE_URL_TEMPLATE` - Optional git clone URL template for `services/isolate-review`. Substitutes `{owner}` and `{repo}`. Blank or omitted defaults to `https://github.com/{owner}/{repo}.git`. [SERVER]
+- `NEXTAUTH_SECRET` - Shared JWT signing secret used by isolate-review to validate the authenticated Kilo bearer against the current user's token pepper. `[SECRET]`
+- `INTERNAL_API_SECRET` - Shared secret sent in `x-internal-api-key` by authenticated server-side callers of isolate-review. `[SECRET]`
+- `ISOLATE_REVIEW_WORKER_URL` - Server-only base URL for the web app's isolate-review client. [SERVER]
+
 ### Other Services
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]

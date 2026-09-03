@@ -1,6 +1,6 @@
 export const REVIEW_INSTRUCTIONS_FILE = 'REVIEW.md';
 
-const MAX_REVIEW_INSTRUCTIONS_CHARS = 10_000;
+export const MAX_REVIEW_INSTRUCTIONS_CHARS = 10_000;
 const TRUNCATION_NOTE = `\n\n[${REVIEW_INSTRUCTIONS_FILE} truncated after ${MAX_REVIEW_INSTRUCTIONS_CHARS} characters.]`;
 
 export type NormalizedRepositoryReviewInstructions = {

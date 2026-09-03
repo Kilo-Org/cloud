@@ -601,6 +601,20 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     return false;
   }
 
+  logExceptInTest('[dispatchReview] Worker dispatch prompt diagnostics', {
+    reviewId: review.id,
+    attemptId: attempt.id,
+    promptSha256: crypto
+      .createHash('sha256')
+      .update(dispatchPayload.sessionInput.prompt, 'utf8')
+      .digest('hex'),
+    promptLength: dispatchPayload.sessionInput.prompt.length,
+    model: dispatchPayload.sessionInput.model,
+    variant: dispatchPayload.sessionInput.variant ?? null,
+    analytics_enabled_at_dispatch: attempt.analytics_enabled_at_dispatch,
+    packagedCliVersion: '7.4.20',
+  });
+
   try {
     await codeReviewWorkerClient.dispatchReview({
       ...dispatchPayload,

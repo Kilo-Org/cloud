@@ -1,0 +1,18 @@
+# Shared secret for JWT token validation (same as NextAuth.js secret)
+# @from NEXTAUTH_SECRET
+NEXTAUTH_SECRET=your-nextauth-secret-here
+
+# Shared secret for internal API calls, same as the web app.
+# @from INTERNAL_API_SECRET
+INTERNAL_API_SECRET=your-internal-api-secret-here
+
+# Local Next.js OpenRouter proxy. Production omits this and uses api.kilo.ai.
+# @url nextjs/api/openrouter
+KILO_GATEWAY_URL=http://localhost:3000/api/openrouter
+
+ENVIRONMENT=development
+
+# Optional. Blank = https://api.github.com
+GITHUB_API_URL=
+# Optional. Blank = https://github.com/{owner}/{repo}.git
+GIT_CLONE_URL_TEMPLATE=

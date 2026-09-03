@@ -10,6 +10,7 @@ import {
   user_admin_notes,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
 import { uninstallGitHubOrganizationInstallation } from './github-installation-uninstall';
@@ -21,6 +22,8 @@ const mockUnlinkTeamKiloUsers = jest.fn<Promise<number>, []>();
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyAndDeleteGitHubOrganizationInstallation: jest.fn(),
 }));
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 jest.mock('@/lib/organizations/organization-audit-logs', () => {
   const actual = jest.requireActual('@/lib/organizations/organization-audit-logs');
@@ -40,6 +43,7 @@ jest.mock('@/lib/bot-identity', () => ({
 
 const upstream = jest.mocked(verifyAndDeleteGitHubOrganizationInstallation);
 const audit = jest.mocked(createAuditLog);
+const sentryCaptureException = jest.mocked(captureException);
 
 async function integration(owner: { userId?: string; organizationId?: string }, overrides = {}) {
   const [row] = await db
@@ -84,6 +88,7 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     audit.mockImplementation(
       jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
     );
+    sentryCaptureException.mockReset();
     mockBotInitialize.mockResolvedValue();
     mockBotGetState.mockReturnValue({});
     mockUnlinkTeamKiloUsers.mockResolvedValue(0);
@@ -271,6 +276,9 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       await uninstall;
     }
     expect(upstream).toHaveBeenCalledTimes(1);
+    await expect(
+      db.update(kilocode_users).set({ is_admin: false }).where(eq(kilocode_users.id, actor.id))
+    ).resolves.toMatchObject({ rowCount: 1 });
   });
 
   test('returns pending and retains local row when confirmed cleanup transaction fails', async () => {
@@ -282,6 +290,7 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
     );
     audit.mockRejectedValueOnce(new Error('final audit private database error'));
+    audit.mockRejectedValueOnce(new Error('fallback audit private database error'));
     audit.mockImplementationOnce(
       jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
     );
@@ -302,11 +311,72 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       .from(organization_audit_logs)
       .where(eq(organization_audit_logs.organization_id, org.id));
     expect(audits.map(entry => entry.message)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('uninstall attempted'),
-        expect.stringContaining('confirmed; local cleanup pending'),
-      ])
+      expect.arrayContaining([expect.stringContaining('uninstall attempted')])
     );
+    expect(sentryCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        operation: 'github-installation-uninstall-audit',
+        audit_status: 'confirmed_local_cleanup_pending',
+      },
+      extra: { integrationId: row.id, ownerType: 'organization' },
+    });
+    expect(sentryCaptureException.mock.calls[0]?.[1]).not.toHaveProperty('result');
+  });
+
+  test('retains the local row and returns a safe error when upstream and fallback audit fail', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('Uninstall fallback audit failure org', owner.id, 0);
+    const row = await integration({ organizationId: org.id });
+    upstream.mockRejectedValue(new Error('upstream private error'));
+    audit.mockImplementationOnce(
+      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+    );
+    audit.mockRejectedValueOnce(new Error('fallback audit private database error'));
+
+    await expect(
+      uninstallGitHubOrganizationInstallation({
+        input: request(row, { type: 'organization', id: org.id }),
+        actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'GitHub installation uninstall could not be confirmed. Refresh before retrying.',
+    });
+    expect(
+      await db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, row.id),
+      })
+    ).toBeDefined();
+    expect(sentryCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        operation: 'github-installation-uninstall-audit',
+        audit_status: 'unconfirmed',
+      },
+      extra: { integrationId: row.id, ownerType: 'organization' },
+    });
+    expect(sentryCaptureException.mock.calls[0]?.[1]).not.toHaveProperty('result');
+  });
+
+  test('releases target locks when upstream deletion fails', async () => {
+    const actor = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
+    const replacementOwner = await insertTestUser();
+    const row = await integration({ userId: owner.id });
+    upstream.mockRejectedValue(new Error('upstream private error'));
+
+    await expect(
+      uninstallGitHubOrganizationInstallation({
+        input: request(row, { type: 'user', id: owner.id }),
+        actor: { id: actor.id, email: actor.google_user_email, name: actor.google_user_name },
+      })
+    ).rejects.toThrow('Refresh before retrying');
+    await expect(
+      db
+        .update(platform_integrations)
+        .set({ owned_by_user_id: replacementOwner.id })
+        .where(eq(platform_integrations.id, row.id))
+    ).resolves.toMatchObject({ rowCount: 1 });
   });
 
   test('standard deletion webhook reconciles a legacy row retained after local cleanup rolls back', async () => {

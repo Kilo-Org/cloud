@@ -46,8 +46,10 @@ const call = async (options: {
 it('posts to the messages endpoint with a bearer token', async () => {
   const { calls } = await call({});
   expect(calls[0]?.url).toBe('https://app.kilocode.ai/api/gateway/v1/messages');
-  expect(calls[0]?.request.headers['authorization']).toBe('Bearer tok');
-  expect(calls[0]?.request.headers).not.toHaveProperty('x-kilocode-organizationid');
+  expect(calls[0]?.request.headers).toEqual({
+    'content-type': 'application/json',
+    authorization: 'Bearer tok',
+  });
 });
 
 it('names the organization when the context is an organization', async () => {

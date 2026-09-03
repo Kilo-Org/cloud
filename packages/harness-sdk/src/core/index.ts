@@ -1,3 +1,4 @@
+export * from './ceiling.js';
 export * from './fetch.js';
 export * from './id.js';
 export * from './model.js';

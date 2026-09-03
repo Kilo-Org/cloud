@@ -60,7 +60,8 @@
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "typescript/explicit-module-boundary-types": "off"
+        "typescript/explicit-module-boundary-types": "off",
+        "import/max-dependencies": "off"
       }
     },
     {

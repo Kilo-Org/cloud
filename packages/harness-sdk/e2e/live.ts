@@ -4,6 +4,7 @@ import { openSession, type SessionHandle } from '../src/core/run.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
+import { layerFixedCeiling } from '../src/plugins/ceiling/fixed.js';
 import { layerUlid } from '../src/plugins/id/ulid.js';
 import { layerAssembler } from '../src/plugins/prompt/default.js';
 import { kiloToken, nodeFetch } from './node-fetch.js';
@@ -49,6 +50,7 @@ const program = Effect.gen(function* () {
 const layers = Layer.mergeAll(
   layerUlid,
   layerAssembler,
+  layerFixedCeiling(),
   layerKiloGateway({
     baseUrl,
     token: await kiloToken(),

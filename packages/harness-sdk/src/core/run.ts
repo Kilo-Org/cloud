@@ -1,5 +1,6 @@
 import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
 import { type AskOptions, askWith, onStore, type Wiring } from './ask.js';
+import { TokenCeiling } from './ceiling.js';
 import { IdGenerator } from './id.js';
 import {
   type Effort,
@@ -23,8 +24,11 @@ import type { Turn } from './turn.js';
 interface SessionOptions {
   readonly system: string;
   readonly model: string;
-  /** The default ceiling on one answer. One question may raise or lower it. */
-  readonly maxTokens: number;
+  /**
+   * The default ceiling on one answer. Without one the `TokenCeiling` plugin
+   * decides. One question may raise or lower it either way.
+   */
+  readonly maxTokens?: number;
   /** How hard the model should think. Frozen: a change invalidates the cache. */
   readonly effort?: Effort;
 }
@@ -52,7 +56,11 @@ interface SessionHandle {
  */
 const openSession = (
   options: SessionOptions
-): Effect.Effect<SessionHandle, never, IdGenerator | PromptAssembler | ModelClient | Scope.Scope> =>
+): Effect.Effect<
+  SessionHandle,
+  never,
+  IdGenerator | PromptAssembler | ModelClient | TokenCeiling | Scope.Scope
+> =>
   Effect.gen(function* () {
     const ids = yield* IdGenerator;
     const wiring: Wiring = {
@@ -60,6 +68,7 @@ const openSession = (
       ids,
       assembler: yield* PromptAssembler,
       client: yield* ModelClient,
+      ceiling: yield* TokenCeiling,
       store: yield* Effect.serviceOption(SessionStore),
       state: yield* Ref.make(yield* Effect.provideService(makeSession(), IdGenerator, ids)),
       totals: yield* Ref.make(zeroUsage),

@@ -1,5 +1,6 @@
 import { Chunk, Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
+import { layerFixedCeiling } from '../plugins/ceiling/fixed.js';
 import { layerUlid } from '../plugins/id/ulid.js';
 import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
@@ -30,7 +31,7 @@ const run = <A>(
   store?: Layer.Layer<SessionStore>
 ) => {
   const model = fakeModel(replies);
-  const layers = Layer.mergeAll(layerUlid, layerAssembler, model.layer);
+  const layers = Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(), model.layer);
   const program = Effect.scoped(Effect.flatMap(openSession(options), use));
   return Effect.runPromise(
     Effect.provide(program, store === undefined ? layers : Layer.merge(layers, store))
@@ -103,7 +104,7 @@ it('raises the token ceiling for one question only', async () => {
 
 it('asks with the same effort on every question of a session', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
-  const layers = Layer.mergeAll(layerUlid, layerAssembler, model.layer);
+  const layers = Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(), model.layer);
   await Effect.runPromise(
     Effect.provide(
       Effect.scoped(
@@ -115,4 +116,37 @@ it('asks with the same effort on every question of a session', async () => {
     )
   );
   expect(model.calls.map(call => call.effort)).toEqual(['low', 'low']);
+});
+
+it('takes the ceiling from the plugin when the caller names none', async () => {
+  const model = fakeModel([{ deltas: ['x'] }]);
+  await Effect.runPromise(
+    Effect.provide(
+      Effect.scoped(
+        Effect.flatMap(openSession({ system: 'sys', model: 'm' }), session =>
+          Stream.runDrain(session.ask('a'))
+        )
+      ),
+      Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(2048), model.layer)
+    )
+  );
+  expect(model.calls[0]?.maxTokens).toBe(2048);
+});
+
+it('lets the session and then the question beat the plugin', async () => {
+  const model = fakeModel([{ deltas: ['x'] }]);
+  await Effect.runPromise(
+    Effect.provide(
+      Effect.scoped(
+        Effect.flatMap(openSession({ ...options, maxTokens: 512 }), session =>
+          Effect.zipRight(
+            Stream.runDrain(session.ask('a')),
+            Stream.runDrain(session.ask('b', { maxTokens: 99 }))
+          )
+        )
+      ),
+      Layer.mergeAll(layerUlid, layerAssembler, layerFixedCeiling(2048), model.layer)
+    )
+  );
+  expect(model.calls.map(call => call.maxTokens)).toEqual([512, 99]);
 });

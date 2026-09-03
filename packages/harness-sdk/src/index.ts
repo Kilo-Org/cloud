@@ -1,3 +1,4 @@
+export * from './core/ceiling.js';
 export * from './core/fetch.js';
 export * from './core/id.js';
 export * from './core/model.js';
@@ -7,6 +8,7 @@ export * from './core/usage.js';
 export * from './core/session.js';
 export * from './core/storage.js';
 export * from './core/turn.js';
+export * from './plugins/ceiling/fixed.js';
 export * from './plugins/gateway/index.js';
 export * from './plugins/id/ulid.js';
 export * from './plugins/prompt/default.js';

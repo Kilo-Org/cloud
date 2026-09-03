@@ -1,5 +1,6 @@
 import { Effect, Option, Ref, Stream } from 'effect';
 import { IdGenerator } from './id.js';
+import type { TokenCeilingService } from './ceiling.js';
 import type { Effort, ModelClientService, ModelError, ModelEvent, ModelUsage } from './model.js';
 import type { PromptAssemblerService } from './prompt.js';
 import { appendTurn, type Session } from './session.js';
@@ -20,8 +21,10 @@ interface AskOptions {
 interface Wiring {
   readonly system: string;
   readonly model: string;
-  readonly maxTokens: number;
+  /** What the caller named at open. Without one the `TokenCeiling` plugin decides. */
+  readonly maxTokens?: number;
   readonly effort?: Effort;
+  readonly ceiling: TokenCeilingService;
   readonly ids: IdGenerator['Type'];
   readonly assembler: PromptAssemblerService;
   readonly client: ModelClientService;
@@ -36,6 +39,15 @@ const onStore = (
   use: (plugin: SessionStoreService) => Effect.Effect<void, StoreError>
 ): Effect.Effect<void, StoreError> =>
   Option.match(store, { onNone: () => Effect.void, onSome: use });
+
+/** One question beats the session, and the session beats the plugin. */
+const ceilingOf = (wiring: Wiring, options: AskOptions | undefined): number =>
+  options?.maxTokens ??
+  wiring.maxTokens ??
+  wiring.ceiling.of({
+    model: wiring.model,
+    ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
+  });
 
 /** Adds a turn to the session and tells the store. The store decides when to write. */
 const record = (wiring: Wiring, turn: Turn): Effect.Effect<void, StoreError> =>
@@ -70,7 +82,7 @@ const askWith =
           .stream({
             prompt: wiring.assembler.assemble({ system: wiring.system, turns }),
             model: wiring.model,
-            maxTokens: options?.maxTokens ?? wiring.maxTokens,
+            maxTokens: ceilingOf(wiring, options),
             ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
             stream: true,
             cacheKey: id,

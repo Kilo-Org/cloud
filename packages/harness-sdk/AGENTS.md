@@ -182,7 +182,16 @@ Changing any of them mid-session throws the cache away, so the type does not
 allow it.
 
 `maxTokens` is not frozen. It never reaches the rendered prefix, so it costs no
-cache, and one question may raise or lower it: `session.ask(text, { maxTokens })`.
+cache. Three places may set it, and the nearest one wins:
+
+1. The question: `session.ask(text, { maxTokens })`.
+2. The session: `openSession({ maxTokens })`.
+3. The `TokenCeiling` plugin, when neither names a number.
+
+The right ceiling belongs to the application, not to the package, which is why
+it is a plugin. The package ships `layerFixedCeiling(4096)` and no opinion
+beyond it. A model-aware plugin that reads a model's own output limit is the
+obvious next one.
 
 One session answers one question at a time. A semaphore holds the second
 question until the first is finished, because two answers built on one prefix
@@ -232,8 +241,10 @@ never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
 | `src/core/model.ts` | The `ModelClient` plugin point; transport only |
 | `src/core/storage.ts` | The `SessionStore` plugin point; no plugin yet |
 | `src/core/id.ts` | The `IdGenerator` plugin point |
+| `src/core/ceiling.ts` | The `TokenCeiling` plugin point |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
 | `src/plugins/id/ulid.ts` | The identifier plugin |
+| `src/plugins/ceiling/fixed.ts` | One ceiling for every model |
 | `src/plugins/model/fake.ts` | A scripted model, for tests without a network |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/gateway/` | The kilo gateway plugin |

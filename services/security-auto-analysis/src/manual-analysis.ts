@@ -164,7 +164,8 @@ export async function processManualAnalysisStart(params: {
       actor,
       nextAuthSecret,
       params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
-      params.env.SHARED_RESOURCE_TOKENS_ENABLED
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      owner.type === 'org' ? owner.id : undefined
     );
     const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,

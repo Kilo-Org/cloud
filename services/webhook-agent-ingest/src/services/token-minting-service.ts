@@ -114,11 +114,15 @@ export class TokenMintingService {
 
       logger.info('Token minting: ensuring bot user', { orgId: params.orgId });
       const botUser = await ensureBotUserForOrg(db, params.orgId);
+      if (botUser.blocked_at || botUser.blocked_reason) {
+        throw new Error('Webhook bot user is blocked');
+      }
 
       const token = await this.signToken({
         kiloUserId: botUser.id,
         apiTokenPepper: botUser.api_token_pepper,
         botId: WEBHOOK_BOT_ID,
+        organizationId: params.orgId,
         internalApiUse: true,
         createdOnPlatform: 'webhook',
       });
@@ -146,6 +150,7 @@ export class TokenMintingService {
     kiloUserId: string;
     apiTokenPepper: string | null;
     botId?: string;
+    organizationId?: string;
     internalApiUse: boolean;
     createdOnPlatform: string;
   }): Promise<string> {
@@ -166,6 +171,7 @@ export class TokenMintingService {
         credentialExchange: false,
         extra: {
           botId: payload.botId,
+          organizationId: payload.organizationId,
           internalApiUse: payload.internalApiUse,
           createdOnPlatform: payload.createdOnPlatform,
           runtimeAdmission: {

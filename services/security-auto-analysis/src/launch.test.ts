@@ -273,6 +273,36 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     });
   });
 
+  it('passes the prepareSession organization to the modern control token', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue(finding as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    await startSecurityAnalysis(
+      createParams(
+        false,
+        vi
+          .fn()
+          .mockResolvedValueOnce(
+            Response.json({
+              result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+            })
+          )
+          .mockResolvedValueOnce(
+            Response.json({ result: { data: { executionId: 'exec-123' } } })
+          ) as never
+      )
+    );
+
+    expect(generateControlToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+  });
+
   it('reuses existing triage and launches sandbox without retriaging', async () => {
     const previousAnalysis = {
       triage: existingTriage,

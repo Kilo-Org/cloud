@@ -201,7 +201,8 @@ export async function startSecurityAnalysis(
         params.actorUser,
         params.nextAuthSecret,
         environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED
+        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+        params.organizationId
       ),
       generateTriageToken(
         params.actorUser,

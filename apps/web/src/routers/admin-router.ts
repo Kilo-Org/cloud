@@ -142,6 +142,8 @@ import {
   getKilocodeRepoRecentlyMergedExternalPRs,
   ALL_REPO_IDS,
 } from '@/lib/github/open-pull-request-counts';
+import { GitHubOrganizationInstallationLookupInputSchema } from '@/lib/admin/github-installation-lookup-input';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
 
 const SyncResponseSchema = z.object({
   success: z.boolean(),
@@ -508,6 +510,18 @@ export const adminRouter = createTRPCRouter({
   impactReferrals: adminImpactReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
+    lookupOrganizationInstallation: adminProcedure
+      .input(GitHubOrganizationInstallationLookupInputSchema)
+      .mutation(async ({ input }) => {
+        try {
+          return await lookupGitHubOrganizationInstallation(input.organization);
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'GitHub installation lookup failed',
+          });
+        }
+      }),
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
     }),

@@ -1,10 +1,14 @@
 import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerFactory } from '@/lib/trpc/init';
+import { rootRouter } from '@/routers/root-router';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   getKilocodeRepoOpenPullRequestsSummary,
   getKilocodeRepoRecentlyClosedExternalPRs,
 } from '@/lib/github/open-pull-request-counts';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { setAdminAccessSinkForTest } from '@/lib/admin/admin-access-log';
 
 jest.mock('@/lib/github/open-pull-request-counts', () => ({
   getKilocodeRepoOpenPullRequestCounts: jest.fn(),
@@ -14,8 +18,16 @@ jest.mock('@/lib/github/open-pull-request-counts', () => ({
   ALL_REPO_IDS: ['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy'],
 }));
 
+jest.mock('@/lib/admin/github-installation-lookup', () => ({
+  lookupGitHubOrganizationInstallation: jest.fn(),
+}));
+
 let regularUser: User;
 let adminUser: User;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
   beforeAll(async () => {
@@ -38,6 +50,97 @@ describe('admin.github.getKilocodeOpenPullRequestCounts', () => {
     await expect(caller.admin.github.getKilocodeOpenPullRequestCounts()).rejects.toThrow(
       'Admin access required'
     );
+  });
+});
+
+describe('admin.github.lookupOrganizationInstallation', () => {
+  it('denies anonymous callers before a lookup', async () => {
+    const createCaller = createCallerFactory(rootRouter);
+    const caller = createCaller({ user: null } as never);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme' })
+    ).rejects.toThrow();
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('denies non-admin callers before a lookup', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme' })
+    ).rejects.toThrow('Admin access required');
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('normalizes input and delegates only for an admin', async () => {
+    const response = {
+      organization: 'acme',
+      checkedAt: new Date().toISOString(),
+      apps: [],
+      records: [],
+      recordsTruncated: false,
+    };
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockResolvedValue(response);
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({
+        organization: 'https://github.com/acme/',
+      })
+    ).resolves.toEqual(response);
+    expect(lookupGitHubOrganizationInstallation).toHaveBeenCalledWith('acme');
+  });
+
+  it('returns a generic error when the database lookup fails', async () => {
+    const sentinel = 'SELECT secret FROM platform_integrations WHERE account = acme';
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockRejectedValue(new Error(sentinel));
+    const caller = await createCallerForUser(adminUser.id);
+
+    const error = await caller.admin.github
+      .lookupOrganizationInstallation({ organization: 'acme' })
+      .catch(error => error);
+
+    expect(error).toHaveProperty('message', 'GitHub installation lookup failed');
+    expect(error.message).not.toContain(sentinel);
+    expect(error.cause).toBeUndefined();
+  });
+
+  it('preserves admin guard auditing without lookup input or results', async () => {
+    const sink = jest.fn();
+    setAdminAccessSinkForTest(sink);
+    (lookupGitHubOrganizationInstallation as jest.Mock).mockResolvedValue({
+      organization: 'private-lookup-target',
+      records: [{ id: 'private-lookup-result' }],
+    });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.github.lookupOrganizationInstallation({
+        organization: 'private-lookup-target',
+      });
+      expect(sink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'admin_guard',
+          route: 'admin.github.lookupOrganizationInstallation',
+          method: 'mutation',
+          target: null,
+        })
+      );
+      expect(JSON.stringify(sink.mock.calls)).not.toContain('private-lookup-target');
+      expect(JSON.stringify(sink.mock.calls)).not.toContain('private-lookup-result');
+    } finally {
+      setAdminAccessSinkForTest(null);
+    }
+  });
+
+  it('rejects invalid input without calling the lookup', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.github.lookupOrganizationInstallation({ organization: 'acme--tools' })
+    ).rejects.toThrow('Enter a valid GitHub organization login');
+    expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
   });
 });
 

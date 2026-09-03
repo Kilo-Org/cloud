@@ -3,9 +3,21 @@ import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
+import {
+  getSandboxAllocationProvider,
+  isSelectableSandboxAllocation,
+  sandboxAllocationRequiresControlPlane,
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
-import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
+import {
+  classifySandboxId,
+  isGeneratedSharedSandboxId,
+  isValidSandboxId,
+  type SandboxIdClass,
+} from '../sandbox-id.js';
 import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
@@ -233,11 +245,23 @@ const CredentialContainmentSchema = z
   })
   .strip();
 
+/** Sandbox-ID class each isolated allocation must have in persisted metadata. */
+const SANDBOX_ALLOCATION_ID_CLASS: Record<
+  Exclude<SandboxAllocation, 'cloudflare-shared'>,
+  SandboxIdClass
+> = {
+  'isolated-standard': 'isolated-standard',
+  'cloudflare-single': 'isolated-small',
+  'vercel-small': 'isolated-small',
+  'vercel-large': 'isolated-small',
+};
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
@@ -247,10 +271,28 @@ const MetadataWorkspaceSchema = z
     credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
-    sandboxAllocation: z.literal('isolated-standard').optional(),
   })
   .strip()
   .superRefine((workspace, context) => {
+    const allocation = workspace.sandboxAllocation;
+    if (allocation !== undefined) {
+      const shared = allocation === 'cloudflare-shared';
+      if (
+        // Metadata written before an explicit provider defaults to Cloudflare.
+        (workspace.sandboxProvider ?? 'cloudflare') !== getSandboxAllocationProvider(allocation) ||
+        !workspace.sandboxId ||
+        (shared
+          ? !isGeneratedSharedSandboxId(workspace.sandboxId) || !workspace.sandboxRoute
+          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation]) ||
+        workspace.devcontainerRequested === true
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['sandboxAllocation'],
+          message: 'Sandbox allocation conflicts with workspace identity',
+        });
+      }
+    }
     const route = workspace.sandboxRoute;
     if (!route) return;
     const sandboxId = workspace.sandboxId;
@@ -346,6 +388,35 @@ export const CurrentSessionMetadataSchema = z
       PROVIDER_CAPABILITIES[metadata.workspace?.sandboxProvider ?? 'cloudflare'].devcontainer ||
       !metadata.devcontainer,
     'Sandbox provider metadata cannot contain a devcontainer runtime'
+  )
+  .refine(
+    metadata =>
+      metadata.workspace?.sandboxAllocation === undefined ||
+      (!metadata.devcontainer &&
+        metadata.identity.billingOrigin !== 'code-review' &&
+        metadata.identity.createdOnPlatform !== 'code-review'),
+    'Sandbox allocations cannot be combined with specialized routing'
+  )
+  .refine(
+    metadata =>
+      // The selectable allocations are organization-scoped; `isolated-standard` is
+      // authorized per user and stays valid on a personal session.
+      !isSelectableSandboxAllocation(metadata.workspace?.sandboxAllocation) ||
+      !!metadata.identity.orgId,
+    'Selectable sandbox allocations require an organization-owned session'
+  )
+  .refine(
+    metadata =>
+      // `isolated-standard` remains legacy-plane only; Vercel is control-plane only.
+      metadata.workspace?.sandboxAllocation !== 'isolated-standard' ||
+      sessionPlaneFromId(metadata.identity.sessionId) === 'legacy',
+    'Isolated Standard allocation is not supported for control-plane sessions'
+  )
+  .refine(
+    metadata =>
+      !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
+      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+    'Vercel sandbox allocations require a control-plane session'
   );
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;

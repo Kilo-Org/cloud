@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { TRPCError } from '@trpc/server';
 import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type {
   createWorkerTrigger as createWorkerTriggerType,
@@ -16,6 +17,18 @@ import type {
 } from './webhook-triggers-router';
 
 const mockEnsureOrganizationAccess = jest.fn<typeof ensureOrganizationAccess>();
+const mockGetSandboxSelectionOptions =
+  jest.fn<CloudAgentNextClient['getSandboxSelectionOptions']>();
+
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  createCloudAgentNextClient: () => ({
+    getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
+  }),
+}));
+
+jest.mock('@/lib/tokens', () => ({
+  generateCloudAgentToken: () => 'test-cloud-agent-token',
+}));
 
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
 const mockUpdateWorkerTrigger = jest.fn<typeof updateWorkerTriggerType>();
@@ -122,6 +135,7 @@ describe('webhook trigger variant inputs', () => {
       requestId: '00000000-0000-4000-8000-000000000005',
     });
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
   });
 
   it.each(['high', 'High', 'a'.repeat(50)])('accepts valid create variant %s', variant => {
@@ -243,59 +257,55 @@ describe('webhook trigger variant inputs', () => {
   );
 
   it.each(['owner', 'admin', 'member'] as const)(
-    'reports actual platform-admin capability for an organization %s',
+    'uses Worker organization capabilities for an organization %s',
     async role => {
       const organizationId = '00000000-0000-4000-8000-000000000003';
-      mockEnsureOrganizationAccess.mockResolvedValueOnce(role);
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
       await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
         canSetSandboxAllocation: false,
       });
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+      await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
+        canSetSandboxAllocation: true,
+      });
       expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), organizationId);
+      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+        kilocodeOrganizationId: organizationId,
+      });
     }
   );
 
-  it('reports platform-admin capability and preserves organization access checks', async () => {
-    await expect(createCaller({ user }).capabilities({})).resolves.toEqual({
+  it.each([false, true])('never enables personal selection for is_admin=%s', async is_admin => {
+    await expect(createCaller({ user: { ...user, is_admin } }).capabilities({})).resolves.toEqual({
       canSetSandboxAllocation: false,
     });
-    await expect(
-      createCaller({ user: { ...user, is_admin: true } }).capabilities({})
-    ).resolves.toEqual({ canSetSandboxAllocation: true });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
 
+  it('checks organization access before requesting Worker capabilities', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000003';
     mockEnsureOrganizationAccess.mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }));
     await expect(createCaller({ user }).capabilities({ organizationId })).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { scope: 'personal', activationMode: 'webhook', organizationId: undefined },
-    {
-      scope: 'organization',
-      activationMode: 'webhook',
-      organizationId: '00000000-0000-4000-8000-000000000003',
-    },
-    { scope: 'personal', activationMode: 'scheduled', organizationId: undefined },
-    {
-      scope: 'organization',
-      activationMode: 'scheduled',
-      organizationId: '00000000-0000-4000-8000-000000000003',
-    },
-  ] as const)(
-    'allows a Kilo admin to create and update Dedicated Standard for $scope $activationMode triggers',
-    async ({ activationMode, organizationId }) => {
-      const admin = { ...user, is_admin: true };
-      const triggerInput = {
+  it.each(['webhook', 'scheduled'] as const)(
+    'allows an enrolled organization member to set Dedicated Standard on %s triggers',
+    async activationMode => {
+      const organizationId = '00000000-0000-4000-8000-000000000003';
+      mockEnsureOrganizationAccess.mockResolvedValue('member');
+      mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: true, options: [] });
+      await createCaller({ user }).create({
         ...createInput,
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
         activationMode,
         ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
-        sandboxAllocation: 'isolated-standard' as const,
-      };
-      await createCaller({ user: admin }).create(triggerInput);
+        sandboxAllocation: 'isolated-standard',
+      });
       expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
-        organizationId ? undefined : 'user-1',
+        undefined,
         organizationId,
         'trigger-id',
         expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
@@ -308,13 +318,13 @@ describe('webhook trigger variant inputs', () => {
           target_type: 'cloud_agent',
         },
       ]);
-      await createCaller({ user: admin }).update({
+      await createCaller({ user }).update({
         triggerId: 'trigger-id',
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
         sandboxAllocation: 'isolated-standard',
       });
       expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
-        organizationId ? undefined : 'user-1',
+        undefined,
         organizationId,
         'trigger-id',
         expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
@@ -361,28 +371,33 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
-  it.each(['webhook', 'scheduled'] as const)(
-    'rejects a non-admin Dedicated Standard create and update for %s triggers before writes',
-    async activationMode => {
-      const input = {
-        ...createInput,
-        activationMode,
-        ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
-        sandboxAllocation: 'isolated-standard' as const,
-      };
-      await expect(createCaller({ user }).create(input)).rejects.toMatchObject({
-        code: 'FORBIDDEN',
-        message: 'Kilo admin access is required to select Dedicated Standard',
-      });
-      await expect(
-        createCaller({ user }).update({
-          triggerId: 'trigger-id',
-          sandboxAllocation: 'isolated-standard',
-        })
-      ).rejects.toMatchObject({
-        code: 'FORBIDDEN',
-        message: 'Kilo admin access is required to select Dedicated Standard',
-      });
+  it.each([
+    { activationMode: 'webhook', is_admin: false },
+    { activationMode: 'webhook', is_admin: true },
+    { activationMode: 'scheduled', is_admin: false },
+    { activationMode: 'scheduled', is_admin: true },
+  ] as const)(
+    'rejects unenrolled Dedicated Standard $activationMode triggers for is_admin=$is_admin before writes',
+    async ({ activationMode, is_admin }) => {
+      const caller = createCaller({ user: { ...user, is_admin } });
+      for (const organizationId of [undefined, '00000000-0000-4000-8000-000000000003']) {
+        await expect(
+          caller.create({
+            ...createInput,
+            organizationId,
+            activationMode,
+            ...(activationMode === 'scheduled' ? { cronExpression: '* * * * *' } : {}),
+            sandboxAllocation: 'isolated-standard',
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        await expect(
+          caller.update({
+            triggerId: 'trigger-id',
+            organizationId,
+            sandboxAllocation: 'isolated-standard',
+          })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      }
       expect(mockDbInsert).not.toHaveBeenCalled();
       expect(mockDbUpdate).not.toHaveBeenCalled();
       expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
@@ -390,19 +405,24 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
-  it('does not grant allocation privileges to an organization owner or member', async () => {
+  it('fails closed before writes when Worker capabilities are unavailable', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000003';
-    for (const role of ['owner', 'member'] as const) {
-      mockEnsureOrganizationAccess.mockResolvedValueOnce(role);
-      await expect(
-        createCaller({ user }).create({
-          ...createInput,
-          organizationId,
-          sandboxAllocation: 'isolated-standard',
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    }
+    mockGetSandboxSelectionOptions.mockRejectedValue(new Error('Capabilities unavailable'));
+    const caller = createCaller({ user });
+    await expect(
+      caller.create({ ...createInput, organizationId, sandboxAllocation: 'isolated-standard' })
+    ).rejects.toThrow('Capabilities unavailable');
+    await expect(
+      caller.update({
+        triggerId: 'trigger-id',
+        organizationId,
+        sandboxAllocation: 'isolated-standard',
+      })
+    ).rejects.toThrow('Capabilities unavailable');
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
   });
 
   it.each([null, 'isolated-standard'] as const)(

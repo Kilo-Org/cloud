@@ -86,6 +86,7 @@ export const adminGatewayUsageRouter = createTRPCRouter({
               INNER JOIN microdollar_usage_metadata meta ON mu.id = meta.id
               WHERE mu.requested_model = ${input.model}
                 AND meta.is_user_byok = false
+                AND mu.input_tokens > 0
                 AND mu.created_at >= ${startDate}::timestamptz
                 AND mu.created_at < ${endDate}::timestamptz
               GROUP BY mu.provider, meta.is_byok

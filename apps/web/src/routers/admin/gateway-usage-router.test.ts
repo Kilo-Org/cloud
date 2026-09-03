@@ -99,7 +99,7 @@ describe('admin.gatewayUsage.getMonthlyUsage', () => {
         'SUM(mu.cache_hit_tokens)::text AS cache_read_tokens, SUM(mu.cache_write_tokens)::text AS cache_write_tokens, ' +
         'SUM(mu.cost)::text AS cost, SUM(meta.market_cost)::text AS market_cost ' +
         'FROM microdollar_usage mu INNER JOIN microdollar_usage_metadata meta ON mu.id = meta.id ' +
-        'WHERE mu.requested_model = $1 AND meta.is_user_byok = false ' +
+        'WHERE mu.requested_model = $1 AND meta.is_user_byok = false AND mu.input_tokens > 0 ' +
         'AND mu.created_at >= $2::timestamptz AND mu.created_at < $3::timestamptz ' +
         'GROUP BY mu.provider, meta.is_byok ORDER BY mu.provider, meta.is_byok'
     );
@@ -436,6 +436,17 @@ describe('admin.gatewayUsage.getMonthlyUsage PostgreSQL semantics', () => {
         cost: '500',
         market_cost: '1000',
       },
+    ]);
+  });
+
+  it('excludes nonpositive input-token usage from counts, sums, and provider groups', async () => {
+    await insertUsage({ input_tokens: 1 });
+    await insertUsage({ input_tokens: 0, kilo_user_id: 'excluded-zero-input-user' });
+    await insertUsage({ input_tokens: -1, kilo_user_id: 'excluded-negative-input-user' });
+    await insertUsage({ input_tokens: 0, provider: 'excluded-provider' });
+
+    await expect(caller().getMonthlyUsage(input)).resolves.toEqual([
+      { ...singleUsage, input_tokens: '1' },
     ]);
   });
 

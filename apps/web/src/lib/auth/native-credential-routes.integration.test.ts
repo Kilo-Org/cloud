@@ -27,6 +27,8 @@ import { db } from '@/lib/drizzle';
 import { generateApiToken } from '@/lib/tokens';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
+jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) } }));
+
 const nativeResourceTokensKey = 'NATIVE_RESOURCE_TOKENS_ENABLED';
 const originalNativeResourceTokens = process.env[nativeResourceTokensKey];
 

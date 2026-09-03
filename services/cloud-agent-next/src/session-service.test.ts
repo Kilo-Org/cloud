@@ -4,6 +4,7 @@ import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
 import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import jwt from 'jsonwebtoken';
 import { ExecutionError } from './execution/errors.js';
 import {
   createPendingSessionMessage,
@@ -2457,6 +2458,107 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.context.workspacePath).toBe(workspacePath);
     expect(result.ready.workspacePath).toBe(workspacePath);
     expect(result.readyRequest.workspace.workspacePath).toBe(workspacePath);
+  });
+
+  it('uses a fenced Worker proxy handle for modern authorization without exposing its backing token', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const backingToken = jwt.sign(
+      {
+        runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+      'backing-secret'
+    );
+    const issueRuntimeCredentialProxyGrant = vi.fn().mockResolvedValue('stable-proxy-handle');
+    env.CLOUD_AGENT_SESSION.get = vi.fn(() => ({ issueRuntimeCredentialProxyGrant })) as never;
+    const metadata = createMetadata({ kilocodeToken: backingToken });
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bModernProxyAAAA',
+          prompt: 'Do the work',
+        },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: { sandboxId: 'ses-abcdef', metadata },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_modern',
+            wrapperGeneration: 3,
+            wrapperConnectionId: 'conn_modern',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(issueRuntimeCredentialProxyGrant).toHaveBeenCalledWith({
+      wrapperRunId: 'wr_modern',
+      wrapperGeneration: 3,
+      wrapperConnectionId: 'conn_modern',
+    });
+    expect(result.readyRequest.runtimeCredentialProxy).toEqual({
+      handle: 'stable-proxy-handle',
+      targets: {
+        backendBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/backend',
+        providerBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/provider',
+        sessionIngestBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/ingest',
+      },
+    });
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('stable-proxy-handle');
+    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
+      kilo: { type: 'api', key: 'stable-proxy-handle' },
+    });
+    expect(JSON.stringify(result.readyRequest)).not.toContain(backingToken);
+    expect(JSON.stringify(result.readyRequest)).not.toContain('backing-secret');
+    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the session cannot issue a modern runtime proxy handle', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const backingToken = jwt.sign(
+      {
+        runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+      'backing-secret'
+    );
+    const issueRuntimeCredentialProxyGrant = vi.fn().mockResolvedValue(null);
+    env.CLOUD_AGENT_SESSION.get = vi.fn(() => ({ issueRuntimeCredentialProxyGrant })) as never;
+    const metadata = createMetadata({ kilocodeToken: backingToken });
+
+    await expect(
+      service.buildWrapperSessionReadyAndPromptRequests({
+        env,
+        plan: {
+          scope: { sessionId: 'agent_test', userId: 'user_test' },
+          turn: {
+            type: 'prompt',
+            messageId: 'msg_018f1e2d3c4bNoProxyHandleAAAA',
+            prompt: 'Do the work',
+          },
+          agent: { mode: 'code', model: 'test-model' },
+          workspace: { sandboxId: 'ses-abcdef', metadata },
+          wrapper: {
+            fence: {
+              wrapperRunId: 'wr_modern',
+              wrapperGeneration: 3,
+              wrapperConnectionId: 'conn_modern',
+            },
+          },
+        } satisfies FencedWrapperDispatchRequest,
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+      message: 'Runtime credential proxy grant is unavailable',
+    });
+    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
   });
 
   it.each([undefined, 1])(

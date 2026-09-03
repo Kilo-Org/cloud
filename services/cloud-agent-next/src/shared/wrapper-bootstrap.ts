@@ -59,18 +59,13 @@ export type WrapperBootstrapMaterializedConfig = {
 };
 
 export type WrapperRuntimeCredentialProxyConfig = {
-  authorizationId: string;
-  authorizationFingerprint: string;
-  alias: string;
-  credential: string;
+  /** Opaque Worker-issued handle; never the renewable backing credential. */
+  handle: string;
   targets: {
     backendBaseUrl: string;
     providerBaseUrl: string;
     sessionIngestBaseUrl: string;
   };
-  authorizedSessionIds: string[];
-  organizationId?: string;
-  fence: string;
 };
 
 export type WrapperDevContainerMetadata = {
@@ -263,6 +258,42 @@ function hasString(value: Record<string, unknown>, key: string): boolean {
   return typeof value[key] === 'string' && value[key].length > 0;
 }
 
+function isRuntimeCredentialProxyConfig(
+  value: unknown
+): value is WrapperRuntimeCredentialProxyConfig {
+  if (!isRecord(value) || !hasString(value, 'handle') || !isRecord(value.targets)) return false;
+  const targets = value.targets;
+  if (
+    Object.keys(value).length !== 2 ||
+    !Object.hasOwn(value, 'handle') ||
+    !Object.hasOwn(value, 'targets') ||
+    Object.keys(targets).length !== 3
+  ) {
+    return false;
+  }
+  const routes = {
+    backendBaseUrl: 'backend',
+    providerBaseUrl: 'provider',
+    sessionIngestBaseUrl: 'ingest',
+  } as const;
+  return Object.entries(routes).every(([key, route]) => {
+    if (!hasString(targets, key)) return false;
+    try {
+      const target = new URL(targets[key] as string);
+      return (
+        target.protocol === 'https:' &&
+        !target.username &&
+        !target.password &&
+        !target.search &&
+        !target.hash &&
+        target.pathname.endsWith(`/api/runtime-credential-proxy/${route}`)
+      );
+    } catch {
+      return false;
+    }
+  });
+}
+
 function isWrapperDevContainerMetadata(value: unknown): value is WrapperDevContainerMetadata {
   if (!isRecord(value)) return false;
   if (!hasString(value, 'workspacePath')) return false;
@@ -312,6 +343,13 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;
+
+  if (
+    value.runtimeCredentialProxy !== undefined &&
+    !isRuntimeCredentialProxyConfig(value.runtimeCredentialProxy)
+  ) {
+    return false;
+  }
 
   const session = value.session;
   if (!isRecord(session)) return false;

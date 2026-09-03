@@ -26,6 +26,7 @@ import {
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { runtimeCredentialProxyBaseUrl } from './runtime-credential-proxy.js';
 import { ExecutionError } from './execution/errors.js';
 import {
   checkDiskAndCleanBeforeSetup,
@@ -86,6 +87,7 @@ import {
   type WrapperBootstrapRepoSource,
   type WrapperCommandRequest,
   type WrapperPromptRequest,
+  type WrapperRuntimeCredentialProxyConfig,
   type WrapperSessionReadyRequest,
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
@@ -2062,12 +2064,6 @@ export class SessionService {
     const { scope, turn, agent, finalization, workspace, wrapper } = plan;
     const { sessionId, userId, orgId } = scope;
     const { sandboxId, metadata } = workspace;
-    if (hasModernRuntimeAuthorization(metadata)) {
-      throw ExecutionError.invalidRequest(
-        'Modern runtime credential delivery is not ready; shared issuance must remain disabled'
-      );
-    }
-
     if (!metadata.auth.kilocodeToken) {
       throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
     }
@@ -2078,16 +2074,54 @@ export class SessionService {
     if (!nextAuthSecret) {
       throw ExecutionError.invalidRequest('NEXTAUTH_SECRET is not configured on the worker');
     }
-    const kiloCredential = await this.resolveKiloCapability(env, metadata, {
-      userId,
-      cloudAgentSessionId: sessionId,
-      kiloSessionId: metadata.auth.kiloSessionId,
-      sandboxId,
-      userToken: metadata.auth.kilocodeToken,
-    });
-    const kiloCapability = kiloCredential.capability;
-    const kiloProviderBaseUrl = kiloCredential.providerBaseUrl;
-    const kiloSessionIngestBaseUrl = kiloCredential.sessionIngestBaseUrl;
+    const modernRuntimeAuthorization = hasModernRuntimeAuthorization(metadata);
+    let runtimeCredentialProxy: WrapperRuntimeCredentialProxyConfig | undefined;
+    let kiloCapability: string;
+    let kiloBackendBaseUrl: string | undefined;
+    let kiloProviderBaseUrl: string | undefined;
+    let kiloSessionIngestBaseUrl: string | undefined;
+    if (modernRuntimeAuthorization) {
+      const workerUrl = env.WORKER_URL;
+      const proxyBaseUrl = workerUrl ? runtimeCredentialProxyBaseUrl(workerUrl) : null;
+      const targets = deriveKiloSandboxTargets(env, metadata.auth.kilocodeToken);
+      if (!proxyBaseUrl || !targets.success) {
+        throw ExecutionError.invalidRequest(
+          'Runtime credential proxy configuration is unavailable'
+        );
+      }
+      // The session-owned RPC checks the current persisted runtime fence. It is
+      // deliberately called only after this delivery plan carries every fence field.
+      const handle = await withDORetry(
+        () => resolveSessionStub(env, userId, sessionId),
+        stub => stub.issueRuntimeCredentialProxyGrant(plan.wrapper.fence),
+        'issueRuntimeCredentialProxyGrant'
+      );
+      if (!handle) {
+        throw ExecutionError.invalidRequest('Runtime credential proxy grant is unavailable');
+      }
+      const proxyTargets = {
+        backendBaseUrl: `${proxyBaseUrl}/backend`,
+        providerBaseUrl: `${proxyBaseUrl}/provider`,
+        sessionIngestBaseUrl: `${proxyBaseUrl}/ingest`,
+      };
+      runtimeCredentialProxy = { handle, targets: proxyTargets };
+      kiloCapability = handle;
+      kiloBackendBaseUrl = proxyTargets.backendBaseUrl;
+      kiloProviderBaseUrl = proxyTargets.providerBaseUrl;
+      kiloSessionIngestBaseUrl = proxyTargets.sessionIngestBaseUrl;
+    } else {
+      const kiloCredential = await this.resolveKiloCapability(env, metadata, {
+        userId,
+        cloudAgentSessionId: sessionId,
+        kiloSessionId: metadata.auth.kiloSessionId,
+        sandboxId,
+        userToken: metadata.auth.kilocodeToken,
+      });
+      kiloCapability = kiloCredential.capability;
+      kiloBackendBaseUrl = kiloCredential.backendBaseUrl;
+      kiloProviderBaseUrl = kiloCredential.providerBaseUrl;
+      kiloSessionIngestBaseUrl = kiloCredential.sessionIngestBaseUrl;
+    }
 
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
@@ -2137,6 +2171,7 @@ export class SessionService {
       workspacePath,
       env,
       kiloCapability,
+      kiloBackendBaseUrl,
       kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl,
       kilocodeModel: agent.model,
@@ -2219,6 +2254,7 @@ export class SessionService {
         requireSnapshot: metadata.clone !== undefined,
       },
       ...(repo ? { repo } : {}),
+      ...(runtimeCredentialProxy ? { runtimeCredentialProxy } : {}),
       ...(devcontainerRequested
         ? {
             devcontainer: {
@@ -2827,9 +2863,11 @@ export class SessionService {
     options: RestoreRuntimeOptions,
     restoreTokenFilePath: string | undefined
   ): Record<string, string | undefined> {
-    const backendUrl = options.env.KILOCODE_BACKEND_BASE_URL
-      ? backendUrlForSandbox(options.env.KILOCODE_BACKEND_BASE_URL)
-      : undefined;
+    const backendUrl =
+      options.kiloBackendBaseUrl ??
+      (options.env.KILOCODE_BACKEND_BASE_URL
+        ? backendUrlForSandbox(options.env.KILOCODE_BACKEND_BASE_URL)
+        : undefined);
     return {
       KILOCODE_TOKEN_FILE: restoreTokenFilePath,
       KILO_SESSION_INGEST_URL:
@@ -3068,6 +3106,7 @@ type RestoreRuntimeOptions = {
   dockerEnv?: Record<string, string>;
   env: PersistenceEnv;
   kiloCapability: string;
+  kiloBackendBaseUrl?: string;
   kiloSessionIngestBaseUrl?: string;
   runtimeEnv: Record<string, string>;
   sessionHome: string;

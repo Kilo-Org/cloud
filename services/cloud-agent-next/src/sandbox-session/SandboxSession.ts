@@ -594,7 +594,11 @@ export class SandboxSession extends DurableObject<Env> {
    * allocation generation plus wrapper run/connection tuple required to fence
    * a bearer credential. Keep this RPC fail-closed until that lifecycle exists.
    */
-  async issueRuntimeCredentialProxyGrant(): Promise<string | null> {
+  async issueRuntimeCredentialProxyGrant(_fence: {
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<string | null> {
     return null;
   }
 

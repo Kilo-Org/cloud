@@ -2,7 +2,12 @@ import React from 'react';
 import { describe, expect, it } from '@jest/globals';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { GitHubOrganizationInstallationLookupResult } from '@/lib/admin/github-installation-lookup';
-import { GitHubInstallationLookupResult, LocalAssociationTable } from './GitHubInstallationLookup';
+import {
+  getUninstallTarget,
+  GitHubInstallationLookupResult,
+  LocalAssociationTable,
+  uninstallConfirmationCopy,
+} from './GitHubInstallationLookup';
 
 const result = {
   organization: 'acme-tools',
@@ -24,7 +29,7 @@ const result = {
   ],
   records: [
     {
-      id: 'actual-record',
+      id: '123e4567-e89b-42d3-a456-426614174000',
       appType: 'standard',
       installationId: '123',
       accountLogin: 'acme-tools',
@@ -33,7 +38,11 @@ const result = {
       suspendedAt: null,
       authInvalid: false,
       updatedAt: '2026-09-03T13:00:00.000Z',
-      owner: { type: 'organization', id: 'org/id', name: 'Acme Tools' },
+      owner: {
+        type: 'organization',
+        id: '223e4567-e89b-42d3-a456-426614174000',
+        name: 'Acme Tools',
+      },
       association: 'actual',
     },
     {
@@ -83,7 +92,7 @@ describe('GitHubInstallationLookupResult', () => {
     expect(html).toContain('Authentication invalid');
     expect(html).toContain('No owner linked');
     expect(html).toContain('Results truncated');
-    expect(html).toContain('/admin/organizations/org%2Fid');
+    expect(html).toContain('/admin/organizations/223e4567-e89b-42d3-a456-426614174000');
     expect(html).toContain('/admin/users/user%2Fid');
   });
 
@@ -109,5 +118,81 @@ describe('GitHubInstallationLookupResult', () => {
 
     expect(html).toContain('No local association records matched this lookup.');
     expect(html).not.toContain('Not installed');
+  });
+
+  it('only enables the install-wide action for a live, actual record with complete identity', () => {
+    const target = getUninstallTarget(result, result.records[0]);
+    const candidateTarget = getUninstallTarget(result, result.records[1]);
+    const ownerlessTarget = getUninstallTarget(result, result.records[2]);
+    const html = renderToStaticMarkup(
+      React.createElement(GitHubInstallationLookupResult, {
+        result,
+        onUninstall: () => {},
+      })
+    );
+
+    expect(target).toMatchObject({
+      appType: 'standard',
+      installationId: '123',
+      accountId: '456',
+      owner: { type: 'organization', id: '223e4567-e89b-42d3-a456-426614174000' },
+    });
+    expect(candidateTarget).toBeNull();
+    expect(ownerlessTarget).toBeNull();
+    expect(html).toContain('Uninstall GitHub App');
+    expect(html).toContain('Not eligible');
+  });
+
+  it('allows suspended actual installations and preserves arbitrary OAuth owner IDs', () => {
+    const suspendedResult = {
+      ...result,
+      records: [
+        {
+          ...result.records[0],
+          owner: { type: 'user' as const, id: 'oauth|github|9/with:any-id', name: 'OAuth user' },
+          suspendedAt: '2026-09-03T13:00:00.000Z',
+        },
+      ],
+      apps: [
+        {
+          ...result.apps[0],
+          reason: 'suspended' as const,
+          installation: {
+            ...result.apps[0].installation!,
+            suspendedAt: '2026-09-03T13:00:00.000Z',
+          },
+        },
+        result.apps[1],
+      ],
+    } satisfies GitHubOrganizationInstallationLookupResult;
+
+    expect(getUninstallTarget(suspendedResult, suspendedResult.records[0])).toMatchObject({
+      owner: { type: 'user', id: 'oauth|github|9/with:any-id' },
+    });
+  });
+
+  it('refuses duplicate effective app associations and unknown live checks', () => {
+    const duplicateResult = {
+      ...result,
+      records: [
+        result.records[0],
+        { ...result.records[0], id: '323e4567-e89b-42d3-a456-426614174000', appType: null },
+      ],
+    };
+    expect(getUninstallTarget(duplicateResult, duplicateResult.records[0])).toBeNull();
+    expect(getUninstallTarget({ ...result, apps: [] }, result.records[0])).toBeNull();
+  });
+
+  it('uses irreversible confirmation copy that names the access impact and recovery path', () => {
+    expect(uninstallConfirmationCopy.description).toContain(
+      'This removes the GitHub App installation from GitHub.'
+    );
+    expect(uninstallConfirmationCopy.impact).toContain(
+      'All repositories served by this GitHub installation lose app access.'
+    );
+    expect(uninstallConfirmationCopy.impact).toContain('Kilo history and settings are retained.');
+    expect(uninstallConfirmationCopy.impact).toContain(
+      'Reinstall the app through GitHub to restore access.'
+    );
   });
 });

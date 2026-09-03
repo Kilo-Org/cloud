@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { GitHubOrganizationInstallationLookupResult } from '@/lib/admin/github-installation-lookup';
 import { normalizeGitHubOrganizationLogin } from '@/lib/admin/github-installation-lookup-input';
+import { GitHubInstallationUninstallInputSchema } from '@/lib/admin/github-installation-uninstall-input';
 import { useTRPC } from '@/lib/trpc/utils';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,6 +13,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -24,22 +35,149 @@ import {
 type LookupResult = GitHubOrganizationInstallationLookupResult;
 type LookupApp = LookupResult['apps'][number];
 type LookupRecord = LookupResult['records'][number];
+export type UninstallTarget = {
+  integrationId: string;
+  installationId: string;
+  accountId: string;
+  appType: 'standard' | 'lite';
+  owner: NonNullable<LookupRecord['owner']>;
+  accountLogin: string;
+};
+
+export const uninstallConfirmationCopy = {
+  description:
+    'This removes the GitHub App installation from GitHub. It cannot be undone from Kilo.',
+  impact:
+    'All repositories served by this GitHub installation lose app access. Kilo history and settings are retained. Reinstall the app through GitHub to restore access.',
+};
+
+function isPositiveDecimalString(value: string | null): value is string {
+  return value !== null && /^[1-9]\d*$/.test(value);
+}
+
+export function getUninstallTarget(
+  result: LookupResult,
+  record: LookupRecord
+): UninstallTarget | null {
+  if (
+    record.association !== 'actual' ||
+    !record.owner ||
+    !isPositiveDecimalString(record.installationId) ||
+    !isPositiveDecimalString(record.accountId)
+  ) {
+    return null;
+  }
+
+  const appType = record.appType ?? 'standard';
+  if (appType !== 'standard' && appType !== 'lite') return null;
+  if (
+    result.records.filter(
+      candidate =>
+        (candidate.appType ?? 'standard') === appType &&
+        candidate.installationId === record.installationId
+    ).length !== 1
+  ) {
+    return null;
+  }
+
+  const installation = result.apps.find(
+    app =>
+      app.appType === appType &&
+      app.status === 'installed' &&
+      app.installation?.id === record.installationId &&
+      app.installation.accountId === record.accountId
+  )?.installation;
+
+  if (!installation) return null;
+
+  const target: UninstallTarget = {
+    integrationId: record.id,
+    installationId: record.installationId,
+    accountId: record.accountId,
+    appType,
+    owner: record.owner,
+    accountLogin: installation.accountLogin,
+  };
+
+  return GitHubInstallationUninstallInputSchema.safeParse({
+    ...target,
+    owner: { type: target.owner.type, id: target.owner.id },
+    confirmation: target.installationId,
+  }).success
+    ? target
+    : null;
+}
 
 export function GitHubInstallationLookup() {
   const trpc = useTRPC();
   const [organization, setOrganization] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
+  const [result, setResult] = useState<LookupResult>();
+  const [submittedOrganization, setSubmittedOrganization] = useState<string>();
+  const [uninstallTarget, setUninstallTarget] = useState<UninstallTarget | null>(null);
+  const [uninstallConfirmation, setUninstallConfirmation] = useState('');
+  const [uninstallSuccess, setUninstallSuccess] = useState<string | null>(null);
+  const [uninstalledIntegrationId, setUninstalledIntegrationId] = useState<string | null>(null);
+  const [refreshingAfterUninstall, setRefreshingAfterUninstall] = useState(false);
   const lookup = useMutation(
-    trpc.admin.github.lookupOrganizationInstallation.mutationOptions({ retry: false })
+    trpc.admin.github.lookupOrganizationInstallation.mutationOptions({
+      retry: false,
+      onSuccess: data => {
+        setResult(data);
+        setRefreshingAfterUninstall(false);
+      },
+      onError: () => {
+        setResult(undefined);
+        if (refreshingAfterUninstall) {
+          setUninstallSuccess(
+            previous =>
+              `${previous ?? 'GitHub uninstall confirmed.'} The refreshed lookup could not be loaded. Refresh before taking another action.`
+          );
+          setRefreshingAfterUninstall(false);
+        }
+      },
+    })
   );
-  const result = inputError || lookup.isPending || lookup.isError ? undefined : lookup.data;
+  const uninstall = useMutation(
+    trpc.admin.github.uninstallOrganizationInstallation.mutationOptions({
+      retry: false,
+      onSuccess: response => {
+        const organizationToRefresh = submittedOrganization;
+        setUninstallTarget(null);
+        setUninstallConfirmation('');
+        setResult(undefined);
+        setUninstalledIntegrationId(uninstallTarget?.integrationId ?? null);
+        setUninstallSuccess(
+          response.localCleanup === 'pending'
+            ? 'GitHub App was uninstalled, but local cleanup is not confirmed. The deletion webhook normally reconciles this. Refresh the lookup; manual investigation is needed if the record remains.'
+            : 'GitHub App was uninstalled and local cleanup completed.'
+        );
+        if (organizationToRefresh) {
+          setRefreshingAfterUninstall(true);
+          lookup.mutate({ organization: organizationToRefresh });
+        }
+      },
+      onError: () => {
+        setResult(undefined);
+      },
+    })
+  );
+  const lookupBlocked = uninstall.isPending;
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (lookup.isPending || uninstall.isPending) return;
+    setResult(undefined);
 
     try {
       const normalizedOrganization = normalizeGitHubOrganizationLogin(organization);
       setInputError(null);
+      setUninstallSuccess(null);
+      setUninstallTarget(null);
+      setUninstallConfirmation('');
+      setUninstalledIntegrationId(null);
+      setResult(undefined);
+      setSubmittedOrganization(normalizedOrganization);
       lookup.mutate({ organization: normalizedOrganization });
     } catch {
       setInputError('Enter a valid GitHub organization login.');
@@ -79,7 +217,7 @@ export function GitHubInstallationLookup() {
                 autoCapitalize="none"
                 spellCheck={false}
                 maxLength={256}
-                disabled={lookup.isPending}
+                disabled={lookup.isPending || lookupBlocked}
                 placeholder="acme-tools"
                 value={organization}
                 onChange={event => {
@@ -95,7 +233,11 @@ export function GitHubInstallationLookup() {
                 </p>
               ) : null}
             </div>
-            <Button type="submit" className="sm:min-w-32" disabled={lookup.isPending}>
+            <Button
+              type="submit"
+              className="sm:min-w-32"
+              disabled={lookup.isPending || lookupBlocked}
+            >
               {lookup.isPending ? 'Checking…' : 'Check installation'}
             </Button>
           </form>
@@ -109,15 +251,77 @@ export function GitHubInstallationLookup() {
               </AlertDescription>
             </Alert>
           ) : null}
+          {uninstallSuccess ? (
+            <Alert>
+              <AlertTitle>GitHub uninstall confirmed</AlertTitle>
+              <AlertDescription>{uninstallSuccess}</AlertDescription>
+            </Alert>
+          ) : null}
         </CardContent>
       </Card>
 
-      {result ? <GitHubInstallationLookupResult result={result} /> : null}
+      {result ? (
+        <GitHubInstallationLookupResult
+          result={result}
+          uninstallPending={uninstall.isPending}
+          unavailableIntegrationId={uninstalledIntegrationId}
+          onUninstall={target => {
+            uninstall.reset();
+            setUninstallConfirmation('');
+            setUninstallTarget(target);
+          }}
+        />
+      ) : null}
+      <UninstallGitHubAppDialog
+        target={uninstallTarget}
+        confirmation={uninstallConfirmation}
+        isPending={uninstall.isPending}
+        error={
+          uninstall.isError
+            ? 'GitHub App uninstall could not be confirmed. Close this dialog and refresh the lookup before trying again.'
+            : null
+        }
+        onConfirmationChange={setUninstallConfirmation}
+        onOpenChange={open => {
+          if (!open && !uninstall.isPending) {
+            setUninstallTarget(null);
+            setUninstallConfirmation('');
+          }
+        }}
+        onConfirm={() => {
+          if (
+            uninstall.isPending ||
+            uninstall.isError ||
+            !uninstallTarget ||
+            uninstallConfirmation !== uninstallTarget.installationId
+          ) {
+            return;
+          }
+          uninstall.mutate({
+            integrationId: uninstallTarget.integrationId,
+            installationId: uninstallTarget.installationId,
+            accountId: uninstallTarget.accountId,
+            appType: uninstallTarget.appType,
+            owner: { type: uninstallTarget.owner.type, id: uninstallTarget.owner.id },
+            confirmation: uninstallTarget.installationId,
+          });
+        }}
+      />
     </div>
   );
 }
 
-export function GitHubInstallationLookupResult({ result }: { result: LookupResult }) {
+export function GitHubInstallationLookupResult({
+  result,
+  onUninstall,
+  uninstallPending = false,
+  unavailableIntegrationId,
+}: {
+  result: LookupResult;
+  onUninstall?: (target: UninstallTarget) => void;
+  uninstallPending?: boolean;
+  unavailableIntegrationId?: string | null;
+}) {
   return (
     <div className="flex flex-col gap-6">
       <section className="space-y-3" aria-labelledby="live-installations-heading">
@@ -159,7 +363,13 @@ export function GitHubInstallationLookupResult({ result }: { result: LookupResul
             </AlertDescription>
           </Alert>
         ) : null}
-        <LocalAssociationTable records={result.records} />
+        <LocalAssociationTable
+          result={result}
+          records={result.records}
+          onUninstall={onUninstall}
+          uninstallPending={uninstallPending}
+          unavailableIntegrationId={unavailableIntegrationId}
+        />
       </section>
     </div>
   );
@@ -197,7 +407,19 @@ function LiveInstallationCard({ app }: { app: LookupApp }) {
   );
 }
 
-export function LocalAssociationTable({ records }: { records: LookupRecord[] }) {
+export function LocalAssociationTable({
+  result,
+  records,
+  onUninstall,
+  uninstallPending = false,
+  unavailableIntegrationId,
+}: {
+  result?: LookupResult;
+  records: LookupRecord[];
+  onUninstall?: (target: UninstallTarget) => void;
+  uninstallPending?: boolean;
+  unavailableIntegrationId?: string | null;
+}) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
@@ -209,17 +431,33 @@ export function LocalAssociationTable({ records }: { records: LookupRecord[] }) 
             <TableHead>GitHub account</TableHead>
             <TableHead>Local state</TableHead>
             <TableHead>Updated</TableHead>
+            {onUninstall ? <TableHead className="text-right">Action</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {records.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground h-24 text-center">
+              <TableCell
+                colSpan={onUninstall ? 7 : 6}
+                className="text-muted-foreground h-24 text-center"
+              >
                 No local association records matched this lookup.
               </TableCell>
             </TableRow>
           ) : (
-            records.map(record => <LocalAssociationRow key={record.id} record={record} />)
+            records.map(record => (
+              <LocalAssociationRow
+                key={record.id}
+                record={record}
+                uninstallTarget={
+                  result && record.id !== unavailableIntegrationId
+                    ? getUninstallTarget(result, record)
+                    : null
+                }
+                uninstallPending={uninstallPending}
+                onUninstall={onUninstall}
+              />
+            ))
           )}
         </TableBody>
       </Table>
@@ -227,7 +465,17 @@ export function LocalAssociationTable({ records }: { records: LookupRecord[] }) 
   );
 }
 
-function LocalAssociationRow({ record }: { record: LookupRecord }) {
+function LocalAssociationRow({
+  record,
+  uninstallTarget,
+  uninstallPending,
+  onUninstall,
+}: {
+  record: LookupRecord;
+  uninstallTarget: UninstallTarget | null;
+  uninstallPending: boolean;
+  onUninstall?: (target: UninstallTarget) => void;
+}) {
   return (
     <TableRow>
       <TableCell className="min-w-36 align-top">
@@ -264,7 +512,112 @@ function LocalAssociationRow({ record }: { record: LookupRecord }) {
       <TableCell className="text-muted-foreground min-w-40 align-top text-sm">
         {formatTimestamp(record.updatedAt)}
       </TableCell>
+      {onUninstall ? (
+        <TableCell className="min-w-40 align-top text-right">
+          {uninstallTarget ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={uninstallPending}
+              onClick={() => onUninstall(uninstallTarget)}
+            >
+              Uninstall GitHub App
+            </Button>
+          ) : (
+            <span className="text-muted-foreground text-xs">Not eligible</span>
+          )}
+        </TableCell>
+      ) : null}
     </TableRow>
+  );
+}
+
+export function UninstallGitHubAppDialog({
+  target,
+  confirmation,
+  isPending,
+  error,
+  onConfirmationChange,
+  onOpenChange,
+  onConfirm,
+}: {
+  target: UninstallTarget | null;
+  confirmation: string;
+  isPending: boolean;
+  error: string | null;
+  onConfirmationChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const canConfirm = target !== null && confirmation === target.installationId;
+
+  return (
+    <AlertDialog open={target !== null} onOpenChange={onOpenChange}>
+      <AlertDialogContent
+        className="sm:max-w-xl"
+        aria-busy={isPending}
+        onEscapeKeyDown={event => {
+          if (isPending) event.preventDefault();
+        }}
+        onPointerDownOutside={event => {
+          if (isPending) event.preventDefault();
+        }}
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>Uninstall GitHub App?</AlertDialogTitle>
+          <AlertDialogDescription>{uninstallConfirmationCopy.description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {target ? (
+          <div className="space-y-4 text-sm">
+            <dl className="grid gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+              <Detail label="GitHub App" value={`${target.appType} app`} />
+              <Detail label="GitHub login" value={target.accountLogin} />
+              <Detail label="Installation ID" value={target.installationId} mono />
+              <Detail label="Kilo owner" value={`${target.owner.type}: ${target.owner.id}`} mono />
+            </dl>
+            <Alert variant="destructive">
+              <AlertTitle>Repository access will stop</AlertTitle>
+              <AlertDescription>{uninstallConfirmationCopy.impact}</AlertDescription>
+            </Alert>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="github-installation-uninstall-confirmation">
+                Type installation ID <span className="font-mono">{target.installationId}</span> to
+                confirm
+              </Label>
+              <Input
+                id="github-installation-uninstall-confirmation"
+                value={confirmation}
+                onChange={event => onConfirmationChange(event.target.value)}
+                disabled={isPending}
+                autoComplete="off"
+                maxLength={16}
+                inputMode="numeric"
+                aria-describedby={error ? 'github-installation-uninstall-error' : undefined}
+              />
+            </div>
+            {error ? (
+              <p
+                id="github-installation-uninstall-error"
+                className="text-destructive text-sm"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={isPending || error !== null || !canConfirm}
+            onClick={onConfirm}
+          >
+            {isPending ? 'Uninstalling GitHub App…' : 'Uninstall GitHub App'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

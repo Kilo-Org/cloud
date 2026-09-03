@@ -13,6 +13,8 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
+    "./runtime-authorization": "./src/runtime-authorization.ts",
+    "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",

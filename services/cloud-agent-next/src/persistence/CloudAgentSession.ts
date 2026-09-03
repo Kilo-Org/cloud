@@ -9,6 +9,12 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
+  renewRuntimeAuthorization,
+  unsealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
@@ -100,6 +106,11 @@ import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
 import { dispatchedKilocodeModelId } from './model-utils.js';
+import {
+  getRuntimeAuthorizationStatus,
+  renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_KEY,
+} from '../session/runtime-authorization-persistence.js';
 
 import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
@@ -251,6 +262,7 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
 type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
+  runtimeAuthorizationSeal?: string;
   clone?: SessionMetadata['clone'];
   /** Omitted for a clone-only create: no synthetic initial turn is registered. */
   message?: {
@@ -1667,6 +1679,62 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getStoredMetadata();
   }
 
+  async getRuntimeToken(): Promise<string | null> {
+    const metadata = await this.getMetadata();
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return renewStoredRuntimeAuthorization({
+      metadata,
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      putAuthorization: authorization =>
+        this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
+      getMetadata: () => this.getMetadata(),
+      putMetadata: updated => this.ctx.storage.put('metadata', updated),
+      renew: authorization =>
+        renewRuntimeAuthorization({
+          authorization,
+          secret,
+          connectionString: this.env.HYPERDRIVE.connectionString,
+        }),
+    });
+  }
+
+  async getRuntimeAuthorizationStatus(): Promise<'legacy' | 'active' | 'revoked'> {
+    return getRuntimeAuthorizationStatus({
+      metadata: await this.getMetadata(),
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async reauthorizeRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    runtimeAuthorizationSeal: string;
+  }): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return false;
+    let authorization: RuntimeAuthorization;
+    try {
+      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return false;
+    }
+    if (authorization.state !== 'active') return false;
+    const current = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!current.success || current.data.id !== input.expectedOldId) return false;
+    await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+    return true;
+  }
+
   async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
     const metadata = await this.getStoredMetadata();
     return metadata ? sessionRuntimeLocator(metadata) : null;
@@ -2497,6 +2565,28 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (existing) {
       return { success: false, error: 'Session already registered' };
     }
+    let runtimeAuthorization: RuntimeAuthorization | undefined;
+    if (input.runtimeAuthorizationSeal) {
+      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      if (!secret) return { success: false, error: 'Authentication unavailable' };
+      let authorization: RuntimeAuthorization;
+      try {
+        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+          resourceKind: 'cloud-agent-next',
+          resourceId: input.identity.sessionId,
+          userId: input.identity.userId,
+          organizationId: input.identity.orgId,
+        });
+      } catch {
+        return { success: false, error: 'Invalid runtime authorization' };
+      }
+      if (authorization.state !== 'active')
+        return { success: false, error: 'Runtime authorization revoked' };
+      if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)) {
+        return { success: false, error: 'Runtime authorization already installed' };
+      }
+      runtimeAuthorization = authorization;
+    }
     const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
     if (routeAssignmentError) {
       return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
@@ -2583,6 +2673,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return { success: false, error: modeError };
     }
 
+    if (runtimeAuthorization) {
+      await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, runtimeAuthorization);
+    }
     await this.ctx.storage.put('metadata', serialized);
     await this.updateLastActivity();
     await this.ensureAlarmScheduled();

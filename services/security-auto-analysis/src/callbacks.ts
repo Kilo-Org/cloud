@@ -10,7 +10,7 @@ import {
   getSecurityFindingById,
 } from './db/queries.js';
 import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
-import { generateApiToken } from './token.js';
+import { generateTriageToken } from './token.js';
 import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js';
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
@@ -466,6 +466,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         userId,
         sessionIngestWorkerUrl: params.env.SESSION_INGEST_WORKER_URL,
         nextAuthSecret,
+        sharedResourceTokensEnabled: params.env.SHARED_RESOURCE_TOKENS_ENABLED,
       });
     },
     extractSandboxAnalysis: async ({ finding, rawMarkdown }) => {
@@ -478,7 +479,12 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         throw new Error(`Analysis actor ${triggeredByUserId} is unavailable`);
       }
       const [nextAuthSecret] = await Promise.all([params.env.NEXTAUTH_SECRET.get()]);
-      const authToken = await generateApiToken(actor, nextAuthSecret, params.env.ENVIRONMENT);
+      const authToken = await generateTriageToken(
+        actor,
+        nextAuthSecret,
+        params.env.ENVIRONMENT,
+        params.env.SHARED_RESOURCE_TOKENS_ENABLED
+      );
       return runSandboxExtraction({
         finding,
         rawMarkdown,

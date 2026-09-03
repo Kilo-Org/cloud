@@ -1,4 +1,6 @@
 import { signKiloToken } from '@kilocode/worker-utils';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getWorkerDb,
   findUserForToken,
@@ -15,6 +17,7 @@ export type TokenMintingEnv = {
   HYPERDRIVE: { connectionString: string };
   NEXTAUTH_SECRET: { get(): Promise<string> }; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
+  SHARED_RESOURCE_TOKENS_ENABLED?: string | boolean;
 };
 
 type MintTokenParams = {
@@ -147,6 +150,33 @@ export class TokenMintingService {
     createdOnPlatform: string;
   }): Promise<string> {
     const jwtSecret = await this.getJwtSecret();
+
+    if (
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === true ||
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === 'true'
+    ) {
+      const { token } = await signModernKiloToken({
+        userId: payload.kiloUserId,
+        pepper: payload.apiTokenPepper,
+        secret: jwtSecret,
+        expiresInSeconds: 60 * 60,
+        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+        audience: CLOUD_AGENT_NEXT_AUDIENCE,
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        extra: {
+          botId: payload.botId,
+          internalApiUse: payload.internalApiUse,
+          createdOnPlatform: payload.createdOnPlatform,
+          runtimeAdmission: {
+            source: 'automation',
+            authorizationUserId: payload.kiloUserId,
+            authorizationPepper: payload.apiTokenPepper,
+          },
+        },
+      });
+      return token;
+    }
 
     const { token } = await signKiloToken({
       userId: payload.kiloUserId,

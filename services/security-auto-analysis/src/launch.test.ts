@@ -10,7 +10,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { buildSecurityAnalysisCallbackTarget, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { generateControlToken, generateTriageToken } from './token.js';
 import { triageSecurityFinding } from './triage.js';
 
 vi.mock('./db/queries.js', () => ({
@@ -21,7 +21,7 @@ vi.mock('./db/queries.js', () => ({
   tryAcquireAnalysisStartLease: vi.fn(),
 }));
 vi.mock('./analysis-start-lifecycle.js', () => ({ transitionAnalysisStartLifecycle: vi.fn() }));
-vi.mock('./token.js', () => ({ generateApiToken: vi.fn() }));
+vi.mock('./token.js', () => ({ generateControlToken: vi.fn(), generateTriageToken: vi.fn() }));
 vi.mock('./triage.js', () => ({ triageSecurityFinding: vi.fn() }));
 
 const CALLBACK_SECRET = 'test-callback-token-secret';
@@ -225,7 +225,8 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(tryAcquireAnalysisStartLease).mockResolvedValue(true);
-    vi.mocked(generateApiToken).mockResolvedValue('auth-token');
+    vi.mocked(generateControlToken).mockResolvedValue('control-token');
+    vi.mocked(generateTriageToken).mockResolvedValue('triage-token');
     vi.mocked(getSecurityAgentConfigForOwner).mockResolvedValue({
       auto_dismiss_enabled: true,
       auto_dismiss_confidence_threshold: 'high',

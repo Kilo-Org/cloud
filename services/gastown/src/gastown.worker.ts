@@ -140,6 +140,7 @@ import { timingMiddleware, instrumented } from './middleware/analytics.middlewar
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
+import { handleReauthorizeTownRuntime } from './handlers/town-runtime-authorization.handler';
 import {
   handleGetMoleculeCurrentStep,
   handleAdvanceMoleculeStep,
@@ -1030,6 +1031,11 @@ app.get('/api/towns/:townId/config', c =>
 app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
 );
+app.post('/api/towns/:townId/runtime-authorization/reauthorize', c =>
+  instrumented(c, 'POST /api/towns/:townId/runtime-authorization/reauthorize', () =>
+    handleReauthorizeTownRuntime(c, c.req.param())
+  )
+);
 
 // ── Cloudflare Debug ────────────────────────────────────────────────
 // Returns DO IDs and namespace IDs for constructing Cloudflare dashboard URLs.
@@ -1357,6 +1363,7 @@ app.use(
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
       gastownAccess: c.get('kiloGastownAccess') ?? false,
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
+      controlToken: c.get('kiloControlToken') ?? '',
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);

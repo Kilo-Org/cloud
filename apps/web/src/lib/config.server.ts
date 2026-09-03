@@ -66,6 +66,9 @@ export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
 export function isNativeResourceCredentialIssuanceEnabled(): boolean {
   return getEnvVariable('NATIVE_RESOURCE_TOKENS_ENABLED') === 'true';
 }
+export function isSharedResourceTokenIssuanceEnabled(): boolean {
+  return getEnvVariable('SHARED_RESOURCE_TOKENS_ENABLED') === 'true';
+}
 export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');

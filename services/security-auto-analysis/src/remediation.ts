@@ -55,7 +55,7 @@ import {
 } from './db/queries.js';
 import { InsufficientCreditsError } from './launch.js';
 import { logger } from './logger.js';
-import { generateApiToken } from './token.js';
+import { generateControlToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
 const REMEDIATION_LAUNCH_MAX_ATTEMPTS = 3;
@@ -1164,10 +1164,11 @@ async function launchAttempt(params: {
     params.env.INTERNAL_API_SECRET.get(),
     params.env.CALLBACK_TOKEN_SECRET.get(),
   ]);
-  const authToken = await generateApiToken(
+  const authToken = await generateControlToken(
     params.actor,
     nextAuthSecret,
-    params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+    params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+    params.env.SHARED_RESOURCE_TOKENS_ENABLED
   );
   const attemptToken = randomUUID();
   const callbackToken = await deriveCallbackToken({
@@ -2481,7 +2482,12 @@ export async function cancelRemediation(params: {
     .where(eq(security_remediation_attempts.id, attempt.id));
   if (attempt.cloud_agent_session_id) {
     const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
-    const authToken = await generateApiToken(actor, nextAuthSecret, params.env.ENVIRONMENT);
+    const authToken = await generateControlToken(
+      actor,
+      nextAuthSecret,
+      params.env.ENVIRONMENT,
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED
+    );
     await interruptCloudAgentSession({
       env: params.env,
       authToken,

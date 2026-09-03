@@ -33,6 +33,11 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import jwt from 'jsonwebtoken';
 
 import type { Env, SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
@@ -62,6 +67,7 @@ import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
 import { createMessageId } from './message-id.js';
+import { assertKiloModelAvailable } from '../model-validation.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
   AcceptedExecutionTurn,
@@ -179,6 +185,7 @@ type NewSessionAllocation = SessionRegistrationResult & {
   credentialContainment: CredentialContainment;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
+  runtimeAuthorization?: { token: string; seal: string };
 };
 
 // ----- operation-ledger boundary (P1-A-08b) -----------------------------------
@@ -547,6 +554,40 @@ async function allocateNewSession(
         )
       : undefined;
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
+  let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
+  const claims = jwt.decode(ctx.authToken);
+  const isPolicyBearing =
+    claims !== null &&
+    typeof claims === 'object' &&
+    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+  if (isPolicyBearing) {
+    const secret = ctx.env.NEXTAUTH_SECRET;
+    const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
+    if (!nextAuthSecret)
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+    const created = await createRuntimeAuthorization({
+      token: ctx.authToken,
+      secret: nextAuthSecret,
+      connectionString: ctx.env.HYPERDRIVE.connectionString,
+      resourceKind: 'cloud-agent-next',
+      resourceId: cloudAgentSessionId,
+      ...(orgId ? { organizationId: orgId } : {}),
+    });
+    runtimeAuthorization = {
+      token: created.token,
+      seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
+    };
+    if (initialTurn?.type === 'prompt') {
+      await assertKiloModelAvailable({
+        env: ctx.env,
+        submittedModel: input.agent.model,
+        originalToken: runtimeAuthorization.token,
+        originalOrganizationId: orgId,
+        createdOnPlatform: input.options?.createdOnPlatform,
+        procedure: 'runtime_authorized_session_create',
+      });
+    }
+  }
 
   try {
     if (ledger) {
@@ -773,6 +814,7 @@ async function allocateNewSession(
           .error('Failed to rollback cli_sessions_v2 record');
       }
     },
+    ...(runtimeAuthorization ? { runtimeAuthorization } : {}),
   };
 }
 
@@ -908,8 +950,11 @@ function buildSessionRegistrationCommand(
     },
     auth: {
       kiloSessionId: allocation.kiloSessionId,
-      kilocodeToken: ctx.authToken,
+      kilocodeToken: allocation.runtimeAuthorization?.token ?? ctx.authToken,
     },
+    ...(allocation.runtimeAuthorization
+      ? { runtimeAuthorizationSeal: allocation.runtimeAuthorization.seal }
+      : {}),
     clone: input.clone
       ? {
           cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,

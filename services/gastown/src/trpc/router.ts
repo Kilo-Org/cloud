@@ -39,6 +39,7 @@ import {
 } from './schemas';
 import type { TRPCContext } from './init';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
+import { authorizeTown, TownAuthorizationUnavailableError } from '../util/town-authorization.util';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
@@ -158,12 +159,38 @@ type TownOwnershipResult =
  * support/debugging purposes. The caller is responsible for restricting
  * destructive mutations (delete, billing config) when the result type is 'admin'.
  */
-async function resolveTownOwnership(
+export async function resolveTownOwnership(
   env: Env,
   ctx: TRPCContext,
   townId: string
 ): Promise<TownOwnershipResult> {
   const { userId, isAdmin, orgMemberships: memberships } = ctx;
+  const townStub = getTownDOStub(env, townId);
+  const identity = await townStub.getPrivateTownIdentity();
+  if (identity?.runtimeMode === 'modern') {
+    let authorization;
+    try {
+      authorization = await authorizeTown(env, identity, userId, ctx.apiTokenPepper);
+    } catch (error) {
+      if (error instanceof TownAuthorizationUnavailableError) {
+        throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'Authorization unavailable' });
+      }
+      throw error;
+    }
+    if (!authorization) throw new TRPCError({ code: 'FORBIDDEN', message: 'Forbidden' });
+    if (authorization.type === 'admin') return { type: 'admin' };
+    if (authorization.type === 'org') {
+      return {
+        type: 'org',
+        stub: getGastownOrgStub(env, authorization.organizationId),
+        orgId: authorization.organizationId,
+      };
+    }
+    const ownerStub = getGastownUserStub(env, identity.ownerUserId);
+    const town = await ownerStub.getTownAsync(townId);
+    if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+    return { type: 'user', stub: ownerStub, town };
+  }
 
   // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
@@ -178,7 +205,6 @@ async function resolveTownOwnership(
   }
 
   // Check TownDO config for org ownership, verify via JWT claims
-  const townStub = getTownDOStub(env, townId);
   let config;
   try {
     config = await townStub.getTownConfig();
@@ -359,10 +385,25 @@ export const gastownRouter = router({
       const userStub = getGastownUserStub(ctx.env, user.id);
       const town = await userStub.createTown({ name: input.name, owner_user_id: user.id });
 
-      // Store kilocode token so agents can auth with the Kilo LLM gateway
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
       const townStub = getTownDOStub(ctx.env, town.id);
       await townStub.setTownId(town.id);
+      const runtime = await townStub.initializeTownIdentityAndRuntimeAuthorization(
+        {
+          ownerType: 'user',
+          ownerUserId: user.id,
+          createdByUserId: user.id,
+          runtimeMode: 'legacy',
+        },
+        ctx.controlToken
+      );
+      if (runtime.modernControl && !runtime.runtimeToken) {
+        await userStub.deleteTown(town.id);
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'A current Gastown control token is required',
+        });
+      }
+      const kilocodeToken = runtime.runtimeToken ?? (await mintKilocodeToken(ctx.env, user));
       await townStub.updateTownConfig({
         kilocode_token: kilocodeToken,
         owner_user_id: user.id,
@@ -1265,16 +1306,6 @@ export const gastownRouter = router({
         });
       }
 
-      // Strip ownership fields — only the system (createTown flows) should set these
-      const {
-        owner_user_id: _a,
-        owner_type: _b,
-        owner_id: _c,
-        organization_id: _d,
-        created_by_user_id: _e,
-        ...safeConfig
-      } = input.config;
-
       const townStub = getTownDOStub(ctx.env, input.townId);
       const existingConfig = await townStub.getTownConfig();
 
@@ -1290,7 +1321,7 @@ export const gastownRouter = router({
           });
         }
       }
-      const result = await townStub.updateTownConfig(safeConfig);
+      const result = await townStub.updateTownConfig(input.config);
 
       // Push updated env vars to the running container so changes
       // take effect without a container restart
@@ -1389,6 +1420,62 @@ export const gastownRouter = router({
       const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser);
       await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
       await townStub.syncConfigToContainer();
+    }),
+
+  reauthorizeRuntime: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const town = getTownDOStub(ctx.env, input.townId);
+      const identity = await town.getPrivateTownIdentity();
+      if (!identity)
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Town requires recreation' });
+      let modernAuthorization;
+      if (identity.runtimeMode === 'modern') {
+        try {
+          modernAuthorization = await authorizeTown(
+            ctx.env,
+            identity,
+            ctx.userId,
+            ctx.apiTokenPepper
+          );
+        } catch (error) {
+          if (error instanceof TownAuthorizationUnavailableError) {
+            throw new TRPCError({
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Authorization unavailable',
+            });
+          }
+          throw error;
+        }
+        if (!modernAuthorization) throw new TRPCError({ code: 'FORBIDDEN' });
+        if (
+          identity.ownerType === 'org' &&
+          (modernAuthorization.type !== 'org' || modernAuthorization.role !== 'owner')
+        ) {
+          throw new TRPCError({ code: 'FORBIDDEN' });
+        }
+      }
+      if (identity.ownerType === 'user' && identity.ownerUserId !== ctx.userId) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (identity.ownerType === 'org' && identity.runtimeMode !== 'modern') {
+        const membership = getOrgMembership(ctx.orgMemberships, identity.organizationId ?? '');
+        if (!membership || membership.role !== 'owner') {
+          throw new TRPCError({ code: 'FORBIDDEN' });
+        }
+      }
+      const authorized = await town.reauthorizeRuntime(
+        ctx.controlToken,
+        ctx.userId,
+        identity.organizationId
+      );
+      if (!authorized) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Town runtime cannot be reauthorized',
+        });
+      }
+      return { reauthorized: true };
     }),
 
   forceRestartContainer: gastownProcedure
@@ -1597,12 +1684,27 @@ export const gastownRouter = router({
         created_by_user_id: ctx.userId,
       });
 
-      // Mint kilocode token so the mayor can start without waiting for rig creation
-      const user = userFromCtx(ctx);
-      const kilocodeToken = await mintKilocodeToken(ctx.env, user);
-
       const townStub = getTownDOStub(ctx.env, town.id);
       await townStub.setTownId(town.id);
+      const runtime = await townStub.initializeTownIdentityAndRuntimeAuthorization(
+        {
+          ownerType: 'org',
+          ownerUserId: ctx.userId,
+          organizationId: input.organizationId,
+          createdByUserId: ctx.userId,
+          runtimeMode: 'legacy',
+        },
+        ctx.controlToken
+      );
+      if (runtime.modernControl && !runtime.runtimeToken) {
+        await stub.deleteTown(town.id);
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'A current Gastown control token is required',
+        });
+      }
+      const kilocodeToken =
+        runtime.runtimeToken ?? (await mintKilocodeToken(ctx.env, userFromCtx(ctx)));
       await townStub.updateTownConfig({
         kilocode_token: kilocodeToken,
         owner_type: 'org',

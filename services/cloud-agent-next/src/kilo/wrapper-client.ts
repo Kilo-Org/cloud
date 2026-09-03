@@ -1155,6 +1155,15 @@ export class WrapperClient {
     await this.request<{ status: 'updated' }>('POST', '/session/environment', { env });
   }
 
+  async updateRuntimeCredential(input: {
+    credential: string;
+    authorizationId: string;
+    fence: string;
+    scope?: string;
+  }): Promise<void> {
+    await this.request<{ status: 'updated' }>('POST', '/session/kilo-credential', input);
+  }
+
   // ---------------------------------------------------------------------------
   // Action Methods (synchronous, no inflight tracking)
   // ---------------------------------------------------------------------------

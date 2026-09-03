@@ -6,6 +6,7 @@ export type SessionClient = Pick<
   | 'fetch'
   | 'closeOrgStreams'
   | 'getMetadata'
+  | 'getRuntimeAuthorizationStatus'
   | 'validateKiloGlobalFeedProducer'
   | 'getLatestAssistantMessage'
   | 'getLatestEventId'

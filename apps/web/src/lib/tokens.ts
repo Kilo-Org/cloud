@@ -19,7 +19,11 @@ import {
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
-import { isBoundedInternalServiceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
+import {
+  isBoundedInternalServiceTokenIssuanceEnabled,
+  isSharedResourceTokenIssuanceEnabled,
+  NEXTAUTH_SECRET,
+} from '@/lib/config.server';
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
@@ -259,4 +263,56 @@ export function validateAuthorizationHeader(
 
 export function generateCloudAgentToken(user: User) {
   return generateApiToken(user, { tokenSource: 'cloud-agent' });
+}
+
+export function generateCloudAgentWorkflowToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    botId?: string;
+    createdOnPlatform?: string;
+    expiresIn: number;
+    authorizationUser?: User;
+  }
+): string {
+  if (!isSharedResourceTokenIssuanceEnabled()) {
+    return generateApiToken(
+      user,
+      {
+        organizationId: options.organizationId,
+        tokenSource: options.tokenSource,
+        botId: options.botId,
+        createdOnPlatform: options.createdOnPlatform,
+      },
+      { expiresIn: options.expiresIn }
+    );
+  }
+  if (!user.api_token_pepper) {
+    throw new Error('Workflow control tokens require a current user pepper');
+  }
+  const authorizationUser = options.authorizationUser ?? user;
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: 'cloud-agent-next',
+    issuedAt,
+    expiresAt: issuedAt + options.expiresIn,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
+      botId: options.botId,
+      createdOnPlatform: options.createdOnPlatform,
+      runtimeAdmission: {
+        source: 'automation',
+        authorizationUserId: authorizationUser.id,
+        authorizationPepper: authorizationUser.api_token_pepper,
+      },
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
 }

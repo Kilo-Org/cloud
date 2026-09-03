@@ -162,7 +162,7 @@ function createEnv(): MockEnv {
     INTERNAL_API_SECRET: 'test-internal-secret',
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn(() => ({ getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy') })),
     },
     USER_KILO_FACADE: {
       idFromName: vi.fn(),
@@ -887,7 +887,9 @@ describe('server raw global feed route', () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     const facadeFetch = vi.fn().mockResolvedValue(new Response('accepted', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
     env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
     env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
     const token = signKiloToken('usr_feed');
@@ -910,7 +912,9 @@ describe('server raw global feed route', () => {
     const env = createEnv();
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
     const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
       async () => new Response('accepted', { status: 200 })
     );
@@ -1131,6 +1135,9 @@ describe('server wrapper ingest route', () => {
 
   it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
     const env = createEnv();
+    const doFetch = vi.fn();
+    const getRuntimeAuthorizationStatus = vi.fn().mockResolvedValue('legacy');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ getRuntimeAuthorizationStatus, fetch: doFetch });
     const token = signKiloToken('usr_feed');
     requireCurrentSessionAccessMock.mockRejectedValue(
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
@@ -1149,14 +1156,18 @@ describe('server wrapper ingest route', () => {
       kiloUserId: 'usr_feed',
       cloudAgentSessionId: 'agent_live',
     });
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(getRuntimeAuthorizationStatus).toHaveBeenCalledOnce();
+    expect(doFetch).not.toHaveBeenCalled();
   });
 
   it('accepts a valid wrapper dispatch ticket and forwards to the session Durable Object', async () => {
     const env = createEnv();
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
+      fetch: doFetch,
+    });
     const ticket = signWrapperDispatchTicket();
 
     const response = await fetchWorker(
@@ -1179,7 +1190,10 @@ describe('server wrapper ingest route', () => {
     const env = createEnv();
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
+      fetch: doFetch,
+    });
     const token = signKiloToken('usr_feed');
 
     const response = await fetchWorker(
@@ -1231,6 +1245,80 @@ describe('server wrapper ingest route', () => {
 });
 
 describe('server wrapper log upload route', () => {
+  it('rejects a legacy wrapper token before ingest reaches a runtime-authorized session', async () => {
+    const env = createEnv();
+    const fetch = vi.fn();
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('active'),
+      fetch,
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
+        headers: {
+          Upgrade: 'websocket',
+          Authorization: `Bearer ${signKiloToken('usr_feed')}`,
+        },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy wrapper tokens working for fenced global feed dispatch', async () => {
+    const env = createEnv();
+    const validateKiloGlobalFeedProducer = vi.fn().mockResolvedValue({ success: true });
+    const facadeFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${signKiloToken('usr_feed')}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledOnce();
+    expect(facadeFetch).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a legacy wrapper token before writing a runtime-authorized log archive', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('revoked'),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+        body: 'archive',
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
   it('does not accept legacy raw archives for control-plane sessions', async () => {
     const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
     const response = await fetchWorker(

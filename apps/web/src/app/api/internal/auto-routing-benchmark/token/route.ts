@@ -30,7 +30,15 @@ import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { generateApiToken } from '@/lib/tokens';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import {
+  isSharedResourceTokenIssuanceEnabled,
+  INTERNAL_API_SECRET,
+  NEXTAUTH_SECRET,
+} from '@/lib/config.server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import jwt from 'jsonwebtoken';
 
 const RequestSchema = z.object({
   userId: z.string().min(1),
@@ -72,26 +80,60 @@ export async function POST(req: NextRequest) {
 
   const extraPayload = { tokenSource: 'auto-routing-benchmark' };
   const organizationId = parsed.data.organizationId;
+  let organizationRole: 'owner' | 'member' | undefined;
+  let legacyOrganizationRole: OrganizationRole | undefined;
   if (organizationId) {
-    const organizationRole = await getOrganizationRole(parsed.data.userId, organizationId);
-    if (organizationRole === null) {
+    const role = await getOrganizationRole(parsed.data.userId, organizationId);
+    if (role === null) {
       return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
     }
-
-    const apiToken = generateApiToken(
-      user,
-      {
-        ...extraPayload,
-        organizationId,
-        organizationRole,
-      },
-      { expiresIn: SIX_HOURS_IN_SECONDS }
-    );
-    const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
-
-    return NextResponse.json({ token: apiToken, expiresAt });
+    if (isSharedResourceTokenIssuanceEnabled()) {
+      if (role !== 'owner' && role !== 'member') {
+        return NextResponse.json(
+          { error: 'Organization role is not supported for benchmark tokens' },
+          { status: 403 }
+        );
+      }
+      organizationRole = role;
+    }
+    legacyOrganizationRole = role;
   }
 
+  if (isSharedResourceTokenIssuanceEnabled()) {
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const expiresAt = issuedAt + SIX_HOURS_IN_SECONDS;
+    const token = jwt.sign(
+      buildModernKiloTokenPayload({
+        userId: user.id,
+        pepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        audience: KILO_GATEWAY_AUDIENCE,
+        issuedAt,
+        expiresAt,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        extra: { ...extraPayload, organizationId, organizationRole },
+      }),
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+    return NextResponse.json({ token, expiresAt: new Date(expiresAt * 1000).toISOString() });
+  }
+
+  if (organizationId) {
+    if (legacyOrganizationRole === null || legacyOrganizationRole === undefined) {
+      return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
+    }
+    const apiToken = generateApiToken(
+      user,
+      { ...extraPayload, organizationId, organizationRole: legacyOrganizationRole },
+      { expiresIn: SIX_HOURS_IN_SECONDS }
+    );
+    return NextResponse.json({
+      token: apiToken,
+      expiresAt: new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString(),
+    });
+  }
   const apiToken = generateApiToken(user, extraPayload, { expiresIn: SIX_HOURS_IN_SECONDS });
   const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
 

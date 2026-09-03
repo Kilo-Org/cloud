@@ -41,6 +41,7 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
     c.set('kiloGastownAccess', payload.gastownAccess === true);
     c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
+    c.set('kiloControlToken', token);
     logger.setTags({ userId: payload.kiloUserId });
   } catch (err) {
     console.warn(

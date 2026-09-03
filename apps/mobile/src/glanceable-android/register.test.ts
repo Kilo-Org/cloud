@@ -96,7 +96,7 @@ async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
       widgetName: 'ActiveAgentsWidget',
       widgetId: 1,
       width,
-      height: 100,
+      height: 200,
       screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
     },
     renderWidget: widget => {

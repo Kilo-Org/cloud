@@ -139,7 +139,12 @@ async function tryStartOrUpdate(
 /** Retry a pending start after permission turns granted. Caller owns the check. */
 function retryPendingStart(): void {
   const p = pending;
-  if (p === null || notificationActive || !getLiveActivityEnabled() || !hasCurrentWork(p.snapshot)) {
+  if (
+    p === null ||
+    notificationActive ||
+    !getLiveActivityEnabled() ||
+    !hasCurrentWork(p.snapshot)
+  ) {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);

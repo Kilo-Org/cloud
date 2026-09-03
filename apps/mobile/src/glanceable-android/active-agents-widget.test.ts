@@ -82,12 +82,12 @@ function collectText(node: unknown): string[] {
   return output;
 }
 
-function render(props: ReturnType<typeof buildAndroidWidgetProps>, width: number) {
+function render(props: ReturnType<typeof buildAndroidWidgetProps>, width: number, height = 200) {
   return renderActiveAgentsWidget(props, {
     widgetName: 'ActiveAgentsWidget',
     widgetId: 1,
     width,
-    height: 100,
+    height,
     screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
   }) as unknown as { light: MockElement; dark: MockElement };
 }
@@ -130,6 +130,24 @@ describe('renderActiveAgentsWidget', () => {
     // The zero row draws so the rows hold still as work moves between states.
     expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents']);
   });
+
+  // One cell tall: the counts run in a row instead of stacking. A short row
+  // keeps the word only on the ranked state, a wide one labels all three.
+  it.each([
+    { width: 250, visibleText: ['1', 'Needs input', '1', '0'] },
+    { width: 340, visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Idle'] },
+  ])(
+    'runs the counts in a row at width $width and one cell of height',
+    ({ width, visibleText }) => {
+      const props = buildAndroidWidgetProps(
+        snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+        {},
+        translate
+      );
+
+      expect(collectText(render(props, width, 100).light)).toEqual(visibleText);
+    }
+  );
 
   it.each([
     { width: 120, visibleText: ['2', 'Needs input'] },

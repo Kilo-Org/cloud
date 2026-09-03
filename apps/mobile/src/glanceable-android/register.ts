@@ -54,7 +54,9 @@ registerWidgetTaskHandler(async (task: WidgetTaskHandlerProps) => {
   // queued this task when newer work or a privacy blank replaces its deadline.
   const stored = getStoredWidgetSnapshot();
   let props =
-    stored === null ? getCurrentWidgetProps() : buildCurrentWidgetProps(stored, translate, formatGlanceableCount);
+    stored === null
+      ? getCurrentWidgetProps()
+      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount);
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();

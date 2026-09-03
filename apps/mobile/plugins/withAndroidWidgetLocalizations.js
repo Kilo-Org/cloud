@@ -96,13 +96,7 @@ module.exports = function withAndroidWidgetLocalizations(config, options) {
   return withDangerousMod(withDefaults, [
     'android',
     async cfg => {
-      const resPath = path.join(
-        cfg.modRequest.platformProjectRoot,
-        'app',
-        'src',
-        'main',
-        'res'
-      );
+      const resPath = path.join(cfg.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res');
       if (!fs.existsSync(resPath)) {
         throw new Error(`withAndroidWidgetLocalizations: no res directory at ${resPath}`);
       }

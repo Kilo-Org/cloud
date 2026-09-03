@@ -22,11 +22,25 @@ import { type AndroidWidgetProps } from './widget-props';
 
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 
-/** Below this width (dp) only the primary count fits beside the mark. */
-const COMPACT_MAX_WIDTH_DP = 170;
-/** Below this height (dp) the three rows cannot stack, so they run in a row. */
-const ROW_MAX_HEIGHT_DP = 90;
-
+/**
+ * Below this width (dp) only the primary count fits beside the mark.
+ *
+ * Two cells wide reports about 150–190 dp and three cells about 230–280 dp, so
+ * the split sits between them. A tighter bound let a two-cell cell take the
+ * row of three states and clip the last one.
+ */
+const COMPACT_MAX_WIDTH_DP = 210;
+/** At or above this width (dp) every state in the row can carry its label. */
+const ROW_LABEL_MIN_WIDTH_DP = 300;
+/**
+ * Below this height (dp) the three rows cannot stack, so they run in a row.
+ *
+ * One cell tall lands anywhere from 40 dp to about 110 dp depending on the
+ * device and the launcher's grid, and two cells tall starts around 150 dp, so
+ * the split sits between them. A tighter bound let a one-cell cell take the
+ * stacked layout and clip its last row.
+ */
+const ROW_MAX_HEIGHT_DP = 130;
 
 type Palette = {
   background: HexColor;
@@ -63,11 +77,19 @@ const DARK: Palette = {
 
 type Size = 'compact' | 'row' | 'stack';
 
-function sizeOf(info: WidgetInfo): Size {
+/** The size bucket, plus whether a `row` cell is wide enough for its labels. */
+type Shape = { size: Size; rowLabels: boolean };
+
+function shapeOf(info: WidgetInfo): Shape {
   if (info.width < COMPACT_MAX_WIDTH_DP) {
-    return 'compact';
+    return { size: 'compact', rowLabels: true };
   }
-  return info.height < ROW_MAX_HEIGHT_DP ? 'row' : 'stack';
+  if (info.height < ROW_MAX_HEIGHT_DP) {
+    // Three cells wide fit three counts but not three labels, so the ranked
+    // state keeps its word and the other two show as a marker and a number.
+    return { size: 'row', rowLabels: info.width >= ROW_LABEL_MIN_WIDTH_DP };
+  }
+  return { size: 'stack', rowLabels: true };
 }
 
 function dotColor(kind: GlanceableCountKind, palette: Palette): HexColor {
@@ -90,9 +112,7 @@ function stateDot(kind: GlanceableCountKind, palette: Palette, size: number) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        ...(kind === 'idle'
-          ? { borderWidth: 2, borderColor: color }
-          : { backgroundColor: color }),
+        ...(kind === 'idle' ? { borderWidth: 2, borderColor: color } : { backgroundColor: color }),
       }}
     />
   );
@@ -106,18 +126,15 @@ function logo(size: number) {
  * One count line: marker, count, label. Only the label color ranks the rows,
  * because a second font size in a three-row list reads as a mistake.
  */
-// eslint-disable-next-line max-params -- one line, its rank, and the two style inputs
+type RowStyle = { palette: Palette; fontSize: number; showLabel: boolean };
+
 function countRow(
   line: AndroidWidgetProps['countLines'][number],
   isPrimary: boolean,
-  palette: Palette,
-  fontSize: number
+  { palette, fontSize, showLabel }: RowStyle
 ) {
   return (
-    <FlexWidget
-      key={line.label}
-      style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}
-    >
+    <FlexWidget key={line.label} style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
       {stateDot(line.kind, palette, fontSize < 14 ? 9 : 10)}
       <TextWidget
         // oxlint-disable-next-line no-literal-copy/no-literal-copy -- an already-formatted number
@@ -125,12 +142,14 @@ function countRow(
         maxLines={1}
         style={{ color: palette.foreground, fontSize, fontWeight: 'bold' }}
       />
-      <TextWidget
-        text={line.label}
-        maxLines={1}
-        truncate="END"
-        style={{ color: isPrimary ? palette.foreground : palette.muted, fontSize }}
-      />
+      {showLabel ? (
+        <TextWidget
+          text={line.label}
+          maxLines={1}
+          truncate="END"
+          style={{ color: isPrimary ? palette.foreground : palette.muted, fontSize }}
+        />
+      ) : null}
     </FlexWidget>
   );
 }
@@ -154,8 +173,7 @@ function renderCompact(props: AndroidWidgetProps, palette: Palette) {
       count: props.primaryCount,
     },
     true,
-    palette,
-    15
+    { palette, fontSize: 15, showLabel: true }
   );
 }
 
@@ -170,14 +188,20 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
   );
 }
 
-function renderCounts(props: AndroidWidgetProps, palette: Palette, size: Size) {
+function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   if (props.countLines.length === 0) {
     return statusText(props, palette);
   }
+  const { size, rowLabels } = shape;
   const primaryLabel = props.primaryLabel;
-  const rows = props.countLines.map(line =>
-    countRow(line, line.label === primaryLabel, palette, size === 'row' ? 13 : 15)
-  );
+  const rows = props.countLines.map(line => {
+    const isPrimary = line.label === primaryLabel;
+    return countRow(line, isPrimary, {
+      palette,
+      fontSize: size === 'row' ? 13 : 15,
+      showLabel: size !== 'row' || rowLabels || isPrimary,
+    });
+  });
   const stacked = (
     <FlexWidget
       style={{
@@ -202,9 +226,10 @@ function renderCounts(props: AndroidWidgetProps, palette: Palette, size: Size) {
   );
 }
 
-function renderSurface(props: AndroidWidgetProps, palette: Palette, size: Size) {
+function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
+  const { size } = shape;
   const body =
-    size === 'compact' ? renderCompact(props, palette) : renderCounts(props, palette, size);
+    size === 'compact' ? renderCompact(props, palette) : renderCounts(props, palette, shape);
   // Short cells put the mark beside the counts; a tall cell stacks the mark on
   // top and lets the counts sit at the bottom, the same composition as the iOS
   // small family.
@@ -270,9 +295,9 @@ export function renderActiveAgentsWidget(
   props: AndroidWidgetProps,
   info: WidgetInfo
 ): WidgetRepresentation {
-  const size = sizeOf(info);
+  const shape = shapeOf(info);
   return {
-    light: renderSurface(props, LIGHT, size),
-    dark: renderSurface(props, DARK, size),
+    light: renderSurface(props, LIGHT, shape),
+    dark: renderSurface(props, DARK, shape),
   };
 }

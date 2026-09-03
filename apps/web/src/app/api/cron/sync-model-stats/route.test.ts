@@ -164,6 +164,7 @@ describe('GET /api/cron/sync-model-stats', () => {
       jest.mocked(syncArtificialAnalysisBenchmarks).mockImplementationOnce(async () => {
         writes.push('benchmarks');
         if (failure === 'benchmarks') throw error;
+        return undefined;
       });
       jest.mocked(syncInternalUsageStats).mockImplementationOnce(async () => {
         usageStarted.resolve();

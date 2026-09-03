@@ -95,8 +95,9 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
   }
 
   const token = generateBoundedInternalServiceToken(userId, {
-      audience: SESSION_INGEST_AUDIENCE,
-    });
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
 
   let response: Response;
@@ -180,6 +181,7 @@ export const activeSessionsRouter = createTRPCRouter({
 
     const token = generateBoundedInternalServiceToken(ctx.user.id, {
       audience: SESSION_INGEST_AUDIENCE,
+      expiresIn: 60 * 60,
     });
     const url = `${SESSION_INGEST_WORKER_URL}/api/instances/active`;
 

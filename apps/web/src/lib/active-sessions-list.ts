@@ -307,6 +307,7 @@ export async function listActiveSessions({
   } else {
     const token = generateBoundedInternalServiceToken(userId, {
       audience: SESSION_INGEST_AUDIENCE,
+      expiresIn: 60 * 60,
     });
     const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
 

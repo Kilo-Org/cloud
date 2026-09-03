@@ -8,6 +8,7 @@ import {
   getKilocodeRepoRecentlyClosedExternalPRs,
 } from '@/lib/github/open-pull-request-counts';
 import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
 import { setAdminAccessSinkForTest } from '@/lib/admin/admin-access-log';
 
 jest.mock('@/lib/github/open-pull-request-counts', () => ({
@@ -20,6 +21,10 @@ jest.mock('@/lib/github/open-pull-request-counts', () => ({
 
 jest.mock('@/lib/admin/github-installation-lookup', () => ({
   lookupGitHubOrganizationInstallation: jest.fn(),
+}));
+
+jest.mock('@/lib/admin/github-installation-uninstall', () => ({
+  uninstallGitHubOrganizationInstallation: jest.fn(),
 }));
 
 let regularUser: User;
@@ -141,6 +146,51 @@ describe('admin.github.lookupOrganizationInstallation', () => {
       caller.admin.github.lookupOrganizationInstallation({ organization: 'acme--tools' })
     ).rejects.toThrow('Enter a valid GitHub organization login');
     expect(lookupGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.github.uninstallOrganizationInstallation', () => {
+  const input = {
+    integrationId: '12345678-1234-4234-9234-123456789abc',
+    installationId: '123',
+    accountId: '456',
+    appType: 'standard' as const,
+    owner: { type: 'user' as const, id: 'oauth/github|arbitrary-user-id' },
+    confirmation: '123',
+  };
+
+  it('denies anonymous callers before local or upstream work', async () => {
+    const createCaller = createCallerFactory(rootRouter);
+    const caller = createCaller({ user: null } as never);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).rejects.toThrow();
+    expect(uninstallGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('denies non-admin callers before local or upstream work', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).rejects.toThrow(
+      'Admin access required'
+    );
+    expect(uninstallGitHubOrganizationInstallation).not.toHaveBeenCalled();
+  });
+
+  it('passes the exact, client-safe snapshot to the guarded helper', async () => {
+    (uninstallGitHubOrganizationInstallation as jest.Mock).mockResolvedValue({
+      status: 'uninstalled',
+      localCleanup: 'complete',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(caller.admin.github.uninstallOrganizationInstallation(input)).resolves.toEqual({
+      status: 'uninstalled',
+      localCleanup: 'complete',
+    });
+    expect(uninstallGitHubOrganizationInstallation).toHaveBeenCalledWith({
+      input,
+      actor: expect.objectContaining({ id: adminUser.id }),
+    });
   });
 });
 

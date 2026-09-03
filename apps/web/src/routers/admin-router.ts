@@ -145,6 +145,8 @@ import {
 } from '@/lib/github/open-pull-request-counts';
 import { GitHubOrganizationInstallationLookupInputSchema } from '@/lib/admin/github-installation-lookup-input';
 import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { GitHubInstallationUninstallInputSchema } from '@/lib/admin/github-installation-uninstall-input';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
 
 const SyncResponseSchema = z.object({
   success: z.boolean(),
@@ -522,6 +524,18 @@ export const adminRouter = createTRPCRouter({
             message: 'GitHub installation lookup failed',
           });
         }
+      }),
+    uninstallOrganizationInstallation: adminProcedure
+      .input(GitHubInstallationUninstallInputSchema)
+      .mutation(async ({ ctx, input }) => {
+        return uninstallGitHubOrganizationInstallation({
+          input,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+        });
       }),
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });

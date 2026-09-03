@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Ilmoitukset",
+    "liveActivities": "Livetoiminnot",
+    "liveActivitySubtitle": "Näytä aktiiviset agentit lukitusnäytöllä",
     "push": "Push",
     "enabled": "Ilmoitukset käytössä",
     "onDescription": "Push-ilmoitukset ovat päällä tälle laitteelle.",
@@ -3225,7 +3227,6 @@
     "needsInput": "vaatii syötettä",
     "idle": "Vapaalla",
     "channelName": "Aktiiviset agentit",
-    "activityKitDisabledTitle": "Live-aktiviteetit ovat pois päältä",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön Asetuksissa, niin näet aktiiviset agentit lukitulla näytöllä."
   }
 }

@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "خبرتیاوې",
+    "liveActivities": "ژوندۍ فعالیتونه",
+    "liveActivitySubtitle": "فعال اجنټان په لاک سکرین کې وښایه",
     "push": "پوش",
     "enabled": "خبرتیاوې فعالې شوې",
     "onDescription": "پوش خبرتیاوې د دې وسیلې لپاره فعالې دي.",
@@ -3225,7 +3227,6 @@
     "needsInput": "ورودی ته اړتیا لري",
     "idle": "بې کاره",
     "channelName": "فعال اجنټان",
-    "activityKitDisabledTitle": "ژوندي فعالیتونه بند دي",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې ژوندي فعالیتونه فعال کړئ."
   }
 }

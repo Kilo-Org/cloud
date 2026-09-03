@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Izaziso",
+    "liveActivities": "Imisebenzi ebukhoma",
+    "liveActivitySubtitle": "Bonisa ama-agent asebenzayo kuSikrini Sokukhiya",
     "push": "Ukudonsa",
     "enabled": "Izaziso zivuliwe",
     "onDescription": "Izaziso zokudonsa zivuliwe kule divayisi.",
@@ -3225,7 +3227,6 @@
     "needsInput": "idinga okokufaka",
     "idle": "Banga",
     "channelName": "Ama-agent asebenzayo",
-    "activityKitDisabledTitle": "Imisebenzi Ebukhoma ivaliwe",
     "activityKitDisabledBody": "Vula Imisebenzi Ebukhoma ku-Izilungiselelo ukuze ubone Ama-agent asebenzayo Esikrinini Esikhiyiwe."
   }
 }

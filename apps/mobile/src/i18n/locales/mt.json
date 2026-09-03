@@ -635,6 +635,8 @@
   },
   "notifications": {
     "title": "Notifiki",
+    "liveActivities": "Attivitajiet diretti",
+    "liveActivitySubtitle": "Uri l-aġenti attivi fuq l-iskrin imsakkar",
     "push": "Push",
     "enabled": "Notifiki attivati",
     "onDescription": "In-notifiki push huma mixgħula għal dan l-apparat.",
@@ -3291,7 +3293,6 @@
     "needsInput": "jeħtieġ input",
     "idle": "Idle",
     "channelName": "Aġenti attivi",
-    "activityKitDisabledTitle": "L-Attivitajiet Diretti huma mitfija",
     "activityKitDisabledBody": "Ixgħel l-Attivitajiet Diretti fis-Settings biex tara l-Aġenti Attivi fuq l-Iskrin Imsakkar."
   }
 }

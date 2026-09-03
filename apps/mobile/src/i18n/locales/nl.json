@@ -183,6 +183,8 @@
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen"
     },
     "title": "Meldingen",
+    "liveActivities": "Live activiteiten",
+    "liveActivitySubtitle": "Actieve agents tonen op het toegangsscherm",
     "push": "Push",
     "enabled": "Meldingen ingeschakeld",
     "onDescription": "Pushmeldingen staan aan voor dit apparaat.",
@@ -3225,7 +3227,6 @@
     "needsInput": "heeft invoer nodig",
     "idle": "Inactief",
     "channelName": "Actieve agents",
-    "activityKitDisabledTitle": "Liveactiviteiten staan uit",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via Instellingen om actieve agents op het toegangsscherm te zien."
   }
 }

@@ -1,5 +1,9 @@
 import { i18n } from '@/i18n';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import {
+  getLiveActivityEnabled,
+  subscribeLiveActivityEnabled,
+} from '@/lib/glanceable/live-activity-switch';
 
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
@@ -25,4 +29,16 @@ void ensureWidgetLogo();
 i18n.on('languageChanged', () => {
   refreshActiveAgentsLiveActivityCopy();
   refreshActiveAgentsWidgetCopy();
+});
+
+// Turning the in-app switch off must clear the activity already on the Lock
+// Screen, not just stop the next start. `startOrUpdate` holds the guard for
+// everything after this.
+let liveActivityAllowed = getLiveActivityEnabled();
+subscribeLiveActivityEnabled(() => {
+  const next = getLiveActivityEnabled();
+  if (liveActivityAllowed && !next) {
+    iosSink.endImmediate();
+  }
+  liveActivityAllowed = next;
 });

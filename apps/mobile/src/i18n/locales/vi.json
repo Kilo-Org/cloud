@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "Thông báo",
+    "liveActivities": "Hoạt động trực tiếp",
+    "liveActivitySubtitle": "Hiển thị tác nhân đang hoạt động trên Màn hình khóa",
     "push": "Đẩy",
     "enabled": "Đã bật thông báo",
     "onDescription": "Thông báo đẩy đang bật cho thiết bị này.",
@@ -3225,7 +3227,6 @@
     "needsInput": "cần nhập",
     "idle": "Không hoạt động",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledTitle": "Hoạt động trực tiếp đang tắt",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên Màn hình khóa."
   }
 }

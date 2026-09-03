@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "الإشعارات",
+    "liveActivities": "الأنشطة المباشرة",
+    "liveActivitySubtitle": "اعرض الوكلاء النشطين على شاشة القفل",
     "push": "فوري",
     "enabled": "الإشعارات ممكّنة",
     "onDescription": "الإشعارات الفورية قيد التشغيل لهذا الجهاز.",
@@ -3313,7 +3315,6 @@
     "needsInput": "يتطلب إدخالًا",
     "idle": "خامل",
     "channelName": "الوكلاء النشطون",
-    "activityKitDisabledTitle": "الأنشطة المباشرة متوقفة",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لرؤية الوكلاء النشطين على شاشة القفل."
   }
 }

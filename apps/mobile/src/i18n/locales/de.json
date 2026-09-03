@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "Benachrichtigungen",
+    "liveActivities": "Live-Aktivitäten",
+    "liveActivitySubtitle": "Aktive Agenten auf dem Sperrbildschirm anzeigen",
     "push": "Push",
     "enabled": "Benachrichtigungen aktiviert",
     "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
@@ -3225,7 +3227,6 @@
     "needsInput": "Eingabe erforderlich",
     "idle": "Inaktiv",
     "channelName": "Aktive Agenten",
-    "activityKitDisabledTitle": "Live-Aktivitäten sind deaktiviert",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   }
 }

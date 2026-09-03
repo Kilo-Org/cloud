@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Mga Notipikasyon",
+    "liveActivities": "Mga live na aktibidad",
+    "liveActivitySubtitle": "Ipakita ang mga aktibong agent sa Lock Screen",
     "push": "Push",
     "enabled": "Pinagana ang mga notipikasyon",
     "onDescription": "Naka-on ang push notifications para sa device na ito.",
@@ -3225,7 +3227,6 @@
     "needsInput": "kailangan ng input",
     "idle": "Idle",
     "channelName": "Mga aktibong agent",
-    "activityKitDisabledTitle": "Naka-off ang Mga Live na Aktibidad",
     "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."
   }
 }

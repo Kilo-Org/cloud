@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "Powiadomienia",
+    "liveActivities": "Aktywności na żywo",
+    "liveActivitySubtitle": "Pokazuj aktywnych agentów na ekranie blokady",
     "push": "Push",
     "enabled": "Powiadomienia włączone",
     "onDescription": "Powiadomienia push są włączone dla tego urządzenia.",
@@ -3269,7 +3271,6 @@
     "needsInput": "wymaga danych",
     "idle": "Bezczynny",
     "channelName": "Aktywni agenci",
-    "activityKitDisabledTitle": "Wydarzenia na żywo są wyłączone",
     "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   }
 }

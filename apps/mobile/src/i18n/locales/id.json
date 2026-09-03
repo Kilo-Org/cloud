@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "Notifikasi",
+    "liveActivities": "Aktivitas langsung",
+    "liveActivitySubtitle": "Tampilkan agen aktif di Layar Terkunci",
     "push": "Push",
     "enabled": "Notifikasi diaktifkan",
     "onDescription": "Notifikasi push aktif untuk perangkat ini.",
@@ -3225,7 +3227,6 @@
     "needsInput": "memerlukan input",
     "idle": "Idle",
     "channelName": "Agen aktif",
-    "activityKitDisabledTitle": "Aktivitas Langsung nonaktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di Pengaturan untuk melihat Agen Aktif di Layar Terkunci."
   }
 }

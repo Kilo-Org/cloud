@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Tilkynningar",
+    "liveActivities": "Beinar aðgerðir",
+    "liveActivitySubtitle": "Sýna virk umboð á lásskjánum",
     "push": "Push",
     "enabled": "Tilkynningar virkjaðar",
     "onDescription": "Push-tilkynningar eru kveiktar á þessu tæki.",
@@ -3225,7 +3227,6 @@
     "needsInput": "þarfnast inntaks",
     "idle": "Í bið",
     "channelName": "Virk umboð",
-    "activityKitDisabledTitle": "Slökkt er á Beinni virkni",
     "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."
   }
 }

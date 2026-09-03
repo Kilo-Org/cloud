@@ -210,6 +210,9 @@ const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFoot
     clearPrReviewFooterPreference: vi.fn(),
   }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
+vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
+  clearLiveActivityPreference: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 

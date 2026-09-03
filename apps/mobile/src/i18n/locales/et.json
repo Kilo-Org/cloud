@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Teavitused",
+    "liveActivities": "Reaalajas tegevused",
+    "liveActivitySubtitle": "Näita aktiivseid agente lukustuskuval",
     "push": "Push",
     "enabled": "Teavitused on lubatud",
     "onDescription": "Push-teavitused on selle seadme jaoks sisse lülitatud.",
@@ -3225,7 +3227,6 @@
     "needsInput": "vajab sisendit",
     "idle": "Ooterežiimis",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledTitle": "Reaalajas tegevused on välja lülitatud",
     "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
   }
 }

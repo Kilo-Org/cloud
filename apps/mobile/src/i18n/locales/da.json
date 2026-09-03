@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Meddelelser",
+    "liveActivities": "Live-aktiviteter",
+    "liveActivitySubtitle": "Vis aktive agenter på låseskærmen",
     "push": "Push",
     "enabled": "Meddelelser aktiveret",
     "onDescription": "Push-meddelelser er til for denne enhed.",
@@ -3225,7 +3227,6 @@
     "needsInput": "kræver input",
     "idle": "Inaktiv",
     "channelName": "Aktive agenter",
-    "activityKitDisabledTitle": "Liveaktiviteter er slået fra",
     "activityKitDisabledBody": "Slå Liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   }
 }

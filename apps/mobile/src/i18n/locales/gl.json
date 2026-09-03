@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Notificacións",
+    "liveActivities": "Actividades en directo",
+    "liveActivitySubtitle": "Amosa os axentes activos na pantalla de bloqueo",
     "push": "Push",
     "enabled": "Notificacións activadas",
     "onDescription": "As notificacións push están activadas para este dispositivo.",
@@ -3225,7 +3227,6 @@
     "needsInput": "precisa entrada",
     "idle": "Inactivo",
     "channelName": "Axentes activos",
-    "activityKitDisabledTitle": "As actividades en directo están desactivadas",
     "activityKitDisabledBody": "Activa as actividades en directo en Configuración para ver os axentes activos na pantalla de bloqueo."
   }
 }

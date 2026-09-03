@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "اعلان‌ها",
+    "liveActivities": "فعالیت‌های زنده",
+    "liveActivitySubtitle": "نمایش عامل‌های فعال در صفحه قفل",
     "push": "Push",
     "enabled": "اعلان‌ها فعال‌اند",
     "onDescription": "اعلان‌های push برای این دستگاه روشن‌اند.",
@@ -3225,7 +3227,6 @@
     "needsInput": "نیاز به ورودی",
     "idle": "غیرفعال",
     "channelName": "عامل‌های فعال",
-    "activityKitDisabledTitle": "فعالیت‌های زنده خاموش هستند",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحه قفل، فعالیت‌های زنده را در تنظیمات روشن کنید."
   }
 }

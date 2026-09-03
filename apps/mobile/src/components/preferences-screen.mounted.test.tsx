@@ -77,13 +77,6 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
     setKeepScreenOn: vi.fn(),
   }),
 }));
-vi.mock('@/lib/hooks/use-glanceable-preference', () => ({
-  useGlanceablePreference: () => ({
-    glanceableEnabled: true,
-    hasLoaded: true,
-    setGlanceableEnabled: vi.fn(),
-  }),
-}));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   usePrReviewFooterPreference: () => ({
     prReviewFooter: true,

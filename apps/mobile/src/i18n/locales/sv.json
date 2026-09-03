@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Aviseringar",
+    "liveActivities": "Liveaktiviteter",
+    "liveActivitySubtitle": "Visa aktiva agenter på låsskärmen",
     "push": "Push",
     "enabled": "Aviseringar aktiverade",
     "onDescription": "Pushaviseringar är på för den här enheten.",
@@ -3225,7 +3227,6 @@
     "needsInput": "kräver indata",
     "idle": "Inaktiv",
     "channelName": "Aktiva agenter",
-    "activityKitDisabledTitle": "Liveaktiviteter är avstängda",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se Aktiva agenter på låsskärmen."
   }
 }

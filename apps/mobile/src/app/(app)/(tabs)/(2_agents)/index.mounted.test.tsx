@@ -415,27 +415,20 @@ describe('Agents ActivityKit Settings recovery', () => {
     });
   }
 
-  it('recovers on direct Settings return without refocusing or repeating the alert', async () => {
+  it('recovers on direct Settings return without refocusing, and never alerts', async () => {
     activityKit.denied = true;
     const renderer = mountRoute();
     await flushMicrotasks();
     expect(surface.activity).toBeNull();
-    expect(lastAlertButtons()).toEqual([
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open Settings', onPress: expect.any(Function) },
-    ]);
+    // This screen used to alert on every cold launch, asking the user to undo a
+    // choice they had just made. The state now lives on the notifications
+    // screen, where they went to set it.
+    expect(alertMock).not.toHaveBeenCalled();
 
-    act(() => {
-      lastAlertButtons()
-        ?.find(button => button.text === 'Open Settings')
-        ?.onPress?.();
-    });
-    expect(activityKit.settingsOpen).toBe(true);
     changeAppState('background');
     changeAppState('active');
     await flushMicrotasks();
     expect(surface.activity).toBeNull();
-    expect(alertMock.mock.calls).toHaveLength(1);
 
     changeAppState('background');
     activityKit.available = true;
@@ -446,7 +439,7 @@ describe('Agents ActivityKit Settings recovery', () => {
     await flushMicrotasks();
 
     expect(surface.activity).toEqual(snapshot);
-    expect(alertMock.mock.calls).toHaveLength(1);
+    expect(alertMock).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

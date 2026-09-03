@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "ਸੂਚਨਾਵਾਂ",
+    "liveActivities": "ਲਾਈਵ ਸਰਗਰਮੀਆਂ",
+    "liveActivitySubtitle": "ਲਾਕ ਸਕ੍ਰੀਨ ਉੱਤੇ ਸਰਗਰਮ ਏਜੰਟ ਦਿਖਾਓ",
     "push": "ਪੁਸ਼",
     "enabled": "ਸੂਚਨਾਵਾਂ ਸਮਰੱਥ ਹਨ",
     "onDescription": "ਇਸ ਡਿਵਾਈਸ ਲਈ ਪੁਸ਼ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਹਨ।",
@@ -3225,7 +3227,6 @@
     "needsInput": "ਇਨਪੁੱਟ ਦੀ ਲੋੜ ਹੈ",
     "idle": "ਸੁਸਤ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
-    "activityKitDisabledTitle": "ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਬੰਦ ਹਨ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਦੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
   }
 }

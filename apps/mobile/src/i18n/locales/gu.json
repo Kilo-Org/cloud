@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "સૂચનાઓ",
+    "liveActivities": "લાઇવ પ્રવૃત્તિઓ",
+    "liveActivitySubtitle": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો બતાવો",
     "push": "પુશ",
     "enabled": "સૂચનાઓ સક્ષમ",
     "onDescription": "આ ઉપકરણ માટે પુશ સૂચનાઓ ચાલુ છે.",
@@ -3225,7 +3227,6 @@
     "needsInput": "ઇનપુટ જરૂરી",
     "idle": "નિષ્ક્રિય",
     "channelName": "સક્રિય એજન્ટો",
-    "activityKitDisabledTitle": "લાઇવ પ્રવૃત્તિઓ બંધ છે",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
   }
 }

@@ -8,6 +8,7 @@ import { after, type LiveActivity } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
 import { getGlanceableDelivery, type GlanceableSink } from '@/lib/glanceable/sink-registry';
+import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 
 import { ActiveAgentsLiveActivity } from './active-agents-live-activity';
 import { ActiveAgentsWidget } from './active-agents-widget';
@@ -294,7 +295,15 @@ export const iosSink: GlanceableSink = {
   },
 
   startOrUpdate(snapshot, ctx) {
-    if (activityKitDeniedState || !isEligibleGlanceableWork(snapshot) || !refreshActivity()) {
+    // The in-app switch is checked first: it is the one the user set here, and
+    // honoring it costs no native call. ActivityKit's own switch still decides
+    // the rest, and `start` remains the authority on it.
+    if (
+      !getLiveActivityEnabled() ||
+      activityKitDeniedState ||
+      !isEligibleGlanceableWork(snapshot) ||
+      !refreshActivity()
+    ) {
       return;
     }
 

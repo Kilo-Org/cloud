@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Ngā Pānui",
+    "liveActivities": "Ngā mahi ora",
+    "liveActivitySubtitle": "Whakaatu i ngā māngai kaha ki te Mata Raka",
     "push": "Pana",
     "enabled": "Kua whakahohea ngā pānui",
     "onDescription": "Kei te kā ngā pānui pana mō tēnei pūrere.",
@@ -3225,7 +3227,6 @@
     "needsInput": "e hiahia ana ki te whakaurunga",
     "idle": "Kore mahi",
     "channelName": "Ngā māngai hohe",
-    "activityKitDisabledTitle": "Kua whakawetohia ngā Mahi Mataora",
     "activityKitDisabledBody": "Whakakāngia ngā Mahi Mataora i Ngā tautuhinga kia kite i ngā Māngai Hohe i te Mata Maukati."
   }
 }

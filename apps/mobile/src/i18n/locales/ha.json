@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Sanarwa",
+    "liveActivities": "Ayyukan kai tsaye",
+    "liveActivitySubtitle": "Nuna wakilai masu aiki a allon kulle",
     "push": "Turawa",
     "enabled": "Sanarwa suna aiki",
     "onDescription": "Sanarwar turawa suna aiki ga wannan na'ura.",
@@ -3225,7 +3227,6 @@
     "needsInput": "yana buƙatar bayani",
     "idle": "Rashin aiki",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledTitle": "Ayyukan Kai Tsaye suna a kashe",
     "activityKitDisabledBody": "Kunna Ayyukan Kai Tsaye a cikin Saituna don ganin Wakilai da ke Aiki a kan Allon Kulle."
   }
 }

@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Pemberitahuan",
+    "liveActivities": "Aktiviti langsung",
+    "liveActivitySubtitle": "Tunjukkan ejen aktif pada Skrin Kunci",
     "push": "Push",
     "enabled": "Pemberitahuan didayakan",
     "onDescription": "Pemberitahuan push dihidupkan untuk peranti ini.",
@@ -3225,7 +3227,6 @@
     "needsInput": "perlu input",
     "idle": "Melahu",
     "channelName": "Ejen aktif",
-    "activityKitDisabledTitle": "Aktiviti Langsung dimatikan",
     "activityKitDisabledBody": "Hidupkan Aktiviti Langsung dalam Tetapan untuk melihat Ejen Aktif pada Skrin Kunci."
   }
 }

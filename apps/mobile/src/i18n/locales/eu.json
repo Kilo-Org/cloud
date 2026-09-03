@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Jakinarazpenak",
+    "liveActivities": "Zuzeneko jarduerak",
+    "liveActivitySubtitle": "Erakutsi agente aktiboak blokeo-pantailan",
     "push": "Bultzadazkoak",
     "enabled": "Jakinarazpenak gaituta",
     "onDescription": "Bultzadazko jakinarazpenak piztuta daude gailu honetan.",
@@ -3225,7 +3227,6 @@
     "needsInput": "sarreraren zain",
     "idle": "Geldirik",
     "channelName": "Agente aktiboak",
-    "activityKitDisabledTitle": "Zuzeneko jarduerak desaktibatuta daude",
     "activityKitDisabledBody": "Aktibatu Zuzeneko jarduerak Ezarpenetan, Agente aktiboak Blokeo-pantailan ikusteko."
   }
 }

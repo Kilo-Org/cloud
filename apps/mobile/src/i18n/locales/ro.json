@@ -621,6 +621,8 @@
   },
   "notifications": {
     "title": "Notificări",
+    "liveActivities": "Activități live",
+    "liveActivitySubtitle": "Afișează agenții activi pe ecranul blocat",
     "push": "Push",
     "enabled": "Notificări activate",
     "onDescription": "Notificările push sunt activate pentru acest dispozitiv.",
@@ -3247,7 +3249,6 @@
     "needsInput": "necesită introducere",
     "idle": "Inactiv",
     "channelName": "Agenți activi",
-    "activityKitDisabledTitle": "Activitățile live sunt dezactivate",
     "activityKitDisabledBody": "Activează Activități live în Setări pentru a vedea Agenții activi pe ecranul de blocare."
   }
 }

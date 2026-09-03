@@ -628,6 +628,8 @@
   },
   "notifications": {
     "title": "Pranešimai",
+    "liveActivities": "Tiesioginės veiklos",
+    "liveActivitySubtitle": "Rodyti aktyvius agentus užrakinimo ekrane",
     "push": "Push",
     "enabled": "Pranešimai įjungti",
     "onDescription": "Push pranešimai šiame įrenginyje įjungti.",
@@ -3269,7 +3271,6 @@
     "needsInput": "reikia įvesties",
     "idle": "Neaktyvus",
     "channelName": "Aktyvūs agentai",
-    "activityKitDisabledTitle": "Tiesioginės veiklos išjungtos",
     "activityKitDisabledBody": "Nustatymuose įjunkite tiesiogines veiklas, kad užrakinimo ekrane matytumėte aktyvius agentus."
   }
 }

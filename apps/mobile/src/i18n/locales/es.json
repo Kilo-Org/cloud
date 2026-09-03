@@ -183,6 +183,8 @@
       "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA"
     },
     "title": "Notificaciones",
+    "liveActivities": "Actividades en directo",
+    "liveActivitySubtitle": "Muestra los agentes activos en la pantalla bloqueada",
     "push": "Push",
     "enabled": "Notificaciones activadas",
     "onDescription": "Las notificaciones push están activadas para este dispositivo.",
@@ -3247,7 +3249,6 @@
     "needsInput": "requiere entrada",
     "idle": "Inactivo",
     "channelName": "Agentes activos",
-    "activityKitDisabledTitle": "Las actividades en directo están desactivadas",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
   }
 }

@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "اطلاعیں",
+    "liveActivities": "لائیو سرگرمیاں",
+    "liveActivitySubtitle": "لاک اسکرین پر فعال ایجنٹس دکھائیں",
     "push": "پش",
     "enabled": "اطلاعیں فعال ہیں",
     "onDescription": "پش اطلاعیں اس آلے کے لیے آن ہیں۔",
@@ -3225,7 +3227,6 @@
     "needsInput": "ان پٹ درکار",
     "idle": "غیر فعال",
     "channelName": "فعال ایجنٹس",
-    "activityKitDisabledTitle": "لائیو سرگرمیاں بند ہیں",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
   }
 }

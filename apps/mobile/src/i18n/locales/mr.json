@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "सूचना",
+    "liveActivities": "लाइव्ह क्रियाकलाप",
+    "liveActivitySubtitle": "लॉक स्क्रीनवर सक्रिय एजंट दाखवा",
     "push": "पुश",
     "enabled": "सूचना सक्षम केल्या",
     "onDescription": "या डिव्हाइससाठी पुश सूचना चालू आहेत.",
@@ -3225,7 +3227,6 @@
     "needsInput": "इनपुट आवश्यक",
     "idle": "निष्क्रिय",
     "channelName": "सक्रिय एजंट्स",
-    "activityKitDisabledTitle": "थेट क्रियाकलाप बंद आहेत",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये थेट क्रियाकलाप सुरू करा."
   }
 }

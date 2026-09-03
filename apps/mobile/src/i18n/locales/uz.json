@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Bildirishnomalar",
+    "liveActivities": "Jonli faoliyatlar",
+    "liveActivitySubtitle": "Faol agentlarni qulflash ekranida ko‘rsatish",
     "push": "Push",
     "enabled": "Bildirishnomalar yoqilgan",
     "onDescription": "Push bildirishnomalari bu qurilmada yoqilgan.",
@@ -3225,7 +3227,6 @@
     "needsInput": "kiritish kerak",
     "idle": "Kutmoqda",
     "channelName": "Faol agentlar",
-    "activityKitDisabledTitle": "Jonli faoliyatlar o'chirilgan",
     "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
   }
 }

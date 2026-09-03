@@ -45,6 +45,7 @@ import {
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
@@ -390,6 +391,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearAgentModelPreference();
           clearReasoningPreference();
           clearKeepScreenOnPreference();
+          clearLiveActivityPreference();
           clearSessionScopedState();
           clearPrReviewFooterPreference();
         } finally {

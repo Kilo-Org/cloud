@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Awọn ifitonileti",
+    "liveActivities": "Awọn iṣẹ laaye",
+    "liveActivitySubtitle": "Fi awọn aṣoju to n ṣiṣẹ han lori Iboju Titiipa",
     "push": "Titari",
     "enabled": "Awọn ifitonileti mu ṣiṣẹ",
     "onDescription": "Awọn ifitonileti titari wa ni lori ẹ̀rọ yii.",
@@ -3225,7 +3227,6 @@
     "needsInput": "nilo igbewọle",
     "idle": "Ìsinmi",
     "channelName": "Awọn aṣoju to n ṣiṣẹ",
-    "activityKitDisabledTitle": "Awọn Iṣẹ Lọwọlọwọ wa ni pipa",
     "activityKitDisabledBody": "Tan Awọn Iṣẹ Lọwọlọwọ ninu Eto lati ri Awọn aṣoju to n ṣiṣẹ lori Iboju Titiipa."
   }
 }

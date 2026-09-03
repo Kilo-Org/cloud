@@ -621,6 +621,8 @@
   },
   "notifications": {
     "title": "Paziņojumi",
+    "liveActivities": "Tiešās aktivitātes",
+    "liveActivitySubtitle": "Rādīt aktīvos aģentus bloķēšanas ekrānā",
     "push": "Push",
     "enabled": "Paziņojumi iespējoti",
     "onDescription": "Push paziņojumi šai ierīcei ir ieslēgti.",
@@ -3247,7 +3249,6 @@
     "needsInput": "nepieciešama ievade",
     "idle": "Dīkstāvē",
     "channelName": "Aktīvie aģenti",
-    "activityKitDisabledTitle": "Tiešraides aktivitātes ir izslēgtas",
     "activityKitDisabledBody": "Ieslēdz tiešraides aktivitātes iestatījumos, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   }
 }

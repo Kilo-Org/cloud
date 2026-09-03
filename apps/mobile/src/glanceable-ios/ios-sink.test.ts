@@ -7,6 +7,10 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
+import {
+  _resetLiveActivitySwitchForTests,
+  setLiveActivityEnabledValue,
+} from '@/lib/glanceable/live-activity-switch';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
@@ -166,6 +170,7 @@ function snapshotFor(
 }
 
 beforeEach(() => {
+  _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
   subscriptions.clear();
   mockState.startError = null;
@@ -200,6 +205,20 @@ describe('iosSink start and update', () => {
     expect(mockState.started).toMatchObject([{ ended: false, props: { running: 1 } }]);
     expect(subscriptions).toEqual(new Set(['scope', 'activity']));
     publisher.dispose();
+  });
+
+  it('starts nothing while the in-app switch is off, and starts once it is on', () => {
+    setLiveActivityEnabledValue(false);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    expect(mockState.started).toEqual([]);
+    // The widget families are not covered by this switch: they are opt-in by
+    // placement, so publish still writes their timeline.
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 0));
+    expect(mockState.snapshots.at(-1)).toMatchObject({ primaryCount: 1 });
+
+    setLiveActivityEnabledValue(true);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    expect(mockState.started.length).toBe(1);
   });
 
   it('starts once and updates the same activity on a newer revision', () => {

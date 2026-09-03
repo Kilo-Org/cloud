@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "বিজ্ঞপ্তি",
+    "liveActivities": "লাইভ অ্যাক্টিভিটি",
+    "liveActivitySubtitle": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখান",
     "push": "পুশ",
     "enabled": "বিজ্ঞপ্তি সক্রিয়",
     "onDescription": "এই ডিভাইসে পুশ বিজ্ঞপ্তি চালু আছে।",
@@ -3225,7 +3227,6 @@
     "needsInput": "ইনপুট প্রয়োজন",
     "idle": "নিষ্ক্রিয়",
     "channelName": "সক্রিয় এজেন্ট",
-    "activityKitDisabledTitle": "সরাসরি কার্যকলাপ বন্ধ আছে",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্টগুলি দেখতে সেটিংসে সরাসরি কার্যকলাপ চালু করুন।"
   }
 }

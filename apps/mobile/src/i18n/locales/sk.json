@@ -628,6 +628,8 @@
   },
   "notifications": {
     "title": "Upozornenia",
+    "liveActivities": "Živé aktivity",
+    "liveActivitySubtitle": "Zobrazovať aktívnych agentov na uzamknutej obrazovke",
     "push": "Push",
     "enabled": "Upozornenia povolené",
     "onDescription": "Push upozornenia sú pre toto zariadenie zapnuté.",
@@ -3269,7 +3271,6 @@
     "needsInput": "vyžaduje vstup",
     "idle": "Nečinný",
     "channelName": "Aktívni agenti",
-    "activityKitDisabledTitle": "Živé aktivity sú vypnuté",
     "activityKitDisabledBody": "Zapnite živé aktivity v Nastaveniach, aby sa aktívni agenti zobrazovali na zamknutej obrazovke."
   }
 }

@@ -12,10 +12,7 @@ import {
   type GitHubInstallReturnOutcome,
   subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
-import {
-  recoverGlanceableActivityKit,
-  showActivityKitDisabledAlertOnce,
-} from '@/lib/glanceable/activity-kit-prompt';
+import { recoverGlanceableActivityKit } from '@/lib/glanceable/activity-kit-prompt';
 import { trpcClient } from '@/lib/trpc';
 
 export type GitHubInstallOutcomeAlertButton = {
@@ -144,7 +141,6 @@ export default function AgentSessionList() {
   // changing route focus, so also retry recovery when the app becomes active.
   useFocusEffect(
     useCallback(() => {
-      showActivityKitDisabledAlertOnce();
       void recoverGlanceableActivityKit();
       const subscription = AppState.addEventListener('change', state => {
         if (state === 'active') {

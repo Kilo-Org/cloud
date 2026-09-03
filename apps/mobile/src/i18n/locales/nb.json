@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Varsler",
+    "liveActivities": "Sanntidsaktiviteter",
+    "liveActivitySubtitle": "Vis aktive agenter på låseskjermen",
     "push": "Push",
     "enabled": "Varsler aktivert",
     "onDescription": "Push-varsler er på for denne enheten.",
@@ -3225,7 +3227,6 @@
     "needsInput": "trenger innspill",
     "idle": "Ledig",
     "channelName": "Aktive agenter",
-    "activityKitDisabledTitle": "Oppdateringer i sanntid er av",
     "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."
   }
 }

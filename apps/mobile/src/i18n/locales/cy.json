@@ -642,6 +642,8 @@
   },
   "notifications": {
     "title": "Hysbysiadau",
+    "liveActivities": "Gweithgareddau byw",
+    "liveActivitySubtitle": "Dangos asiantau gweithredol ar y sgrin clo",
     "push": "Gwthio",
     "enabled": "Hysbysiadau wedi'u galluogi",
     "onDescription": "Mae hysbysiadau gwthio ymlaen ar gyfer y ddyfais hon.",
@@ -3313,7 +3315,6 @@
     "needsInput": "angen mewnbwn",
     "idle": "Segur",
     "channelName": "Asiantau gweithredol",
-    "activityKitDisabledTitle": "Mae Gweithgareddau Byw wedi'u diffodd",
     "activityKitDisabledBody": "Trowch Weithgareddau Byw ymlaen yn Gosodiadau i weld Asiantau gweithredol ar y Sgrin Glo."
   }
 }

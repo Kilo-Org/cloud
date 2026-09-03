@@ -621,6 +621,8 @@
   },
   "notifications": {
     "title": "Notificações",
+    "liveActivities": "Atividades em direto",
+    "liveActivitySubtitle": "Mostrar agentes ativos no ecrã bloqueado",
     "push": "Push",
     "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativas para este dispositivo.",
@@ -3247,7 +3249,6 @@
     "needsInput": "requer entrada",
     "idle": "Inativo",
     "channelName": "Agentes ativos",
-    "activityKitDisabledTitle": "As Atividades em tempo real estão desativadas",
     "activityKitDisabledBody": "Ative as Atividades em tempo real nas Definições para ver os agentes ativos no Ecrã bloqueado."
   }
 }

@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Arifa",
+    "liveActivities": "Shughuli za moja kwa moja",
+    "liveActivitySubtitle": "Onyesha mawakala hai kwenye Skrini ya Kufunga",
     "push": "Push",
     "enabled": "Arifa zimewashwa",
     "onDescription": "Arifa za push zimewashwa kwa kifaa hiki.",
@@ -3225,7 +3227,6 @@
     "needsInput": "inahitaji mchango",
     "idle": "Hakikazi",
     "channelName": "Mawakala wanaofanya kazi",
-    "activityKitDisabledTitle": "Shughuli za Moja kwa Moja zimezimwa",
     "activityKitDisabledBody": "Washa Shughuli za Moja kwa Moja katika Mipangilio ili uone Mawakala wanaofanya kazi kwenye Skrini Iliyofungwa."
   }
 }

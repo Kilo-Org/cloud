@@ -163,6 +163,8 @@
       "securityFindingsSubtitle": "nouveaux résultats et rappels SLA"
     },
     "title": "Notifications",
+    "liveActivities": "Activités en direct",
+    "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
     "push": "Push",
     "enabled": "Notifications activées",
     "onDescription": "Les notifications push sont activées pour cet appareil.",
@@ -3247,7 +3249,6 @@
     "needsInput": "saisie requise",
     "idle": "Inactif",
     "channelName": "Agents actifs",
-    "activityKitDisabledTitle": "Les activités en direct sont désactivées",
     "activityKitDisabledBody": "Activez les activités en direct dans Réglages pour voir les agents actifs sur l'écran verrouillé."
   }
 }

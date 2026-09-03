@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Ọkwa",
+    "liveActivities": "Ọrụ ndụ",
+    "liveActivitySubtitle": "Gosi ndị ọrụ na-arụ ọrụ na Lock Screen",
     "push": "Push",
     "enabled": "Ọkwa agbanyela",
     "onDescription": "Ọkwa push dị maka ngwaọrụ a.",
@@ -3225,7 +3227,6 @@
     "needsInput": "chọrọ ntinye",
     "idle": "Ọrụ na-agaghị",
     "channelName": "Ndị ọrụ na-arụ ọrụ",
-    "activityKitDisabledTitle": "Agbanyụrụ Ihe Omume Dị Ndụ",
     "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
   }
 }

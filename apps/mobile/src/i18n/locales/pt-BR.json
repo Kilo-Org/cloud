@@ -147,6 +147,8 @@
       "security": "Descobertas de segurança"
     },
     "title": "Notificações",
+    "liveActivities": "Atividades ao vivo",
+    "liveActivitySubtitle": "Mostrar agentes ativos na tela bloqueada",
     "push": "Push",
     "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativadas para este dispositivo.",
@@ -3247,7 +3249,6 @@
     "needsInput": "requer entrada",
     "idle": "Ocioso",
     "channelName": "Agentes ativos",
-    "activityKitDisabledTitle": "As Atividades ao Vivo estão desativadas",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo em Ajustes para ver os agentes ativos na Tela Bloqueada."
   }
 }

@@ -163,6 +163,8 @@
       "securityFindingsSubtitle": "nuovi risultati e promemoria SLA"
     },
     "title": "Notifiche",
+    "liveActivities": "Attività in tempo reale",
+    "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
     "push": "Push",
     "enabled": "Notifiche attivate",
     "onDescription": "Le notifiche push sono attive per questo dispositivo.",
@@ -3247,7 +3249,6 @@
     "needsInput": "richiede input",
     "idle": "Inattivo",
     "channelName": "Agenti attivi",
-    "activityKitDisabledTitle": "Le attività in tempo reale sono disattivate",
     "activityKitDisabledBody": "Attiva le attività in tempo reale in Impostazioni per vedere gli agenti attivi sulla schermata di blocco."
   }
 }

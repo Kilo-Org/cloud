@@ -635,6 +635,8 @@
   },
   "notifications": {
     "title": "Fógraí",
+    "liveActivities": "Gníomhaíochtaí beo",
+    "liveActivitySubtitle": "Taispeáin gníomhairí gníomhacha ar an scáileán glasáilte",
     "push": "Brú",
     "enabled": "Fógraí cumasaithe",
     "onDescription": "Tá brú-fhógraí ar siúl don ghléas seo.",
@@ -3291,7 +3293,6 @@
     "needsInput": "teastaíonn ionchur",
     "idle": "Díomhaoin",
     "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledTitle": "Tá Gníomhaíochtaí Beo as",
     "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
   }
 }

@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Notifications",
+    "liveActivities": "Live Activities",
+    "liveActivitySubtitle": "Show active agents on the Lock Screen",
     "push": "Push",
     "enabled": "Notifications enabled",
     "onDescription": "Push notifications are on for this device.",
@@ -3225,7 +3227,6 @@
     "needsInput": "Needs input",
     "idle": "Idle",
     "channelName": "Active agents",
-    "activityKitDisabledTitle": "Live Activities are off",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   }
 }

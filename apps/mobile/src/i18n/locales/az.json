@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Bildirişlər",
+    "liveActivities": "Canlı fəaliyyətlər",
+    "liveActivitySubtitle": "Aktiv agentləri kilid ekranında göstərin",
     "push": "Push",
     "enabled": "Bildirişlər aktivdir",
     "onDescription": "Push bildirişləri bu cihaz üçün açıqdır.",
@@ -3225,7 +3227,6 @@
     "needsInput": "GİRİŞ TƏLƏB OLUNUR",
     "idle": "Boşda",
     "channelName": "Aktiv agentlər",
-    "activityKitDisabledTitle": "Canlı fəaliyyətlər söndürülüb",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."
   }
 }

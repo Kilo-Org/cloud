@@ -628,6 +628,8 @@
   },
   "notifications": {
     "title": "Obvestila",
+    "liveActivities": "Aktivnosti v živo",
+    "liveActivitySubtitle": "Prikaži aktivne agente na zaklenjenem zaslonu",
     "push": "Potisno",
     "enabled": "Obvestila omogočena",
     "onDescription": "Potisna obvestila so vklopljena za to napravo.",
@@ -3269,7 +3271,6 @@
     "needsInput": "potrebuje vnos",
     "idle": "Nedejavno",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledTitle": "Dejavnosti v živo so izklopljene",
     "activityKitDisabledBody": "V Nastavitvah vklopite Dejavnosti v živo, da bodo Aktivni agenti prikazani na zaklenjenem zaslonu."
   }
 }

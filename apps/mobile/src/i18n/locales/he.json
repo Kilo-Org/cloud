@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "התראות",
+    "liveActivities": "פעילויות בזמן אמת",
+    "liveActivitySubtitle": "הצג סוכנים פעילים במסך הנעילה",
     "push": "דחיפה",
     "enabled": "התראות מופעלות",
     "onDescription": "התראות דחיפה מופעלות עבור מכשיר זה.",
@@ -3247,7 +3249,6 @@
     "needsInput": "נדרש קלט",
     "idle": "בטל",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledTitle": "פעילויות בזמן אמת כבויות",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   }
 }

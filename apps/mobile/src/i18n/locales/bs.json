@@ -621,6 +621,8 @@
   },
   "notifications": {
     "title": "Obavijesti",
+    "liveActivities": "Aktivnosti uživo",
+    "liveActivitySubtitle": "Prikaži aktivne agente na zaključanom ekranu",
     "push": "Push",
     "enabled": "Obavijesti omogućene",
     "onDescription": "Push obavijesti su uključene za ovaj uređaj.",
@@ -3247,7 +3249,6 @@
     "needsInput": "treba unos",
     "idle": "Neaktivan",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledTitle": "Aktivnosti uživo su isključene",
     "activityKitDisabledBody": "Uključite aktivnosti uživo u Postavkama da biste vidjeli aktivne agente na zaključanom ekranu."
   }
 }

@@ -621,6 +621,8 @@
   },
   "notifications": {
     "title": "Notificacions",
+    "liveActivities": "Activitats en directe",
+    "liveActivitySubtitle": "Mostra els agents actius a la pantalla de bloqueig",
     "push": "Push",
     "enabled": "Notificacions activades",
     "onDescription": "Les notificacions push estan activades per a aquest dispositiu.",
@@ -3247,7 +3249,6 @@
     "needsInput": "requereix entrada",
     "idle": "Inactiu",
     "channelName": "Agents actius",
-    "activityKitDisabledTitle": "Les activitats en directe estan desactivades",
     "activityKitDisabledBody": "Activa les activitats en directe a Configuració per veure els agents actius a la pantalla de bloqueig."
   }
 }

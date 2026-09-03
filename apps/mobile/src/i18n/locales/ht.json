@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Notifikasyon",
+    "liveActivities": "Aktivite an dirèk",
+    "liveActivitySubtitle": "Montre ajans aktif yo sou ekran vewouye a",
     "push": "Pouse",
     "enabled": "Notifikasyon aktive",
     "onDescription": "Notifikasyon pouse louvri pou aparèy sa a.",
@@ -3225,7 +3227,6 @@
     "needsInput": "bezwen input",
     "idle": "Anchaj",
     "channelName": "Ajans aktif yo",
-    "activityKitDisabledTitle": "Aktivite an dirèk yo fèmen",
     "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."
   }
 }

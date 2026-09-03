@@ -30,13 +30,35 @@ vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
   useKiloClawTabVisible,
 }));
 
+const { openSettings, setLiveActivityEnabled, liveActivityEnabled, systemAllowsLiveActivities } =
+  vi.hoisted(() => ({
+    openSettings: vi.fn(),
+    setLiveActivityEnabled: vi.fn(),
+    liveActivityEnabled: vi.fn(() => true),
+    systemAllowsLiveActivities: vi.fn(() => true),
+  }));
+
 vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
-  Linking: { openSettings: vi.fn() },
+  Linking: { openSettings: openSettings },
+  Platform: { OS: 'ios' },
+}));
+// The Live Activity row: the preference is SecureStore-backed and the system
+// switch is a native read, so both are stubbed the way every other native
+// dependency on this screen is.
+vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
+  useLiveActivityPreference: () => ({
+    liveActivityEnabled: liveActivityEnabled(),
+    hasLoaded: true,
+    setLiveActivityEnabled,
+  }),
+}));
+vi.mock('@/glanceable-ios/system-switch', () => ({
+  liveActivitiesAllowedBySystem: () => systemAllowsLiveActivities(),
 }));
 vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
@@ -54,6 +76,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   RefreshCw: 'RefreshCw',
   ShieldAlert: 'ShieldAlert',
+  Smartphone: 'Smartphone',
   Sparkles: 'Sparkles',
   Wallet: 'Wallet',
 }));

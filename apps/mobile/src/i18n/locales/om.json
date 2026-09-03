@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Beeksisota",
+    "liveActivities": "Sochoota kallattii",
+    "liveActivitySubtitle": "Eejentoota hojjetan gaaffii cufaa irratti agarsiisi",
     "push": "Push",
     "enabled": "Beeksisni dandeesame",
     "onDescription": "Beeksisni push meeshaa kanaaf jira.",
@@ -3225,7 +3227,6 @@
     "needsInput": "seensa barbaada",
     "idle": "Hojii irraa boqachaa",
     "channelName": "Eejentoota hojii irra jiran",
-    "activityKitDisabledTitle": "Sochiiwwan Kallattii cufamaniiru",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran Iskiriinii Qulfii irratti arguuf, Qindaa'ina keessatti Sochiiwwan Kallattii banaa."
   }
 }

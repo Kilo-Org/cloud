@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Értesítések",
+    "liveActivities": "Élő tevékenységek",
+    "liveActivitySubtitle": "Aktív ügynökök megjelenítése a zárolási képernyőn",
     "push": "Leküldés",
     "enabled": "Értesítések engedélyezve",
     "onDescription": "A leküldéses értesítések be vannak kapcsolva ehhez az eszközhöz.",
@@ -3225,7 +3227,6 @@
     "needsInput": "bemenetet igényel",
     "idle": "Tétlen",
     "channelName": "Aktív ügynökök",
-    "activityKitDisabledTitle": "Az Élő tevékenységek ki vannak kapcsolva",
     "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   }
 }

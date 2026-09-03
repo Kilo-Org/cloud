@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Ogaysiisyada",
+    "liveActivities": "Hawlaha tooska ah",
+    "liveActivitySubtitle": "Ku muuji wakiillada firfircoon Shaashadda Qufulka",
     "push": "Push",
     "enabled": "Ogaysiisyadu waa daaran",
     "onDescription": "Ogaysiisyada push waxay u daaran aaladdan.",
@@ -3225,7 +3227,6 @@
     "needsInput": "u baahan wax-soo-gal",
     "idle": "Firfircooni la'aan",
     "channelName": "Wakiillada firfircoon",
-    "activityKitDisabledTitle": "Hawlaha Tooska ah waa daman",
     "activityKitDisabledBody": "Ku daar Hawlaha Tooska ah Dejinta si aad Wakiillada firfircoon ugu aragto Shaashadda Qufulka."
   }
 }

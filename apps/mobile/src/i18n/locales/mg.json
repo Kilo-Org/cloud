@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Fampandrenesana",
+    "liveActivities": "Hetsika mivantana",
+    "liveActivitySubtitle": "Asehoy ny agent miasa eo amin’ny efijery mihidy",
     "push": "Push",
     "enabled": "Alefa ny fampandrenesana",
     "onDescription": "Miasa amin'ity fitaovana ity ny fampandrenesana push.",
@@ -3225,7 +3227,6 @@
     "needsInput": "mila fampidirana",
     "idle": "Tsy mihetsika",
     "channelName": "Agent mavitrika",
-    "activityKitDisabledTitle": "Tsy mandeha ny Hetsika Mivantana",
     "activityKitDisabledBody": "Alefaso ao amin'ny Fikirana ny Hetsika Mivantana mba hahitana ny Agent Mavitrika eo amin'ny Efijery Fihidy."
   }
 }

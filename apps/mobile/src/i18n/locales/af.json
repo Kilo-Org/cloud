@@ -614,6 +614,8 @@
   },
   "notifications": {
     "title": "Kennisgewings",
+    "liveActivities": "Live-aktiwiteite",
+    "liveActivitySubtitle": "Wys aktiewe agente op die sluitskerm",
     "push": "Druk",
     "enabled": "Kennisgewings geaktiveer",
     "onDescription": "Drukkennisgewings is aan vir hierdie toestel.",
@@ -3225,7 +3227,6 @@
     "needsInput": "benodig invoer",
     "idle": "Onaktief",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledTitle": "Regstreekse Aktiwiteite is af",
     "activityKitDisabledBody": "Skakel Regstreekse Aktiwiteite in Instellings aan om Aktiewe Agente op die Sluitskerm te sien."
   }
 }

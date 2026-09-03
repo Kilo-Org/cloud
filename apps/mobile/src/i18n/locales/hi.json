@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "सूचनाएँ",
+    "liveActivities": "लाइव गतिविधियाँ",
+    "liveActivitySubtitle": "लॉक स्क्रीन पर सक्रिय एजेंट दिखाएँ",
     "push": "पुश",
     "enabled": "सूचनाएँ सक्षम",
     "onDescription": "इस डिवाइस के लिए पुश सूचनाएँ चालू हैं।",
@@ -3225,7 +3227,6 @@
     "needsInput": "इनपुट आवश्यक",
     "idle": "निष्क्रिय",
     "channelName": "सक्रिय एजेंट",
-    "activityKitDisabledTitle": "लाइव ऐक्टिविटी बंद हैं",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
   }
 }

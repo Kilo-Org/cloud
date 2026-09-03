@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { Alert, Linking, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import {
   buildOpaqueScopeKey,
@@ -12,33 +12,6 @@ import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
 import { forEachSink } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
-import { i18n } from '@/i18n';
-
-/**
- * The one in-app Open Settings alert for an ActivityKit-unavailable surface.
- * Shown at most once per process when the Agents tab regains focus — never
- * auto-alerted from the publisher, so the publisher stays a pure state machine.
- */
-
-let alertShown = false;
-
-export function showActivityKitDisabledAlertOnce(): void {
-  if (Platform.OS !== 'ios' || alertShown) {
-    return;
-  }
-  if (!getActivityKitDenied()) {
-    return;
-  }
-  alertShown = true;
-  Alert.alert(
-    i18n.t('glanceable.activityKitDisabledTitle'),
-    i18n.t('glanceable.activityKitDisabledBody'),
-    [
-      { text: i18n.t('common.cancel'), style: 'cancel' },
-      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
-    ]
-  );
-}
 
 /**
  * Recover a once-denied ActivityKit surface after verifying the stored identity

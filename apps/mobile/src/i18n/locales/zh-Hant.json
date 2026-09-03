@@ -160,6 +160,8 @@
   },
   "notifications": {
     "title": "通知",
+    "liveActivities": "即時動態",
+    "liveActivitySubtitle": "在鎖定畫面上顯示使用中的代理",
     "push": "推播",
     "enabled": "已啟用通知",
     "onDescription": "此裝置的推播通知已開啟。",
@@ -3225,7 +3227,6 @@
     "needsInput": "需要輸入",
     "idle": "閒置",
     "channelName": "使用中的代理",
-    "activityKitDisabledTitle": "即時動態已關閉",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，以在鎖定畫面上查看使用中的代理。"
   }
 }

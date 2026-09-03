@@ -4,6 +4,10 @@ import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/verce
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
+} from './runtime-credential-proxy.js';
 
 const {
   getRunningTerminalClientMock,
@@ -721,6 +725,107 @@ describe('server /terminal', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+});
+
+describe('server runtime credential proxy', () => {
+  async function handle(): Promise<string> {
+    return issueRuntimeCredentialProxyHandle(
+      { NEXTAUTH_SECRET: secret } as never,
+      createRuntimeProxyGrant({
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        sessionId: 'agent_proxy',
+        kiloSessionId: 'kilo_proxy',
+        userId: 'usr_proxy',
+        orgId: 'org_proxy',
+        mode: 'contained',
+        generation: 1,
+        allocationId: 'allocation_proxy',
+        wrapperRunId: 'run_proxy',
+        wrapperConnectionId: 'connection_proxy',
+        leaseExpiresAt: Date.now() + 60_000,
+        state: 'active',
+      })
+    );
+  }
+
+  it('denies invalid handles before resolving a session or fetching', async () => {
+    const env = createEnv();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
+        headers: { Authorization: 'Bearer invalid' },
+      }),
+      env
+    );
+    expect(response.status).toBe(401);
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('replaces caller credentials, enforces organization identity, and preserves request shape', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({
+      token: 'https://provider.example.test/api/openrouter:backing-token',
+      organizationId: 'org_proxy',
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('POST');
+      expect(new URL(request.url).pathname).toBe('/api/openrouter/chat/completions');
+      expect(await request.text()).toBe('{"stream":true}');
+      expect(request.headers.get('authorization')).toMatch(/^Bearer /);
+      expect(request.headers.get('authorization')).not.toBe('Bearer caller-token');
+      expect(request.headers.get('cookie')).toBeNull();
+      expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      return new Response('stream-body', {
+        status: 307,
+        headers: { Location: 'https://other.test' },
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request(
+        'https://worker.test/api/runtime-credential-proxy/provider/chat/completions?stream=true',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await handle()}`,
+            Cookie: 'session=caller',
+            'X-Kilocode-OrganizationId': 'attacker-org',
+            'Content-Type': 'application/json',
+          },
+          body: '{"stream":true}',
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://other.test');
+    await expect(response.text()).resolves.toBe('stream-body');
+    expect(resolve).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it('validates the body-bound ingest identity before fetching upstream', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({ token: jwt.sign({ exp: 4_000_000_000 }, secret) });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await handle()}`, 'Content-Type': 'application/json' },
+        body: '{"sessionId":"other"}',
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(upstream).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

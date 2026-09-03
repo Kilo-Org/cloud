@@ -49,6 +49,11 @@ import {
 } from './sandbox-control/credential.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import {
+  runtimeCredentialProxyUpstream,
+  verifyRuntimeCredentialProxyHandle,
+} from './runtime-credential-proxy.js';
+import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 
 const app = new Hono<HonoContext>();
 
@@ -215,6 +220,10 @@ app.get('/health', (c: Context<HonoContext>) => {
   });
 });
 
+// Handle authentication is bearer-only; the URL contains neither a credential
+// nor an upstream authority. Register before the broad facade routes.
+app.all('/api/runtime-credential-proxy/:route/*', routeRuntimeCredentialProxy);
+
 function requireInternalApi(c: Context<HonoContext>): Response | null {
   if (!c.env.INTERNAL_API_SECRET) {
     return c.text('Internal API secret not configured', 500);
@@ -295,17 +304,141 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
 function createSanitizedForwardRequest(
   request: Request,
   url: string | URL,
-  headers: Headers
+  headers: Headers,
+  body?: BodyInit
 ): Request {
   const init: RequestInit & { duplex?: 'half' } = {
     method: request.method,
     headers,
   };
-  if (request.body && requestMethodAllowsBody(request.method)) {
-    init.body = request.body;
+  if ((body !== undefined || request.body) && requestMethodAllowsBody(request.method)) {
+    init.body = body ?? request.body;
     init.duplex = 'half';
   }
   return new Request(url, init);
+}
+
+function runtimeProxyAuthorization(request: Request): string | null {
+  const authorization = request.headers.get('Authorization');
+  const match = authorization ? /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization) : null;
+  return match?.[1] ?? null;
+}
+
+function runtimeProxyHeaders(request: Request, token: string, organizationId?: string): Headers {
+  const headers = new Headers(request.headers);
+  for (const name of [
+    'Authorization',
+    'Cookie',
+    'Host',
+    'Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+    'X-Kilocode-OrganizationId',
+  ]) {
+    headers.delete(name);
+  }
+  for (const [name] of headers) {
+    if (
+      name.startsWith('proxy-') ||
+      name.startsWith('x-forwarded-') ||
+      name.startsWith('x-internal-') ||
+      name.startsWith('x-kilo-') ||
+      name.startsWith('x-kilocode-') ||
+      name === 'forwarded' ||
+      name === 'x-real-ip' ||
+      name === 'x-kilocode-organizationid'
+    ) {
+      headers.delete(name);
+    }
+  }
+  headers.set('Authorization', `Bearer ${token}`);
+  if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
+  return headers;
+}
+
+async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let value = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) return value + decoder.decode();
+      const bytes = new Uint8Array(chunk.value);
+      size += bytes.byteLength;
+      if (size > maximumBytes) {
+        await reader.cancel();
+        return null;
+      }
+      value += decoder.decode(bytes, { stream: true });
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return c.text('Unauthorized', 401);
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return c.text('Unauthorized', 401);
+  const route = c.req.param('route');
+  const prefix = `/api/runtime-credential-proxy/${route}/`;
+  const requestPath = new URL(c.req.url).pathname;
+  if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
+  const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
+    return c.text('Not found', 404);
+  let bodyText: string | undefined;
+  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
+    bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
+    if (bodyText === undefined) return c.text('Not found', 404);
+  }
+  let credential: { token: string; organizationId?: string } | null;
+  try {
+    credential = await withDORetry(
+      () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
+      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      'resolveRuntimeCredentialProxyGrant'
+    );
+  } catch {
+    return c.text('Credential unavailable', 503);
+  }
+  if (!credential) return c.text('Unauthorized', 401);
+  const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  if (!targets.success) return c.text('Not found', 404);
+  const upstream = runtimeCredentialProxyUpstream(
+    targets.targets,
+    route,
+    c.req.method,
+    path,
+    new URL(c.req.url).search,
+    claims.kiloSessionId,
+    credential.organizationId,
+    c.req.header('content-type'),
+    bodyText
+  );
+  if (!upstream) return c.text('Not found', 404);
+  try {
+    return await fetch(
+      createSanitizedForwardRequest(
+        c.req.raw,
+        upstream,
+        runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId),
+        bodyText
+      ),
+      { redirect: 'manual' }
+    );
+  } catch {
+    return c.text('Upstream unavailable', 502);
+  }
 }
 
 function parseOptionalWrapperGeneration(raw: string | null): number | undefined {

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, eq, isNull, or } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -60,10 +61,18 @@ async function writeAudit(
 async function tryWriteAudit(params: { actor: Actor; record: LocalRecord; status: AuditStatus }) {
   try {
     await writeAudit(db, params.actor, params.record, params.status);
-  } catch {
-    return false;
+  } catch (error) {
+    captureException(error, {
+      tags: {
+        operation: 'github-installation-uninstall-audit',
+        audit_status: params.status.replaceAll(/[^a-z]+/g, '_').replaceAll(/^_|_$/g, ''),
+      },
+      extra: {
+        integrationId: params.record.id,
+        ownerType: params.record.ownerType,
+      },
+    });
   }
-  return true;
 }
 
 function recordMatchesInput(record: LocalRecord, input: GitHubInstallationUninstallInput) {
@@ -169,6 +178,7 @@ export async function uninstallGitHubOrganizationInstallation(params: {
 
   let upstreamDeleted = false;
   try {
+    // These transaction-scoped locks auto-release, but intentionally span the bounded remote call to prevent actor revocation or target reassignment.
     await db.transaction(async tx => {
       await requireFreshActiveAdmin(tx, params.actor.id);
       const locked = await lockRecord(tx, params.input);

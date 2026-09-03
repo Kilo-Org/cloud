@@ -15,6 +15,7 @@ import {
   controlFrameSchema,
   controlErrorCodes,
   sandboxHelloResultSchema,
+  sandboxHeartbeatPayloadSchema,
   sessionEventPayloadSchema,
   type ControlError,
   type EventFrame,
@@ -62,7 +63,7 @@ export type SandboxControlClient = {
 type ClientState =
   | { kind: 'idle' }
   | { kind: 'starting'; promise: Promise<void>; abort: AbortController }
-  | { kind: 'ready'; socket: WebSocket; dispose: () => void }
+  | { kind: 'ready'; socket: WebSocket; dispose: () => void; kiloVersionHeartbeat: boolean }
   | { kind: 'closed' };
 
 const CONNECT_TIMEOUT_MS = 10_000;
@@ -237,6 +238,7 @@ export function createSandboxControlClient(
       const signal = starting.abort.signal;
       const requestId = crypto.randomUUID();
       let phase: 'opening' | 'hello' | 'status' | 'finished' = 'opening';
+      let kiloVersionHeartbeat = false;
       let timeout = setTimeout(fail, Math.min(CONNECT_TIMEOUT_MS, deadlineAt - Date.now()));
 
       function dispose(): void {
@@ -326,10 +328,13 @@ export function createSandboxControlClient(
         }
         if (phase === 'opening') return;
         if (frame.type === 'response' && frame.requestId === requestId) {
-          if (!frame.ok || !sandboxHelloResultSchema.safeParse(frame.result).success) {
+          if (phase !== 'hello') return;
+          const hello = sandboxHelloResultSchema.safeParse(frame.result);
+          if (!frame.ok || !hello.success) {
             fail();
             return;
           }
+          kiloVersionHeartbeat = hello.data.capabilities?.kiloVersionHeartbeat === true;
           phase = 'status';
           diagnostic('hello_accepted', ws);
           return;
@@ -371,6 +376,7 @@ export function createSandboxControlClient(
         state = {
           kind: 'ready',
           socket: ws,
+          kiloVersionHeartbeat,
           dispose: () => {
             clearInterval(keepalive);
             dispose();
@@ -499,7 +505,10 @@ export function createSandboxControlClient(
         return false;
       }
       try {
-        const serialized = serializeEvent(event, payload, session);
+        const heartbeat =
+          event === 'sandbox.heartbeat' ? sandboxHeartbeatPayloadSchema.parse(payload) : null;
+        if (heartbeat && !state.kiloVersionHeartbeat) delete heartbeat.kilo.version;
+        const serialized = serializeEvent(event, heartbeat ?? payload, session);
         socket.send(serialized);
         eventDiagnostic('sent', Buffer.byteLength(serialized));
         return true;

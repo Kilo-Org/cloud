@@ -10,6 +10,7 @@ import {
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
+import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
 import type {
   ControlErrorCode,
   SessionAttachPayload,
@@ -53,6 +54,7 @@ export type WorktreeKiloAttachment = {
 };
 
 export type WorktreeKiloRuntimes = {
+  readonly kiloCliVersion?: string | null;
   attach(
     identity: SessionRequestIdentity,
     kilo: WorktreeKiloAuth,
@@ -284,7 +286,13 @@ export function createWorktreeKiloRuntimes(options: {
   const roots = new Map<string, RootAttachment>();
   const homesByDirectory = new Map<string, Set<string>>();
   const deletedDirectories = new Set<string>();
+  let observedVersion: string | null | undefined;
   let closed = false;
+
+  function recordVersion(value: unknown): void {
+    const version = safeSandboxRuntimeVersion(value);
+    observedVersion = observedVersion === undefined || observedVersion === version ? version : null;
+  }
 
   function findRoot(identity: SessionRequestIdentity): RootAttachment | undefined {
     for (const root of roots.values()) {
@@ -459,6 +467,20 @@ export function createWorktreeKiloRuntimes(options: {
       );
       abort.signal.throwIfAborted();
       entry.runtime = runtime;
+      void withKiloRequestDeadline(
+        signal => eventClient.global.health({ signal }),
+        abort.signal
+      ).then(
+        health => {
+          if (closed || abort.signal.aborted || entry.processAbort !== abort) return;
+          recordVersion(health.data?.healthy === true ? health.data.version : null);
+        },
+        () => {
+          if (!closed && !abort.signal.aborted && entry.processAbort === abort) {
+            recordVersion(null);
+          }
+        }
+      );
       return runtime;
     } catch {
       if (entry.runtime) failRuntime(entry, 'credential_refresh_failed');
@@ -526,6 +548,9 @@ export function createWorktreeKiloRuntimes(options: {
   }
 
   return {
+    get kiloCliVersion() {
+      return observedVersion ?? null;
+    },
     attach(identity, kilo, environment, canRefreshCredentials) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);

@@ -3,6 +3,7 @@ import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   sandboxControlSocketAttachmentSchema,
+  sandboxHelloResultSchema,
   sessionTerminalCloseResultSchema,
   sessionTerminalConnectResultSchema,
   sessionTerminalCreateResultSchema,
@@ -11,6 +12,7 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import {
   errorResponse,
+  helloResult,
   isControlEvent,
   isControlOperation,
   isSessionOperation,
@@ -37,6 +39,29 @@ const terminalPty = {
 };
 
 describe('sandbox control frames', () => {
+  it('advertises heartbeat version support without requiring it from an old Worker', () => {
+    expect(sandboxHelloResultSchema.parse(helloResult())).toEqual({
+      protocolVersion: 1,
+      handshakeComplete: true,
+      capabilities: { kiloVersionHeartbeat: true },
+    });
+    const previous = { protocolVersion: 1, handshakeComplete: true };
+    expect(sandboxHelloResultSchema.parse(previous)).toEqual(previous);
+    for (const capabilities of [
+      null,
+      { kiloVersionHeartbeat: 'true' },
+      { kiloVersionHeartbeat: 1 },
+    ]) {
+      expect(sandboxHelloResultSchema.safeParse({ ...previous, capabilities }).success).toBe(false);
+    }
+    expect(
+      sandboxHelloResultSchema.safeParse({ ...helloResult(), protocolVersion: 2 }).success
+    ).toBe(false);
+    expect(
+      sandboxHelloResultSchema.safeParse({ ...helloResult(), handshakeComplete: false }).success
+    ).toBe(false);
+  });
+
   it('accepts a valid request envelope', () => {
     const parsed = parseControlFrame(
       JSON.stringify({

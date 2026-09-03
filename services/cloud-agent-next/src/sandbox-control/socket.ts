@@ -5,10 +5,16 @@ import {
   type ControlDiagnosticFields,
 } from './diagnostics.js';
 import {
+  safeSandboxRuntimeVersion,
+  type SandboxRuntimeMetadata,
+} from '../shared/sandbox-status.js';
+import {
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   SANDBOX_CONTROL_WS_TAG,
   SANDBOX_HELLO_DEADLINE_MS,
   sandboxControlSocketAttachmentSchema,
+  sandboxControlObservationSchema,
+  type SandboxControlObservation,
   sessionRequestIdentitySchema,
   type ControlOperation,
   type RequestFrame,
@@ -37,6 +43,7 @@ import {
   createControlRequestWaiters,
   type ControlRequestWaiters,
 } from './waiters.js';
+import { summarizeHeartbeatIdle } from './status-projection.js';
 
 export type SandboxControlSocketState = DurableObjectState;
 
@@ -56,7 +63,10 @@ export type SandboxControlConnectionIdentity = {
 
 export type SandboxControlSocketHooks = {
   validateHandshake?(providerInstanceId: string): boolean | Promise<boolean>;
-  onHandshakeComplete?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
+  onHandshakeComplete?(
+    identity: SandboxControlConnectionIdentity,
+    runtime?: Pick<SandboxRuntimeMetadata, 'wrapperVersion'>
+  ): void | Promise<void>;
   onReady?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
   onHeartbeat?(
     payload: SandboxHeartbeatPayload,
@@ -90,9 +100,60 @@ export type SandboxControlSocketHandler = {
   closeProvisionalSockets(): void;
 };
 
+const operationalAttachmentSchema = sandboxControlSocketAttachmentSchema.extend({
+  observation: sandboxControlObservationSchema.optional().catch(undefined),
+});
+
 function readAttachment(ws: WebSocket): SandboxControlSocketAttachment | null {
-  const parsed = sandboxControlSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
+  const parsed = operationalAttachmentSchema.safeParse(ws.deserializeAttachment());
   return parsed.success ? parsed.data : null;
+}
+
+export type SandboxControlConnectionObservation =
+  | { state: 'disconnected' }
+  | { state: 'unknown' }
+  | { state: 'connected'; acceptedAt: number; observation: SandboxControlObservation };
+
+const observedRuntimeSchema = sandboxControlSocketAttachmentSchema
+  .pick({ connectionId: true, providerInstanceId: true, wrapperInstanceId: true })
+  .required({ connectionId: true, providerInstanceId: true })
+  .extend({ readyConnectionId: sandboxControlSocketAttachmentSchema.shape.connectionId });
+
+export function readSandboxControlConnection(
+  state: Pick<DurableObjectState, 'getWebSockets'>,
+  providerRef: string | null,
+  runtime: unknown
+): SandboxControlConnectionObservation {
+  let current: SandboxControlSocketAttachment | undefined;
+  for (const ws of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
+    if (ws.readyState !== 1) continue;
+    const parsed = sandboxControlSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
+    if (!parsed.success) return { state: 'unknown' };
+    if (!parsed.data.handshakeComplete) continue;
+    if (current) return { state: 'unknown' };
+    current = parsed.data;
+  }
+  if (!current) return { state: 'disconnected' };
+  const expected = observedRuntimeSchema.safeParse(runtime);
+  if (
+    !expected.success ||
+    current.connectionId !== expected.data.connectionId ||
+    current.providerInstanceId !== expected.data.providerInstanceId ||
+    current.wrapperInstanceId !== expected.data.wrapperInstanceId ||
+    (current.observation?.ready && expected.data.readyConnectionId !== current.connectionId) ||
+    current.protocolVersion !== SANDBOX_CONTROL_PROTOCOL_VERSION ||
+    current.providerInstanceId !== providerRef ||
+    !current.observation ||
+    !Number.isSafeInteger(current.acceptedAt) ||
+    current.observation.receivedAt < current.acceptedAt
+  ) {
+    return { state: 'unknown' };
+  }
+  return {
+    state: 'connected',
+    acceptedAt: current.acceptedAt,
+    observation: current.observation,
+  };
 }
 
 function sendJson(ws: WebSocket, value: unknown): void {
@@ -220,6 +281,32 @@ export function createSandboxControlSocketHandler(
   const activatingConnections = new Set<string>();
   const log = (event: string, fields: ControlDiagnosticFields) =>
     logControlDiagnostic(event, { sandboxId, ...fields });
+  const observations = new WeakMap<WebSocket, SandboxControlObservation>();
+
+  function recordObservation(
+    ws: WebSocket,
+    attachment: SandboxControlSocketAttachment,
+    ready: boolean
+  ): SandboxControlObservation | undefined {
+    if (currentHandshakenSocket(state)?.socket !== ws) return undefined;
+    const observation: SandboxControlObservation = { ready, receivedAt: Date.now(), idle: null };
+    observations.set(ws, observation);
+    ws.serializeAttachment({ ...attachment, observation });
+    return observation;
+  }
+
+  function invalidateIdleObservation(
+    ws: WebSocket,
+    attachment: SandboxControlSocketAttachment
+  ): void {
+    if (currentHandshakenSocket(state)?.socket !== ws) return;
+    observations.delete(ws);
+    if (!attachment.observation?.idle) return;
+    ws.serializeAttachment({
+      ...attachment,
+      observation: { ...attachment.observation, idle: null },
+    });
+  }
 
   return {
     hasHandshakenSocket(): boolean {
@@ -405,6 +492,7 @@ export function createSandboxControlSocketHandler(
           }
         }
 
+        observations.delete(ws);
         ws.serializeAttachment(completed);
         if (replaced) waiters.rejectAll('Wrapper socket replaced');
         for (const existing of superseded) {
@@ -416,7 +504,9 @@ export function createSandboxControlSocketHandler(
 
         activatingConnections.add(identity.connectionId);
         try {
-          const activation = hooks.onHandshakeComplete?.(identity);
+          const activation = hooks.onHandshakeComplete?.(identity, {
+            wrapperVersion: safeSandboxRuntimeVersion(payload.wrapperVersion),
+          });
           if (activation) await activation;
         } finally {
           activatingConnections.delete(identity.connectionId);
@@ -481,16 +571,27 @@ export function createSandboxControlSocketHandler(
           return;
         }
         if (frame.event === 'sandbox.ready') {
+          recordObservation(ws, attachment, true);
           await hooks.onReady?.(identity);
         } else if (frame.event === 'sandbox.heartbeat') {
-          await hooks.onHeartbeat?.(eventPayload.payload as SandboxHeartbeatPayload, identity);
+          const payload = eventPayload.payload as SandboxHeartbeatPayload;
+          const observation = recordObservation(ws, attachment, payload.kilo.ready);
+          await hooks.onHeartbeat?.(payload, identity);
+          if (observation) {
+            const idle = await summarizeHeartbeatIdle(payload);
+            if (isCurrentConnection(state, ws, identity) && observations.get(ws) === observation) {
+              ws.serializeAttachment({ ...attachment, observation: { ...observation, idle } });
+            }
+          }
         } else if (frame.event === 'session.event') {
+          invalidateIdleObservation(ws, attachment);
           await hooks.onSessionEvent?.(
             frame.session,
             eventPayload.payload as SessionEventPayload,
             identity
           );
         } else if (frame.event === 'session.preparing') {
+          invalidateIdleObservation(ws, attachment);
           await hooks.onSessionPreparing?.(
             frame.session,
             eventPayload.payload as SessionPreparingPayload,

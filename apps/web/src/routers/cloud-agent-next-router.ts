@@ -29,6 +29,8 @@ import {
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseGetSandboxStatusNextSchema,
+  baseGetSandboxStatusNextOutputSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -537,6 +539,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  getSandboxStatus: baseProcedure
+    .input(baseGetSandboxStatusNextSchema)
+    .output(baseGetSandboxStatusNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId).catch(() => {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Session not found or access denied',
+        });
+      });
+      return await createCloudAgentNextClient(generateCloudAgentToken(ctx.user)).getSandboxStatus(
+        input.cloudAgentSessionId
+      );
     }),
 
   getComputeBillingStatus: baseProcedure

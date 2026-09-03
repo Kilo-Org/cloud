@@ -95,7 +95,13 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7" title="Send feedback">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          title="Send feedback"
+          aria-label="Send feedback"
+        >
           <MessageSquareWarning className="h-4 w-4" />
         </Button>
       </DialogTrigger>

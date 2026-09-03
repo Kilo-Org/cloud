@@ -18,9 +18,9 @@ import {
 } from './session-ownership';
 
 const PERSONAL_SESSION_ID = 'ses_access_personal_1234567890';
-const PERSONAL_CLOUD_AGENT_SESSION_ID = 'agent_access_personal';
+const PERSONAL_CLOUD_AGENT_SESSION_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
 const ORGANIZATION_SESSION_ID = 'ses_access_organization_123456';
-const ORGANIZATION_CLOUD_AGENT_SESSION_ID = 'agent_access_organization';
+const ORGANIZATION_CLOUD_AGENT_SESSION_ID = 'workspace_87654321-4321-4321-8321-cba987654321';
 
 let owner: User;
 let otherMember: User;
@@ -161,6 +161,27 @@ describe('Cloud Agent session ownership', () => {
     ).resolves.toBeNull();
   });
 
+  it('does not allow a personal session through organization scope', async () => {
+    await expect(
+      verifyOrgOwnsSessionV2ByCloudAgentId(
+        db,
+        organization.id,
+        owner.id,
+        PERSONAL_CLOUD_AGENT_SESSION_ID
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('denies missing control-plane sessions in either scope', async () => {
+    const missingId = 'workspace_aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    await expect(
+      verifyUserOwnsSessionV2ByCloudAgentId(db, owner.id, missingId)
+    ).resolves.toBeNull();
+    await expect(
+      verifyOrgOwnsSessionV2ByCloudAgentId(db, organization.id, owner.id, missingId)
+    ).resolves.toBeNull();
+  });
+
   it('denies access after removal and restores it after rejoining', async () => {
     await db
       .delete(organization_memberships)
@@ -232,6 +253,14 @@ describe('Cloud Agent session ownership', () => {
       .set({ deleted_at: new Date().toISOString() })
       .where(eq(organizations.id, organization.id));
 
+    await expect(
+      verifyOrgOwnsSessionV2ByCloudAgentId(
+        db,
+        organization.id,
+        owner.id,
+        ORGANIZATION_CLOUD_AGENT_SESSION_ID
+      )
+    ).resolves.toBeNull();
     await expect(
       queryAccessibleCloudAgentSession(db, {
         kiloUserId: owner.id,

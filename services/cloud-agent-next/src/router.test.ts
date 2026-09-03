@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 
 // Mock Cloudflare sandbox to prevent module resolution errors
@@ -91,6 +91,8 @@ import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import { WrapperClient } from './kilo/wrapper-client.js';
+import { logger } from './logger.js';
+import type { SandboxStatusSnapshot } from './shared/sandbox-status.js';
 
 type MockSessionStub = {
   deleteSession?: ReturnType<typeof vi.fn>;
@@ -1868,6 +1870,223 @@ describe('router sessionId validation', () => {
       // getSession procedure tests below.
     });
   });
+});
+
+describe('getSandboxStatus procedure', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const snapshot = {
+    status: 'active',
+    provider: 'Cloudflare',
+    observedAt: 1_800_000_000_000,
+    detailCode: 'sandbox_ready',
+    inactivityTimeoutMs: 300_000,
+    estimatedSleepAt: 1_800_000_060_000,
+  } satisfies SandboxStatusSnapshot;
+  const unavailable = {
+    status: 'unknown',
+    provider: 'Unknown',
+    observedAt: expect.any(Number),
+    detailCode: 'status_unavailable',
+    inactivityTimeoutMs: null,
+    estimatedSleepAt: null,
+  };
+  const getSandboxStatus = vi.fn<() => Promise<unknown>>();
+  const sandboxSession = {
+    idFromName: vi.fn((name: string) => name),
+    get: vi.fn(() => ({ getSandboxStatus })),
+  };
+  const legacySession = { idFromName: vi.fn(), get: vi.fn() };
+  let context: TRPCContext;
+  let caller: ReturnType<typeof appRouter.createCaller>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getSandboxStatus.mockReset().mockResolvedValue(snapshot);
+    sandboxSession.get.mockReset().mockImplementation(() => ({ getSandboxStatus }));
+    sandboxSession.idFromName.mockReset().mockImplementation(name => name);
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: null,
+    });
+    context = {
+      userId: 'oauth/provider:status-owner',
+      authToken: 'test-token',
+      request: new Request('https://worker.test/trpc/getSandboxStatus'),
+      env: {
+        SANDBOX_SESSION: sandboxSession,
+        CLOUD_AGENT_SESSION: legacySession,
+      },
+    } as unknown as TRPCContext;
+    caller = appRouter.createCaller(context);
+  });
+
+  afterEach(() => {
+    expect(legacySession.idFromName).not.toHaveBeenCalled();
+    expect(legacySession.get).not.toHaveBeenCalled();
+    expect(getSandbox).not.toHaveBeenCalled();
+    expect(fetchSessionMetadata).not.toHaveBeenCalled();
+    expect(getOrCreateSessionMock).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it.each([null, '11111111-2222-4333-8444-555555555555'])(
+    'authorizes current scope %s before any passive lookup',
+    async organizationId => {
+      requireCurrentSessionAccessMock.mockImplementationOnce(async () => {
+        expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+        expect(getSandboxStatus).not.toHaveBeenCalled();
+        return { kiloSessionId: 'ses_12345678901234567890123456', organizationId };
+      });
+      await expect(caller.getSandboxStatus({ cloudAgentSessionId })).resolves.toEqual(snapshot);
+      expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+        env: context.env,
+        kiloUserId: context.userId,
+        cloudAgentSessionId,
+      });
+      expect(sandboxSession.idFromName).toHaveBeenCalledWith(
+        `oauth/provider:status-owner:${cloudAgentSessionId}`
+      );
+      expect(getSandboxStatus).toHaveBeenCalledWith();
+    }
+  );
+
+  it('requires authentication before authorization or DO access', async () => {
+    const unauthenticated = appRouter.createCaller({
+      ...context,
+      userId: '',
+      authToken: '',
+    });
+    await expect(unauthenticated.getSandboxStatus({ cloudAgentSessionId })).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_12345678-1234-4234-9234-123456789abc',
+    'ses_12345678901234567890123456',
+    'sess_12345678-1234-4234-9234-123456789abc',
+    'workspace_',
+    'workspace_pending',
+    `${cloudAgentSessionId} `,
+    `${cloudAgentSessionId}\n`,
+    'workspace_../../private',
+    '',
+  ])('rejects ineligible reference %s before any lookup', async invalidId => {
+    await expect(caller.getSandboxStatus({ cloudAgentSessionId: invalidId })).rejects.toMatchObject(
+      { code: 'BAD_REQUEST' }
+    );
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'provider',
+    'ownerId',
+    'userId',
+    'orgId',
+    'organizationId',
+    'sandboxId',
+    'providerInstanceId',
+    'observedAt',
+    'inactivityTimeoutMs',
+    'estimatedSleepAt',
+  ])('rejects caller-supplied %s before any lookup', async field => {
+    await expect(
+      caller.getSandboxStatus({ cloudAgentSessionId, [field]: 'private-override' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+  });
+
+  it.each(['FORBIDDEN', 'NOT_FOUND', 'SERVICE_UNAVAILABLE'] as const)(
+    'preserves %s authorization failures rather than returning unknown',
+    async code => {
+      requireCurrentSessionAccessMock.mockRejectedValueOnce(
+        new TRPCError({ code, message: 'Session access denied' })
+      );
+      await expect(caller.getSandboxStatus({ cloudAgentSessionId })).rejects.toMatchObject({
+        code,
+      });
+      expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+      expect(getSandboxStatus).not.toHaveBeenCalled();
+    }
+  );
+
+  it('strips private upstream fields and repeatedly uses only the passive RPC', async () => {
+    getSandboxStatus.mockResolvedValue({
+      ...snapshot,
+      sessionId: 'private-session',
+      sandboxId: 'private-sandbox',
+      ownerId: 'private-owner',
+      providerInstanceId: 'private-instance',
+      credentials: { token: 'private-token' },
+      error: 'private-error',
+    });
+    for (let read = 0; read < 3; read++) {
+      const result = await caller.getSandboxStatus({ cloudAgentSessionId });
+      expect(result).toEqual(snapshot);
+      expect(JSON.stringify(result)).not.toContain('private');
+    }
+    expect(getSandboxStatus).toHaveBeenCalledTimes(3);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    null,
+    {},
+    { ...snapshot, status: 'private-status' },
+    { ...snapshot, provider: 'private-provider' },
+    { ...snapshot, detailCode: 'private-error' },
+    { ...snapshot, detailCode: 'sandbox_failed' },
+    { ...snapshot, observedAt: Infinity },
+    { ...snapshot, inactivityTimeoutMs: -1 },
+    { ...snapshot, estimatedSleepAt: snapshot.observedAt },
+  ])('makes malformed upstream data safely unavailable: %j', async response => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    getSandboxStatus.mockResolvedValue(response);
+    await expect(caller.getSandboxStatus({ cloudAgentSessionId })).resolves.toEqual(unavailable);
+    expect(getSandboxStatus).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private');
+  });
+
+  it('sanitizes retryable DO errors before logging and uses fresh stubs', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    getSandboxStatus.mockRejectedValueOnce(
+      Object.assign(new Error('private-token provider diagnostics'), { retryable: true })
+    );
+    await expect(caller.getSandboxStatus({ cloudAgentSessionId })).resolves.toEqual(snapshot);
+    expect(sandboxSession.get).toHaveBeenCalledTimes(2);
+    expect(getSandboxStatus).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private');
+    expect(warn).toHaveBeenCalledWith(
+      '[do-retry] Retrying',
+      expect.objectContaining({ error: 'Sandbox status unavailable' })
+    );
+  });
+
+  it.each(['stub', 'rpc', 'exhausted'] as const)(
+    'bounds %s failures without leaking diagnostics or confirming sandbox failure',
+    async failure => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const logError = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const error = Object.assign(new Error('private-token provider diagnostics'), {
+        retryable: failure === 'exhausted',
+      });
+      if (failure === 'stub')
+        sandboxSession.get.mockImplementation(() => {
+          throw error;
+        });
+      else getSandboxStatus.mockRejectedValue(error);
+      const response = await caller.getSandboxStatus({ cloudAgentSessionId });
+      expect(response).toEqual(unavailable);
+      expect(JSON.stringify([response, warn.mock.calls, logError.mock.calls])).not.toContain(
+        'private'
+      );
+      expect(sandboxSession.get).toHaveBeenCalledTimes(failure === 'exhausted' ? 3 : 1);
+    }
+  );
 });
 
 describe('getMessageResult procedure', () => {

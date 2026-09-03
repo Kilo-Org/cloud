@@ -30,6 +30,7 @@ import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import {
   createSandboxControlSocketHandler,
   type SandboxControlConnectionIdentity,
+  readSandboxControlConnection,
   type SandboxControlOutboundRequest,
   type SandboxControlSocketHandler,
 } from '../sandbox-control/socket.js';
@@ -90,6 +91,7 @@ import {
 } from '../sandbox-control/session-routes.js';
 import {
   projectReportedStatus,
+  projectSandboxStatus,
   type ConnectionState,
   type ReportedSandboxStatus,
   type WorkState,
@@ -108,8 +110,12 @@ import {
   eraseSandboxRecord,
   loadDeadlines,
   loadPhysicalRecord,
+  initialRuntimeMetadata,
+  loadRuntimeMetadata,
+  saveRuntimeMetadata,
   loadRouteTable,
   loadTransitionLog,
+  readSandboxControlState,
   saveDeadlines,
   savePhysicalRecord,
   saveRouteTable,
@@ -177,6 +183,11 @@ import {
   type SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { AgentSandboxProvider } from '../types.js';
+import {
+  safeSandboxRuntimeVersion,
+  type SandboxRuntimeMetadata,
+  type SandboxStatusSnapshot,
+} from '../shared/sandbox-status.js';
 
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_ID_KEY = 'owner_id';
@@ -285,6 +296,7 @@ export class SandboxControl extends DurableObject<Env> {
   private readonly readinessOperations = new Set<Promise<unknown>>();
   private readonly lifecycleOperations = new Set<Promise<unknown>>();
   private worktreeDeletionChain: Promise<unknown> = Promise.resolve();
+  private operationalInitialization: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -295,7 +307,7 @@ export class SandboxControl extends DurableObject<Env> {
     );
     this.socketHandler = createSandboxControlSocketHandler(ctx, this.sandboxId, undefined, {
       validateHandshake: providerInstanceId => this.validateHandshake(providerInstanceId),
-      onHandshakeComplete: identity => this.onHandshakeComplete(identity),
+      onHandshakeComplete: (identity, runtime) => this.onHandshakeComplete(identity, runtime),
       onReady: identity => this.onWrapperReady(identity),
       onHeartbeat: (payload, identity) => this.onHeartbeat(payload, identity),
       onSessionEvent: (sessionIdentity, payload, identity) =>
@@ -305,7 +317,11 @@ export class SandboxControl extends DurableObject<Env> {
       onSocketClosed: (handshakeComplete, identity) =>
         this.onSocketClosed(handshakeComplete, identity),
     });
-    void ctx.blockConcurrencyWhile(async () => {
+  }
+
+  private ensureOperationalInitialized(): Promise<void> {
+    return (this.operationalInitialization ??= this.ctx.blockConcurrencyWhile(async () => {
+      const ctx = this.ctx;
       const [readyAt, runtime, kind, physical] = await Promise.all([
         ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
         ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
@@ -348,10 +364,11 @@ export class SandboxControl extends DurableObject<Env> {
       } else {
         this.kiloReady = !runtime && current !== null && readyAt !== undefined;
       }
-    });
+    }));
   }
 
   async fetch(request: Request): Promise<Response> {
+    await this.ensureOperationalInitialized();
     const upgrade = request.headers.get('Upgrade');
     if (upgrade?.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
@@ -369,6 +386,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    await this.ensureOperationalInitialized();
     if (this.runtimeDeleted) return;
     await this.trackLifecycleOperation(
       Promise.resolve(this.socketHandler.handleMessage(ws, message))
@@ -376,6 +394,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    await this.ensureOperationalInitialized();
     if (this.runtimeDeleted) return;
     await this.trackLifecycleOperation(Promise.resolve(this.socketHandler.handleClose(ws)));
   }
@@ -385,6 +404,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    await this.ensureOperationalInitialized();
     if (this.runtimeDeleted) return;
     await this.trackLifecycleOperation(this.runAlarm());
   }
@@ -430,6 +450,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async setWrapperCredentialHash(hash: string): Promise<void> {
+    await this.ensureOperationalInitialized();
     if (!/^[0-9a-f]{64}$/.test(hash)) {
       throw new Error('Invalid wrapper credential hash');
     }
@@ -462,6 +483,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async initializeOwner(ownerId: string): Promise<{ ownerId: string }> {
+    await this.ensureOperationalInitialized();
     const normalized = typeof ownerId === 'string' ? ownerId.trim() : '';
     if (normalized.length === 0) {
       throw new Error('ownerId must be a non-empty string');
@@ -480,10 +502,12 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async getOwner(): Promise<string | null> {
+    await this.ensureOperationalInitialized();
     return this.readOwner();
   }
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
+    await this.ensureOperationalInitialized();
     await this.assertRequestWorktreeAdmission(input);
     if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
       throw new Error('Worktree cleanup requires the deletion coordinator');
@@ -580,6 +604,7 @@ export class SandboxControl extends DurableObject<Env> {
     wrapperInstanceId: string;
     reason: string;
   }): Promise<{ quarantined: boolean }> {
+    await this.ensureOperationalInitialized();
     if (
       typeof input.ownerId !== 'string' ||
       !input.ownerId ||
@@ -730,6 +755,7 @@ export class SandboxControl extends DurableObject<Env> {
     url: string;
     method: string;
   }): Promise<{ credential: string; organizationId?: string } | null> {
+    await this.ensureOperationalInitialized();
     return this.withCredentialUpdate(async () => {
       try {
         const alias = parseControlPlaneCredential(input.credential);
@@ -810,6 +836,7 @@ export class SandboxControl extends DurableObject<Env> {
   private async runEnsureReady(
     input: Parameters<SandboxControl['ensureReady']>[0]
   ): Promise<SandboxControlStatus & { attachment?: SessionAttachPayload }> {
+    await this.ensureOperationalInitialized();
     this.assertWorktreeAdmission(input.worktreeId);
     const acquisition =
       input.acquisition === undefined
@@ -1255,6 +1282,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async detachSession(sessionId: string): Promise<{ existed: boolean }> {
+    await this.ensureOperationalInitialized();
     const route = (await loadRouteTable(this.ctx.storage)).get(sessionId);
     let runtimeDetached = false;
     let existed = false;
@@ -1585,6 +1613,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async listRoutes(): Promise<SessionRoute[]> {
+    await this.ensureOperationalInitialized();
     const table = await loadRouteTable(this.ctx.storage);
     return [...table.values()];
   }
@@ -1720,6 +1749,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async getStatus(): Promise<SandboxControlStatus> {
+    await this.ensureOperationalInitialized();
     return this.statusForPhysical(await loadPhysicalRecord(this.ctx.storage));
   }
 
@@ -1738,11 +1768,41 @@ export class SandboxControl extends DurableObject<Env> {
     };
   }
 
+  async getSandboxStatus(input: {
+    ownerId: string;
+    provider: AgentSandboxProvider;
+  }): Promise<SandboxStatusSnapshot> {
+    const [stored, ownerId, provider, runtime] = await Promise.all([
+      readSandboxControlState(this.ctx.storage),
+      this.readOwner(),
+      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+      this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
+    ]);
+    const matches =
+      ownerId !== null &&
+      ownerId === input.ownerId &&
+      (provider === 'cloudflare' || provider === 'vercel') &&
+      provider === input.provider;
+    return projectSandboxStatus({
+      stored: matches ? stored : { physical: null, deadlines: null, routes: null },
+      connection: readSandboxControlConnection(
+        this.ctx,
+        stored.physical?.providerRef ?? null,
+        runtime
+      ),
+      ownerId,
+      provider: matches ? provider : undefined,
+      now: Date.now(),
+    });
+  }
+
   async getPhysicalRecord(): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     return loadPhysicalRecord(this.ctx.storage);
   }
 
   async getTransitionLog(): Promise<TransitionRow[]> {
+    await this.ensureOperationalInitialized();
     return loadTransitionLog(this.ctx.storage);
   }
 
@@ -1752,6 +1812,7 @@ export class SandboxControl extends DurableObject<Env> {
     allocationName?: string,
     containment?: CredentialContainmentRequirements
   ): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage, resumable);
       this.assertWorktreeAdmission();
@@ -1780,6 +1841,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async confirmInstance(providerRef: string): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     const next = confirmRunning(current, providerRef, Date.now());
     await this.persistPhysical(current, next, 'instance confirmed');
@@ -1787,6 +1849,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async observeProvider(result: ObserveResult): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     let next = observe(current, result);
     if ((next.state === 'failed' || next.state === 'unknown') && !next.stopTombstone) {
@@ -1808,6 +1871,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async beginStop(reason: string): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     if (current.state === 'stopped' || current.stopTombstone) return current;
     const next = beginStop(current, reason, Date.now(), this.activeConnection?.wrapperInstanceId);
@@ -1816,6 +1880,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async recordStopAttempt(): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     if (this.stopAttemptInFlight && sameAllocation(this.stopAttemptInFlight.physical, current)) {
       this.logDiagnostic('stop_coalesced', {
@@ -1983,6 +2048,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async confirmStopped(): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     const next = confirmStopped(current);
     await this.persistPhysical(current, next, 'terminal');
@@ -1990,6 +2056,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async markFailed(): Promise<PhysicalRecord> {
+    await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
     const next = fail(current, Date.now());
     await this.persistPhysical(current, next, 'failed');
@@ -2004,6 +2071,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   async eraseRecord(options?: { preserveAcquisitionReceipts: true }): Promise<void> {
+    await this.ensureOperationalInitialized();
     await eraseSandboxRecord(this.ctx.storage);
     await this.ctx.storage.delete([
       OWNER_ID_KEY,
@@ -2369,7 +2437,10 @@ export class SandboxControl extends DurableObject<Env> {
     );
   }
 
-  private async onHandshakeComplete(identity: SandboxControlConnectionIdentity): Promise<void> {
+  private async onHandshakeComplete(
+    identity: SandboxControlConnectionIdentity,
+    runtime?: Pick<SandboxRuntimeMetadata, 'wrapperVersion'>
+  ): Promise<void> {
     const socketConnection = this.socketHandler.getConnectionIdentity();
     if (!socketConnection || !this.sameConnection(socketConnection, identity)) return;
 
@@ -2390,15 +2461,34 @@ export class SandboxControl extends DurableObject<Env> {
       return;
     }
     const now = Date.now();
-    await this.ctx.storage.transaction(async () => {
+    const activated = await this.ctx.storage.transaction(async () => {
+      const [current, storedRuntime] = await Promise.all([
+        loadPhysicalRecord(this.ctx.storage),
+        loadRuntimeMetadata(this.ctx.storage),
+      ]);
+      const connection = this.socketHandler.getConnectionIdentity();
+      if (
+        !connection ||
+        !this.sameConnection(connection, identity) ||
+        !sameAllocation(current, physical) ||
+        current.stopTombstone ||
+        (current.state !== 'creating' && current.state !== 'running') ||
+        !this.matchesProviderReference(current, identity.providerInstanceId)
+      )
+        return false;
+      await saveRuntimeMetadata(this.ctx.storage, {
+        ...(storedRuntime ?? initialRuntimeMetadata(this.sandboxId)),
+        wrapperVersion: safeSandboxRuntimeVersion(runtime?.wrapperVersion),
+        kiloCliVersion: null,
+      });
       await this.ctx.storage.put(ACTIVE_WRAPPER_RUNTIME_KEY, identity);
       await this.ctx.storage.delete(WRAPPER_READY_AT_KEY);
-      if (physical.state === 'creating') {
+      if (current.state === 'creating') {
         const providerRef =
-          physical.providerRef ??
+          current.providerRef ??
           (this.providerKind === 'cloudflare' ? identity.providerInstanceId : undefined);
         if (providerRef !== undefined) {
-          await savePhysicalRecord(this.ctx.storage, confirmRunning(physical, providerRef, now));
+          await savePhysicalRecord(this.ctx.storage, confirmRunning(current, providerRef, now));
           await this.appendLog(
             physicalTransition(now, physical.state, 'running', 'hello', providerRef)
           );
@@ -2414,7 +2504,9 @@ export class SandboxControl extends DurableObject<Env> {
       await saveDeadlines(this.ctx.storage, deadlines);
       await this.scheduleAlarm(deadlines);
       await this.appendLog(connectionTransition(now, 'disconnected', 'connected', 'hello'));
+      return true;
     });
+    if (!activated) return;
     this.activeConnection = identity;
     this.readyConnectionId = null;
     this.kiloReady = false;
@@ -2498,8 +2590,24 @@ export class SandboxControl extends DurableObject<Env> {
     const now = Date.now();
     const applied = await this.ctx.storage
       .transaction(async () => {
+        const physical = await loadPhysicalRecord(this.ctx.storage);
         const table = await loadRouteTable(this.ctx.storage);
-        if (!this.isCurrentConnection(identity)) return;
+        if (
+          !this.isCurrentConnection(identity) ||
+          physical.state !== 'running' ||
+          physical.stopTombstone ||
+          physical.providerRef !== identity.providerInstanceId
+        )
+          return;
+        if (payload.kilo.version !== undefined) {
+          const runtime =
+            (await loadRuntimeMetadata(this.ctx.storage)) ?? initialRuntimeMetadata(this.sandboxId);
+          const kiloCliVersion = safeSandboxRuntimeVersion(payload.kilo.version);
+          if (!this.isCurrentConnection(identity)) return;
+          if (runtime.kiloCliVersion !== kiloCliVersion) {
+            await saveRuntimeMetadata(this.ctx.storage, { ...runtime, kiloCliVersion });
+          }
+        }
         const reported = new Map(payload.sessions.map(session => [session.kiloSessionId, session]));
         let missingRoutes = 0;
         let activeRoutes = 0;
@@ -2988,6 +3096,7 @@ export class SandboxControl extends DurableObject<Env> {
     input: SandboxTerminalAccessInput,
     allowExpiredCredentials = false
   ): Promise<TerminalRuntimeSnapshot | TerminalRuntimeRejection> {
+    await this.ensureOperationalInitialized();
     if (
       typeof input.sessionId !== 'string' ||
       input.sessionId.length === 0 ||
@@ -3184,6 +3293,9 @@ export class SandboxControl extends DurableObject<Env> {
     const unavailable =
       to.stopTombstone !== null || (to.state !== 'creating' && to.state !== 'running');
     await savePhysicalRecord(this.ctx.storage, to);
+    if (from.state === 'stopped' && to.state === 'creating') {
+      await saveRuntimeMetadata(this.ctx.storage, initialRuntimeMetadata(this.sandboxId));
+    }
     if (to.state === 'stopped') {
       await saveSessionCredentialGrants(this.ctx.storage, []);
       await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
@@ -3357,6 +3469,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async requireOwner(): Promise<string> {
+    await this.ensureOperationalInitialized();
     const ownerId = await this.readOwner();
     if (ownerId === null) throw new Error('Sandbox owner is not initialized');
     return ownerId;

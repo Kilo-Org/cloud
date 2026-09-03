@@ -14,6 +14,7 @@ import { useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
+import { isSandboxStatusEligible } from './sandbox-status';
 import { ChatInput } from './ChatInput';
 import {
   dedupeCustomModeOptions,
@@ -950,6 +951,15 @@ export default function CloudChatPage({
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
+      sandboxStatusEligible={isSandboxStatusEligible({
+        currentUserId,
+        sessionId,
+        sessionIdFromParams,
+        organizationId,
+        activeSessionType,
+        isReadOnly,
+        fetchedSessionData,
+      })}
     />
   );
 

@@ -12,6 +12,10 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { SendMessagePayload } from './types.js';
+import {
+  SandboxStatusSnapshotSchema,
+  type SandboxStatusSnapshot,
+} from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
 export type { SendMessagePayload } from './types.js';
 
 /**
@@ -578,6 +582,9 @@ type CloudAgentNextTRPCClient = {
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
   };
+  getSandboxStatus: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
@@ -794,6 +801,44 @@ export class CloudAgentNextClient {
         extra: { cloudAgentSessionId },
       });
       throw error;
+    }
+  }
+
+  async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
+    try {
+      return SandboxStatusSnapshotSchema.parse(
+        await this.client.getSandboxStatus.query({ cloudAgentSessionId })
+      );
+    } catch (error) {
+      if (error instanceof TRPCClientError) {
+        const code = error.data?.code ?? error.shape?.data?.code;
+        const httpStatus = error.data?.httpStatus ?? error.shape?.data?.httpStatus;
+        if (code === 'UNAUTHORIZED' || httpStatus === 401) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
+        }
+        if (
+          code === 'FORBIDDEN' ||
+          code === 'NOT_FOUND' ||
+          httpStatus === 403 ||
+          httpStatus === 404
+        ) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Session not found or access denied' });
+        }
+        if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503) {
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Sandbox status is temporarily unavailable',
+          });
+        }
+      }
+      return {
+        status: 'unknown',
+        provider: 'Unknown',
+        observedAt: Date.now(),
+        detailCode: 'status_unavailable',
+        inactivityTimeoutMs: null,
+        estimatedSleepAt: null,
+      };
     }
   }
 

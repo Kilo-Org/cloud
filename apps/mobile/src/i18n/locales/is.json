@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "skrá",
       "file": "skrár",
-      "file_other": "skrár"
+      "file_other": "skrár",
+      "openedAgo": "Opnað {{time}}",
+      "updatedAgo": "Uppfært {{time}}",
+      "mergedAgo": "Sameinað {{time}}",
+      "mergedByAgo": "{{login}} sameinaði {{time}}",
+      "closedAgo": "Lokað {{time}}",
+      "labels": "Merki",
+      "reviewers": "Yfirlesarar",
+      "assignees": "Ábyrgðaraðilar",
+      "linkedIssues": "Tengd mál",
+      "reviewApproved": "Samþykkt",
+      "reviewChangesRequested": "Óskað eftir breytingum",
+      "reviewCommented": "Athugasemd gerð",
+      "reviewPending": "Bíður yfirlestrar",
+      "openIssueA11y": "Opna mál #{{number}} á GitHub",
+      "reviewDismissed": "Vísað frá"
     },
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri biðandi athugasemd á {{location}}",

@@ -564,7 +564,22 @@
       "commit_few": "commity",
       "commit_many": "commitů",
       "file_few": "soubory",
-      "file_many": "souborů"
+      "file_many": "souborů",
+      "openedAgo": "Otevřeno {{time}}",
+      "updatedAgo": "Aktualizováno {{time}}",
+      "mergedAgo": "Sloučeno {{time}}",
+      "mergedByAgo": "Sloučil {{login}} {{time}}",
+      "closedAgo": "Uzavřeno {{time}}",
+      "labels": "Štítky",
+      "reviewers": "Recenzenti",
+      "assignees": "Přiřazení",
+      "linkedIssues": "Propojené úkoly",
+      "reviewApproved": "Schváleno",
+      "reviewChangesRequested": "Vyžádány změny",
+      "reviewCommented": "Okomentováno",
+      "reviewPending": "Čeká na recenzi",
+      "openIssueA11y": "Otevřít úkol #{{number}} na GitHubu",
+      "reviewDismissed": "Zavrženo"
     },
     "pendingComment": {
       "editOutdatedA11y": "Upravit zastaralý čekající komentář na {{location}}",

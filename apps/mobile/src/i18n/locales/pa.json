@@ -550,7 +550,22 @@
       "commit_other": "ਕਮਿਟ",
       "file_one": "ਫਾਈਲ",
       "file": "ਫਾਈਲਾਂ",
-      "file_other": "ਫਾਈਲਾਂ"
+      "file_other": "ਫਾਈਲਾਂ",
+      "openedAgo": "ਖੋਲ੍ਹਿਆ ਗਿਆ {{time}}",
+      "updatedAgo": "ਅੱਪਡੇਟ ਕੀਤਾ ਗਿਆ {{time}}",
+      "mergedAgo": "ਮਰਜ ਹੋਈ {{time}}",
+      "mergedByAgo": "{{login}} ਨੇ ਮਰਜ ਕੀਤਾ {{time}}",
+      "closedAgo": "ਬੰਦ {{time}}",
+      "labels": "ਲੇਬਲ",
+      "reviewers": "ਸਮੀਖਿਅਕ",
+      "assignees": "ਸੌਂਪੇ ਗਏ",
+      "linkedIssues": "ਜੁੜੇ ਮੁੱਦੇ",
+      "reviewApproved": "ਮਨਜ਼ੂਰ",
+      "reviewChangesRequested": "ਤਬਦੀਲੀਆਂ ਮੰਗੀਆਂ",
+      "reviewCommented": "ਟਿੱਪਣੀ ਕੀਤੀ",
+      "reviewPending": "ਸਮੀਖਿਆ ਦੀ ਉਡੀਕ",
+      "openIssueA11y": "GitHub ਉੱਤੇ ਮੁੱਦਾ #{{number}} ਖੋਲ੍ਹੋ",
+      "reviewDismissed": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} 'ਤੇ ਪੁਰਾਣੀ ਲੰਬਿਤ ਟਿੱਪਣੀ ਸੰਪਾਦਿਤ ਕਰੋ",

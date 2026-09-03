@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "arquivo",
       "file": "arquivos",
-      "file_other": "arquivos"
+      "file_other": "arquivos",
+      "openedAgo": "Aberto {{time}}",
+      "updatedAgo": "Actualizado {{time}}",
+      "mergedAgo": "Fusionado {{time}}",
+      "mergedByAgo": "Fusionado por {{login}} {{time}}",
+      "closedAgo": "Pechado {{time}}",
+      "labels": "Etiquetas",
+      "reviewers": "Revisores",
+      "assignees": "Asignados",
+      "linkedIssues": "Incidencias vinculadas",
+      "reviewApproved": "Aprobado",
+      "reviewChangesRequested": "Cambios solicitados",
+      "reviewCommented": "Comentado",
+      "reviewPending": "Á espera de revisión",
+      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub",
+      "reviewDismissed": "Descartado"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentario pendente desactualizado en {{location}}",

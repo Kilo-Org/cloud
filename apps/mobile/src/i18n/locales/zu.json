@@ -550,7 +550,22 @@
       "commit_other": "ama-commit",
       "file_one": "ifayela",
       "file": "amafayela",
-      "file_other": "amafayela"
+      "file_other": "amafayela",
+      "openedAgo": "Kuvuliwe {{time}}",
+      "updatedAgo": "Kubuyekeziwe {{time}}",
+      "mergedAgo": "Kuyahlanganisiwe {{time}}",
+      "mergedByAgo": "Kuhlanganiswe ngu-{{login}} {{time}}",
+      "closedAgo": "Kuvaliwe {{time}}",
+      "labels": "Amalebula",
+      "reviewers": "Ababuyekezi",
+      "assignees": "Abelwe",
+      "linkedIssues": "Izinkinga ezixhunyiwe",
+      "reviewApproved": "Kugunyaziwe",
+      "reviewChangesRequested": "Kuceliwe izinguquko",
+      "reviewCommented": "Kuphawuliwe",
+      "reviewPending": "Kulindele ukubuyekezwa",
+      "openIssueA11y": "Vula inkinga #{{number}} ku-GitHub",
+      "reviewDismissed": "Ichithiwe"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hlela amazwana alindile aphelelwe yisikhathi ku-{{location}}",

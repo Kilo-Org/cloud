@@ -2890,7 +2890,22 @@
       "stateOpenApproved": "打开 · 已批准",
       "stateOpenChangesRequested": "打开 · 已请求更改",
       "stateOpenReviewRequired": "打开 · 需要审查",
-      "unknownAuthor": "未知作者"
+      "unknownAuthor": "未知作者",
+      "openedAgo": "创建于 {{time}}",
+      "updatedAgo": "更新于 {{time}}",
+      "mergedAgo": "已合并 {{time}}",
+      "mergedByAgo": "由 {{login}} 合并 {{time}}",
+      "closedAgo": "已关闭 {{time}}",
+      "labels": "标签",
+      "reviewers": "审查者",
+      "assignees": "指派人",
+      "linkedIssues": "关联的议题",
+      "reviewApproved": "已批准",
+      "reviewChangesRequested": "已请求修改",
+      "reviewCommented": "已评论",
+      "reviewPending": "等待审查",
+      "openIssueA11y": "在 GitHub 上打开议题 #{{number}}",
+      "reviewDismissed": "已忽略"
     },
     "pendingComment": {
       "allQueuedHint": "所有评论将在一次批量请求中发送。",

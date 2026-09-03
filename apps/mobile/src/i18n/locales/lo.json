@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "ໄຟລ໌",
       "file": "ໄຟລ໌",
-      "file_other": "ໄຟລ໌"
+      "file_other": "ໄຟລ໌",
+      "openedAgo": "ເປີດ {{time}}",
+      "updatedAgo": "ອັບເດດ {{time}}",
+      "mergedAgo": "Merge ແລ້ວ {{time}}",
+      "mergedByAgo": "{{login}} ລວມແລ້ວ {{time}}",
+      "closedAgo": "ປິດ {{time}}",
+      "labels": "ປ້າຍກຳກັບ",
+      "reviewers": "ຜູ້ກວດສອບ",
+      "assignees": "ຜູ້ຮັບຜິດຊອບ",
+      "linkedIssues": "ບັນຫາທີ່ເຊື່ອມໂຍງ",
+      "reviewApproved": "ອະນຸມັດແລ້ວ",
+      "reviewChangesRequested": "ຮ້ອງຂໍການປ່ຽນແປງ",
+      "reviewCommented": "ໄດ້ໃຫ້ຄຳເຫັນ",
+      "reviewPending": "ລໍຖ້າການກວດສອບ",
+      "openIssueA11y": "ເປີດບັນຫາ #{{number}} ໃນ GitHub",
+      "reviewDismissed": "ຖືກປິດ"
     },
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍຖ້າທີ່ລ້າສະໄໝໃສ່ {{location}}",

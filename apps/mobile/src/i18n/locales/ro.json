@@ -557,7 +557,22 @@
       "file": "fișiere",
       "file_other": "fișiere",
       "commit_few": "commit-uri",
-      "file_few": "fișiere"
+      "file_few": "fișiere",
+      "openedAgo": "Deschis {{time}}",
+      "updatedAgo": "Actualizat {{time}}",
+      "mergedAgo": "Fuzionat {{time}}",
+      "mergedByAgo": "Îmbinat de {{login}} {{time}}",
+      "closedAgo": "Închis {{time}}",
+      "labels": "Etichete",
+      "reviewers": "Recenzenți",
+      "assignees": "Responsabili",
+      "linkedIssues": "Probleme asociate",
+      "reviewApproved": "Aprobat",
+      "reviewChangesRequested": "Modificări solicitate",
+      "reviewCommented": "Comentat",
+      "reviewPending": "În așteptarea recenziei",
+      "openIssueA11y": "Deschide problema #{{number}} pe GitHub",
+      "reviewDismissed": "Respinsă"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul învechit în așteptare pe {{location}}",

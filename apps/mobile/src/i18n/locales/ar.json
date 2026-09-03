@@ -2970,7 +2970,22 @@
       "file_zero": "لا ملفات",
       "file_two": "ملفّان",
       "file_few": "ملفات",
-      "file_many": "ملفًا"
+      "file_many": "ملفًا",
+      "openedAgo": "فُتح {{time}}",
+      "updatedAgo": "حُدّث {{time}}",
+      "mergedAgo": "تم الدمج {{time}}",
+      "mergedByAgo": "دمجه {{login}} {{time}}",
+      "closedAgo": "مغلق {{time}}",
+      "labels": "التسميات",
+      "reviewers": "المراجعون",
+      "assignees": "المكلَّفون",
+      "linkedIssues": "المشكلات المرتبطة",
+      "reviewApproved": "موافق عليه",
+      "reviewChangesRequested": "طُلبت تغييرات",
+      "reviewCommented": "علّق",
+      "reviewPending": "بانتظار المراجعة",
+      "openIssueA11y": "افتح المشكلة #{{number}} على GitHub",
+      "reviewDismissed": "مرفوض"
     },
     "pendingComment": {
       "allQueuedHint": "ستُرسل جميع التعليقات في طلب مجمّع واحد.",

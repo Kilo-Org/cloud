@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "fil",
       "file": "filer",
-      "file_other": "filer"
+      "file_other": "filer",
+      "openedAgo": "Öppnad {{time}}",
+      "updatedAgo": "Uppdaterad {{time}}",
+      "mergedAgo": "Sammanfogad {{time}}",
+      "mergedByAgo": "Sammanfogad av {{login}} {{time}}",
+      "closedAgo": "Stängd {{time}}",
+      "labels": "Etiketter",
+      "reviewers": "Granskare",
+      "assignees": "Ansvariga",
+      "linkedIssues": "Länkade ärenden",
+      "reviewApproved": "Godkänd",
+      "reviewChangesRequested": "Ändringar begärda",
+      "reviewCommented": "Kommenterad",
+      "reviewPending": "Väntar på granskning",
+      "openIssueA11y": "Öppna ärende #{{number}} på GitHub",
+      "reviewDismissed": "Avskriven"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redigera föråldrad väntande kommentar på {{location}}",

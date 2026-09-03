@@ -564,7 +564,22 @@
       "commit_few": "каміты",
       "commit_many": "камітаў",
       "file_few": "файлы",
-      "file_many": "файлаў"
+      "file_many": "файлаў",
+      "openedAgo": "Адкрыта {{time}}",
+      "updatedAgo": "Абноўлена {{time}}",
+      "mergedAgo": "Зліта {{time}}",
+      "mergedByAgo": "Аб'яднаў {{login}} {{time}}",
+      "closedAgo": "Закрыты {{time}}",
+      "labels": "Меткі",
+      "reviewers": "Рэцэнзенты",
+      "assignees": "Прызначаныя",
+      "linkedIssues": "Звязаныя задачы",
+      "reviewApproved": "Ухвалена",
+      "reviewChangesRequested": "Запытаны змены",
+      "reviewCommented": "Пракаменціравана",
+      "reviewPending": "Чакае рэцэнзіі",
+      "openIssueA11y": "Адкрыць задачу #{{number}} на GitHub",
+      "reviewDismissed": "Адхілена"
     },
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы чакаючы каментар на {{location}}",

@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "αρχείο",
       "file": "αρχεία",
-      "file_other": "αρχεία"
+      "file_other": "αρχεία",
+      "openedAgo": "Άνοιξε {{time}}",
+      "updatedAgo": "Ενημερώθηκε {{time}}",
+      "mergedAgo": "Συγχωνεύτηκε {{time}}",
+      "mergedByAgo": "Συγχωνεύτηκε από τον {{login}} {{time}}",
+      "closedAgo": "Κλειστό {{time}}",
+      "labels": "Ετικέτες",
+      "reviewers": "Κριτές",
+      "assignees": "Ανατέθηκε σε",
+      "linkedIssues": "Συνδεδεμένα ζητήματα",
+      "reviewApproved": "Εγκρίθηκε",
+      "reviewChangesRequested": "Ζητήθηκαν αλλαγές",
+      "reviewCommented": "Σχολιάστηκε",
+      "reviewPending": "Σε αναμονή κριτικής",
+      "openIssueA11y": "Άνοιγμα ζητήματος #{{number}} στο GitHub",
+      "reviewDismissed": "Απορρίφθηκε"
     },
     "pendingComment": {
       "editOutdatedA11y": "Επεξεργασία ξεπερασμένου εκκρεμούς σχολίου στο {{location}}",

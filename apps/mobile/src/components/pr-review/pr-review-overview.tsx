@@ -11,6 +11,7 @@ import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import {
@@ -211,6 +212,8 @@ export function PrReviewOverview({
           deletions={data.counts.deletions}
         />
       </View>
+
+      <PrOverviewMeta overview={data} />
 
       <View className="gap-2">
         <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">

@@ -550,7 +550,22 @@
       "commit_other": "awọn iṣẹ",
       "file_one": "faili",
       "file": "àwọn fáìlì",
-      "file_other": "àwọn fáìlì"
+      "file_other": "àwọn fáìlì",
+      "openedAgo": "Ṣí {{time}}",
+      "updatedAgo": "Ṣàtúnṣe {{time}}",
+      "mergedAgo": "Ti darapọ {{time}}",
+      "mergedByAgo": "{{login}} darapọ̀ mọ́ ọn {{time}}",
+      "closedAgo": "Tí a pa {{time}}",
+      "labels": "Àwọn àmì",
+      "reviewers": "Àwọn olùyẹ̀wò",
+      "assignees": "Àwọn tí a yàn",
+      "linkedIssues": "Àwọn ọ̀rọ̀ tí a so pọ̀",
+      "reviewApproved": "Ti fọwọ́sí",
+      "reviewChangesRequested": "Wọ́n béèrè àwọn àyípadà",
+      "reviewCommented": "Ti sọ̀rọ̀",
+      "reviewPending": "Ń dúró de àyẹ̀wò",
+      "openIssueA11y": "Ṣí ọ̀rọ̀ #{{number}} lórí GitHub",
+      "reviewDismissed": "Ti fi silẹ"
     },
     "pendingComment": {
       "editOutdatedA11y": "Ṣatunkọ asọye idaduro atijọ lori {{location}}",

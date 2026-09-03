@@ -1401,10 +1401,15 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       userId: 'usr_1',
       cliSessionIds: ['personal', 'org-a', 'org-b', 'foreign'],
     });
-    expect(requestedScopes).toEqual([
-      { userId: 'usr_1', organizationId: null },
-      { userId: 'usr_1', organizationId: 'org-1' },
-    ]);
+    // The two scopes are independent surfaces and fan out concurrently, so
+    // assert the set, never the completion order.
+    expect(requestedScopes).toHaveLength(2);
+    expect(requestedScopes).toEqual(
+      expect.arrayContaining([
+        { userId: 'usr_1', organizationId: null },
+        { userId: 'usr_1', organizationId: 'org-1' },
+      ])
+    );
     expect(queries[0].sql).toContain('select "session_id", "kilo_user_id", "organization_id"');
     expect(queries[0].sql).toContain('"cli_sessions_v2"."session_id" in');
     expect(messages).toHaveLength(4);

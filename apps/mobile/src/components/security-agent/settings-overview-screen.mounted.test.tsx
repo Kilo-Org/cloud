@@ -9,6 +9,7 @@ import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
+import { securityConfigFixture } from './security-config.test-fixture';
 
 const committedConnectivity = vi.hoisted(() => ({
   status: 'online' as 'online' | 'offline' | 'unknown',
@@ -81,6 +82,8 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 
 function host(root: ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
@@ -124,12 +127,7 @@ beforeEach(() => {
   onlineManager.setOnline(true);
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: 3, gcTime: Infinity } } });
   committedConnectivity.status = 'online';
-  configData = {
-    isEnabled: false,
-    repositorySelectionMode: 'all',
-    selectedRepositoryIds: [],
-    analysisMode: 'auto',
-  };
+  configData = structuredClone(securityConfigFixture);
   repositoriesData = [{ id: 1 }];
   roles = [{ organizationId: 'org_123', role: 'owner' }];
   failures.clear();
@@ -232,6 +230,8 @@ describe.each([
       failures.clear();
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
+      expect(host(root, 'CenteredState')).toHaveLength(isEnabled ? 0 : 1);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(isEnabled ? 1 : 0);
       expect(active.every(query => query.state.status === 'success')).toBe(true);
       expect(onlineManager.isOnline()).toBe(false);
     }

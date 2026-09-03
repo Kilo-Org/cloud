@@ -6,6 +6,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { POST } from './route';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -69,6 +70,10 @@ describe('POST /api/openrouter/models/validate', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ valid: true });
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
   });
 
   test('does not expose details for an unavailable model', async () => {

@@ -9,6 +9,7 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { INCEPTION_PROMO_MODEL, INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   checkOrganizationModelRestrictions,
   countAndStoreFimUsage,
@@ -90,7 +91,10 @@ export async function POST(request: NextRequest) {
     user: maybeUser,
     authFailedResponse,
     organizationId,
-  } = await getUserFromAuth({ adminOnly: false });
+  } = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  });
   authSpan.end();
   if (authFailedResponse) return authFailedResponse;
 

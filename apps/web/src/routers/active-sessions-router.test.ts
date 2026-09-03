@@ -1,4 +1,5 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
+import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -40,6 +41,51 @@ let createCallerForUser: typeof CreateCallerForUser;
 let regularUser: User;
 let testOrganization: Organization;
 
+const boundedTokenFlag = 'BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED';
+const originalBoundedTokenFlag = process.env[boundedTokenFlag];
+
+function restoreBoundedTokenFlag() {
+  if (originalBoundedTokenFlag === undefined) {
+    delete process.env[boundedTokenFlag];
+  } else {
+    process.env[boundedTokenFlag] = originalBoundedTokenFlag;
+  }
+}
+
+function authorizationToken(fetchSpy: jest.SpiedFunction<typeof fetch>): string {
+  const init = fetchSpy.mock.calls[0]?.[1];
+  const authorization = new Headers(init?.headers).get('authorization');
+  expect(authorization).toMatch(/^Bearer .+$/);
+  if (!authorization) throw new Error('expected authorization header');
+  return authorization.slice('Bearer '.length);
+}
+
+function expectSessionIngestAssertion(
+  token: string,
+  secret: string,
+  enabled: boolean
+): jwt.JwtPayload {
+  const claims = jwt.verify(token, secret, { algorithms: ['HS256'] });
+  if (typeof claims === 'string') throw new Error('expected JWT claims');
+
+  expect(claims.exp! - claims.iat!).toBe(60 * 60);
+  expect(claims.organizationId).toBeUndefined();
+  expect(claims.apiTokenPepper).toBeUndefined();
+  expect(claims.env).toBeUndefined();
+  if (enabled) {
+    expect(claims).toMatchObject({
+      aud: 'session-ingest',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+  } else {
+    expect(claims.aud).toBeUndefined();
+    expect(claims.tokenPurpose).toBeUndefined();
+    expect(claims.credentialExchange).toBeUndefined();
+  }
+  return claims;
+}
+
 describe('active-sessions-router', () => {
   beforeAll(async () => {
     ({ createCallerForUser } = await import('@/routers/test-utils'));
@@ -76,6 +122,63 @@ describe('active-sessions-router', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    restoreBoundedTokenFlag();
+  });
+
+  describe.each([
+    { name: 'disabled', enabled: false },
+    { name: 'enabled', enabled: true },
+  ])('bounded Session Ingest assertions when issuance is $name', ({ enabled }) => {
+    beforeEach(() => {
+      if (enabled) {
+        process.env[boundedTokenFlag] = 'true';
+      } else {
+        delete process.env[boundedTokenFlag];
+      }
+    });
+
+    it.each([
+      {
+        name: 'mintWebTicket',
+        path: '/api/user/web-ticket',
+        response: { ticket: 'opaque-web-ticket', expiresAt: 1_700_000_060 },
+        invoke: (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+          caller.activeSessions.createWebTicket(),
+      },
+      {
+        name: 'list',
+        path: '/api/sessions/active',
+        response: { sessions: [] },
+        invoke: (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+          caller.activeSessions.list(),
+      },
+      {
+        name: 'listInstances',
+        path: '/api/instances/active',
+        response: { instances: [] },
+        invoke: (caller: Awaited<ReturnType<typeof createCallerForUser>>) =>
+          caller.activeSessions.listInstances(),
+      },
+    ])('signs the $name request with the expected claims', async ({ path, response, invoke }) => {
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const { NEXTAUTH_SECRET } = await import('@/lib/config.server');
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await invoke(caller);
+
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(`https://test-ingest.example.com${path}`);
+      const token = authorizationToken(fetchSpy);
+      expectSessionIngestAssertion(token, NEXTAUTH_SECRET, enabled);
+      if (path === '/api/user/web-ticket') {
+        expect(result).toEqual({ token: 'opaque-web-ticket', expiresAt: 1_700_000_060 });
+        expect(() => jwt.verify('opaque-web-ticket', NEXTAUTH_SECRET)).toThrow();
+      }
+    });
   });
 
   describe('web ticket minting', () => {

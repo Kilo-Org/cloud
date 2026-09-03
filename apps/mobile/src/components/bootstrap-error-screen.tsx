@@ -1,6 +1,6 @@
-import { ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
@@ -25,14 +25,9 @@ export function BootstrapErrorScreen({
   secondaryAccessibilityLabel,
   onSecondaryPress,
 }: BootstrapErrorScreenProps) {
-  const { top, bottom } = useSafeAreaInsets();
   return (
-    <View className="flex-1 bg-background">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={makeContentContainerStyle({ top, bottom })}
-        showsVerticalScrollIndicator={false}
-      >
+    <CenteredState className="bg-background">
+      <View className="items-center gap-4 px-6">
         <View className="gap-2">
           <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
           <Text className="text-center text-sm text-muted-foreground">{description}</Text>
@@ -50,25 +45,7 @@ export function BootstrapErrorScreen({
             <Text>{secondaryLabel}</Text>
           </Button>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </CenteredState>
   );
-}
-
-type Insets = { readonly top: number; readonly bottom: number };
-
-const VERTICAL_GUTTER = 24;
-const HORIZONTAL_GUTTER = 24;
-const CONTENT_GAP = 16;
-
-function makeContentContainerStyle({ top, bottom }: Insets) {
-  return {
-    flexGrow: 1,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    gap: CONTENT_GAP,
-    paddingHorizontal: HORIZONTAL_GUTTER,
-    paddingTop: top + VERTICAL_GUTTER,
-    paddingBottom: bottom + VERTICAL_GUTTER,
-  };
 }

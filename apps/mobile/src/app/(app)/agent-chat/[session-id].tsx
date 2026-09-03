@@ -23,6 +23,7 @@ import { useIdentityConfirmation } from '@/components/agents/user-web-connection
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -195,36 +196,38 @@ export default function SessionDetailScreen() {
           backFallback="/(app)/(tabs)/(2_agents)"
         />
         <SessionConnectionIndicator />
-        <View className="flex-1 items-center justify-center gap-3 px-6">
-          <QueryError
-            variant={variant}
-            placement="top"
-            className="px-0 pt-0"
-            title={title}
-            message={message}
-            onRetry={notFound || unauthorized ? undefined : retry}
-            isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
-          />
-          <View className="flex-row gap-3">
-            <Button
-              variant="ghost"
-              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-              onPress={() => {
-                void performCopy(copyText);
-              }}
-            >
-              <Text>{t('common.copy')}</Text>
-            </Button>
-            <Button
-              variant="ghost"
-              onPress={() => {
-                router.replace('/(app)/(tabs)/(2_agents)' as Href);
-              }}
-            >
-              <Text>{t('agentChat.session.backToSessions')}</Text>
-            </Button>
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <QueryError
+              variant={variant}
+              placement="top"
+              className="px-0 pt-0"
+              title={title}
+              message={message}
+              onRetry={notFound || unauthorized ? undefined : retry}
+              isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
+            />
+            <View className="flex-row gap-3">
+              <Button
+                variant="ghost"
+                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
+                onPress={() => {
+                  void performCopy(copyText);
+                }}
+              >
+                <Text>{t('common.copy')}</Text>
+              </Button>
+              <Button
+                variant="ghost"
+                onPress={() => {
+                  router.replace('/(app)/(tabs)/(2_agents)' as Href);
+                }}
+              >
+                <Text>{t('agentChat.session.backToSessions')}</Text>
+              </Button>
+            </View>
           </View>
-        </View>
+        </CenteredState>
       </View>
     );
   }

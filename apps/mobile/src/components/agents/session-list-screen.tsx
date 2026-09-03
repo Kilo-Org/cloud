@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
 
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import {
   liveSessionContent,
@@ -56,16 +57,16 @@ export function AgentSessionListScreen() {
   );
 
   const context = useLiveSessionContext();
-  const { organizationId } = context;
+  const { organizationId, isError: isContextError, refetch: refetchContext } = context;
   const sessions = useLiveAgentSessions({ organizationId, enabled: context.isReady });
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
+  const showFab = context.isReady && content !== 'empty';
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const hasVisibleRows = visibleSessions.length > 0;
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -145,12 +146,12 @@ export function AgentSessionListScreen() {
       setRefreshing(true);
       try {
         // LiveSessionFeedback retains and announces failures without a duplicate toast.
-        await refetch();
+        await (isContextError ? refetchContext() : refetch());
       } finally {
         setRefreshing(false);
       }
     })();
-  }, [refetch]);
+  }, [isContextError, refetchContext, refetch]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
@@ -163,8 +164,6 @@ export function AgentSessionListScreen() {
     ),
     [navigateToSession, organizationId]
   );
-
-  const keyExtractor = useCallback((item: ActiveSession) => item.id, []);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
@@ -198,11 +197,12 @@ export function AgentSessionListScreen() {
         ))}
       </View>
     );
-  } else if (hasLiveRows && !hasVisibleRows) {
+  } else if (hasLiveRows && visibleSessions.length === 0) {
     body = (
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -222,7 +222,10 @@ export function AgentSessionListScreen() {
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState organizationId={organizationId} tabBarHeight={tabBarHeight} />
+      <LiveSessionListEmptyState
+        organizationId={organizationId}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      />
     );
   } else if (hasLiveRows) {
     body = (
@@ -230,7 +233,7 @@ export function AgentSessionListScreen() {
         ref={listRef}
         data={visibleSessions}
         renderItem={renderItem}
-        keyExtractor={keyExtractor}
+        keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -240,65 +243,69 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('tabs.agents')}
-        eyebrow={
-          !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
-            ? t('agents.liveCount', { count: activeSessions.length })
-            : undefined
-        }
-        reserveEyebrow
-        size="large"
-        showBackButton={false}
-        className="px-[22px] pb-1"
-        headerRight={headerRight}
-      />
-      <View className="px-[22px]">
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={t('agents.sessionList.couldNotLoadActive')}
+    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t('tabs.agents')}
+          eyebrow={
+            !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
+              ? t('agents.liveCount', { count: activeSessions.length })
+              : undefined
+          }
+          reserveEyebrow
+          size="large"
+          showBackButton={false}
+          className="px-[22px] pb-1"
+          headerRight={headerRight}
         />
+        {hasLiveRows || isSearching ? (
+          <SessionListSearchHeader
+            inputRef={query.searchInputRef}
+            hasText={query.searchQuery.length > 0}
+            showSearchBusy={false}
+            showInlineError={false}
+            onChangeText={query.handleSearchChange}
+            onClearSearch={query.handleClearSearch}
+          />
+        ) : null}
+        <View className={query.hasLoaded && content === 'error' ? 'flex-1' : 'px-[22px]'}>
+          <LiveSessionFeedback
+            context={context}
+            sessions={sessions}
+            failureLabel={t('agents.sessionList.couldNotLoadActive')}
+            centered={query.hasLoaded && content === 'error'}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          />
+        </View>
+        {body}
+        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {showFab && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('agentChat.newSession.title')}
+            testID="agents-new-session-fab"
+            onPress={() => {
+              router.push(getNewAgentSessionPath(organizationId) as Href);
+            }}
+            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
+            style={fabStyle}
+          >
+            <Plus size={24} color={colors.primaryForeground} />
+          </Pressable>
+        )}
+        {showFilterModal && (
+          <SessionFilterModal
+            selectedPlatforms={query.platformFilter}
+            selectedProjects={query.projectFilter}
+            projectOptions={query.options.projectOptions}
+            platformOptions={query.options.platformOptions}
+            onClose={() => {
+              setShowFilterModal(false);
+            }}
+            onApply={query.handleApplyFilters}
+          />
+        )}
       </View>
-      {hasLiveRows || isSearching ? (
-        <SessionListSearchHeader
-          inputRef={query.searchInputRef}
-          hasText={query.searchQuery.length > 0}
-          showSearchBusy={false}
-          showInlineError={false}
-          onChangeText={query.handleSearchChange}
-          onClearSearch={query.handleClearSearch}
-        />
-      ) : null}
-      {body}
-      {/* Empty content owns its creation action; other admitted states keep the FAB. */}
-      {context.isReady && content !== 'empty' && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.title')}
-          testID="agents-new-session-fab"
-          onPress={() => {
-            router.push(getNewAgentSessionPath(organizationId) as Href);
-          }}
-          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
-          style={fabStyle}
-        >
-          <Plus size={24} color={colors.primaryForeground} />
-        </Pressable>
-      )}
-      {showFilterModal && (
-        <SessionFilterModal
-          selectedPlatforms={query.platformFilter}
-          selectedProjects={query.projectFilter}
-          projectOptions={query.options.projectOptions}
-          platformOptions={query.options.platformOptions}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={query.handleApplyFilters}
-        />
-      )}
-    </View>
+    </StateSurfaceInsets>
   );
 }

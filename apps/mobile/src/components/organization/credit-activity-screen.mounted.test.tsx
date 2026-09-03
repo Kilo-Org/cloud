@@ -110,7 +110,8 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: ({ title }: { title: string }) => `EMPTY_STATE:${title}`,
+  EmptyState: (props: { title: string; placement?: string }) =>
+    createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));
 
 vi.mock('@/components/query-error', () => ({
@@ -160,7 +161,7 @@ vi.mock('react-native', () => ({
   }) => {
     const data = props.data ?? [];
     if (data.length === 0) {
-      return props.ListEmptyComponent ?? null;
+      return createElement('FlatList', null, props.ListEmptyComponent, props.ListFooterComponent);
     }
     return createElement(
       'View',
@@ -273,14 +274,33 @@ describe('OrganizationCreditActivityScreen empty', () => {
   it('renders the empty state when the first page has no entries', async () => {
     pageQuery.data = { pages: [{ entries: [], nextCursor: null, hasMore: false }] };
 
-    const texts = await renderScreen();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationCreditActivityScreen)
+    );
 
-    expect(texts).toContain('EMPTY_STATE:No credit activity');
+    expect(collectText(renderer.toJSON())).toContain('EMPTY_STATE:No credit activity');
+    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(
+      (
+        renderer.root.find(node => String(node.type) === 'EmptyState').props as {
+          placement?: string;
+        }
+      ).placement
+    ).not.toBe('top');
     expect(queryErrors.errors).toHaveLength(0);
+    unmount();
   });
 });
 
 describe('OrganizationCreditActivityScreen pagination', () => {
+  it('keeps pagination available when a loaded page has no visible entries', async () => {
+    pageQuery.data = { pages: [{ entries: [], nextCursor: 1, hasMore: true }] };
+    pageHook.hasMore = true;
+    const texts = await renderScreen();
+    expect(texts).toContain('EMPTY_STATE:No credit activity');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
   it('renders the truncated footer with Load more when hasMore is true', async () => {
     pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
     pageHook.entries = [TRANSACTION];

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -510,9 +511,15 @@ function FilePreviewModal({
         sharing={sharing}
       />
       <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
-      <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-        {renderBody()}
-      </ScrollView>
+      {status === 'error' || (status === 'ready' && text === '') ? (
+        <CenteredState className="px-6">
+          <View className="items-center py-6">{renderBody()}</View>
+        </CenteredState>
+      ) : (
+        <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+          {renderBody()}
+        </ScrollView>
+      )}
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
   );

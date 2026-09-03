@@ -1,7 +1,7 @@
 import { Info } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -14,6 +14,7 @@ export function PickerSheet({
   doneLabel,
   cancelLabel,
   children,
+  headerContent,
   expired = false,
   scrollable = true,
   disabled = false,
@@ -25,6 +26,7 @@ export function PickerSheet({
   /** Overrides the leading control's text and accessibility label (nested Back). */
   cancelLabel?: string;
   children?: ReactNode;
+  headerContent?: ReactNode;
   /** Set when the caller's data source (picker bridge) is gone — renders the standard "Options expired" empty state instead of children. */
   expired?: boolean;
   /**
@@ -54,15 +56,18 @@ export function PickerSheet({
   // pinning the scroll view to the full sheet, painting it over the header.
   return (
     <>
-      <SheetHeader
-        title={title}
-        onDone={onDone}
-        onCancel={onCancel}
-        doneLabel={doneLabel}
-        cancelLabel={cancelLabel}
-        disabled={disabled}
-      />
-      {scrollable ? (
+      <View collapsable={false}>
+        <SheetHeader
+          title={title}
+          onDone={onDone}
+          onCancel={onCancel}
+          doneLabel={doneLabel}
+          cancelLabel={cancelLabel}
+          disabled={disabled}
+        />
+        {headerContent}
+      </View>
+      {scrollable && !expired ? (
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       ) : (
         body

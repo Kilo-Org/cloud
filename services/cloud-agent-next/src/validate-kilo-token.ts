@@ -1,5 +1,6 @@
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export async function validateKiloToken(
   authHeader: string | null,
@@ -26,6 +27,7 @@ export async function validateKiloToken(
     token,
     nextAuthSecret: secret,
     connectionString,
+    resourceAudience: { audience: CLOUD_AGENT_NEXT_AUDIENCE, mode: 'allow-legacy' },
     ...(workerEnv ? { workerEnv } : {}),
   });
 

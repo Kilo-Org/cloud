@@ -186,58 +186,56 @@ export default function ModelListScreen() {
         </View>
       )}
       {isError && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.modelList.couldNotLoad')}
-            onRetry={() => {
-              void refetch();
-              void configQuery.refetch();
-            }}
-          />
-        </View>
-      )}
-      {!isLoading && !isError && (
-        <FlatList
-          data={sections}
-          keyExtractor={(item, index) =>
-            item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`
-          }
-          contentContainerStyle={listContentContainerStyle}
-          ListEmptyComponent={
-            <EmptyState
-              icon={Search}
-              title={
-                searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')
-              }
-              description={
-                searchFilter
-                  ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })
-                  : t('kiloclaw.modelList.noModelsDescription')
-              }
-              placement="top"
-              action={
-                searchFilter ? (
-                  <Button variant="outline" size="sm" onPress={handleClearSearch}>
-                    <Text>{t('kiloclaw.modelList.clearSearch')}</Text>
-                  </Button>
-                ) : undefined
-              }
-            />
-          }
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View className="px-4 pb-1 pt-4">
-                  <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {item.title}
-                  </Text>
-                </View>
-              );
-            }
-            return renderItem({ item: item.model });
+        <QueryError
+          message={t('kiloclaw.modelList.couldNotLoad')}
+          onRetry={() => {
+            void refetch();
+            void configQuery.refetch();
           }}
         />
       )}
+      {!isLoading &&
+        !isError &&
+        (sections.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title={
+              searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')
+            }
+            description={
+              searchFilter
+                ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })
+                : t('kiloclaw.modelList.noModelsDescription')
+            }
+            action={
+              searchFilter ? (
+                <Button variant="outline" size="sm" onPress={handleClearSearch}>
+                  <Text>{t('kiloclaw.modelList.clearSearch')}</Text>
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <FlatList
+            data={sections}
+            keyExtractor={(item, index) =>
+              item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`
+            }
+            contentContainerStyle={listContentContainerStyle}
+            renderItem={({ item }) => {
+              if (item.type === 'header') {
+                return (
+                  <View className="px-4 pb-1 pt-4">
+                    <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {item.title}
+                    </Text>
+                  </View>
+                );
+              }
+              return renderItem({ item: item.model });
+            }}
+          />
+        ))}
     </View>
   );
 }

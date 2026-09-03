@@ -118,14 +118,12 @@ export default function DevicePairingScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.devicePairing.couldNotLoad')}
-            onRetry={() => {
-              void handleRefresh();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.devicePairing.couldNotLoad')}
+          onRetry={() => {
+            void handleRefresh();
+          }}
+        />
       </View>
     );
   }
@@ -174,10 +172,7 @@ export default function DevicePairingScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.devicePairing.title')} headerRight={refreshButton} />
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          className="flex-1 items-center justify-center"
-        >
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <EmptyState
             icon={Monitor}
             title={t('kiloclaw.devicePairing.noPending')}

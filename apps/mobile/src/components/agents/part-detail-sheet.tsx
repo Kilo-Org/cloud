@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -13,8 +14,13 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
 import { SessionPageSheet } from './session-page-sheet';
-import { getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
+import {
+  getPartDetailTitle,
+  shouldAutoFollowPartDetail,
+  shouldCenterPartDetail,
+} from './part-detail-model';
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
+import { useToolCardImageUri } from './tool-card-image-cache';
 import { ToolPartDetailBody } from './tool-part-detail-body';
 import { usePartDetailAutoScroll } from './use-part-detail-auto-scroll';
 
@@ -31,9 +37,6 @@ function renderPartContent(part: Part | null): ReactNode {
         {i18n.t('agentChat.partDetail.detailsUnavailable')}
       </Text>
     );
-  }
-  if (isToolPart(part)) {
-    return <ToolPartDetailBody part={part} />;
   }
   if (isReasoningPart(part)) {
     // While streaming, plain Text instead of SelectableText: the read-only
@@ -77,6 +80,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   const { t } = useTranslation();
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
+  const [failedImage, setFailedImage] = useState<{ partId: string; uri: string } | null>(null);
   const trackMonoBlock = useCallback(() => {
     setMonoCount(count => count + 1);
     return () => {
@@ -86,6 +90,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   useEffect(() => {
     if (!visible) {
       setTextMode('wrap');
+      setFailedImage(null);
     }
   }, [visible]);
   const sheetContext = useMemo(
@@ -96,6 +101,25 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
     enabled: visible && shouldAutoFollowPartDetail(part),
     resetKey: visible ? 'open' : 'closed',
   });
+  const attachmentUri = useToolCardImageUri(part?.id ?? '');
+  const imageFailed =
+    failedImage !== null && failedImage.partId === part?.id && failedImage.uri === attachmentUri;
+  const centered = shouldCenterPartDetail(part, attachmentUri !== undefined, imageFailed);
+  const content = (
+    <MonoScrollSheetProvider value={sheetContext}>
+      {part && isToolPart(part) ? (
+        <ToolPartDetailBody
+          part={part}
+          imageFailed={imageFailed}
+          onImageError={uri => {
+            setFailedImage({ partId: part.id, uri });
+          }}
+        />
+      ) : (
+        renderPartContent(part)
+      )}
+    </MonoScrollSheetProvider>
+  );
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
@@ -119,23 +143,27 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
         </View>
       ) : null}
 
-      <ScrollView
-        ref={autoFollow.scrollRef}
-        className="flex-1"
-        contentContainerClassName="gap-2 px-4 pb-6 pt-3"
-        onScroll={autoFollow.handleScroll}
-        onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
-        onScrollEndDrag={autoFollow.handleScrollEndDrag}
-        onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
-        onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
-        onContentSizeChange={autoFollow.handleContentSizeChange}
-        onLayout={autoFollow.handleLayout}
-        scrollEventThrottle={16}
-      >
-        <MonoScrollSheetProvider value={sheetContext}>
-          {renderPartContent(part)}
-        </MonoScrollSheetProvider>
-      </ScrollView>
+      {centered ? (
+        <CenteredState className="px-4">
+          <View className="items-center py-6">{content}</View>
+        </CenteredState>
+      ) : (
+        <ScrollView
+          ref={autoFollow.scrollRef}
+          className="flex-1"
+          contentContainerClassName="gap-2 px-4 pb-6 pt-3"
+          onScroll={autoFollow.handleScroll}
+          onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
+          onScrollEndDrag={autoFollow.handleScrollEndDrag}
+          onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
+          onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
+          onContentSizeChange={autoFollow.handleContentSizeChange}
+          onLayout={autoFollow.handleLayout}
+          scrollEventThrottle={16}
+        >
+          {content}
+        </ScrollView>
+      )}
 
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>

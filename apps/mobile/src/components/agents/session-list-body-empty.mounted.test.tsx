@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { BodyEmpty } from './session-list-body-empty';
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
 }));

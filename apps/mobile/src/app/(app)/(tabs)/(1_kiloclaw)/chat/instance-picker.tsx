@@ -76,6 +76,7 @@ export default function InstancePickerScreen() {
 
   return (
     <PickerSheet
+      scrollable={instancesQuery.isPending || (showList && loadedInstances.length > 0)}
       title={t('chat.instancePicker.switchInstance')}
       onDone={() => {
         router.back();
@@ -90,7 +91,6 @@ export default function InstancePickerScreen() {
       ) : null}
       {instancesQuery.isError ? (
         <QueryError
-          className="py-12"
           message={t('chat.instancePicker.couldNotLoadInstances')}
           onRetry={() => {
             void instancesQuery.refetch();
@@ -99,7 +99,6 @@ export default function InstancePickerScreen() {
       ) : null}
       {showList && loadedInstances.length === 0 ? (
         <EmptyState
-          className="py-12"
           icon={Server}
           title={t('chat.instancePicker.noInstances')}
           description={t('chat.instancePicker.noInstancesDescription')}
@@ -115,7 +114,7 @@ export default function InstancePickerScreen() {
           }
         />
       ) : null}
-      {showList ? (
+      {showList && loadedInstances.length > 0 ? (
         <Animated.View entering={FadeIn.duration(200)}>
           {loadedInstances.map(instance => (
             <InstanceRow

@@ -7,6 +7,7 @@ import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -87,17 +88,23 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('kiloPass.title')} modal />
-      <View className="flex-1 items-center justify-center gap-3 px-6">
-        <Text className="text-center font-semibold text-foreground">
-          {t('kiloPass.unavailable')}
-        </Text>
-        <Text className="text-center text-sm text-muted-foreground">
-          {t('kiloPass.couldNotLoad')}
-        </Text>
-        <Button accessibilityLabel={t('kiloPass.retryLoading')} onPress={onRetry} variant="outline">
-          <Text>{t('common.retry')}</Text>
-        </Button>
-      </View>
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center font-semibold text-foreground">
+            {t('kiloPass.unavailable')}
+          </Text>
+          <Text className="text-center text-sm text-muted-foreground">
+            {t('kiloPass.couldNotLoad')}
+          </Text>
+          <Button
+            accessibilityLabel={t('kiloPass.retryLoading')}
+            onPress={onRetry}
+            variant="outline"
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      </CenteredState>
     </View>
   );
 }
@@ -121,38 +128,31 @@ function KiloPassUnavailableScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('kiloPass.title')} modal />
-      <View className="flex-1 px-5">
-        <DetailScreenScrollView
-          className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text className="px-1 text-sm leading-5 text-muted-foreground">
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <Text className="text-center text-sm leading-5 text-muted-foreground">
             {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
-          <View className="rounded-xl border border-border bg-card p-5">
-            <Text className="font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
-            <Text className="mt-1 text-sm text-muted-foreground">{description}</Text>
-            {isWebManagement && presentation.webUrl ? (
-              <Button
-                accessibilityLabel={t('kiloPass.manage')}
-                className="mt-4 self-start"
-                onPress={() => {
-                  if (!presentation.webUrl) {
-                    return;
-                  }
-                  void openExternalUrl(presentation.webUrl, {
-                    label: t('kiloPass.kiloPassManagement'),
-                  });
-                }}
-                variant="outline"
-              >
-                {t('kiloPass.manage')}
-              </Button>
-            ) : null}
-          </View>
-        </DetailScreenScrollView>
-      </View>
+          <Text className="text-center font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
+          <Text className="text-center text-sm text-muted-foreground">{description}</Text>
+          {isWebManagement && presentation.webUrl ? (
+            <Button
+              accessibilityLabel={t('kiloPass.manage')}
+              onPress={() => {
+                if (!presentation.webUrl) {
+                  return;
+                }
+                void openExternalUrl(presentation.webUrl, {
+                  label: t('kiloPass.kiloPassManagement'),
+                });
+              }}
+              variant="outline"
+            >
+              {t('kiloPass.manage')}
+            </Button>
+          ) : null}
+        </View>
+      </CenteredState>
     </View>
   );
 }
@@ -461,7 +461,7 @@ export function KiloPassSubscriptionScreen() {
     return <KiloPassLoadingScreen />;
   }
 
-  if (presentationQuery.isError) {
+  if (!presentationQuery.data) {
     return (
       <KiloPassPresentationErrorScreen
         onRetry={() => {

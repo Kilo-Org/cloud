@@ -1,5 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -78,9 +79,43 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     errorVariant = errorCode === 'NOT_FOUND' ? 'not-found' : 'permission';
   }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('codeReviewer.title')} />
+  let body: ReactNode = null;
+  if (!isLoading && data?.success && data.reviews.length === 0) {
+    body = (
+      <EmptyState
+        icon={GitPullRequest}
+        title={t('codeReviewer.reviewList.noReviews')}
+        description={t('codeReviewer.reviewList.noReviewsDescription')}
+        action={
+          <Button
+            onPress={() => {
+              router.push(
+                (hasConnectedProvider
+                  ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
+                  : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+              );
+            }}
+          >
+            <Text>
+              {hasConnectedProvider
+                ? t('codeReviewer.reviewList.startManualReview')
+                : t('codeReviewer.reviewList.configureProvider')}
+            </Text>
+          </Button>
+        }
+      />
+    );
+  } else if (!isLoading && ((isError && !data) || (data && !data.success))) {
+    body = (
+      <QueryError
+        variant={!data ? errorVariant : 'server'}
+        title={!data && isPermanentError ? undefined : t('codeReviewer.reviewList.couldNotLoad')}
+        onRetry={!data && isPermanentError ? undefined : () => void refetch()}
+        isRetrying={isFetching}
+      />
+    );
+  } else {
+    body = (
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
@@ -89,56 +124,6 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               <Skeleton className="h-20 w-full rounded-lg" />
               <Skeleton className="h-20 w-full rounded-lg" />
             </Animated.View>
-          )}
-
-          {/* Only a full-screen error when there's no usable data yet — a transient
-              background poll failure with stale data should keep showing that data,
-              not hide it behind a retry banner. */}
-          {!isLoading && isError && !data && (
-            <QueryError
-              variant={errorVariant}
-              placement="top"
-              title={isPermanentError ? undefined : t('codeReviewer.reviewList.couldNotLoad')}
-              onRetry={isPermanentError ? undefined : () => void refetch()}
-              isRetrying={isFetching}
-            />
-          )}
-
-          {!isLoading && data && !data.success && (
-            <QueryError
-              variant="server"
-              placement="top"
-              title={t('codeReviewer.reviewList.couldNotLoad')}
-              onRetry={() => void refetch()}
-              isRetrying={isFetching}
-            />
-          )}
-
-          {!isLoading && data?.success && data.reviews.length === 0 && (
-            <EmptyState
-              icon={GitPullRequest}
-              placement="top"
-              title={t('codeReviewer.reviewList.noReviews')}
-              description={t('codeReviewer.reviewList.noReviewsDescription')}
-              className="pt-12"
-              action={
-                <Button
-                  onPress={() => {
-                    router.push(
-                      (hasConnectedProvider
-                        ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
-                        : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
-                    );
-                  }}
-                >
-                  <Text>
-                    {hasConnectedProvider
-                      ? t('codeReviewer.reviewList.startManualReview')
-                      : t('codeReviewer.reviewList.configureProvider')}
-                  </Text>
-                </Button>
-              }
-            />
           )}
 
           {!isLoading && data?.success && data.reviews.length > 0 && (
@@ -179,6 +164,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           )}
         </Animated.View>
       </TabScreenScrollView>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('codeReviewer.title')} />
+      {body}
     </View>
   );
 }

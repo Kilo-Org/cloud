@@ -101,10 +101,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   it('restores unexpired persisted counts after a fresh process starts', async () => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
-    const expected =
-      width === 120
-        ? ['2', 'Needs input']
-        : ['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Open agents'];
+    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -173,10 +170,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected =
-      width === 120
-        ? ['1', 'Working']
-        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -198,10 +192,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected =
-      width === 120
-        ? ['1', 'Working']
-        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -282,10 +273,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected =
-      width === 120
-        ? ['1', 'Working']
-        : ['0', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);

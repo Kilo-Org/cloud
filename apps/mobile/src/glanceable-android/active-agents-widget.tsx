@@ -23,7 +23,7 @@ import { type AndroidWidgetProps } from './widget-props';
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 
 /**
- * Below this width (dp) only the primary count fits beside the mark.
+ * Below this width (dp) a short cell stacks its rows instead of running them.
  *
  * Two cells wide reports about 150–190 dp and three cells about 230–280 dp, so
  * the split sits between them. A tighter bound let a two-cell cell take the
@@ -33,7 +33,8 @@ const COMPACT_MAX_WIDTH_DP = 210;
 /** At or above this width (dp) every state in the row can carry its label. */
 const ROW_LABEL_MIN_WIDTH_DP = 300;
 /**
- * Below this height (dp) the three rows cannot stack, so they run in a row.
+ * At or above this height (dp) the mark sits above the rows and they own the
+ * full width; below it the mark sits beside them.
  *
  * One cell tall lands anywhere from 40 dp to about 110 dp depending on the
  * device and the launcher's grid, and two cells tall starts around 150 dp, so
@@ -85,19 +86,17 @@ type Size = 'compact' | 'row' | 'stack';
 type Shape = { size: Size; rowLabels: boolean; rtl: boolean };
 
 function shapeOf(info: WidgetInfo, rtl: boolean): Shape {
+  // Height first: a narrow cell that is tall enough still stacks, because the
+  // rows then own the full width. Beside the mark they truncated their labels.
+  if (info.height >= ROW_MAX_HEIGHT_DP) {
+    return { size: 'stack', rowLabels: true, rtl };
+  }
   if (info.width < COMPACT_MAX_WIDTH_DP) {
     return { size: 'compact', rowLabels: true, rtl };
   }
-  if (info.height < ROW_MAX_HEIGHT_DP) {
-    // Three cells wide fit three counts but not three labels, so the ranked
-    // state keeps its word and the other two show as a marker and a number.
-    return {
-      size: 'row',
-      rowLabels: info.width >= ROW_LABEL_MIN_WIDTH_DP,
-      rtl,
-    };
-  }
-  return { size: 'stack', rowLabels: true, rtl };
+  // Three cells wide fit three counts but not three labels, so the ranked
+  // state keeps its word and the other two show as a marker and a number.
+  return { size: 'row', rowLabels: info.width >= ROW_LABEL_MIN_WIDTH_DP, rtl };
 }
 
 /** The edge a column's content starts from. */
@@ -188,29 +187,7 @@ function countRow(
   );
 }
 
-/** Narrow cells: the mark, the ranked marker, and the one count worth a glance. */
-function renderCompact(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
-  if (props.primaryKind === null) {
-    return (
-      <TextWidget
-        text={props.statusLine ?? ''}
-        maxLines={2}
-        truncate="END"
-        style={{ color: palette.muted, fontSize: 13 }}
-      />
-    );
-  }
-  return countRow(
-    {
-      label: props.primaryLabel ?? '',
-      kind: props.primaryKind,
-      count: props.primaryCount,
-    },
-    true,
-    { palette, fontSize: 15, showLabel: true, rtl }
-  );
-}
-
+/** The locked copy, drawn in place of the counts. */
 function statusText(props: AndroidWidgetProps, palette: Palette) {
   return (
     <TextWidget
@@ -222,55 +199,74 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
   );
 }
 
+/**
+ * The mark, with the stale warning under it when counts are showing too.
+ *
+ * Stale is the one status that carries both, and the warning belongs with the
+ * mark rather than under the rows: a fourth line below three counts reads as a
+ * fourth state.
+ */
+const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26 } satisfies Record<Size, number>;
+/** A short cell runs its counts in a row, so the gap separates states, not lines. */
+const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6 } satisfies Record<Size, number>;
+
+function markGroup(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
+  const mark = logo(MARK_SIZE_DP[shape.size]);
+  if (props.countLines.length === 0 || props.statusLine === null) {
+    return mark;
+  }
+  return (
+    <FlexWidget
+      style={{
+        flexDirection: 'column',
+        alignItems: startEdge(shape.rtl),
+        flexGap: 3,
+      }}
+    >
+      {mark}
+      <TextWidget
+        text={props.statusLine}
+        maxLines={1}
+        truncate="END"
+        style={{ color: palette.muted, fontSize: 11 }}
+      />
+    </FlexWidget>
+  );
+}
+
 function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   if (props.countLines.length === 0) {
     return statusText(props, palette);
   }
   const { size, rowLabels, rtl } = shape;
   const primaryLabel = props.primaryLabel;
+  // Every state draws its own row, zeros included, so the rows hold still as
+  // work moves between them and a narrow cell says as much as a wide one.
   const rows = props.countLines.map(line => {
     const isPrimary = line.label === primaryLabel;
     return countRow(line, isPrimary, {
       palette,
-      fontSize: size === 'row' ? 13 : 15,
+      fontSize: size === 'stack' ? 15 : 13,
       showLabel: size !== 'row' || rowLabels || isPrimary,
       rtl,
     });
   });
-  const stacked = (
+  return (
     <FlexWidget
       style={{
         flexDirection: size === 'row' ? 'row' : 'column',
         alignItems: size === 'row' ? 'center' : startEdge(rtl),
-        flexGap: size === 'row' ? 14 : 6,
+        flexGap: COUNT_GAP_DP[size],
       }}
     >
       {size === 'row' ? inReadingOrder(rows, rtl) : rows}
-    </FlexWidget>
-  );
-  // Stale carries counts and a warning at once. Only the tall cell has a line
-  // to spare for it; the short row would have to drop a count to fit it.
-  if (size !== 'stack' || props.statusLine === null) {
-    return stacked;
-  }
-  return (
-    <FlexWidget
-      style={{
-        flexDirection: 'column',
-        alignItems: startEdge(rtl),
-        flexGap: 4,
-      }}
-    >
-      {stacked}
-      {statusText(props, palette)}
     </FlexWidget>
   );
 }
 
 function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   const { size, rtl } = shape;
-  const body =
-    size === 'compact' ? renderCompact(props, palette, rtl) : renderCounts(props, palette, shape);
+  const body = renderCounts(props, palette, shape);
   // Short cells put the mark beside the counts; a tall cell stacks the mark on
   // top and lets the counts sit at the bottom, the same composition as the iOS
   // small family.
@@ -284,24 +280,18 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
           backgroundColor: palette.background,
           flexDirection: 'column',
           alignItems: startEdge(rtl),
-          justifyContent: 'space-between',
+          // Centred, not spread: with no affordance under the counts the block
+          // is the mark and the rows, and spreading those two to the edges
+          // leaves a hole between them.
+          justifyContent: 'center',
+          flexGap: 12,
           height: 'match_parent',
           width: 'match_parent',
           padding: 14,
         }}
       >
-        {logo(26)}
+        {markGroup(props, palette, shape)}
         {body}
-        {props.showOpenAgents ? (
-          <TextWidget
-            text={props.openAgentsLabel}
-            maxLines={1}
-            truncate="END"
-            style={{ color: palette.muted, fontSize: 12 }}
-          />
-        ) : (
-          <FlexWidget style={{ width: 0, height: 0 }} />
-        )}
       </FlexWidget>
     );
   }
@@ -322,16 +312,16 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
       }}
     >
       {/* No array here: a wrapper element per slot would add a layout node. */}
-      {rtl ? body : logo(size === 'compact' ? 22 : 28)}
-      {rtl ? logo(size === 'compact' ? 22 : 28) : body}
+      {rtl ? body : markGroup(props, palette, shape)}
+      {rtl ? markGroup(props, palette, shape) : body}
     </FlexWidget>
   );
 }
 
 /**
- * Distinct light and dark layouts through the library's theme callback. Narrow
- * cells show only the ranked count; short cells run the three states in a row;
- * a tall cell stacks them under the mark.
+ * Distinct light and dark layouts through the library's theme callback. A tall
+ * cell stacks the three states under the mark; a short wide cell runs them
+ * beside it in a row; a short narrow cell stacks them beside it.
  */
 export function renderActiveAgentsWidget(
   props: AndroidWidgetProps,

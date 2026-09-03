@@ -11,7 +11,11 @@ import {
 } from '@/lib/glanceable/presentation';
 
 /** One translated count line for an Android surface. `kind` picks dot and color. */
-type AndroidWidgetCount = { label: string; kind: GlanceableCountKind; count: string };
+type AndroidWidgetCount = {
+  label: string;
+  kind: GlanceableCountKind;
+  count: string;
+};
 
 /**
  * Format a count in the active language's own digits.
@@ -31,18 +35,10 @@ export type GlanceableCountFormat = (value: number) => string;
 export type AndroidWidgetProps = {
   /** Translated locked copy; null while counts show (happy). Stale carries both. */
   statusLine: string | null;
-  /** Non-zero count lines in rank order (needs-input, running, idle). */
+  /** Every count line in rank order (needs-input, running, idle), zeros included. */
   countLines: AndroidWidgetCount[];
-  /** Top-ranked count label for compact widths; null when no eligible work. */
+  /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
-  /** Top-ranked count state for compact widths; null when no eligible work. */
-  primaryKind: GlanceableCountKind | null;
-  /** Top-ranked count value for compact widths; formatted "0" when none. */
-  primaryCount: string;
-  /** Translated "Open agents" affordance. */
-  openAgentsLabel: string;
-  /** True for happy and stale — the only statuses that show counts. */
-  showOpenAgents: boolean;
   /** Spoken label: status words, counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
@@ -68,10 +64,6 @@ export function buildAndroidWidgetProps(
       count: formatCount(line.count),
     })),
     primaryLabel: primary === null ? null : translate(primary.key),
-    primaryKind: primary === null ? null : primary.kind,
-    primaryCount: formatCount(primary === null ? 0 : primary.count),
-    openAgentsLabel: translate('glanceable.openAgents'),
-    showOpenAgents: showCounts,
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
@@ -114,19 +106,12 @@ function buildExpiredWidgetProps(
 }
 
 /** Gallery placeholder: empty copy and no counts, with no snapshot behind it. */
-export function buildGenericWidgetProps(
-  translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
-): AndroidWidgetProps {
+export function buildGenericWidgetProps(translate: (key: string) => string): AndroidWidgetProps {
   const empty = translate('glanceable.empty');
   return {
     statusLine: empty,
     countLines: [],
     primaryLabel: null,
-    primaryKind: null,
-    primaryCount: formatCount(0),
-    openAgentsLabel: translate('glanceable.openAgents'),
-    showOpenAgents: false,
     accessibilityLabel: empty,
   };
 }

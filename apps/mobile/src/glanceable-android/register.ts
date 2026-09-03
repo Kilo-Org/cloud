@@ -89,7 +89,7 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
     }
     props =
       snapshot === null
-        ? buildGenericWidgetProps(translate, formatGlanceableCount)
+        ? buildGenericWidgetProps(translate)
         : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
     // A live publish during restoration owns the widget.
     props = getCurrentWidgetProps() ?? props;

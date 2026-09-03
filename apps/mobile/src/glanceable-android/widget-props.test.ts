@@ -53,8 +53,6 @@ describe('buildAndroidWidgetProps', () => {
   it('ranks the compact primary count and keeps all expanded numeric counts', () => {
     const props = buildAndroidWidgetProps(MIXED, {}, translate);
     expect(props.primaryLabel).toBe('Needs input');
-    expect(props.primaryCount).toBe('2');
-    expect(props.primaryKind).toBe('needsInput');
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
@@ -90,11 +88,10 @@ describe('buildAndroidWidgetProps', () => {
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Open Kilo to see agents', 0, false],
     ];
-    for (const [status, sessions, statusLine, counts, showOpenAgents] of cases) {
+    for (const [status, sessions, statusLine, counts] of cases) {
       const props = buildAndroidWidgetProps(snapshotFor(sessions, 0, status), {}, translate);
       expect(props.statusLine).toBe(statusLine);
       expect(props.countLines).toHaveLength(counts);
-      expect(props.showOpenAgents).toBe(showOpenAgents);
     }
   });
 
@@ -112,11 +109,7 @@ describe('buildAndroidWidgetProps', () => {
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'countLines',
-      'openAgentsLabel',
-      'primaryCount',
-      'primaryKind',
       'primaryLabel',
-      'showOpenAgents',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -133,14 +126,13 @@ describe('current widget deadline rendering', () => {
     vi.useRealTimers();
   });
 
-  it.each(['happy', 'stale'] as const)('hides expired %s counts and the visible action', status => {
+  it.each(['happy', 'stale'] as const)('hides expired %s counts', status => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW + 28_800_000);
     const props = buildCurrentWidgetProps({ ...MIXED, status }, translate);
     expect(props.statusLine).toBe('Status expired');
     expect(props.countLines).toEqual([]);
     expect(props.accessibilityLabel).toBe('Status expired, Open agents');
-    expect(props.showOpenAgents).toBe(false);
   });
 
   it.each([
@@ -155,7 +147,6 @@ describe('current widget deadline rendering', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.accessibilityLabel).toBe(`${expected}, Open agents`);
     expect(props.countLines).toEqual([]);
-    expect(props.showOpenAgents).toBe(false);
   });
 
   it('hides counts when the stored expiry is not a valid date', () => {
@@ -219,8 +210,6 @@ describe('status precedence and count hiding', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe('0');
-    expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, {})).toBeNull();
   });
@@ -234,8 +223,6 @@ describe('status precedence and count hiding', () => {
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(props.primaryCount).toBe('0');
-    expect(props.showOpenAgents).toBe(false);
     expect(buildOngoingNotificationText(snapshot, flags, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, flags)).toBeNull();
   });

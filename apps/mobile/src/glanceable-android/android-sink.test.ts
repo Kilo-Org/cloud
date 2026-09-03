@@ -391,6 +391,11 @@ describe('androidSink app-state retry', () => {
   });
 });
 
+/** The working row's count — the rows always carry all three states in order. */
+function runningCount(): string | undefined {
+  return getCurrentWidgetProps()?.countLines.find(line => line.kind === 'running')?.count;
+}
+
 describe('androidSink widget publish and end', () => {
   it('publishes the widget snapshot on every publish', () => {
     androidSink.publish(snapshotFor([{ status: 'busy' }], 0));
@@ -400,7 +405,7 @@ describe('androidSink widget publish and end', () => {
       expect.objectContaining({ widgetName: 'ActiveAgentsWidget' })
     );
     expect(getCurrentWidgetProps()?.statusLine).toBeNull();
-    expect(getCurrentWidgetProps()?.primaryCount).toBe('1');
+    expect(runningCount()).toBe('1');
   });
 
   it('publishes the stale warning and retained counts through the native bridge', async () => {
@@ -458,7 +463,7 @@ describe('androidSink widget publish and end', () => {
     androidSink.endImmediate();
     expect(mocks.native.end).toHaveBeenCalledTimes(1);
     expect(getCurrentWidgetProps()).not.toBeNull();
-    expect(getCurrentWidgetProps()?.primaryCount).toBe('1');
+    expect(runningCount()).toBe('1');
   });
 
   it('ends the ongoing notification without removing widget delivery', async () => {
@@ -481,12 +486,10 @@ describe('androidSink widget publish and end', () => {
       expect(vi.getTimerCount()).toBe(0);
 
       vi.setSystemTime(NOW + 28_799_999);
-      expect(getCurrentWidgetProps()?.primaryCount).toBe('1');
+      expect(runningCount()).toBe('1');
       vi.setSystemTime(NOW + 28_800_000);
       expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
       expect(getCurrentWidgetProps()?.countLines).toEqual([]);
-      expect(getCurrentWidgetProps()?.primaryCount).toBe('0');
-      expect(getCurrentWidgetProps()?.showOpenAgents).toBe(false);
     }
   );
 
@@ -503,7 +506,7 @@ describe('androidSink widget publish and end', () => {
     androidSink.endImmediate();
     expect(mocks.getWidgetDeadline()).toBe(NOW + 28_860_000);
     vi.setSystemTime(NOW + 28_800_000);
-    expect(getCurrentWidgetProps()?.primaryCount).toBe('1');
+    expect(runningCount()).toBe('1');
     expect(mocks.getNotification()).toBeNull();
   });
 
@@ -512,7 +515,7 @@ describe('androidSink widget publish and end', () => {
     vi.setSystemTime(NOW + 60_000);
     androidSink.publish({ ...MIXED, status: 'stale', revision: 2 });
     expect(mocks.getWidgetDeadline()).toBe(NOW + 28_800_000);
-    expect(getCurrentWidgetProps()?.primaryCount).toBe('2');
+    expect(getCurrentWidgetProps()?.countLines.at(0)?.count).toBe('2');
     vi.setSystemTime(NOW + 28_800_000);
     expect(getCurrentWidgetProps()?.countLines).toEqual([]);
   });

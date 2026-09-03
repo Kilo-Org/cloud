@@ -129,11 +129,29 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Idle',
       '0',
-      'Open agents',
     ]);
   });
 
-  it('shows only the primary count at a small width', () => {
+  // Two cells wide and one tall: too narrow to run the states across, so they
+  // stack beside the mark and each one keeps its word.
+  it('stacks every state beside the mark in a short narrow cell', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      {},
+      translate
+    );
+
+    expect(collectText(render(props, { width: 150, height: 100 }).light)).toEqual([
+      '1',
+      'Needs input',
+      '1',
+      'Working',
+      '0',
+      'Idle',
+    ]);
+  });
+
+  it('draws every state at a small width too, zeros included', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'question' }, { status: 'busy' }, { status: 'busy' }], 0),
       {},
@@ -142,10 +160,10 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1', 'Needs input']);
+    expect(text).toEqual(['1', 'Needs input', '2', 'Working', '0', 'Idle']);
   });
 
-  it('shows every count, zeros included, and the Open agents affordance at a wide width', () => {
+  it('shows every count, zeros included, at a wide width', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
       {},
@@ -155,7 +173,7 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
-    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Open agents']);
+    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle']);
   });
 
   // One cell tall: the counts run in a row instead of stacking. A short row
@@ -176,20 +194,16 @@ describe('renderActiveAgentsWidget', () => {
     }
   );
 
+  // The stale warning sits with the mark, above the rows, so a fourth line
+  // under three counts cannot read as a fourth state.
   it.each([
-    { width: 120, visibleText: ['2', 'Needs input'] },
+    {
+      width: 120,
+      visibleText: ['Updates delayed', '2', 'Needs input', '4', 'Working', '3', 'Idle'],
+    },
     {
       width: 250,
-      visibleText: [
-        '2',
-        'Needs input',
-        '4',
-        'Working',
-        '3',
-        'Idle',
-        'Updates delayed',
-        'Open agents',
-      ],
+      visibleText: ['Updates delayed', '2', 'Needs input', '4', 'Working', '3', 'Idle'],
     },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',

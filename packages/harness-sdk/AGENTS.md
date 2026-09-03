@@ -47,3 +47,11 @@ regression until a measurement says otherwise.
 | `src/index.ts` | The public entry point |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config; stricter than the root config |
+
+## Recorded deviations
+
+- `import/no-named-export` is off. This package is a library; a barrel needs
+  named exports.
+- `import/group-exports` stays on. Declare a name, then export it in one
+  `export type { ... }` block and one `export { ... }` block at the end of the
+  file.

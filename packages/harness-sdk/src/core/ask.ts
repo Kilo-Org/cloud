@@ -1,17 +1,27 @@
 import { Effect, Option, Ref, Stream } from 'effect';
 import { IdGenerator } from './id.js';
-import type { ModelClientService, ModelError, ModelEvent, ModelUsage } from './model.js';
+import type { Effort, ModelClientService, ModelError, ModelEvent, ModelUsage } from './model.js';
 import type { PromptAssemblerService } from './prompt.js';
 import { appendTurn, type Session } from './session.js';
 import type { SessionStoreService, StoreError } from './storage.js';
 import { makeTurn, type Turn } from './turn.js';
 import { add } from './usage.js';
 
+/**
+ * What one question may change. Only `maxTokens` may: it never reaches the
+ * rendered prefix, so it costs no cache. The model, the system prompt, and the
+ * effort are frozen for the life of the session.
+ */
+interface AskOptions {
+  readonly maxTokens?: number;
+}
+
 /** Everything one session holds. Every plugin here is already resolved. */
 interface Wiring {
   readonly system: string;
   readonly model: string;
   readonly maxTokens: number;
+  readonly effort?: Effort;
   readonly ids: IdGenerator['Type'];
   readonly assembler: PromptAssemblerService;
   readonly client: ModelClientService;
@@ -46,7 +56,7 @@ const turnOf = (wiring: Wiring, id: string, turn: { role: Turn['role']; text: st
  */
 const askWith =
   (wiring: Wiring, id: string) =>
-  (text: string): Stream.Stream<ModelEvent, ModelError | StoreError> =>
+  (text: string, options?: AskOptions): Stream.Stream<ModelEvent, ModelError | StoreError> =>
     Stream.unwrapScoped(
       Effect.gen(function* () {
         yield* Effect.acquireRelease(wiring.gate.take(1), () => wiring.gate.release(1));
@@ -60,7 +70,8 @@ const askWith =
           .stream({
             prompt: wiring.assembler.assemble({ system: wiring.system, turns }),
             model: wiring.model,
-            maxTokens: wiring.maxTokens,
+            maxTokens: options?.maxTokens ?? wiring.maxTokens,
+            ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
             stream: true,
             cacheKey: id,
           })
@@ -78,5 +89,5 @@ const askWith =
       })
     );
 
-export type { Wiring };
+export type { AskOptions, Wiring };
 export { askWith, onStore };

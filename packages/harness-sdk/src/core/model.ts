@@ -1,11 +1,26 @@
 import { Context, Data, type Effect, type Stream } from 'effect';
 import type { Prompt } from './prompt.js';
 
-/** What the model was asked. `model` is part of the cache key, so it belongs here. */
+/**
+ * How hard the model should think. Both model SDKs spell the levels this way.
+ *
+ * This is not `maxTokens`. `maxTokens` is a wall the server enforces and the
+ * model cannot see; effort is a dial the model itself follows. A reasoning
+ * model spends its thinking out of `maxTokens`, so a low wall and a high effort
+ * together produce no answer at all.
+ */
+type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/**
+ * What the model was asked. `model` and `effort` are part of the cache key.
+ * `maxTokens` is not: it never reaches the rendered prefix, so it may vary from
+ * one call to the next at no cost.
+ */
 interface ModelRequest {
   readonly prompt: Prompt;
   readonly model: string;
   readonly maxTokens: number;
+  readonly effort?: Effort;
   readonly stream: boolean;
   /** Groups the requests of one session onto one cache entry. Use the session id. */
   readonly cacheKey?: string;
@@ -57,5 +72,5 @@ interface ModelClientService {
 
 class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelClientService>() {}
 
-export type { ModelClientService, ModelEvent, ModelReply, ModelRequest, ModelUsage };
+export type { Effort, ModelClientService, ModelEvent, ModelReply, ModelRequest, ModelUsage };
 export { ModelClient, ModelError, zeroUsage };

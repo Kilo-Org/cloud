@@ -1,6 +1,6 @@
 import type OpenAI from 'openai';
 import { z } from 'zod';
-import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 import type { ContentBlock } from './messages.js';
 
@@ -10,6 +10,8 @@ import type { ContentBlock } from './messages.js';
  * reads it and ignores it everywhere else, so marking a breakpoint is free.
  */
 type CompletionsBody = Omit<OpenAI.Chat.ChatCompletionCreateParams, 'messages'> & {
+  /** The OpenRouter reasoning field. It is not part of the OpenAI type. */
+  readonly reasoning?: { readonly effort: Effort };
   readonly messages: readonly {
     readonly role: 'system' | 'user' | 'assistant';
     readonly content: readonly ContentBlock[];
@@ -21,10 +23,11 @@ const ephemeral = { type: 'ephemeral' } as const;
 const block = (text: string, cache: boolean): ContentBlock =>
   cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
 
-const toBody = ({ prompt, model, maxTokens, stream }: ModelRequest): CompletionsBody => ({
+const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): CompletionsBody => ({
   model,
   max_tokens: maxTokens,
   stream,
+  ...(effort === undefined ? {} : { reasoning: { effort } }),
   ...(stream ? { stream_options: { include_usage: true } as const } : {}),
   messages: [
     ...prompt.system.map(part => ({

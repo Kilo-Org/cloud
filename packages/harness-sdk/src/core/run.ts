@@ -1,7 +1,8 @@
 import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
-import { askWith, onStore, type Wiring } from './ask.js';
+import { type AskOptions, askWith, onStore, type Wiring } from './ask.js';
 import { IdGenerator } from './id.js';
 import {
+  type Effort,
   ModelClient,
   type ModelError,
   type ModelEvent,
@@ -22,14 +23,20 @@ import type { Turn } from './turn.js';
 interface SessionOptions {
   readonly system: string;
   readonly model: string;
+  /** The default ceiling on one answer. One question may raise or lower it. */
   readonly maxTokens: number;
+  /** How hard the model should think. Frozen: a change invalidates the cache. */
+  readonly effort?: Effort;
 }
 
 /** A live session. It owns the turns, so a caller cannot lose one. */
 interface SessionHandle {
   readonly id: string;
   /** Asks the model. The stream ends with `done`, which carries this call's counts. */
-  readonly ask: (text: string) => Stream.Stream<ModelEvent, ModelError | StoreError>;
+  readonly ask: (
+    text: string,
+    options?: AskOptions
+  ) => Stream.Stream<ModelEvent, ModelError | StoreError>;
   readonly history: Effect.Effect<Chunk.Chunk<Turn>>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
   readonly usage: Effect.Effect<ModelUsage>;

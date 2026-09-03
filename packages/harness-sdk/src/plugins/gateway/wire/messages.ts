@@ -13,10 +13,11 @@ const ephemeral = { type: 'ephemeral' } as const;
 const block = (text: string, cache: boolean): ContentBlock =>
   cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
 
-const toBody = ({ prompt, model, maxTokens, stream }: ModelRequest): MessagesBody => ({
+const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): MessagesBody => ({
   model,
   max_tokens: maxTokens,
   stream,
+  ...(effort === undefined ? {} : { output_config: { effort } }),
   system: prompt.system.map(part => block(part.text, part.cache)),
   messages: prompt.messages.map(message => ({
     role: message.role,

@@ -10,10 +10,18 @@ import type { Wire } from './wire.js';
  */
 type ResponsesBody = OpenAI.Responses.ResponseCreateParams;
 
-const toBody = ({ prompt, model, maxTokens, stream, cacheKey }: ModelRequest): ResponsesBody => ({
+const toBody = ({
+  prompt,
+  model,
+  maxTokens,
+  stream,
+  cacheKey,
+  effort,
+}: ModelRequest): ResponsesBody => ({
   model,
   max_output_tokens: maxTokens,
   stream,
+  ...(effort === undefined ? {} : { reasoning: { effort } }),
   instructions: prompt.system.map(part => part.text).join('\n'),
   ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
   input: prompt.messages.map(message => ({

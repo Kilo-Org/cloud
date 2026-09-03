@@ -90,3 +90,29 @@ it('runs with no store at all', async () => {
   );
   expect(value).toEqual(['user:hi', 'assistant:hello']);
 });
+
+it('raises the token ceiling for one question only', async () => {
+  const { calls } = await run([{ deltas: ['x'] }], session =>
+    Effect.zipRight(
+      Stream.runDrain(session.ask('a', { maxTokens: 4096 })),
+      Stream.runDrain(session.ask('b'))
+    )
+  );
+  expect(calls.map(call => call.maxTokens)).toEqual([4096, 1024]);
+});
+
+it('asks with the same effort on every question of a session', async () => {
+  const model = fakeModel([{ deltas: ['x'] }]);
+  const layers = Layer.mergeAll(layerUlid, layerAssembler, model.layer);
+  await Effect.runPromise(
+    Effect.provide(
+      Effect.scoped(
+        Effect.flatMap(openSession({ ...options, effort: 'low' }), session =>
+          Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b')))
+        )
+      ),
+      layers
+    )
+  );
+  expect(model.calls.map(call => call.effort)).toEqual(['low', 'low']);
+});

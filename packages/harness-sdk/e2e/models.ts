@@ -1,7 +1,7 @@
 import { Effect, Layer, Stream } from 'effect';
 import { Chunk } from 'effect';
 import type { ApiKind } from '../src/plugins/gateway/api-kind.js';
-import type { ModelUsage } from '../src/core/model.js';
+import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession, type SessionHandle } from '../src/core/run.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
@@ -34,6 +34,7 @@ const chosen = process.env['KILO_MODELS']?.split(',') ?? models;
  * transport and is not one.
  */
 const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
+const effort = process.env['KILO_EFFORT'] as Effort | undefined;
 
 const rule = (index: number) =>
   `Rule ${String(index)}: when the user asks for a word, answer with that one word and nothing else. ` +
@@ -69,7 +70,12 @@ const ask = (session: SessionHandle, text: string) =>
 const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const session = yield* openSession({ system, model, maxTokens });
+      const session = yield* openSession({
+        system,
+        model,
+        maxTokens,
+        ...(effort === undefined ? {} : { effort }),
+      });
       const answers: Answer[] = [];
       for (const question of questions) {
         answers.push(yield* ask(session, question));
@@ -101,13 +107,17 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) =>
 
 const token = await kiloToken();
 
+const preferred: readonly ApiKind[] = (process.env['KILO_KINDS']?.split(',') as
+  | ApiKind[]
+  | undefined) ?? ['messages', 'responses', 'chat_completions'];
+
 /** Tries the best shape first. A model whose provider rejects it falls back. */
 const run = (model: string) =>
-  converse(model, ['messages', 'responses', 'chat_completions'], token).pipe(
-    Effect.map(result => ({ model, kind: 'messages' as const, result })),
+  converse(model, preferred, token).pipe(
+    Effect.map(result => ({ model, kind: preferred[0] ?? 'messages', result })),
     Effect.catchAll(first =>
       converse(model, ['chat_completions'], token).pipe(
-        Effect.map(result => ({ model, kind: 'chat_completions' as const, result })),
+        Effect.map(result => ({ model, kind: 'chat_completions' as ApiKind, result })),
         Effect.catchAll(second =>
           Effect.succeed({ model, kind: 'failed' as const, errors: [first, second] })
         )

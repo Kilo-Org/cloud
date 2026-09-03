@@ -148,6 +148,24 @@ Every served model took the `messages` shape. Two lessons hold beyond this run:
   these ten answered nothing: a reasoning model spends the budget before it
   writes a word. The run uses 1024.
 
+### Effort is not the token ceiling
+
+`maxTokens` is a wall the server enforces and the model cannot see. `effort` is
+a dial the model follows. A reasoning model pays for its thinking out of
+`maxTokens`, so the two meet, but one does not replace the other.
+
+Measured on 2026-09-03 at 64 tokens with `effort: 'low'`:
+
+| Model | Shape | Answers |
+|---|---|---|
+| `xiaomi/mimo-v2.5` | messages | 4 of 5, up from 1 |
+| `z-ai/glm-5.3-flash` | messages | 4 of 5, up from 4 |
+| `tencent/hy3` | messages, then completions | 0 of 5 either way |
+| `deepseek/deepseek-v4-flash` | completions | 1 of 5 |
+
+Low effort helps, and it does not rescue a wall that is too low. Raise
+`maxTokens` first; reach for `effort` to cut cost once answers arrive.
+
 ## Decisions
 
 ### The session bridges; the plugin decides
@@ -157,10 +175,14 @@ carries no requirement. It then tells each plugin what happened and lets the
 plugin decide what to do about it. The session never decides when a store
 writes, how a transport retries, or how an identifier is made.
 
-Two values are frozen for the life of a session: the system prompt and the
-model. The system prompt is the front of the cached prefix, and a cache belongs
-to one model. Changing either one mid-session throws the cache away, so the type
-does not allow it.
+Three values are frozen for the life of a session: the system prompt, the model,
+and the effort. The system prompt is the front of the cached prefix, a cache
+belongs to one model, and a change of effort invalidates the messages cache.
+Changing any of them mid-session throws the cache away, so the type does not
+allow it.
+
+`maxTokens` is not frozen. It never reaches the rendered prefix, so it costs no
+cache, and one question may raise or lower it: `session.ask(text, { maxTokens })`.
 
 One session answers one question at a time. A semaphore holds the second
 question until the first is finished, because two answers built on one prefix

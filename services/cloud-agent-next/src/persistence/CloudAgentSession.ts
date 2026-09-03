@@ -116,6 +116,7 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from '../runtime-credential-proxy-rpc.js';
+import type { RuntimeProxyFence } from '../runtime-credential-proxy.js';
 
 import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
@@ -1711,7 +1712,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private async runtimeProxyFence() {
+  private async runtimeProxyFence(): Promise<RuntimeProxyFence | null> {
     const [metadata, runtime, lease] = await Promise.all([
       this.getMetadata(),
       getWrapperRuntimeState(this.ctx.storage),
@@ -1728,6 +1729,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return null;
     }
     return {
+      plane: 'legacy',
       generation: runtime.wrapperGeneration,
       allocationId: lease.instance.instanceId,
       wrapperRunId: runtime.wrapperRunId,
@@ -1743,6 +1745,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const currentFence = await this.runtimeProxyFence();
     if (
       !currentFence ||
+      currentFence.plane !== 'legacy' ||
       currentFence.wrapperRunId !== fence.wrapperRunId ||
       currentFence.generation !== fence.wrapperGeneration ||
       currentFence.wrapperConnectionId !== fence.wrapperConnectionId
@@ -1757,6 +1760,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     ]);
     if (
       !latestFence ||
+      latestFence.plane !== 'legacy' ||
       latestFence.wrapperRunId !== fence.wrapperRunId ||
       latestFence.generation !== fence.wrapperGeneration ||
       latestFence.wrapperConnectionId !== fence.wrapperConnectionId

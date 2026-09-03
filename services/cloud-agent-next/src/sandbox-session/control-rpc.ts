@@ -47,6 +47,12 @@ type SandboxControlRpc = {
     wrapperInstanceId?: string;
     operationResults?: true;
   }>;
+  getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+  }): Promise<ControlRuntimeCredentialProxyFence | null>;
   quarantineRuntime(input: {
     ownerId: string;
     sessionId: string;

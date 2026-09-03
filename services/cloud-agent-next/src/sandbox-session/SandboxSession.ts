@@ -12,6 +12,16 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { resolveSecret } from '../auth.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../runtime-credential-proxy-rpc.js';
+import {
+  runtimeCredentialProxyBaseUrl,
+  runtimeProxyGrantSchema,
+  RUNTIME_PROXY_GRANT_KEY,
+  verifyRuntimeCredentialProxyHandle,
+} from '../runtime-credential-proxy.js';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
@@ -930,7 +940,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async getMetadata(): Promise<SessionMetadata | null> {
-    return this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
+    return this.deletedWorktreeId || this.terminalLifecycle.isBlocked()
       ? null
       : this.terminalLifecycle.getStoredMetadata();
   }
@@ -965,23 +975,80 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  /**
-   * The control plane persists only a wrapper instance ID, not the complete
-   * allocation generation plus wrapper run/connection tuple required to fence
-   * a bearer credential. Keep this RPC fail-closed until that lifecycle exists.
-   */
   async issueRuntimeCredentialProxyGrant(_fence: {
     wrapperRunId: string;
     wrapperGeneration: number;
     wrapperConnectionId: string;
   }): Promise<string | null> {
-    return null;
+    const metadata = await this.getMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !kiloSessionId || !sandboxId) return null;
+    const control = sandboxControlRpc(this.env, sandboxId);
+    const readFence = () =>
+      control.getRuntimeCredentialProxyFence({
+        ownerId: metadata.identity.userId,
+        sessionId: metadata.identity.sessionId,
+        kiloSessionId,
+        directory: this.directory(metadata),
+      });
+    const fence = await readFence();
+    if (!fence) return null;
+    const token = await this.getRuntimeToken();
+    const [latestMetadata, storedAuthorization, latestFence] = await Promise.all([
+      this.getMetadata(),
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      readFence(),
+    ]);
+    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    if (
+      !latestFence ||
+      latestFence.allocationId !== fence.allocationId ||
+      latestFence.providerInstanceId !== fence.providerInstanceId ||
+      latestFence.connectionId !== fence.connectionId ||
+      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
+    ) {
+      return null;
+    }
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata: latestMetadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence: latestFence,
+      token,
+      mode: 'contained',
+    });
   }
 
   async resolveRuntimeCredentialProxyGrant(
     _handle: string
   ): Promise<{ token: string; organizationId?: string } | null> {
-    return null;
+    return resolvePersistedRuntimeProxyCredential({
+      env: this.env,
+      storage: this.ctx.storage,
+      handle: _handle,
+      metadata: () => this.getMetadata(),
+      authorization: async () => {
+        const parsed = RuntimeAuthorizationSchema.safeParse(
+          await this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        return parsed.success ? parsed.data : null;
+      },
+      fence: async () => {
+        const metadata = await this.getMetadata();
+        const kiloSessionId = metadata?.auth.kiloSessionId;
+        const sandboxId = metadata?.workspace?.sandboxId;
+        if (!metadata || !kiloSessionId || !sandboxId) return null;
+        return sandboxControlRpc(this.env, sandboxId).getRuntimeCredentialProxyFence({
+          ownerId: metadata.identity.userId,
+          sessionId: metadata.identity.sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        });
+      },
+      token: () => this.getRuntimeToken(),
+    });
   }
 
   async reauthorizeRuntimeAuthorization(input: {

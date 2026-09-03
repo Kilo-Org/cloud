@@ -13,6 +13,7 @@ const env = { NEXTAUTH_SECRET: secret } as never;
 const authorizationId = '00000000-0000-4000-8000-000000000001';
 
 type Fence = {
+  plane: 'legacy';
   generation: number;
   allocationId: string;
   wrapperRunId: string;
@@ -46,6 +47,7 @@ function metadata(kiloSessionId = 'kilo_1'): SessionMetadata {
 
 function fence(generation = 1): Fence {
   return {
+    plane: 'legacy',
     generation,
     allocationId: 'allocation_1',
     wrapperRunId: 'run_1',

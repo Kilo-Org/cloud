@@ -27,9 +27,8 @@ const claimsSchema = z
   .refine(claims => claims.exp > claims.iat);
 
 export const RUNTIME_PROXY_GRANT_KEY = 'runtime_proxy_grant';
-export const runtimeProxyGrantSchema = z
+const runtimeProxyGrantBaseSchema = z
   .object({
-    version: z.literal(1),
     grantId: z.string().uuid(),
     authorizationId: z.string().uuid(),
     sessionId: z.string().min(1),
@@ -38,22 +37,65 @@ export const runtimeProxyGrantSchema = z
     orgId: z.string().min(1).optional(),
     nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     mode: z.enum(['direct', 'contained']),
-    generation: z.number().int().nonnegative(),
     allocationId: z.string().min(1),
-    wrapperRunId: z.string().min(1),
-    wrapperConnectionId: z.string().min(1),
     issuedAt: z.number().int().positive().optional(),
     leaseExpiresAt: z.number().int().positive(),
     state: z.literal('active'),
   })
   .strict();
-export type RuntimeProxyGrant = z.infer<typeof runtimeProxyGrantSchema>;
 
-export function createRuntimeProxyGrant(
-  input: Omit<RuntimeProxyGrant, 'version' | 'grantId' | 'nonce'>
-): RuntimeProxyGrant {
+const legacyRuntimeProxyGrantV2Schema = runtimeProxyGrantBaseSchema.extend({
+  version: z.literal(2),
+  plane: z.literal('legacy'),
+  generation: z.number().int().nonnegative(),
+  wrapperRunId: z.string().min(1),
+  wrapperConnectionId: z.string().min(1),
+});
+const controlRuntimeProxyGrantV2Schema = runtimeProxyGrantBaseSchema.extend({
+  version: z.literal(2),
+  plane: z.literal('control'),
+  providerInstanceId: z.string().min(1),
+  connectionId: z.string().min(1),
+  wrapperInstanceId: z.string().min(1),
+});
+const legacyRuntimeProxyGrantV1Schema = runtimeProxyGrantBaseSchema
+  .extend({
+    version: z.literal(1),
+    generation: z.number().int().nonnegative(),
+    wrapperRunId: z.string().min(1),
+    wrapperConnectionId: z.string().min(1),
+  })
+  .transform(grant => ({ ...grant, plane: 'legacy' as const }));
+
+/** v1 persisted grants are accepted temporarily as legacy only; never control. */
+export const runtimeProxyGrantSchema = z.union([
+  legacyRuntimeProxyGrantV2Schema,
+  controlRuntimeProxyGrantV2Schema,
+  legacyRuntimeProxyGrantV1Schema,
+]);
+export type RuntimeProxyGrant = z.infer<typeof runtimeProxyGrantSchema>;
+export type RuntimeProxyFence =
+  | {
+      plane: 'legacy';
+      generation: number;
+      allocationId: string;
+      wrapperRunId: string;
+      wrapperConnectionId: string;
+    }
+  | {
+      plane: 'control';
+      allocationId: string;
+      providerInstanceId: string;
+      connectionId: string;
+      wrapperInstanceId: string;
+    };
+type RuntimeProxyGrantInput =
+  | Omit<z.infer<typeof legacyRuntimeProxyGrantV2Schema>, 'version' | 'grantId' | 'nonce'>
+  | Omit<z.infer<typeof controlRuntimeProxyGrantV2Schema>, 'version' | 'grantId' | 'nonce'>;
+
+export function createRuntimeProxyGrant(input: RuntimeProxyGrantInput): RuntimeProxyGrant {
   return runtimeProxyGrantSchema.parse({
-    version: 1,
+    version: 2,
     grantId: crypto.randomUUID(),
     nonce: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url'),
     ...input,
@@ -112,10 +154,7 @@ export function matchesRuntimeProxyGrant(
     kiloSessionId: string;
     userId: string;
     orgId?: string;
-    generation: number;
-    allocationId: string;
-    wrapperRunId: string;
-    wrapperConnectionId: string;
+    fence: RuntimeProxyFence;
     now: number;
   }
 ): value is RuntimeProxyGrant {
@@ -137,10 +176,17 @@ export function matchesRuntimeProxyGrant(
     current.kiloSessionId === context.kiloSessionId &&
     current.userId === context.userId &&
     current.orgId === context.orgId &&
-    current.generation === context.generation &&
-    current.allocationId === context.allocationId &&
-    current.wrapperRunId === context.wrapperRunId &&
-    current.wrapperConnectionId === context.wrapperConnectionId
+    current.plane === context.fence.plane &&
+    current.allocationId === context.fence.allocationId &&
+    (current.plane === 'legacy' && context.fence.plane === 'legacy'
+      ? current.generation === context.fence.generation &&
+        current.wrapperRunId === context.fence.wrapperRunId &&
+        current.wrapperConnectionId === context.fence.wrapperConnectionId
+      : current.plane === 'control' &&
+        context.fence.plane === 'control' &&
+        current.providerInstanceId === context.fence.providerInstanceId &&
+        current.connectionId === context.fence.connectionId &&
+        current.wrapperInstanceId === context.fence.wrapperInstanceId)
   );
 }
 
@@ -154,10 +200,7 @@ export async function resolveRuntimeProxyCredential(input: {
     kiloSessionId: string;
     userId: string;
     orgId?: string;
-    generation: number;
-    allocationId: string;
-    wrapperRunId: string;
-    wrapperConnectionId: string;
+    fence: RuntimeProxyFence;
   };
   now?: number;
   token: string;

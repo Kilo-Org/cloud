@@ -95,12 +95,6 @@ export type ServerDependencies = {
    * of repeating the same connection failure. See MEMORY_CGROUPS_PLAN.md (W5).
    */
   restartKiloRuntime?: () => Promise<void>;
-  updateRuntimeCredential?: (input: {
-    credential: string;
-    authorizationId: string;
-    fence: string;
-    scope?: string;
-  }) => boolean;
 };
 
 export type SessionBinding = {
@@ -1219,36 +1213,6 @@ export function createFetchHandler(
   const sessionReadyHandler = createSessionReadyHandler(deps);
   const runtimeEnvironmentHandler = createRuntimeEnvironmentHandler(deps);
   const kiloProxyHandler = createKiloProxyHandler(deps);
-  const credentialHandler = async (req: Request): Promise<Response> => {
-    if (!deps.updateRuntimeCredential) return errorResponse('NOT_FOUND', 'Path not found', 404);
-    let input: unknown;
-    try {
-      input = await req.json();
-    } catch {
-      return errorResponse('INVALID_REQUEST', 'Invalid request', 400);
-    }
-    if (
-      !input ||
-      typeof input !== 'object' ||
-      Array.isArray(input) ||
-      typeof (input as { credential?: unknown }).credential !== 'string' ||
-      typeof (input as { authorizationId?: unknown }).authorizationId !== 'string' ||
-      typeof (input as { fence?: unknown }).fence !== 'string' ||
-      ((input as { scope?: unknown }).scope !== undefined &&
-        typeof (input as { scope?: unknown }).scope !== 'string')
-    ) {
-      return errorResponse('INVALID_REQUEST', 'Invalid request', 400);
-    }
-    const body = input as {
-      credential: string;
-      authorizationId: string;
-      fence: string;
-      scope?: string;
-    };
-    return deps.updateRuntimeCredential(body)
-      ? Response.json({ status: 'updated' })
-      : errorResponse('FORBIDDEN', 'Credential update rejected', 403);
-  };
 
   // Route table
   type RouteHandler = (req: Request) => Response | Promise<Response>;
@@ -1267,7 +1231,6 @@ export function createFetchHandler(
       '/pty': ptyCreateHandler,
       '/session/ready': sessionReadyHandler,
       '/session/environment': runtimeEnvironmentHandler,
-      '/session/kilo-credential': credentialHandler,
     },
   };
 

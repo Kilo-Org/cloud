@@ -144,6 +144,28 @@ describe('signKiloToken', () => {
 
     expect(kiloTokenPayload.parse(payload)).toEqual(payload);
   });
+
+  it('accepts admin organization roles and runtime claims', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-runtime',
+      pepper: 'pepper-runtime',
+      secret: SECRET,
+      expiresInSeconds: 60,
+      extra: {
+        organizationRole: 'admin',
+        runtimeAdmission: {
+          source: 'user',
+          authorizationUserId: 'user-runtime',
+          authorizationPepper: 'pepper-runtime',
+        },
+      },
+    });
+
+    await expect(verifyKiloToken(token, SECRET)).resolves.toMatchObject({
+      organizationRole: 'admin',
+      runtimeAdmission: { source: 'user' },
+    });
+  });
 });
 
 describe('verifyKiloToken', () => {

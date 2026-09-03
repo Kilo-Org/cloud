@@ -22,5 +22,5 @@ export async function POST() {
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  return NextResponse.json(createKiloChatTokenResponse(user));
+  return NextResponse.json(await createKiloChatTokenResponse(user));
 }

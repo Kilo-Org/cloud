@@ -2,6 +2,17 @@ import { SignJWT, jwtVerify } from 'jose';
 import { z } from 'zod';
 
 export const KILO_TOKEN_VERSION = 3;
+const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
+const runtimeAdmission = z.object({
+  source: z.enum(['user', 'automation']),
+  authorizationUserId: z.string().min(1),
+  authorizationPepper: z.string().nullable(),
+});
+const runtimeAuthorization = z.object({
+  id: z.string().uuid(),
+  resourceKind: z.enum(['cloud-agent-next', 'gastown']),
+  resourceId: z.string().min(1),
+});
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
@@ -20,16 +31,16 @@ export const kiloTokenPayload = z.object({
   gastownAccess: z.boolean().optional(),
   botId: z.string().optional(),
   organizationId: z.string().optional(),
-  organizationRole: z.enum(['owner', 'member', 'billing_manager']).optional(),
+  organizationRole: organizationRole.optional(),
   internalApiUse: z.boolean().optional(),
   createdOnPlatform: z.string().optional(),
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
   deviceSessionId: z.string().optional(),
   // Org memberships (baked into gastown tokens to avoid DB lookups)
-  orgMemberships: z
-    .array(z.object({ orgId: z.string(), role: z.enum(['owner', 'member', 'billing_manager']) }))
-    .optional(),
+  orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
+  runtimeAdmission: runtimeAdmission.optional(),
+  runtimeAuthorization: runtimeAuthorization.optional(),
   // Standard JWT claims
   iat: z.number().optional(),
   exp: z.number().optional(),
@@ -55,6 +66,8 @@ export type SignKiloTokenExtra = Pick<
   | 'deviceAuthRequestCode'
   | 'deviceSessionId'
   | 'orgMemberships'
+  | 'runtimeAdmission'
+  | 'runtimeAuthorization'
 >;
 
 export async function signKiloToken(params: {

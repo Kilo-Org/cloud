@@ -606,6 +606,15 @@ async function main() {
       `session/ready received agentSessionId=${request.agentSessionId} kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0} platform=${request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM ?? '(unset)'} stateConnected=${state.isConnected}`
     );
     try {
+      if (request.runtimeCredentialProxy) {
+        return {
+          status: 'error',
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Runtime credential proxy delivery is not implemented',
+          },
+        };
+      }
       const bindError = await bindSessionContext(
         request.session,
         serverConfig,

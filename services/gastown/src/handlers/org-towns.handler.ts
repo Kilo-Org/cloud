@@ -42,7 +42,22 @@ export async function handleCreateOrgTown(c: Context<GastownEnv>, params: { orgI
   // Initialize the TownDO config with org ownership metadata
   const townDOStub = getTownDOStub(c.env, town.id);
   await townDOStub.setTownId(town.id);
+  const runtime = await townDOStub.initializeTownIdentityAndRuntimeAuthorization(
+    {
+      ownerType: 'org',
+      ownerUserId: userId,
+      organizationId: params.orgId,
+      createdByUserId: userId,
+      runtimeMode: 'legacy',
+    },
+    c.get('kiloControlToken')
+  );
+  if (runtime.modernControl && !runtime.runtimeToken) {
+    await orgDO.deleteTown(town.id);
+    return c.json(resError('A current Gastown control token is required'), 403);
+  }
   await townDOStub.updateTownConfig({
+    ...(runtime.runtimeToken ? { kilocode_token: runtime.runtimeToken } : {}),
     owner_type: 'org',
     owner_id: params.orgId,
     owner_user_id: userId,

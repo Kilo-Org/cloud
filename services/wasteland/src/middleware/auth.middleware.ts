@@ -1,4 +1,6 @@
-export type JwtOrgMembership = { orgId: string; role: 'owner' | 'member' | 'billing_manager' };
+import type { KiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
+
+export type JwtOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
 
 export type AuthVariables = {
   kiloUserId: string;

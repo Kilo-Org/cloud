@@ -22,7 +22,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { generateControlToken } from './token.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -160,10 +160,11 @@ export async function processManualAnalysisStart(params: {
       ]);
     if (!tokenResult.success) return { status: 'token-missing' };
 
-    const authToken = await generateApiToken(
+    const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
-      params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+      params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED
     );
     const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,

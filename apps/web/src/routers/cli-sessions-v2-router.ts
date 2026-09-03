@@ -29,7 +29,7 @@ import {
   type CliSessionV2,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateCloudAgentToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
@@ -1044,7 +1044,15 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(WorktreeInputSchema)
     .output(z.object({ success: z.literal(true), deletedSessionIds: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const client = createCloudAgentNextClient(
+        (
+          await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+            headers: ctx.headersList,
+            organizationId: input.organizationId ?? undefined,
+            tokenSource: 'cloud-agent',
+          })
+        ).token
+      );
       try {
         return await client.deleteWorktree({
           worktreeId: input.worktreeId,
@@ -1423,7 +1431,13 @@ export const cliSessionsV2Router = createTRPCRouter({
       let watermarkEventId: number | null = null;
       if (!input.cursor && session.cloud_agent_session_id) {
         try {
-          const authToken = generateCloudAgentToken(ctx.user);
+          const authToken = (
+            await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+              headers: ctx.headersList,
+              organizationId: session.organization_id ?? undefined,
+              tokenSource: 'cloud-agent',
+            })
+          ).token;
           const client = createCloudAgentNextClient(authToken);
           const sessionState = await client.getSession(session.cloud_agent_session_id);
           watermarkEventId = sessionState.latestEventId ?? null;
@@ -1589,7 +1603,13 @@ export const cliSessionsV2Router = createTRPCRouter({
 
       if (session.cloud_agent_session_id) {
         try {
-          const authToken = generateCloudAgentToken(ctx.user);
+          const authToken = (
+            await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+              headers: ctx.headersList,
+              organizationId: session.organization_id ?? undefined,
+              tokenSource: 'cloud-agent',
+            })
+          ).token;
           const client = createCloudAgentNextClient(authToken);
           runtimeState = await client.getSession(session.cloud_agent_session_id);
         } catch (error) {
@@ -1975,7 +1995,13 @@ export const cliSessionsV2Router = createTRPCRouter({
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
     if (session.cloud_agent_session_id) {
-      const authToken = generateCloudAgentToken(ctx.user);
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: session.organization_id ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
       const client = createCloudAgentNextClient(authToken);
       try {
         const result = await client.deleteSession(session.cloud_agent_session_id);

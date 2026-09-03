@@ -34,6 +34,7 @@
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "WEBHOOK_AGENT_URL": "https://hooks.kilosessions.ai",
     "KILOCLAW_API_URL": "https://claw.kilosessions.ai",
+    "SHARED_RESOURCE_TOKENS_ENABLED": "false",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -137,6 +138,7 @@
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILOCLAW_API_URL": "http://localhost:8795",
         "WEBHOOK_AGENT_URL": "http://localhost:8793",
+        "SHARED_RESOURCE_TOKENS_ENABLED": "false",
       },
       // DEV service binding to Cloud Agent Next
       "services": [

@@ -1,6 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
+import {
+  renewRuntimeAuthorization,
+  unsealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { resolveSecret } from '../auth.js';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
@@ -74,6 +81,11 @@ import { sandboxControlRpc } from './control-rpc.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
+import {
+  getRuntimeAuthorizationStatus,
+  renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_KEY,
+} from '../session/runtime-authorization-persistence.js';
 import { validateControlSessionOptions } from './attach-payload.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
@@ -169,6 +181,7 @@ type DispatchPhase = 'preparing' | 'attach' | 'prompt';
 type SandboxSessionRegistrationInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
+  runtimeAuthorizationSeal?: string;
   agent: SessionMetadata['agent'];
   repository?: SessionMetadata['repository'];
   workspace?: SessionMetadata['workspace'];
@@ -544,6 +557,65 @@ export class SandboxSession extends DurableObject<Env> {
     return this.deletedWorktreeId || this.terminalLifecycle.isDeleted()
       ? null
       : this.terminalLifecycle.getStoredMetadata();
+  }
+
+  async getRuntimeToken(): Promise<string | null> {
+    const metadata = await this.getMetadata();
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return renewStoredRuntimeAuthorization({
+      metadata,
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      putAuthorization: async authorization => {
+        this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+      },
+      getMetadata: () => this.getMetadata(),
+      putMetadata: async updated => {
+        this.ctx.storage.kv.put(METADATA_KEY, updated);
+      },
+      renew: authorization =>
+        renewRuntimeAuthorization({
+          authorization,
+          secret,
+          connectionString: this.env.HYPERDRIVE.connectionString,
+        }),
+    });
+  }
+
+  async getRuntimeAuthorizationStatus(): Promise<'legacy' | 'active' | 'revoked'> {
+    return getRuntimeAuthorizationStatus({
+      metadata: await this.getMetadata(),
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async reauthorizeRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    runtimeAuthorizationSeal: string;
+  }): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return false;
+    let authorization: RuntimeAuthorization;
+    try {
+      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return false;
+    }
+    if (authorization.state !== 'active') return false;
+    const current = RuntimeAuthorizationSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!current.success || current.data.id !== input.expectedOldId) return false;
+    this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+    return true;
   }
 
   async getCredentialMetadata(): Promise<SessionMetadata | null> {
@@ -967,6 +1039,28 @@ export class SandboxSession extends DurableObject<Env> {
       }
       return { success: true };
     }
+    let runtimeAuthorization: RuntimeAuthorization | undefined;
+    if (input.runtimeAuthorizationSeal) {
+      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      if (!secret) return { success: false, error: 'Authentication unavailable' };
+      let authorization: RuntimeAuthorization;
+      try {
+        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+          resourceKind: 'cloud-agent-next',
+          resourceId: input.identity.sessionId,
+          userId: input.identity.userId,
+          organizationId: input.identity.orgId,
+        });
+      } catch {
+        return { success: false, error: 'Invalid runtime authorization' };
+      }
+      if (authorization.state !== 'active')
+        return { success: false, error: 'Runtime authorization revoked' };
+      if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY)) {
+        return { success: false, error: 'Runtime authorization already installed' };
+      }
+      runtimeAuthorization = authorization;
+    }
     try {
       validateControlSessionOptions(input);
     } catch (error) {
@@ -999,6 +1093,9 @@ export class SandboxSession extends DurableObject<Env> {
     });
     if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
+    if (runtimeAuthorization) {
+      this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, runtimeAuthorization);
+    }
     this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(metadata));
     this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
       revision: 0,

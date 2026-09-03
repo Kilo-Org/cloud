@@ -575,6 +575,14 @@ async function selectDirectKiloToken(
   existing: SessionCredentialGrant | undefined,
   now: number
 ): Promise<string> {
+  const decoded = jwt.decode(token);
+  if (decoded !== null && typeof decoded === 'object') {
+    if ('runtimeAdmission' in decoded) invalidCredentials();
+    if ('runtimeAuthorization' in decoded) invalidCredentials();
+    if ('aud' in decoded || 'tokenPurpose' in decoded || 'credentialExchange' in decoded) {
+      invalidCredentials();
+    }
+  }
   if (
     !existing ||
     existing.kilo.token === token ||

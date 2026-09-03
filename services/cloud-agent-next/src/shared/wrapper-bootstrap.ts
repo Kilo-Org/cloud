@@ -58,6 +58,21 @@ export type WrapperBootstrapMaterializedConfig = {
   runtimeSkills?: WrapperBootstrapRuntimeSkill[];
 };
 
+export type WrapperRuntimeCredentialProxyConfig = {
+  authorizationId: string;
+  authorizationFingerprint: string;
+  alias: string;
+  credential: string;
+  targets: {
+    backendBaseUrl: string;
+    providerBaseUrl: string;
+    sessionIngestBaseUrl: string;
+  };
+  authorizedSessionIds: string[];
+  organizationId?: string;
+  fence: string;
+};
+
 export type WrapperDevContainerMetadata = {
   workspacePath: string;
   innerWorkspaceFolder: string;
@@ -129,6 +144,7 @@ export type WrapperSessionReadyRequest = {
   repo?: WrapperBootstrapRepoSource;
   devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
+  runtimeCredentialProxy?: WrapperRuntimeCredentialProxyConfig;
   session: WrapperSessionBinding;
   preparation?: {
     attemptId: string;

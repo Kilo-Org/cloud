@@ -9,7 +9,7 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { getFixTicketById } from '../db/fix-tickets';
 import type { Owner } from '../core/schemas';
 import type { DispatchFixRequest } from '../core/schemas';
@@ -51,7 +51,11 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
     }
 
     // 3. Generate auth token for cloud agent with bot identifier
-    const authToken = generateApiToken(user, { botId: 'auto-fix' });
+    const authToken = generateCloudAgentWorkflowToken(user, {
+      tokenSource: 'auto-fix',
+      botId: 'auto-fix',
+      expiresIn: TOKEN_EXPIRY.default,
+    });
 
     // 4. Parse and validate config
     const configResult = AutoFixAgentConfigSchema.safeParse(agentConfig.config);

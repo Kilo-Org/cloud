@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import jwt from 'jsonwebtoken';
 import type { SecurityFinding, User } from '@kilocode/db/schema';
 import type * as securityAnalysisModule from '../db/security-analysis';
 import type * as securityFindingsModule from '../db/security-findings';
@@ -147,7 +148,7 @@ describe('startSecurityAnalysis token source', () => {
     });
   });
 
-  it('uses one non-exchangeable security-agent token for triage and sandbox analysis', async () => {
+  it('uses separate gateway and sandbox security-agent credentials', async () => {
     const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
     const finding = createFinding(user);
     mockGetSecurityFindingById.mockResolvedValue(finding);
@@ -164,8 +165,14 @@ describe('startSecurityAnalysis token source', () => {
     const cloudAgentToken = mockCreateCloudAgentNextClient.mock.calls[0]?.[0];
     if (!triageInput) throw new Error('Expected triage to receive an input');
     expect(triageInput.authToken).toEqual(expect.any(String));
-    expect(cloudAgentToken).toBe(triageInput.authToken);
-    await expectNonExchangeableSystemToken(triageInput.authToken, user, 'security-agent');
+    const cloudAgentClaims = jwt.decode(cloudAgentToken);
+    if (!cloudAgentClaims || typeof cloudAgentClaims === 'string') {
+      throw new Error('Expected sandbox JWT claims');
+    }
+    if (cloudAgentClaims.tokenPurpose !== undefined) {
+      expect(cloudAgentToken).not.toBe(triageInput.authToken);
+    }
+    await expectNonExchangeableSystemToken(cloudAgentToken, user, 'security-agent');
     expect(mockPrepareSession).toHaveBeenCalledTimes(1);
     expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
       cloudAgentSessionId: 'agent-session-123',

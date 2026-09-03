@@ -61,6 +61,7 @@ import {
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
@@ -1279,6 +1280,7 @@ export class SessionService {
       workspacePath,
       env: opts.env,
       kiloCapability: opts.kiloCapability,
+      kiloBackendBaseUrl: opts.kiloBackendBaseUrl,
       kiloProviderBaseUrl: opts.kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl: opts.kiloSessionIngestBaseUrl,
       kilocodeModel: opts.kilocodeModel,
@@ -1307,6 +1309,7 @@ export class SessionService {
       workspacePath,
       env,
       kiloCapability,
+      kiloBackendBaseUrl,
       kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl,
       kilocodeModel,
@@ -1639,8 +1642,9 @@ export class SessionService {
       envVars.KILOCODE_ORGANIZATION_ID = kilocodeOrganizationId;
     }
 
-    if (env.KILOCODE_BACKEND_BASE_URL) {
-      const sandboxUrl = backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL);
+    if (kiloBackendBaseUrl || env.KILOCODE_BACKEND_BASE_URL) {
+      const sandboxUrl =
+        kiloBackendBaseUrl ?? backendUrlForSandbox(env.KILOCODE_BACKEND_BASE_URL ?? '');
       envVars.KILOCODE_BACKEND_BASE_URL = sandboxUrl;
       // Used by kilo server to check user auth to send to ingest
       envVars.KILO_API_URL = sandboxUrl;
@@ -1967,7 +1971,12 @@ export class SessionService {
       kilocodeContainment: boolean;
       userToken: string;
     }
-  ): Promise<{ capability: string; providerBaseUrl?: string; sessionIngestBaseUrl?: string }> {
+  ): Promise<{
+    capability: string;
+    backendBaseUrl?: string;
+    providerBaseUrl?: string;
+    sessionIngestBaseUrl?: string;
+  }> {
     if (params.sandboxId.startsWith('dind-')) {
       return { capability: params.userToken };
     }
@@ -2005,6 +2014,7 @@ export class SessionService {
     // `upstream_not_allowed`, even though the capability itself is valid.
     return {
       capability: issued.value.capability,
+      backendBaseUrl: derivedTargets.targets.backendBaseUrl,
       providerBaseUrl: derivedTargets.targets.providerBaseUrl,
       sessionIngestBaseUrl: derivedTargets.targets.sessionIngestBaseUrl,
     };
@@ -2020,7 +2030,12 @@ export class SessionService {
       sandboxId: string;
       userToken: string;
     }
-  ): Promise<{ capability: string; providerBaseUrl?: string; sessionIngestBaseUrl?: string }> {
+  ): Promise<{
+    capability: string;
+    backendBaseUrl?: string;
+    providerBaseUrl?: string;
+    sessionIngestBaseUrl?: string;
+  }> {
     return this.issueKiloSessionCapability(env, {
       userId: params.userId,
       cloudAgentSessionId: params.cloudAgentSessionId,
@@ -2047,6 +2062,11 @@ export class SessionService {
     const { scope, turn, agent, finalization, workspace, wrapper } = plan;
     const { sessionId, userId, orgId } = scope;
     const { sandboxId, metadata } = workspace;
+    if (hasModernRuntimeAuthorization(metadata)) {
+      throw ExecutionError.invalidRequest(
+        'Modern runtime credential delivery is not ready; shared issuance must remain disabled'
+      );
+    }
 
     if (!metadata.auth.kilocodeToken) {
       throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
@@ -2058,17 +2078,16 @@ export class SessionService {
     if (!nextAuthSecret) {
       throw ExecutionError.invalidRequest('NEXTAUTH_SECRET is not configured on the worker');
     }
-    const {
-      capability: kiloCapability,
-      providerBaseUrl: kiloProviderBaseUrl,
-      sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
-    } = await this.resolveKiloCapability(env, metadata, {
+    const kiloCredential = await this.resolveKiloCapability(env, metadata, {
       userId,
       cloudAgentSessionId: sessionId,
       kiloSessionId: metadata.auth.kiloSessionId,
       sandboxId,
       userToken: metadata.auth.kilocodeToken,
     });
+    const kiloCapability = kiloCredential.capability;
+    const kiloProviderBaseUrl = kiloCredential.providerBaseUrl;
+    const kiloSessionIngestBaseUrl = kiloCredential.sessionIngestBaseUrl;
 
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
@@ -2327,6 +2346,7 @@ export class SessionService {
     }
     const {
       capability: kiloCapability,
+      backendBaseUrl: kiloBackendBaseUrl,
       providerBaseUrl: kiloProviderBaseUrl,
       sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
     } = await this.resolveKiloCapability(env, metadata, {
@@ -2397,6 +2417,7 @@ export class SessionService {
       context,
       env,
       kiloCapability,
+      kiloBackendBaseUrl,
       kiloProviderBaseUrl,
       kiloSessionIngestBaseUrl,
       kilocodeModel: options.kilocodeModel,
@@ -3029,6 +3050,7 @@ export type GetOrCreateSessionOptions = {
   context: SessionContext;
   env: PersistenceEnv;
   kiloCapability: string;
+  kiloBackendBaseUrl?: string;
   kiloProviderBaseUrl?: string;
   kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;
@@ -3057,6 +3079,7 @@ type GetSaferEnvVarsOptions = {
   workspacePath: string;
   env: PersistenceEnv;
   kiloCapability: string;
+  kiloBackendBaseUrl?: string;
   kiloProviderBaseUrl?: string;
   kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;

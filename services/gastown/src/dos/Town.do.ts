@@ -67,8 +67,15 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerDoId, getTownContainerStub } from './TownContainer.do';
 
+import {
+  createRuntimeAuthorization,
+  renewRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
+  RuntimeAuthorizationSchema,
+  type RuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
 import { kiloTokenPayload } from '@kilocode/worker-utils';
-import { jwtVerify } from 'jose';
+import { decodeJwt, jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
@@ -110,6 +117,17 @@ import type {
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
+const RUNTIME_AUTHORIZATION_KEY = 'town:private:runtime-authorization';
+const TOWN_IDENTITY_KEY = 'town:private:identity';
+
+const TownIdentitySchema = z.object({
+  ownerType: z.enum(['user', 'org']),
+  ownerUserId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
+  createdByUserId: z.string().min(1),
+  runtimeMode: z.enum(['legacy', 'modern']),
+});
+type TownIdentity = z.infer<typeof TownIdentitySchema>;
 
 /** Format a bead_events row into a human-readable message for the status feed. */
 function formatEventMessage(row: Record<string, unknown>): string {
@@ -954,6 +972,148 @@ export class TownDO extends DurableObject<Env> {
     this._ownerUserId = result.owner_user_id;
     await this.prepareContainerBilling(undefined, result);
     return result;
+  }
+
+  async initializePrivateTownIdentity(identity: TownIdentity): Promise<void> {
+    const parsed = TownIdentitySchema.parse(identity);
+    const existing = await this.ctx.storage.get<unknown>(TOWN_IDENTITY_KEY);
+    if (existing) throw new Error('Town identity already initialized');
+    await this.ctx.storage.put(TOWN_IDENTITY_KEY, parsed);
+    await config.updateTownConfig(this.ctx.storage, {
+      owner_type: parsed.ownerType,
+      owner_id: parsed.organizationId ?? parsed.ownerUserId,
+      owner_user_id: parsed.ownerUserId,
+      organization_id: parsed.organizationId,
+      created_by_user_id: parsed.createdByUserId,
+    });
+  }
+
+  async initializeTownIdentityAndRuntimeAuthorization(
+    identity: TownIdentity,
+    controlToken: string
+  ): Promise<{ runtimeToken?: string; modernControl: boolean }> {
+    await this.initializePrivateTownIdentity(identity);
+    const modernControl = this.isModernControlToken(controlToken);
+    const runtimeToken = await this.createRuntimeAuthorization(
+      controlToken,
+      identity.ownerUserId,
+      identity.organizationId
+    );
+    return { runtimeToken, modernControl };
+  }
+
+  private isModernControlToken(token: string): boolean {
+    try {
+      return typeof decodeJwt(token).tokenPurpose === 'string';
+    } catch {
+      return false;
+    }
+  }
+
+  async getPrivateTownIdentity(): Promise<TownIdentity | null> {
+    const identity = TownIdentitySchema.safeParse(
+      await this.ctx.storage.get<unknown>(TOWN_IDENTITY_KEY)
+    );
+    return identity.success ? identity.data : null;
+  }
+
+  async createRuntimeAuthorization(
+    controlToken: string,
+    userId: string,
+    organizationId?: string
+  ): Promise<string | undefined> {
+    const identity = await this.getPrivateTownIdentity();
+    if (
+      !identity ||
+      identity.organizationId !== organizationId ||
+      (identity.ownerType === 'user' && identity.ownerUserId !== userId) ||
+      !controlToken ||
+      !this.env.NEXTAUTH_SECRET ||
+      !this.env.HYPERDRIVE
+    )
+      return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return undefined;
+    try {
+      const created = await createRuntimeAuthorization({
+        token: controlToken,
+        secret,
+        connectionString: this.env.HYPERDRIVE.connectionString,
+        resourceKind: 'gastown',
+        resourceId: this.townId,
+        organizationId,
+      });
+      if (identity.ownerType === 'user' && created.authorization.userId !== userId) {
+        throw new Error('Runtime authorization user mismatch');
+      }
+      await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, created.authorization);
+      await this.ctx.storage.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
+      return created.token;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async reauthorizeRuntime(
+    controlToken: string,
+    userId: string,
+    organizationId?: string
+  ): Promise<boolean> {
+    const identity = await this.getPrivateTownIdentity();
+    const current = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (
+      !this.isModernControlToken(controlToken) ||
+      !identity ||
+      !current.success ||
+      current.data.state !== 'revoked' ||
+      identity.organizationId !== organizationId ||
+      (identity.ownerType === 'user' && identity.ownerUserId !== userId) ||
+      this.hasActiveWork()
+    )
+      return false;
+    const container = await getTownContainerStub(this.env, this.townId).getState();
+    if (container.status === 'running' || container.status === 'healthy') return false;
+    return (
+      (await this.createRuntimeAuthorization(controlToken, userId, organizationId)) !== undefined
+    );
+  }
+
+  private async renewRuntimeAuthorization(): Promise<string | undefined> {
+    const raw = await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+    if (!raw || !this.env.NEXTAUTH_SECRET || !this.env.HYPERDRIVE) return undefined;
+    const authorization = RuntimeAuthorizationSchema.safeParse(raw);
+    if (!authorization.success || authorization.data.state !== 'active') return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return undefined;
+    try {
+      const renewed = await renewRuntimeAuthorization({
+        authorization: authorization.data,
+        secret,
+        connectionString: this.env.HYPERDRIVE.connectionString,
+      });
+      const current = RuntimeAuthorizationSchema.safeParse(
+        await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+      );
+      if (
+        !current.success ||
+        current.data.id !== authorization.data.id ||
+        current.data.state !== 'active'
+      ) {
+        return undefined;
+      }
+      await this.updateTownConfig({ kilocode_token: renewed.token });
+      return renewed.token;
+    } catch (error) {
+      if (error instanceof RuntimeAuthorizationRevokedError) {
+        await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, {
+          ...authorization.data,
+          state: 'revoked',
+        } satisfies RuntimeAuthorization);
+      }
+      return undefined;
+    }
   }
 
   async getBillingStatus(): Promise<GastownBillingStatus> {
@@ -3416,6 +3576,13 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async resolveKilocodeToken(): Promise<string | undefined> {
+    const runtimeToken = await this.renewRuntimeAuthorization();
+    if (runtimeToken) return runtimeToken;
+    const runtimeAuthorization = await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+    const privateIdentity = await this.ctx.storage.get<unknown>(TOWN_IDENTITY_KEY);
+    const identity = TownIdentitySchema.safeParse(privateIdentity);
+    if (runtimeAuthorization || (identity.success && identity.data.runtimeMode === 'modern'))
+      return undefined;
     const townConfig = await this.getTownConfig();
     if (townConfig.kilocode_token) return townConfig.kilocode_token;
 
@@ -4847,6 +5014,8 @@ export class TownDO extends DurableObject<Env> {
     const now = Date.now();
     if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
     this.lastKilocodeTokenCheckAt = now;
+
+    if (await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)) return;
 
     const townConfig = await this.getTownConfig();
     const token = townConfig.kilocode_token;

@@ -17,11 +17,23 @@ const TOKEN_CACHE_TTL_SECONDS = 30 * 60;
 // Maximum number of retry attempts for failed webhook processing
 const MAX_RETRY_ATTEMPTS = 3;
 
-function tokenCacheKey(triggerConfig: TriggerConfig): string {
+function tokenCacheKey(
+  triggerConfig: TriggerConfig,
+  sharedResourceTokensEnabled: string | boolean | undefined
+): string {
   // Cache key is based on userId or orgId, not namespace
   // This ensures token caching is per-user or per-org
   const principal = triggerConfig.userId ?? triggerConfig.orgId;
-  return `webhook-token:${principal}`;
+  const format =
+    sharedResourceTokensEnabled === true || sharedResourceTokensEnabled === 'true'
+      ? 'modern'
+      : 'legacy';
+  return `webhook-token:${format}:${principal}`;
+}
+
+function sharedResourceTokensEnabled(env: Env): string | boolean | undefined {
+  const value: unknown = Reflect.get(env, 'SHARED_RESOURCE_TOKENS_ENABLED');
+  return typeof value === 'string' || typeof value === 'boolean' ? value : undefined;
 }
 
 const PrepareSessionResponseSchema = z.object({
@@ -57,7 +69,7 @@ async function getOrMintToken(
   env: Env,
   triggerConfig: TriggerConfig
 ): Promise<{ token: string; cached: boolean }> {
-  const cacheKey = tokenCacheKey(triggerConfig);
+  const cacheKey = tokenCacheKey(triggerConfig, sharedResourceTokensEnabled(env));
 
   // Check KV cache first
   const cachedToken = await env.WEBHOOK_TOKEN_CACHE.get(cacheKey);

@@ -41,6 +41,7 @@ import {
 import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
 import { getSandboxSessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from './session-plane.js';
+import { withDORetry } from './utils/do-retry.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -362,6 +363,23 @@ function stripPublicCredentialHeaders(headers: Headers): Headers {
   return sanitized;
 }
 
+async function rejectLegacyWrapperTokenForRuntimeGrant(
+  env: Env,
+  claims: WrapperAuthClaims,
+  userId: string,
+  sessionId: string
+): Promise<Response | null> {
+  if (claims.type !== 'legacy_kilo_token') return null;
+  const status = await withDORetry(
+    () => resolveSessionStub(env, userId, sessionId),
+    stub => stub.getRuntimeAuthorizationStatus(),
+    'getRuntimeAuthorizationStatus'
+  );
+  return status === 'legacy'
+    ? null
+    : new Response('Legacy wrapper token is not authorized', { status: 401 });
+}
+
 async function routeToUserKiloFacade(
   c: Context<HonoContext>,
   userId: string,
@@ -611,6 +629,14 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Token does not match session user', 403);
   }
 
+  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+    c.env,
+    authResult.claims,
+    userId,
+    sessionId
+  );
+  if (legacyRejection) return legacyRejection;
+
   const url = new URL(c.req.url);
   const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
   const wrapperGeneration = parseOptionalWrapperGeneration(wrapperGenerationParam);
@@ -687,6 +713,14 @@ app.put(
     if (authResult.claims.userId !== userId) {
       return c.text('Token does not match session user', 403);
     }
+
+    const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+      c.env,
+      authResult.claims,
+      userId,
+      sessionId
+    );
+    if (legacyRejection) return legacyRejection;
 
     const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
     if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {

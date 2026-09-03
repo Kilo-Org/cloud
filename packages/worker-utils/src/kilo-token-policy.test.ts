@@ -855,7 +855,7 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
   };
   type ExpectedReadonlyOrganizationMemberships = readonly {
     readonly orgId: string;
-    readonly role: 'owner' | 'member' | 'billing_manager';
+    readonly role: 'owner' | 'admin' | 'member' | 'billing_manager';
   }[];
 
   expectTypeOf<DeviceAccessModernKiloTokenClaims['credentialExchange']>().toEqualTypeOf<false>();
@@ -881,8 +881,31 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
     ).resolves.toMatchObject({ userId: 'synthetic-user' });
   });
 
+  it('supports unique audience arrays only for non-exchangeable modern tokens', () => {
+    expect(
+      buildModernKiloTokenPayload({
+        userId: 'synthetic-user',
+        audience: ['kilo-api', 'kilo-gateway'],
+        issuedAt: NOW_SECONDS,
+        expiresAt: NOW_SECONDS + 60,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+      }).aud
+    ).toEqual(['kilo-api', 'kilo-gateway']);
+    expect(() =>
+      buildModernKiloTokenPayload({
+        userId: 'synthetic-user',
+        pepper: 'synthetic-pepper',
+        audience: ['kilo-api', 'kilo-gateway'],
+        issuedAt: NOW_SECONDS,
+        expiresAt: NOW_SECONDS + 60,
+        tokenPurpose: 'human-api',
+        credentialExchange: true,
+      })
+    ).toThrow();
+  });
+
   it.each([
-    { audience: ['kilo-api'] },
     { issuedAt: -1 },
     { expiresAt: NOW_SECONDS },
     { tokenPurpose: 'device-access', credentialExchange: true },

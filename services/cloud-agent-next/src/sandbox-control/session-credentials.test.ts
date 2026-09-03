@@ -1451,7 +1451,6 @@ describe('direct worktree Kilo token stability', () => {
     ['organization', { organizationId: INTEGRATION_ID }],
     ['role', { organizationRole: 'member' }],
     ['bot', { botId: 'bot-a' }],
-    ['audience', { aud: 'internal-service' }],
     ['unknown authorization', { futurePermission: 'restricted' }],
   ])('does not substitute the retained token after a change to %s', async (_name, claims) => {
     const first = await prepareDirect(env, data(token()));
@@ -1459,6 +1458,14 @@ describe('direct worktree Kilo token stability', () => {
     const refreshed = await prepareDirect(env, data(changed), first.grant, NOW + 2000);
     expect(refreshed.payload.kilo.token).toBe(changed);
     expect(refreshed.payload.env?.KILOCODE_TOKEN).toBe(changed);
+  });
+
+  it('fails closed for unsupported audience-bearing direct credentials at this checkpoint', async () => {
+    const first = await prepareDirect(env, data(token()));
+    const changed = token(NOW + 1000, { aud: 'internal-service' });
+    await expect(prepareDirect(env, data(changed), first.grant, NOW + 2000)).rejects.toThrow(
+      'Invalid contained worktree credentials'
+    );
   });
 
   it.each([

@@ -7,8 +7,8 @@ import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
 
-const screenLayout: typeof privacyScreenLayout = props =>
-  appUnlockScreenLayout({ children: privacyScreenLayout(props) });
+const screenLayout: typeof appUnlockScreenLayout = props =>
+  appUnlockScreenLayout({ ...props, children: privacyScreenLayout(props) });
 
 // Mounts exactly one command observer per scope alongside a headerless Stack,
 // so it stays mounted across Dashboard/Findings/Settings navigation without

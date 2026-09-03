@@ -85,14 +85,12 @@ export default function ExecPolicyScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.execPolicy.title')} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.execPolicy.couldNotLoad')}
-            onRetry={() => {
-              void statusQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.execPolicy.couldNotLoad')}
+          onRetry={() => {
+            void statusQuery.refetch();
+          }}
+        />
       </View>
     );
   }

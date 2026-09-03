@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
@@ -159,8 +160,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         return (
           <View className="flex-1 bg-background">
             <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
-            <PlatformErrorScreen
-              title={t('securityAgent.title')}
+            <QueryError
               variant="offline"
               message={t('securityAgent.scopeEntry.setupFailed')}
               onRetry={() => void performMint()}
@@ -197,8 +197,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         return (
           <View className="flex-1 bg-background">
             <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
-            <PlatformErrorScreen
-              title={t('securityAgent.title')}
+            <QueryError
               variant="offline"
               message={t('securityAgent.scopeEntry.reauthorizeFailed')}
               onRetry={() => void performMint()}

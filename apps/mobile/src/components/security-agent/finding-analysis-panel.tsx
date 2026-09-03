@@ -9,6 +9,8 @@ import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { CenteredState } from '@/components/centered-state';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
   formatExploitable,
@@ -59,7 +61,7 @@ export function FindingAnalysisPanel({
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3">
+      <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
       </View>
@@ -67,18 +69,13 @@ export function FindingAnalysisPanel({
   }
 
   if (isError && !analysis) {
-    return (
-      <View className="items-center justify-center py-8">
-        <QueryError message={t('securityAgent.analysis.couldNotLoad')} onRetry={onRetry} />
-      </View>
-    );
+    return <QueryError message={t('securityAgent.analysis.couldNotLoad')} onRetry={onRetry} />;
   }
 
   if (!analysis) {
     return (
       <EmptyState
         icon={ScanSearch}
-        placement="top"
         title={t('securityAgent.analysis.noAnalysisYet')}
         description={t('securityAgent.analysis.noAnalysisYetDescription')}
       />
@@ -158,8 +155,14 @@ export function FindingAnalysisPanel({
     );
   };
 
-  return (
-    <View className="gap-4">
+  const hasContent =
+    (triageState && Boolean(triage)) ||
+    (sandboxState && Boolean(sandbox)) ||
+    Boolean(technicalMarkdown);
+  const Body = hasContent ? TabScreenScrollView : CenteredState;
+
+  const content = (
+    <View className="gap-4 px-6 py-2">
       <View className="gap-1 rounded-lg bg-secondary p-3">
         <FindingStatusBadge
           icon={presentation.icon}
@@ -335,4 +338,6 @@ export function FindingAnalysisPanel({
       ) : null}
     </View>
   );
+
+  return <Body className="flex-1">{content}</Body>;
 }

@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { KILO_EMBEDDING_MODEL_CATALOG } from '@/lib/ai-gateway/embeddings/kilo-embedding-models';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
 } from '@/lib/organizations/effective-model-access.server';
 
 export async function GET(): Promise<NextResponse> {
-  const auth = await getUserFromAuth({ adminOnly: false }).catch(() => null);
+  const auth = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  }).catch(() => null);
   if (auth?.organizationId && auth.user) {
     // Resolve the member's policy once, then evaluate each catalog model
     // against it — the policy context is a transaction + several queries.

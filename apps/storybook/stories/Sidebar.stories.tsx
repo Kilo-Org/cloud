@@ -14,7 +14,6 @@ import {
   Database,
   Download,
   Factory,
-  Gift,
   Key,
   List,
   ListChecks,
@@ -46,7 +45,7 @@ import {
   type OrganizationSwitcherOrganization,
 } from '@/app/(app)/components/OrganizationSwitcher';
 import SidebarMenuList from '@/app/(app)/components/SidebarMenuList';
-import SidebarUserFooter from '@/app/(app)/components/SidebarUserFooter';
+import { SidebarUserFooterView as SidebarUserFooter } from '@/app/(app)/components/SidebarUserFooter';
 
 const meta: Meta = {
   title: 'Components/Layout/Sidebar',

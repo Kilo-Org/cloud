@@ -21,6 +21,9 @@ import { QueryError } from '@/components/query-error';
 import { i18n } from '@/i18n';
 import { ChildSessionModelLabel } from './child-session-model-label';
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
+
 describe('ChildSessionSheet title layout', () => {
   it.each([
     {
@@ -78,6 +81,9 @@ describe('ChildSessionSheet title layout', () => {
     expect(header.props).toMatchObject({ title: 'Inspect performance child 01' });
     expect(header.props.onDone).toBe(props.onClose);
     expect(textValues(renderer.root)).toContain(state.expectedText);
+    expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(
+      state.messages.length === 0 ? 1 : 0
+    );
     expect(
       renderer.root.findAll(
         node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
@@ -101,6 +107,8 @@ describe('ChildSessionSheet mounted', () => {
 
     expect(textValues(renderer.root)).toContain('child text');
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(renderer.root.findAllByType(QueryError)[0]?.props.placement).toBe('top');
+    expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(0);
     expect(textValues(renderer.root)).toContain('Failed');
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: false,
@@ -187,7 +195,9 @@ describe('ChildSessionSheet sheet surface', () => {
     expect(modalNode.props.onRequestClose).toBe(onClose);
     expect(modalNode.props.onDismiss).toBe(onDismiss);
 
-    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    expect(surface[0]?.props.style).toBeUndefined();
   });
 
   it('renders an opaque full-window Modal padded by the top inset on Android', async () => {

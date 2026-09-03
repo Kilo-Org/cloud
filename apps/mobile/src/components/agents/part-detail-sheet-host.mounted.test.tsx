@@ -29,6 +29,10 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+const cachedUri = vi.hoisted(() => ({ value: undefined as string | undefined }));
+vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => cachedUri.value }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -59,7 +63,7 @@ vi.mock('./tool-part-detail-body', () => ({
     createElement(
       'ToolPartDetailBody',
       props,
-      createElement(MonoScrollBlock, { content: LONG_LINE })
+      props.part.tool === 'bash' ? createElement(MonoScrollBlock, { content: LONG_LINE }) : null
     ),
 }));
 
@@ -223,6 +227,49 @@ describe('PartDetailSheetHost mounted', () => {
         propOf(node, 'children') === 'Details unavailable'
     );
     expect(unavailable).toHaveLength(1);
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+  });
+
+  it('switches from a centered state to inline content when an attachment becomes available', async () => {
+    const part: ToolPart = {
+      ...makeBashPart('read-1', '', true),
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { filePath: 'image.png' },
+        output: 'Image read successfully',
+        title: 'read',
+        metadata: {},
+        time: { start: 1, end: 2 },
+        attachments: [
+          {
+            id: 'file-1',
+            sessionID: 's1',
+            messageID: 'm1',
+            type: 'file',
+            mime: 'image/png',
+            url: '',
+          },
+        ],
+      },
+    };
+    const renderer = await mountHost([makeMessage('m1', [part])]);
+    act(() => {
+      capturedOpener?.('read-1');
+    });
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    act(() => {
+      cachedUri.value = 'file:///cached.png';
+      renderer.update(hostElement([makeMessage('m1', [part])]));
+    });
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(0);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(1);
+    cachedUri.value = undefined;
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('renders full selectable reasoning text with the completed label', async () => {

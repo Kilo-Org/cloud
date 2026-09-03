@@ -139,6 +139,10 @@ export function CountSurfaces() {
   );
 }
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  StateSurfaceInsets: 'StateSurfaceInsets',
+}));
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({
     token: 'account',

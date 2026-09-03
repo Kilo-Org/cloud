@@ -41,6 +41,7 @@ app-example
 # generated native folders
 /ios
 /android
+/modules/*/android/build/
 
 # prebuild cache stamp (written by the E2E workflow)
 .kilo-prebuild-key-*

@@ -23,6 +23,10 @@ const config = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+const provider = vi.hoisted(() => ({ status: 'connected' }));
+const centeredState = vi.hoisted(() => vi.fn());
+const scrollView = vi.hoisted(() => vi.fn());
+
 const permission = vi.hoisted(() => ({
   status: 'ready',
   canEdit: true,
@@ -44,6 +48,12 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
+}));
+vi.mock('@/components/centered-state', () => ({
+  CenteredState: (props: { children?: unknown }) => {
+    centeredState(props);
+    return props.children;
+  },
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   openModelPicker: vi.fn(),
@@ -70,7 +80,10 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: () => null }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: ({ children }: { children?: unknown }) => children,
+  TabScreenScrollView: (props: { children?: unknown }) => {
+    scrollView(props);
+    return props.children;
+  },
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: {
@@ -83,7 +96,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: [], isLoading: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  classifyProviderState: () => ({ status: 'connected' }),
+  classifyProviderState: () => provider,
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
     isLoading: false,
@@ -175,6 +188,19 @@ beforeEach(() => {
   config.refetch.mockClear();
   permission.status = 'ready';
   permission.canEdit = true;
+  provider.status = 'connected';
+  centeredState.mockClear();
+  scrollView.mockClear();
+});
+
+describe('PlatformOverviewScreen disconnected setup', () => {
+  it.each([false, true])('centers setup with edit permission %s', async canEdit => {
+    provider.status = 'disconnected';
+    permission.canEdit = canEdit;
+    await renderScreen();
+    expect(centeredState).toHaveBeenCalledOnce();
+    expect(scrollView).not.toHaveBeenCalled();
+  });
 });
 
 describe('PlatformOverviewScreen actionRequired banner', () => {

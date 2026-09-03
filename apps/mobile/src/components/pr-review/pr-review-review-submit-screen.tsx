@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+
+import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewSubmit } from '@/components/pr-review/pr-review-submit';
@@ -55,9 +57,9 @@ export function PrReviewReviewSubmitScreen() {
   }
 
   const body: ReactNode = pr.isLoading ? (
-    <View className="flex-1 items-center justify-center py-16">
+    <CenteredState>
       <ActivityIndicator size="small" color={colors.mutedForeground} />
-    </View>
+    </CenteredState>
   ) : (
     <QueryError
       variant="server"
@@ -72,9 +74,7 @@ export function PrReviewReviewSubmitScreen() {
   return (
     <>
       <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={dismiss} />
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="grow">
-        {body}
-      </ScrollView>
+      {body}
     </>
   );
 }

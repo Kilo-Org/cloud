@@ -31,7 +31,25 @@ export async function POST(request: Request) {
 
   const { code } = validation.data;
 
-  await approveDeviceAuthRequest(code, user.id);
+  try {
+    await approveDeviceAuthRequest(code, user.id);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Device authorization request not found') {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      if (error.message === 'Device authorization request is not pending') {
+        return NextResponse.json(
+          { error: 'Device authorization request can no longer be approved' },
+          { status: 409 }
+        );
+      }
+      if (error.message === 'Device authorization request has expired') {
+        return NextResponse.json({ error: error.message }, { status: 410 });
+      }
+    }
+    throw error;
+  }
 
   return NextResponse.json({ success: true });
 }

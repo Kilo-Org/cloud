@@ -21,7 +21,6 @@ import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
-import { i18n } from '@/i18n';
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 
@@ -34,6 +33,7 @@ import {
   type AttachmentMoveDirection,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
+import { CenteredState } from '@/components/centered-state';
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -111,13 +111,6 @@ export function dragTargetIndex(
 }
 
 function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string }) {
-  if (preview.text === '') {
-    return (
-      <Text className="text-xs text-muted-foreground">
-        {i18n.t('agentChat.filePart.fileEmpty')}
-      </Text>
-    );
-  }
   if (preview.mode === 'markdown') {
     return <MarkdownText value={preview.text} />;
   }
@@ -490,10 +483,20 @@ function AttachmentChip({
             }}
             doneLabel={t('common.done')}
           />
-          <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-            {renderPreviewBody(textPreview)}
-          </ScrollView>
-          <View style={{ height: insets.bottom }} className="bg-background" />
+          {textPreview.text === '' ? (
+            <CenteredState>
+              <Text className="px-6 text-center text-xs text-muted-foreground">
+                {t('agentChat.filePart.fileEmpty')}
+              </Text>
+            </CenteredState>
+          ) : (
+            <>
+              <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+                {renderPreviewBody(textPreview)}
+              </ScrollView>
+              <View style={{ height: insets.bottom }} className="bg-background" />
+            </>
+          )}
         </SessionPageSheet>
       ) : null}
     </>

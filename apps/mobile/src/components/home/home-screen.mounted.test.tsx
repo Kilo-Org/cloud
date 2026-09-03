@@ -55,6 +55,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   ActivityIndicator: 'ActivityIndicator',
@@ -730,6 +731,79 @@ describe('Home admission', () => {
       expect(state.destination).toBe('/(app)/(tabs)/(3_profile)');
     }
   });
+
+  it.each(['unavailable', 'error'] as const)(
+    'centers %s feedback only without remaining product choices',
+    async mode => {
+      state.organization.organizationId = 'org-1';
+      state.boundary.orgs = [];
+      state.boundary.isError = mode === 'error';
+      await renderHome();
+      expect(nodes('CenteredState')).toHaveLength(0);
+      expect(nodes('ScrollView')).toHaveLength(1);
+      expect(text()).toContain('PR Review');
+
+      state.prReviewEnabled = false;
+      await renderHome();
+      expect(nodes('CenteredState')).toHaveLength(1);
+      expect(nodes('CenteredState')[0]?.props.refreshControl).toBeDefined();
+      expect(nodes('ScrollView')).toHaveLength(0);
+      expect(nodes('NewTaskButton')).toHaveLength(0);
+      expect(text()).not.toContain('PR Review');
+      expect(text()).toContain(
+        mode === 'error' ? "Couldn't load your organizations" : 'Organization unavailable'
+      );
+    }
+  );
+
+  it('keeps session failures inline when the new task choice remains', async () => {
+    state.live.terminalError = failure;
+    state.prReviewEnabled = false;
+    await renderHome();
+    expect(nodes('CenteredState')).toHaveLength(0);
+    expect(nodes('ScrollView')).toHaveLength(1);
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+  });
+
+  it.each([false, true])(
+    'refreshes organization errors through the context with product choices=%s',
+    async prReviewEnabled => {
+      state.organization.organizationId = 'org-1';
+      state.boundary.isError = true;
+      state.prReviewEnabled = prReviewEnabled;
+      const pending = Promise.withResolvers<undefined>();
+      state.boundaryRefetch.mockReturnValue(pending.promise);
+      await renderHome();
+      const refresh = () =>
+        nodes(prReviewEnabled ? 'ScrollView' : 'CenteredState')[0]?.props.refreshControl as {
+          props: { refreshing: boolean; onRefresh: () => void };
+        };
+      act(() => {
+        refresh().props.onRefresh();
+      });
+      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+      expect(state.refetch).not.toHaveBeenCalled();
+      expect(refresh().props.refreshing).toBe(true);
+      await act(async () => {
+        pending.resolve(undefined);
+        await pending.promise;
+      });
+      expect(refresh().props.refreshing).toBe(false);
+
+      state.organization.organizationId = null;
+      state.live.activeSessions = [row];
+      await renderHome();
+      const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { onRefresh: () => void };
+      };
+      await act(async () => {
+        readyRefresh.props.onRefresh();
+        await Promise.resolve();
+      });
+      expect(state.refetch).toHaveBeenCalledOnce();
+      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+    }
+  );
 
   it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';

@@ -3,7 +3,8 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
@@ -75,7 +76,10 @@ export async function fetchSessionSnapshot(
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/export`;
 
   const response = await fetch(url, {
@@ -167,7 +171,10 @@ export async function fetchSessionMessagesPage(
     query ? `?${query}` : ''
   }`;
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -243,7 +250,10 @@ export async function shareSession(
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/share`;
 
   const response = await fetch(url, {
@@ -282,7 +292,10 @@ export async function unshareSession(sessionId: string, userId: string): Promise
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/unshare`;
 
   const response = await fetch(url, {
@@ -461,7 +474,10 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
 
-  const token = generateInternalServiceToken(userId);
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
 
   const response = await fetch(url, {

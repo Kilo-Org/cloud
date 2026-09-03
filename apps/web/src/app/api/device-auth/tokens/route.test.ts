@@ -46,6 +46,53 @@ describe('POST /api/device-auth/tokens', () => {
     expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1');
   });
 
+  it.each([
+    {
+      message: 'Device authorization request not found',
+      status: 404,
+      error: 'Not found',
+    },
+    {
+      message: 'Device authorization request is not pending',
+      status: 409,
+      error: 'Device authorization request can no longer be approved',
+    },
+    {
+      message: 'Device authorization request has expired',
+      status: 410,
+      error: 'Device authorization request has expired',
+    },
+  ])('returns $status when approval fails with "$message"', async ({ message, status, error }) => {
+    mockGetUserFromSession.mockResolvedValue({
+      user: defineTestUser({ id: 'user-1' }),
+      authFailedResponse: null,
+    });
+    mockApprove.mockRejectedValueOnce(new Error(message));
+
+    const response = await POST(
+      createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders)
+    );
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+    expect(mockApprove).toHaveBeenCalledWith('ABCD-EFGH', 'user-1');
+  });
+
+  it.each([new Error('Database unavailable'), 'Unexpected rejection'])(
+    'rethrows unexpected approval failures: %s',
+    async error => {
+      mockGetUserFromSession.mockResolvedValue({
+        user: defineTestUser({ id: 'user-1' }),
+        authFailedResponse: null,
+      });
+      mockApprove.mockRejectedValueOnce(error);
+
+      await expect(
+        POST(createRequest(JSON.stringify({ code: 'ABCD-EFGH' }), sessionHeaders))
+      ).rejects.toBe(error);
+    }
+  );
+
   it.each([undefined, 'https://evil.example'])(
     'rejects a %s origin before authenticating',
     async origin => {

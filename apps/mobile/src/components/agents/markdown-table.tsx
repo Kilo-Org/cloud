@@ -3,6 +3,7 @@ import { Table2, X } from '@/components/ui/icons';
 import {
   type ComponentRef,
   type ComponentType,
+  type ReactElement,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -42,6 +43,8 @@ import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { CenteredState } from '@/components/centered-state';
+import { StateSurface } from '@/components/centered-state-surface';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
 import { getMarkdownStyles, type MarkdownPalette } from './markdown-palette';
@@ -227,7 +230,25 @@ export function MarkdownTable({
 
   const tableStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
+    transformOrigin: 'top left',
   }));
+  const scrollContentStyle = { padding: 16, paddingBottom: insets.bottom + 16 };
+
+  function renderTableContent(cells: ReactNode) {
+    return (
+      <ScrollView ref={verticalRef} className="flex-1" contentContainerStyle={scrollContentStyle}>
+        <ScrollView ref={horizontalRef} horizontal showsHorizontalScrollIndicator>
+          <GestureDetector gesture={zoomGesture}>
+            <View style={sizerStyle}>
+              <Animated.View className="self-start" onLayout={handleTableLayout} style={tableStyle}>
+                {cells}
+              </Animated.View>
+            </View>
+          </GestureDetector>
+        </ScrollView>
+      </ScrollView>
+    );
+  }
 
   return (
     <>
@@ -276,7 +297,7 @@ export function MarkdownTable({
             setOpen(false);
           }}
         >
-          <View className="flex-1 bg-background">
+          <StateSurface className="flex-1 bg-background">
             <View
               className="flex-row items-center justify-between border-b border-border bg-background px-4"
               style={{ paddingTop: insets.top, height: insets.top + 56 }}
@@ -304,49 +325,30 @@ export function MarkdownTable({
             </View>
             {/* RNGH gestures need their own root inside an RN Modal — see image-viewer-modal.tsx. */}
             <GestureHandlerRootView className="flex-1">
-              <ScrollView
-                ref={verticalRef}
-                className="flex-1"
-                // eslint-disable-next-line react-native/no-inline-styles -- padding must be combined after contentContainerClassName removal
-                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
-              >
-                <ScrollView ref={horizontalRef} horizontal showsHorizontalScrollIndicator>
-                  <GestureDetector gesture={zoomGesture}>
-                    {/* Sizer: gives both scrollers the zoomed extent. The table keeps its
-                        natural layout size (self-start) and is scaled from its top-left. */}
-                    {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic measured sizer dimensions */}
-                    <View style={sizerStyle}>
-                      <Animated.View
-                        className="self-start"
-                        onLayout={handleTableLayout}
-                        // eslint-disable-next-line react-native/no-inline-styles -- animated transform + transformOrigin
-                        style={[tableStyle, { transformOrigin: 'top left' }]}
-                      >
-                        {raw !== undefined ? (
-                          <MarkdownTableBody
-                            palette={palette}
-                            raw={raw}
-                            columnCount={columnCount}
-                            rowCount={rowCount}
-                            selectable={selectable}
-                            onLongPressLink={onLongPressLink}
-                            onPressLink={onPressLink}
-                          />
-                        ) : (
-                          <MarkdownTableCells
-                            palette={palette}
-                            header={header ?? []}
-                            rows={rows ?? []}
-                            columnCount={columnCount}
-                          />
-                        )}
-                      </Animated.View>
-                    </View>
-                  </GestureDetector>
-                </ScrollView>
-              </ScrollView>
+              {raw !== undefined ? (
+                <MarkdownTableBody
+                  palette={palette}
+                  raw={raw}
+                  columnCount={columnCount}
+                  rowCount={rowCount}
+                  selectable={selectable}
+                  onLongPressLink={onLongPressLink}
+                  onPressLink={onPressLink}
+                >
+                  {renderTableContent}
+                </MarkdownTableBody>
+              ) : (
+                renderTableContent(
+                  <MarkdownTableCells
+                    palette={palette}
+                    header={header ?? []}
+                    rows={rows ?? []}
+                    columnCount={columnCount}
+                  />
+                )
+              )}
             </GestureHandlerRootView>
-          </View>
+          </StateSurface>
         </Modal>
       ) : null}
     </>
@@ -410,6 +412,7 @@ function MarkdownTableCells({
 }
 
 type MarkdownTableBodyProps = {
+  children: (cells: ReactNode) => ReactElement;
   palette: MarkdownPalette;
   raw: string;
   columnCount: number;
@@ -425,6 +428,7 @@ type MarkdownTableBodyProps = {
 // flashing the wait or empty states, and leaves the parent's chrome and zoom
 // untouched.
 function MarkdownTableBody({
+  children,
   palette,
   raw,
   columnCount,
@@ -476,20 +480,22 @@ function MarkdownTableBody({
   const cells = elements.length > 0 ? elements : lastCellsRef.current;
 
   if (cells !== null) {
-    return <>{cells}</>;
+    return children(cells);
   }
 
   if (rowCount === 0) {
     return (
-      <AccessibleStatus
-        className="px-4 py-4"
-        message={t('agentChat.markdownTable.empty')}
-        tone="status"
-      />
+      <CenteredState>
+        <AccessibleStatus
+          className="px-4 py-4 text-center"
+          message={t('agentChat.markdownTable.empty')}
+          tone="status"
+        />
+      </CenteredState>
     );
   }
 
-  return (
+  return children(
     <View className="flex-row items-center gap-3 px-4 py-4">
       <ActivityIndicator />
       <AccessibleStatus message={t('agentChat.markdownTable.loading')} tone="status" />

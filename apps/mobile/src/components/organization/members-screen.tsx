@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
@@ -103,7 +103,7 @@ export function OrganizationMembersScreen() {
   const emptyState = (
     <EmptyState
       icon={Users}
-      placement="top"
+      placement={items.length > 0 ? 'top' : 'center'}
       title={t('organization.members.emptyTitle')}
       description={
         canInvite
@@ -125,32 +125,6 @@ export function OrganizationMembersScreen() {
       }
     />
   );
-
-  // Loading, error, and empty are mutually exclusive and evaluated in this
-  // order. An error leaves both member arrays empty, so it must be checked
-  // before the empty branch — otherwise a 500 renders "No members yet".
-  const renderListEmpty = () => {
-    if (isLoading) {
-      return (
-        <View className="mx-6 rounded-lg bg-secondary">
-          <MemberRowSkeleton />
-          <MemberRowSkeleton />
-          <MemberRowSkeleton last />
-        </View>
-      );
-    }
-    if (errorView) {
-      return (
-        <QueryError
-          variant={errorView.variant}
-          onRetry={errorView.showRetry ? () => void orgWithMembers.refetch() : undefined}
-          isRetrying={orgWithMembers.isFetching}
-          placement="top"
-        />
-      );
-    }
-    return emptyState;
-  };
 
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
@@ -210,6 +184,19 @@ export function OrganizationMembersScreen() {
     }
   };
 
+  let emptyBody: ReactNode = null;
+  if (!isLoading && errorView) {
+    emptyBody = (
+      <QueryError
+        variant={errorView.variant}
+        onRetry={errorView.showRetry ? () => void orgWithMembers.refetch() : undefined}
+        isRetrying={orgWithMembers.isFetching}
+      />
+    );
+  } else if (!isLoading && items.length === 0) {
+    emptyBody = emptyState;
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -230,36 +217,44 @@ export function OrganizationMembersScreen() {
           ) : undefined
         }
       />
-      <FlashList
-        style={listStyle}
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={item => {
-          switch (item.kind) {
-            case 'section': {
-              return `section:${item.title}`;
+      {emptyBody ?? (
+        <FlashList
+          style={listStyle}
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => {
+            switch (item.kind) {
+              case 'section': {
+                return `section:${item.title}`;
+              }
+              case 'members-empty': {
+                return 'members-empty';
+              }
+              case 'member': {
+                return item.member.id;
+              }
+              case 'invite': {
+                return item.invite.inviteId;
+              }
+              default: {
+                const _exhaustive: never = item;
+                return _exhaustive;
+              }
             }
-            case 'members-empty': {
-              return 'members-empty';
-            }
-            case 'member': {
-              return item.member.id;
-            }
-            case 'invite': {
-              return item.invite.inviteId;
-            }
-            default: {
-              const _exhaustive: never = item;
-              return _exhaustive;
-            }
+          }}
+          getItemType={item => item.kind}
+          ListEmptyComponent={
+            <View className="mx-6 rounded-lg bg-secondary">
+              <MemberRowSkeleton />
+              <MemberRowSkeleton />
+              <MemberRowSkeleton last />
+            </View>
           }
-        }}
-        getItemType={item => item.kind}
-        ListEmptyComponent={renderListEmpty}
-        ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={listContentContainerStyle}
-      />
+          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={listContentContainerStyle}
+        />
+      )}
     </View>
   );
 }

@@ -68,6 +68,8 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+
 vi.mock('@/components/detail-screen', () => ({
   DetailScreenScrollView: 'DetailScreenScrollView',
 }));
@@ -271,6 +273,29 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.purchase.mockReset();
     mocks.nativeIap.ownedByAnotherAccount = false;
     mocks.routerPush.mockReset();
+  });
+
+  it.each(['web_management', 'unavailable'])(
+    'centers %s outside the purchase scroller',
+    async kind => {
+      mocks.presentation.data = { kind, webUrl: null };
+      const renderer = await renderScreen();
+      expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+      expect(
+        renderer.root.findAll(node => String(node.type) === 'DetailScreenScrollView')
+      ).toHaveLength(0);
+      expect(mocks.ownerMount).not.toHaveBeenCalled();
+      renderer.unmount();
+    }
+  );
+
+  it('keeps a cached presentation after a refetch failure', async () => {
+    mocks.presentation.data = { kind: 'web_management', webUrl: null };
+    mocks.presentation.isError = true;
+    const renderer = await renderScreen();
+    expect(allText(renderer)).toContain('This Kilo Pass is managed on the web.');
+    expect(allText(renderer)).not.toContain("Couldn't load Kilo Pass.");
+    renderer.unmount();
   });
 
   it('happy: native_iap with products and an allowed preflight enables tiles and starts purchase', async () => {

@@ -37,17 +37,23 @@ function UnavailableRow({
   );
 }
 
+type ToolCardImageAttachmentsProps = {
+  part: ToolPart;
+  imageFailed?: boolean;
+  onImageError?: (uri: string) => void;
+};
+
 function ToolCardImageAttachment({
   part,
   label,
-}: Readonly<{
-  part: ToolPart;
-  label: string;
-}>) {
+  imageFailed,
+  onImageError,
+}: Readonly<ToolCardImageAttachmentsProps & { label: string }>) {
   const { t } = useTranslation();
   const uri = useToolCardImageUri(part.id);
   const [aspectRatio, setAspectRatio] = useState<number | undefined>(undefined);
-  const [failed, setFailed] = useState(false);
+  const [failedUri, setFailedUri] = useState<string | undefined>(undefined);
+  const failed = imageFailed ?? failedUri === uri;
   const [viewerVisible, setViewerVisible] = useState(false);
 
   if (uri === undefined) {
@@ -86,7 +92,8 @@ function ToolCardImageAttachment({
             setAspectRatio(resolveImagePreviewAspectRatio(event.source.width, event.source.height));
           }}
           onError={() => {
-            setFailed(true);
+            setFailedUri(uri);
+            onImageError?.(uri);
           }}
         />
       </Pressable>
@@ -104,7 +111,11 @@ function ToolCardImageAttachment({
   );
 }
 
-export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>) {
+export function ToolCardImageAttachments({
+  part,
+  imageFailed,
+  onImageError,
+}: Readonly<ToolCardImageAttachmentsProps>) {
   const attachments = getToolImageAttachments(part);
   if (attachments.length === 0) {
     return null;
@@ -120,7 +131,13 @@ export function ToolCardImageAttachments({ part }: Readonly<{ part: ToolPart }>)
 
   return (
     <View className="gap-2">
-      <ToolCardImageAttachment part={part} label={label} />
+      <ToolCardImageAttachment
+        key={part.id}
+        part={part}
+        label={label}
+        imageFailed={imageFailed}
+        onImageError={onImageError}
+      />
     </View>
   );
 }

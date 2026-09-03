@@ -3,7 +3,7 @@ import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CenteredState } from '@/components/centered-state';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -44,7 +44,6 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
@@ -130,57 +129,43 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('prReview.screenTitle')} />
-        <View className="flex-1 items-center justify-center">
+        <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
-        </View>
+        </CenteredState>
       </View>
     );
   }
 
   if (view === 'connect' || view === 'reconnect') {
     const revoked = view === 'reconnect';
-    // Geometry (R1 on iPhone 17 Pro): EmptyState flex-centers its full stack
-    // (icon→CTA), but AC measures the title…CTA cluster — half the icon block
-    // (~36pt) below true center. The screen root also extends under the home
-    // indicator, so the safe region under the header is shorter than flex-1.
-    // Fix without touching shared EmptyState: (1) pad the body by the bottom
-    // safe-area inset so centering uses header-bottom → safe-bottom; (2) add
-    // pb-[72px] (= h-14 icon bubble + gap-4) inside EmptyState so justify-center
-    // lifts the stack by half that amount and the title…CTA cluster lands on
-    // the safe-region midpoint (±24pt).
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('prReview.screenTitle')} />
-        <View className="flex-1" style={{ paddingBottom: insets.bottom }}>
-          <EmptyState
-            className="pb-[72px]"
-            icon={revoked ? ShieldAlert : PlugZap}
-            title={revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
-            description={
-              revoked
-                ? t('prReview.connect.reconnectDescription')
-                : t('prReview.connect.description')
-            }
-            action={
-              <Button
-                className="mt-3 w-full flex-row gap-2"
-                disabled={connecting}
-                onPress={() => {
-                  void handleConnect();
-                }}
-              >
-                {connecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <RefreshCcw size={16} color={colors.primaryForeground} />
-                )}
-                <Text>
-                  {revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
-                </Text>
-              </Button>
-            }
-          />
-        </View>
+        <EmptyState
+          icon={revoked ? ShieldAlert : PlugZap}
+          title={revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+          description={
+            revoked ? t('prReview.connect.reconnectDescription') : t('prReview.connect.description')
+          }
+          action={
+            <Button
+              className="mt-3 w-full flex-row gap-2"
+              disabled={connecting}
+              onPress={() => {
+                void handleConnect();
+              }}
+            >
+              {connecting ? (
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              ) : (
+                <RefreshCcw size={16} color={colors.primaryForeground} />
+              )}
+              <Text>
+                {revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+              </Text>
+            </Button>
+          }
+        />
       </View>
     );
   }

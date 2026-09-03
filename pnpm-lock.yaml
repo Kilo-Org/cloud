@@ -1149,9 +1149,6 @@ importers:
       recharts:
         specifier: 3.8.1
         version: 3.8.1(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react-is@19.2.8)(react@19.2.6)(redux@5.0.1)
-      redis:
-        specifier: 5.11.0
-        version: 5.11.0
       remark-gfm:
         specifier: 4.0.1
         version: 4.0.1

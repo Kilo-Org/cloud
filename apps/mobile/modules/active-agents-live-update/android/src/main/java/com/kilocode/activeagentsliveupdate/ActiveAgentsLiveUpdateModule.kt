@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
+import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -49,8 +50,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
     }
   }
 
+  // `AppContext` exposes only the React context. Every entry point here runs
+  // from a JS call, so losing it means the module cannot work at all.
   private val context: Context
-    get() = appContext.reactContext ?: appContext.applicationContext
+    get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
   private val notificationManager: NotificationManager
     get() = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

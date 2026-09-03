@@ -11,7 +11,7 @@ export { getWorkerDb, type WorkerDb };
 
 export type UserForToken = Pick<
   typeof kilocode_users.$inferSelect,
-  'id' | 'blocked_reason' | 'api_token_pepper'
+  'id' | 'blocked_at' | 'blocked_reason' | 'api_token_pepper'
 >;
 
 export type BotUserForToken = {
@@ -85,6 +85,7 @@ export async function findUserForToken(db: WorkerDb, userId: string): Promise<Us
   const rows = await db
     .select({
       id: kilocode_users.id,
+      blocked_at: kilocode_users.blocked_at,
       blocked_reason: kilocode_users.blocked_reason,
       api_token_pepper: kilocode_users.api_token_pepper,
     })

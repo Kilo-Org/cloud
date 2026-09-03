@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime-authorization';
@@ -80,6 +80,82 @@ describe('runtime authorization persistence', () => {
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
     expect(record.id).toBe('00000000-0000-4000-8000-000000000002');
     expect(writes).toEqual([]);
+  });
+
+  it('reuses a matching modern token outside the renewal window', async () => {
+    const record = authorization('00000000-0000-4000-8000-000000000005');
+    const now = Date.UTC(2026, 0, 1);
+    const token = jwt.sign(
+      {
+        runtimeAuthorization: { id: record.id },
+        exp: Math.floor((now + 10 * 60_000) / 1000),
+      },
+      'test-secret',
+      { noTimestamp: true }
+    );
+    const renew = vi.fn(async () => ({ token: 'unexpected' }));
+
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: metadata(token),
+        getAuthorization: async () => record,
+        putAuthorization: async () => {},
+        getMetadata: async () => metadata(token),
+        putMetadata: async () => {},
+        renew,
+        now,
+      })
+    ).resolves.toBe(token);
+    expect(renew).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'near expiry', expiresIn: 5 * 60_000 },
+    { label: 'wrong authorization', expiresIn: 10 * 60_000, authorizationId: 'other' },
+  ])('renews a modern token at $label', async ({ expiresIn, authorizationId }) => {
+    const record = authorization('00000000-0000-4000-8000-000000000006');
+    const now = Date.UTC(2026, 0, 1);
+    const token = jwt.sign(
+      {
+        runtimeAuthorization: { id: authorizationId ?? record.id },
+        exp: Math.floor((now + expiresIn) / 1000),
+      },
+      'test-secret',
+      { noTimestamp: true }
+    );
+    let stored = metadata(token);
+
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: stored,
+        getAuthorization: async () => record,
+        putAuthorization: async () => {},
+        getMetadata: async () => stored,
+        putMetadata: async value => {
+          stored = value;
+        },
+        renew: async () => ({ token: 'renewed-token' }),
+        now,
+      })
+    ).resolves.toBe('renewed-token');
+    expect(stored.auth.kilocodeToken).toBe('renewed-token');
+  });
+
+  it('rejects a revoked private authorization before renewal', async () => {
+    const record = authorization('00000000-0000-4000-8000-000000000007', 'revoked');
+    const renew = vi.fn(async () => ({ token: 'unexpected' }));
+
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: metadata(),
+        getAuthorization: async () => record,
+        putAuthorization: async () => {},
+        getMetadata: async () => metadata(),
+        putMetadata: async () => {},
+        renew,
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
+    expect(renew).not.toHaveBeenCalled();
   });
 
   it('marks only the matching revoked record and never renews it', async () => {

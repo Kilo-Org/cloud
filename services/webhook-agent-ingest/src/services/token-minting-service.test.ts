@@ -33,6 +33,7 @@ describe('webhook token minting', () => {
     findUserForToken.mockResolvedValue({
       id: 'user-1',
       api_token_pepper: 'current-pepper',
+      blocked_at: null,
       blocked_reason: null,
     });
   });
@@ -66,5 +67,20 @@ describe('webhook token minting', () => {
         authorizationPepper: 'current-pepper',
       },
     });
+  });
+
+  it.each([
+    { blocked_at: new Date(), blocked_reason: null },
+    { blocked_at: null, blocked_reason: 'disabled' },
+  ])('rejects disabled personal users', async disabled => {
+    findUserForToken.mockResolvedValue({
+      id: 'user-1',
+      api_token_pepper: 'current-pepper',
+      ...disabled,
+    });
+
+    await expect(
+      service(true).mintToken({ userId: 'user-1', triggerId: 'trigger-1' })
+    ).rejects.toThrow('User is blocked');
   });
 });

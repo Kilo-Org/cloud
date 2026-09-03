@@ -4,6 +4,7 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { generateOrganizationApiToken } from '@/lib/tokens';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import {
+  canIssueLegacyOrganizationToken,
   createDelegatedResourceToken,
   isDelegableResource,
   TypedResourceDelegationError,
@@ -72,6 +73,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
       throw error;
     }
+  }
+
+  if (!canIssueLegacyOrganizationToken(request.headers)) {
+    return NextResponse.json(
+      { error: 'Explicit resource negotiation is required for bearer credentials' },
+      { status: 403 }
+    );
   }
 
   const { token, expiresAt } = generateOrganizationApiToken(user, organizationId, user.role);

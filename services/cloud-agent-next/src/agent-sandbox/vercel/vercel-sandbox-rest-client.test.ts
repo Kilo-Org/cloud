@@ -149,6 +149,79 @@ describe('VercelSandboxRestClient', () => {
     });
   });
 
+  it.each([
+    { vcpus: 2, memory: 4096 },
+    { vcpus: 4, memory: 8192 },
+  ] as const)('creates and inspects explicitly sized $vcpus vCPU sandboxes', async resources => {
+    const providerFetch = vi.fn().mockImplementation(async () =>
+      jsonResponse({
+        resumed: false,
+        sandbox: sandbox(),
+        session: session(resources),
+        routes: [],
+      })
+    );
+    const client = clientFor(providerFetch);
+    const input = { ...createInput(), resources };
+    await expect(client.createSandbox(input)).resolves.toMatchObject({ session: resources });
+    expect(JSON.parse(providerFetch.mock.calls[0][1].body as string).resources).toEqual(resources);
+    await expect(client.inspectByName(input)).resolves.toMatchObject({ session: resources });
+  });
+
+  describe.each(['createSandbox', 'inspectByName'] as const)('%s resources', operation => {
+    it.each([{ vcpus: 4 }, { memory: 8192 }])(
+      'rejects a mismatched response %j',
+      async mismatch => {
+        const client = clientFor(
+          vi.fn().mockResolvedValue(
+            jsonResponse({
+              resumed: false,
+              sandbox: sandbox(),
+              session: session(mismatch),
+              routes: [],
+            })
+          )
+        );
+        await expect(
+          client[operation]({
+            ...createInput(),
+            resources: { vcpus: 2, memory: 4096 },
+          })
+        ).rejects.toMatchObject({ kind: 'correlation_mismatch' });
+      }
+    );
+
+    it('retains provider-default behavior when resources are omitted', async () => {
+      const client = clientFor(
+        vi.fn().mockResolvedValue(
+          jsonResponse({
+            resumed: false,
+            sandbox: sandbox(),
+            session: session({ vcpus: 8, memory: 16384 }),
+            routes: [],
+          })
+        )
+      );
+      await expect(client[operation](createInput())).resolves.toMatchObject({
+        session: { vcpus: 8, memory: 16384 },
+      });
+    });
+
+    it.each([{ vcpus: 2, memory: 8192 }, { vcpus: 8, memory: 16384 }, null])(
+      'rejects invalid resources before provider I/O: %j',
+      async resources => {
+        const providerFetch = vi.fn();
+        const input = { ...createInput(), resources } as Parameters<
+          VercelSandboxRestClient['createSandbox']
+        >[0];
+        await expect(clientFor(providerFetch)[operation](input)).rejects.toMatchObject({
+          kind: 'invalid_request',
+        });
+        expect(providerFetch).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   it('creates a contained sandbox with a nested REST-native policy and redirects disabled', async () => {
     const providerFetch = vi
       .fn()

@@ -689,8 +689,8 @@ export function TriggerForm({
                 </p>
                 {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
                   <p className="text-muted-foreground text-xs">
-                    Only Kilo admins can newly enable Dedicated Standard. You can keep this
-                    allocation or clear it.
+                    Dedicated Standard requires an enabled organization. Choose Automatic to use
+                    default routing.
                   </p>
                 )}
               </div>

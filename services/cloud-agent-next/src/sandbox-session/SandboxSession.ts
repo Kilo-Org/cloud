@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
+import { getSandboxAllocationResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
@@ -1552,6 +1553,7 @@ export class SandboxSession extends DurableObject<Env> {
               ownerId: metadata.identity.userId,
               sessionId,
               provider,
+              resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }

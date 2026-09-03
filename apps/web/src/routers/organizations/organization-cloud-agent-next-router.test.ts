@@ -15,9 +15,18 @@ import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agen
 import { TRPCError } from '@trpc/server';
 import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type {
-  basePrepareSessionNextSchema,
+  organizationPrepareSessionNextSchema,
   SandboxStatusSnapshot,
 } from '@/routers/cloud-agent-next-schemas';
+import {
+  getSandboxAllocationRequest,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+  type SelectableSandboxAllocation,
+  type SelectableSandboxAllocationRequest,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -31,6 +40,7 @@ const mockPrepareSession = jest.fn<
     bitbucketWorkspaceUuid?: string;
     bitbucketRepositoryUuid?: string;
     devcontainer?: boolean;
+    sandboxAllocation?: SandboxAllocationInput;
     kilocodeOrganizationId?: string;
     attachments?: AttachmentReference;
   }) => Promise<{
@@ -74,7 +84,11 @@ const mockCancelQueuedMessage =
 const mockGetSandboxStatus =
   jest.fn<(cloudAgentSessionId: string) => Promise<SandboxStatusSnapshot>>();
 
+const mockGetSandboxSelectionOptions =
+  jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
+
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
+  getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
@@ -208,6 +222,11 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
 }));
 
+jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
+  linkPendingUploads: jest.fn(),
+  releasePendingUploads: jest.fn(),
+}));
+
 jest.mock('@/routers/organizations/utils', () => {
   const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
@@ -226,9 +245,11 @@ jest.mock('@/routers/organizations/utils', () => {
 });
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
-  prepareSession: (
-    input: z.infer<typeof basePrepareSessionNextSchema> & { organizationId: string }
-  ) => Promise<{
+  getSandboxSelectionOptions: (input: {
+    organizationId: string;
+    devcontainer?: boolean;
+  }) => Promise<SandboxSelectionCapabilities>;
+  prepareSession: (input: z.input<typeof organizationPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -970,6 +991,115 @@ describe('organizationCloudAgentNextRouter terminal ownership', () => {
   });
 });
 
+describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('authorizes membership and forwards the organization with the caller token', async () => {
+    const capabilities: SandboxSelectionCapabilities = {
+      enabled: true,
+      defaultDestination: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      options: [
+        { allocation: getSandboxAllocationRequest('cloudflare-single'), available: true },
+        {
+          allocation: getSandboxAllocationRequest('vercel-large'),
+          available: false,
+          reason: 'Vercel is unavailable',
+        },
+      ],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+    const caller = createCaller({ user: { id: 'oauth/member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual(capabilities);
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'oauth/member', is_admin: false } }),
+      ORGANIZATION_ID
+    );
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: ORGANIZATION_ID,
+    });
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('forwards explicit devcontainer context %s', async devcontainer => {
+    const capabilities: SandboxSelectionCapabilities = {
+      enabled: true,
+      defaultDestination: devcontainer
+        ? { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' }
+        : getSandboxAllocationRequest('cloudflare-shared'),
+      options: [],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID, devcontainer })
+    ).resolves.toEqual(capabilities);
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: ORGANIZATION_ID,
+      devcontainer,
+    });
+  });
+
+  it('rejects non-members before calling the Worker', async () => {
+    mockEnsureOrganizationAccess.mockImplementationOnce(() => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Membership required' });
+    });
+    const caller = createCaller({ user: { id: 'non-member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Membership required');
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('keeps Worker-disabled selection disabled for administrators', async () => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
+    const caller = createCaller({ user: { id: 'admin-member', is_admin: true } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual({ enabled: false, options: [] });
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+  });
+
+  it('propagates Worker failure without granting a capability', async () => {
+    mockGetSandboxSelectionOptions.mockRejectedValueOnce(new Error('Worker unavailable'));
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Worker unavailable');
+  });
+
+  it('rejects a malformed Worker capability response', async () => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+      enabled: true,
+      options: [
+        {
+          allocation: {
+            provider: { id: 'vercel', account: 'kilo' },
+            instanceType: 'medium' as 'small',
+          },
+          available: true,
+        },
+      ],
+    });
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Output validation failed');
+  });
+});
+
 describe('organizationCloudAgentNextRouter.prepareSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1025,7 +1155,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
       githubRepo: 'acme/repo',
       autoInitiate: true,
       clientProvenance: 'browser',
-    } as z.infer<typeof basePrepareSessionNextSchema> & { organizationId: string });
+    } as z.input<typeof organizationPrepareSessionNextSchema>);
 
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1034,6 +1164,121 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         clientProvenance: 'mobile',
       })
     );
+  });
+
+  const sandboxInput = {
+    organizationId: ORGANIZATION_ID,
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'kilo/test-model',
+    githubRepo: 'acme/repo',
+  };
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+    'forwards the normalized legacy organization sandbox preset %s',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ user: { id: 'member', is_admin: false } }),
+        ORGANIZATION_ID
+      );
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sandboxAllocation: getSandboxAllocationRequest(sandboxAllocation),
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    }
+  );
+
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ] satisfies SelectableSandboxAllocationRequest[])(
+    'forwards a structured sandbox destination without changing its account: %j',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sandboxAllocation, kilocodeOrganizationId: ORGANIZATION_ID })
+      );
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards the first-chat operation and attachments with the preset and server provenance', async () => {
+    const caller = createCaller({
+      user: { id: 'organization-browser', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    const input = {
+      ...sandboxInput,
+      sandboxAllocation: getSandboxAllocationRequest('vercel-small'),
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      initialMessageId: 'msg_123456789abc123456789ABCDE',
+      autoInitiate: true,
+      attachments: {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      },
+    };
+
+    await caller.prepareSession(input);
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: input.operationKey,
+        initialMessageId: input.initialMessageId,
+        autoInitiate: true,
+        attachments: input.attachments,
+        sandboxAllocation: input.sandboxAllocation,
+        kilocodeOrganizationId: ORGANIZATION_ID,
+        clientProvenance: 'browser',
+      })
+    );
+  });
+
+  it('keeps Default omitted and independent of the capability query', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession(sandboxInput);
+
+    expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+    expect(mockPrepareSession.mock.calls[0][0]).not.toHaveProperty('sandboxAllocation');
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid preset before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'vercel-medium' as SelectableSandboxAllocation,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+  });
+
+  it('rejects explicit presets with dev containers before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'cloudflare-single',
+        devcontainer: true,
+      })
+    ).rejects.toThrow('Sandbox selection is not available with dev containers');
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
 
   it('rejects devcontainer sessions when the feature flag is disabled', async () => {
@@ -1284,7 +1529,30 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
       operationKey: uuid,
       organizationId: ORGANIZATION_ID,
     });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS,
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ])(
+    'rejects a sibling chat sandbox override %j before invoking the operation',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'organization-owner', is_admin: false } as User });
+      const input = {
+        organizationId: ORGANIZATION_ID,
+        sourceKiloSessionId,
+        operationKey: uuid,
+        sandboxAllocation,
+      };
+
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects a revoked organization member before resolving the source session', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {

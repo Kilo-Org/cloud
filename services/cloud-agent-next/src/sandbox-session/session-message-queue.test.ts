@@ -896,7 +896,7 @@ describe('streamQueuedSnapshots', () => {
 });
 
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
-const SANDBOX_ID = 'ses-11111111111141118111111111111111';
+const SANDBOX_ID = `ses-${'1'.repeat(48)}` as const;
 const RUNTIME_ID = '22222222-2222-4222-8222-222222222222';
 const NEXT_RUNTIME_ID = '33333333-3333-4333-8333-333333333333';
 const DIRECTORY = '/workspace/session';
@@ -1147,6 +1147,41 @@ describe('SandboxSession orchestration', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it.each([
+    ['vercel-small', { vcpus: 2, memory: 4096 }],
+    ['vercel-large', { vcpus: 4, memory: 8192 }],
+  ] as const)(
+    'forwards persisted %s resources through readiness after a session reset',
+    async (sandboxAllocation, resources) => {
+      const fixture = sessionFixture({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'user_1',
+          orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: DIRECTORY,
+          sandboxProvider: 'vercel',
+          sandboxAllocation,
+        },
+      });
+      const signing = deferred<[]>();
+      orchestrationMocks.signedAttachments.mockImplementationOnce(() => signing.promise);
+      await fixture.admit('sized');
+      await fixture.flush();
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+      fixture.reload();
+      await fixture.fireAlarm();
+      expect(fixture.control.ensureReady).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'vercel', resources })
+      );
+      expect(fixture.record('sized')?.state).toBe('accepted');
+      signing.resolve([]);
+      await fixture.flush();
+    }
+  );
 
   it('persists the alarm and head budget before the first RPC and wakes the head on a fresh ID after reset', async () => {
     const fixture = sessionFixture();

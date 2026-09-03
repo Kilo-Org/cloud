@@ -1,6 +1,10 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 import type * as SandboxIdModule from './sandbox-id.js';
 import { TRPCError } from '@trpc/server';
+import {
+  getSandboxAllocationRequest,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 
@@ -246,6 +250,241 @@ function createInternalApiContext(options: {
     },
   } as TRPCContext;
 }
+
+describe('sandbox selection Worker API', () => {
+  const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+  const prepareInput = {
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'claude-3',
+    githubRepo: 'acme/repo',
+    kilocodeOrganizationId: orgId,
+    sandboxAllocation: 'cloudflare-single' as const,
+  };
+  const startInput = {
+    message: { prompt: 'Test prompt' },
+    agent: { mode: 'code', model: 'claude-3' },
+    repository: { type: 'github' as const, repo: 'acme/repo' },
+    options: { kilocodeOrganizationId: orgId },
+    runtime: { sandboxAllocation: 'cloudflare-single' as const },
+  };
+  const allocationInputs = sandboxAllocationSchema.options.flatMap(allocation => [
+    { name: allocation, sandboxAllocation: allocation },
+    {
+      name: `structured ${allocation}`,
+      sandboxAllocation: getSandboxAllocationRequest(allocation),
+    },
+  ]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
+  });
+
+  it('requires authentication for capability discovery', async () => {
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ userId: null, authToken: null })
+    );
+    await expect(
+      caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(organizationMembershipLimitMock).not.toHaveBeenCalled();
+  });
+
+  it.each(allocationInputs)(
+    'requires membership for $name even for disabled options and skip-balance callers',
+    async ({ sandboxAllocation }) => {
+      organizationMembershipLimitMock.mockResolvedValue([]);
+      const caller = appRouter.createCaller(createInternalApiContext({ skipBalanceCheck: true }));
+      await expect(
+        caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('exposes only authoritative capability options and keeps the disabled result empty', async () => {
+    const ctx = createInternalApiContext({});
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+    ).resolves.toEqual({ enabled: false, options: [] });
+    ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+    ctx.env.CONTROL_PLANE_IDS = orgId;
+    const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(result.enabled).toBe(true);
+    expect(
+      result.options.filter(option => option.available).map(option => option.allocation)
+    ).toEqual([
+      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+    ]);
+    expect(
+      result.options.filter(option => !option.available).every(option => Boolean(option.reason))
+    ).toBe(true);
+  });
+
+  it.each(allocationInputs)(
+    'rejects $name in prepare and public start when selection is disabled',
+    async ({ sandboxAllocation }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({ skipBalanceCheck: true }));
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(allocationInputs)(
+    'rejects personal $name in prepare and public start even with wildcard enrollment',
+    async ({ sandboxAllocation }) => {
+      const ctx = createInternalApiContext({ skipBalanceCheck: true });
+      ctx.env.SANDBOX_SELECTION_ORG_IDS = '*';
+      const caller = appRouter.createCaller(ctx);
+      await expect(
+        caller.prepareSession({
+          ...prepareInput,
+          kilocodeOrganizationId: undefined,
+          sandboxAllocation,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, options: {}, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns default destination metadata without allocating, including devcontainer context', async () => {
+    const ctx = createInternalApiContext({});
+    ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+    ctx.env.PER_SESSION_SANDBOX_ORG_IDS = orgId;
+    const caller = appRouter.createCaller(ctx);
+    const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
+    const devcontainer = await caller.getSandboxSelectionOptions({
+      kilocodeOrganizationId: orgId,
+      devcontainer: true,
+    });
+    expect(devcontainer.defaultDestination).toEqual({
+      provider: { id: 'cloudflare', account: 'kilo' },
+      instanceType: 'devcontainer',
+    });
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(createSessionReportMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['small', 'large'] as const)(
+    'rejects BYOC %s before allocation side effects',
+    async instanceType => {
+      const ctx = createInternalApiContext({ skipBalanceCheck: true });
+      ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+      const caller = appRouter.createCaller(ctx);
+      const sandboxAllocation = {
+        provider: { id: 'vercel', account: 'byoc' },
+        instanceType,
+      } as const;
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('BYOC'),
+      });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('BYOC'),
+      });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'authorizes Dedicated Standard for an enrolled organization %s trigger',
+    async createdOnPlatform => {
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+      await appRouter.createCaller(ctx).prepareSession({
+        ...prepareInput,
+        sandboxAllocation: 'isolated-standard',
+        createdOnPlatform,
+      });
+      expect(doStub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ orgId, createdOnPlatform }),
+          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+        })
+      );
+    }
+  );
+
+  it('authorizes Dedicated Standard in public start without an internal API key', async () => {
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, requestInternalApiKey: null });
+    ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    await appRouter.createCaller(ctx).start({
+      ...startInput,
+      runtime: { sandboxAllocation: 'isolated-standard' },
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ orgId }),
+        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+      })
+    );
+  });
+
+  it.each(['legacy', 'structured'] as const)(
+    'keeps canonical workspace metadata for authorized %s starts and prepares',
+    async format => {
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      ctx.env.SANDBOX_SESSION = ctx.env
+        .CLOUD_AGENT_SESSION as unknown as typeof ctx.env.SANDBOX_SESSION;
+      ctx.env.SANDBOX_SELECTION_ORG_IDS = orgId;
+      ctx.env.CONTROL_PLANE_IDS = orgId;
+      generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
+      const sandboxAllocation =
+        format === 'legacy'
+          ? 'cloudflare-single'
+          : getSandboxAllocationRequest('cloudflare-single');
+      const caller = appRouter.createCaller(ctx);
+      await caller.start({ ...startInput, runtime: { sandboxAllocation } });
+      await caller.prepareSession({ ...prepareInput, sandboxAllocation });
+      const metadata = expect.objectContaining({
+        workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(metadata);
+      expect(doStub.registerSession).toHaveBeenCalledWith(metadata);
+    }
+  );
+});
 
 describe('effective session profile policy', () => {
   it.each([

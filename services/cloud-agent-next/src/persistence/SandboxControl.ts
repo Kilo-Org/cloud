@@ -18,6 +18,10 @@ import {
 } from '../sandbox-control/worktree-deletion.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { withTimeout } from '@kilocode/worker-utils';
+import {
+  getSandboxAllocationResources,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
@@ -75,6 +79,8 @@ import {
   recordStopAttempt,
   sameAllocation,
   getWorktreeCredentialContainment,
+  sandboxProviderConfigurationSchema,
+  type SandboxProviderConfiguration,
   WORKTREE_CREDENTIAL_CONTAINMENT,
   type CredentialContainmentRequirements,
   type ObserveResult,
@@ -196,6 +202,7 @@ const ACTIVE_WRAPPER_RUNTIME_KEY = 'active_wrapper_runtime';
 const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
 const PROVIDER_LOCATOR_KEY = 'provider_locator';
+const PROVIDER_CONFIGURATION_KEY = 'provider_configuration';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
@@ -264,6 +271,7 @@ export class SandboxControl extends DurableObject<Env> {
   private activeConnection: SandboxControlConnectionIdentity | null = null;
   private readyConnectionId: string | null = null;
   private providerKind: AgentSandboxProvider = 'cloudflare';
+  private vercelResources: VercelSandboxResources | undefined;
   private readonly sessionForwardChains = new Map<string, Promise<void>>();
   private readonly forwarding = {
     enqueued: 0,
@@ -322,16 +330,18 @@ export class SandboxControl extends DurableObject<Env> {
   private ensureOperationalInitialized(): Promise<void> {
     return (this.operationalInitialization ??= this.ctx.blockConcurrencyWhile(async () => {
       const ctx = this.ctx;
-      const [readyAt, runtime, kind, physical] = await Promise.all([
+      const [readyAt, runtime, configuration, physical] = await Promise.all([
         ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
         ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
-        ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY),
+        this.readProviderConfiguration(),
         loadPhysicalRecord(ctx.storage),
       ]);
       this.vercelLocator = vercelProviderLocatorSchema
         .optional()
         .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
-      this.providerKind = kind ?? 'cloudflare';
+      this.providerKind = configuration?.provider ?? 'cloudflare';
+      this.vercelResources =
+        configuration?.provider === 'vercel' ? configuration.resources : undefined;
       this.provider = this.createProviderAdapter(this.providerKind, physical);
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
@@ -655,7 +665,9 @@ export class SandboxControl extends DurableObject<Env> {
     }
     const metadata = await this.readCredentialMetadata(input);
     const provider = getSandboxProvider(metadata);
-    await this.pinProvider(provider);
+    await this.pinProvider(provider, {
+      resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
+    });
     const physical = await loadPhysicalRecord(this.ctx.storage);
     const requiredContainment = getWorktreeCredentialContainment(
       requiresContainmentSandbox(metadata)
@@ -823,6 +835,7 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     sessionId: string;
     provider?: AgentSandboxProvider;
+    resources?: VercelSandboxResources;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -864,7 +877,7 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    await this.pinProvider(input.provider);
+    await this.pinProvider(input.provider, { resources: input.resources });
     if (acquisition && this.providerKind !== 'cloudflare') {
       throw new Error('Sandbox acquisition is only supported for Cloudflare');
     }
@@ -1823,7 +1836,13 @@ export class SandboxControl extends DurableObject<Env> {
         const { projectId, snapshotId, runtimeBuildId, runtime } = vercel;
         next.createIntent = {
           ...next.createIntent,
-          vercel: { projectId, snapshotId, runtimeBuildId, runtime },
+          vercel: {
+            projectId,
+            snapshotId,
+            runtimeBuildId,
+            runtime,
+            ...(this.vercelResources === undefined ? {} : { resources: this.vercelResources }),
+          },
         };
         this.vercelLocator = vercelProviderLocatorSchema.parse({
           teamId: vercel.teamId,
@@ -2080,12 +2099,14 @@ export class SandboxControl extends DurableObject<Env> {
       ACTIVE_WRAPPER_RUNTIME_KEY,
       DIAGNOSTIC_BUNDLE_KEY,
       PROVIDER_KIND_KEY,
+      PROVIDER_CONFIGURATION_KEY,
       BILLING_INPUT_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
       PROVIDER_LOCATOR_KEY,
       ...(options?.preserveAcquisitionReceipts ? [] : [ACQUISITION_RECEIPTS_KEY]),
     ]);
     this.vercelLocator = undefined;
+    this.vercelResources = undefined;
     this.activeConnection = null;
     this.readyConnectionId = null;
     this.kiloReady = false;
@@ -2236,20 +2257,67 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
-  private async pinProvider(requested?: AgentSandboxProvider): Promise<void> {
-    const stored = await this.ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY);
-    const kind = stored ?? requested ?? 'cloudflare';
-    if (stored !== undefined && requested !== undefined && stored !== requested) {
+  private async readProviderConfiguration(): Promise<SandboxProviderConfiguration | undefined> {
+    const [raw, legacyKind] = await Promise.all([
+      this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
+      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+    ]);
+    const legacy =
+      legacyKind === undefined
+        ? undefined
+        : sandboxProviderConfigurationSchema.parse({ provider: legacyKind });
+    if (raw === undefined) return legacy;
+    const configuration = sandboxProviderConfigurationSchema.parse(raw);
+    if (legacy && legacy.provider !== configuration.provider) {
       throw new Error('Sandbox provider mismatch');
     }
-    if (kind === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
-      throw new Error('Vercel sandbox runtime configuration is unavailable');
-    }
-    if (stored === undefined) {
-      await this.ctx.storage.put(PROVIDER_KIND_KEY, kind);
-    }
-    this.providerKind = kind;
-    this.provider = this.createProviderAdapter(kind, await loadPhysicalRecord(this.ctx.storage));
+    return configuration;
+  }
+
+  private async pinProvider(
+    requested?: AgentSandboxProvider,
+    allocation?: { resources?: VercelSandboxResources }
+  ): Promise<void> {
+    const configuration = await this.ctx.storage.transaction(async () => {
+      const stored = await this.readProviderConfiguration();
+      const resources =
+        allocation !== undefined
+          ? allocation.resources
+          : stored?.provider === 'vercel'
+            ? stored.resources
+            : undefined;
+      const provider = requested ?? stored?.provider ?? 'cloudflare';
+      if (stored && stored.provider !== provider) {
+        throw new Error('Sandbox provider mismatch');
+      }
+      const next = sandboxProviderConfigurationSchema.parse({
+        provider,
+        ...(resources === undefined ? {} : { resources }),
+      });
+      if (
+        stored?.provider === 'vercel' &&
+        next.provider === 'vercel' &&
+        (stored.resources?.vcpus !== next.resources?.vcpus ||
+          stored.resources?.memory !== next.resources?.memory)
+      ) {
+        throw new Error('Sandbox resources mismatch');
+      }
+      if (next.provider === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
+        throw new Error('Vercel sandbox runtime configuration is unavailable');
+      }
+      await this.ctx.storage.put({
+        [PROVIDER_KIND_KEY]: next.provider,
+        [PROVIDER_CONFIGURATION_KEY]: next,
+      });
+      return next;
+    });
+    this.providerKind = configuration.provider;
+    this.vercelResources =
+      configuration.provider === 'vercel' ? configuration.resources : undefined;
+    this.provider = this.createProviderAdapter(
+      configuration.provider,
+      await loadPhysicalRecord(this.ctx.storage)
+    );
   }
 
   private async billingInput(

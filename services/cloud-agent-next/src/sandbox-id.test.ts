@@ -532,6 +532,80 @@ describe('selectSandboxForNewSession', () => {
   const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
   const legacySessionId = 'agent_12345678-1234-1234-1234-123456789abc';
 
+  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+    'routes explicit %s independently of conflicting allocation and provider rollouts',
+    async sandboxAllocation => {
+      for (const rollout of ['', '*']) {
+        const selection = await selectSandboxForNewSession({
+          env: {
+            ...completeVercelConfiguration,
+            PER_SESSION_SANDBOX_ORG_IDS: rollout,
+            VERCEL_SANDBOX_ORG_IDS: rollout,
+          },
+          orgId: 'org-id',
+          userId: 'user-id',
+          sessionId: controlSessionId,
+          sandboxAllocation,
+        });
+        expect(selection.provider).toBe(
+          sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare'
+        );
+        expect(selection.sandboxId).toMatch(
+          sandboxAllocation === 'cloudflare-shared' ? /^org-/ : /^ses-/
+        );
+      }
+    }
+  );
+
+  it('retains the default shared identity for an explicit shared preset', async () => {
+    const shared = await generateSandboxRoutingTarget('', 'org-id', 'user-id', controlSessionId);
+    expect(
+      await generateSandboxRoutingTarget('*', 'org-id', 'user-id', controlSessionId, undefined, {
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).toEqual(shared);
+    expect(
+      await generateSandboxRoutingTarget('*', 'org-id', 'other-user', controlSessionId, undefined, {
+        sandboxAllocation: 'cloudflare-shared',
+      })
+    ).not.toEqual(shared);
+    expect(
+      await generateSandboxRoutingTarget('', 'org-id', 'user-id', legacySessionId)
+    ).not.toEqual(shared);
+  });
+
+  it.each(['cloudflare-single', 'cloudflare-shared'] as const)(
+    'routes an explicit %s on a legacy session without changing its plane',
+    async sandboxAllocation => {
+      const selection = await selectSandboxForNewSession({
+        env: { ...completeVercelConfiguration, VERCEL_SANDBOX_ORG_IDS: '*' },
+        orgId: 'org-id',
+        userId: 'user-id',
+        sessionId: legacySessionId,
+        sandboxAllocation,
+      });
+      expect(selection.provider).toBe('cloudflare');
+      expect(selection.sandboxId).toMatch(
+        sandboxAllocation === 'cloudflare-shared' ? /^org-/ : /^ses-/
+      );
+    }
+  );
+
+  it.each(['vercel-small', 'vercel-large'] as const)(
+    'rejects %s on a legacy session because Vercel exists only on the control plane',
+    async sandboxAllocation => {
+      await expect(
+        selectSandboxForNewSession({
+          env: completeVercelConfiguration,
+          orgId: 'org-id',
+          userId: 'user-id',
+          sessionId: legacySessionId,
+          sandboxAllocation,
+        })
+      ).rejects.toThrow('require a control-plane session');
+    }
+  );
+
   it('selects Cloudflare by default while preserving shared sandbox allocation', async () => {
     const selection = await selectSandboxForNewSession({
       env: {},

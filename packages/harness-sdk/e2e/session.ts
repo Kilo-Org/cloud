@@ -17,7 +17,8 @@ import assert from 'node:assert/strict';
 import { Effect, Layer, Stream } from 'effect';
 import { SessionBusyError } from '../src/core/ask.js';
 import type { ModelUsage } from '../src/core/model.js';
-import { openSession, type SessionHandle } from '../src/core/run.js';
+import { openSession } from '../src/core/run.js';
+import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerTableCatalog } from '../src/plugins/catalog/table.js';
 import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
@@ -51,7 +52,9 @@ const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
     event.kind === 'delta'
       ? { ...held, said: held.said + event.text }
-      : { ...held, usage: event.usage }
+      : event.kind === 'done'
+        ? { ...held, usage: event.usage }
+        : held
   );
 
 const words = [

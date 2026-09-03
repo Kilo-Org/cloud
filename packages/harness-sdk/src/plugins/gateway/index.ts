@@ -1,5 +1,12 @@
 import { Effect, Layer, Option, Ref, Stream } from 'effect';
-import { type HttpCaller, type HttpConfig, post } from './http.js';
+import {
+  abortHandle,
+  post,
+  withAbort,
+  type AbortHandle,
+  type HttpCaller,
+  type HttpConfig,
+} from './http.js';
 import { ModelCatalog, type ModelCatalogService } from '../../core/catalog.js';
 import {
   ModelClient,
@@ -22,6 +29,13 @@ interface Gateway extends HttpCaller {
   readonly catalog: ModelCatalogService;
 }
 
+/** One call, with the handle that stops it when the caller stops listening. */
+interface Sent {
+  readonly wire: Wire;
+  readonly request: ModelRequest;
+  readonly handle: AbortHandle | undefined;
+}
+
 /**
  * `request.stream` is already set by the caller; the wire reads it.
  *
@@ -29,27 +43,33 @@ interface Gateway extends HttpCaller {
  * image in a media type the provider does not take throws here, and that is a
  * failed call, not a crash.
  */
-const bodyFor = (gateway: Gateway, wire: Wire, request: ModelRequest) =>
+const bodyFor = (gateway: Gateway, sent: Sent) =>
   Effect.try({
-    try: () => JSON.stringify(wire.toBody(request)),
+    try: () => JSON.stringify(sent.wire.toBody(sent.request)),
     catch: cause => new ModelError({ reason: 'unsupported', cause }),
-  }).pipe(Effect.flatMap(body => post(gateway, wire.path, body)));
+  }).pipe(
+    Effect.flatMap(body =>
+      post(gateway, { path: sent.wire.path, body, signal: sent.handle?.signal })
+    )
+  );
 
 const send = (gateway: Gateway, request: ModelRequest): Effect.Effect<ModelReply, ModelError> =>
-  wireFor(gateway.catalog, request.model).pipe(
-    Effect.flatMap(wire =>
-      bodyFor(gateway, wire, { ...request, stream: false }).pipe(
-        Effect.flatMap(response =>
-          Effect.tryPromise({
-            try: () => response.text(),
-            catch: cause => new ModelError({ reason: 'transport', cause }),
-          })
-        ),
-        Effect.flatMap(text =>
-          Effect.try({
-            try: () => wire.toReply(JSON.parse(text)),
-            catch: cause => new ModelError({ reason: 'body', cause }),
-          })
+  withAbort(handle =>
+    wireFor(gateway.catalog, request.model).pipe(
+      Effect.flatMap(wire =>
+        bodyFor(gateway, { wire, request: { ...request, stream: false }, handle }).pipe(
+          Effect.flatMap(response =>
+            Effect.tryPromise({
+              try: () => response.text(),
+              catch: cause => new ModelError({ reason: 'transport', cause }),
+            })
+          ),
+          Effect.flatMap(text =>
+            Effect.try({
+              try: () => wire.toReply(JSON.parse(text)),
+              catch: cause => new ModelError({ reason: 'body', cause }),
+            })
+          )
         )
       )
     )
@@ -74,28 +94,48 @@ const eventsOf = (wire: Wire, usage: Ref.Ref<ModelUsage>, data: string) =>
     Effect.map(event => Option.fromNullable(wire.toDelta(event)))
   );
 
+/**
+ * The handle lives as long as the stream, not as long as the request.
+ *
+ * A streamed call returns as soon as the headers arrive and keeps producing
+ * afterwards, so a handle released when the request resolved would cancel
+ * nothing. Scoped to the stream, dropping the stream stops the generation, and
+ * the provider stops charging for it.
+ */
 const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEvent, ModelError> =>
-  Stream.unwrap(
-    Effect.map(Ref.make(zeroUsage), usage => {
-      const read = sseReader();
-      return Stream.unwrap(
-        Effect.map(wireFor(gateway.catalog, request.model), wire =>
-          Stream.fromEffect(bodyFor(gateway, wire, { ...request, stream: true })).pipe(
-            Stream.flatMap(chunksOf),
-            Stream.mapConcat(chunk => read(chunk)),
-            Stream.mapEffect(data => eventsOf(wire, usage, data)),
-            Stream.filterMap(part => part),
-            Stream.map((part): ModelEvent => ({ kind: part.kind, text: part.text })),
-            Stream.concat(
-              Stream.fromEffect(Ref.get(usage)).pipe(
-                Stream.map((counts): ModelEvent => ({ kind: 'done', usage: counts }))
-              )
+  Stream.unwrapScoped(
+    Effect.flatMap(
+      Effect.acquireRelease(abortHandle(), handle => Effect.sync(() => handle?.abort())),
+      handle => streamWith(gateway, request, handle)
+    )
+  );
+
+const streamWith = (
+  gateway: Gateway,
+  request: ModelRequest,
+  handle: AbortHandle | undefined
+): Effect.Effect<Stream.Stream<ModelEvent, ModelError>> =>
+  Effect.map(Ref.make(zeroUsage), usage => {
+    const read = sseReader();
+    return Stream.unwrap(
+      Effect.map(wireFor(gateway.catalog, request.model), wire =>
+        Stream.fromEffect(
+          bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
+        ).pipe(
+          Stream.flatMap(chunksOf),
+          Stream.mapConcat(chunk => read(chunk)),
+          Stream.mapEffect(data => eventsOf(wire, usage, data)),
+          Stream.filterMap(part => part),
+          Stream.map((part): ModelEvent => ({ kind: part.kind, text: part.text })),
+          Stream.concat(
+            Stream.fromEffect(Ref.get(usage)).pipe(
+              Stream.map((counts): ModelEvent => ({ kind: 'done', usage: counts }))
             )
           )
         )
-      );
-    })
-  );
+      )
+    );
+  });
 
 /**
  * The kilo gateway plugin. It picks the best shape the model speaks.

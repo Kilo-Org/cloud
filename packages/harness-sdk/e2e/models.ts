@@ -2,7 +2,8 @@ import { Effect, Layer, Stream } from 'effect';
 import { Chunk } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { Effort, ModelUsage } from '../src/core/model.js';
-import { openSession, type SessionHandle } from '../src/core/run.js';
+import { openSession } from '../src/core/run.js';
+import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
 import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
@@ -67,7 +68,9 @@ const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
     event.kind === 'delta'
       ? { ...held, said: held.said + event.text }
-      : { ...held, usage: event.usage }
+      : event.kind === 'done'
+        ? { ...held, usage: event.usage }
+        : held
   );
 
 const converse = (model: string, kinds: readonly ApiKind[], token: string) => {

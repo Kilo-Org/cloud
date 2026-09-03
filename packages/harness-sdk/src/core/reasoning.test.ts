@@ -30,10 +30,7 @@ it('adds no reasoning part when the model did none', async () => {
 
 it('never sends the reasoning back in the next prompt', async () => {
   const { calls } = await run([thinking], session =>
-    Effect.zipRight(
-      Stream.runDrain(session.ask('why')),
-      Stream.runDrain(session.ask('and then'))
-    )
+    Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and then')))
   );
 
   /* A thinking block returned without the signature the provider issued is
@@ -43,9 +40,7 @@ it('never sends the reasoning back in the next prompt', async () => {
 });
 
 it('streams the reasoning to the caller, marked as reasoning', async () => {
-  const { value } = await run([thinking], session =>
-    Stream.runCollect(session.ask('why'))
-  );
+  const { value } = await run([thinking], session => Stream.runCollect(session.ask('why')));
 
   expect(
     Chunk.toReadonlyArray(value)

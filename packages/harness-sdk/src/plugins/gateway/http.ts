@@ -1,8 +1,42 @@
 import { Effect } from 'effect';
-import type { FetchLike, HttpResponse } from '../../core/fetch.js';
+import type { AbortLike, FetchLike, HttpResponse } from '../../core/fetch.js';
 import { ModelError } from '../../core/model.js';
 import type { RetryPolicyService } from '../../core/retry.js';
 import { TokenError, type TokenSourceService } from '../../core/token.js';
+
+/**
+ * Where a call gets the handle that cancels it.
+ *
+ * `AbortController` is a global in every runtime that has `fetch`, and this
+ * package requires the caller to supply a `fetch`, so it is read off the global
+ * rather than made into a plugin of its own. A runtime that lacks it still
+ * works: the call simply cannot be stopped early.
+ */
+interface AbortHandle {
+  readonly signal: AbortLike;
+  readonly abort: () => void;
+}
+
+interface AbortHost {
+  readonly AbortController?: new () => AbortHandle;
+}
+
+const host: AbortHost = globalThis;
+
+/**
+ * A handle for one call, released when the caller stops listening.
+ *
+ * The release aborts whether the call ended or was interrupted. Aborting a
+ * request whose body has already been read does nothing, and the alternative is
+ * inspecting the exit for a case where the answer is the same.
+ */
+const abortHandle = (): Effect.Effect<AbortHandle | undefined> =>
+  Effect.sync(() => (host.AbortController === undefined ? undefined : new host.AbortController()));
+
+const withAbort = <A, E, R>(
+  use: (handle: AbortHandle | undefined) => Effect.Effect<A, E, R>
+): Effect.Effect<A, E, R> =>
+  Effect.acquireUseRelease(abortHandle(), use, handle => Effect.sync(() => handle?.abort()));
 
 /** Whose credit pays for the call. */
 type OrgContext =
@@ -40,6 +74,14 @@ const headersOf = (org: OrgContext, token: string): Record<string, string> => ({
 const asModelError = (error: TokenError | ModelError): ModelError =>
   error instanceof TokenError ? new ModelError({ reason: 'transport', cause: error.cause }) : error;
 
+/** One call: where it goes, what it carries, and what stops it. */
+interface Sending {
+  readonly path: string;
+  readonly body: string;
+  /** Absent when the runtime has no `AbortController`. */
+  readonly signal: AbortLike | undefined;
+}
+
 /**
  * Sends the body and returns the response once the status is good. The retry
  * stops here on purpose: the body has not been read yet, so a second try
@@ -48,19 +90,16 @@ const asModelError = (error: TokenError | ModelError): ModelError =>
  * The token is read inside the retried effect, so a retry that follows a 401
  * picks up whatever the token plugin supplies next.
  */
-const post = (
-  caller: HttpCaller,
-  path: string,
-  body: string
-): Effect.Effect<HttpResponse, ModelError> =>
+const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse, ModelError> =>
   caller.token.get().pipe(
     Effect.flatMap(token =>
       Effect.tryPromise({
         try: () =>
-          caller.config.fetch(`${caller.config.baseUrl.replace(/\/+$/u, '')}${path}`, {
+          caller.config.fetch(`${caller.config.baseUrl.replace(/\/+$/u, '')}${sending.path}`, {
             method: 'POST',
             headers: headersOf(caller.config.org, token),
-            body,
+            body: sending.body,
+            ...(sending.signal === undefined ? {} : { signal: sending.signal }),
           }),
         catch: cause => new ModelError({ reason: 'transport', cause }),
       })
@@ -82,5 +121,5 @@ const post = (
     Effect.retry(caller.retry.schedule)
   );
 
-export type { HttpCaller, HttpConfig, HttpPlugins, OrgContext };
-export { post };
+export type { AbortHandle, HttpCaller, HttpConfig, HttpPlugins, OrgContext, Sending };
+export { abortHandle, post, withAbort };

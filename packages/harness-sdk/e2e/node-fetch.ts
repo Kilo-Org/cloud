@@ -16,7 +16,15 @@ const decode = async function* decode(body: ReadableStream<Uint8Array>): AsyncIt
 };
 
 export const nodeFetch: FetchLike = async (url, request) => {
-  const response = await fetch(url, request);
+  const response = await fetch(url, {
+    method: request.method,
+    headers: { ...request.headers },
+    body: request.body,
+    /* The package declares only the part of a signal it hands on, so the
+       adapter names the type this runtime actually has. Dropping it would
+       leave a cancelled call still running on the provider. */
+    signal: (request.signal ?? null) as AbortSignal | null,
+  });
   return {
     ok: response.ok,
     status: response.status,

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Effect, Layer, Stream } from 'effect';
-import { openSession, type SessionHandle } from '../src/core/run.js';
+import { openSession } from '../src/core/run.js';
+import type { SessionHandle } from '../src/core/wiring.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerKiloGateway } from '../src/plugins/gateway/index.js';
@@ -39,7 +40,9 @@ const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
     event.kind === 'delta'
       ? { ...held, said: held.said + event.text }
-      : { ...held, usage: event.usage }
+      : event.kind === 'done'
+        ? { ...held, usage: event.usage }
+        : held
   );
 
 const program = Effect.gen(function* () {

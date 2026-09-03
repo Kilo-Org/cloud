@@ -36,6 +36,12 @@ export type GlanceablePublisherOptions = {
    * success after a signed-out or privacy blank cannot republish or restart.
    */
   terminalBlankEpoch?: () => number;
+  /**
+   * Confirmed-lost-org latch reader (see cleanup). Read on every emit, not at
+   * construction, so a publisher rebuilt by a token refresh or a remount stays
+   * silent until a successful org list confirms membership again.
+   */
+  orgLost?: () => boolean;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -75,6 +81,7 @@ export class GlanceablePublisher {
   private readonly terminalMs: number;
   private readonly terminalBlankEpoch: () => number;
   private readonly blankEpochAtStart: number;
+  private readonly orgLost: () => boolean;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   private coalesceTimer: TimerHandle | null = null;
@@ -91,6 +98,7 @@ export class GlanceablePublisher {
     this.terminalMs = options.terminalMs ?? GLANCEABLE_TERMINAL_MS;
     this.terminalBlankEpoch = options.terminalBlankEpoch ?? (() => 0);
     this.blankEpochAtStart = this.terminalBlankEpoch();
+    this.orgLost = options.orgLost ?? (() => false);
     this.current = options.initial ?? null;
     this.activityStarted = false;
   }
@@ -203,7 +211,7 @@ export class GlanceablePublisher {
   }
 
   private isGated(): boolean {
-    return this.terminalBlankEpoch() !== this.blankEpochAtStart;
+    return this.terminalBlankEpoch() !== this.blankEpochAtStart || this.orgLost();
   }
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {

@@ -495,17 +495,18 @@ describe('direct worktree credential refresh', () => {
   it.each(['connection', 'http'] as const)(
     'classifies real SDK SSE startup %s errors without retaining private data',
     async failure => {
+      vi.mocked(fetch).mockImplementation(async request => {
+        const url = request instanceof Request ? request.url : String(request);
+        if (new URL(url).pathname === '/global/health') {
+          return Response.json({ healthy: true, version: '7.4.20' });
+        }
+        if (failure === 'connection') throw new Error('private-connection-credential');
+        return new Response(null, { status: 503, statusText: 'private-http-credential' });
+      });
       const f = fixture();
       const runtime = await f.attach();
       const feed = vi.mocked(startSandboxControlEventFeed).mock.calls[0]?.[0];
       if (!feed) throw new Error('Missing worktree event feed');
-      if (failure === 'connection') {
-        vi.mocked(fetch).mockRejectedValueOnce(new Error('private-connection-credential'));
-      } else {
-        vi.mocked(fetch).mockResolvedValueOnce(
-          new Response(null, { status: 503, statusText: 'private-http-credential' })
-        );
-      }
       const { stream } = await feed.open(feed.signal);
       if (!stream) throw new Error('Missing SDK SSE stream');
       const error = await stream[Symbol.asyncIterator]()
@@ -518,7 +519,12 @@ describe('direct worktree credential refresh', () => {
       expect(error).not.toHaveProperty('cause');
       expect(String(error)).not.toContain('private-');
       expect(JSON.stringify(error)).not.toContain('private-');
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(fetch).mock.calls.filter(([request]) => {
+          const url = request instanceof Request ? request.url : String(request);
+          return new URL(url).pathname === '/global/event';
+        })
+      ).toHaveLength(1);
       expect(runtime.signal.aborted).toBe(false);
       feed.onUnexpectedClose(error);
       expect(f.onUnexpectedClose.mock.calls).toEqual([

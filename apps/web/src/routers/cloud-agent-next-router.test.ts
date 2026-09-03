@@ -3,7 +3,12 @@ import type { User } from '@kilocode/db/schema';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import type { z } from 'zod';
-import type { personalPrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
+import type {
+  personalPrepareSessionNextSchema,
+  SandboxStatusSnapshot,
+} from '@/routers/cloud-agent-next-schemas';
+import { TRPCError } from '@trpc/server';
+import type { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -58,12 +63,15 @@ const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
   jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
+const mockGetSandboxStatus =
+  jest.fn<(cloudAgentSessionId: string) => Promise<SandboxStatusSnapshot>>();
 
-const mockCreateCloudAgentNextClient = jest.fn(() => ({
+const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   cancelQueuedMessage: mockCancelQueuedMessage,
+  getSandboxStatus: mockGetSandboxStatus,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -83,7 +91,7 @@ const mockComputeCloudAgentNextBalanceCheckEligibility = jest.fn<
 const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
-  jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
+  jest.fn<typeof verifyUserOwnsSessionV2ByCloudAgentId>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
 const mockFetchGitHubRepositoriesForUser = jest.fn<
   (
@@ -200,6 +208,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   }) => Promise<unknown>;
   getAttachmentDownloadUrl: (input: { messageUuid: string; filename: string }) => Promise<unknown>;
   cancelQueuedMessage: (input: { sessionId: string; messageId: string }) => Promise<unknown>;
+  getSandboxStatus: (input: { cloudAgentSessionId: string }) => Promise<SandboxStatusSnapshot>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -458,6 +467,131 @@ describe('cloudAgentNextRouter.cancelQueuedMessage', () => {
     ).rejects.toThrow('Session not found or access denied');
 
     expect(mockCancelQueuedMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudAgentNextRouter.getSandboxStatus', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const user = { id: 'oauth/provider:status-owner', is_admin: false } as User;
+  const snapshot = {
+    status: 'sleeping',
+    provider: 'Vercel',
+    observedAt: 1_800_000_000_000,
+    detailCode: 'sandbox_stopped',
+    inactivityTimeoutMs: 300_000,
+    estimatedSleepAt: null,
+  } satisfies SandboxStatusSnapshot;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockReset().mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockGetSandboxStatus.mockReset().mockResolvedValue(snapshot);
+  });
+
+  it('authorizes personal creator access before contacting the Worker without balance checks', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockImplementationOnce(async () => {
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+      return { kiloSessionId: 'ses_12345678901234567890123456' };
+    });
+    await expect(createCaller({ user }).getSandboxStatus({ cloudAgentSessionId })).resolves.toEqual(
+      snapshot
+    );
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockGetSandboxStatus).toHaveBeenCalledWith(cloudAgentSessionId);
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+    expect(mockGetBalanceForUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_12345678-1234-4234-9234-123456789abc',
+    'ses_12345678901234567890123456',
+    'workspace_',
+    'workspace_pending',
+    'workspace_../../private',
+    `${cloudAgentSessionId} `,
+    '',
+  ])('rejects invalid reference %s before ownership or Worker lookup', async invalidId => {
+    await expect(
+      createCaller({ user }).getSandboxStatus({ cloudAgentSessionId: invalidId })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'provider',
+    'ownerId',
+    'userId',
+    'organizationId',
+    'sandboxId',
+    'observedAt',
+    'inactivityTimeoutMs',
+    'estimatedSleepAt',
+  ])('rejects caller override %s', async field => {
+    const input = { cloudAgentSessionId, [field]: 'private-override' };
+    await expect(createCaller({ user }).getSandboxStatus(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+  });
+
+  it('keeps inaccessible personal or organization sessions denied before status', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    await expect(
+      createCaller({ user }).getSandboxStatus({ cloudAgentSessionId })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+    });
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without leaking unavailable authorization storage diagnostics', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockRejectedValueOnce(
+      new Error('private-database-diagnostics')
+    );
+    await expect(
+      createCaller({ user }).getSandboxStatus({ cloudAgentSessionId })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+      cause: undefined,
+    });
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+  });
+
+  it.each(['UNAUTHORIZED', 'FORBIDDEN'] as const)('preserves Worker %s denials', async code => {
+    mockGetSandboxStatus.mockRejectedValueOnce(
+      new TRPCError({ code, message: 'Session access denied' })
+    );
+    await expect(
+      createCaller({ user }).getSandboxStatus({ cloudAgentSessionId })
+    ).rejects.toMatchObject({ code });
+  });
+
+  it('strips unexpected client fields at the web output boundary', async () => {
+    mockGetSandboxStatus.mockResolvedValueOnce({
+      ...snapshot,
+      credentials: 'private-token',
+      sandboxId: 'private-runtime',
+    } as SandboxStatusSnapshot);
+    const response = await createCaller({ user }).getSandboxStatus({ cloudAgentSessionId });
+    expect(response).toEqual(snapshot);
+    expect(JSON.stringify(response)).not.toContain('private');
   });
 });
 

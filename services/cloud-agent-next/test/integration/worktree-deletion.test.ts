@@ -155,7 +155,8 @@ function createDeletionProvider(sandboxId: string) {
   } satisfies ProviderAdapter;
 }
 
-function installDeletionProvider(instance: SandboxControl, provider: ProviderAdapter) {
+async function installDeletionProvider(instance: SandboxControl, provider: ProviderAdapter) {
+  await instance.getStatus();
   Object.assign(instance, {
     env: {
       ...instance['env'],
@@ -601,7 +602,7 @@ describe('worktree deletion in Durable Objects', () => {
           }),
         },
       });
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       Object.assign(instance, {
         socketHandler: {
           hasHandshakenSocket: () => true,
@@ -783,7 +784,7 @@ describe('worktree deletion in Durable Objects', () => {
           }),
         },
       });
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       Object.assign(instance, {
         socketHandler: {
           hasHandshakenSocket: () => true,
@@ -858,7 +859,7 @@ describe('worktree deletion in Durable Objects', () => {
       if (!('providerRef' in created)) throw new Error('Missing native fixture allocation');
       const stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
       const observe = vi.fn(native.observe.bind(native));
-      installDeletionProvider(instance, { ...native, stop, observe });
+      await installDeletionProvider(instance, { ...native, stop, observe });
       const original = instance['env'].SESSION_INGEST;
       Object.assign(instance['env'], {
         SESSION_INGEST: {
@@ -998,7 +999,7 @@ describe('worktree deletion in Durable Objects', () => {
     await runInDurableObject(control, async (instance, state) => {
       const provider = createDeletionProvider(sandboxId);
       const create = vi.fn(provider.create.bind(provider));
-      installDeletionProvider(instance, { ...provider, create });
+      await installDeletionProvider(instance, { ...provider, create });
       const original = instance['env'].SESSION_INGEST;
       Object.assign(instance['env'], {
         SESSION_INGEST: {
@@ -1527,7 +1528,7 @@ describe('worktree deletion in Durable Objects', () => {
           ...memory,
           stop: ref => (mayStop ? memory.stop(ref) : Promise.resolve('retryable')),
         };
-        installDeletionProvider(instance, provider);
+        await installDeletionProvider(instance, provider);
         const original = instance['env'].SESSION_INGEST;
         Object.assign(instance['env'], {
           SESSION_INGEST: {
@@ -1667,7 +1668,7 @@ describe('worktree deletion in Durable Objects', () => {
           return memory.stop(ref);
         },
       };
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       const original = instance['env'].SESSION_INGEST;
       const workerUrl = instance['env'].WORKER_URL;
       Object.assign(instance['env'], {

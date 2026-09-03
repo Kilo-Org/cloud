@@ -31,6 +31,7 @@ import {
   type ControlOperation,
   type ResponseFrame,
   type SandboxHelloPayload,
+  type SandboxHelloResult,
 } from '../shared/sandbox-control-protocol.js';
 
 const encoder = new TextEncoder();
@@ -170,9 +171,10 @@ export function errorResponse(
   return { type: 'response', requestId, ok: false, error };
 }
 
-export function helloResult(): { protocolVersion: 1; handshakeComplete: true } {
+export function helloResult(): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
     handshakeComplete: true,
+    capabilities: { kiloVersionHeartbeat: true },
   };
 }

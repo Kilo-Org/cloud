@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -16,6 +17,17 @@ import {
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
+
+export {
+  SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+export type {
+  SandboxLifecycleStatus,
+  SandboxProviderLabel,
+  SandboxStatusDetailCode,
+  SandboxStatusSnapshot,
+} from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 
 /**
  * Shared schemas for cloud-agent-next routers
@@ -547,6 +559,12 @@ export const baseCancelQueuedMessageNextSchema = z.object({
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
+
+export const baseGetSandboxStatusNextSchema = z
+  .object({
+    cloudAgentSessionId: SandboxStatusSessionIdSchema,
+  })
+  .strict();
 
 export const cloudAgentTerminalSizeSchema = z.object({
   cols: z.number().int().min(2).max(500),

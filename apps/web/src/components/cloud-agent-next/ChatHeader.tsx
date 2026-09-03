@@ -18,6 +18,7 @@ import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 
 export function computeBillingRefetchInterval(
   sessionActive: boolean,
@@ -45,6 +46,7 @@ type ChatHeaderProps = {
   onToggleSound?: () => void;
   sessionTitle?: string;
   sessionActive: boolean;
+  sandboxStatusEligible?: boolean;
 };
 
 export function ChatHeader({
@@ -64,6 +66,7 @@ export function ChatHeader({
   organizationId,
   sessionTitle,
   sessionActive,
+  sandboxStatusEligible = false,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -124,6 +127,14 @@ export function ChatHeader({
         repository={repository}
       />
       <div className="flex min-w-0 items-center gap-1">
+        {sandboxStatusEligible && (
+          <SandboxStatusIndicator
+            key={`${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            sessionActive={sessionActive}
+          />
+        )}
         {onToggleSound && (
           <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
         )}

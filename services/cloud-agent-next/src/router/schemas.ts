@@ -28,6 +28,10 @@ import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { SessionMessageCompletionSourceSchema } from '../session/session-message-state.js';
 import { SafeFailureProjectionSchema } from '../session/safe-failure-projection.js';
+import { SandboxStatusSessionIdSchema } from '../shared/sandbox-status.js';
+
+export { SandboxStatusSnapshotSchema as GetSandboxStatusOutput } from '../shared/sandbox-status.js';
+export type { SandboxStatusSnapshot as GetSandboxStatusResponse } from '../shared/sandbox-status.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
@@ -998,6 +1002,12 @@ export const UpdateSessionOutput = z.object({
 export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
 });
+
+export const GetSandboxStatusInput = z
+  .object({
+    cloudAgentSessionId: SandboxStatusSessionIdSchema,
+  })
+  .strict();
 
 /** Customer-safe, no-wake compute billing status for an existing session. */
 export const GetComputeBillingStatusOutput = z.object({

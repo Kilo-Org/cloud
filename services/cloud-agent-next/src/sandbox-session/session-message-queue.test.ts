@@ -1075,6 +1075,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       })
     ),
     attachSession: vi.fn(async () => ({})),
+    bindRuntimeCredentialProxyHandle: vi.fn(async () => undefined),
     detachSession: vi.fn(async () => ({ existed: true })),
     quarantineRuntime: vi.fn(
       async (

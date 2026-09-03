@@ -1195,11 +1195,17 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://github.com/acme/other.git/info/refs?service=git-upload-pack'],
+    ['POST', 'https://api.github.com/graphql', 'repository_mismatch'],
+    [
+      'GET',
+      'https://github.com/acme/other.git/info/refs?service=git-upload-pack',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://npm.pkg.github.com/@acme/design', 'upstream_host_not_allowed'],
+    ['GET', 'https://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
   ] as const)(
     'keeps legacy unbound GitHub capabilities repository-confined for %s %s',
-    async (requestMethod, requestUrl) => {
+    async (requestMethod, requestUrl, reason) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
         githubRepo: 'acme/repo',
@@ -1215,7 +1221,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
           requestMethod,
           requestUrl,
         })
-      ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+      ).resolves.toEqual({ success: false, reason });
       expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     }
   );
@@ -1335,6 +1341,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ['GET', 'https://api.github.com/user/repos'],
     ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
+    ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
     ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
     ['POST', 'https://github.com/acme/other.git/info/lfs/objects/batch'],
   ] as const)(
@@ -1427,6 +1435,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ['GET', 'https://api.github.com/user/repos'],
     ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
+    ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
     ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
     ['GET', 'https://github.com/acme/other.git/info/refs?service=git-upload-pack'],
   ] as const)(
@@ -1483,6 +1493,11 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ],
     ['GET', 'https://api.github.com:8443/user/repos', 'upstream_host_not_allowed'],
     ['GET', 'https://api.github.com/user/repos#fragment', 'invalid_upstream_url'],
+    ['GET', 'http://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
+    ['GET', 'https://attacker@npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_url'],
+    ['GET', 'https://npm.pkg.github.com/@acme%2fdesign#fragment', 'invalid_upstream_url'],
+    ['GET', 'https://npm.pkg.github.com:8443/@acme%2fdesign', 'upstream_host_not_allowed'],
+    ['GET', 'https://npm.pkg.github.com.evil.example/@acme%2fdesign', 'upstream_host_not_allowed'],
   ] as const)(
     'rejects unsafe upstream request %s %s without forwarding authorization',
     async (requestMethod, requestUrl, reason) => {
@@ -1507,28 +1522,34 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     }
   );
 
-  it('rejects unsafe selected-user destinations before resolving authorization', async () => {
-    const service = createService();
-    const issued = await service.issueGitHubSessionCapability({
-      githubRepo: 'acme/repo',
-      userId: 'user_1',
-      outboundContainerId,
-      allowUserAuthorization: true,
-    });
-    if (!issued.success) throw new Error('Expected successful issuance');
-    expect(issued.source).toBe('user');
-    serviceMocks.selectUserAuthorization.mockClear();
-
-    await expect(
-      service.redeemGitHubSessionCapability({
-        capability: issued.capability,
+  it.each([
+    'https://github.com.evil.example/graphql',
+    'https://npm.pkg.github.com.evil.example/@acme%2fdesign',
+  ])(
+    'rejects unsafe selected-user destination %s before resolving authorization',
+    async requestUrl => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
         outboundContainerId,
-        requestMethod: 'POST',
-        requestUrl: 'https://github.com.evil.example/graphql',
-      })
-    ).resolves.toEqual({ success: false, reason: 'upstream_host_not_allowed' });
-    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
-  });
+        allowUserAuthorization: true,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      expect(issued.source).toBe('user');
+      serviceMocks.selectUserAuthorization.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod: 'POST',
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason: 'upstream_host_not_allowed' });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects user-source redemption rather than falling back to installation authorization', async () => {
     const service = createService();

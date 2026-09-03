@@ -33,6 +33,7 @@ it('leaves every earlier message unchanged when a turn is appended', () => {
   expect(grown.system).toEqual(assemble({ system, turns: before }).system);
 });
 
-it('sets no message breakpoint when the session has no turns', () => {
-  expect(assemble({ system, turns: Chunk.empty() }).messages).toEqual([]);
+it('still breaks the cache after the system prompt when the session has no turns', () => {
+  const prompt = assemble({ system, turns: Chunk.empty() });
+  expect(prompt.system).toEqual([{ text: system, cache: true }]);
 });

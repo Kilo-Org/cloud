@@ -15,6 +15,6 @@ it('reads two events out of one chunk', () => {
   expect(sseReader()('data: a\n\ndata: b\n\n')).toEqual(['a', 'b']);
 });
 
-it('skips a comment and the done marker', () => {
-  expect(sseReader()(': ping\n\ndata: [DONE]\n\n')).toEqual([]);
+it('skips a comment and the done marker but keeps the events around them', () => {
+  expect(sseReader()('data: a\n\n: ping\n\ndata: [DONE]\n\ndata: b\n\n')).toEqual(['a', 'b']);
 });

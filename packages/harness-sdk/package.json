@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",
-    "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test && pnpm build",
+    "check": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm test && pnpm build",
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
     "test": "vitest run --passWithNoTests",

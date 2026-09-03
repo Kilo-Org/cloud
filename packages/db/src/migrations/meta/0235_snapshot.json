@@ -1,5 +1,9 @@
 {
+<<<<<<< ours
   "id": "80422fd8-514b-4e81-ba33-ec66f1a7cdfe",
+=======
+  "id": "12a8ccc9-2ed1-4b5e-babd-bee19f8a85d9",
+>>>>>>> theirs
   "prevId": "4ce43cc2-f500-4a55-97f1-2810d5c177f5",
   "version": "7",
   "dialect": "postgresql",
@@ -11305,6 +11309,41 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+<<<<<<< ours
+=======
+    "public.direct_byok_model_lists": {
+      "name": "direct_byok_model_lists",
+      "schema": "",
+      "columns": {
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "models": {
+          "name": "models",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "synced_at": {
+          "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+>>>>>>> theirs
     "public.discord_gateway_listener": {
       "name": "discord_gateway_listener",
       "schema": "",
@@ -36214,6 +36253,7 @@
       },
       "isRLSEnabled": false
     },
+<<<<<<< ours
     "public.user_activity_tokens": {
       "name": "user_activity_tokens",
       "schema": "",
@@ -36329,6 +36369,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+=======
+>>>>>>> theirs
     "public.user_admin_notes": {
       "name": "user_admin_notes",
       "schema": "",

@@ -1,12 +1,13 @@
 import * as z from 'zod';
+import {
+  API_GATEWAY_CREDENTIAL_FORMAT,
+  type NativeCredentialBundleMetadata,
+  type NativeTokenPair,
+  parseNativeTokenPair,
+} from '@kilocode/app-shared/native-auth';
 
 const tokenResponseSchema = z.object({ token: z.string().min(1) });
-const tokenPairSchema = z.object({
-  token: z.string().min(1),
-  refreshToken: z.string().min(1).optional(),
-  expiresIn: z.number().positive().optional(),
-  created: z.boolean().optional(),
-});
+const credentialEnvelopeSchema = z.record(z.string(), z.unknown());
 const emailCodeResponseSchema = z.object({
   success: z.literal(true),
   challengeId: z.uuid().optional(),
@@ -16,30 +17,35 @@ const errorResponseSchema = z.object({
   ssoOrganizationId: z.string().min(1).optional(),
 });
 
-export type TokenPair =
-  | { token: string; refreshToken: string; expiresIn: number; created?: boolean }
-  | { token: string; refreshToken?: undefined; expiresIn?: undefined; created?: boolean };
+export type TokenPair = NativeTokenPair;
 
 export function parseTokenResponse(value: unknown): { token: string } | null {
+  if (hasCredentialFormat(value)) {
+    return null;
+  }
   const result = tokenResponseSchema.safeParse(value);
   return result.success ? result.data : null;
 }
 
 export function parseTokenPair(value: unknown): TokenPair | null {
-  const result = tokenPairSchema.safeParse(value);
-  if (!result.success) {
-    return null;
-  }
-  const { token, refreshToken, expiresIn, created } = result.data;
-  if (refreshToken && expiresIn) {
-    return { token, refreshToken, expiresIn, created };
-  }
-  return { token, created };
+  return parseNativeTokenPair(value);
+}
+
+export { API_GATEWAY_CREDENTIAL_FORMAT, type NativeCredentialBundleMetadata, type NativeTokenPair };
+
+function hasCredentialFormat(value: unknown): boolean {
+  const envelope = credentialEnvelopeSchema.safeParse(value);
+  return (
+    envelope.success &&
+    (Object.hasOwn(envelope.data, 'credentialFormat') ||
+      Object.hasOwn(envelope.data, 'gatewayToken') ||
+      Object.hasOwn(envelope.data, 'metadata'))
+  );
 }
 
 const deviceAuthTokenStatusSchema = z.enum(['pending', 'approved', 'denied', 'expired']);
 
-const deviceAuthTokenResponseSchema = z.object({
+const deviceAuthTokenResponseSchema = z.looseObject({
   status: deviceAuthTokenStatusSchema,
   token: z.string().min(1).optional(),
   refreshToken: z.string().min(1).optional(),
@@ -54,8 +60,7 @@ const deviceAuthCodeResponseSchema = z.object({
 });
 
 export type DeviceAuthTokenResult =
-  | { status: 'approved'; token: string; refreshToken: string; expiresIn: number }
-  | { status: 'approved'; token: string; refreshToken?: undefined; expiresIn?: undefined }
+  | ({ status: 'approved' } & NativeTokenPair)
   | { status: 'pending' | 'denied' | 'expired' };
 
 export type DeviceAuthCodeResult = {
@@ -65,7 +70,11 @@ export type DeviceAuthCodeResult = {
 };
 
 export function buildDeviceAuthPollRequest(deviceCode: string) {
-  return { deviceCode, supportsRefresh: true as const };
+  return {
+    deviceCode,
+    credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+    supportsRefresh: true as const,
+  };
 }
 
 export function shouldRefreshBeforeRequest(
@@ -94,21 +103,12 @@ export function parseDeviceAuthTokenResponse(value: unknown): DeviceAuthTokenRes
   if (!result.success) {
     return null;
   }
-  const { status, token, refreshToken, expiresIn } = result.data;
-  if (status === 'approved' && token) {
-    // Require a complete pair: both refreshToken AND expiresIn must be
-    // present. An incomplete pair (one without the other) is dropped to
-    // token-only so signIn never stores a refresh token with no expiry;
-    // proactive refresh relies on TOKEN_EXPIRES_AT_KEY to decide rotation.
-    if (refreshToken && expiresIn) {
-      return { status, token, refreshToken, expiresIn };
-    }
-    return { status, token };
+  const { status, ...pairValue } = result.data;
+  if (status === 'approved') {
+    const pair = parseNativeTokenPair(pairValue);
+    return pair ? { status, ...pair } : null;
   }
-  if (status !== 'approved') {
-    return { status };
-  }
-  return null;
+  return { status };
 }
 
 export function parseEmailCodeResponse(value: unknown) {

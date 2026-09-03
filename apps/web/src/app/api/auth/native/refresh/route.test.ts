@@ -95,4 +95,41 @@ describe('POST /api/auth/native/refresh', () => {
     const response = await POST(createMalformedRequest());
     expect(response.status).toBe(400);
   });
+
+  it('passes a negotiated credential format through and preserves metadata', async () => {
+    mockRotateRefreshToken.mockResolvedValue({
+      ok: true,
+      token: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+      expiresIn: 3600,
+      metadata: {
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-09-02T22:00:00.000Z',
+      },
+    });
+
+    const response = await POST(
+      createRequest({ refreshToken: 'valid-refresh', credentialFormat: 'api-gateway-v1' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockRotateRefreshToken).toHaveBeenCalledWith('valid-refresh', {
+      credentialFormat: 'api-gateway-v1',
+    });
+    expect((await response.json()).metadata).toEqual({
+      credentialFormat: 'api-gateway-v1',
+      gatewayToken: 'gateway-token',
+      expiresAt: '2026-09-02T22:00:00.000Z',
+    });
+  });
+
+  it('rejects an unknown credential format without rotating', async () => {
+    const response = await POST(
+      createRequest({ refreshToken: 'valid-refresh', credentialFormat: 'nope' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockRotateRefreshToken).not.toHaveBeenCalled();
+  });
 });

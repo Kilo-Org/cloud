@@ -73,6 +73,7 @@ vi.mock('@/lib/config', () => ({
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
+  NATIVE_CREDENTIAL_BUNDLE_KEY: 'native-credential-bundle',
 }));
 
 // auth-context pulls in react-native, Sentry and the telemetry modules.
@@ -159,13 +160,12 @@ describe('getAuthHeaders', () => {
     const headers = await loadHeaders();
 
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    // Cold path: one token read plus one expiry read.
-    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(3);
 
     // The resolved expiry was published into the owner: a normal request
     // rereads neither key.
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(3);
   });
 
   it('uses the newest owner token published while the cold expiry was read', async () => {

@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { consumeDeviceAuthByDeviceCode } from '@/lib/device-auth/device-auth';
 import * as z from 'zod';
+import { nativeCredentialFormatSchema } from '@kilocode/app-shared/native-auth';
 
-const TokenBodySchema = z.object({
-  deviceCode: z.string().min(1),
-  supportsRefresh: z.boolean().optional(),
-});
+const TokenBodySchema = z
+  .object({
+    deviceCode: z.string().min(1),
+    supportsRefresh: z.boolean().optional(),
+    credentialFormat: nativeCredentialFormatSchema.optional(),
+  })
+  .superRefine((data, context) => {
+    if (data.credentialFormat && !data.supportsRefresh) {
+      context.addIssue({
+        code: 'custom',
+        path: ['supportsRefresh'],
+        message: 'supportsRefresh is required when credentialFormat is specified',
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -23,9 +35,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { deviceCode, supportsRefresh } = validation.data;
+  const { deviceCode, supportsRefresh, credentialFormat } = validation.data;
 
-  const result = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh });
+  const result = await consumeDeviceAuthByDeviceCode(deviceCode, {
+    supportsRefresh,
+    ...(credentialFormat ? { credentialFormat } : {}),
+  });
 
   switch (result.status) {
     case 'pending':
@@ -35,9 +50,10 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           status: 'approved',
-          token: result.token,
+          ...(result.token ? { token: result.token } : {}),
           ...(result.refreshToken ? { refreshToken: result.refreshToken } : {}),
           ...(result.expiresIn ? { expiresIn: result.expiresIn } : {}),
+          ...(result.metadata ? { metadata: result.metadata } : {}),
           userId: result.userId,
           userEmail: result.userEmail,
         },

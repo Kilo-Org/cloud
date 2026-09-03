@@ -1,14 +1,22 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import {
+  type NativeCredentialBundleMetadata,
+  parseNativeTokenPair,
+} from '@kilocode/app-shared/native-auth';
+import { AUTH_TOKEN_KEY, NATIVE_CREDENTIAL_BUNDLE_KEY } from '@/lib/storage-keys';
+import { parseTimestamp } from '@/lib/utils';
 
 export type ActiveToken = {
   token: string;
   expiresAtMs: number | null;
 };
 
-export type ActiveTokenSnapshot = ActiveToken & { epoch: number };
+export type ActiveTokenSnapshot = ActiveToken & {
+  epoch: number;
+  bundle?: NativeCredentialBundleMetadata;
+};
 
 let activeToken: ActiveTokenSnapshot | null = null;
 
@@ -30,8 +38,12 @@ export function isSignOutTeardownActive(): boolean {
 }
 
 /** Holds the token in memory, tagged with the auth epoch that was current when it was stored. */
-export function setActiveToken(token: string, expiresAtMs: number | null): void {
-  activeToken = { token, expiresAtMs, epoch: currentAuthEpoch() };
+export function setActiveToken(
+  token: string,
+  expiresAtMs: number | null,
+  bundle?: NativeCredentialBundleMetadata
+): void {
+  activeToken = { token, expiresAtMs, epoch: currentAuthEpoch(), ...(bundle ? { bundle } : {}) };
 }
 
 /** Returns the held token and expiry, or null when unset or when the epoch moved. */
@@ -86,10 +98,13 @@ export function clearActiveToken(): void {
  * sign-out teardown the cold path returns no token and never warms: the
  * stored credentials are scheduled for deletion.
  */
-export async function getAuthTokenForRequest(): Promise<string | null> {
+export async function getAuthTokenForRequest(
+  resource: 'api' | 'gateway' = 'api'
+): Promise<string | null> {
   const active = getActiveToken();
   if (active) {
-    return active.token;
+    const snapshot = getActiveTokenSnapshot();
+    return resource === 'api' ? active.token : (snapshot?.bundle?.gatewayToken ?? active.token);
   }
   const epoch = currentAuthEpoch();
   // Sign-out teardown is active: the stored credentials are queued for
@@ -97,12 +112,29 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
   if (isSignOutTeardownActive()) {
     return null;
   }
+  const rawBundle = await SecureStore.getItemAsync(NATIVE_CREDENTIAL_BUNDLE_KEY);
+  if (rawBundle !== null) {
+    const bundle = parseStoredBundle(rawBundle);
+    const published = getActiveToken();
+    if (published) {
+      return resource === 'api'
+        ? published.token
+        : (getActiveTokenSnapshot()?.bundle?.gatewayToken ?? published.token);
+    }
+    if (!bundle || !isCurrentAuthEpoch(epoch) || isSignOutTeardownActive()) {
+      return null;
+    }
+    setActiveToken(bundle.token, bundle.expiresAtMs, bundle);
+    return resource === 'api' ? bundle.token : bundle.gatewayToken;
+  }
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
   // A sign-in or refresh may have published a newer owner while the cold read
   // was in flight: prefer it and never overwrite it with the stale read.
   const published = getActiveToken();
   if (published) {
-    return published.token;
+    return resource === 'api'
+      ? published.token
+      : (getActiveTokenSnapshot()?.bundle?.gatewayToken ?? published.token);
   }
   // One read for both decisions: the flag cannot change between them.
   const tearingDown = isSignOutTeardownActive();
@@ -110,4 +142,28 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
     setActiveToken(token, null);
   }
   return tearingDown ? null : token;
+}
+
+type StoredBundle = NativeCredentialBundleMetadata & {
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+  expiresAtMs: number;
+};
+
+function parseStoredBundle(raw: string): StoredBundle | null {
+  try {
+    const value: unknown = JSON.parse(raw);
+    const pair = parseNativeTokenPair(value);
+    if (!pair?.refreshToken || !pair.expiresIn || !pair.metadata) {
+      return null;
+    }
+    const expiresAtMs = parseTimestamp(pair.metadata.expiresAt).getTime();
+    if (!Number.isFinite(expiresAtMs)) {
+      return null;
+    }
+    return { ...pair, ...pair.metadata, expiresAtMs };
+  } catch {
+    return null;
+  }
 }

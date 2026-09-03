@@ -23,10 +23,8 @@ import { errorMessage } from './login-screen-state';
 
 const deviceAuth = vi.hoisted(() => ({
   status: 'idle' as string,
-  token: undefined as string | undefined,
   code: undefined as string | undefined,
-  refreshToken: undefined as string | undefined,
-  expiresIn: undefined as number | undefined,
+  credentials: undefined,
   error: undefined as string | undefined,
   verificationUrl: undefined as string | undefined,
   resumed: false,
@@ -73,10 +71,8 @@ vi.mock('@/lib/auth/auth-context', () => ({
 vi.mock('@/lib/auth/use-device-auth', () => ({
   useDeviceAuth: () => ({
     status: deviceAuth.status,
-    token: deviceAuth.token,
     code: deviceAuth.code,
-    refreshToken: deviceAuth.refreshToken,
-    expiresIn: deviceAuth.expiresIn,
+    credentials: deviceAuth.credentials,
     error: deviceAuth.error,
     verificationUrl: deviceAuth.verificationUrl,
     resumed: deviceAuth.resumed,
@@ -269,10 +265,8 @@ describe('login-screen language globe', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     deviceAuth.status = 'idle';
-    deviceAuth.token = undefined;
     deviceAuth.code = undefined;
-    deviceAuth.refreshToken = undefined;
-    deviceAuth.expiresIn = undefined;
+    deviceAuth.credentials = undefined;
     deviceAuth.error = undefined;
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
@@ -349,10 +343,8 @@ describe('login-screen idle skeleton', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     deviceAuth.status = 'idle';
-    deviceAuth.token = undefined;
     deviceAuth.code = undefined;
-    deviceAuth.refreshToken = undefined;
-    deviceAuth.expiresIn = undefined;
+    deviceAuth.credentials = undefined;
     deviceAuth.error = undefined;
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;

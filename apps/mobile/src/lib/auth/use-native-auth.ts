@@ -5,6 +5,10 @@ import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import {
+  API_GATEWAY_CREDENTIAL_FORMAT,
+  type NativeTokenPair,
+} from '@kilocode/app-shared/native-auth';
 
 import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
@@ -51,6 +55,30 @@ type NativeAuthResult = {
   clearSsoRecovery: () => void;
   handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
 };
+
+async function getAdmissionBody() {
+  try {
+    return await resolveAdmission();
+  } catch {
+    return null;
+  }
+}
+
+async function completeNativeSignIn(
+  data: unknown,
+  signIn: (pair: NativeTokenPair) => Promise<void>
+): Promise<boolean> {
+  const pair = parseTokenPair(data);
+  if (!pair) {
+    toast.error(defaultErrorMessage());
+    return false;
+  }
+  await signIn(pair);
+  if (pair.created === true) {
+    announcingToast.success(i18n.t('login.accountCreated'));
+  }
+  return true;
+}
 
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
@@ -113,10 +141,8 @@ export function useNativeAuth(): NativeAuthResult {
         ? AppleAuthentication.formatFullName(credential.fullName) || undefined
         : undefined;
 
-      let admissionBody: Record<string, unknown> = {};
-      try {
-        admissionBody = await resolveAdmission();
-      } catch {
+      const admissionBody = await getAdmissionBody();
+      if (!admissionBody) {
         return;
       }
 
@@ -126,23 +152,12 @@ export function useNativeAuth(): NativeAuthResult {
         idToken: credential.identityToken,
         nonce: rawNonce,
         supportsRefresh: true,
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
         ...(fullName ? { fullName } : {}),
       });
 
       if (result.ok) {
-        const parsed = parseTokenPair(result.data);
-        if (!parsed) {
-          toast.error(defaultErrorMessage());
-          return;
-        }
-        await signIn(
-          parsed.token,
-          'refreshToken' in parsed ? parsed.refreshToken : undefined,
-          'expiresIn' in parsed ? parsed.expiresIn : undefined
-        );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        await completeNativeSignIn(result.data, signIn);
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
       } else {
@@ -180,16 +195,15 @@ export function useNativeAuth(): NativeAuthResult {
         return;
       }
 
-      let admissionBody: Record<string, unknown> = {};
-      try {
-        admissionBody = await resolveAdmission();
-      } catch {
+      const admissionBody = await getAdmissionBody();
+      if (!admissionBody) {
         return;
       }
 
       const result = await postAuth('/api/auth/native/token', {
         provider: 'google',
         supportsRefresh: true,
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
         ...(serverAuthCode
           ? { serverAuthCode, googleClientId: GOOGLE_WEB_CLIENT_ID }
           : { idToken }),
@@ -197,19 +211,7 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (result.ok) {
-        const parsed = parseTokenPair(result.data);
-        if (!parsed) {
-          toast.error(defaultErrorMessage());
-          return;
-        }
-        await signIn(
-          parsed.token,
-          'refreshToken' in parsed ? parsed.refreshToken : undefined,
-          'expiresIn' in parsed ? parsed.expiresIn : undefined
-        );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
-        }
+        await completeNativeSignIn(result.data, signIn);
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
       } else {
@@ -272,10 +274,8 @@ export function useNativeAuth(): NativeAuthResult {
         // email means the challenge was generated for a different address.
         const challengeId = selectChallengeId(challengeRef.current, email);
 
-        let admissionBody: Record<string, unknown> = {};
-        try {
-          admissionBody = await resolveAdmission();
-        } catch {
+        const admissionBody = await getAdmissionBody();
+        if (!admissionBody) {
           return false;
         }
 
@@ -285,6 +285,7 @@ export function useNativeAuth(): NativeAuthResult {
           email,
           code,
           supportsRefresh: true,
+          credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
           ...(challengeId ? { challengeId } : {}),
         });
         if (!result.ok) {
@@ -295,18 +296,8 @@ export function useNativeAuth(): NativeAuthResult {
           }
           return false;
         }
-        const parsed = parseTokenPair(result.data);
-        if (!parsed) {
-          toast.error(defaultErrorMessage());
+        if (!(await completeNativeSignIn(result.data, signIn))) {
           return false;
-        }
-        await signIn(
-          parsed.token,
-          'refreshToken' in parsed ? parsed.refreshToken : undefined,
-          'expiresIn' in parsed ? parsed.expiresIn : undefined
-        );
-        if (parsed.created === true) {
-          announcingToast.success(i18n.t('login.accountCreated'));
         }
         return true;
       } catch (error) {

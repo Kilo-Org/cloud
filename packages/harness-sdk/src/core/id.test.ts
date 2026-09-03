@@ -33,9 +33,7 @@ it('carries into the next millisecond when the random part is exhausted', () => 
   /* An entropy source pinned to the top of the range: every draw is 31, so the
      next identifier in the same millisecond has nowhere to carry to. */
   const exhausted = { bytes: (count: number) => new Uint8Array(count).fill(255) };
-  const ids = Effect.runSync(
-    Effect.all(Array.from({ length: 3 }, () => makeId(exhausted, 'trn')))
-  );
+  const ids = Effect.runSync(Effect.all(Array.from({ length: 3 }, () => makeId(exhausted, 'trn'))));
   expect([...ids].toSorted()).toEqual(ids);
   expect(new Set(ids).size).toBe(3);
 });

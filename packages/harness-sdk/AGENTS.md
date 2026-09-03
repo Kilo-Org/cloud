@@ -145,6 +145,20 @@ Marginal cost through `openSession`, `ask`, the gateway and a fake transport,
 | SSE parse and wire read (the validator table above) | 0.25 |
 | typia validation alone | 0.005 |
 
+Identifiers, measured the same day:
+
+| | us |
+|---|---:|
+| one identifier, through `Effect.runSync` | 0.86 |
+| two identifiers, which is one question | 1.69 |
+| one `entropy.bytes(16)` draw | 0.59 |
+
+The draw looks expensive next to the rest, and it is — but the monotonic
+counter only draws when the millisecond changes. Measured over 200000
+identifiers spanning 179 ms: 180 draws, one per millisecond, 1111 identifiers
+each. The cost of randomness is bounded by the clock, not by how many
+identifiers are asked for.
+
 Nothing here is being changed: 7 us per token is 7 ms on a thousand token
 answer, against seconds of model latency. The table exists so the next change
 to this path argues from data, in either direction.
@@ -245,16 +259,50 @@ measure of what `FetchLike` asks of a caller.
 used models on OpenRouter. The last question can only be answered from the
 history, so the run proves the prompt actually carries the conversation.
 
-The last table was measured before the usage merge was fixed, when the gateway
-overwrote counts instead of raising them, so a provider echoing zeros in its
-last frame scored near zero on counts that were never wrong. It is deleted
-rather than kept as a number nobody can cite. Re-run and record a fresh one.
+Measured on 2026-09-03, five questions each, the Kilo organization:
+
+| Model | Shape | Recalled | Cache read | Input | Ratio |
+|---|---|---|---:|---:|---:|
+| `openai/gpt-5.6-luna` | messages | yes | 45018 | 15 | 0.9997 |
+| `deepseek/deepseek-v4-flash` | messages | yes | 56320 | 324 | 0.9943 |
+| `minimax/minimax-m3` | messages | yes | 45702 | 11382 | 0.8006 |
+| `xiaomi/mimo-v2.5` | messages | yes | 46080 | 11714 | 0.7973 |
+| `deepseek/deepseek-v4-flash-0731` | messages | yes | 45056 | 11588 | 0.7954 |
+| `tencent/hy3` | messages | yes | 44608 | 11691 | 0.7923 |
+| `z-ai/glm-5.3-flash` | messages | yes | 27648 | 28666 | 0.4910 |
+| `google/gemini-3.7-flash` | messages | yes | 24436 | 34203 | 0.4167 |
+| `nvidia/nemotron-3-ultra-550b-a55b` | messages | yes | 8192 | 50667 | 0.1392 |
+| `tencent/hy4-preview` | — | — | — | — | 404, not allowed for the team |
+
+Nine of ten answered every turn from the history.
+
+These ratios are lower than the ones recorded before the usage merge was
+fixed, and the lower ones are the honest ones. The earlier table had
+`deepseek/deepseek-v4-flash-0731` at 0.9943 on a cumulative input of 324
+tokens, which cannot happen: no cache exists on the first call, so the cold
+call alone spends the whole prefix as uncached input. Reading the raw frames
+for that model shows why the counts move:
+
+```
+first call, cold    message_start  {"input_tokens":0,"output_tokens":0}
+                    message_delta  {"input_tokens":6899,"output_tokens":44}
+second call, warm   message_start  {"input_tokens":0,"output_tokens":0}
+                    message_delta  {"input_tokens":125,"output_tokens":39,
+                                    "cache_read_input_tokens":6784}
+```
+
+This relay puts zeros in `message_start` and the counts in `message_delta`,
+which is the inverse of Anthropic direct. Raising rather than overwriting is
+right for both: `max(0, 6899)` is 6899 either way round. When you doubt a
+count, dump the frames before you reason about the aggregate.
 
 Two lessons hold beyond any one run:
 
 - **The ratio is partly the provider's.** The package places the same
-  breakpoints for every model, so a spread across models is not a defect here.
-  Read a low number as a question, not a bug — but rule out the package first.
+  breakpoints for every model, and the spread above runs from 0.14 to 0.9997
+  on identical breakpoints. Read a low number as a question, not a bug — but
+  rule out the package first, and check the arithmetic closes before trusting
+  a high one.
 - **A small token budget reads as a broken transport.** At 64 tokens a
   reasoning model spends the budget before it writes a word. The run uses 1024.
 

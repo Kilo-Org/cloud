@@ -16,10 +16,7 @@ const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5' };
 
 const stored = <A, E>(run: (store: SessionStoreService) => Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(
-    Effect.provide(
-      Effect.flatMap(SessionStore, run),
-      layerNodeStore(new DatabaseSync(':memory:'))
-    )
+    Effect.provide(Effect.flatMap(SessionStore, run), layerNodeStore(new DatabaseSync(':memory:')))
   );
 
 const question: readonly PartDraft[] = [

@@ -3,7 +3,7 @@ import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
-import type { Wire } from './wire.js';
+import type { Wire, WirePart } from './wire.js';
 import type { TokenCount } from './usage.js';
 
 /**
@@ -64,9 +64,16 @@ interface CompletedEvent {
   response: { usage: Counts };
 }
 
+/** This shape streams the thinking as a summary, under a name of its own. */
+interface ReasoningEvent {
+  type: 'response.reasoning_summary_text.delta';
+  delta: string;
+}
+
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isCompleted = createIs<CompletedEvent>();
+const isReasoning = createIs<ReasoningEvent>();
 
 /** The cached count is reported inside the input total, so it is subtracted out. */
 const readUsage = (usage: Counts): Partial<ModelUsage> => {
@@ -95,7 +102,12 @@ const toReply = (raw: unknown): ModelReply => {
   };
 };
 
-const toDelta = (event: unknown): string | undefined => (isDelta(event) ? event.delta : undefined);
+const toDelta = (event: unknown): WirePart | undefined => {
+  if (isDelta(event)) {
+    return { kind: 'delta', text: event.delta };
+  }
+  return isReasoning(event) ? { kind: 'reasoning', text: event.delta } : undefined;
+};
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
   isCompleted(event) ? readUsage(event.response.usage) : undefined;

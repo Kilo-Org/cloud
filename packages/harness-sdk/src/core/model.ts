@@ -49,9 +49,16 @@ class ModelError extends Data.TaggedError('harness/ModelError')<{
   readonly cause: unknown;
 }> {}
 
-/** One piece of a streamed reply. The last event of a stream is always `done`. */
+/**
+ * One piece of a streamed reply. The last event of a stream is always `done`.
+ *
+ * `reasoning` is the model thinking aloud. It is a separate kind because it is
+ * not the answer: a caller may show it, and the package stores it, but it never
+ * goes back into a prompt.
+ */
 type ModelEvent =
   | { readonly kind: 'delta'; readonly text: string }
+  | { readonly kind: 'reasoning'; readonly text: string }
   | { readonly kind: 'done'; readonly usage: ModelUsage };
 
 const zeroUsage: ModelUsage = {

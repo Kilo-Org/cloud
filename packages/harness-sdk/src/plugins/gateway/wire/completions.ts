@@ -3,7 +3,7 @@ import { createAssert, createIs } from 'typia';
 import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri, isLast } from './parts.js';
-import type { Wire } from './wire.js';
+import type { Wire, WirePart } from './wire.js';
 import type { TokenCount } from './usage.js';
 
 /**
@@ -85,12 +85,21 @@ interface DeltaEvent {
   choices: { delta: { content?: string | null } }[];
 }
 
+/**
+ * The relayed providers do not agree on a name for the thinking: OpenRouter
+ * sends `reasoning` and others send `reasoning_content`, so both are read.
+ */
+interface ReasoningEvent {
+  choices: { delta: { reasoning?: string | null; reasoning_content?: string | null } }[];
+}
+
 interface UsageEvent {
   usage: Counts;
 }
 
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
+const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
 
 /** The cached count is reported inside the prompt total, so it is subtracted out. */
@@ -122,8 +131,18 @@ const toReply = (raw: unknown): ModelReply => {
  * with a rest element expresses it, but typia then copies the rest on every
  * check, which costs three times as much on the per-token path.
  */
-const toDelta = (event: unknown): string | undefined =>
-  isDelta(event) ? (event.choices[0]?.delta.content ?? undefined) : undefined;
+const toDelta = (event: unknown): WirePart | undefined => {
+  const said = isDelta(event) ? (event.choices[0]?.delta.content ?? undefined) : undefined;
+  if (said !== undefined) {
+    return { kind: 'delta', text: said };
+  }
+  if (!isReasoning(event)) {
+    return undefined;
+  }
+  const thought = event.choices[0]?.delta;
+  const text = thought?.reasoning ?? thought?.reasoning_content ?? undefined;
+  return text === undefined ? undefined : { kind: 'reasoning', text };
+};
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
   isUsage(event) ? readUsage(event.usage) : undefined;

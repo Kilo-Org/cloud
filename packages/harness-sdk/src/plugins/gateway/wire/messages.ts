@@ -3,7 +3,7 @@ import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { isLast } from './parts.js';
-import type { Wire } from './wire.js';
+import type { Wire, WirePart } from './wire.js';
 import { type Counts, set, type TokenCount } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
@@ -74,6 +74,11 @@ interface DeltaEvent {
   delta: { text: string };
 }
 
+/** A thinking block streams under its own field, so the two never collide. */
+interface ThinkingEvent {
+  delta: { thinking: string };
+}
+
 interface UsageEvent {
   usage: WireUsage;
 }
@@ -86,6 +91,7 @@ interface StartEvent {
 /** The reply is an edge, so it is validated before the package believes it. */
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
+const isThinking = createIs<ThinkingEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStart = createIs<StartEvent>();
 
@@ -102,8 +108,12 @@ const toReply = (raw: unknown): ModelReply => {
   };
 };
 
-const toDelta = (event: unknown): string | undefined =>
-  isDelta(event) ? event.delta.text : undefined;
+const toDelta = (event: unknown): WirePart | undefined => {
+  if (isDelta(event)) {
+    return { kind: 'delta', text: event.delta.text };
+  }
+  return isThinking(event) ? { kind: 'reasoning', text: event.delta.thinking } : undefined;
+};
 
 const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
   const counts: Counts = {};

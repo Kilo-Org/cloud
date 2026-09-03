@@ -82,6 +82,43 @@ const record = (wiring: Wiring, turn: Turn): Effect.Effect<void, StoreError> =>
 /** The stream one question answers with. */
 type Answer = Stream.Stream<ModelEvent, ModelError | StoreError>;
 
+/** What is collected while the reply streams, to become the assistant's turn. */
+interface Spoken {
+  readonly text: Ref.Ref<string>;
+  readonly reasoning: Ref.Ref<string>;
+}
+
+/**
+ * The reasoning comes first, in the order the model produced it, and only when
+ * there was any. The text part is always there: an answer of no words is still
+ * an answer, and a turn with no text would shorten the prompt that follows.
+ */
+const partsSaid = (said: string, thought: string): readonly PartDraft[] =>
+  thought === ''
+    ? [{ kind: 'text', body: said }]
+    : [
+        { kind: 'reasoning', body: thought },
+        { kind: 'text', body: said },
+      ];
+
+/** Writes the assistant's turn and adds this call's counts to the session's. */
+const finish = (
+  wiring: Wiring,
+  spoken: Spoken,
+  usage: ModelUsage
+): Effect.Effect<void, StoreError> =>
+  Effect.all({ said: Ref.get(spoken.text), thought: Ref.get(spoken.reasoning) }).pipe(
+    Effect.flatMap(({ said, thought }) =>
+      makeTurn(wiring.entropy, {
+        sessionId: wiring.id,
+        role: 'assistant',
+        parts: partsSaid(said, thought),
+      })
+    ),
+    Effect.flatMap(turn => record(wiring, turn)),
+    Effect.zipRight(Ref.update(wiring.totals, held => add(held, usage)))
+  );
+
 /**
  * Records the question, then builds the stream of the answer. The assistant
  * turn is added only when the stream reaches `done`: a half written turn would
@@ -98,7 +135,7 @@ const answerOf = (
       turn => record(wiring, turn)
     );
     const { turns } = yield* Ref.get(wiring.state);
-    const spoken = yield* Ref.make('');
+    const spoken: Spoken = { text: yield* Ref.make(''), reasoning: yield* Ref.make('') };
     const maxTokens = yield* ceilingOf(wiring, options);
 
     return wiring.client
@@ -111,21 +148,19 @@ const answerOf = (
         cacheKey: wiring.id,
       })
       .pipe(
-        Stream.tap(event =>
-          event.kind === 'delta'
-            ? Ref.update(spoken, held => held + event.text)
-            : Ref.get(spoken).pipe(
-                Effect.flatMap(said =>
-                  makeTurn(wiring.entropy, {
-                    sessionId: wiring.id,
-                    role: 'assistant',
-                    parts: [{ kind: 'text', body: said }],
-                  })
-                ),
-                Effect.flatMap(turn => record(wiring, turn)),
-                Effect.zipRight(Ref.update(wiring.totals, held => add(held, event.usage)))
-              )
-        )
+        Stream.tap(event => {
+          switch (event.kind) {
+            case 'delta': {
+              return Ref.update(spoken.text, held => held + event.text);
+            }
+            case 'reasoning': {
+              return Ref.update(spoken.reasoning, held => held + event.text);
+            }
+            case 'done': {
+              return finish(wiring, spoken, event.usage);
+            }
+          }
+        })
       );
   });
 

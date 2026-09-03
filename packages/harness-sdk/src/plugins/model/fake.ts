@@ -9,9 +9,15 @@ import {
   zeroUsage,
 } from '../../core/model.js';
 
-/** One scripted answer. `fail` ends the stream after the deltas it lists. */
+/**
+ * One scripted answer. `fail` ends the stream after the deltas it lists.
+ *
+ * `reasoning` streams before the deltas, which is the order a model produces
+ * them in.
+ */
 interface FakeReply {
   readonly deltas: readonly string[];
+  readonly reasoning?: readonly string[];
   readonly usage?: Partial<ModelUsage>;
   readonly fail?: ModelError;
 }
@@ -31,9 +37,10 @@ const fakeModel = (
 
   const stream = (request: ModelRequest): Stream.Stream<ModelEvent, ModelError> => {
     const reply = nextReply(request);
-    const deltas = Stream.fromIterable(
-      reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text }))
-    );
+    const deltas = Stream.fromIterable([
+      ...(reply.reasoning ?? []).map((text): ModelEvent => ({ kind: 'reasoning', text })),
+      ...reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text })),
+    ]);
     const done = Stream.succeed<ModelEvent>({
       kind: 'done',
       usage: { ...zeroUsage, ...reply.usage },

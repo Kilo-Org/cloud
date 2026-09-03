@@ -84,8 +84,8 @@ const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEve
             Stream.flatMap(chunksOf),
             Stream.mapConcat(chunk => read(chunk)),
             Stream.mapEffect(data => eventsOf(wire, usage, data)),
-            Stream.filterMap(text => text),
-            Stream.map((text): ModelEvent => ({ kind: 'delta', text })),
+            Stream.filterMap(part => part),
+            Stream.map((part): ModelEvent => ({ kind: part.kind, text: part.text })),
             Stream.concat(
               Stream.fromEffect(Ref.get(usage)).pipe(
                 Stream.map((counts): ModelEvent => ({ kind: 'done', usage: counts }))

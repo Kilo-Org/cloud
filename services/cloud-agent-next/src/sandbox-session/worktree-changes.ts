@@ -21,7 +21,7 @@ export type WorktreeChangesContext = {
   orgId?: string;
   sandboxId: string;
   worktreeId?: NonNullable<SessionMetadata['workspace']>['worktreeId'];
-  provider: 'cloudflare' | 'vercel';
+  provider: 'cloudflare' | 'vercel' | 'onprem';
   providerRuntime?: NonNullable<SessionMetadata['workspace']>['providerRuntime'];
   repository: { type: string; source: string };
   baseRef?: string;

@@ -15,8 +15,12 @@ import type {
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
-import type { Env } from '../types.js';
-import type { RuntimeQuarantineResult, SandboxAcquisition } from '../persistence/SandboxControl.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
+import type {
+  RuntimeQuarantineResult,
+  SandboxAcquisition,
+  SandboxProviderFailureReason,
+} from '../persistence/SandboxControl.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
@@ -30,7 +34,7 @@ type SandboxControlRpc = {
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
-    provider?: 'cloudflare' | 'vercel';
+    provider?: AgentSandboxProvider;
     providerBinding?: SandboxProviderBinding;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
@@ -42,22 +46,16 @@ type SandboxControlRpc = {
     wrapperInstanceId?: string;
     operationResults?: true;
     attachment?: SessionAttachPayload;
-    failureReason?:
-      | 'byoc_credential_missing'
-      | 'byoc_vercel_not_ready'
-      | 'byoc_vercel_forbidden'
-      | 'byoc_vercel_capacity';
+    hardStopAt?: number;
+    failureReason?: SandboxProviderFailureReason;
   }>;
   getStatus(): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
     operationResults?: true;
-    failureReason?:
-      | 'byoc_credential_missing'
-      | 'byoc_vercel_not_ready'
-      | 'byoc_vercel_forbidden'
-      | 'byoc_vercel_capacity';
+    hardStopAt?: number;
+    failureReason?: SandboxProviderFailureReason;
   }>;
   quarantineRuntime(input: {
     ownerId: string;

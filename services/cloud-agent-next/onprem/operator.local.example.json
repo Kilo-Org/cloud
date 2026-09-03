@@ -1,0 +1,49 @@
+{
+  "cloudUrl": "http://host.docker.internal:7794",
+  "cloudIPv4": "192.168.5.2",
+  "systemNamespace": "kilo-onprem-local-system",
+  "sandboxNamespace": "kilo-onprem-local-sandboxes",
+  "upstreams": {
+    "backendBaseUrl": "http://host.docker.internal:3000",
+    "providerBaseUrl": "http://host.docker.internal:3000",
+    "sessionIngestBaseUrl": "http://host.docker.internal:7800"
+  },
+  "localFixtureUpstreams": {
+    "github.com": "http://host.docker.internal:18080",
+    "api.github.com": "http://host.docker.internal:18080"
+  },
+  "profile": {
+    "id": "local-gvisor",
+    "revision": "local-arm64-v1",
+    "runtimeClass": "gvisor",
+    "image": "docker.io/library/kilo-onprem-sandbox:local",
+    "maxLifetimeMs": 3600000
+  },
+  "provisionerImage": "docker.io/library/kilo-onprem-provisioner:local",
+  "instanceTypes": [
+    {
+      "id": "small",
+      "displayName": "Small",
+      "resources": {
+        "cpuMillis": 1000,
+        "memoryMiB": 2048,
+        "diskMiB": 4096
+      }
+    },
+    {
+      "id": "large",
+      "displayName": "Large",
+      "resources": {
+        "cpuMillis": 4000,
+        "memoryMiB": 8192,
+        "diskMiB": 16384
+      }
+    }
+  ],
+  "resources": {
+    "cpuMillis": 1000,
+    "memoryMiB": 2048,
+    "diskMiB": 4096,
+    "maxConcurrent": 1
+  }
+}

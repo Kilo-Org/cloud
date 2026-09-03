@@ -462,6 +462,9 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
   let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  if (process.env.SKIP_STRIPE_API === 'true') {
+    serviceNames = serviceNames.filter(name => name !== 'stripe');
+  }
 
   const sessionName = getSessionName();
   let sessionAlreadyRunning = sessionExists(sessionName);
@@ -696,7 +699,13 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     PATH: sessionPath,
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
   };
-  for (const key of ['PNPM_HOME', 'COREPACK_HOME', 'npm_execpath']) {
+  for (const key of [
+    'PNPM_HOME',
+    'COREPACK_HOME',
+    'npm_execpath',
+    'DOCKER_HOST',
+    'DOCKER_SOCKET',
+  ]) {
     const value = process.env[key];
     if (value !== undefined && value !== '') {
       sessionEnv[key] = value;

@@ -192,7 +192,11 @@ async function loadWorktreeSource(
     input.sourceKiloSessionId,
     input.sourceCloudAgentSessionId
   );
-  if (!ownership || ownership.organizationId !== (input.kilocodeOrganizationId ?? null)) {
+  if (
+    !ownership ||
+    (ownership.organizationId?.toLowerCase() ?? null) !==
+      (input.kilocodeOrganizationId?.toLowerCase() ?? null)
+  ) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' });
   }
 
@@ -204,7 +208,7 @@ async function loadWorktreeSource(
     ownership.createdOnPlatform !== 'cloud-agent-web' ||
     !isControlPlaneOwner(ctx.env, {
       userId: ctx.userId,
-      orgId: input.kilocodeOrganizationId,
+      orgId: input.kilocodeOrganizationId?.toLowerCase(),
     })
   ) {
     throw sourceRejected();
@@ -219,6 +223,10 @@ async function loadWorktreeSource(
   if (!parsedMetadata.success) throw sourceRejected();
 
   const metadata = parsedMetadata.data;
+  const organizationId =
+    getSandboxProviderBinding(metadata).kind === 'onprem'
+      ? input.kilocodeOrganizationId?.toLowerCase()
+      : input.kilocodeOrganizationId;
   const workspace = metadata.workspace;
   const repository = metadata.repository;
   if (
@@ -229,7 +237,7 @@ async function loadWorktreeSource(
     !metadata.agent?.mode ||
     !metadata.agent.model ||
     metadata.identity.userId !== ctx.userId ||
-    metadata.identity.orgId !== input.kilocodeOrganizationId ||
+    metadata.identity.orgId !== organizationId ||
     metadata.identity.sessionId !== input.sourceCloudAgentSessionId ||
     metadata.auth.kiloSessionId !== input.sourceKiloSessionId ||
     metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
@@ -237,8 +245,7 @@ async function loadWorktreeSource(
     metadata.devcontainer !== undefined ||
     workspace.devcontainerRequested === true ||
     workspace.worktreeId !== worktreeId ||
-    workspace.workspacePath !==
-      getWorktreeWorkspacePath(input.kilocodeOrganizationId, ctx.userId, worktreeId) ||
+    workspace.workspacePath !== getWorktreeWorkspacePath(organizationId, ctx.userId, worktreeId) ||
     (ownership.gitUrl !== null &&
       normalizeGitUrl(ownership.gitUrl) !== canonicalRepositoryUrl(repository))
   ) {

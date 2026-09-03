@@ -11,6 +11,7 @@ export {
 } from './sandbox-outbound.js';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { SandboxControl } from './persistence/SandboxControl.js';
+export { OnPremInstallation } from './onprem/installation.js';
 export { SandboxSession } from './sandbox-session/SandboxSession.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';

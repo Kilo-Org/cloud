@@ -37,6 +37,44 @@ describe('deriveSandboxAllocationId', () => {
 });
 
 describe('generateSandboxId', () => {
+  it('isolates an on-prem target and rejects incompatible routing instead of falling back', async () => {
+    const binding = {
+      kind: 'onprem',
+      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      installationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      profileId: 'gvisor',
+    } as const;
+    const sessionId = 'workspace_33333333-3333-4333-8333-333333333333';
+    const target = await generateSandboxRoutingTarget(
+      undefined,
+      binding.organizationId.toUpperCase(),
+      'owner',
+      sessionId,
+      undefined,
+      { onprem: binding }
+    );
+    expect(target).toEqual({
+      kind: 'isolated',
+      sandboxId: expect.stringMatching(/^ses-[0-9a-f]{48}$/),
+    });
+    for (const input of [
+      { orgId: undefined, sessionId, devcontainer: false },
+      {
+        orgId: binding.organizationId,
+        sessionId: 'agent_33333333-3333-4333-8333-333333333333',
+        devcontainer: false,
+      },
+      { orgId: binding.organizationId, sessionId, devcontainer: true },
+    ]) {
+      await expect(
+        generateSandboxRoutingTarget(undefined, input.orgId, 'owner', input.sessionId, undefined, {
+          onprem: binding,
+          devcontainer: input.devcontainer,
+        })
+      ).rejects.toThrow('isolated organization control-plane session');
+    }
+  });
+
   describe('shared sandbox (default)', () => {
     it('should generate sandboxId within 63 character limit', async () => {
       const sandboxId = await generateSandboxId(

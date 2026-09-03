@@ -51,6 +51,14 @@ import {
   ByocCredentialMissingError,
 } from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
+import {
+  getSelectedBinding as getSelectedOnPremBinding,
+  resolveProfile as resolveOnPremProfile,
+} from '../onprem/client.js';
+import {
+  onPremProviderBindingSchema,
+  type OnPremProviderBinding,
+} from '../shared/onprem-protocol.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { getPgDb } from '../db/pg.js';
@@ -255,7 +263,8 @@ export function assertSessionOperationIdentity(
     row.domain !== 'session' ||
     row.kilo_user_id !== expected.userId ||
     row.intent !== expected.intent ||
-    row.organization_id !== (expected.organizationId ?? null) ||
+    (row.organization_id?.toLowerCase() ?? null) !==
+      (expected.organizationId?.toLowerCase() ?? null) ||
     row.resource_key !== (expected.resourceKey ?? null)
   ) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
@@ -456,12 +465,13 @@ function deriveCanonicalRepositoryUrl(repository: SessionRepositoryRequest): str
 function computeCredentialContainment(
   sessionId: string,
   input: SessionRegistrationInput,
-  env: Env
+  env: Env,
+  provider: SandboxSelection['provider']
 ): CredentialContainment {
   const controlPlaneContainment = getControlPlaneCredentialContainment(
     sessionId,
     input.repository,
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+    provider === 'onprem' || env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
   );
   if (controlPlaneContainment) return controlPlaneContainment;
   const containmentEnabled =
@@ -511,7 +521,7 @@ function worktreeEnabledForCreate(
   const recordedIds = canonicalSessionIds(row);
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
-  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
+  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId?.toLowerCase() };
   return sessionPlaneForNewOwner(ctx.env, owner) === 'control' && isWorktreeOwner(ctx.env, owner);
 }
 
@@ -544,15 +554,39 @@ async function allocateNewSession(
 ): Promise<NewSessionAllocation> {
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const orgId = input.options?.kilocodeOrganizationId;
+  const orgId = input.options?.kilocodeOrganizationId?.toLowerCase();
   const isCodeReviewSession = options?.billingOrigin === 'code-review';
-  // BYOC enrollment is organization-only. A wildcard must not redirect
-  // personal sessions into a credentialed provider path.
+  const plane = sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId });
+  let onpremBinding: OnPremProviderBinding | null = null;
+  try {
+    const selectedOnPrem =
+      orgId === undefined ? null : await getSelectedOnPremBinding(ctx.env, orgId);
+    onpremBinding =
+      selectedOnPrem === null ? null : onPremProviderBindingSchema.parse(selectedOnPrem);
+    if (
+      onpremBinding &&
+      (onpremBinding.organizationId !== orgId ||
+        plane !== 'control' ||
+        input.runtime?.devcontainer ||
+        input.runtime?.sandboxAllocation !== undefined ||
+        isCodeReviewSession)
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'On-prem compute requires an isolated organization control-plane session without a devcontainer',
+      });
+    }
+    if (onpremBinding) await resolveOnPremProfile(ctx.env, onpremBinding);
+  } catch (error) {
+    rethrowAllocationFailure(ledger, 'sandbox', error);
+  }
   const byocEnrolled =
-    !isCodeReviewSession && orgId !== undefined && isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, orgId);
-  const cloudAgentSessionId = generateSessionId(
-    byocEnrolled ? 'control' : sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
-  );
+    !onpremBinding &&
+    !isCodeReviewSession &&
+    orgId !== undefined &&
+    isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, orgId);
+  const cloudAgentSessionId = generateSessionId(byocEnrolled ? 'control' : plane);
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -597,7 +631,6 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'report', error);
   }
 
-  const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
@@ -628,6 +661,7 @@ async function allocateNewSession(
       devcontainer: input.runtime?.devcontainer,
       createdOnPlatform: isCodeReviewSession ? 'code-review' : undefined,
       sandboxAllocation: input.runtime?.sandboxAllocation,
+      ...(onpremBinding ? { onprem: onpremBinding } : {}),
       ...(byocEnrolled ? { byoc: true } : {}),
     };
     const target = await generateSandboxRoutingTarget(
@@ -639,6 +673,7 @@ async function allocateNewSession(
       routingOptions
     );
     if (target.kind === 'shared') {
+      if (onpremBinding) throw new Error('On-prem compute cannot use a shared sandbox route');
       const assignment = await resolveSharedSandboxAssignment(
         ctx.env.SHARED_SANDBOX_OVERRIDES,
         target.routeKey
@@ -651,7 +686,10 @@ async function allocateNewSession(
       };
     } else {
       sandboxId = target.sandboxId;
-      if (byocEnrollment) {
+      if (onpremBinding) {
+        sandboxProvider = 'onprem';
+        sandboxProviderBinding = onpremBinding;
+      } else if (byocEnrollment) {
         sandboxProvider = 'vercel';
         sandboxProviderBinding = {
           kind: 'vercel',
@@ -727,7 +765,7 @@ async function allocateNewSession(
       cloudAgentSessionId,
       ctx.userId,
       ctx.env,
-      input.options?.kilocodeOrganizationId,
+      onpremBinding?.organizationId ?? input.options?.kilocodeOrganizationId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -810,7 +848,12 @@ async function allocateNewSession(
     sandboxProviderBinding,
     initialTurn,
     reportingCreatedAt,
-    credentialContainment,
+    credentialContainment: computeCredentialContainment(
+      cloudAgentSessionId,
+      input,
+      ctx.env,
+      sandboxProvider
+    ),
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -870,7 +913,10 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
+    (sandboxProvider !== 'cloudflare' &&
+      sandboxProvider !== 'vercel' &&
+      sandboxProvider !== 'onprem') ||
+    (sandboxProvider === 'onprem' && sandboxProviderBinding === undefined)
   ) {
     throw creationInProgressError();
   }
@@ -919,7 +965,16 @@ function rebuildRecordedSessionAllocation(
       ? bindingFromLegacyProvider(sandboxProvider)
       : sandboxProviderBinding
   );
-  if (!parsedBinding.success || parsedBinding.data.kind !== sandboxProvider) {
+  if (
+    !parsedBinding.success ||
+    parsedBinding.data.kind !== sandboxProvider ||
+    (parsedBinding.data.kind === 'onprem' &&
+      (parsedBinding.data.organizationId !== input.options?.kilocodeOrganizationId?.toLowerCase() ||
+        !cloudAgentSessionId.startsWith('workspace_') ||
+        !sandboxId.startsWith('ses-') ||
+        route !== undefined ||
+        input.runtime?.devcontainer === true))
+  ) {
     throw creationInProgressError();
   }
   const normalizedBinding = parsedBinding.data;
@@ -937,7 +992,12 @@ function rebuildRecordedSessionAllocation(
       !initialTurn && cloudAgentSessionId.startsWith('agent_')
         ? reportingCreatedAt.data
         : undefined,
-    credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
+    credentialContainment: computeCredentialContainment(
+      cloudAgentSessionId,
+      input,
+      ctx.env,
+      normalizedBinding.kind
+    ),
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -966,11 +1026,15 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
+  const orgId =
+    allocation.sandboxProviderBinding.kind === 'onprem'
+      ? allocation.sandboxProviderBinding.organizationId
+      : input.options?.kilocodeOrganizationId;
   return {
     identity: {
       sessionId: allocation.cloudAgentSessionId,
       userId: ctx.userId,
-      orgId: input.options?.kilocodeOrganizationId,
+      orgId,
       botId: ctx.botId,
       createdOnPlatform: input.options?.createdOnPlatform,
       billingOrigin: options?.billingOrigin,
@@ -1011,11 +1075,7 @@ function buildSessionRegistrationCommand(
       ...(allocation.worktreeId
         ? {
             worktreeId: allocation.worktreeId,
-            workspacePath: getWorktreeWorkspacePath(
-              input.options?.kilocodeOrganizationId,
-              ctx.userId,
-              allocation.worktreeId
-            ),
+            workspacePath: getWorktreeWorkspacePath(orgId, ctx.userId, allocation.worktreeId),
           }
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
@@ -1975,7 +2035,8 @@ async function reconcileLedgerCreate(
     worktreeAllocation &&
     (ownership.cloudAgentSessionId !== ids.cloudAgentSessionId ||
       ownership.cloudAgentSessionScopeId !== ids.cloudAgentSessionId ||
-      ownership.organizationId !== (input.options?.kilocodeOrganizationId ?? null) ||
+      ownership.organizationId?.toLowerCase() !==
+        input.options?.kilocodeOrganizationId?.toLowerCase() ||
       ownership.worktreeId !== worktreeAllocation.worktreeId)
   ) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });

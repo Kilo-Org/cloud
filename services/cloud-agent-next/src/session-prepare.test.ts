@@ -1,5 +1,6 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 import type * as SandboxIdModule from './sandbox-id.js';
+import type * as OnPremClient from './onprem/client.js';
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
@@ -78,6 +79,11 @@ vi.mock('./sandbox-id.js', async importOriginal => {
     getSandboxNamespace: vi.fn(),
   };
 });
+
+vi.mock('./onprem/client.js', async importOriginal => ({
+  ...(await importOriginal<typeof OnPremClient>()),
+  getSelectedBinding: vi.fn(async () => null),
+}));
 
 vi.mock('./telemetry/session-reports.js', () => ({
   createCloudAgentSessionReport: createSessionReportMock,

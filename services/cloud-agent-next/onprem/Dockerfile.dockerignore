@@ -1,0 +1,5 @@
+**
+!onprem/
+!onprem/Dockerfile
+!onprem/dist/
+!onprem/dist/provisioner.js

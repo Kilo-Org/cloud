@@ -1,4 +1,5 @@
 export const DEADLINE_IDS = [
+  'hardStop',
   'startup',
   'socketHandshake',
   'wrapperReadiness',

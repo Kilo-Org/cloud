@@ -1,4 +1,5 @@
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+import type { OnPremProfile, OnPremProviderBinding } from '../shared/onprem-protocol.js';
 
 export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
 
@@ -26,6 +27,11 @@ export type CreateIntent = {
   intentId: string;
   createdAt: number;
   allocationName?: string;
+  onprem?: {
+    binding: OnPremProviderBinding;
+    profile: OnPremProfile;
+    hardStopAt: number;
+  };
   vercel?: Pick<
     VercelSandboxRuntimeConfig,
     'projectId' | 'snapshotId' | 'runtimeBuildId' | 'runtime'

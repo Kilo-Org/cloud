@@ -28,6 +28,83 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it('requires an explicit contained organization workspace for on-prem metadata', () => {
+    const binding = {
+      kind: 'onprem',
+      organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      installationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      profileId: 'gvisor',
+    } as const;
+    const metadata = {
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+        userId: 'oauth/user',
+        orgId: binding.organizationId,
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'onprem',
+        sandboxProviderBinding: binding,
+        credentialContainment: { kilocode: true, github: false, gitlab: false },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    } as const;
+    expect(serializeSessionMetadata(parseSessionMetadata(metadata))).toEqual(metadata);
+    expect(getSandboxProvider(parseSessionMetadata(metadata))).toBe('onprem');
+    expect(
+      parseSessionMetadata({
+        ...metadata,
+        identity: { ...metadata.identity, orgId: binding.organizationId.toUpperCase() },
+        workspace: {
+          ...metadata.workspace,
+          sandboxProviderBinding: {
+            ...binding,
+            organizationId: binding.organizationId.toUpperCase(),
+            installationId: binding.installationId.toUpperCase(),
+          },
+        },
+      })
+    ).toEqual(metadata);
+    for (const workspace of [
+      { ...metadata.workspace, sandboxProviderBinding: undefined },
+      { ...metadata.workspace, sandboxProvider: undefined },
+      { ...metadata.workspace, sandboxId: 'org-abcdef' },
+      { ...metadata.workspace, devcontainerRequested: true },
+      {
+        ...metadata.workspace,
+        credentialContainment: { kilocode: false, github: false, gitlab: false },
+      },
+    ]) {
+      expect(() => parseSessionMetadata({ ...metadata, workspace })).toThrow(
+        'Invalid current session metadata'
+      );
+    }
+    for (const identity of [
+      { ...metadata.identity, orgId: '33333333-3333-4333-8333-333333333333' },
+      { ...metadata.identity, sessionId: 'agent_33333333-3333-4333-8333-333333333333' },
+    ]) {
+      expect(() => parseSessionMetadata({ ...metadata, identity })).toThrow(
+        'Invalid current session metadata'
+      );
+    }
+    for (const providerMetadata of [
+      { sandboxProvider: 'onprem', sandboxProviderBinding: null },
+      { workspace: { sandboxProvider: 'onprem', sandboxProviderBinding: binding } },
+    ]) {
+      expect(() =>
+        parseSessionMetadata({
+          sessionId: 'agent_legacy',
+          userId: 'oauth/user',
+          version: 1,
+          timestamp: 1,
+          ...providerMetadata,
+        })
+      ).toThrow('On-prem sandboxes require current session metadata');
+    }
+  });
+
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,

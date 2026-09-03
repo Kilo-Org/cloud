@@ -52,6 +52,7 @@ import {
 } from '../persistence/session-metadata.js';
 import {
   bindingFromLegacyProvider,
+  isManagedContainerBillingExempt,
   sameSandboxProviderBinding,
 } from '../sandbox-provider-binding.js';
 import type { OperationResult } from '../persistence/types.js';
@@ -2426,8 +2427,11 @@ export class SandboxSession extends DurableObject<Env> {
     const deadlineAt = queued?.deliveryDeadlineAt;
     if (!queued || deadlineAt === undefined) return;
     const provider = getSandboxProvider(metadata);
+    const providerBinding = getSandboxProviderBinding(metadata);
     const acquisition =
-      provider === 'cloudflare' ? { id: assigned.attemptId, deadlineAt } : undefined;
+      provider === 'cloudflare' || provider === 'onprem'
+        ? { id: assigned.attemptId, deadlineAt }
+        : undefined;
     const allowCreate = acquisition === undefined && options?.allowCreate === true;
     let wrapperInstanceId = queued.wrapperInstanceId;
     const isCurrent = () => this.queuedMessage(messageId, epoch, wrapperInstanceId) !== undefined;
@@ -2649,16 +2653,20 @@ export class SandboxSession extends DurableObject<Env> {
               ownerId: metadata.identity.userId,
               sessionId,
               provider,
-              providerBinding: getSandboxProviderBinding(metadata),
+              providerBinding,
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }
                 : {}),
-              billing: buildSandboxBillingInput(
-                metadata,
-                sandboxId,
-                isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
-              ),
+              ...(isManagedContainerBillingExempt(providerBinding)
+                ? {}
+                : {
+                    billing: buildSandboxBillingInput(
+                      metadata,
+                      sandboxId,
+                      isCloudAgentContainerBillingEnabled(this.env, metadata.identity)
+                    ),
+                  }),
             }),
           DEADLINE_MS.startup
         );

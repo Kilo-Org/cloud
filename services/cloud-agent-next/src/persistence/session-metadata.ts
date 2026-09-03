@@ -34,7 +34,7 @@ const SharedSandboxIdSchema = z
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
-const SandboxProviderSchema = z.enum(['cloudflare', 'vercel']);
+const SandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'onprem']);
 
 const VercelProviderRuntimeSchema = z
   .object({
@@ -359,7 +359,38 @@ export const CurrentSessionMetadataSchema = z
       PROVIDER_CAPABILITIES[metadata.workspace?.sandboxProvider ?? 'cloudflare'].devcontainer ||
       !metadata.devcontainer,
     'Sandbox provider metadata cannot contain a devcontainer runtime'
-  );
+  )
+  .superRefine((metadata, context) => {
+    const workspace = metadata.workspace;
+    const binding = workspace?.sandboxProviderBinding;
+    if (workspace?.sandboxProvider !== 'onprem' && binding?.kind !== 'onprem') return;
+    if (
+      workspace?.sandboxProvider !== 'onprem' ||
+      binding?.kind !== 'onprem' ||
+      binding.organizationId !== metadata.identity.orgId?.toLowerCase() ||
+      sessionPlaneFromId(metadata.identity.sessionId) !== 'control' ||
+      !workspace.sandboxId?.startsWith('ses-') ||
+      workspace.sandboxRoute !== undefined ||
+      workspace.sandboxAllocation !== undefined ||
+      workspace.credentialContainment?.kilocode !== true ||
+      (metadata.repository?.type === 'github' && !workspace.credentialContainment.github) ||
+      (metadata.repository?.type === 'gitlab' && !workspace.credentialContainment.gitlab) ||
+      (metadata.repository?.type === 'bitbucket' && !workspace.credentialContainment.bitbucket)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'On-prem metadata requires an isolated contained control-plane workspace and its organization binding',
+        path: ['workspace'],
+      });
+    }
+  })
+  .transform(metadata => {
+    const binding = metadata.workspace?.sandboxProviderBinding;
+    return binding?.kind === 'onprem'
+      ? { ...metadata, identity: { ...metadata.identity, orgId: binding.organizationId } }
+      : metadata;
+  });
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
@@ -567,6 +598,26 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
     throw new Error(`Invalid current session metadata: ${JSON.stringify(current.error.format())}`);
   }
 
+  const legacyProviderSchema = z.object({
+    sandboxProvider: z.unknown().optional(),
+    sandboxProviderBinding: z.unknown().optional(),
+    workspace: z.unknown().optional(),
+  });
+  const legacyProvider = legacyProviderSchema.safeParse(raw);
+  const legacyWorkspace = legacyProviderSchema.safeParse(
+    legacyProvider.success ? legacyProvider.data.workspace : undefined
+  );
+  if (
+    [legacyProvider, legacyWorkspace].some(
+      value =>
+        value.success &&
+        (value.data.sandboxProvider === 'onprem' ||
+          z.object({ kind: z.literal('onprem') }).safeParse(value.data.sandboxProviderBinding)
+            .success)
+    )
+  ) {
+    throw new Error('On-prem sandboxes require current session metadata');
+  }
   return legacyToCurrentSessionMetadata(LegacySessionMetadataSchema.parse(raw));
 }
 

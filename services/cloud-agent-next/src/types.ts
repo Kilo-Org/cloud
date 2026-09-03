@@ -4,6 +4,7 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
+import type { OnPremInstallation } from './onprem/installation.js';
 import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxSession } from './sandbox-session/SandboxSession.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
@@ -134,7 +135,7 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare' | 'vercel';
+export type AgentSandboxProvider = 'cloudflare' | 'vercel' | 'onprem';
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}` | `workspace_${string}`;
@@ -533,6 +534,7 @@ export type Env = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  ONPREM_INSTALLATION?: DurableObjectNamespace<OnPremInstallation>;
   /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
   VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */

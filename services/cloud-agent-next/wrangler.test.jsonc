@@ -27,6 +27,10 @@
         "class_name": "SandboxSession",
         "name": "SANDBOX_SESSION",
       },
+      {
+        "class_name": "OnPremInstallation",
+        "name": "ONPREM_INSTALLATION",
+      },
     ],
   },
   "migrations": [
@@ -49,6 +53,10 @@
     {
       "new_sqlite_classes": ["SandboxSession"],
       "tag": "v10",
+    },
+    {
+      "new_sqlite_classes": ["OnPremInstallation"],
+      "tag": "v12",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

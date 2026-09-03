@@ -22,6 +22,7 @@ import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
 import {
+  CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
   requiresContainmentSandbox,
   type SessionMetadata,
@@ -210,6 +211,23 @@ import {
   type VercelSandboxNetworkPolicy,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
+  createOnPremProviderAdapter,
+  OnPremAcknowledgementPendingError,
+  OnPremLifetimeError,
+  parseOnPremCreateIntent,
+} from '../sandbox-control/onprem-provider.js';
+import {
+  getAllocation as getOnPremAllocation,
+  resolveProfile as resolveOnPremProfile,
+} from '../onprem/client.js';
+import { resolveOnPremCredentialGrant } from '../sandbox-control/onprem-credentials.js';
+import {
+  onPremCredentialRpcInputSchema,
+  type OnPremCredentialRpcInput,
+  type OnPremCredentialResolution,
+} from '../shared/onprem-credential-protocol.js';
+import { decodeOnPremProviderRef, onPremProfileSchema } from '../shared/onprem-protocol.js';
+import {
   parseVercelSandboxRuntimeConfig,
   parseVercelSandboxRuntimeDefaults,
   resolveVercelSandboxRuntimeConfig,
@@ -249,6 +267,7 @@ import {
 } from '../shared/sandbox-status.js';
 import {
   bindingFromLegacyProvider,
+  isManagedContainerBillingExempt,
   SandboxProviderBindingSchema,
   sameSandboxProviderBinding,
   type SandboxProviderBinding,
@@ -277,6 +296,21 @@ const allocationIdentitySchema = z.discriminatedUnion('kind', [
 const acquisitionReceiptsSchema = z.array(
   sandboxAcquisitionSchema.extend({ allocation: allocationIdentitySchema })
 );
+const onPremAcknowledgementSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      state: z.literal('waiting'),
+      providerRef: z.string().min(1).max(128),
+      deadlineAt: sandboxAcquisitionSchema.shape.deadlineAt,
+    })
+    .strict(),
+  z
+    .object({
+      state: z.literal('acknowledged'),
+      providerRef: z.string().min(1).max(128),
+    })
+    .strict(),
+]);
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
 
@@ -298,6 +332,7 @@ const PROVIDER_BINDING_KEY = 'provider_binding';
 const FAILURE_REASON_KEY = 'failure_reason';
 const PROVIDER_RESOLUTION_RETRY_KEY = 'provider_resolution_retry';
 const NEXT_LEASE_CHECK_AT_KEY = 'next_lease_check_at';
+const ONPREM_ACKNOWLEDGEMENT_KEY = 'onprem_acknowledgement';
 const BYOC_SNAPSHOT_RECOVERY_KEY = 'byoc_snapshot_recovery';
 const SNAPSHOT_VALIDATOR_REF_KEY = 'snapshot_validator_ref';
 
@@ -320,7 +355,9 @@ export type SandboxProviderFailureReason =
   | 'byoc_credential_missing'
   | 'byoc_vercel_not_ready'
   | 'byoc_vercel_forbidden'
-  | 'byoc_vercel_capacity';
+  | 'byoc_vercel_capacity'
+  | 'onprem_unavailable'
+  | 'onprem_lifetime_exhausted';
 
 type PersistedWrapperRuntime = SandboxControlConnectionIdentity & {
   readyConnectionId?: string;
@@ -353,6 +390,7 @@ export type SandboxControlStatus = {
   work: WorkState;
   wrapperInstanceId?: string;
   operationResults?: true;
+  hardStopAt?: number;
   failureReason?: SandboxProviderFailureReason;
 };
 
@@ -364,6 +402,11 @@ function providerFailureReason(
   binding: SandboxProviderBinding,
   error: unknown
 ): SandboxProviderFailureReason | undefined {
+  if (binding.kind === 'onprem') {
+    return error instanceof OnPremLifetimeError
+      ? 'onprem_lifetime_exhausted'
+      : 'onprem_unavailable';
+  }
   if (error instanceof ByocCredentialMissingError) return 'byoc_credential_missing';
   if (error instanceof ByocVercelNotReadyError) return 'byoc_vercel_not_ready';
   if (
@@ -942,6 +985,8 @@ export class SandboxControl extends DurableObject<Env> {
       ((!maintenance || scopedStop !== undefined) && physical.state !== 'running') ||
       ((!maintenance || scopedStop !== undefined) && physical.stopTombstone) ||
       physical.providerRef !== runtime.providerInstanceId ||
+      (this.providerBinding.kind === 'onprem' &&
+        !this.matchesProviderReference(physical, runtime.providerInstanceId)) ||
       !isCurrent()
     ) {
       throw new Error('Sandbox runtime is not ready');
@@ -977,6 +1022,8 @@ export class SandboxControl extends DurableObject<Env> {
           current.state !== 'running' ||
           current.stopTombstone ||
           current.providerRef !== runtime.providerInstanceId ||
+          (this.providerBinding.kind === 'onprem' &&
+            !this.matchesProviderReference(current, runtime.providerInstanceId)) ||
           !sameAllocation(physical, current) ||
           !isCurrent()
         ) {
@@ -1412,10 +1459,14 @@ export class SandboxControl extends DurableObject<Env> {
     await this.pinProvider(binding);
     const provider = binding.kind;
     const physical = await loadPhysicalRecord(this.ctx.storage);
-    const requiredContainment = getWorktreeCredentialContainment(
-      requiresContainmentSandbox(metadata)
-    );
-    if (!this.matchesContainment(physical, requiredContainment)) {
+    const requiredContainment =
+      provider === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : getWorktreeCredentialContainment(requiresContainmentSandbox(metadata));
+    if (
+      (provider === 'onprem' && (physical.state !== 'running' || physical.providerRef === null)) ||
+      !this.matchesContainment(physical, requiredContainment)
+    ) {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const outboundContainerId =
@@ -1464,6 +1515,9 @@ export class SandboxControl extends DurableObject<Env> {
       if (
         (deadlineAt !== undefined && Date.now() >= deadlineAt) ||
         !sameAllocation(physical, currentPhysical) ||
+        (provider === 'onprem' &&
+          (currentPhysical.state !== 'running' ||
+            currentPhysical.providerRef !== physical.providerRef)) ||
         !this.matchesContainment(currentPhysical, requiredContainment)
       ) {
         throw new Error('Sandbox changed during credential preparation');
@@ -1574,6 +1628,102 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  async resolveOnPremCredential(
+    input: OnPremCredentialRpcInput
+  ): Promise<OnPremCredentialResolution | null> {
+    try {
+      const parsed = onPremCredentialRpcInputSchema.safeParse(input);
+      if (!parsed.success) return null;
+      const { binding, providerRef, podUid, ...request } = parsed.data;
+      return await this.withCredentialUpdate(async () => {
+        const physical = await loadPhysicalRecord(this.ctx.storage);
+        const ownerId = await this.requireOwner();
+        if (
+          this.providerBinding.kind !== 'onprem' ||
+          !sameSandboxProviderBinding(this.providerBinding, binding) ||
+          physical.state !== 'running' ||
+          physical.providerRef !== providerRef ||
+          physical.stopTombstone ||
+          !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+          this.runtimeDeleted ||
+          this.exclusiveDeletionWorktreeId
+        ) {
+          return null;
+        }
+        const allocation = await withTimeout(
+          getOnPremAllocation(this.env, binding.organizationId, providerRef),
+          DEADLINE_MS.stopAttempt,
+          'On-prem credential allocation verification timed out'
+        );
+        if (
+          !allocation ||
+          allocation.sandboxId !== this.sandboxId ||
+          allocation.providerRef !== providerRef ||
+          allocation.pod?.uid !== podUid ||
+          !sameSandboxProviderBinding(allocation.binding, binding) ||
+          allocation.phase !== 'launched' ||
+          allocation.status !== 'active' ||
+          !allocation.acknowledgementFresh ||
+          allocation.acknowledgedAt === null ||
+          allocation.acknowledgedAt > Date.now()
+        ) {
+          return null;
+        }
+        return this.ctx.storage.transaction(async () => {
+          const grants = await loadSessionCredentialGrants(this.ctx.storage);
+          const currentOwnerId = await this.readOwner();
+          const current = await loadPhysicalRecord(this.ctx.storage);
+          const now = Date.now();
+          if (
+            this.providerBinding.kind !== 'onprem' ||
+            !sameSandboxProviderBinding(this.providerBinding, binding) ||
+            currentOwnerId !== ownerId ||
+            current.state !== 'running' ||
+            current.providerRef !== providerRef ||
+            current.stopTombstone ||
+            !sameAllocation(current, physical) ||
+            !this.matchesContainment(current, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+            this.runtimeDeleted ||
+            this.exclusiveDeletionWorktreeId ||
+            now >= allocation.hardStopAt
+          ) {
+            return null;
+          }
+          const intent = parseOnPremCreateIntent(current.createIntent, binding);
+          if (
+            allocation.allocationId !== intent.intentId ||
+            allocation.createdAt !== intent.createdAt ||
+            allocation.allocationName !== intent.allocationName ||
+            allocation.profile.id !== intent.onprem.profile.id ||
+            allocation.profile.revision !== intent.onprem.profile.revision ||
+            allocation.hardStopAt !== intent.onprem.hardStopAt
+          ) {
+            return null;
+          }
+          for (const grant of grants) {
+            if (
+              grant.provider !== 'onprem' ||
+              grant.sandboxId !== this.sandboxId ||
+              grant.userId !== ownerId ||
+              grant.orgId !== binding.organizationId ||
+              this.deletingWorktrees.has(grant.scopeId)
+            ) {
+              continue;
+            }
+            const resolved = resolveOnPremCredentialGrant({ grant, request, now });
+            if (resolved) {
+              const expiresAt = Math.min(resolved.expiresAt, allocation.hardStopAt);
+              return expiresAt > Date.now() ? { headers: resolved.headers, expiresAt } : null;
+            }
+          }
+          return null;
+        });
+      });
+    } catch {
+      return null;
+    }
+  }
+
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
@@ -1609,14 +1759,15 @@ export class SandboxControl extends DurableObject<Env> {
       'Sandbox credential metadata timed out'
     );
     const worktreeId = metadata.workspace?.worktreeId;
-    const requiredContainment = getWorktreeCredentialContainment(
-      requiresContainmentSandbox(metadata)
-    );
+    const metadataBinding = getSandboxProviderBinding(metadata);
+    const requiredContainment =
+      metadataBinding.kind === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : getWorktreeCredentialContainment(requiresContainmentSandbox(metadata));
     if (input.worktreeId !== undefined && input.worktreeId !== worktreeId) {
       throw new Error('Worktree identity conflict');
     }
     this.assertWorktreeAdmission(worktreeId);
-    const metadataBinding = getSandboxProviderBinding(metadata);
     if (
       (input.provider !== undefined && input.provider !== metadataBinding.kind) ||
       (input.providerBinding !== undefined &&
@@ -1632,8 +1783,11 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    if (acquisition && binding.kind !== 'cloudflare') {
-      throw new Error('Sandbox acquisition is only supported for Cloudflare');
+    if (acquisition && binding.kind !== 'cloudflare' && binding.kind !== 'onprem') {
+      throw new Error('Sandbox acquisition is only supported for Cloudflare and on-prem');
+    }
+    if (binding.kind === 'onprem' && !acquisition) {
+      throw new Error('On-prem sandboxes require an acquisition receipt');
     }
     const billing = await this.billingInput(ownerId, input.billing, worktreeId);
     let physical: PhysicalRecord;
@@ -1709,6 +1863,9 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         return currentStatus();
       }
+      if (binding.kind === 'onprem' && !creating && physical.state === 'creating') {
+        return currentStatus();
+      }
       if (!this.matchesContainment(physical, requiredContainment)) {
         if (this.matchesWorktreeContainment(physical)) {
           throw new Error('Sandbox containment mode conflicts with the session');
@@ -1721,7 +1878,7 @@ export class SandboxControl extends DurableObject<Env> {
         !creating &&
         physical.state === 'running' &&
         physical.providerRef !== null &&
-        !(binding.kind === 'vercel' && binding.source.kind === 'byoc')
+        !isManagedContainerBillingExempt(binding)
       ) {
         const providerRef = physical.providerRef;
         await withTimeout(
@@ -1741,39 +1898,62 @@ export class SandboxControl extends DurableObject<Env> {
           throw new Error('Sandbox runtime changed during billing admission');
         }
       }
+      const readyRuntime = this.readyWrapperRuntime();
+      if (
+        binding.kind === 'onprem' &&
+        !creating &&
+        physical.state === 'running' &&
+        physical.providerRef !== null &&
+        readyRuntime
+      ) {
+        await this.verifyOnPremLifetime(
+          physical,
+          Math.min(acquisition?.deadlineAt ?? Infinity, Date.now() + DEADLINE_MS.stopAttempt),
+          readyRuntime
+        );
+      }
       const preparationDeadline = Math.min(
         acquisition?.deadlineAt ?? Number.MAX_SAFE_INTEGER,
         Date.now() + DEADLINE_MS.startup
       );
-      let attachment: SessionAttachPayload;
-      try {
-        attachment = await withTimeout(
-          this.withCredentialUpdate(() =>
-            withTimeout(
-              this.prepareOwnedSessionCredentials(
-                { ownerId, sessionId: input.sessionId },
-                undefined,
-                preparationDeadline
-              ),
-              Math.max(1, preparationDeadline - Date.now()),
-              'Sandbox credential preparation timed out'
-            )
-          ),
-          Math.max(1, preparationDeadline - Date.now()),
-          'Sandbox credential preparation timed out'
-        );
-      } catch (error) {
-        const current = await loadPhysicalRecord(this.ctx.storage);
-        if (
-          creating &&
-          sameAllocation(current, physical) &&
-          !current.stopTombstone &&
-          (current.state === 'creating' || current.state === 'running')
-        ) {
-          await this.markFailed();
+      const prepareAttachment = async (): Promise<SessionAttachPayload> => {
+        try {
+          return await withTimeout(
+            this.withCredentialUpdate(() =>
+              withTimeout(
+                this.prepareOwnedSessionCredentials(
+                  { ownerId, sessionId: input.sessionId },
+                  undefined,
+                  preparationDeadline
+                ),
+                Math.max(1, preparationDeadline - Date.now()),
+                'Sandbox credential preparation timed out'
+              )
+            ),
+            Math.max(1, preparationDeadline - Date.now()),
+            'Sandbox credential preparation timed out'
+          );
+        } catch (error) {
+          const current = await loadPhysicalRecord(this.ctx.storage);
+          if (
+            creating &&
+            sameAllocation(current, physical) &&
+            !current.stopTombstone &&
+            (current.state === 'creating' || current.state === 'running')
+          ) {
+            if (binding.kind === 'onprem') {
+              await this.ctx.storage.put(
+                FAILURE_REASON_KEY,
+                providerFailureReason(binding, error) ?? 'onprem_unavailable'
+              );
+            }
+            await this.markFailed();
+          }
+          throw error;
         }
-        throw error;
-      }
+      };
+      let attachment: SessionAttachPayload | undefined;
+      if (binding.kind !== 'onprem' || !creating) attachment = await prepareAttachment();
       if (creating) {
         let provider: ProviderAdapter;
         let byocSnapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -1883,6 +2063,13 @@ export class SandboxControl extends DurableObject<Env> {
             }
             await this.ctx.storage.delete(BYOC_SNAPSHOT_RECOVERY_KEY);
             await this.scheduleNextLeaseCheck('initial', createdAt);
+            if (binding.kind === 'onprem') {
+              attachment = await prepareAttachment();
+              const prepared = await loadPhysicalRecord(this.ctx.storage);
+              if (!sameAllocation(prepared, physical) || prepared.stopTombstone) {
+                return currentStatus();
+              }
+            }
             this.assertWorktreeAdmission(worktreeId);
             if (acquisition) assertAcquisitionDeadline(acquisition);
             phase = 'launch';
@@ -1975,12 +2162,16 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async acquirePhysical(
     acquisition: SandboxAcquisition,
-    requiredContainment: CredentialContainmentRequirements,
+    requestedContainment: CredentialContainmentRequirements,
     worktreeId?: string
   ): Promise<{
     physical: PhysicalRecord;
     action: 'create' | 'reuse' | 'wait';
   }> {
+    const requiredContainment =
+      this.providerBinding.kind === 'onprem'
+        ? WORKTREE_CREDENTIAL_CONTAINMENT
+        : requestedContainment;
     const intentId = crypto.randomUUID();
     const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
     return this.ctx.storage.transaction(async () => {
@@ -2261,7 +2452,8 @@ export class SandboxControl extends DurableObject<Env> {
         binding.kind !== input.location.provider ||
         (binding.kind === 'vercel' &&
           binding.source.kind === 'byoc' &&
-          binding.source.organizationId !== input.organizationId)
+          binding.source.organizationId !== input.organizationId) ||
+        (binding.kind === 'onprem' && binding.organizationId !== input.organizationId)
       ) {
         throw new Error('Sandbox provider binding mismatch');
       }
@@ -2518,7 +2710,7 @@ export class SandboxControl extends DurableObject<Env> {
   ): Promise<SandboxTerminalAccessResult> {
     const runtime = await this.readTerminalRuntime(input, true);
     if (!runtime.allowed) return runtime;
-    if (this.providerBinding.kind === 'vercel' && this.providerBinding.source.kind === 'byoc') {
+    if (isManagedContainerBillingExempt(this.providerBinding)) {
       return this.renewTerminalCredentialLease(input, runtime);
     }
 
@@ -2643,6 +2835,9 @@ export class SandboxControl extends DurableObject<Env> {
       return { allowed: false, reason: 'runtime_changed' };
     }
     await this.renewProviderLease(runtime.connection);
+    if (runtime.provider === 'onprem' && !this.isCurrentConnection(runtime.connection)) {
+      return { allowed: false, reason: 'runtime_changed' };
+    }
     return { allowed: true };
   }
 
@@ -2669,6 +2864,9 @@ export class SandboxControl extends DurableObject<Env> {
       this.socketHandler.supportsOperationResults()
         ? { operationResults: true as const }
         : {}),
+      ...(this.providerBinding.kind === 'onprem' && physical.createIntent?.onprem
+        ? { hardStopAt: physical.createIntent.onprem.hardStopAt }
+        : {}),
       failureReason,
     };
   }
@@ -2686,7 +2884,7 @@ export class SandboxControl extends DurableObject<Env> {
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
-      (provider === 'cloudflare' || provider === 'vercel') &&
+      (provider === 'cloudflare' || provider === 'vercel' || provider === 'onprem') &&
       provider === input.provider;
     return projectSandboxStatus({
       stored: matches ? stored : { physical: null, deadlines: null, routes: null },
@@ -2721,7 +2919,13 @@ export class SandboxControl extends DurableObject<Env> {
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage, resumable);
       this.assertWorktreeAdmission();
-      const next = claimCreate(current, intentId, Date.now(), allocationName, containment);
+      const next = claimCreate(
+        current,
+        this.providerBinding.kind === 'onprem' ? z.uuid().toLowerCase().parse(intentId) : intentId,
+        Date.now(),
+        allocationName,
+        this.providerBinding.kind === 'onprem' ? WORKTREE_CREDENTIAL_CONTAINMENT : containment
+      );
       const vercel =
         this.providerBinding.kind === 'vercel' && this.providerBinding.source.kind === 'platform'
           ? parseVercelSandboxRuntimeConfig(this.env)
@@ -2749,6 +2953,12 @@ export class SandboxControl extends DurableObject<Env> {
   async confirmInstance(providerRef: string): Promise<PhysicalRecord> {
     await this.ensureOperationalInitialized();
     const current = await loadPhysicalRecord(this.ctx.storage);
+    if (
+      this.providerBinding.kind === 'onprem' &&
+      !this.matchesProviderReference({ ...current, providerRef }, providerRef)
+    ) {
+      throw new Error('On-prem reservation does not match its registered allocation');
+    }
     const next = confirmRunning(current, providerRef, Date.now());
     await this.persistPhysical(current, next, 'instance confirmed');
     return next;
@@ -2914,6 +3124,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   private isCreationSettling(physical: PhysicalRecord): boolean {
     return (
+      this.providerBinding.kind !== 'onprem' &&
       physical.createIntent !== null &&
       !physical.stopTombstone?.wrapperInstanceId &&
       Date.now() < physical.createIntent.createdAt + DEADLINE_MS.createSettle
@@ -2922,7 +3133,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   private shouldSlowReap(physical: PhysicalRecord): boolean {
     return (
-      this.providerBinding.kind === 'cloudflare' &&
+      (this.providerBinding.kind === 'cloudflare' || this.providerBinding.kind === 'onprem') &&
       physical.state !== 'stopped' &&
       physical.stopTombstone !== null &&
       physical.stopTombstone.attempts >= DEADLINE_MS.stopAttemptLadder.length
@@ -3010,6 +3221,7 @@ export class SandboxControl extends DurableObject<Env> {
       FAILURE_REASON_KEY,
       PROVIDER_RESOLUTION_RETRY_KEY,
       NEXT_LEASE_CHECK_AT_KEY,
+      ONPREM_ACKNOWLEDGEMENT_KEY,
       BYOC_SNAPSHOT_RECOVERY_KEY,
     ]);
     this.vercelLocator = undefined;
@@ -3052,6 +3264,7 @@ export class SandboxControl extends DurableObject<Env> {
     }
     this.assertWorktreeAdmission(metadata.workspace?.worktreeId);
     const binding = getSandboxProviderBinding(metadata);
+    if (binding.kind === 'onprem') return CurrentSessionMetadataSchema.parse(metadata);
     if (
       binding.kind === 'vercel' &&
       binding.source.kind === 'byoc' &&
@@ -3144,6 +3357,48 @@ export class SandboxControl extends DurableObject<Env> {
     physical: PhysicalRecord,
     onSnapshotResolved?: (snapshot: ByocVercelRuntimeSnapshot) => void
   ): Promise<ProviderAdapter> {
+    if (binding.kind === 'onprem') {
+      let pinned = physical;
+      if (
+        physical.state === 'creating' &&
+        !physical.stopTombstone &&
+        physical.createIntent &&
+        !physical.createIntent.onprem
+      ) {
+        const profile = onPremProfileSchema.parse(await resolveOnPremProfile(this.env, binding));
+        pinned = await this.ctx.storage.transaction(async () => {
+          const current = await loadPhysicalRecord(this.ctx.storage);
+          if (
+            !sameAllocation(current, physical) ||
+            current.state !== 'creating' ||
+            current.stopTombstone ||
+            !current.createIntent
+          ) {
+            throw new Error('Sandbox allocation changed during provider resolution');
+          }
+          const createIntent = parseOnPremCreateIntent(
+            {
+              ...current.createIntent,
+              onprem: current.createIntent.onprem ?? {
+                binding,
+                profile,
+                hardStopAt: current.createIntent.createdAt + profile.maxLifetimeMs,
+              },
+            },
+            binding
+          );
+          const next = { ...current, createIntent };
+          await this.persistPhysicalState(current, next, 'onprem profile pinned');
+          return next;
+        });
+      }
+      return createOnPremProviderAdapter({
+        env: this.env,
+        binding,
+        sandboxId: this.sandboxId,
+        intent: pinned.createIntent,
+      });
+    }
     const allocationName =
       physical.createIntent?.allocationName ??
       (binding.kind === 'vercel'
@@ -3282,7 +3537,7 @@ export class SandboxControl extends DurableObject<Env> {
     supplied?: SandboxBillingInput,
     worktreeId?: string
   ): Promise<SandboxBillingInput | undefined> {
-    if (this.providerBinding.kind === 'vercel' && this.providerBinding.source.kind === 'byoc') {
+    if (isManagedContainerBillingExempt(this.providerBinding)) {
       return undefined;
     }
     const raw = await this.ctx.storage.get<unknown>(BILLING_INPUT_KEY);
@@ -3353,6 +3608,20 @@ export class SandboxControl extends DurableObject<Env> {
     if (this.providerBinding.kind === 'vercel') {
       return decodeVercelProviderRef(providerRef)?.sandboxName === allocationName;
     }
+    if (this.providerBinding.kind === 'onprem') {
+      const native = decodeOnPremProviderRef(providerRef);
+      try {
+        const intent = parseOnPremCreateIntent(physical.createIntent, this.providerBinding);
+        return (
+          physical.providerRef === providerRef &&
+          native?.installationId === this.providerBinding.installationId &&
+          native.allocationId === intent.intentId &&
+          Date.now() < intent.onprem.hardStopAt
+        );
+      } catch {
+        return false;
+      }
+    }
     const native = decodeCloudflareProviderRef(providerRef);
     const containment = physical.createIntent?.containment ?? physical.containment;
     return (
@@ -3378,6 +3647,16 @@ export class SandboxControl extends DurableObject<Env> {
     requiredContainment: CredentialContainmentRequirements
   ): boolean {
     if (physical.stopTombstone) return false;
+    if (
+      this.providerBinding.kind === 'onprem' &&
+      (!requiredContainment.kilocode ||
+        !requiredContainment.github ||
+        !requiredContainment.worktreeScoped ||
+        (physical.createIntent?.onprem !== undefined &&
+          Date.now() >= physical.createIntent.onprem.hardStopAt))
+    ) {
+      return false;
+    }
     if (physical.state === 'creating') {
       const containment = physical.createIntent?.containment;
       return (
@@ -3410,6 +3689,21 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async handleDeadline(id: DeadlineId): Promise<void> {
+    if (id === 'hardStop') {
+      const physical = await loadPhysicalRecord(this.ctx.storage);
+      const hardStopAt = physical.createIntent?.onprem?.hardStopAt;
+      if (
+        this.providerBinding.kind === 'onprem' &&
+        physical.state !== 'stopped' &&
+        hardStopAt !== undefined &&
+        hardStopAt <= Date.now()
+      ) {
+        await this.ctx.storage.put(FAILURE_REASON_KEY, 'onprem_lifetime_exhausted');
+        await this.beginStop('onprem_lifetime_exhausted');
+        await this.recordStopAttempt();
+      }
+      return;
+    }
     if (id === 'socketHandshake') {
       this.socketHandler.closeProvisionalSockets();
       return;
@@ -3536,7 +3830,7 @@ export class SandboxControl extends DurableObject<Env> {
   private async validateHandshake(providerInstanceId: string): Promise<boolean> {
     const physical = await loadPhysicalRecord(this.ctx.storage);
     return (
-      (this.providerBinding.kind !== 'vercel' || physical.state === 'running') &&
+      (this.providerBinding.kind === 'cloudflare' || physical.state === 'running') &&
       this.matchesProviderReference(physical, providerInstanceId) &&
       this.matchesWorktreeContainment(physical)
     );
@@ -3553,7 +3847,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (
       physical.stopTombstone ||
       (physical.state !== 'running' && physical.state !== 'creating') ||
-      (this.providerBinding.kind === 'vercel' && physical.state !== 'running') ||
+      (this.providerBinding.kind !== 'cloudflare' && physical.state !== 'running') ||
       !this.matchesProviderReference(physical, identity.providerInstanceId) ||
       !this.matchesWorktreeContainment(physical)
     ) {
@@ -3873,6 +4167,98 @@ export class SandboxControl extends DurableObject<Env> {
     await this.renewProviderLease(identity, now);
   }
 
+  private async verifyOnPremLifetime(
+    physical: PhysicalRecord,
+    deadlineAt: number,
+    identity: SandboxControlConnectionIdentity
+  ): Promise<void> {
+    const binding = this.providerBinding;
+    const providerRef = physical.providerRef;
+    if (binding.kind !== 'onprem' || providerRef === null) {
+      throw new Error('On-prem lifetime requires a registered allocation');
+    }
+    const intent = parseOnPremCreateIntent(physical.createIntent, binding);
+    const provider = await this.createProviderAdapter(binding, physical);
+    let verificationDeadline = deadlineAt;
+    const readAcknowledgement = async () => {
+      const record = onPremAcknowledgementSchema
+        .optional()
+        .parse(await this.ctx.storage.get(ONPREM_ACKNOWLEDGEMENT_KEY));
+      return record?.providerRef === providerRef ? record : undefined;
+    };
+    const assertCurrent = async () => {
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (Date.now() >= verificationDeadline) {
+        throw new Error('On-prem lifetime verification timed out');
+      }
+      if (
+        current.state !== 'running' ||
+        current.stopTombstone ||
+        current.providerRef !== providerRef ||
+        !sameAllocation(current, physical) ||
+        !sameSandboxProviderBinding(this.providerBinding, binding) ||
+        !this.matchesProviderReference(current, providerRef) ||
+        !this.isCurrentConnection(identity)
+      ) {
+        throw new Error('On-prem allocation changed during lifetime verification');
+      }
+    };
+    while (true) {
+      const acknowledgement = await this.ctx.storage.transaction(async () => {
+        await assertCurrent();
+        const current = await readAcknowledgement();
+        if (current?.state === 'acknowledged') return current;
+        const waiting: z.infer<typeof onPremAcknowledgementSchema> = {
+          state: 'waiting',
+          providerRef,
+          deadlineAt: Math.min(
+            verificationDeadline,
+            intent.createdAt + DEADLINE_MS.startup,
+            current?.deadlineAt ?? Infinity
+          ),
+        };
+        if (current?.deadlineAt !== waiting.deadlineAt) {
+          await this.ctx.storage.put(ONPREM_ACKNOWLEDGEMENT_KEY, waiting);
+        }
+        return waiting;
+      });
+      if (acknowledgement.state === 'waiting') {
+        verificationDeadline = Math.min(verificationDeadline, acknowledgement.deadlineAt);
+      }
+      await assertCurrent();
+      try {
+        await withTimeout(
+          provider.ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
+          Math.max(1, verificationDeadline - Date.now()),
+          'On-prem lifetime verification timed out'
+        );
+        await this.ctx.storage.transaction(async () => {
+          const current = await readAcknowledgement();
+          if (current?.state === 'waiting') {
+            verificationDeadline = Math.min(verificationDeadline, current.deadlineAt);
+          }
+          await assertCurrent();
+          await this.ctx.storage.put(ONPREM_ACKNOWLEDGEMENT_KEY, {
+            state: 'acknowledged',
+            providerRef,
+          });
+        });
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof OnPremAcknowledgementPendingError) ||
+          acknowledgement.state === 'acknowledged'
+        ) {
+          throw error;
+        }
+        await assertCurrent();
+        await new Promise<void>(resolve =>
+          setTimeout(resolve, Math.min(1_000, verificationDeadline - Date.now()))
+        );
+      }
+    }
+  }
+
   private async renewProviderLease(
     identity: SandboxControlConnectionIdentity,
     now = Date.now()
@@ -3906,34 +4292,28 @@ export class SandboxControl extends DurableObject<Env> {
     try {
       const providerRef = physical.providerRef;
       const deadlineAt = Date.now() + DEADLINE_MS.stopAttempt;
-      await withTimeout(
-        this.createProviderAdapter(this.providerBinding, physical).then(provider => {
-          if (Date.now() >= deadlineAt) throw new Error('Sandbox lease renewal timed out');
-          return this.isCurrentConnection(identity)
-            ? provider.ensureLeaseAtLeast(providerRef, leaseAtLeastMs())
-            : undefined;
-        }),
-        DEADLINE_MS.stopAttempt,
-        'Sandbox lease renewal timed out',
-        () => {
-          timedOut = true;
-        }
-      );
+      if (this.providerBinding.kind === 'onprem') {
+        await this.verifyOnPremLifetime(physical, deadlineAt, identity);
+      } else {
+        await withTimeout(
+          this.createProviderAdapter(this.providerBinding, physical).then(provider => {
+            if (Date.now() >= deadlineAt) throw new Error('Sandbox lease renewal timed out');
+            return this.isCurrentConnection(identity)
+              ? provider.ensureLeaseAtLeast(providerRef, leaseAtLeastMs())
+              : undefined;
+          }),
+          DEADLINE_MS.stopAttempt,
+          'Sandbox lease renewal timed out',
+          () => {
+            timedOut = true;
+          }
+        );
+      }
       this.logDiagnostic('lease', {
         ...diagnostic,
         result: 'completed',
         durationMs: Date.now() - startedAt,
       });
-
-      this.logDiagnostic(
-        'lease',
-        {
-          ...diagnostic,
-          result: timedOut ? 'timed_out' : 'failed',
-          durationMs: Date.now() - startedAt,
-        },
-        'warn'
-      );
       if (!this.isCurrentConnection(identity)) return;
       await this.scheduleNextLeaseCheck('renewal', now);
       await this.ctx.storage.delete(FAILURE_REASON_KEY);
@@ -3950,6 +4330,9 @@ export class SandboxControl extends DurableObject<Env> {
       if (!this.isCurrentConnection(identity)) return;
       const failureReason = providerFailureReason(this.providerBinding, error);
       if (failureReason) await this.ctx.storage.put(FAILURE_REASON_KEY, failureReason);
+      if (this.providerBinding.kind === 'onprem') {
+        await this.quarantineConnection(identity, failureReason ?? 'onprem_unavailable');
+      }
     }
   }
 
@@ -4912,6 +5295,9 @@ export class SandboxControl extends DurableObject<Env> {
           );
         }
       }
+      if (this.providerBinding.kind === 'onprem' && physical.createIntent?.onprem !== undefined) {
+        deadlines = armDeadline(deadlines, 'hardStop', physical.createIntent.onprem.hardStopAt);
+      }
       await saveDeadlines(this.ctx.storage, deadlines);
       await this.scheduleAlarm(deadlines);
     });
@@ -5057,6 +5443,7 @@ export class SandboxControl extends DurableObject<Env> {
         CREDENTIAL_POLICY_DIRTY_KEY,
         FAILURE_REASON_KEY,
         PROVIDER_RESOLUTION_RETRY_KEY,
+        ONPREM_ACKNOWLEDGEMENT_KEY,
       ]);
       const [routes, receipts] = await Promise.all([
         loadRouteTable(this.ctx.storage),
@@ -5089,6 +5476,7 @@ export class SandboxControl extends DurableObject<Env> {
           WRAPPER_READY_AT_KEY,
           FAILURE_REASON_KEY,
           PROVIDER_RESOLUTION_RETRY_KEY,
+          ONPREM_ACKNOWLEDGEMENT_KEY,
         ]);
       }
       next = { startup: (to.createIntent?.createdAt ?? Date.now()) + DEADLINE_MS.startup };
@@ -5127,6 +5515,13 @@ export class SandboxControl extends DurableObject<Env> {
           }
         }
       }
+    }
+    if (
+      !unavailable &&
+      this.providerBinding.kind === 'onprem' &&
+      to.createIntent?.onprem !== undefined
+    ) {
+      next = armDeadline(next, 'hardStop', to.createIntent.onprem.hardStopAt);
     }
     if (to.state !== 'stopped' && deadlines.credentialExpiry !== undefined) {
       next = armDeadline(next, 'credentialExpiry', deadlines.credentialExpiry);

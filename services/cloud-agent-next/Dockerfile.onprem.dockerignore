@@ -1,0 +1,10 @@
+**
+!Dockerfile.onprem
+!scripts/
+!scripts/kilo-git-credential
+!wrapper/
+!wrapper/onprem-entrypoint.sh
+!wrapper/dist/
+!wrapper/dist/control-wrapper.js
+!wrapper/dist/restore-session.js
+!wrapper/dist/bb

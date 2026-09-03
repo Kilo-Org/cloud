@@ -407,6 +407,98 @@ describe('observed Kilo runtime version', () => {
 });
 
 describe('worktree Kilo environments', () => {
+  it('rewrites original Kilo target paths only from the trusted on-prem launch environment', () => {
+    const kilo = {
+      ...auth,
+      targets: {
+        backendBaseUrl: 'http://host.docker.internal:3000/backend',
+        providerBaseUrl: 'https://provider.example.test/prefix/api/openrouter',
+        sessionIngestBaseUrl: 'http://host.docker.internal:8790',
+      },
+    };
+    const profile = {
+      KILO_ONPREM_BROKER_URL: 'https://untrusted.example.test',
+      GH_TOKEN: 'github-alias',
+    };
+    const launch = {
+      ...inherited,
+      KILO_ONPREM_BROKER_URL: 'https://broker.example.test:8443',
+      NODE_EXTRA_CA_CERTS: '/etc/kilo-onprem/ca.crt',
+      SSL_CERT_FILE: '/tmp/onprem-ca-bundle',
+      GIT_SSL_CAINFO: '/tmp/onprem-ca-bundle',
+      CURL_CA_BUNDLE: '/tmp/onprem-ca-bundle',
+    };
+    const env = buildWorktreeKiloEnvironment('/workspace/a', '/home/a', kilo, profile, launch);
+    expect(env).toMatchObject({
+      KILOCODE_TOKEN: auth.token,
+      KILOCODE_BACKEND_BASE_URL: 'https://broker.example.test:8443/_kilo/backend/backend',
+      KILO_API_URL: 'https://broker.example.test:8443/_kilo/backend/backend',
+      KILO_OPENROUTER_BASE: 'https://broker.example.test:8443/_kilo/provider/prefix/api/openrouter',
+      KILO_SESSION_INGEST_URL: 'https://broker.example.test:8443/_kilo/ingest',
+      GH_TOKEN: 'github-alias',
+      NODE_EXTRA_CA_CERTS: launch.NODE_EXTRA_CA_CERTS,
+      SSL_CERT_FILE: launch.SSL_CERT_FILE,
+      GIT_SSL_CAINFO: launch.GIT_SSL_CAINFO,
+      CURL_CA_BUNDLE: launch.CURL_CA_BUNDLE,
+    });
+    expect(JSON.parse(env.KILO_CONFIG_CONTENT).provider.kilo.options.baseURL).toBe(
+      env.KILO_OPENROUTER_BASE
+    );
+    expect(env.OPENCODE_CONFIG_CONTENT).toBe(env.KILO_CONFIG_CONTENT);
+    expect(env.KILO_ONPREM_BROKER_URL).toBeUndefined();
+    expect(kilo.targets.providerBaseUrl).toBe(
+      'https://provider.example.test/prefix/api/openrouter'
+    );
+    const unchanged = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/a',
+      kilo,
+      profile,
+      inherited
+    );
+    expect(unchanged.KILOCODE_BACKEND_BASE_URL).toBe(kilo.targets.backendBaseUrl);
+    expect(unchanged.KILO_OPENROUTER_BASE).toBe(kilo.targets.providerBaseUrl);
+    expect(unchanged.KILO_SESSION_INGEST_URL).toBe(kilo.targets.sessionIngestBaseUrl);
+  });
+
+  it('rejects invalid trusted broker URLs and noncanonical original target paths', () => {
+    for (const broker of [
+      '',
+      'http://broker.example.test',
+      'https://broker.example.test/prefix',
+      'https://user@broker.example.test',
+      'https://broker.example.test?token=value',
+      'https://broker.example.test/%2e%2e',
+    ]) {
+      expect(() =>
+        buildWorktreeKiloEnvironment(
+          '/workspace/a',
+          '/home/a',
+          auth,
+          {},
+          {
+            KILO_ONPREM_BROKER_URL: broker,
+          }
+        )
+      ).toThrow('Invalid on-prem broker URL');
+    }
+    expect(() =>
+      buildWorktreeKiloEnvironment(
+        '/workspace/a',
+        '/home/a',
+        {
+          ...auth,
+          targets: {
+            ...auth.targets,
+            providerBaseUrl: 'https://provider.example.test/api/%252fopenrouter',
+          },
+        },
+        {},
+        { KILO_ONPREM_BROKER_URL: 'https://broker.example.test' }
+      )
+    ).toThrow('Invalid on-prem Kilo target');
+  });
+
   it.each([undefined, 'org-trusted'])(
     'uses only trusted organization attribution: %s',
     organizationId => {

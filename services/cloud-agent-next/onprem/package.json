@@ -1,0 +1,29 @@
+{
+  "name": "@kilocode/cloud-agent-onprem",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "bun": "1.3.14"
+  },
+  "scripts": {
+    "start": "bun src/main.ts",
+    "build": "bun build src/main.ts --target=bun --outfile=dist/provisioner.js",
+    "preview:local": "bun --no-env-file scripts/preview-local.ts",
+    "install:local": "bun scripts/install-local.ts",
+    "test": "bun test src",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/cloud-agent-next/onprem/src services/cloud-agent-next/onprem/scripts",
+    "format": "oxfmt src scripts package.json tsconfig.json",
+    "format:check": "oxfmt --list-different src scripts package.json tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
+  }
+}

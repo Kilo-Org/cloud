@@ -49,6 +49,9 @@ jobs:
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
 
+      - name: Test worker deployment detection
+        run: node --test scripts/deploy-workers.test.mjs
+
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
 

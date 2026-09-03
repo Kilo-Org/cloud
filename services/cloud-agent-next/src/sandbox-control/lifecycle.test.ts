@@ -26,6 +26,7 @@ import {
   loadRecoveryDecisions,
   loadRouteTable,
   loadSessionCredentialGrants,
+  saveSessionCredentialGrants,
 } from './durable-state.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import type * as SocketModule from './socket.js';
@@ -36,6 +37,20 @@ import * as byocCredentialResolver from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
 import { summarizeHeartbeatIdle } from './status-projection.js';
+import type {
+  LaunchOnPremAllocationInput,
+  OnPremAllocationInfo,
+  ReserveOnPremAllocationInput,
+} from '../onprem/installation.js';
+import { encodeOnPremProviderRef, type OnPremProfile } from '../shared/onprem-protocol.js';
+import {
+  createOnPremProviderAdapter,
+  OnPremAcknowledgementPendingError,
+  OnPremLifetimeError,
+} from './onprem-provider.js';
+import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
+import type { OnPremCredentialRpcInput } from '../shared/onprem-credential-protocol.js';
+import { getWorktreeWorkspacePath } from '../workspace.js';
 
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
@@ -388,7 +403,11 @@ async function harness(
         billing: BILLING,
       });
     },
-    async ready(runtime?: { wrapperVersion: string | null; recoveryCapable?: boolean }) {
+    async ready(
+      runtimeOrAttach?: { wrapperVersion: string | null; recoveryCapable?: boolean } | boolean
+    ) {
+      const runtime = typeof runtimeOrAttach === 'object' ? runtimeOrAttach : undefined;
+      const attach = typeof runtimeOrAttach === 'boolean' ? runtimeOrAttach : true;
       const physical = await control.getPhysicalRecord();
       if (!physical.providerRef) throw new Error('No physical allocation');
       connection = {
@@ -400,7 +419,7 @@ async function harness(
       const identity = connection;
       await hooks.onHandshakeComplete?.(identity, runtime);
       await hooks.onReady?.(identity);
-      await control.attachSession(ROUTE);
+      if (attach) await control.attachSession(ROUTE);
       return identity;
     },
     async fireAlarm() {
@@ -438,6 +457,672 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+async function onpremHarness() {
+  const binding = {
+    kind: 'onprem',
+    organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    installationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    profileId: 'gvisor',
+  } as const;
+  const profile: OnPremProfile = {
+    id: binding.profileId,
+    revision: 'v1',
+    runtimeClass: 'gvisor',
+    image: 'kilo/onprem:v1',
+    brokerUrl: 'https://broker.example.test',
+    maxLifetimeMs: 20 * 60_000,
+  };
+  const state: { allocation: OnPremAllocationInfo | null } = { allocation: null };
+  const manager = {
+    resolveProfile: vi.fn(async () => profile),
+    reserveAllocation: vi.fn(async (input: ReserveOnPremAllocationInput) => {
+      const providerRef = encodeOnPremProviderRef({
+        installationId: binding.installationId,
+        allocationId: input.allocationId,
+      });
+      state.allocation = {
+        ...input,
+        providerRef,
+        hardStopAt: input.createdAt + input.profile.maxLifetimeMs,
+        phase: 'reserved',
+        revision: 0,
+        notAfter: null,
+        pod: null,
+        status: 'unknown',
+        acknowledgedAt: null,
+        acknowledgementFresh: false,
+      };
+      return { providerRef, hardStopAt: state.allocation.hardStopAt };
+    }),
+    launchAllocation: vi.fn(async (input: LaunchOnPremAllocationInput) => {
+      if (!state.allocation || state.allocation.providerRef !== input.providerRef)
+        throw new Error('Missing reservation');
+      Object.assign(state.allocation, {
+        phase: 'launched',
+        status: 'active',
+        notAfter: input.notAfter,
+        pod: { namespace: 'onprem', name: 'sandbox', uid: 'pod-1' },
+        acknowledgedAt: Date.now(),
+        acknowledgementFresh: true,
+      });
+    }),
+    getAllocation: vi.fn(async (providerRef: string) =>
+      state.allocation?.providerRef === providerRef ? state.allocation : null
+    ),
+    observeAllocation: vi.fn(async (providerRef: string) => ({
+      status: state.allocation?.status ?? 'unknown',
+      providerRef,
+    })),
+    stopAllocation: vi.fn(async () => 'retryable' as 'retryable' | 'terminal'),
+  };
+  const h = await harness({
+    env: {
+      ONPREM_INSTALLATION: {
+        getByName: vi.fn(() => manager),
+      } as unknown as Env['ONPREM_INSTALLATION'],
+      CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+      CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: OWNER,
+      CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: binding.organizationId,
+    },
+  });
+  const metadata = await h.session.getCredentialMetadata();
+  h.session.getCredentialMetadata.mockResolvedValue(
+    parseSessionMetadata({
+      ...metadata,
+      identity: { ...metadata.identity, orgId: binding.organizationId },
+      workspace: {
+        ...metadata.workspace,
+        sandboxProvider: 'onprem',
+        sandboxProviderBinding: binding,
+        credentialContainment: { kilocode: true, github: false, gitlab: false },
+      },
+    })
+  );
+  return { h, manager, state, profile, binding };
+}
+
+async function onpremCredentialHarness() {
+  const fixture = await onpremHarness();
+  const { h, binding, state } = fixture;
+  h.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+  const metadata = await h.session.getCredentialMetadata();
+  const worktreeId = 'worktree_cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  h.session.getCredentialMetadata.mockResolvedValue(
+    parseSessionMetadata({
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        worktreeId,
+        workspacePath: getWorktreeWorkspacePath(binding.organizationId, OWNER, worktreeId),
+      },
+    })
+  );
+  const acquired = await h.acquire({
+    id: crypto.randomUUID(),
+    deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+  });
+  const [grant] = await loadSessionCredentialGrants(h.storage);
+  const allocation = state.allocation;
+  if (!grant?.kilo.alias || !allocation?.pod) throw new Error('Missing on-prem credential fixture');
+  const request: OnPremCredentialRpcInput = {
+    binding,
+    providerRef: allocation.providerRef,
+    podUid: allocation.pod.uid,
+    url: 'https://backend.example.test/api/profile/balance',
+    method: 'GET',
+    authorization: `Bearer ${grant.kilo.alias}`,
+  };
+  return { ...fixture, allocation, grant, acquired, request };
+}
+
+describe('SandboxControl on-prem credentials', () => {
+  it('prepares contained aliases and redeems only the allocation-scoped headers with a hard expiry', async () => {
+    const { h, manager, binding, allocation, grant, acquired, request } =
+      await onpremCredentialHarness();
+    expect(acquired.physical).toBe('running');
+    expect(acquired.attachment?.env?.KILOCODE_TOKEN).toBe(grant.kilo.alias);
+    expect(JSON.stringify(acquired.attachment)).not.toContain('test-token');
+    expect(grant.provider).toBe('onprem');
+    expect(grant.containmentEnabled).not.toBe(false);
+    expect(grant).not.toHaveProperty('outboundContainerId');
+    expect((await h.control.getPhysicalRecord()).createIntent?.containment).toEqual(
+      WORKTREE_CREDENTIAL_CONTAINMENT
+    );
+    expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+    expect(h.allocations.size).toBe(0);
+    manager.getAllocation.mockImplementationOnce(async () => {
+      expect(h.transactionActive).toBe(false);
+      return allocation;
+    });
+    await expect(h.control.resolveOnPremCredential(request)).resolves.toEqual({
+      headers: {
+        authorization: 'Bearer test-token',
+        host: 'backend.example.test',
+        'x-kilocode-organizationid': binding.organizationId,
+      },
+      expiresAt: allocation.hardStopAt,
+    });
+    expect(grant.expiresAt).toBeGreaterThan(allocation.hardStopAt);
+    for (const changed of [
+      { ...request, podUid: 'another-pod' },
+      { ...request, binding: { ...binding, profileId: 'another-profile' } },
+      { ...request, authorization: 'Bearer unknown-alias' },
+      { ...request, url: 'file:///etc/passwd' },
+    ]) {
+      await expect(h.control.resolveOnPremCredential(changed)).resolves.toBeNull();
+    }
+    await expect(
+      h.control.resolveCredential({
+        credential: grant.kilo.alias ?? '',
+        outboundContainerId: 'not-a-cloudflare-origin',
+        url: request.url,
+        method: request.method,
+      })
+    ).resolves.toBeNull();
+    manager.getAllocation.mockResolvedValueOnce({
+      ...allocation,
+      hardStopAt: allocation.hardStopAt + 1,
+    });
+    await expect(h.control.resolveOnPremCredential(request)).resolves.toBeNull();
+    const active = { ...allocation };
+    Object.assign(allocation, {
+      status: 'unknown',
+      acknowledgedAt: null,
+      acknowledgementFresh: false,
+    });
+    await expect(h.control.resolveOnPremCredential(request)).resolves.toBeNull();
+    Object.assign(allocation, active);
+    vi.setSystemTime(allocation.hardStopAt);
+    await expect(h.control.resolveOnPremCredential(request)).resolves.toBeNull();
+  });
+
+  it('rejects grants from another owner, organization, or provider and sanitizes lookup failures', async () => {
+    const { h, manager, grant, request } = await onpremCredentialHarness();
+    for (const changed of [
+      { ...grant, userId: 'another-owner' },
+      { ...grant, orgId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+      { ...grant, provider: 'vercel' as const },
+    ]) {
+      await saveSessionCredentialGrants(h.storage, [changed]);
+      await expect(h.control.resolveOnPremCredential(request)).resolves.toBeNull();
+    }
+    await saveSessionCredentialGrants(h.storage, [grant]);
+    manager.getAllocation.mockRejectedValueOnce(new Error('onprem_unavailable'));
+    await expect(h.control.resolveOnPremCredential(request)).resolves.toBeNull();
+  });
+
+  it.each(['stop', 'grant removal', 'worktree deletion'] as const)(
+    'rechecks %s after a held allocation lookup before returning credential headers',
+    async change => {
+      const { h, manager, allocation, grant, request } = await onpremCredentialHarness();
+      const lookup = deferred<OnPremAllocationInfo>();
+      manager.getAllocation.mockReturnValueOnce(lookup.promise);
+      const resolution = h.control.resolveOnPremCredential(request);
+      await vi.waitFor(() => expect(manager.getAllocation).toHaveBeenCalledOnce());
+      if (change === 'stop') await h.control.beginStop('credential_race');
+      else if (change === 'grant removal') await saveSessionCredentialGrants(h.storage, []);
+      else h.control['deletingWorktrees'].add(grant.scopeId);
+      lookup.resolve(allocation);
+      await expect(resolution).resolves.toBeNull();
+    }
+  );
+});
+
+describe('SandboxControl on-prem lifecycle', () => {
+  it('releases only unreserved intents and fences a held profile resolver after cleanup', async () => {
+    const { h, manager, profile, binding } = await onpremHarness();
+    const profileGate = deferred<OnPremProfile>();
+    manager.resolveProfile.mockReturnValueOnce(profileGate.promise);
+    const createProvider = h.control['createProviderAdapter'].bind(h.control);
+    const resolutions: ReturnType<typeof createProvider>[] = [];
+    Object.assign(h.control, {
+      createProviderAdapter: (...args: Parameters<typeof createProvider>) => {
+        const resolution = createProvider(...args);
+        resolutions.push(resolution);
+        return resolution;
+      },
+    });
+    const acquisition = {
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    const starting = h.acquire(acquisition);
+    await vi.waitFor(() => expect(manager.resolveProfile).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.startup);
+    await expect(starting).resolves.toMatchObject({ physical: 'failed' });
+    const failed = await h.control.getPhysicalRecord();
+    const intent = failed.createIntent;
+    if (!intent || resolutions[0] === undefined) throw new Error('Missing held create intent');
+    expect(intent.onprem).toBeUndefined();
+    expect(failed.providerRef).toBeNull();
+    await expect(h.control.recordStopAttempt()).resolves.toMatchObject({
+      state: 'stopped',
+      createIntent: null,
+      providerRef: null,
+    });
+    expect(manager.observeAllocation).not.toHaveBeenCalled();
+    expect(manager.stopAllocation).not.toHaveBeenCalled();
+    const successor = await h.control.claimCreate(
+      crypto.randomUUID(),
+      false,
+      SANDBOX_ID,
+      WORKTREE_CREDENTIAL_CONTAINMENT
+    );
+    const oldResolution = expect(resolutions[0]).rejects.toThrow(
+      'allocation changed during provider resolution'
+    );
+    profileGate.resolve(profile);
+    await oldResolution;
+    expect(await h.control.getPhysicalRecord()).toEqual(successor);
+    expect(manager.reserveAllocation).not.toHaveBeenCalled();
+    expect(manager.launchAllocation).not.toHaveBeenCalled();
+    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+
+    const providerRef = encodeOnPremProviderRef({
+      installationId: binding.installationId,
+      allocationId: intent.intentId,
+    });
+    const ambiguous = {
+      ...intent,
+      onprem: { binding, profile, hardStopAt: intent.createdAt + profile.maxLifetimeMs },
+    };
+    const provider = createOnPremProviderAdapter({ env: h.env, binding, sandboxId: SANDBOX_ID });
+    await expect(provider.observe(null, ambiguous)).resolves.toEqual({
+      status: 'unknown',
+      providerRef,
+    });
+    await expect(provider.stop(null, ambiguous)).resolves.toBe('retryable');
+    await expect(provider.observe(providerRef, intent)).resolves.toEqual({
+      status: 'unknown',
+      providerRef,
+    });
+    await expect(provider.stop(providerRef, intent)).resolves.toBe('retryable');
+  });
+
+  it('pins the reservation before credential setup and launch, without spending a receipt twice', async () => {
+    const { h, manager, state, profile, binding } = await onpremHarness();
+    await expect(
+      h.control.prepareSessionCredentials({ ownerId: OWNER, sessionId: ROUTE.sessionId })
+    ).rejects.toThrow();
+    expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+    const reserve = manager.reserveAllocation.getMockImplementation();
+    if (!reserve) throw new Error('Missing reservation fixture');
+    manager.reserveAllocation.mockImplementationOnce(async input => {
+      const before = await h.control.getPhysicalRecord();
+      expect(before.createIntent?.onprem).toEqual({
+        binding,
+        profile,
+        hardStopAt: input.createdAt + profile.maxLifetimeMs,
+      });
+      expect(before.providerRef).toBeNull();
+      const providerRef = encodeOnPremProviderRef({
+        installationId: binding.installationId,
+        allocationId: input.allocationId,
+      });
+      expect(await h.hooks.validateHandshake?.(providerRef)).toBe(false);
+      await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'creating' });
+      expect(prepare).not.toHaveBeenCalled();
+      return reserve(input);
+    });
+    const prepare = vi.fn(async () => {
+      const physical = await h.control.getPhysicalRecord();
+      expect(physical).toMatchObject({
+        state: 'running',
+        providerRef: state.allocation?.providerRef,
+        createIntent: { onprem: { binding, profile, hardStopAt: state.allocation?.hardStopAt } },
+      });
+      expect(await loadDeadlines(h.storage)).toHaveProperty(
+        'hardStop',
+        state.allocation?.hardStopAt
+      );
+      return {} as SessionAttachPayload;
+    });
+    Object.assign(h.control, { prepareOwnedSessionCredentials: prepare });
+    const acquisition = {
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    await h.acquire(acquisition);
+    if (!state.allocation) throw new Error('Missing on-prem reservation');
+    state.allocation.status = 'unknown';
+    state.allocation.acknowledgementFresh = false;
+    await expect(h.acquire(acquisition)).resolves.toMatchObject({ physical: 'running' });
+    expect(manager.stopAllocation).not.toHaveBeenCalled();
+    const physical = await h.control.getPhysicalRecord();
+    expect(manager.reserveAllocation).toHaveBeenCalledTimes(1);
+    expect(manager.launchAllocation).toHaveBeenCalledTimes(1);
+    expect(manager.launchAllocation.mock.calls[0]?.[0]).toMatchObject({
+      providerRef: physical.providerRef,
+      bootstrap: { PROVIDER_INSTANCE_ID: physical.providerRef },
+      notAfter: (physical.createIntent?.createdAt ?? 0) + DEADLINE_MS.startup,
+    });
+    expect(manager.reserveAllocation.mock.calls[0]?.[0]).not.toHaveProperty('billing');
+    expect(manager.reserveAllocation.mock.calls[0]?.[0]).not.toHaveProperty('networkPolicy');
+    expect(h.records.has('billing_input')).toBe(false);
+    expect(await h.hooks.validateHandshake?.(physical.providerRef ?? '')).toBe(true);
+    expect(
+      await h.hooks.validateHandshake?.(
+        encodeOnPremProviderRef({
+          installationId: binding.installationId,
+          allocationId: crypto.randomUUID(),
+        })
+      )
+    ).toBe(false);
+    expect(h.allocations.size).toBe(0);
+    expect(h.issueKiloSessionCapability).not.toHaveBeenCalled();
+    await h.control.beginStop('test_stop');
+    manager.stopAllocation.mockResolvedValue('terminal');
+    await h.control.recordStopAttempt();
+    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+    expect(manager.reserveAllocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the first management acknowledgement after wrapper readiness but not warm stale evidence', async () => {
+    const { h, manager, state } = await onpremHarness();
+    Object.assign(h.control, {
+      prepareOwnedSessionCredentials: async () => ({}) as SessionAttachPayload,
+    });
+    const acquisition = {
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    await h.acquire(acquisition);
+    const allocation = state.allocation;
+    if (!allocation) throw new Error('Missing on-prem allocation');
+    Object.assign(allocation, {
+      status: 'unknown',
+      acknowledgedAt: null,
+      acknowledgementFresh: false,
+      pod: { namespace: 'onprem', name: 'sandbox', uid: 'pod-1' },
+    });
+    const identity = await h.ready(false);
+    let settled = false;
+    const waiting = h.acquire(acquisition).then(result => {
+      settled = true;
+      return result;
+    });
+    await vi.waitFor(() => expect(manager.getAllocation).toHaveBeenCalled());
+    const heartbeat = h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(await h.control.getStatus()).toMatchObject({ physical: 'running', connection: 'ready' });
+    expect(settled).toBe(false);
+    expect(manager.stopAllocation).not.toHaveBeenCalled();
+    Object.assign(allocation, {
+      status: 'active',
+      acknowledgedAt: Date.now(),
+      acknowledgementFresh: true,
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(waiting).resolves.toMatchObject({ physical: 'running', connection: 'ready' });
+    await heartbeat;
+    expect(manager.reserveAllocation).toHaveBeenCalledOnce();
+    expect(manager.launchAllocation).toHaveBeenCalledOnce();
+    expect(manager.getAllocation.mock.calls.every(([ref]) => ref === allocation.providerRef)).toBe(
+      true
+    );
+    const checkedAt = Date.now();
+    Object.assign(allocation, {
+      status: 'unknown',
+      acknowledgedAt: null,
+      acknowledgementFresh: false,
+    });
+    await expect(h.acquire(acquisition)).resolves.toMatchObject({
+      physical: 'failed',
+      failureReason: 'onprem_unavailable',
+    });
+    expect(Date.now()).toBe(checkedAt);
+  });
+
+  it('rejects a held acknowledgement after stop and replacement without acknowledging the successor', async () => {
+    const { h, manager, state } = await onpremHarness();
+    Object.assign(h.control, {
+      prepareOwnedSessionCredentials: async () => ({}) as SessionAttachPayload,
+    });
+    const acquisition = {
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    };
+    await h.acquire(acquisition);
+    const allocation = state.allocation;
+    if (!allocation) throw new Error('Missing on-prem allocation');
+    Object.assign(allocation, {
+      status: 'unknown',
+      acknowledgedAt: null,
+      acknowledgementFresh: false,
+      pod: { namespace: 'onprem', name: 'sandbox', uid: 'pod-1' },
+    });
+    await h.ready(false);
+    const observation = deferred<OnPremAllocationInfo>();
+    manager.getAllocation.mockReturnValueOnce(observation.promise);
+    const waiting = h.acquire(acquisition).catch(error => error);
+    await vi.waitFor(() => expect(manager.getAllocation).toHaveBeenCalledOnce());
+    await h.control.beginStop('cancelled');
+    manager.stopAllocation.mockResolvedValue('terminal');
+    await h.control.recordStopAttempt();
+    const successor = await h.control.claimCreate(
+      crypto.randomUUID(),
+      false,
+      SANDBOX_ID,
+      WORKTREE_CREDENTIAL_CONTAINMENT
+    );
+    observation.resolve({
+      ...allocation,
+      status: 'active',
+      acknowledgedAt: Date.now(),
+      acknowledgementFresh: true,
+    });
+    expect(await waiting).toBeInstanceOf(Error);
+    expect(await h.control.getPhysicalRecord()).toEqual(successor);
+    expect(h.records.has('onprem_acknowledgement')).toBe(false);
+    expect(manager.reserveAllocation).toHaveBeenCalledOnce();
+    expect(manager.launchAllocation).toHaveBeenCalledOnce();
+  });
+
+  it.each(['startup', 'acquisition', 'stopAttempt'] as const)(
+    'bounds first acknowledgement waiting by the original %s deadline across retries',
+    async budget => {
+      const { h, manager, state } = await onpremHarness();
+      Object.assign(h.control, {
+        prepareOwnedSessionCredentials: async () => ({}) as SessionAttachPayload,
+      });
+      await h.acquire({
+        id: crypto.randomUUID(),
+        deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      });
+      const allocation = state.allocation;
+      if (!allocation) throw new Error('Missing on-prem allocation');
+      Object.assign(allocation, {
+        status: 'unknown',
+        acknowledgedAt: null,
+        acknowledgementFresh: false,
+        pod: { namespace: 'onprem', name: 'sandbox', uid: 'pod-1' },
+      });
+      await h.ready(false);
+      if (budget === 'startup')
+        vi.setSystemTime(allocation.createdAt + DEADLINE_MS.startup - 1_500);
+      const acquisition = {
+        id: crypto.randomUUID(),
+        deadlineAt: Date.now() + (budget === 'acquisition' ? 1_500 : SESSION_DELIVERY_TIMEOUT_MS),
+      };
+      let firstProbeAt: number | undefined;
+      const heldObservation = deferred<OnPremAllocationInfo>();
+      manager.getAllocation.mockImplementation(async () => {
+        firstProbeAt ??= Date.now();
+        return budget === 'stopAttempt' ? heldObservation.promise : allocation;
+      });
+      const waiting = h.acquire(acquisition).catch(error => error);
+      await vi.waitFor(() => {
+        expect(h.records.get('onprem_acknowledgement')).toMatchObject({ state: 'waiting' });
+        expect(manager.getAllocation).toHaveBeenCalled();
+      });
+      if (firstProbeAt === undefined) throw new Error('Missing management probe');
+      const expiresAt = Math.min(
+        allocation.createdAt + DEADLINE_MS.startup,
+        acquisition.deadlineAt,
+        firstProbeAt + DEADLINE_MS.stopAttempt
+      );
+      const receipt = {
+        state: 'waiting',
+        providerRef: allocation.providerRef,
+        deadlineAt: expiresAt,
+      };
+      expect(h.records.get('onprem_acknowledgement')).toEqual(receipt);
+      const retry = h
+        .acquire({
+          id: crypto.randomUUID(),
+          deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+        })
+        .catch(error => error);
+      await vi.waitFor(() => expect(manager.getAllocation.mock.calls.length).toBeGreaterThan(1));
+      expect(h.records.get('onprem_acknowledgement')).toEqual(receipt);
+      await vi.advanceTimersByTimeAsync(expiresAt - Date.now());
+      await Promise.all([waiting, retry]);
+      expect(await h.control.getPhysicalRecord()).toMatchObject({
+        state: 'failed',
+        providerRef: allocation.providerRef,
+      });
+      expect(Date.now()).toBe(expiresAt);
+      expect(h.records.get('onprem_acknowledgement')).toEqual(receipt);
+      expect(manager.reserveAllocation).toHaveBeenCalledOnce();
+      expect(manager.launchAllocation).toHaveBeenCalledOnce();
+      heldObservation.resolve({
+        ...allocation,
+        status: 'active',
+        acknowledgedAt: Date.now(),
+        acknowledgementFresh: true,
+      });
+    }
+  );
+
+  it('retains hard expiry and slow cleanup while the installation is disconnected', async () => {
+    const { h, manager, state, profile, binding } = await onpremHarness();
+    Object.assign(h.control, {
+      prepareOwnedSessionCredentials: async () => ({}) as SessionAttachPayload,
+    });
+    await h.acquire({
+      id: crypto.randomUUID(),
+      deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+    });
+    const allocated = await h.control.getPhysicalRecord();
+    const hardStopAt = allocated.createIntent?.onprem?.hardStopAt;
+    if (hardStopAt === undefined || !state.allocation)
+      throw new Error('Missing on-prem allocation');
+    await h.storage.put('deadlines', { heartbeatExpiry: hardStopAt + DEADLINE_MS.heartbeatExpiry });
+    await h.evict();
+    expect((await loadDeadlines(h.storage)).hardStop).toBe(hardStopAt);
+    expect(await h.control.getStatus()).toHaveProperty('hardStopAt', hardStopAt);
+    manager.resolveProfile.mockRejectedValue(new Error('onprem_installation_not_ready'));
+    state.allocation.status = 'unknown';
+    state.allocation.acknowledgementFresh = false;
+    await h.fireAlarm();
+    expect(await h.control.getPhysicalRecord()).toMatchObject({
+      state: 'stopping',
+      providerRef: allocated.providerRef,
+      stopTombstone: { reason: 'onprem_lifetime_exhausted', attempts: 1 },
+      createIntent: { onprem: { binding, profile, hardStopAt } },
+    });
+    for (let attempt = 1; attempt < DEADLINE_MS.stopAttemptLadder.length; attempt++)
+      await h.fireAlarm();
+    vi.setSystemTime(hardStopAt + DEADLINE_MS.reconciliationWindow + 1);
+    await h.fireAlarm();
+    expect(manager.stopAllocation).toHaveBeenCalledTimes(6);
+    expect(manager.resolveProfile).toHaveBeenCalledTimes(1);
+    expect(await h.control.getPhysicalRecord()).toMatchObject({
+      state: 'unknown',
+      providerRef: allocated.providerRef,
+    });
+    expect((await loadDeadlines(h.storage)).reconciliation).toBeGreaterThan(Date.now());
+    expect(h.allocations.size).toBe(0);
+    state.allocation.status = 'terminal';
+    await h.fireAlarm();
+    expect(await h.control.getPhysicalRecord()).toMatchObject({
+      state: 'stopped',
+      providerRef: null,
+    });
+  });
+
+  it('rejects unacknowledged lifetime and requests beyond the fixed cap without renewing it', async () => {
+    const { h, manager, state, profile, binding } = await onpremHarness();
+    const mixedCaseBinding = {
+      ...binding,
+      organizationId: binding.organizationId.toUpperCase(),
+      installationId: binding.installationId.toUpperCase(),
+    };
+    const intent = {
+      intentId: 'CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC',
+      createdAt: Date.now(),
+      allocationName: SANDBOX_ID,
+      containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      onprem: {
+        binding: mixedCaseBinding,
+        profile,
+        hardStopAt: Date.now() + profile.maxLifetimeMs,
+      },
+    };
+    const provider = createOnPremProviderAdapter({
+      env: h.env,
+      binding: mixedCaseBinding,
+      sandboxId: SANDBOX_ID,
+      intent,
+    });
+    const result = await provider.create(intent);
+    if (!('providerRef' in result) || !state.allocation)
+      throw new Error('Missing on-prem reservation');
+    expect(manager.reserveAllocation.mock.calls[0]?.[0]).toMatchObject({
+      binding,
+      allocationId: intent.intentId.toLowerCase(),
+    });
+    const mixedCaseRef = `onprem:v1:${mixedCaseBinding.installationId}:${intent.intentId}`;
+    await expect(provider.ensureLeaseAtLeast(mixedCaseRef, 60_000)).rejects.toThrow(
+      'not acknowledged'
+    );
+    expect(manager.getAllocation).toHaveBeenLastCalledWith(result.providerRef);
+    await provider.launch(mixedCaseRef, {});
+    await expect(
+      provider.ensureLeaseAtLeast(result.providerRef, profile.maxLifetimeMs)
+    ).resolves.toBeUndefined();
+    const acknowledgedChecks = manager.getAllocation.mock.calls.length;
+    await expect(
+      provider.ensureLeaseAtLeast(result.providerRef, profile.maxLifetimeMs + 1)
+    ).rejects.toBeInstanceOf(OnPremLifetimeError);
+    expect(manager.getAllocation).toHaveBeenCalledTimes(acknowledgedChecks);
+    vi.setSystemTime(intent.createdAt + 1);
+    await expect(
+      provider.ensureLeaseAtLeast(result.providerRef, profile.maxLifetimeMs)
+    ).rejects.toBeInstanceOf(OnPremLifetimeError);
+    state.allocation.acknowledgementFresh = false;
+    await expect(provider.ensureLeaseAtLeast(result.providerRef, 60_000)).rejects.toThrow(
+      'not acknowledged'
+    );
+    const pending = {
+      ...state.allocation,
+      status: 'unknown',
+      acknowledgedAt: null,
+      acknowledgementFresh: false,
+      pod: { namespace: 'onprem', name: 'sandbox', uid: 'pod-1' },
+    } satisfies OnPremAllocationInfo;
+    Object.assign(state.allocation, pending);
+    await expect(provider.ensureLeaseAtLeast(result.providerRef, 60_000)).rejects.toBeInstanceOf(
+      OnPremAcknowledgementPendingError
+    );
+    for (const change of [
+      { phase: 'stopping' },
+      { pod: null },
+      { allocationId: crypto.randomUUID() },
+    ] satisfies Partial<OnPremAllocationInfo>[]) {
+      Object.assign(state.allocation, pending, change);
+      await expect(
+        provider.ensureLeaseAtLeast(result.providerRef, 60_000)
+      ).rejects.not.toBeInstanceOf(OnPremAcknowledgementPendingError);
+    }
+    Object.assign(state.allocation, pending);
+    vi.setSystemTime(intent.createdAt + DEADLINE_MS.startup);
+    await expect(provider.launch(result.providerRef, {})).rejects.toThrow('bootstrap expired');
+    expect(manager.launchAllocation).toHaveBeenCalledTimes(1);
+    expect(state.allocation.hardStopAt).toBe(intent.onprem.hardStopAt);
+  });
 });
 
 describe('SandboxControl failed-instance recovery', () => {

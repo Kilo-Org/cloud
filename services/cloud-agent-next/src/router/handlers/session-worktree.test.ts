@@ -71,7 +71,7 @@ vi.mock('../../utils/do-retry.js', () => ({
 }));
 
 const USER_ID = 'oauth/google:1234';
-const ORGANIZATION_ID = '11111111-1111-4111-8111-111111111111';
+const ORGANIZATION_ID = 'abcdabcd-abcd-4abc-8abc-abcdabcdabcd';
 const OTHER_ORGANIZATION_ID = '22222222-2222-4222-8222-222222222222';
 const SOURCE_WORKSPACE_ID = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const DESTINATION_WORKSPACE_ID = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -654,36 +654,48 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     undefined,
     { kind: 'vercel', source: { kind: 'platform' } },
     BYOC_PROVIDER_BINDING,
+    {
+      kind: 'onprem',
+      organizationId: ORGANIZATION_ID,
+      installationId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      profileId: 'gvisor',
+    },
   ] as const)(
-    'inherits the isolated Vercel provider binding %j without copying provider runtime',
+    'inherits the isolated provider binding %j without copying provider runtime',
     async sandboxProviderBinding => {
       const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      const sandboxProvider = sandboxProviderBinding?.kind ?? 'vercel';
       metadata.workspace = {
         ...metadata.workspace,
         sandboxId: 'ses-0123456789abcdef',
-        sandboxProvider: 'vercel',
+        sandboxProvider,
         sandboxProviderBinding,
         sandboxRoute: undefined,
-        providerRuntime: { provider: 'vercel', sessionId: 'vercel-instance' },
+        providerRuntime:
+          sandboxProvider === 'vercel'
+            ? { provider: 'vercel', sessionId: 'vercel-instance' }
+            : undefined,
       };
       const { caller, input, destinationStub } = fixture({
         organizationId: ORGANIZATION_ID,
         metadata,
       });
 
-      await caller.createWorktreeChat(input);
+      const organizationId =
+        sandboxProvider === 'onprem' ? ORGANIZATION_ID.toUpperCase() : ORGANIZATION_ID;
+      await caller.createWorktreeChat({ ...input, kilocodeOrganizationId: organizationId });
 
       expect(assertOrganizationMembershipMock).toHaveBeenCalledWith(
         expect.anything(),
         USER_ID,
-        ORGANIZATION_ID
+        organizationId
       );
       expect(destinationStub.registerSession).toHaveBeenCalledWith(
         expect.objectContaining({
           identity: expect.objectContaining({ orgId: ORGANIZATION_ID }),
           workspace: expect.objectContaining({
             sandboxId: 'ses-0123456789abcdef',
-            sandboxProvider: 'vercel',
+            sandboxProvider,
             sandboxProviderBinding,
             worktreeId: WORKTREE_ID,
             workspacePath: getWorktreeWorkspacePath(ORGANIZATION_ID, USER_ID, WORKTREE_ID),

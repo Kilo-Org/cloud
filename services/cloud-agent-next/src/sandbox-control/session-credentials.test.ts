@@ -15,6 +15,10 @@ import {
   type SessionCredentialGrant,
 } from './session-credentials.js';
 import { findMatchingCredentialInjectionRule } from './vercel-network-policy.js';
+import { resolveOnPremCredentialGrant } from './onprem-credentials.js';
+import { createOnPremCredentialRoutes } from '../onprem/credential-route.js';
+import { encodeOnPremProviderRef } from '../shared/onprem-protocol.js';
+import type { OnPremCredentialRequest } from '../shared/onprem-credential-protocol.js';
 
 vi.mock('../logger.js', () => {
   const logger = {
@@ -207,7 +211,8 @@ async function prepare(
     env,
     metadata: data,
     sandboxId: data.workspace?.sandboxId ?? SANDBOX_ID,
-    ...(data.workspace?.sandboxProvider === 'vercel'
+    ...(data.workspace?.sandboxProvider === 'vercel' ||
+    data.workspace?.sandboxProviderBinding?.kind === 'onprem'
       ? {}
       : { outboundContainerId: OUTBOUND_CONTAINER_ID }),
     existing,
@@ -1812,6 +1817,370 @@ describe('credential resolution boundaries', () => {
     ]) {
       expect(sessionCredentialGrantSchema.safeParse(invalid).success).toBe(false);
     }
+  });
+});
+
+const ONPREM_BINDING = {
+  kind: 'onprem',
+  organizationId: INTEGRATION_ID,
+  installationId: WORKSPACE_UUID,
+  profileId: 'arm64-gvisor',
+} as const;
+
+function onpremMetadata(overrides: Partial<SessionMetadata> = {}): SessionMetadata {
+  return metadata({
+    ...overrides,
+    workspace: {
+      sandboxProvider: 'onprem',
+      sandboxProviderBinding: ONPREM_BINDING,
+      ...overrides.workspace,
+    },
+  });
+}
+
+function redeemOnPrem(
+  grant: SessionCredentialGrant,
+  request: Partial<OnPremCredentialRequest> = {},
+  now = NOW
+) {
+  return resolveOnPremCredentialGrant({
+    grant,
+    request: {
+      url: 'https://provider.example.com/api/openrouter/chat/completions',
+      method: 'POST',
+      authorization: `Bearer ${grant.kilo.alias}`,
+      ...request,
+    },
+    now,
+  });
+}
+
+describe('on-prem credential containment', () => {
+  it('always prepares aliases, keeps native tokens cloud-side, and never fabricates a container identity', async () => {
+    const { broker } = createBroker();
+    const { grant, payload } = await prepare(
+      environment(broker),
+      onpremMetadata({
+        workspace: {
+          credentialContainment: {
+            kilocode: false,
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+          },
+        },
+        profile: {
+          envVars: {
+            GH_TOKEN: GITHUB_TOKEN,
+            KILO_AUTH_CONTENT: JSON.stringify({ key: KILO_TOKEN }),
+          },
+          setupCommands: [`run --token=${KILO_TOKEN}`],
+        },
+      })
+    );
+    expect(grant.provider).toBe('onprem');
+    expect(isContainedSessionCredentialGrant(grant)).toBe(true);
+    expect(grant.kilo.token).toBe(KILO_TOKEN);
+    expect(grant.scm?.nativeToken).toBe(GITHUB_TOKEN);
+    expect(grant.outboundContainerId).toBeUndefined();
+    expect(grant.kilo.capabilities).toEqual({});
+    expect(grant.scm?.capability).toBeUndefined();
+    expect(payload.kilo.token).toBe(grant.kilo.alias);
+    expect(payload.git?.token).toBe(grant.scm?.alias);
+    expect(payload.env?.GH_TOKEN).toBe(grant.scm?.alias);
+    expect(JSON.stringify(payload)).not.toContain(KILO_TOKEN);
+    expect(JSON.stringify(payload)).not.toContain(GITHUB_TOKEN);
+    expect(payload).not.toHaveProperty('networkPolicy');
+    expectNoCapabilities(broker);
+    expect(sessionCredentialGrantSchema.parse(grant)).toEqual(grant);
+    expect(() => buildControlNetworkPolicy([grant])).toThrow();
+    for (const invalid of [
+      { ...grant, containmentEnabled: false },
+      { ...grant, outboundContainerId: OUTBOUND_CONTAINER_ID },
+      { ...grant, orgId: undefined },
+    ]) {
+      expect(sessionCredentialGrantSchema.safeParse(invalid).success).toBe(false);
+    }
+    await expect(
+      prepareSessionCredentials({
+        env: environment(broker),
+        metadata: onpremMetadata(),
+        sandboxId: SANDBOX_ID,
+        outboundContainerId: OUTBOUND_CONTAINER_ID,
+        now: NOW,
+      })
+    ).rejects.toThrow('Invalid contained worktree credentials');
+    await expect(
+      prepare(
+        environment(broker),
+        onpremMetadata({
+          identity: { ...metadata().identity, orgId: REPOSITORY_UUID },
+        })
+      )
+    ).rejects.toThrow('Invalid contained worktree credentials');
+    expect(await resolve(environment(broker), grant)).toBeNull();
+  });
+
+  it('rejects managed GitLab and Bitbucket instead of using direct credentials', async () => {
+    const { broker } = createBroker();
+    for (const repository of [
+      { type: 'gitlab', url: 'https://gitlab.example.com/acme/repo.git' },
+      {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/repo.git',
+        workspaceUuid: WORKSPACE_UUID,
+        repositoryUuid: REPOSITORY_UUID,
+      },
+    ] satisfies Array<SessionMetadata['repository']>) {
+      await expect(prepare(environment(broker), onpremMetadata({ repository }))).rejects.toThrow(
+        'Invalid contained worktree credentials'
+      );
+    }
+    expect(broker.getGitLabToken).not.toHaveBeenCalled();
+    expect(broker.getBitbucketToken).not.toHaveBeenCalled();
+    expectNoCapabilities(broker);
+  });
+
+  it('checks each Kilo target full origin, method, and canonical path even when hostnames overlap', async () => {
+    const { broker } = createBroker();
+    const env = {
+      ...environment(broker),
+      KILOCODE_BACKEND_BASE_URL: 'http://host.docker.internal:3000/backend',
+      KILO_OPENROUTER_BASE: 'https://host.docker.internal:3000/provider/api/openrouter',
+      KILO_SESSION_INGEST_URL: 'http://host.docker.internal:3001/ingest',
+    };
+    const { grant } = await prepare(env, onpremMetadata());
+    expect(
+      redeemOnPrem(grant, { url: `${grant.kilo.targets.backendBaseUrl}/api/user`, method: 'GET' })
+    ).toEqual({
+      headers: {
+        authorization: `Bearer ${KILO_TOKEN}`,
+        host: 'host.docker.internal:3000',
+        'x-kilocode-organizationid': INTEGRATION_ID,
+      },
+      expiresAt: grant.expiresAt,
+    });
+    expect(
+      redeemOnPrem(grant, { url: `${grant.kilo.targets.providerBaseUrl}/chat/completions` })
+    ).not.toBeNull();
+    for (const request of [
+      { url: 'https://host.docker.internal:3000/backend/api/user', method: 'GET' },
+      { url: 'http://host.docker.internal:3000/provider/api/openrouter/chat/completions' },
+      { url: 'http://host.docker.internal:3001/backend/api/user', method: 'GET' },
+      { url: 'http://other.example.com:3000/backend/api/user', method: 'GET' },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/user`, method: 'POST' },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/user/token`, method: 'GET' },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/auth/native/exchange` },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/user#fragment`, method: 'GET' },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/../api/user`, method: 'GET' },
+      { url: `${grant.kilo.targets.backendBaseUrl}/api/%75ser`, method: 'GET' },
+      { url: `${grant.kilo.targets.providerBaseUrl}/%2e%2e/session` },
+      { url: `${grant.kilo.targets.providerBaseUrl}/%252e%252e%252fsession` },
+      { url: `${grant.kilo.targets.providerBaseUrl}/chat%2fcompletions` },
+      { url: `${grant.kilo.targets.providerBaseUrl}/chat%5ccompletions` },
+      { url: `${grant.kilo.targets.providerBaseUrl}//chat/completions` },
+    ] satisfies Array<Partial<OnPremCredentialRequest>>) {
+      expect(redeemOnPrem(grant, request)).toBeNull();
+    }
+  });
+
+  it('preserves root membership, expiry, aliases, and session shadows under model prefixes', async () => {
+    const { broker } = createBroker();
+    const env = {
+      ...environment(broker),
+      KILO_SESSION_INGEST_URL: 'https://provider.example.com/api/openrouter',
+    };
+    const first = await prepare(env, onpremMetadata());
+    const { grant } = await prepare(
+      env,
+      onpremMetadata({
+        identity: secondRoot().identity,
+        auth: secondRoot().auth,
+      }),
+      first.grant
+    );
+    const collection = `${grant.kilo.targets.sessionIngestBaseUrl}/api/session`;
+    expect(
+      redeemOnPrem(grant, { url: `${collection}/${SECOND_ROOT_ID}/export`, method: 'GET' })
+    ).not.toBeNull();
+    expect(redeemOnPrem(grant, { url: `${collection}/${ROOT_ID}/ingest` })).not.toBeNull();
+    for (const request of [
+      { url: collection },
+      { url: `${collection}/${THIRD_ROOT_ID}/ingest` },
+      { url: `${collection}/${ROOT_ID}/export`, method: 'POST' },
+      { url: `${collection}/${ROOT_ID}/import` },
+      { url: `${collection}/${ROOT_ID}/ingest/extra` },
+      { authorization: undefined },
+      { authorization: `Bearer ${KILO_TOKEN}` },
+      { authorization: `Bearer ${createControlPlaneCredential(SANDBOX_ID, 'kilo')}` },
+      { authorization: `Bearer ${createControlPlaneCredential('usr-other', 'kilo')}` },
+      { authorization: `Bearer ${grant.scm?.alias}` },
+    ] satisfies Array<Partial<OnPremCredentialRequest>>) {
+      expect(redeemOnPrem(grant, request)).toBeNull();
+    }
+    expect(redeemOnPrem(grant, {}, grant.expiresAt)).toBeNull();
+    expect(redeemOnPrem(grant, {}, grant.preparedAt - 1)).toBeNull();
+    const retained = removeSessionCredentialMembership([grant], SECOND_SESSION_ID)[0];
+    expect(
+      redeemOnPrem(retained, { url: `${collection}/${SECOND_ROOT_ID}/export`, method: 'GET' })
+    ).toBeNull();
+    expect(
+      redeemOnPrem(retained, { url: `${collection}/${ROOT_ID}/export`, method: 'GET' })
+    ).not.toBeNull();
+  });
+
+  it('redeems GitHub aliases only within the repository and never downgrades invalid aliases to anonymous', async () => {
+    const { broker } = createBroker();
+    const { grant } = await prepare(environment(broker), onpremMetadata());
+    const api = 'https://api.github.com/repos/acme/repo';
+    const git = 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack';
+    const alias = grant.scm?.alias;
+    for (const authorization of [
+      `Bearer ${alias}`,
+      `token ${alias}`,
+      `Basic ${btoa(`x-access-token:${alias}`)}`,
+    ]) {
+      expect(
+        redeemOnPrem(grant, { url: api, method: 'GET', authorization })?.headers.authorization
+      ).toBe(`Bearer ${GITHUB_TOKEN}`);
+      expect(
+        redeemOnPrem(grant, { url: git, method: 'GET', authorization })?.headers.authorization
+      ).toBe(`Basic ${btoa(`x-access-token:${GITHUB_TOKEN}`)}`);
+    }
+    for (const url of [
+      'http://api.github.com/repos/acme/repo',
+      'https://api.github.com:8443/repos/acme/repo',
+      'https://api.github.com/repos/acme/other',
+      'https://api.github.com/repos/acme/repo-other',
+      `${api}/actions/runners/registration-token`,
+      `${api}/actions/runners/remove-token`,
+      `${api}/actions/runners/generate-jitconfig`,
+      `${api}/actions/runners/registration-token/`,
+      `${api}/actions/%72unners/registration-token`,
+      `${api}/actions/%252erunners/registration-token`,
+    ]) {
+      expect(redeemOnPrem(grant, { url, authorization: `Bearer ${alias}` })).toBeNull();
+    }
+    for (const url of [git, 'https://github.com/acme/public/info/refs?service=git-upload-pack']) {
+      expect(redeemOnPrem(grant, { url, method: 'GET', authorization: undefined })).toEqual({
+        headers: {},
+        expiresAt: grant.expiresAt,
+      });
+    }
+    expect(redeemOnPrem(grant, { url: api, method: 'GET', authorization: undefined })).toBeNull();
+    for (const authorization of [
+      `Bearer ${createControlPlaneCredential(SANDBOX_ID, 'github')}`,
+      `Bearer ${GITHUB_TOKEN}`,
+      'Basic invalid',
+      `Basic ${btoa(`other-user:${alias}`)}`,
+      '',
+    ]) {
+      expect(redeemOnPrem(grant, { url: git, method: 'GET', authorization })).toBeNull();
+    }
+  });
+
+  it('exposes native headers only after installation and allocation authorization and rejects revocation during redemption', async () => {
+    const { broker } = createBroker();
+    const now = Date.now();
+    const { grant } = await prepare(environment(broker), onpremMetadata(), undefined, now);
+    const managementCredential = 'a'.repeat(64);
+    const providerRef = encodeOnPremProviderRef({
+      installationId: WORKSPACE_UUID,
+      allocationId: REPOSITORY_UUID,
+    });
+    let revoked = false;
+    const authorizeAllocation = vi.fn(
+      async (input: { credential: string; providerRef: string; podUid: string }) => {
+        if (
+          revoked ||
+          input.credential !== managementCredential ||
+          input.providerRef !== providerRef ||
+          input.podUid !== 'pod-a'
+        ) {
+          throw new Error('onprem_unauthorized');
+        }
+        return { binding: ONPREM_BINDING, sandboxId: SANDBOX_ID, allocationId: REPOSITORY_UUID };
+      }
+    );
+    const routeEnv = {
+      ONPREM_INSTALLATION: { getByName: vi.fn(() => ({ authorizeAllocation })) },
+    } as unknown as Pick<Env, 'ONPREM_INSTALLATION' | 'SANDBOX_CONTROL'>;
+    const resolver = vi.fn<Parameters<typeof createOnPremCredentialRoutes>[0]>(
+      async (_env, _sandboxId, input) =>
+        redeemOnPrem(
+          grant,
+          { url: input.url, method: input.method, authorization: input.authorization },
+          now
+        )
+    );
+    const routes = createOnPremCredentialRoutes(resolver);
+    const route = `http://worker.test/onprem/organizations/${INTEGRATION_ID}/installations/${WORKSPACE_UUID}/credentials/resolve`;
+    const body = {
+      providerRef,
+      podUid: 'pod-a',
+      url: 'https://backend.example.com/api/user',
+      method: 'GET',
+      authorization: `Bearer ${grant.kilo.alias}`,
+    };
+    const request = (credential: string, input: unknown = body) =>
+      routes.request(
+        route,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+        routeEnv
+      );
+    const unauthenticated = await request(grant.kilo.alias);
+    expect(unauthenticated.status).toBe(401);
+    expect(authorizeAllocation).not.toHaveBeenCalled();
+    expect(resolver).not.toHaveBeenCalled();
+    expect((await request(managementCredential, { ...body, podUid: 'other-pod' })).status).toBe(
+      401
+    );
+    expect(resolver).not.toHaveBeenCalled();
+    const response = await request(managementCredential);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({
+      headers: {
+        authorization: `Bearer ${KILO_TOKEN}`,
+        host: 'backend.example.com',
+        'x-kilocode-organizationid': INTEGRATION_ID,
+      },
+      expiresAt: grant.expiresAt,
+    });
+    expect(resolver).toHaveBeenLastCalledWith(routeEnv, SANDBOX_ID, {
+      ...body,
+      binding: ONPREM_BINDING,
+    });
+    expect(
+      (await request(managementCredential, { ...body, outboundContainerId: OUTBOUND_CONTAINER_ID }))
+        .status
+    ).toBe(400);
+    resolver.mockImplementationOnce(async () => {
+      revoked = true;
+      return { headers: { authorization: `Bearer ${KILO_TOKEN}` }, expiresAt: grant.expiresAt };
+    });
+    const denied = await request(managementCredential);
+    expect(denied.status).toBe(401);
+    expect(await denied.text()).not.toContain(KILO_TOKEN);
+    const oversized = await routes.request(
+      route,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${managementCredential}`,
+          'Content-Type': 'application/json',
+          'Content-Length': '1',
+        },
+        body: ' '.repeat(16 * 1024 + 1),
+      },
+      routeEnv
+    );
+    expect(oversized.status).toBe(413);
+    expectSecretSafeLogs();
   });
 });
 

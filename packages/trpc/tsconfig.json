@@ -17,6 +17,7 @@
     "resolveJsonModule": true,
     "paths": {
       "@/*": ["../../apps/web/src/*"],
+      "@cloud-agent-shared/*": ["../../services/cloud-agent-next/src/shared/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],
       "@kilocode/encryption": ["../encryption/src/index.ts"]

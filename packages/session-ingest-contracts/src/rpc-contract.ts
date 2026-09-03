@@ -8,7 +8,7 @@ export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: z.enum(['cloudflare', 'vercel', 'onprem']),
   })
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;

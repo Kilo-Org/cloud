@@ -25,6 +25,14 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
     .digest('base64');
 }
 
+export function generateProviderSpecificSessionHash(
+  userId: string,
+  sessionId: string,
+  provider: Provider
+): string {
+  return generateProviderSpecificHash(userId + '-' + sessionId, provider);
+}
+
 export function generateOpenRouterDownstreamSafetyIdentifier(userId: string): string {
   return generateProviderSpecificHash(userId, OPENROUTER);
 }
@@ -54,7 +62,7 @@ export function applyTrackingIds(
   taskId: string | null
 ) {
   const userHash = generateProviderSpecificHash(userId, provider);
-  const taskHash = taskId ? generateProviderSpecificHash(userId + '-' + taskId, provider) : '';
+  const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
     if (provider.id === 'openrouter') {

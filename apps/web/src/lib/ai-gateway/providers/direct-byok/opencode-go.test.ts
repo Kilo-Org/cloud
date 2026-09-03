@@ -1,4 +1,5 @@
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
@@ -61,21 +62,33 @@ describe('OpenCode Go session headers', () => {
     );
   });
 
-  test.each([
-    { session_id: 'conversation-2' },
-    { kilo_user_id: 'oauth/another-user' },
-    { organization_id: 'another-organization' },
-  ])('isolates sessions when the conversation or owner changes: %j', overrides => {
-    const first = createContext();
-    const other = createContext(overrides);
+  test.each([{ session_id: 'conversation-2' }, { kilo_user_id: 'oauth/another-user' }])(
+    'isolates sessions when the conversation or user changes: %j',
+    overrides => {
+      const first = createContext();
+      const other = createContext(overrides);
 
-    openCodeGo.transformRequest(first);
-    openCodeGo.transformRequest(other);
+      openCodeGo.transformRequest(first);
+      openCodeGo.transformRequest(other);
 
-    expect(other.extraHeaders['x-opencode-session']).not.toBe(
-      first.extraHeaders['x-opencode-session']
-    );
-  });
+      expect(other.extraHeaders['x-opencode-session']).not.toBe(
+        first.extraHeaders['x-opencode-session']
+      );
+    }
+  );
+
+  test.each(requests.filter(request => request.kind !== 'messages'))(
+    'matches the existing prompt cache key for $kind',
+    request => {
+      const trackedRequest = structuredClone(request);
+      const context = createContext({ request: trackedRequest });
+      applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
+
+      openCodeGo.transformRequest(context);
+
+      expect(context.extraHeaders['x-opencode-session']).toBe(trackedRequest.body.prompt_cache_key);
+    }
+  );
 
   test('keeps the header stable when the model, API key, or request body changes', () => {
     const first = createContext();

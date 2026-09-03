@@ -24,6 +24,7 @@ import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
@@ -188,7 +189,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
-  const authPromise = getUserFromAuth({ adminOnly: false });
+  const authPromise = getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  });
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: GatewayRequest;
   try {

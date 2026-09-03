@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
-import { SignJWT } from 'jose';
+import { decodeProtectedHeader, jwtVerify, SignJWT } from 'jose';
 import {
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
   buildModernKiloTokenPayload,
   isKiloCredentialExchangeEligible,
   isKiloResourceAudienceAllowed,
+  signModernKiloToken,
   verifyKiloSessionForPolicy,
   verifyKiloTokenForResource,
   verifyKiloTokenForPolicy,
@@ -940,5 +941,114 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
       kiloUserId: 'synthetic-user',
     });
     await expect(verifyKiloTokenForPolicy(noDates, SECRET, LEGACY_POLICY)).rejects.toThrow();
+  });
+});
+
+describe('signModernKiloToken', () => {
+  const baseParams = {
+    userId: 'synthetic-user',
+    secret: SECRET,
+    expiresInSeconds: 60,
+    audience: 'kilo-api',
+    tokenPurpose: 'human-api' as const,
+    credentialExchange: true,
+    pepper: 'synthetic-pepper',
+  };
+
+  it('signs the complete builder-validated payload with one clock value', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    const signed = await signModernKiloToken({
+      ...baseParams,
+      pepper: 'synthetic-pepper',
+      env: 'production',
+      extra: { deviceAuthRequestCode: 'request-code' },
+    });
+    const { payload } = await jwtVerify(signed.token, key(), { algorithms: ['HS256'] });
+
+    expect(decodeProtectedHeader(signed.token)).toEqual({ alg: 'HS256', typ: 'JWT' });
+    expect(payload).toEqual({
+      version: 3,
+      kiloUserId: 'synthetic-user',
+      apiTokenPepper: 'synthetic-pepper',
+      env: 'production',
+      aud: 'kilo-api',
+      iat: NOW_SECONDS,
+      exp: NOW_SECONDS + 60,
+      tokenPurpose: 'human-api',
+      credentialExchange: true,
+      deviceAuthRequestCode: 'request-code',
+    });
+    expect(signed.expiresAt).toBe(new Date((NOW_SECONDS + 60) * 1000).toISOString());
+  });
+
+  it.each([
+    ['omits an absent pepper', undefined, false],
+    ['retains a null pepper', null, true],
+  ])('%s', async (_name, pepper, hasPepper) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    const { token } = await signModernKiloToken({
+      ...baseParams,
+      pepper,
+      credentialExchange: false,
+    });
+    const { payload } = await jwtVerify(token, key(), { algorithms: ['HS256'] });
+
+    expect(Object.hasOwn(payload, 'apiTokenPepper')).toBe(hasPepper);
+    if (hasPepper) expect(payload.apiTokenPepper).toBeNull();
+  });
+
+  it('allows non-exchangeable internal tokens and retains their source', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    const { token } = await signModernKiloToken({
+      ...baseParams,
+      audience: 'git-token-service:internal',
+      pepper: undefined,
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+      extra: { tokenSource: 'git-token-service' },
+    });
+    const context = await verifyKiloTokenForPolicy(token, SECRET, {
+      audience: 'git-token-service:internal',
+      mode: 'required',
+    });
+
+    expect(context.claims).toMatchObject({
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+      tokenSource: 'git-token-service',
+    });
+    expect(isKiloCredentialExchangeEligible(context, { legacy: 'deny' })).toBe(false);
+  });
+
+  it.each([
+    ['missing TTL', { expiresInSeconds: undefined }],
+    ['zero TTL', { expiresInSeconds: 0 }],
+    ['negative TTL', { expiresInSeconds: -1 }],
+    ['fractional TTL', { expiresInSeconds: 1.5 }],
+    ['NaN TTL', { expiresInSeconds: Number.NaN }],
+    ['infinite TTL', { expiresInSeconds: Number.POSITIVE_INFINITY }],
+    ['unsafe TTL', { expiresInSeconds: Number.MAX_SAFE_INTEGER + 1 }],
+    ['overflowing TTL', { expiresInSeconds: Number.MAX_SAFE_INTEGER }],
+    ['invalid purpose', { tokenPurpose: 'unknown' }],
+    ['invalid audience', { audience: ' kilo-api' }],
+    ['unknown extra', { extra: { unknown: true } }],
+    ['reserved extra override', { extra: { aud: undefined } }],
+  ])('rejects %s', async (_name, overrides) => {
+    await expect(signModernKiloToken({ ...baseParams, ...overrides } as never)).rejects.toThrow();
+  });
+
+  it.each([
+    ['a non-API audience', { audience: 'kilo-gateway' }],
+    ['a missing pepper', { pepper: undefined }],
+    ['a non-human purpose', { tokenPurpose: 'device-access', credentialExchange: true }],
+    ['a source marker', { extra: { tokenSource: 'automation' } }],
+  ])('rejects exchangeable human API tokens with %s', async (_name, overrides) => {
+    await expect(signModernKiloToken({ ...baseParams, ...overrides } as never)).rejects.toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as TrpcClientModule from '@trpc/client';
+import type * as CloudAgentClientModule from './cloud-agent-client';
 import type {
-  CloudAgentNextClient as CloudAgentNextClientType,
   ComputeBillingStatus,
   CreateWorktreeChatInput,
   CreateWorktreeChatOutput,
@@ -11,6 +11,7 @@ import type {
   PrepareSessionInput,
   SendMessageInput,
 } from './cloud-agent-client';
+import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 
 const mockCreateTRPCClient = jest.fn(() => ({}));
 const mockHttpLink =
@@ -78,12 +79,10 @@ beforeEach(() => {
 
 // Load the real `closeCloudAgentOrgStreams` (the module mock above does not
 // expose it) so the test exercises the actual fetch call, not a stub.
-const { closeCloudAgentOrgStreams, CloudAgentNextClient } = jest.requireActual(
-  './cloud-agent-client'
-) as {
-  closeCloudAgentOrgStreams: (userId: string, organizationId: string) => Promise<void>;
-  CloudAgentNextClient: typeof CloudAgentNextClientType;
-};
+const realCloudAgentClientModule =
+  jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
+  realCloudAgentClientModule;
 
 describe('createCloudAgentNextClientForModel', () => {
   it('returns the default client when the model is paid and has no BYOK', () => {
@@ -114,6 +113,71 @@ describe('createCloudAgentNextClientForModel', () => {
     expect(result).toEqual({ marker: 'appbuilder' });
     expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('createAppBuilderCloudAgentNextClient', () => {
+  it('forwards the original App Builder JWT to Cloud Agent Next with its dedicated policy headers', async () => {
+    const { token } = await signKiloToken({
+      userId: 'synthetic-app-builder-user',
+      pepper: 'synthetic-app-builder-pepper',
+      secret: 'synthetic-app-builder-secret',
+      expiresInSeconds: 60,
+      extra: { tokenSource: 'app-builder' },
+    });
+    const prepareSession = jest.fn(async () => ({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    }));
+    const getSession = jest.fn<
+      (input: { cloudAgentSessionId: string }) => Promise<Record<string, never>>
+    >(async () => ({}));
+    const interruptSession = jest.fn<
+      (input: {
+        sessionId: string;
+      }) => Promise<{ success: boolean; message: string; processesFound: boolean }>
+    >(async () => ({
+      success: true,
+      message: 'interrupted',
+      processesFound: true,
+    }));
+    const initiateFromKilocodeSessionV2 = jest.fn<
+      (input: { cloudAgentSessionId: string }) => Promise<Record<string, never>>
+    >(async () => ({}));
+    const sendMessageV2 = jest.fn(async () => ({}));
+    mockCreateTRPCClient.mockReturnValueOnce({
+      prepareSession: { mutate: prepareSession },
+      getSession: { query: getSession },
+      interruptSession: { mutate: interruptSession },
+      initiateFromKilocodeSessionV2: { mutate: initiateFromKilocodeSessionV2 },
+      sendMessageV2: { mutate: sendMessageV2 },
+    });
+
+    const client = createAppBuilderCloudAgentNextClient(token);
+    const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+    await client.prepareSession({ prompt: 'Build an app', mode: 'code', model: 'kilo/test-model' });
+    await client.getSession(cloudAgentSessionId);
+    await client.interruptSession(cloudAgentSessionId);
+    await client.initiateFromPreparedSession({ cloudAgentSessionId });
+    await client.sendMessage({
+      cloudAgentSessionId,
+      payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'kilo/test-model' },
+    });
+
+    expect(mockHttpLink).toHaveBeenCalledWith({
+      url: 'http://cloud-agent-next/trpc',
+      headers: expect.any(Function),
+    });
+    expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
+      Authorization: `Bearer ${token}`,
+      'x-skip-balance-check': 'true',
+      'x-internal-api-key': 'test-secret',
+    });
+    expect(prepareSession).toHaveBeenCalledTimes(1);
+    expect(getSession).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(interruptSession).toHaveBeenCalledWith({ sessionId: cloudAgentSessionId });
+    expect(initiateFromKilocodeSessionV2).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(sendMessageV2).toHaveBeenCalledTimes(1);
   });
 });
 

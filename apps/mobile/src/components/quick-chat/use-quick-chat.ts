@@ -6,7 +6,7 @@ import { ulid } from 'ulid';
 
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { getGatewayAuthTokenForRequest } from '@/lib/auth/credentials';
 import { useOrganization } from '@/lib/organization-context';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -266,7 +266,7 @@ export function useQuickChat(model: string) {
 
     void (async () => {
       try {
-        const authToken = await getAuthTokenForRequest();
+        const authToken = await getGatewayAuthTokenForRequest();
         if (abortRef.current !== controller) {
           return;
         }

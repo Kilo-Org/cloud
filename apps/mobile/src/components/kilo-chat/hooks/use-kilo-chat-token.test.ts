@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getItemAsync: vi.fn<() => Promise<string | null>>(),
+  getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
   getTokenQuery: vi.fn<() => Promise<{ token: string; userId: string; expiresAt: string }>>(),
 }));
 
@@ -15,6 +15,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
+  NATIVE_CREDENTIAL_BUNDLE_KEY: 'native-credential-bundle',
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -30,6 +31,8 @@ vi.mock('@/lib/trpc', () => ({
 describe('useKiloChatTokenResponseGetter', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    const { clearActiveToken } = await import('@/lib/auth/token-owner');
+    clearActiveToken();
     const { clearKiloChatTokenCache } = await import('./use-kilo-chat-token');
     clearKiloChatTokenCache();
   });
@@ -42,7 +45,10 @@ describe('useKiloChatTokenResponseGetter', () => {
     };
     const seenUserIds: string[] = [];
 
-    mocks.getItemAsync.mockResolvedValue('auth-token-1');
+    mocks.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      return key === 'auth-token' ? 'auth-token-1' : null;
+    });
     mocks.getTokenQuery.mockRejectedValueOnce(new Error('network down'));
     mocks.getTokenQuery.mockResolvedValueOnce(response);
 
@@ -69,7 +75,10 @@ describe('useKiloChatTokenResponseGetter', () => {
       expiresAt: '2099-03-13 14:30:00+00',
     };
 
-    mocks.getItemAsync.mockResolvedValue('auth-token-2');
+    mocks.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      return key === 'auth-token' ? 'auth-token-2' : null;
+    });
     mocks.getTokenQuery.mockResolvedValueOnce(response);
 
     const { useKiloChatTokenResponseGetter } = await import('./use-kilo-chat-token');
@@ -98,7 +107,10 @@ describe('useKiloChatTokenResponseGetter', () => {
       expiresAt: '2099-03-13 14:30:00+00',
     };
 
-    mocks.getItemAsync.mockResolvedValue('auth-token-3');
+    mocks.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      return key === 'auth-token' ? 'auth-token-3' : null;
+    });
     mocks.getTokenQuery.mockResolvedValueOnce(firstResponse);
     mocks.getTokenQuery.mockResolvedValueOnce(secondResponse);
 

@@ -19,7 +19,7 @@ vi.mock('expo-secure-store', () => ({
 
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
-import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { AUTH_TOKEN_KEY, NATIVE_CREDENTIAL_BUNDLE_KEY } from '@/lib/storage-keys';
 import { bumpAuthEpoch } from './auth-epoch';
 import {
   clearActiveToken,
@@ -84,7 +84,7 @@ describe('token-owner', () => {
     it('reads SecureStore once on the cold path and returns the stored token', async () => {
       store.set(AUTH_TOKEN_KEY, 'stored-token');
       await expect(getAuthTokenForRequest()).resolves.toBe('stored-token');
-      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(2);
     });
 
     it('warms the owner on a cold read so the next read is in-memory', async () => {
@@ -93,8 +93,9 @@ describe('token-owner', () => {
       expect(getActiveToken()).toEqual({ token: 'stored-token', expiresAtMs: null });
 
       await getAuthTokenForRequest();
-      // One SecureStore read for the first (cold) call, none for the warm hit.
-      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+      // The first cold call checks the versioned bundle and legacy key; the
+      // warm hit does not access SecureStore.
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(2);
     });
 
     it('does not warm the owner when the epoch changes mid-read', async () => {
@@ -165,6 +166,41 @@ describe('token-owner', () => {
 
       await expect(pending).resolves.toBeNull();
       expect(getActiveToken()).toBeNull();
+    });
+
+    it('uses the gateway credential from a versioned bundle', async () => {
+      store.set(
+        NATIVE_CREDENTIAL_BUNDLE_KEY,
+        JSON.stringify({
+          token: 'api-token',
+          refreshToken: 'refresh-token',
+          expiresIn: 3600,
+          metadata: {
+            credentialFormat: 'api-gateway-v1',
+            gatewayToken: 'gateway-token',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+          },
+        })
+      );
+
+      await expect(getAuthTokenForRequest()).resolves.toBe('api-token');
+      await expect(getAuthTokenForRequest('gateway')).resolves.toBe('gateway-token');
+    });
+
+    it('uses a legacy token for gateway requests when no versioned bundle exists', async () => {
+      store.set(AUTH_TOKEN_KEY, 'legacy-token');
+
+      await expect(getAuthTokenForRequest('gateway')).resolves.toBe('legacy-token');
+    });
+
+    it('does not fall back to legacy credentials for a corrupted tagged bundle', async () => {
+      store.set(
+        NATIVE_CREDENTIAL_BUNDLE_KEY,
+        JSON.stringify({ metadata: { credentialFormat: 'bad' } })
+      );
+      store.set(AUTH_TOKEN_KEY, 'legacy-token');
+
+      await expect(getAuthTokenForRequest()).resolves.toBeNull();
     });
   });
 

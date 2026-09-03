@@ -6,6 +6,25 @@ import {
 } from '@/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { APP_URL } from '@/lib/constants';
+import * as z from 'zod';
+import {
+  nativeCredentialFormatSchema,
+  type NativeCredentialFormat,
+  type NativeSessionCredentials,
+} from '@kilocode/app-shared/native-auth';
+
+const requestSchema = z.object({ credentialFormat: nativeCredentialFormatSchema.optional() });
+
+function credentialResponse(credentials: NativeSessionCredentials) {
+  return {
+    token: credentials.token,
+    refreshToken: credentials.refreshToken,
+    expiresIn: credentials.expiresIn,
+    ...('metadata' in credentials && credentials.metadata
+      ? { metadata: credentials.metadata }
+      : {}),
+  };
+}
 
 /**
  * Token exchange endpoint. Authenticates with the existing long-lived bearer
@@ -33,18 +52,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const text = await request.text();
+  let credentialFormat: NativeCredentialFormat | undefined;
+  if (text.length > 0) {
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
+    }
+    const validation = requestSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
+    }
+    credentialFormat = validation.data.credentialFormat;
+  }
+
   const sessionId = await createDeviceSession({
     userId: auth.user.id,
     userAgent: request.headers.get('user-agent') ?? undefined,
   });
 
-  const pair = await issueSessionCredentials(auth.user, sessionId);
+  const pair = credentialFormat
+    ? await issueSessionCredentials(auth.user, sessionId, { credentialFormat })
+    : await issueSessionCredentials(auth.user, sessionId);
 
   return NextResponse.json(
     {
-      token: pair.token,
-      refreshToken: pair.refreshToken,
-      expiresIn: pair.expiresIn,
+      ...credentialResponse(pair),
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );

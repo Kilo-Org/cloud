@@ -1,6 +1,5 @@
-/* eslint-disable max-lines -- sign-out teardown ordering, stale sign-in fencing, and the consent-outcome clear are kept together with the provider mount */
 import * as SecureStore from 'expo-secure-store';
-import { z } from 'zod';
+import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
 import {
   createContext,
   type ReactNode,
@@ -27,13 +26,14 @@ import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
-import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { readUserIdFromToken } from '@/lib/auth/auth-user-id';
+import { useAuthBootstrap } from '@/lib/auth/use-auth-bootstrap';
 import {
   IOS_BEARER_SECURE_STORE_OPTIONS,
   performRefresh,
-  persistSignInCredentialsAtEpoch,
   REFRESH_MARGIN_MS,
+  setCredentials,
   writeCredentials,
 } from '@/lib/auth/credentials';
 import {
@@ -67,6 +67,7 @@ import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
+  NATIVE_CREDENTIAL_BUNDLE_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
@@ -286,69 +287,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     void load();
   }, [load]);
 
-  const signIn = useCallback(
-    async (tokenValue: string, refreshTokenValue?: string, expiresIn?: number) => {
-      // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so
-      // a sign-in queued behind an in-flight sign-out lands only after the
-      // full teardown, and a sign-out queued behind a sign-in signs that new
-      // session out (documented, correct FIFO semantics).
-      await chainSave('auth-transition', async () => {
-        // Close admission before publishing the pending generation or writing credentials.
-        setSignOutTeardownActive(true);
-        setSignOutActive(true);
-        bumpAuthEpoch();
-        beginAuthenticatedOwner();
-        // Blank the prior account's glanceable surface before any credential
-        // persist, so a direct account switch never shows the previous account.
-        writeSignedOutSnapshotAndEnd();
-        // Unregister the prior account's activity tokens (Live Activity /
-        // push-to-start) BEFORE persisting the new credentials, so the
-        // unregister runs under the old token owner's auth. This never revokes
-        // the device session or unregisters the Expo push token (logout-only).
-        await unregisterActivityTokensAndTombstone();
-        setAuthEpoch(currentAuthEpoch());
-        setToken(undefined);
-        clearActiveToken();
-        // Bind the pending deep-link slot to the new user id at the same
-        // place the auth epoch advances, so a destination captured while this
-        // account is signed in restores only for this account.
-        setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
-        const epoch = currentAuthEpoch();
-        const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
-          expiresIn,
-        });
-        // A sign-in superseded by a newer sign-in or sign-out while its
-        // credential write was fenced must not clear the signed-out guard,
-        // update React auth state, or run login side effects.
-        if (!published || !isCurrentAuthEpoch(epoch)) {
-          return;
-        }
-        // Clear the guard so a later refused refresh can sign out again.
-        isSignedOutReference.current = false;
-        // Credentials published on the winning epoch: the teardown window
-        // ends, so refresh may rotate the new session and request-token cold
-        // reads may warm the owner again.
-        setSignOutTeardownActive(false);
-        setSessionEnded(false);
-        // Credentials published on the winning epoch: the sign-out fence opens
-        // so the read-cache mount can subscribe for the new session, and the
-        // reactive `isSigningOut` follows the same flag.
-        setSignOutActive(false);
-        trackEvent('login');
-        resetPurchaseErrorToastDedup();
-        // A direct account switch must not keep the prior account's query
-        // cache: the org list is keyed account-independently, so a stale list
-        // would otherwise drive a false lost-org blank in the org fence.
-        queryClient.clear();
-        setToken(tokenValue);
-        // A direct account switch must not keep the prior account's session
-        // state: trusted hosts, image confirms, media caches, temp copies.
-        clearSessionScopedState();
-      });
-    },
-    []
-  );
-
   const signOut = useCallback(async (ended = false) => {
     // The ENTIRE sign-out body runs inside the FIFO auth-transition queue.
     // Dedupe inside the queued run, not at enqueue: a sign-out queued behind
@@ -449,6 +387,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
               await SecureStore.deleteItemAsync(
                 TOKEN_EXPIRES_AT_KEY,
+                IOS_BEARER_SECURE_STORE_OPTIONS
+              );
+              await SecureStore.deleteItemAsync(
+                NATIVE_CREDENTIAL_BUNDLE_KEY,
                 IOS_BEARER_SECURE_STORE_OPTIONS
               );
               await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);

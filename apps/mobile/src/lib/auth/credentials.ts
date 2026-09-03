@@ -2,11 +2,29 @@ import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { parseTokenPair } from '@/lib/auth/native-auth-contract';
-import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
+import {
+  API_GATEWAY_CREDENTIAL_FORMAT,
+  type NativeCredentialBundleMetadata,
+  type NativeTokenPair,
+  parseTokenPair,
+} from '@/lib/auth/native-auth-contract';
+import {
+  clearActiveToken,
+  getActiveTokenSnapshot,
+  getAuthTokenForRequest,
+  isSignOutTeardownActive,
+  publishActiveTokenExpiry,
+  setActiveToken,
+} from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
-import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
+import {
+  AUTH_TOKEN_KEY,
+  NATIVE_CREDENTIAL_BUNDLE_KEY,
+  REFRESH_TOKEN_KEY,
+  TOKEN_EXPIRES_AT_KEY,
+} from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
+import { parseTimestamp } from '@/lib/utils';
 
 // Apple `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` is not in iCloud or
 // iTunes backup and does not migrate to a new device. Pin every bearer-token
@@ -61,6 +79,8 @@ export async function writeCredentials<T>(write: () => Promise<T>): Promise<T> {
 type PersistCredentialsOptions = {
   expiresIn?: number;
   expectedEpoch?: number;
+  bundle?: NativeCredentialBundleMetadata;
+  allowDuringTeardown?: boolean;
 };
 
 export async function persistSignInCredentialsAtEpoch(
@@ -69,8 +89,27 @@ export async function persistSignInCredentialsAtEpoch(
   options: PersistCredentialsOptions
 ): Promise<boolean> {
   const epoch = options.expectedEpoch ?? currentAuthEpoch();
+  const mayWrite = () =>
+    isCurrentAuthEpoch(epoch) &&
+    (options.allowDuringTeardown !== false || !isSignOutTeardownActive());
   const expiresIn = options.expiresIn;
-  const expiresAtMs = refreshToken && expiresIn ? Date.now() + expiresIn * 1000 : null;
+  const hasBundle = options.bundle !== undefined;
+  const validBundle = hasBundle
+    ? parseTokenPair({ token, refreshToken, expiresIn, metadata: options.bundle })
+    : null;
+
+  if (
+    hasBundle &&
+    (!validBundle?.refreshToken || !validBundle.expiresIn || !validBundle.metadata)
+  ) {
+    return false;
+  }
+  let expiresAtMs: number | null = null;
+  if (validBundle?.metadata) {
+    expiresAtMs = parseTimestamp(validBundle.metadata.expiresAt).getTime();
+  } else if (refreshToken && expiresIn) {
+    expiresAtMs = Date.now() + expiresIn * 1000;
+  }
   const hasPair = expiresAtMs !== null;
 
   // Wipe every credential key a fenced write may already have committed.
@@ -78,21 +117,24 @@ export async function persistSignInCredentialsAtEpoch(
   // a newer sign-in or sign-out: their own credential write is queued
   // strictly behind this one.
   const clearPartialCredentials = async (): Promise<void> => {
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(NATIVE_CREDENTIAL_BUNDLE_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+    ]);
   };
 
   // Fence one credential operation: skip it when the epoch moved before the
   // op, and clear the partial pair when it moved during the op.
   const commitWrite = async (key: string, value?: string): Promise<boolean> => {
-    if (!isCurrentAuthEpoch(epoch)) {
+    if (!mayWrite()) {
       return false;
     }
     await (value === undefined
       ? SecureStore.deleteItemAsync(key, IOS_BEARER_SECURE_STORE_OPTIONS)
       : SecureStore.setItemAsync(key, value, IOS_BEARER_SECURE_STORE_OPTIONS));
-    if (!isCurrentAuthEpoch(epoch)) {
+    if (!mayWrite()) {
       await clearPartialCredentials();
       return false;
     }
@@ -101,19 +143,60 @@ export async function persistSignInCredentialsAtEpoch(
 
   let published = false;
   await writeCredentials(async () => {
-    if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
-      return;
+    try {
+      if (hasBundle) {
+        if (!Number.isFinite(expiresAtMs)) {
+          return;
+        }
+        if (!validBundle?.metadata) {
+          return;
+        }
+        const bundle = validBundle.metadata;
+        const value = JSON.stringify({
+          token,
+          refreshToken,
+          expiresIn,
+          metadata: bundle,
+        });
+        if (!(await commitWrite(NATIVE_CREDENTIAL_BUNDLE_KEY, value))) {
+          return;
+        }
+        if (!(await commitWrite(AUTH_TOKEN_KEY))) {
+          return;
+        }
+        if (!(await commitWrite(REFRESH_TOKEN_KEY))) {
+          return;
+        }
+        if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY))) {
+          return;
+        }
+        setActiveToken(token, expiresAtMs, bundle);
+        published = true;
+        return;
+      }
+      if (!(await commitWrite(NATIVE_CREDENTIAL_BUNDLE_KEY))) {
+        return;
+      }
+      if (!(await commitWrite(AUTH_TOKEN_KEY, token))) {
+        return;
+      }
+      if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
+        return;
+      }
+      if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
+        return;
+      }
+      // Every fenced operation passed its post-check and nothing awaited since
+      // the last one, so the epoch is still current: publish to the owner.
+      setActiveToken(token, expiresAtMs);
+      published = true;
+    } catch (error) {
+      await clearPartialCredentials();
+      if (isCurrentAuthEpoch(epoch)) {
+        clearActiveToken();
+      }
+      throw error;
     }
-    if (!(await commitWrite(REFRESH_TOKEN_KEY, hasPair ? refreshToken : undefined))) {
-      return;
-    }
-    if (!(await commitWrite(TOKEN_EXPIRES_AT_KEY, hasPair ? String(expiresAtMs) : undefined))) {
-      return;
-    }
-    // Every fenced operation passed its post-check and nothing awaited since
-    // the last one, so the epoch is still current: publish to the owner.
-    setActiveToken(token, expiresAtMs);
-    published = true;
   });
   return published;
 }
@@ -146,7 +229,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
     return { ok: false, refused: false, superseded: true };
   }
   try {
-    const storedRefreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    const storedRefreshToken = await readRefreshToken();
     if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }
@@ -162,7 +245,10 @@ async function doRefresh(): Promise<RefreshOutcome> {
       const res = await fetch(`${API_BASE_URL}/api/auth/native/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: storedRefreshToken }),
+        body: JSON.stringify({
+          refreshToken: storedRefreshToken,
+          credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+        }),
         signal,
       });
       return res;
@@ -196,6 +282,8 @@ async function doRefresh(): Promise<RefreshOutcome> {
     const published = await persistSignInCredentialsAtEpoch(parsed.token, parsed.refreshToken, {
       expiresIn: parsed.expiresIn,
       expectedEpoch: sessionVersion,
+      bundle: parsed.metadata,
+      allowDuringTeardown: false,
     });
     if (!published) {
       return { ok: false, refused: false, superseded: true };
@@ -211,4 +299,65 @@ async function doRefresh(): Promise<RefreshOutcome> {
   } catch {
     return { ok: false, refused: false };
   }
+}
+
+export async function getGatewayAuthTokenForRequest(): Promise<string | null> {
+  const epoch = currentAuthEpoch();
+  const token = await getAuthTokenForRequest();
+  const owner = getActiveTokenSnapshot();
+  if (!token || !owner || owner.epoch !== epoch || !isCurrentAuthEpoch(epoch)) {
+    return null;
+  }
+  let expiresAtMs = owner.expiresAtMs;
+  if (expiresAtMs === null && !owner.bundle) {
+    const expiresAt = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+    if (!isCurrentAuthEpoch(epoch)) {
+      return null;
+    }
+    const current = getActiveTokenSnapshot();
+    if (!current || current.epoch !== epoch || current.token !== owner.token) {
+      return getAuthTokenForRequest('gateway');
+    }
+    const parsedExpiry = expiresAt ? Number(expiresAt) : null;
+    expiresAtMs = parsedExpiry !== null && Number.isFinite(parsedExpiry) ? parsedExpiry : null;
+    if (expiresAtMs !== null) {
+      publishActiveTokenExpiry(current, expiresAtMs);
+    }
+  }
+  if (expiresAtMs !== null && shouldRefresh(expiresAtMs)) {
+    const refreshed = await performRefresh();
+    if (!refreshed.ok || !isCurrentAuthEpoch(epoch) || refreshed.sessionVersion !== epoch) {
+      return null;
+    }
+  }
+  if (!isCurrentAuthEpoch(epoch)) {
+    return null;
+  }
+  return getAuthTokenForRequest('gateway');
+}
+
+export async function setCredentials(pair: NativeTokenPair): Promise<boolean> {
+  const published = await persistSignInCredentialsAtEpoch(pair.token, pair.refreshToken, {
+    expiresIn: pair.expiresIn,
+    bundle: pair.metadata,
+  });
+  return published;
+}
+
+function shouldRefresh(expiresAtMs: number): boolean {
+  return Date.now() >= expiresAtMs - REFRESH_MARGIN_MS;
+}
+
+async function readRefreshToken(): Promise<string | null> {
+  const rawBundle = await SecureStore.getItemAsync(NATIVE_CREDENTIAL_BUNDLE_KEY);
+  if (rawBundle !== null) {
+    try {
+      const value: unknown = JSON.parse(rawBundle);
+      const pair = parseTokenPair(value);
+      return pair?.metadata && pair.refreshToken ? pair.refreshToken : null;
+    } catch {
+      return null;
+    }
+  }
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 }

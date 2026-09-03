@@ -1541,6 +1541,73 @@ describe('POST /api/auth/native/token', () => {
   });
 
   describe('supportsRefresh', () => {
+    it('rejects a requested credential format without refresh support before authentication', async () => {
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          idToken: 'google-id-token',
+          credentialFormat: 'api-gateway-v1',
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown credential format before authentication', async () => {
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          idToken: 'google-id-token',
+          supportsRefresh: true,
+          credentialFormat: 'future-format',
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockVerifyNativeGoogleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('passes a requested credential format and preserves tagged metadata', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateDeviceSession.mockResolvedValue('session-1');
+      mockIssueSessionCredentials.mockResolvedValue({
+        token: 'short-jwt',
+        refreshToken: 'refresh-abc',
+        expiresIn: 3600,
+        metadata: {
+          credentialFormat: 'api-gateway-v1',
+          gatewayToken: 'gateway-token',
+          expiresAt: '2026-09-02T22:00:00.000Z',
+        },
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'google',
+          idToken: 'google-id-token',
+          supportsRefresh: true,
+          credentialFormat: 'api-gateway-v1',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'session-1', {
+        credentialFormat: 'api-gateway-v1',
+      });
+      expect((await response.json()).metadata).toEqual({
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-09-02T22:00:00.000Z',
+      });
+    });
+
     it('returns short-lived pair when supportsRefresh is true', async () => {
       mockVerifyNativeGoogleIdToken.mockResolvedValue({
         sub: 'google-sub-1',

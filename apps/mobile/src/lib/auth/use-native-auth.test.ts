@@ -17,6 +17,7 @@ import {
   parseTokenResponse,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
+import { API_GATEWAY_CREDENTIAL_FORMAT } from '@kilocode/app-shared/native-auth';
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -118,6 +119,7 @@ const mockGetAdmission = vi.mocked(getAdmission);
 
 const { useNativeAuth } = await import('@/lib/auth/use-native-auth');
 const { postAuth } = await import('@/lib/auth/auth-fetch');
+const { useAuth } = await import('@/lib/auth/auth-context');
 const mockPostAuth = vi.mocked(postAuth);
 
 // ── C12: Config invariant ────────────────────────────────────────────────
@@ -180,6 +182,20 @@ describe('native-auth-contract (used by use-native-auth)', () => {
     it('parses a full token pair with refresh (Apple/Google/Email after supportsRefresh:true)', () => {
       const result = parseTokenPair({ token: 'at', refreshToken: 'rt', expiresIn: 3600 });
       expect(result).toEqual({ token: 'at', refreshToken: 'rt', expiresIn: 3600 });
+    });
+
+    it('retains modern gateway credential metadata', () => {
+      const metadata = {
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-01-01T01:00:00.000Z',
+      };
+      expect(
+        parseTokenPair({ token: 'at', refreshToken: 'rt', expiresIn: 3600, metadata })
+      ).toMatchObject({
+        token: 'at',
+        metadata,
+      });
     });
 
     it('parses a token-only response (legacy server without refresh)', () => {
@@ -433,6 +449,47 @@ describe('useNativeAuth created-account announcement', () => {
     });
 
     expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('negotiates gateway credentials and forwards their metadata', async () => {
+    const signIn = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useAuth).mockReturnValue({
+      token: undefined,
+      isLoading: false,
+      sessionEnded: false,
+      authEpoch: 0,
+      isSigningOut: false,
+      signIn,
+      signOut: vi.fn(),
+    });
+    const metadata = {
+      credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      gatewayToken: 'gateway-token',
+      expiresAt: '2026-01-01T01:00:00.000Z',
+    };
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'api-token', refreshToken: 'refresh-token', expiresIn: 3600, metadata },
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(mockPostAuth).toHaveBeenCalledWith(
+      '/api/auth/native/token',
+      expect.objectContaining({
+        supportsRefresh: true,
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      })
+    );
+    expect(signIn).toHaveBeenCalledWith({
+      token: 'api-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 3600,
+      metadata,
+    });
   });
 
   it('stays silent when created is false', async () => {

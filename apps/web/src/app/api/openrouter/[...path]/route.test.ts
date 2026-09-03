@@ -37,7 +37,7 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -178,13 +178,13 @@ const vercelProvider = {
 
 const partnerProvider = {
   ...provider,
-  id: 'friendli',
-  apiUrl: 'https://api.friendli.ai/serverless/v1',
+  id: 'perplexity',
+  apiUrl: 'https://api.perplexity.ai/router/v1',
   supportedChatApis: ['messages'],
   transformRequest: jest.fn(async context => {
     Object.assign(context.request.body, {
-      model: 'zai-org/GLM-5.2',
-      metadata: { transformedBy: 'friendli' },
+      model: 'perplexity/kimi-k3',
+      metadata: { transformedBy: 'perplexity' },
     });
     delete context.request.body.provider;
   }),
@@ -714,7 +714,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'friendli' },
+      provider: { ...provider, id: 'perplexity' },
       userByok: null,
       bypassAccessCheck: false,
       experiment: {
@@ -749,7 +749,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'friendli' },
+      provider: { ...provider, id: 'perplexity' },
       userByok: null,
       bypassAccessCheck: false,
       experiment: {
@@ -1557,7 +1557,7 @@ describe('percentage-routed partner fallback', () => {
       const { POST } = await import('./route');
       const response = await POST(
         makeMessagesRequest({
-          model: FRIENDLI_GLM_PUBLIC_ID,
+          model: PERPLEXITY_KIMI_PUBLIC_ID,
           max_tokens: 1_024,
           messages: [{ role: 'user', content: 'hello' }],
         }) as never
@@ -1568,10 +1568,10 @@ describe('percentage-routed partner fallback', () => {
       const partnerAttempt = mockedUpstreamRequest.mock.calls[0]?.[0];
       const fallbackAttempt = mockedUpstreamRequest.mock.calls[1]?.[0];
       expect(partnerAttempt.provider).toBe(partnerProvider);
-      expect(partnerAttempt.body.model).toBe('zai-org/GLM-5.2');
-      expect(partnerAttempt.body.metadata).toEqual({ transformedBy: 'friendli' });
+      expect(partnerAttempt.body.model).toBe('perplexity/kimi-k3');
+      expect(partnerAttempt.body.metadata).toEqual({ transformedBy: 'perplexity' });
       expect(fallbackAttempt.provider).toBe(sourceProvider);
-      expect(fallbackAttempt.body.model).toBe(FRIENDLI_GLM_PUBLIC_ID);
+      expect(fallbackAttempt.body.model).toBe(PERPLEXITY_KIMI_PUBLIC_ID);
       expect(fallbackAttempt.body.metadata).not.toHaveProperty('transformedBy');
       expect(fallbackAttempt.body).not.toBe(partnerAttempt.body);
       expect((fallbackAttempt.body as GatewayMessagesRequest).messages).not.toBe(
@@ -1627,7 +1627,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1658,7 +1658,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1683,7 +1683,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1702,7 +1702,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never

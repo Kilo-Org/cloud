@@ -336,7 +336,9 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       set: { models, synced_at },
     });
 
-  await redisClient.set(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models));
+  await redisClient.set(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models), {
+    ex: 7 * 24 * 60 * 60,
+  });
   return models.length;
 }
 

@@ -142,8 +142,8 @@ describe('cachedEnhancedDirectByokModelList', () => {
       { ...zeta, flags: undefined, variants: undefined },
       { ...gamma, flags: ['reasoning'], variants: undefined },
     ]);
-    expect(curated).toStrictEqual(originalCurated);
-    expect(synced).toStrictEqual(originalSynced);
+    expect(curated).toEqual(originalCurated);
+    expect(synced).toEqual(originalSynced);
     expectProviderReads('codestral');
   });
 

@@ -1,26 +1,12 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
-import type { TurnRole } from '../../../core/turn.js';
 import type { Wire } from './wire.js';
 import { type Counts, set } from './usage.js';
 
-/** A block of the Anthropic Messages body. `cache_control` marks a breakpoint. */
-interface ContentBlock {
-  readonly type: 'text';
-  readonly text: string;
-  readonly cache_control?: { readonly type: 'ephemeral' };
-}
-
-interface MessagesBody {
-  readonly model: string;
-  readonly max_tokens: number;
-  readonly stream: boolean;
-  readonly system: readonly ContentBlock[];
-  readonly messages: readonly {
-    readonly role: TurnRole;
-    readonly content: readonly ContentBlock[];
-  }[];
-}
+/** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
+type ContentBlock = Anthropic.TextBlockParam;
+type MessagesBody = Anthropic.MessageCreateParams;
 
 const ephemeral = { type: 'ephemeral' } as const;
 

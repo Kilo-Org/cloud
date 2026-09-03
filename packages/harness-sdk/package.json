@@ -21,8 +21,10 @@
     "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.104.1",
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",
+    "openai": "6.49.0",
     "ulid": "catalog:",
     "zod": "catalog:"
   },

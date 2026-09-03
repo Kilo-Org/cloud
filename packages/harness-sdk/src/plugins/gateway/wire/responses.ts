@@ -1,3 +1,4 @@
+import type OpenAI from 'openai';
 import { z } from 'zod';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
@@ -7,17 +8,7 @@ import type { Wire } from './wire.js';
  * `prompt_cache_key`, so the caller passes the session identifier and every
  * request of one session lands on the same cache entry.
  */
-interface ResponsesBody {
-  readonly model: string;
-  readonly max_output_tokens: number;
-  readonly stream: boolean;
-  readonly instructions: string;
-  readonly prompt_cache_key?: string;
-  readonly input: readonly {
-    readonly role: 'user' | 'assistant';
-    readonly content: readonly { readonly type: 'input_text'; readonly text: string }[];
-  }[];
-}
+type ResponsesBody = OpenAI.Responses.ResponseCreateParams;
 
 const toBody = ({ prompt, model, maxTokens, stream, cacheKey }: ModelRequest): ResponsesBody => ({
   model,

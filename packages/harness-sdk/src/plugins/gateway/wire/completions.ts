@@ -1,24 +1,20 @@
+import type OpenAI from 'openai';
 import { z } from 'zod';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
 import type { ContentBlock } from './messages.js';
 
 /**
- * The OpenAI chat shape. The gateway forwards `cache_control` to a provider
- * that reads it, and ignores it everywhere else, so marking a breakpoint is
- * free either way.
+ * The OpenAI chat shape, with one extension. `cache_control` on a content block
+ * is not part of the OpenAI type; the gateway forwards it to a provider that
+ * reads it and ignores it everywhere else, so marking a breakpoint is free.
  */
-interface CompletionsBody {
-  readonly model: string;
-  readonly max_tokens: number;
-  readonly stream: boolean;
-  /** Without this the stream carries no token counts at all. */
-  readonly stream_options?: { readonly include_usage: true };
+type CompletionsBody = Omit<OpenAI.Chat.ChatCompletionCreateParams, 'messages'> & {
   readonly messages: readonly {
     readonly role: 'system' | 'user' | 'assistant';
     readonly content: readonly ContentBlock[];
   }[];
-}
+};
 
 const ephemeral = { type: 'ephemeral' } as const;
 

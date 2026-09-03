@@ -24,6 +24,11 @@ file before you change any file in this package.
    | Server-sent events | `eventsource-parser` |
    | Schemas and validation | `zod` |
    | Effects, streams, retry, layers | `effect` |
+   | Request body shapes | `@anthropic-ai/sdk` and `openai`, types only |
+
+   The two model SDKs are imported with `import type` and never called, so they
+   add no runtime code. They make the compiler reject a wrong field name in a
+   request body.
 9. Prove behavior with a local end-to-end run.
 10. Validate every incoming value with Zod at the edge. An edge is any point
     where a value enters from outside the package: a store, a model reply, a

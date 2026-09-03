@@ -1495,12 +1495,18 @@ importers:
 
   packages/harness-sdk:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 0.104.1
+        version: 0.104.1(zod@4.4.3)
       effect:
         specifier: 3.22.1
         version: 3.22.1
       eventsource-parser:
         specifier: 3.0.8
         version: 3.0.8
+      openai:
+        specifier: 6.49.0
+        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       ulid:
         specifier: 'catalog:'
         version: 3.0.2

@@ -132,15 +132,13 @@ export default function DashboardScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.dashboard.title')} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.dashboard.couldNotLoad')}
-            onRetry={() => {
-              void statusQuery.refetch();
-              void billingQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.dashboard.couldNotLoad')}
+          onRetry={() => {
+            void statusQuery.refetch();
+            void billingQuery.refetch();
+          }}
+        />
       </View>
     );
   }

@@ -128,6 +128,8 @@ vi.mock('@/lib/a11y/announce', () => ({
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -835,25 +837,33 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows "This file is empty." for empty decoded text', async () => {
-    expoFileSystemMock.fileText.mockResolvedValue('');
-    cacheFilePart('part-1', {
-      url: 'data:text/markdown;base64,QUJD',
-      mime: 'text/markdown',
-      filename: 'readme.md',
-    });
-    const renderer = await mount(
-      makeFilePart({ id: 'part-1', mime: 'text/markdown', filename: 'readme.md', url: '' })
-    );
-    const root = renderer.root;
+  it.each([
+    ['ios', 'text/markdown', 'readme.md'],
+    ['android', 'text/markdown', 'readme.md'],
+    ['ios', 'text/plain', 'file.txt'],
+    ['android', 'text/plain', 'file.txt'],
+  ])(
+    'centers the empty %s %s preview outside its content scroller',
+    async (platform, mime, filename) => {
+      reactNativeMock.Platform.OS = platform;
+      expoFileSystemMock.fileText.mockResolvedValue('');
+      cacheFilePart('part-1', { url: `data:${mime};base64,QUJD`, mime, filename });
+      const renderer = await mount(makeFilePart({ id: 'part-1', mime, filename, url: '' }));
+      const root = renderer.root;
+      const markdown = mime === 'text/markdown';
+      await press(first(pressableByLabel(root, `${markdown ? 'Preview' : 'Open'} ${filename}`)));
+      if (!markdown) {
+        await selectActionSheet(0);
+      }
+      await flushAsync();
 
-    await press(first(pressableByLabel(root, 'Preview readme.md')));
-    await flushAsync();
-
-    expect(texts(root)).toContain('This file is empty.');
-
-    await unmount(renderer);
-  });
+      expect(texts(root)).toContain('This file is empty.');
+      expect(findByType(root, 'CenteredState')).toHaveLength(1);
+      expect(findByType(root, 'ScrollView')).toHaveLength(0);
+      expect(findByType(root, 'SheetHeader')).toHaveLength(1);
+      await unmount(renderer);
+    }
+  );
 
   it('shares the source file from the header Share on an empty markdown preview', async () => {
     expoFileSystemMock.fileText.mockResolvedValue('');
@@ -910,6 +920,14 @@ describe('FilePartRenderer mounted', () => {
 
     expect(texts(root)).toContain('Could not load this file.');
     expect(pressableByLabel(root, 'Retry loading file')).toHaveLength(1);
+    expect(findByType(root, 'CenteredState')).toHaveLength(1);
+    expect(findByType(root, 'ScrollView')).toHaveLength(0);
+    expoFileSystemMock.fileText.mockResolvedValue('Recovered');
+    await press(first(pressableByLabel(root, 'Retry loading file')));
+    await flushAsync();
+    expect(findByType(root, 'CenteredState')).toHaveLength(0);
+    expect(findByType(root, 'ScrollView')).toHaveLength(1);
+    expect(first(findByType(root, 'ChatMarkdownText')).props.value).toBe('Recovered');
 
     await unmount(renderer);
   });
@@ -1711,7 +1729,9 @@ describe('FilePartRenderer preview sheet surface', () => {
     expect(modals[0]?.props.animationType).toBe('slide');
     expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
     expect(modals[0]?.props.transparent).toBeUndefined();
-    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    expect(surface[0]?.props.style).toBeUndefined();
 
     await unmount(renderer);
   });

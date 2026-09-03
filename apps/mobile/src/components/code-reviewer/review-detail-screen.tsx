@@ -102,23 +102,19 @@ export function ReviewDetailScreen({
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-          <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
-            <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
-          </TabScreenScrollView>
+          <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
         </View>
       );
     }
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
-          <QueryError
-            variant="server"
-            title={t('codeReviewer.reviewDetail.couldNotLoad')}
-            onRetry={() => void refetch()}
-            isRetrying={isFetching}
-          />
-        </TabScreenScrollView>
+        <QueryError
+          variant="server"
+          title={t('codeReviewer.reviewDetail.couldNotLoad')}
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
       </View>
     );
   }

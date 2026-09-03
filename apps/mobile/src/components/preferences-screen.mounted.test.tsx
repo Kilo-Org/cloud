@@ -27,6 +27,11 @@ vi.mock('expo-secure-store', () => storage);
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: 'NativeStateSurface',
+  StateSurface: 'StateSurface',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',

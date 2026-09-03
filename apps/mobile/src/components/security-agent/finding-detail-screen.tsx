@@ -11,9 +11,10 @@ import { FindingAnalysisPanel } from '@/components/security-agent/finding-analys
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
   useTrackSecurityAgentInteraction,
@@ -53,7 +54,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const router = useRouter();
   const navigation = useNavigation();
   const colors = useThemeColors();
-  const paddingBottom = useTabBarBottomPadding();
   const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
@@ -122,19 +122,16 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           showBackButton
           onBack={handleBack}
         />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <EmptyState
-            icon={ShieldOff}
-            className="flex-1"
-            title={t('securityAgent.findingDetail.notFound')}
-            description={t('securityAgent.findingDetail.notFoundDescription')}
-          />
-        </View>
+        <EmptyState
+          icon={ShieldOff}
+          title={t('securityAgent.findingDetail.notFound')}
+          description={t('securityAgent.findingDetail.notFoundDescription')}
+        />
       </View>
     );
   }
 
-  if (findingQuery.isError) {
+  if (findingQuery.isError && !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -142,12 +139,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           showBackButton
           onBack={handleBack}
         />
-        <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
-          <QueryError
-            message={t('securityAgent.findingDetail.couldNotLoad')}
-            onRetry={() => void findingQuery.refetch()}
-          />
-        </View>
+        <QueryError
+          message={t('securityAgent.findingDetail.couldNotLoad')}
+          onRetry={() => void findingQuery.refetch()}
+        />
       </View>
     );
   }
@@ -199,6 +194,15 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           ) : undefined
         }
       />
+      {findingQuery.isError ? (
+        <View className="px-6 pb-2">
+          <SettingsRecoveryStatus
+            message={t('securityAgent.findingDetail.couldNotLoad')}
+            isRetrying={findingQuery.isFetching}
+            onRetry={() => void findingQuery.refetch()}
+          />
+        </View>
+      ) : null}
       {dismissFailure !== null && dismissDraft.draft ? (
         <View className="px-6 pb-2">
           <SecurityCommandRetryCard
@@ -241,29 +245,31 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           );
         })}
       </View>
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
-        {tab === 'details' && <FindingDetailsPanel finding={finding} scope={scope} />}
-        {tab === 'analysis' && (
-          <FindingAnalysisPanel
-            scope={scope}
-            findingId={findingId}
-            analysis={analysisQuery.data}
-            isLoading={analysisQuery.isLoading}
-            isError={analysisQuery.isError}
-            onRetry={() => void analysisQuery.refetch()}
-          />
-        )}
-        {tab === 'remediation' && (
-          <FindingRemediationPanel
-            scope={scope}
-            findingId={findingId}
-            analysis={analysisQuery.data}
-            isLoading={analysisQuery.isLoading}
-            isError={analysisQuery.isError}
-            onRetry={() => void analysisQuery.refetch()}
-          />
-        )}
-      </TabScreenScrollView>
+      {tab === 'details' && (
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
+          <FindingDetailsPanel finding={finding} scope={scope} />
+        </TabScreenScrollView>
+      )}
+      {tab === 'analysis' && (
+        <FindingAnalysisPanel
+          scope={scope}
+          findingId={findingId}
+          analysis={analysisQuery.data}
+          isLoading={analysisQuery.isLoading}
+          isError={analysisQuery.isError}
+          onRetry={() => void analysisQuery.refetch()}
+        />
+      )}
+      {tab === 'remediation' && (
+        <FindingRemediationPanel
+          scope={scope}
+          findingId={findingId}
+          analysis={analysisQuery.data}
+          isLoading={analysisQuery.isLoading}
+          isError={analysisQuery.isError}
+          onRetry={() => void analysisQuery.refetch()}
+        />
+      )}
     </View>
   );
 }

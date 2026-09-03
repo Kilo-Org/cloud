@@ -5,7 +5,6 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, Share, View } from 'react-native';
 
-import { DetailScreenScrollView } from '@/components/detail-screen';
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
@@ -164,21 +163,19 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     })();
   }, [queryClient, trpc, owner, repo, number, pr.data?.headSha]);
 
-  // Each tab owns its own scroll: Overview is a DetailScreenScrollView with
-  // pull-to-refresh; the Files tab hosts a virtualized FlashList and must
-  // NOT be nested inside a ScrollView.
   let body: ReactNode = null;
   if (tab === 'overview') {
     body = (
-      <DetailScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-5 px-4"
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
+      <>
         {partialMergeReason ? <PrMergePartialSuccessBanner reason={partialMergeReason} /> : null}
-        <PrReviewOverview owner={owner} repo={repo} number={number} isActive />
-      </DetailScreenScrollView>
+        <PrReviewOverview
+          owner={owner}
+          repo={repo}
+          number={number}
+          isActive
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
+      </>
     );
   } else if (tab === 'files') {
     body = (

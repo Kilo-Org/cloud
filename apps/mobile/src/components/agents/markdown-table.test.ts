@@ -140,6 +140,8 @@ vi.mock('@/components/ui/icons', () => ({
   Table2: 'Table2',
   X: 'X',
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/ui/accessible-status', () => ({
   AccessibleStatus: 'AccessibleStatus',
 }));
@@ -428,6 +430,42 @@ describe('MarkdownTable open path', () => {
     expect(status[0]?.props.message).toBe('This table has no rows.');
     expect(status[0]?.props.tone).toBe('status');
     expect(closeNode(renderer)).toBeTruthy();
+    const centered = renderer.root.findAll(node => (node.type as string) === 'CenteredState');
+    expect(centered).toHaveLength(1);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ScrollView')).toHaveLength(0);
+    expect(renderer.root.findAll(node => (node.type as string) === 'GestureDetector')).toHaveLength(
+      0
+    );
+    const surface = renderer.root.find(node => (node.type as string) === 'StateSurface');
+    expect(surface.parent?.type).toBe('Modal');
+    expect(surface.props.className).toBe('flex-1 bg-background');
+  });
+
+  it('replaces the centered state with cells and retains cells across an empty parse', () => {
+    const renderer = renderTable({ rowCount: 0 });
+    openTable(renderer);
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'retained-cells' }, 'row'),
+    ]);
+    act(() => {
+      renderer.update(createElement(MarkdownTable, defaultProps));
+    });
+    expect(renderer.root.findAll(node => (node.type as string) === 'CenteredState')).toHaveLength(
+      0
+    );
+    expect(renderer.root.findAll(node => (node.type as string) === 'ScrollView')).toHaveLength(2);
+    vi.mocked(useMarkdown).mockReturnValue([]);
+    act(() => {
+      renderer.update(createElement(MarkdownTable, { ...defaultProps, rowCount: 0, raw: '' }));
+    });
+    expect(renderer.root.findAll(node => node.props.testID === 'retained-cells')).toHaveLength(1);
+    expect(renderer.root.findAll(node => (node.type as string) === 'CenteredState')).toHaveLength(
+      0
+    );
+    expect(renderer.root.findAll(node => (node.type as string) === 'ScrollView')).toHaveLength(2);
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('shows the loading wait before first cells and Close still works', () => {

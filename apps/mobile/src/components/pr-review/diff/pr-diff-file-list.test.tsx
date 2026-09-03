@@ -1,5 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
+import { type RefreshControlProps } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +24,7 @@ const listQueryState = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
+  RefreshControl: 'RefreshControl',
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
@@ -30,6 +32,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@shopify/flash-list', () => ({
   FlashList: 'FlashList',
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -112,10 +115,12 @@ const BASE_PROPS = {
   changedFiles: 1,
 };
 
-function mountList(): TestRenderer.ReactTestRenderer {
+function mountList(changedFiles = BASE_PROPS.changedFiles): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(PrReviewFileList, BASE_PROPS));
+    ref.current = TestRenderer.create(
+      createElement(PrReviewFileList, { ...BASE_PROPS, changedFiles })
+    );
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -147,57 +152,62 @@ function resetState(): void {
   listQueryState.firstPageErrorState = null;
 }
 
-describe('PrReviewFileList first-page chrome bottom inset (plan §6)', () => {
+describe('PrReviewFileList full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
     resetState();
   });
 
-  it('pads the reconnect chrome by the detail-screen padding at a zero inset', () => {
+  it('centers the reconnect notice without local bottom padding', () => {
     listQueryState.firstPageErrorState = { kind: 'reconnect' };
     const renderer = mountList();
-
-    const views = bottomPaddedViews(renderer);
-    expect(views).toHaveLength(1);
-    const view = views[0];
-    if (!view) {
-      throw new Error('expected a padded View');
-    }
-    expect((view.props.style as { paddingBottom?: number }).paddingBottom).toBe(32);
+    const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
+    expect(centered.find(node => String(node.type) === 'PrReviewReconnectNotice')).toBeDefined();
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
   });
 
-  it('pads the retryable chrome by the detail-screen padding at a zero inset', () => {
+  it('lets QueryError own the retryable body and retry action', () => {
     listQueryState.firstPageErrorState = { kind: 'retryable' };
     const renderer = mountList();
-
-    const views = bottomPaddedViews(renderer);
-    expect(views).toHaveLength(1);
-    const view = views[0];
-    if (!view) {
-      throw new Error('expected a padded View');
-    }
-    expect((view.props.style as { paddingBottom?: number }).paddingBottom).toBe(32);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.placement).toBeUndefined();
+    expect(bottomPaddedViews(renderer)).toHaveLength(0);
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(listQueryState.query.refetch).toHaveBeenCalled();
   });
 
-  it('grows the reconnect and retryable padding with a nonzero system inset', () => {
-    insetsState.bottom = 34;
+  it.each([false, true])('refreshes the waiting body with fetching state %s', isFetching => {
+    listQueryState.query.isFetching = isFetching;
+    listQueryState.query.refetch.mockClear();
+    const renderer = mountList();
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyFilesView');
+    const refreshControl = empty.props.refreshControl as ReactElement<RefreshControlProps>;
+    expect(refreshControl.type).toBe('RefreshControl');
+    expect(refreshControl.props.refreshing).toBe(isFetching);
+    expect(
+      renderer.root.findAll(node =>
+        ['FlashList', 'ScrollView', 'CenteredState'].includes(String(node.type))
+      )
+    ).toHaveLength(0);
+    act(() => {
+      refreshControl.props.onRefresh?.();
+    });
+    expect(listQueryState.query.refetch).toHaveBeenCalledOnce();
+  });
 
-    listQueryState.firstPageErrorState = { kind: 'reconnect' };
-    const reconnectViews = bottomPaddedViews(mountList());
-    expect(reconnectViews).toHaveLength(1);
-    const reconnectView = reconnectViews[0];
-    if (!reconnectView) {
-      throw new Error('expected a padded View');
-    }
-    expect((reconnectView.props.style as { paddingBottom?: number }).paddingBottom).toBe(50);
+  it('keeps the confirmed empty state unchanged', () => {
+    const renderer = mountList(0);
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyFilesView');
+    expect(empty.props.refreshControl).toBeUndefined();
+  });
 
-    listQueryState.firstPageErrorState = { kind: 'retryable' };
-    const retryableViews = bottomPaddedViews(mountList());
-    expect(retryableViews).toHaveLength(1);
-    const retryableView = retryableViews[0];
-    if (!retryableView) {
-      throw new Error('expected a padded View');
-    }
-    expect((retryableView.props.style as { paddingBottom?: number }).paddingBottom).toBe(50);
+  it('keeps cached files after a later page fails', () => {
+    listQueryState.files = [{ path: 'src/file.ts' }];
+    listQueryState.query.isError = true;
+    const renderer = mountList();
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 });

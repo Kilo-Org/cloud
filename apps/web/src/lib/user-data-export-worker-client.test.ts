@@ -2,6 +2,7 @@ jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-secret',
   NEXTAUTH_SECRET: 'test-nextauth-secret',
   USER_DATA_EXPORT_WORKER_URL: 'http://127.0.0.1:8787',
+  isBoundedInternalServiceTokenIssuanceEnabled: () => false,
 }));
 
 import jwt from 'jsonwebtoken';

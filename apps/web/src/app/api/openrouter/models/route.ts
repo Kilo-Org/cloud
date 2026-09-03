@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
@@ -14,7 +15,10 @@ import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/loca
 
 async function tryGetUserFromAuth() {
   try {
-    return await getUserFromAuth({ adminOnly: false });
+    return await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
   } catch (e) {
     console.error('[tryGetUserFromAuth] failed to get user from auth', e);
     return { user: null, organizationId: null };

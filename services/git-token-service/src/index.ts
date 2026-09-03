@@ -4,11 +4,13 @@ import {
   extractBearerToken,
   verifyKiloToken,
 } from '@kilocode/worker-utils';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -1503,7 +1505,13 @@ export default {
             : url.pathname === USER_ACCESS_TOKEN_PATH
               ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
               : codeReviewAudience;
-      authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
+      authorization =
+        url.pathname === DISCONNECT_PATH
+          ? await verifyKiloTokenForResource(token, secret, {
+              audience: GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
+              mode: 'allow-legacy',
+            })
+          : await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
       return Response.json(
         { error: 'unauthorized' },

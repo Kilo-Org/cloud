@@ -17,6 +17,7 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@expo/react-native-action-sheet', () => ({

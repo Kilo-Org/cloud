@@ -1,5 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
-import { sanitizeJsonbValue } from './sanitize-jsonb';
+import { sanitizeJsonbValue, sanitizePostgresString } from './sanitize-jsonb';
+
+describe('sanitizePostgresString', () => {
+  test('replaces NUL characters and lone surrogates without changing valid text', () => {
+    expect(sanitizePostgresString('before\0after\ud800')).toBe('before\ufffdafter\ufffd');
+    expect(sanitizePostgresString('`\\u0000` 😀')).toBe('`\\u0000` 😀');
+  });
+});
 
 describe('sanitizeJsonbValue', () => {
   test('replaces JSONB-incompatible characters in nested values and object keys', () => {

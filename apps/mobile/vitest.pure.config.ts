@@ -43,6 +43,7 @@ export default defineProject({
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/components/kiloclaw/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
+      'modules/kilo-surface-geometry/*.test.ts',
     ],
   },
 });

@@ -229,13 +229,21 @@ export function OrganizationInvoicesScreen() {
     );
   } else if (isFirstPageError) {
     body = (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <QueryError
           variant={errorVariant}
           onRetry={isPermanentError ? undefined : () => void query.refetch()}
           isRetrying={query.isFetching}
         />
       </Animated.View>
+    );
+  } else if (invoices.length === 0 && !hasMore && !isLaterPageError) {
+    body = (
+      <EmptyState
+        icon={FileText}
+        title={t('organization.invoices.emptyTitle')}
+        description={t('organization.invoices.emptyDescription')}
+      />
     );
   } else {
     const footer = (
@@ -285,6 +293,7 @@ export function OrganizationInvoicesScreen() {
           contentContainerClassName="grow gap-3 px-6 pt-4"
           ListEmptyComponent={
             <EmptyState
+              placement="top"
               icon={FileText}
               title={t('organization.invoices.emptyTitle')}
               description={t('organization.invoices.emptyDescription')}

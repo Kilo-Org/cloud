@@ -4,31 +4,31 @@
 // mounted while the dismiss sheet is open, so it re-reads the draft on focus.
 
 import { createElement } from 'react';
+import { type SecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
+import { SecurityCommandRetryCard } from './security-command-retry-card';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { SettingsRecoveryStatus } from './settings-recovery-status';
+import { FindingDetailsPanel } from './finding-details-panel';
+import { FindingAnalysisPanel } from './finding-analysis-panel';
+import { FindingRemediationPanel } from './finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { FindingDetailScreen } from './finding-detail-screen';
 
-type Draft = {
-  reason: string;
-  comment: string;
-  lastError: string | null;
-  retryable: boolean | null;
-};
-
 const dismissDraft = vi.hoisted(() => ({
-  draft: null as Draft | null,
-  hydrated: true,
-  persist: vi.fn(),
+  draft: null as SecurityDismissDraft | null,
   clear: vi.fn(),
   refresh: vi.fn(),
 }));
 
 const finding = vi.hoisted(() => ({
   isLoading: false,
+  isFetching: false,
   isError: false,
   error: null as unknown,
   data: undefined as Pick<SecurityFinding, 'status' | 'repo_full_name'> | undefined,
@@ -42,30 +42,12 @@ const analysis = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
-const capability = vi.hoisted(() => ({
-  canManage: true,
-  isLoading: false,
-  isError: false,
-  refetch: vi.fn(),
-}));
+const capability = vi.hoisted(() => ({ canManage: true }));
 
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
 const navigation = vi.hoisted(() => ({ history: [] as string[] }));
 
-// Captures the useFocusEffect callback so a test can simulate a focus event.
-const focusEffect = vi.hoisted(() => ({
-  effect: undefined as (() => void) | undefined,
-}));
-
-// Captures the retry-card props the screen renders.
-const retryCards = vi.hoisted(() => ({
-  cards: [] as {
-    lastError: string;
-    retryable: boolean;
-    onRetry?: () => void;
-    onDiscard?: () => void;
-  }[],
-}));
+const focusEffect = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -97,9 +79,7 @@ vi.mock('expo-router', () => ({
     canGoBack: () => true,
   }),
   useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
-  useFocusEffect: (effect: () => void) => {
-    focusEffect.effect = effect;
-  },
+  useFocusEffect: focusEffect,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
@@ -115,25 +95,15 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
 }));
-vi.mock('@/components/security-agent/security-command-retry-card', () => ({
-  SecurityCommandRetryCard: (props: {
-    lastError: string;
-    retryable: boolean;
-    onRetry?: () => void;
-    onDiscard?: () => void;
-  }) => {
-    retryCards.cards.push(props);
-    return null;
-  },
-}));
+vi.mock('./security-command-retry-card', () => ({ SecurityCommandRetryCard: 'RetryCard' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
 vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn() }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
-  useTabBarBottomPadding: () => 0,
+  TabScreenScrollView: 'TabScreenScrollView',
 }));
 vi.mock('@/components/security-agent/finding-analysis-panel', () => ({
   FindingAnalysisPanel: () => null,
@@ -154,10 +124,13 @@ const scopeRoot = '/(app)/(tabs)/(3_profile)/security-agent/personal';
 const detailPath = `${scopeRoot}/findings/finding-1`;
 
 function renderScreen(): R {
+  const screen = createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' });
   act(() => {
-    renderer = TestRenderer.create(
-      createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' })
-    );
+    if (renderer) {
+      renderer.update(screen);
+    } else {
+      renderer = TestRenderer.create(screen);
+    }
   });
   if (!renderer) {
     throw new Error('renderer was not created');
@@ -166,18 +139,15 @@ function renderScreen(): R {
 }
 
 function press(tree: R, accessibilityLabel: string) {
-  const { onPress } = tree.root.findByProps({ accessibilityLabel }).props as {
-    onPress: () => void;
-  };
-  act(onPress);
+  act(tree.root.findByProps({ accessibilityLabel }).props.onPress as () => void);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   dismissDraft.draft = null;
-  dismissDraft.hydrated = true;
   finding.isLoading = false;
+  finding.isFetching = false;
   finding.isError = false;
   finding.error = null;
   finding.data = { status: 'open', repo_full_name: 'org/repo' };
@@ -186,10 +156,6 @@ beforeEach(() => {
   analysis.isError = false;
   analysis.data = undefined;
   capability.canManage = true;
-  capability.isLoading = false;
-  capability.isError = false;
-  retryCards.cards = [];
-  focusEffect.effect = undefined;
   navigation.history = [detailPath];
 });
 afterEach(() => {
@@ -198,46 +164,80 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('FindingDetailScreen pane containers', () => {
+  it.each([
+    ['analysis', FindingAnalysisPanel],
+    ['remediation', FindingRemediationPanel],
+  ] as const)('keeps finding Retry outside the selected %s pane scroller', (tab, Panel) => {
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    const tree = renderScreen();
+    const tabs = tree.root.findAllByProps({ accessibilityRole: 'tab' });
+    const onPress = tabs[tab === 'analysis' ? 1 : 2]?.props.onPress as () => void;
+    act(onPress);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+    expect(tree.root.findAllByType(Panel)).toHaveLength(1);
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
+    press(tree, 'common.retry');
+    expect(finding.refetch).toHaveBeenCalledOnce();
+    expect(analysis.refetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps cached details mounted through a failed refetch and Retry', () => {
+    const tree = renderScreen();
+    const details = tree.root.findByType(FindingDetailsPanel);
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    renderScreen();
+    expect(tree.root.findByType(FindingDetailsPanel)).toBe(details);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    const retry = tree.root.findByType(SettingsRecoveryStatus);
+    expect(retry.props.message).toBe('securityAgent.findingDetail.couldNotLoad');
+    press(tree, 'common.retry');
+    expect(finding.refetch).toHaveBeenCalledOnce();
+    expect(analysis.refetch).not.toHaveBeenCalled();
+    finding.isFetching = true;
+    renderScreen();
+    expect(retry.props.isRetrying).toBe(true);
+    expect(tree.root.findByType(FindingDetailsPanel)).toBe(details);
+    finding.isFetching = false;
+    finding.isError = false;
+    finding.error = null;
+    renderScreen();
+    expect(tree.root.findByType(FindingDetailsPanel)).toBe(details);
+    expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
+  });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN'])('does not retain cached details after %s', code => {
+    finding.isError = true;
+    finding.error = { data: { code } };
+    const tree = renderScreen();
+    expect(tree.root.findAllByType(FindingDetailsPanel)).toHaveLength(0);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
+  });
+});
+
 describe('FindingDetailScreen dismiss retry card states', () => {
-  it('renders no retry card when there is no draft (empty)', () => {
-    renderScreen();
+  it.each([null, { reason: 'not_used', comment: '', lastError: null, retryable: null }])(
+    'renders no retry card without a recorded failure: %j',
+    draft => {
+      dismissDraft.draft = draft;
+      expect(renderScreen().root.findAllByType(SecurityCommandRetryCard)).toHaveLength(0);
+    }
+  );
 
-    expect(retryCards.cards).toHaveLength(0);
-  });
-
-  it('renders no retry card after accept (no failure recorded)', () => {
-    dismissDraft.draft = { reason: 'not_used', comment: '', lastError: null, retryable: null };
-    renderScreen();
-
-    expect(retryCards.cards).toHaveLength(0);
-  });
-
-  it('renders a retry card with the error and Retry for a retryable failure', () => {
-    dismissDraft.draft = {
-      reason: 'not_used',
-      comment: '',
-      lastError: 'Network error',
-      retryable: true,
-    };
-    renderScreen();
-
-    expect(retryCards.cards).toHaveLength(1);
-    expect(retryCards.cards[0]?.lastError).toBe('Network error');
-    expect(retryCards.cards[0]?.retryable).toBe(true);
-  });
-
-  it('renders a retry card with the error and no Retry for a non-retryable failure', () => {
-    dismissDraft.draft = {
-      reason: 'not_used',
-      comment: '',
-      lastError: 'Security service is not configured',
-      retryable: false,
-    };
-    renderScreen();
-
-    expect(retryCards.cards).toHaveLength(1);
-    expect(retryCards.cards[0]?.lastError).toBe('Security service is not configured');
-    expect(retryCards.cards[0]?.retryable).toBe(false);
+  it.each([
+    ['Network error', true],
+    ['Security service is not configured', false],
+  ] as const)('renders the %s failure with retryable=%s', (lastError, retryable) => {
+    dismissDraft.draft = { reason: 'not_used', comment: '', lastError, retryable };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+    expect(card.props).toMatchObject({ lastError, retryable });
   });
 
   it('drops the card on discard by clearing the draft', () => {
@@ -247,12 +247,8 @@ describe('FindingDetailScreen dismiss retry card states', () => {
       lastError: 'boom',
       retryable: true,
     };
-    renderScreen();
-    expect(retryCards.cards).toHaveLength(1);
-
-    act(() => {
-      retryCards.cards[0]?.onDiscard?.();
-    });
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+    act(card.props.onDiscard as () => void);
 
     expect(dismissDraft.clear).toHaveBeenCalledTimes(1);
   });
@@ -260,9 +256,7 @@ describe('FindingDetailScreen dismiss retry card states', () => {
   it('re-reads the draft on focus', () => {
     renderScreen();
 
-    act(() => {
-      focusEffect.effect?.();
-    });
+    act(focusEffect.mock.lastCall?.[0] as () => void);
 
     expect(dismissDraft.refresh).toHaveBeenCalledTimes(1);
   });
@@ -316,11 +310,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     ).toHaveLength(1);
 
     press(tree, 'common.retry');
-    act(() => {
-      tree.update(
-        createElement(FindingDetailScreen, { scope: 'personal', findingId: 'finding-1' })
-      );
-    });
+    renderScreen();
 
     expect(tree.root.findAllByProps({ children: 'org/recovered' })).toHaveLength(1);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);

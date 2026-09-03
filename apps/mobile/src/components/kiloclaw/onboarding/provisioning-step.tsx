@@ -21,6 +21,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { Button } from '@/components/ui/button';
 import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
@@ -172,85 +173,83 @@ export function ProvisioningStep({
     const danger = toneColor('danger');
     const content = TERMINAL_CONTENT[terminalReason];
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center gap-6 px-6"
-      >
-        <View
-          className={cn(
-            'h-24 w-24 items-center justify-center rounded-3xl border',
-            danger.tileBgClass,
-            danger.tileBorderClass
-          )}
-        >
-          <AlertTriangle size={40} color={colors.destructive} />
-        </View>
-        <View className="items-center gap-2">
-          <Text variant="eyebrow" className="text-xs">
-            {t('kiloclaw.onboarding.flow.provisioning')}
-          </Text>
-          <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
-          <Text variant="muted" className="text-center text-base">
-            {t(content.bodyKey, {
-              name: botName,
-              displayMinutes: formatNumber(OVERALL_TIMEOUT_MS / 60_000, i18n.language),
-            })}
-          </Text>
-        </View>
-        <View className="w-full gap-3">
-          <Button size="lg" className="w-full" onPress={onRetry}>
-            <Text className="text-base">{t('common.tryAgain')}</Text>
-          </Button>
-          <Button variant="ghost" size="lg" className="w-full" onPress={onContinueInBackground}>
-            <Text className="text-base">
-              {t('kiloclaw.onboarding.provisioning.continueInBackground')}
+      <CenteredState>
+        <Animated.View entering={FadeIn.duration(200)} className="items-center gap-6 px-6">
+          <View
+            className={cn(
+              'h-24 w-24 items-center justify-center rounded-3xl border',
+              danger.tileBgClass,
+              danger.tileBorderClass
+            )}
+          >
+            <AlertTriangle size={40} color={colors.destructive} />
+          </View>
+          <View className="items-center gap-2">
+            <Text variant="eyebrow" className="text-xs">
+              {t('kiloclaw.onboarding.flow.provisioning')}
             </Text>
-          </Button>
-        </View>
-      </Animated.View>
+            <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
+            <Text variant="muted" className="text-center text-base">
+              {t(content.bodyKey, {
+                name: botName,
+                displayMinutes: formatNumber(OVERALL_TIMEOUT_MS / 60_000, i18n.language),
+              })}
+            </Text>
+          </View>
+          <View className="w-full gap-3">
+            <Button size="lg" className="w-full" onPress={onRetry}>
+              <Text className="text-base">{t('common.tryAgain')}</Text>
+            </Button>
+            <Button variant="ghost" size="lg" className="w-full" onPress={onContinueInBackground}>
+              <Text className="text-base">
+                {t('kiloclaw.onboarding.provisioning.continueInBackground')}
+              </Text>
+            </Button>
+          </View>
+        </Animated.View>
+      </CenteredState>
     );
   }
 
   return (
-    <Animated.View
-      entering={FadeIn.duration(200)}
-      className="flex-1 items-center justify-center gap-6 px-6"
-    >
-      <Animated.View
-        style={pulseStyle}
-        className={cn(
-          'h-24 w-24 items-center justify-center rounded-3xl border',
-          tint.tileBgClass,
-          tint.tileBorderClass
-        )}
-      >
-        <BotAvatar emoji={botEmoji} size={48} color={colors.foreground} />
-      </Animated.View>
+    <CenteredState>
+      <Animated.View entering={FadeIn.duration(200)} className="items-center gap-6 px-6">
+        <Animated.View
+          style={pulseStyle}
+          className={cn(
+            'h-24 w-24 items-center justify-center rounded-3xl border',
+            tint.tileBgClass,
+            tint.tileBorderClass
+          )}
+        >
+          <BotAvatar emoji={botEmoji} size={48} color={colors.foreground} />
+        </Animated.View>
 
-      <View className="items-center gap-3">
-        <View className="items-center gap-1">
-          <Text variant="eyebrow" className="text-xs">
-            {t('kiloclaw.onboarding.flow.provisioning')}
-          </Text>
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.onboarding.provisioning.settingUp', { name: botName })}
-          </Text>
+        <View className="items-center gap-3">
+          <View className="items-center gap-1">
+            <Text variant="eyebrow" className="text-xs">
+              {t('kiloclaw.onboarding.flow.provisioning')}
+            </Text>
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.onboarding.provisioning.settingUp', { name: botName })}
+            </Text>
+          </View>
+
+          <Animated.View
+            key={stageMessage}
+            entering={FadeIn.duration(300)}
+            exiting={FadeOut.duration(200)}
+          >
+            <Text variant="muted" className="text-center text-base">
+              {stageMessage}
+            </Text>
+          </Animated.View>
         </View>
 
-        <Animated.View
-          key={stageMessage}
-          entering={FadeIn.duration(300)}
-          exiting={FadeOut.duration(200)}
-        >
-          <Text variant="muted" className="text-center text-base">
-            {stageMessage}
-          </Text>
-        </Animated.View>
-      </View>
-
-      <Text variant="muted" className="text-center">
-        {t('kiloclaw.onboarding.provisioning.backgroundHint')}
-      </Text>
-    </Animated.View>
+        <Text variant="muted" className="text-center">
+          {t('kiloclaw.onboarding.provisioning.backgroundHint')}
+        </Text>
+      </Animated.View>
+    </CenteredState>
   );
 }

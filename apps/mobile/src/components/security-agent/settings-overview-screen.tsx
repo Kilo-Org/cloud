@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -30,12 +31,7 @@ const ANALYSIS_MODE_KEYS = {
   auto: 'securityAgent.analysisMode.auto',
   shallow: 'securityAgent.analysisMode.shallow',
   deep: 'securityAgent.analysisMode.deep',
-} satisfies Record<string, string>;
-
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
-function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
-}
+};
 
 function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
@@ -166,8 +162,9 @@ export function SettingsOverviewScreen({
     data.newFindingNotificationsEnabled,
     data.slaNotificationsEnabled,
   ].filter(Boolean).length;
-  const analysisModeKey = lookup(ANALYSIS_MODE_KEYS, data.analysisMode);
-  const analysisModeLabel = analysisModeKey ? t(analysisModeKey) : data.analysisMode;
+  const analysisModeLabel = Object.hasOwn(ANALYSIS_MODE_KEYS, data.analysisMode)
+    ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
+    : data.analysisMode;
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();
@@ -228,117 +225,121 @@ export function SettingsOverviewScreen({
     );
   };
 
+  const Body = data.isEnabled ? TabScreenScrollView : CenteredState;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.settingsOverview.title')} headerRight={auditAction} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
-        <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-          <View className="flex-1 pr-3">
-            <Text className="text-sm font-medium">
-              {t('securityAgent.settingsOverview.securityAgent')}
-            </Text>
-            <Text variant="muted" className="text-xs">
-              {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
-            </Text>
+      <Body className="flex-1">
+        <View className="gap-6 px-6 py-4">
+          <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-medium">
+                {t('securityAgent.settingsOverview.securityAgent')}
+              </Text>
+              <Text variant="muted" className="text-xs">
+                {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
+              </Text>
+            </View>
+            {capability.canManage ? (
+              <Switch
+                accessibilityLabel={t('securityAgent.settingsOverview.securityAgent')}
+                value={data.isEnabled}
+                disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
+                onValueChange={handleToggle}
+              />
+            ) : (
+              <Text variant="muted" className="text-xs">
+                {data.isEnabled
+                  ? t('securityAgent.settingsOverview.enabled')
+                  : t('securityAgent.settingsOverview.disabled')}
+              </Text>
+            )}
           </View>
-          {capability.canManage ? (
-            <Switch
-              accessibilityLabel={t('securityAgent.settingsOverview.securityAgent')}
-              value={data.isEnabled}
-              disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
-              onValueChange={handleToggle}
-            />
-          ) : (
-            <Text variant="muted" className="text-xs">
-              {data.isEnabled
-                ? t('securityAgent.settingsOverview.enabled')
-                : t('securityAgent.settingsOverview.disabled')}
-            </Text>
-          )}
-        </View>
 
-        {(!data.isEnabled || repositoriesLoading || recoveryError) && (
-          <View className="gap-3">
-            {renderRepositoryStatus()}
-            {showRepoCta ? (
+          {(!data.isEnabled || repositoriesLoading || recoveryError) && (
+            <View className="gap-3">
+              {renderRepositoryStatus()}
+              {showRepoCta ? (
+                <ConfigureRow
+                  icon={FolderGit2}
+                  title={t('securityAgent.settingsOverview.selectRepositories')}
+                  subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
+                  onPress={() => {
+                    router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                  }}
+                />
+              ) : null}
+            </View>
+          )}
+
+          {data.isEnabled && (
+            <View>
               <ConfigureRow
                 icon={FolderGit2}
-                title={t('securityAgent.settingsOverview.selectRepositories')}
-                subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
+                title={t('securityAgent.settingsOverview.repositories')}
+                subtitle={repoCountLabel}
                 onPress={() => {
                   router.push(getSecurityAgentPath(scope, 'settings/repositories'));
                 }}
               />
-            ) : null}
-          </View>
-        )}
-
-        {data.isEnabled && (
-          <View>
-            <ConfigureRow
-              icon={FolderGit2}
-              title={t('securityAgent.settingsOverview.repositories')}
-              subtitle={repoCountLabel}
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
-              }}
-            />
-            <ConfigureRow
-              icon={Cpu}
-              title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
-              subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
-                mode: analysisModeLabel,
-              })}
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/analysis'));
-              }}
-            />
-            <ConfigureRow
-              icon={Zap}
-              title={t('securityAgent.settingsOverview.automation')}
-              subtitle={
-                automationEnabledCount === 0
-                  ? t('securityAgent.settingsOverview.automationAllOff')
-                  : t('securityAgent.settingsOverview.automationCount', {
-                      count: automationEnabledCount,
-                      displayCount: formatNumber(automationEnabledCount, i18n.language),
-                    })
-              }
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/automation'));
-              }}
-            />
-            <ConfigureRow
-              icon={Bell}
-              title={t('securityAgent.settingsOverview.notifications')}
-              subtitle={
-                notificationsEnabledCount === 0
-                  ? t('securityAgent.settingsOverview.off')
-                  : t('securityAgent.settingsOverview.notificationsCount', {
-                      count: notificationsEnabledCount,
-                      displayCount: formatNumber(notificationsEnabledCount, i18n.language),
-                    })
-              }
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/notifications'));
-              }}
-            />
-            <ConfigureRow
-              icon={Clock}
-              title={t('securityAgent.settingsOverview.slaPolicy')}
-              subtitle={
-                data.slaEnabled
-                  ? t('securityAgent.settingsOverview.on')
-                  : t('securityAgent.settingsOverview.off')
-              }
-              last
-              onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/sla'));
-              }}
-            />
-          </View>
-        )}
-      </TabScreenScrollView>
+              <ConfigureRow
+                icon={Cpu}
+                title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
+                subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
+                  mode: analysisModeLabel,
+                })}
+                onPress={() => {
+                  router.push(getSecurityAgentPath(scope, 'settings/analysis'));
+                }}
+              />
+              <ConfigureRow
+                icon={Zap}
+                title={t('securityAgent.settingsOverview.automation')}
+                subtitle={
+                  automationEnabledCount === 0
+                    ? t('securityAgent.settingsOverview.automationAllOff')
+                    : t('securityAgent.settingsOverview.automationCount', {
+                        count: automationEnabledCount,
+                        displayCount: formatNumber(automationEnabledCount, i18n.language),
+                      })
+                }
+                onPress={() => {
+                  router.push(getSecurityAgentPath(scope, 'settings/automation'));
+                }}
+              />
+              <ConfigureRow
+                icon={Bell}
+                title={t('securityAgent.settingsOverview.notifications')}
+                subtitle={
+                  notificationsEnabledCount === 0
+                    ? t('securityAgent.settingsOverview.off')
+                    : t('securityAgent.settingsOverview.notificationsCount', {
+                        count: notificationsEnabledCount,
+                        displayCount: formatNumber(notificationsEnabledCount, i18n.language),
+                      })
+                }
+                onPress={() => {
+                  router.push(getSecurityAgentPath(scope, 'settings/notifications'));
+                }}
+              />
+              <ConfigureRow
+                icon={Clock}
+                title={t('securityAgent.settingsOverview.slaPolicy')}
+                subtitle={
+                  data.slaEnabled
+                    ? t('securityAgent.settingsOverview.on')
+                    : t('securityAgent.settingsOverview.off')
+                }
+                last
+                onPress={() => {
+                  router.push(getSecurityAgentPath(scope, 'settings/sla'));
+                }}
+              />
+            </View>
+          )}
+        </View>
+      </Body>
     </View>
   );
 }

@@ -99,88 +99,92 @@ export default function RepoPickerScreen() {
   }
 
   return (
-    <PickerSheet title={t('agentChat.repoPicker.title')} onDone={closePicker} scrollable={false}>
-      <FlatList
-        className="flex-1 bg-background"
-        data={listItems}
-        keyExtractor={item => item.key}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: bottom }}
-        ListHeaderComponent={
-          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-            <Search size={18} color={colors.mutedForeground} />
-            <TextInput
-              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
-              placeholder={t('agentChat.repoPicker.searchPlaceholder')}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-              className="h-8 flex-1 p-0 text-base text-foreground"
-              style={{ color: colors.foreground }}
-              onChangeText={setSearch}
-            />
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            icon={search.trim() ? SearchX : Info}
-            placement="top"
-            title={
-              search.trim()
-                ? t('agentChat.repoPicker.noMatches')
-                : t('agentChat.repoPicker.noRepositories')
-            }
-            description={
-              search.trim()
-                ? t('agentChat.repoPicker.tryDifferentSearch')
-                : t('agentChat.repoPicker.noRepositoriesDescription')
-            }
+    <PickerSheet
+      title={t('agentChat.repoPicker.title')}
+      onDone={closePicker}
+      scrollable={false}
+      headerContent={
+        <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
+          <Search size={18} color={colors.mutedForeground} />
+          <TextInput
+            accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+            placeholder={t('agentChat.repoPicker.searchPlaceholder')}
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+            className="h-8 flex-1 p-0 text-base text-foreground"
+            style={{ color: colors.foreground }}
+            onChangeText={setSearch}
           />
-        }
-        renderItem={({ item }) => {
-          if (item.kind === 'header') {
-            return (
-              <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t(item.titleKey)}
-              </Text>
-            );
+        </View>
+      }
+    >
+      {listItems.length === 0 ? (
+        <EmptyState
+          icon={search.trim() ? SearchX : Info}
+          title={
+            search.trim()
+              ? t('agentChat.repoPicker.noMatches')
+              : t('agentChat.repoPicker.noRepositories')
           }
-          const repo = item.repo;
-          const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
-          const rowLabel = `${platformName} ${repo.fullName}`;
-          return (
-            <Pressable
-              className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
-              onPress={() => {
-                handleSelect(`${repo.platform}:${repo.fullName}`);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={rowLabel}
-            >
-              {repo.isPrivate ? (
-                <Lock size={14} color={colors.mutedForeground} />
-              ) : (
-                <Unlock size={14} color={colors.mutedForeground} />
-              )}
-              <Text
-                className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
-                numberOfLines={1}
+          description={
+            search.trim()
+              ? t('agentChat.repoPicker.tryDifferentSearch')
+              : t('agentChat.repoPicker.noRepositoriesDescription')
+          }
+        />
+      ) : (
+        <FlatList
+          className="flex-1 bg-background"
+          data={listItems}
+          keyExtractor={item => item.key}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: bottom }}
+          renderItem={({ item }) => {
+            if (item.kind === 'header') {
+              return (
+                <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t(item.titleKey)}
+                </Text>
+              );
+            }
+            const repo = item.repo;
+            const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
+            const rowLabel = `${platformName} ${repo.fullName}`;
+            return (
+              <Pressable
+                className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
+                onPress={() => {
+                  handleSelect(`${repo.platform}:${repo.fullName}`);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={rowLabel}
               >
-                {platformName}
-              </Text>
-              <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-                {repo.fullName}
-              </Text>
-              {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
-                <Check size={18} color={colors.primary} />
-              ) : null}
-            </Pressable>
-          );
-        }}
-      />
+                {repo.isPrivate ? (
+                  <Lock size={14} color={colors.mutedForeground} />
+                ) : (
+                  <Unlock size={14} color={colors.mutedForeground} />
+                )}
+                <Text
+                  className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                  numberOfLines={1}
+                >
+                  {platformName}
+                </Text>
+                <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+                  {repo.fullName}
+                </Text>
+                {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
+                  <Check size={18} color={colors.primary} />
+                ) : null}
+              </Pressable>
+            );
+          }}
+        />
+      )}
     </PickerSheet>
   );
 }

@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -88,7 +89,11 @@ export function DeviceSessionsScreen() {
     enabled: token != null,
   });
 
-  const state = classifyDeviceSessionsState({ isLoading, isError, data });
+  const state = classifyDeviceSessionsState({
+    isLoading,
+    isError: isError && data === undefined,
+    data,
+  });
   const sessions = sortDeviceSessions(data ?? []);
 
   const revokeSession = useMutation(
@@ -137,15 +142,43 @@ export function DeviceSessionsScreen() {
     );
   };
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('deviceSessions.title')} />
+  let body: ReactNode = null;
+  if (state === 'error') {
+    body = (
+      <QueryError
+        variant="server"
+        title={t('deviceSessions.couldNotLoad')}
+        message={t('deviceSessions.couldNotLoadDescription')}
+        onRetry={() => void refetch()}
+        isRetrying={isFetching}
+      />
+    );
+  } else if (state === 'empty') {
+    body = (
+      <EmptyState
+        icon={Smartphone}
+        title={t('deviceSessions.noSessions')}
+        description={t('deviceSessions.noSessionsDescription')}
+        action={
+          <Button
+            variant="outline"
+            onPress={() => {
+              router.back();
+            }}
+          >
+            <Text>{t('deviceSessions.viewProfile')}</Text>
+          </Button>
+        }
+      />
+    );
+  } else {
+    body = (
       <DetailScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        {state === 'loading' && (
+        {state === 'loading' ? (
           <View className="gap-3">
             {[0, 1, 2].map(index => (
               <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
@@ -158,39 +191,7 @@ export function DeviceSessionsScreen() {
               </View>
             ))}
           </View>
-        )}
-
-        {state === 'error' && (
-          <QueryError
-            variant="server"
-            placement="top"
-            title={t('deviceSessions.couldNotLoad')}
-            message={t('deviceSessions.couldNotLoadDescription')}
-            onRetry={() => void refetch()}
-            isRetrying={isFetching}
-          />
-        )}
-
-        {state === 'empty' && (
-          <EmptyState
-            icon={Smartphone}
-            placement="top"
-            title={t('deviceSessions.noSessions')}
-            description={t('deviceSessions.noSessionsDescription')}
-            action={
-              <Button
-                variant="outline"
-                onPress={() => {
-                  router.back();
-                }}
-              >
-                <Text>{t('deviceSessions.viewProfile')}</Text>
-              </Button>
-            }
-          />
-        )}
-
-        {(state === 'happy' || state === 'no-current') && (
+        ) : (
           <View className="gap-3">
             {sessions.map(session => (
               <SessionRow
@@ -211,6 +212,13 @@ export function DeviceSessionsScreen() {
           </View>
         )}
       </DetailScreenScrollView>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('deviceSessions.title')} />
+      {body}
     </View>
   );
 }

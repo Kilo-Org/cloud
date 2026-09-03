@@ -11,6 +11,12 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  getWorktreeChangesOutputSchema,
+  refreshWorktreeChangesOutputSchema,
+  type GetWorktreeChangesOutput,
+  type RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
 import {
   SandboxStatusSnapshotSchema,
@@ -585,6 +591,12 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getWorktreeChanges: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
+  refreshWorktreeChanges: {
+    mutate: (input: GetSessionInput) => Promise<unknown>;
+  };
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
@@ -840,6 +852,18 @@ export class CloudAgentNextClient {
         estimatedSleepAt: null,
       };
     }
+  }
+
+  async getWorktreeChanges(cloudAgentSessionId: string): Promise<GetWorktreeChangesOutput> {
+    return getWorktreeChangesOutputSchema.parse(
+      await this.client.getWorktreeChanges.query({ cloudAgentSessionId })
+    );
+  }
+
+  async refreshWorktreeChanges(cloudAgentSessionId: string): Promise<RefreshWorktreeChangesOutput> {
+    return refreshWorktreeChangesOutputSchema.parse(
+      await this.client.refreshWorktreeChanges.mutate({ cloudAgentSessionId })
+    );
   }
 
   async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {

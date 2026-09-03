@@ -204,23 +204,48 @@ export function createSandboxControlClient(
       retireConnection(ws);
       return;
     }
+    let response: string;
     try {
-      ws.send(
-        JSON.stringify({
-          type: 'response',
-          requestId: request.requestId,
-          ...(outcome.ok
-            ? { ok: true, ...(outcome.result !== undefined ? { result: outcome.result } : {}) }
-            : {
-                ok: false,
-                error: outcome.error ?? {
-                  code: 'not_ready',
-                  message: 'Request failed',
-                  retryable: true,
-                },
-              }),
-        })
-      );
+      response = JSON.stringify({
+        type: 'response',
+        requestId: request.requestId,
+        ...(outcome.ok
+          ? { ok: true, ...(outcome.result !== undefined ? { result: outcome.result } : {}) }
+          : {
+              ok: false,
+              error: outcome.error ?? {
+                code: 'not_ready',
+                message: 'Request failed',
+                retryable: true,
+              },
+            }),
+      });
+    } catch {
+      response = JSON.stringify({
+        type: 'response',
+        requestId: request.requestId,
+        ok: false,
+        error: {
+          code: 'capture_failed',
+          message: 'Response serialization failed',
+          retryable: false,
+        },
+      });
+    }
+    if (Buffer.byteLength(response) >= MAX_SANDBOX_CONTROL_FRAME_BYTES) {
+      response = JSON.stringify({
+        type: 'response',
+        requestId: request.requestId,
+        ok: false,
+        error: {
+          code: 'payload_too_large',
+          message: 'Response exceeds size limit',
+          retryable: false,
+        },
+      });
+    }
+    try {
+      ws.send(response);
       requestDiagnostic('response_sent', outcome.ok);
     } catch {
       requestDiagnostic('response_failed', outcome.ok);

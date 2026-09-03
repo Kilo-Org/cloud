@@ -12,11 +12,16 @@ import type {
   SendMessageInput,
 } from './cloud-agent-client';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import type { WorktreeChangesSnapshot } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const mockCreateTRPCClient = jest.fn(() => ({}));
 const mockHttpLink =
   jest.fn<(options: { url: string; headers: () => Record<string, string> }) => undefined>();
 const mockCaptureException = jest.fn();
+const mockGetWorktreeChanges =
+  jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+const mockRefreshWorktreeChanges =
+  jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
 
 import type * as SentryModule from '@sentry/nextjs';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
@@ -90,6 +95,97 @@ const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
 const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
   realCloudAgentClientModule;
+
+describe('CloudAgentNextClient worktree changes', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const snapshot: WorktreeChangesSnapshot = {
+    schemaVersion: 1,
+    revision: 1,
+    capturedAt: '2026-08-26T12:00:00.000Z',
+    comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+    files: [
+      {
+        path: 'src/odd\nfile.ts',
+        status: 'modified',
+        additions: 2,
+        deletions: 1,
+        tracked: true,
+        binary: false,
+        countsComplete: true,
+      },
+    ],
+    truncated: false,
+  };
+
+  beforeEach(() => {
+    mockGetWorktreeChanges.mockReset();
+    mockRefreshWorktreeChanges.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({
+      getWorktreeChanges: { query: mockGetWorktreeChanges },
+      refreshWorktreeChanges: { mutate: mockRefreshWorktreeChanges },
+    });
+  });
+
+  it.each([null, snapshot])(
+    'validates saved query responses without changing paths',
+    async saved => {
+      mockGetWorktreeChanges.mockResolvedValue({ snapshot: saved });
+      const client = new CloudAgentNextClient('token');
+
+      await expect(client.getWorktreeChanges(cloudAgentSessionId)).resolves.toEqual({
+        snapshot: saved,
+      });
+      expect(mockGetWorktreeChanges).toHaveBeenCalledWith({ cloudAgentSessionId });
+      expect(mockRefreshWorktreeChanges).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['refreshed', 'offline', 'failed'] as const)(
+    'validates %s refresh responses',
+    async status => {
+      mockRefreshWorktreeChanges.mockResolvedValue({ status, snapshot });
+      const client = new CloudAgentNextClient('token');
+
+      await expect(client.refreshWorktreeChanges(cloudAgentSessionId)).resolves.toEqual({
+        status,
+        snapshot,
+      });
+      expect(mockRefreshWorktreeChanges).toHaveBeenCalledWith({ cloudAgentSessionId });
+      expect(mockGetWorktreeChanges).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['offline', 'failed'] as const)('accepts %s without a saved snapshot', async status => {
+    mockRefreshWorktreeChanges.mockResolvedValue({ status, snapshot: null });
+    await expect(
+      new CloudAgentNextClient('token').refreshWorktreeChanges(cloudAgentSessionId)
+    ).resolves.toEqual({ status, snapshot: null });
+  });
+
+  it.each([
+    { snapshot: { ...snapshot, schemaVersion: 2 } },
+    { snapshot: { ...snapshot, revision: 0 } },
+    { snapshot: { ...snapshot, capturedAt: 'not-a-date' } },
+    { snapshot: { ...snapshot, files: [{ ...snapshot.files[0], patch: 'file content' }] } },
+    { snapshot: { ...snapshot, files: [{ ...snapshot.files[0], countsComplete: undefined }] } },
+  ])('rejects invalid persisted responses', async response => {
+    mockGetWorktreeChanges.mockResolvedValue(response);
+    await expect(
+      new CloudAgentNextClient('token').getWorktreeChanges(cloudAgentSessionId)
+    ).rejects.toThrow();
+  });
+
+  it.each([
+    { status: 'refreshed', snapshot: null },
+    { status: 'unknown', snapshot },
+    { status: 'failed', snapshot: { ...snapshot, revision: -1 } },
+  ])('rejects invalid refresh responses', async response => {
+    mockRefreshWorktreeChanges.mockResolvedValue(response);
+    await expect(
+      new CloudAgentNextClient('token').refreshWorktreeChanges(cloudAgentSessionId)
+    ).rejects.toThrow();
+  });
+});
 
 describe('createCloudAgentNextClientForModel', () => {
   it('returns the default client when the model is paid and has no BYOK', () => {

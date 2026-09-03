@@ -1,3 +1,7 @@
+// Compile every zod schema built after this point into flat validation code.
+// Must stay the first import: the compiler only sees schemas constructed after
+// it installs. Node and Bun only — workerd and MV3 forbid `new Function()`.
+import 'zod/compile';
 import { startControlServer } from './control-server';
 import { log } from './logger';
 import { activeAgentCount, bootHydration, getUptime, listAgents } from './process-manager';

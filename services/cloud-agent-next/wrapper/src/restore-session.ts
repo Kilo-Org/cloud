@@ -1,3 +1,7 @@
+// Compile every zod schema built after this point into flat validation code.
+// Must stay the first import: the compiler only sees schemas constructed after
+// it installs. Node and Bun only — workerd and MV3 forbid `new Function()`.
+import 'zod/compile';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

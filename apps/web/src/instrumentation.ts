@@ -2,6 +2,11 @@ import { captureRequestError } from '@sentry/nextjs';
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Compile every zod schema built after this point into flat validation code.
+    // Kept first so the compiler sees the schemas that route and tRPC modules
+    // build at import time. Node only — the edge runtime forbids `new Function()`.
+    await import('zod/compile');
+
     await import('../sentry.server.config');
 
     const { getClient, SentryContextManager, validateOpenTelemetrySetup } =

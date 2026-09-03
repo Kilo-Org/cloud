@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+// Compile every zod schema built after this point into flat validation code.
+// Must stay the first import: the compiler only sees schemas constructed after
+// it installs. Node and Bun only — workerd and MV3 forbid `new Function()`.
+import 'zod/compile';
 
 type FetchFunction = (url: string, init: RequestInit) => Promise<Response>;
 type DebugLogger = (event: string, fields?: Record<string, unknown>) => void;

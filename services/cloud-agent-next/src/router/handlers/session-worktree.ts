@@ -13,6 +13,7 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -23,7 +24,7 @@ import {
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { generateSessionId, isControlPlaneOwner } from '../../session-plane.js';
+import { generateSessionId } from '../../session-plane.js';
 import {
   assertSessionOperationIdentity,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
@@ -74,6 +75,7 @@ const ownershipRowSchema = z
 const operationProgressSchema = CreateWorktreeChatOutput.omit({ replayed: true })
   .extend({
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: z.string().regex(/^[a-f0-9]{64}$/),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
   })
   .strict();
 
@@ -199,11 +201,7 @@ async function loadWorktreeSource(
     !worktreeId ||
     ownership.parentSessionId !== null ||
     ownership.cloudAgentSessionScopeId !== input.sourceCloudAgentSessionId ||
-    ownership.createdOnPlatform !== 'cloud-agent-web' ||
-    !isControlPlaneOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.kilocodeOrganizationId,
-    })
+    ownership.createdOnPlatform !== 'cloud-agent-web'
   ) {
     throw sourceRejected();
   }
@@ -258,15 +256,18 @@ async function loadWorktreeSource(
 
 async function worktreeIntentFingerprint(
   input: WorktreeInput,
-  worktreeId: CloudAgentWorktreeId
+  source: WorktreeSource
 ): Promise<string> {
   return sha256Hex(
     JSON.stringify({
       sourceKiloSessionId: input.sourceKiloSessionId,
       sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
       organizationId: input.kilocodeOrganizationId ?? null,
-      worktreeId,
+      worktreeId: source.worktreeId,
       clientProvenance: input.clientProvenance,
+      ...(source.workspace.sandboxAllocation
+        ? { sandboxAllocation: source.workspace.sandboxAllocation }
+        : {}),
     })
   );
 }
@@ -281,6 +282,7 @@ function readOperationProgress(
   if (
     !progress.success ||
     progress.data.worktreeId !== source.worktreeId ||
+    progress.data.sandboxAllocation !== source.workspace.sandboxAllocation ||
     progress.data[SESSION_CREATE_INTENT_FINGERPRINT_KEY] !== fingerprint
   ) {
     throw operationConflict();
@@ -340,6 +342,7 @@ function assertRegisteredMetadata(
     workspace.workspacePath !== source.workspace.workspacePath ||
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
+    workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
     workspace.branchName !== source.workspace.branchName ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||
@@ -699,6 +702,9 @@ async function executeWorktreeCreate(
     kiloSessionId: generateKiloSessionId(),
     worktreeId: source.worktreeId,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,
+    ...(source.workspace.sandboxAllocation
+      ? { sandboxAllocation: source.workspace.sandboxAllocation }
+      : {}),
   });
   const diagnostic = {
     operationRowId: row.id,
@@ -866,7 +872,7 @@ const createWorktreeChatHandler = internalApiProtectedProcedure
     const startedAt = Date.now();
     const db = getPgDb(ctx.env);
     const source = await loadWorktreeSource(db, ctx, input);
-    const fingerprint = await worktreeIntentFingerprint(input, source.worktreeId);
+    const fingerprint = await worktreeIntentFingerprint(input, source);
     const admission = await admitOperation(db, {
       userId: ctx.userId,
       orgId: input.kilocodeOrganizationId,

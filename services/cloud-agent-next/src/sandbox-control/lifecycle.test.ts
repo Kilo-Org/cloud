@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingContext } from '@kilocode/container-usage';
+import {
+  getSandboxAllocationResources,
+  type SandboxAllocation,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { SandboxControl, type SandboxAcquisition } from '../persistence/SandboxControl.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from '../sandbox-session/control-dispatch.js';
 import {
@@ -67,7 +72,7 @@ vi.mock('./socket.js', async importOriginal => ({
 }));
 vi.mock('../sandbox-session/session-stub.js', () => ({ getSandboxSessionStub: mocks.session }));
 
-const SANDBOX_ID = 'ses-abcdef';
+const SANDBOX_ID = `ses-${'a'.repeat(48)}`;
 const OWNER = 'owner_1';
 const ROUTE = {
   ownerId: OWNER,
@@ -143,6 +148,7 @@ async function harness(
   options: {
     containmentEnabled?: boolean;
     env?: Partial<Env>;
+    sandboxAllocation?: SandboxAllocation;
     configureAllocation?: (value: ReturnType<typeof allocation>, id: string) => void;
   } = {}
 ) {
@@ -262,7 +268,11 @@ async function harness(
     getCredentialMetadata: vi.fn(async () =>
       parseSessionMetadata({
         metadataSchemaVersion: 2,
-        identity: { sessionId: ROUTE.sessionId, userId: OWNER },
+        identity: {
+          sessionId: ROUTE.sessionId,
+          userId: OWNER,
+          ...(options.sandboxAllocation ? { orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } : {}),
+        },
         auth: { kiloSessionId: ROUTE.kiloSessionId, kilocodeToken: 'test-token' },
         workspace: {
           sandboxId: SANDBOX_ID,
@@ -278,6 +288,7 @@ async function harness(
                   kilocode: containmentEnabled,
                 },
               }),
+          ...(options.sandboxAllocation ? { sandboxAllocation: options.sandboxAllocation } : {}),
         },
         lifecycle: { version: 1, timestamp: Date.now() },
       })
@@ -348,6 +359,7 @@ async function harness(
         ownerId: OWNER,
         sessionId: ROUTE.sessionId,
         allowCreate: true,
+        resources: getSandboxAllocationResources(options.sandboxAllocation),
         billing: BILLING,
       });
     },
@@ -1105,11 +1117,14 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
     const transaction = h.storage.transaction.bind(h.storage);
-    vi.spyOn(h.storage, 'transaction').mockImplementationOnce(operation =>
+    const transactionSpy = vi.spyOn(h.storage, 'transaction').mockImplementation(operation =>
       transaction(async storage => {
-        await operation(storage);
-        expect(h.records.has('acquisition_receipts')).toBe(true);
-        throw new Error('acquisition transaction failed');
+        const result = await operation(storage);
+        if (h.records.has('acquisition_receipts')) {
+          transactionSpy.mockRestore();
+          throw new Error('acquisition transaction failed');
+        }
+        return result;
       })
     );
     await expect(h.acquire(acquisition)).rejects.toThrow('acquisition transaction failed');
@@ -1125,10 +1140,16 @@ describe('SandboxControl lifecycle boundaries', () => {
     const h = await harness();
     const acquisition = { id: 'attempt_a', deadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS };
     const transaction = h.storage.transaction.bind(h.storage);
-    vi.spyOn(h.storage, 'transaction').mockImplementationOnce(async operation => {
-      await transaction(operation);
-      throw new Error('reset after acquisition commit');
-    });
+    const transactionSpy = vi
+      .spyOn(h.storage, 'transaction')
+      .mockImplementation(async operation => {
+        const result = await transaction(operation);
+        if (h.records.has('acquisition_receipts')) {
+          transactionSpy.mockRestore();
+          throw new Error('reset after acquisition commit');
+        }
+        return result;
+      });
     await expect(h.acquire(acquisition)).rejects.toThrow('reset after acquisition commit');
     const claimed = await h.control.getPhysicalRecord();
     expect(claimed.state).toBe('creating');
@@ -2053,6 +2074,73 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(h.sendRequest).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, 'vercel-small', 'vercel-large'] as const)(
+    'pins %s effective resources and rejects incompatible reuse after eviction',
+    async preset => {
+      const h = await harness({
+        env: {
+          VERCEL_TOKEN: 'test-token',
+          VERCEL_TEAM_ID: 'team_1',
+          VERCEL_PROJECT_ID: 'project_1',
+          VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
+          VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot_1',
+          VERCEL_SANDBOX_RUNTIME: 'node24',
+          VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+          VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
+        },
+      });
+      if (preset === undefined) h.records.set('provider_kind', 'vercel');
+      const input = {
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        provider: 'vercel' as const,
+        resources: getSandboxAllocationResources(preset),
+      };
+      await h.control.ensureReady(input);
+      await h.evict();
+      await expect(h.control.ensureReady(input)).resolves.toMatchObject({ physical: 'stopped' });
+      for (const other of [undefined, 'vercel-small', 'vercel-large'] as const) {
+        if (other === preset) continue;
+        await expect(
+          h.control.ensureReady({ ...input, resources: getSandboxAllocationResources(other) })
+        ).rejects.toThrow('Sandbox resources mismatch');
+      }
+      await expect(
+        h.control.ensureReady({ ...input, provider: 'cloudflare', resources: undefined })
+      ).rejects.toThrow('Sandbox provider mismatch');
+      const claimed = await h.control.claimCreate('after-reset');
+      expect(claimed.createIntent?.vercel?.resources).toEqual(input.resources);
+      expect(mocks.getSandbox).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { provider: 'vercel', resources: { vcpus: 2, memory: 8192 } },
+    { provider: 'cloudflare', resources: { vcpus: 2, memory: 4096 } },
+    { provider: 'unknown' },
+  ])('rejects invalid persisted provider configuration %j on restart', async configuration => {
+    const h = await harness();
+    h.records.set('provider_configuration', configuration);
+    await expect(h.evict()).rejects.toThrow();
+    expect(mocks.getSandbox).not.toHaveBeenCalled();
+  });
+
+  it('rejects resources on a Cloudflare readiness request before pinning or creating', async () => {
+    const h = await harness();
+    await expect(
+      h.control.ensureReady({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        provider: 'cloudflare',
+        resources: { vcpus: 2, memory: 4096 },
+        allowCreate: true,
+      })
+    ).rejects.toThrow();
+    expect(h.records.has('provider_configuration')).toBe(false);
+    expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
+    expect(mocks.getSandbox).not.toHaveBeenCalled();
+  });
+
   it('rejects missing provider configuration and mismatched billing without an illegal transition', async () => {
     const h = await harness();
     await expect(
@@ -2505,9 +2593,17 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.flush();
   });
 
-  it.each([true, false])(
-    'reconciles a lost Vercel create response across runtime config rotation with containment %s',
-    async containmentEnabled => {
+  it.each(
+    [true, false].flatMap(containmentEnabled =>
+      ([undefined, 'vercel-small', 'vercel-large'] as const).map(sandboxAllocation => ({
+        containmentEnabled,
+        sandboxAllocation,
+      }))
+    )
+  )(
+    'reconciles a lost Vercel create response and retains $sandboxAllocation sizing with containment $containmentEnabled across restart and replacement',
+    async ({ containmentEnabled, sandboxAllocation }) => {
+      const resources = getSandboxAllocationResources(sandboxAllocation);
       const remote = new Map<string, VercelSandboxCreateEnvelope>();
       const inspected: URL[] = [];
       const policyUpdates: URL[] = [];
@@ -2524,10 +2620,12 @@ describe('SandboxControl lifecycle boundaries', () => {
               projectId: string;
               runtime: string;
               timeout: number;
+              resources?: VercelSandboxResources;
               source: { snapshotId: string };
               tags: Record<string, string>;
               networkPolicy?: unknown;
             };
+            expect(body.resources).toEqual(resources);
             if (!containmentEnabled) expect(body.networkPolicy).toBeUndefined();
             if (remote.has(body.name)) throw new Error('Name is retained');
             const sessionId = `vsess_${remote.size + 1}`;
@@ -2548,8 +2646,8 @@ describe('SandboxControl lifecycle boundaries', () => {
                 sourceSnapshotId: body.source.snapshotId,
                 runtime: body.runtime,
                 status: 'running',
-                memory: 2048,
-                vcpus: 2,
+                memory: body.resources?.memory ?? 2048,
+                vcpus: body.resources?.vcpus ?? 2,
                 region: 'iad1',
                 timeout: body.timeout,
                 requestedAt: Date.now(),
@@ -2609,11 +2707,13 @@ describe('SandboxControl lifecycle boundaries', () => {
           VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
           VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
         },
+        sandboxAllocation,
       });
       const creating = h.control.ensureReady({
         ownerId: OWNER,
         sessionId: ROUTE.sessionId,
         provider: 'vercel',
+        resources,
         allowCreate: true,
         billing: BILLING,
       });
@@ -2626,6 +2726,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         allocationName: [...remote.keys()][0],
         vercel: { runtimeBuildId: 'build_1', snapshotId: 'snapshot_1' },
       });
+      expect(uncertain.createIntent?.vercel?.resources).toEqual(resources);
+      expect(h.records.get('provider_configuration')).toEqual({
+        provider: 'vercel',
+        ...(resources ? { resources } : {}),
+      });
       h.env.VERCEL_SANDBOX_RUNTIME_BUILD_ID = 'build_2';
       h.env.VERCEL_SANDBOX_SNAPSHOT_ID = 'snapshot_2';
       h.env.CREDENTIAL_CONTAINMENT_ENABLED = containmentEnabled ? 'false' : 'true';
@@ -2635,7 +2740,11 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(inspected[0]?.searchParams.get('resume')).toBe('false');
       expect((await h.control.getPhysicalRecord()).state).toBe('stopped');
       expect([...remote.values()][0]?.session.status).toBe('stopped');
+      await h.evict();
       await h.create();
+      expect((await h.control.getPhysicalRecord()).createIntent?.vercel?.resources).toEqual(
+        resources
+      );
       await h.ready();
       expect(remote.size).toBe(2);
       expect([...remote.values()][1]?.session.sourceSnapshotId).toBe('snapshot_2');

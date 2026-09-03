@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -477,13 +478,24 @@ export const basePrepareSessionNextSchema = z
     path: ['attachments'],
   });
 
-export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema.refine(
-  data => data.bitbucketRepo === undefined,
-  {
+export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
+  .and(z.object({ sandboxAllocation: z.never().optional() }))
+  .refine(data => data.bitbucketRepo === undefined, {
     message: 'Bitbucket repositories require an organization',
     path: ['bitbucketRepo'],
-  }
-);
+  });
+
+export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
+  .and(
+    z.object({
+      organizationId: z.uuid(),
+      sandboxAllocation: selectableSandboxAllocationInputSchema.optional(),
+    })
+  )
+  .refine(data => !data.devcontainer || data.sandboxAllocation === undefined, {
+    message: 'Sandbox selection is not available with dev containers. Choose Default.',
+    path: ['sandboxAllocation'],
+  });
 
 // Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({

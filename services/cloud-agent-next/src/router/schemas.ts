@@ -1,4 +1,8 @@
 import * as z from 'zod';
+import {
+  getKiloSandboxAllocation,
+  sandboxAllocationInputSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   sessionIdSchema,
@@ -51,6 +55,15 @@ export {
 };
 
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
+
+const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
+  const allocation = getKiloSandboxAllocation(request);
+  if (allocation === undefined) {
+    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    return z.NEVER;
+  }
+  return allocation;
+});
 
 // Re-export types
 export type {
@@ -577,10 +590,9 @@ const PrepareSessionSharedFields = {
     .describe(
       'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
     ),
-  sandboxAllocation: z
-    .literal('isolated-standard')
-    .optional()
-    .describe('Allocate a dedicated Standard Cloudflare container for this session'),
+  sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
+    'Select a provider account and instance type instead of default routing'
+  ),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -651,21 +663,18 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
-    if (data.sandboxAllocation === 'isolated-standard' && data.devcontainer) {
+    if (data.sandboxAllocation !== undefined && data.devcontainer) {
       ctx.addIssue({
         code: 'custom',
         path: ['sandboxAllocation'],
-        message: 'Isolated Standard allocation cannot be combined with devcontainer',
+        message: 'Sandbox allocation cannot be combined with devcontainer',
       });
     }
-    if (
-      data.sandboxAllocation === 'isolated-standard' &&
-      data.createdOnPlatform === 'code-review'
-    ) {
+    if (data.sandboxAllocation !== undefined && data.createdOnPlatform === 'code-review') {
       ctx.addIssue({
         code: 'custom',
         path: ['sandboxAllocation'],
-        message: 'Isolated Standard allocation cannot be combined with code review',
+        message: 'Sandbox allocation cannot be combined with code review',
       });
     }
 
@@ -907,6 +916,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
+    runtime: z
+      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+      .strict()
+      .optional(),
     options: z
       .object({
         kilocodeOrganizationId: z.string().uuid().optional(),

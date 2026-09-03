@@ -1,10 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  getSandboxAllocationRequest,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SelectableSandboxAllocationRequest,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
   baseCreateWorktreeChatNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   basePrepareSessionNextSchema,
+  organizationPrepareSessionNextSchema,
+  personalPrepareSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
   type SandboxStatusSnapshot,
@@ -508,6 +515,21 @@ describe('createWorktreeChat schemas', () => {
     }
   });
 
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS,
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ])('rejects attempts to change an existing worktree to %j', sandboxAllocation => {
+    expect(
+      baseCreateWorktreeChatNextSchema.safeParse({
+        sourceKiloSessionId: KILO_SESSION_ID,
+        operationKey,
+        sandboxAllocation,
+      }).success
+    ).toBe(false);
+  });
+
   it('requires canonical workspace/worktree output and rejects private runtime paths', () => {
     const output = {
       kiloSessionId: KILO_SESSION_ID,
@@ -525,6 +547,126 @@ describe('createWorktreeChat schemas', () => {
     ]) {
       expect(baseCreateWorktreeChatNextOutputSchema.safeParse(invalidOutput).success).toBe(false);
     }
+  });
+});
+
+describe('prepare session sandbox selection', () => {
+  const baseInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+  const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  const allocations = SELECTABLE_SANDBOX_ALLOCATIONS;
+  const requests: SelectableSandboxAllocationRequest[] = [
+    ...allocations.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ];
+
+  it.each(['isolated-standard', getSandboxAllocationRequest('isolated-standard')])(
+    'rejects isolated-standard on the organization schema: %j',
+    sandboxAllocation => {
+      expect(
+        organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, sandboxAllocation })
+          .success
+      ).toBe(false);
+    }
+  );
+
+  it.each(allocations)('normalizes the legacy organization allocation %s', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, sandboxAllocation })
+        .sandboxAllocation
+    ).toEqual(getSandboxAllocationRequest(sandboxAllocation));
+  });
+
+  it.each(requests)('preserves the structured organization allocation %j', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, sandboxAllocation })
+        .sandboxAllocation
+    ).toEqual(sandboxAllocation);
+  });
+
+  it.each([...allocations, ...requests, 'default', 'vercel-medium', '', null, 2, { vcpus: 4 }])(
+    'rejects a personal sandboxAllocation instead of stripping it: %j',
+    sandboxAllocation => {
+      expect(
+        personalPrepareSessionNextSchema.safeParse({ ...baseInput, sandboxAllocation }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each([
+    'default',
+    'vercel-medium',
+    '',
+    null,
+    2,
+    { vcpus: 4 },
+    { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
+  ])('rejects an invalid organization sandbox allocation: %j', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, sandboxAllocation })
+        .success
+    ).toBe(false);
+  });
+
+  it('keeps Default omitted in personal and organization requests', () => {
+    expect(personalPrepareSessionNextSchema.parse(baseInput)).not.toHaveProperty(
+      'sandboxAllocation'
+    );
+    expect(organizationPrepareSessionNextSchema.parse(organizationInput)).not.toHaveProperty(
+      'sandboxAllocation'
+    );
+  });
+
+  it.each([...allocations, ...requests])(
+    'rejects dev containers combined with %j',
+    sandboxAllocation => {
+      const result = organizationPrepareSessionNextSchema.safeParse({
+        ...organizationInput,
+        devcontainer: true,
+        sandboxAllocation,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([expect.objectContaining({ path: ['sandboxAllocation'] })])
+        );
+      }
+    }
+  );
+
+  it('accepts dev containers with Default', () => {
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, devcontainer: true })
+        .success
+    ).toBe(true);
+  });
+
+  it('preserves clone-only validation while accepting an organization preset', () => {
+    const cloneInput = {
+      ...organizationInput,
+      prompt: undefined,
+      cloneFromKiloSessionId: KILO_SESSION_ID,
+      autoInitiate: true,
+      operationKey: MESSAGE_UUID,
+      sandboxAllocation: 'cloudflare-single',
+    };
+    expect(organizationPrepareSessionNextSchema.parse(cloneInput).sandboxAllocation).toEqual(
+      getSandboxAllocationRequest('cloudflare-single')
+    );
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...cloneInput, prompt: 'Not allowed' })
+        .success
+    ).toBe(false);
+    expect(personalPrepareSessionNextSchema.safeParse(cloneInput).success).toBe(false);
   });
 });
 

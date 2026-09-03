@@ -6,6 +6,10 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from 'cloudflare:test';
+import {
+  getSandboxAllocationResources,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -18,7 +22,10 @@ import type {
   VercelSandboxNetworkPolicy,
   VercelSandboxSession,
 } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { parseVercelSandboxRuntimeConfig } from '../../src/agent-sandbox/vercel/vercel-runtime-config.js';
+import {
+  parseVercelSandboxRuntimeConfig,
+  resolveVercelSandboxRuntimeConfig,
+} from '../../src/agent-sandbox/vercel/vercel-runtime-config.js';
 import { TRPCError } from '@trpc/server';
 import { router } from '../../src/router/auth.js';
 import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
@@ -902,6 +909,10 @@ function fakeCloudflareContainers(readPhysical: () => Promise<PhysicalRecord>) {
 function fakeVercelRuntime(sandboxName: string, readPhysical: () => Promise<PhysicalRecord>) {
   const runtime = {
     creates: 0,
+    createInputs: [] as Parameters<VercelControlRestClient['createSandbox']>[0][],
+    inspectInputs: [] as Parameters<VercelControlRestClient['inspectByName']>[0][],
+    loseCreateResponse: false,
+    readPhysical,
     launches: [] as WrapperLaunch[],
     policy: undefined as VercelSandboxNetworkPolicy | undefined,
     stoppedSessions: [] as string[],
@@ -930,6 +941,7 @@ function fakeVercelRuntime(sandboxName: string, readPhysical: () => Promise<Phys
   };
   const client: VercelControlRestClient = {
     async inspectByName(input) {
+      runtime.inspectInputs.push(input);
       if (runtime.creates === 0 || input.name !== session.sourceSandboxName) return null;
       return {
         sandbox: {
@@ -949,13 +961,16 @@ function fakeVercelRuntime(sandboxName: string, readPhysical: () => Promise<Phys
     async createSandbox(input) {
       sandboxName = input.name;
       runtime.creates += 1;
+      runtime.createInputs.push(input);
       runtime.policy = input.networkPolicy;
       session = {
         ...session,
+        ...input.resources,
         sourceSandboxName: sandboxName,
         id: `vsess_joined_${runtime.creates}`,
         status: 'running',
       };
+      if (runtime.loseCreateResponse) throw new Error('Create response lost');
       return {
         sandbox: {
           name: sandboxName,
@@ -975,7 +990,7 @@ function fakeVercelRuntime(sandboxName: string, readPhysical: () => Promise<Phys
       await runtime.beforeLaunch?.();
       runtime.launches.push({
         env: input.env ?? {},
-        physical: await readPhysical(),
+        physical: await runtime.readPhysical(),
         networkPolicy: runtime.policy,
       });
       return {
@@ -1018,8 +1033,15 @@ function fakeVercelRuntime(sandboxName: string, readPhysical: () => Promise<Phys
     get provider() {
       return createVercelProviderAdapter({ sandboxName, config, restClient: client });
     },
-    createAdapter: (allocationName: string) =>
-      createVercelProviderAdapter({ sandboxName: allocationName, config, restClient: client }),
+    createAdapter: (
+      allocationName: string,
+      persisted?: NonNullable<PhysicalRecord['createIntent']>['vercel']
+    ) =>
+      createVercelProviderAdapter({
+        sandboxName: allocationName,
+        config: resolveVercelSandboxRuntimeConfig(VERCEL_ENV, persisted),
+        restClient: client,
+      }),
   };
 }
 
@@ -1033,7 +1055,8 @@ async function registerCredentialSession(registration: CredentialRegistration) {
 
 async function credentialFixture(
   provider: AgentSandboxProvider = 'cloudflare',
-  id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '')}`
+  id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`,
+  sandboxAllocation?: SandboxAllocation
 ) {
   const control = env.SANDBOX_CONTROL.getByName(id);
   const broker = fakeCredentialBroker();
@@ -1057,7 +1080,10 @@ async function credentialFixture(
       const runtime = vercel;
       Object.assign(instance, {
         createProviderAdapter: (_kind: AgentSandboxProvider, physical?: PhysicalRecord) =>
-          runtime.createAdapter(physical?.createIntent?.allocationName ?? id),
+          runtime.createAdapter(
+            physical?.createIntent?.allocationName ?? id,
+            physical?.createIntent?.vercel
+          ),
       });
     }
   });
@@ -1079,6 +1105,10 @@ async function credentialFixture(
     workspace: {
       sandboxId: id,
       sandboxProvider: provider,
+      ...(sandboxAllocation ? { sandboxAllocation } : {}),
+      ...(sandboxAllocation === 'cloudflare-shared'
+        ? { sandboxRoute: { kind: 'shared' as const, routeKey: id } }
+        : {}),
       worktreeId: WORKTREE_ID,
       workspacePath: '/workspace/joined',
     },
@@ -1899,6 +1929,175 @@ describe('SandboxControl Vercel network policy updates', () => {
 });
 
 describe('SandboxControl contained Vercel lifecycle', () => {
+  it.each(['vercel-small', 'vercel-large'] as const)(
+    'cleans up an exclusive %s worktree using its pinned resources',
+    async sandboxAllocation => {
+      const { control, registration, environment, sandboxId, vercel } = await credentialFixture(
+        'vercel',
+        undefined,
+        sandboxAllocation
+      );
+      Object.assign(environment, {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({ kind: 'exclusive' }),
+        },
+      });
+      await control.ensureReady({
+        ...credentialInput(registration),
+        provider: 'vercel',
+        resources: getSandboxAllocationResources(sandboxAllocation),
+        allowCreate: true,
+      });
+      const physical = await control.getPhysicalRecord();
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValue((physical.createIntent?.createdAt ?? 0) + DEADLINE_MS.createSettle + 1);
+      try {
+        await expect(
+          control.deleteWorktreeResources({
+            worktreeId: WORKTREE_ID,
+            kiloUserId: registration.identity.userId,
+            organizationId: registration.identity.orgId,
+            location: { sandboxId, provider: 'vercel' },
+            sessionIds: [ROOT_ID],
+          })
+        ).resolves.toEqual({ deleted: true, sessionIds: [ROOT_ID] });
+      } finally {
+        clock.mockRestore();
+      }
+      expect(vercel.runtime.creates).toBe(1);
+      expect(vercel.runtime.stoppedSessions).toEqual(['vsess_joined_1']);
+      expect((await control.getPhysicalRecord()).state).toBe('stopped');
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await state.storage.get('provider_configuration')).toBeUndefined();
+        expect(await state.storage.get('provider_locator')).toBeUndefined();
+      });
+    }
+  );
+
+  it.each([undefined, 'vercel-small', 'vercel-large'] as const)(
+    'retains %s resources through an uncertain create, object resets, inspection, and replacement',
+    async sandboxAllocation => {
+      const fixture = await credentialFixture('vercel', undefined, sandboxAllocation);
+      const { vercel, registration, environment, sandboxId } = fixture;
+      let control = fixture.control;
+      const resources = getSandboxAllocationResources(sandboxAllocation);
+      const input = {
+        ...credentialInput(registration),
+        provider: 'vercel' as const,
+        resources,
+        allowCreate: true,
+      };
+      vercel.runtime.loseCreateResponse = true;
+      await expect(control.ensureReady(input)).resolves.toMatchObject({ physical: 'failed' });
+      const uncertain = await control.getPhysicalRecord();
+      expect(uncertain.providerRef).toBeNull();
+      expect(uncertain.createIntent?.vercel?.resources).toEqual(resources);
+      expect(vercel.runtime.createInputs[0]?.resources).toEqual(resources);
+      expect(vercel.runtime.launches).toHaveLength(0);
+
+      const restart = async () => {
+        await abortAllDurableObjects();
+        control = env.SANDBOX_CONTROL.getByName(sandboxId);
+        await runInDurableObject(control, async (instance, state) => {
+          const physical = await instance.getPhysicalRecord();
+          expect(await state.storage.get('provider_configuration')).toEqual({
+            provider: 'vercel',
+            ...(resources ? { resources } : {}),
+          });
+          vercel.runtime.readPhysical = () => instance.getPhysicalRecord();
+          const createProviderAdapter = (_kind: AgentSandboxProvider, value?: PhysicalRecord) =>
+            vercel.createAdapter(
+              value?.createIntent?.allocationName ?? sandboxId,
+              value?.createIntent?.vercel
+            );
+          Object.assign(instance, {
+            env: environment,
+            createProviderAdapter,
+            provider: createProviderAdapter('vercel', physical),
+          });
+        });
+      };
+      await restart();
+      expect((await control.getPhysicalRecord()).createIntent).toEqual(uncertain.createIntent);
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValue((uncertain.createIntent?.createdAt ?? 0) + DEADLINE_MS.createSettle + 1);
+      try {
+        await fireControlDeadline(control, 'stopAttempt');
+      } finally {
+        clock.mockRestore();
+      }
+      expect(vercel.runtime.inspectInputs).toHaveLength(1);
+      expect(vercel.runtime.inspectInputs[0]).toMatchObject({
+        name: uncertain.createIntent?.allocationName,
+        operationId: uncertain.createIntent?.intentId,
+      });
+      expect(vercel.runtime.inspectInputs[0]?.resources).toEqual(resources);
+      expect(vercel.runtime.creates).toBe(1);
+      expect(vercel.runtime.stoppedSessions).toEqual(['vsess_joined_1']);
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'stopped',
+        createIntent: null,
+      });
+      await restart();
+      await expect(async () =>
+        control.ensureReady({
+          ...input,
+          resources:
+            sandboxAllocation === 'vercel-large'
+              ? { vcpus: 2, memory: 4096 }
+              : { vcpus: 4, memory: 8192 },
+        })
+      ).rejects.toThrow('Sandbox resources mismatch');
+      vercel.runtime.loseCreateResponse = false;
+      await expect(control.ensureReady(input)).resolves.toMatchObject({ physical: 'running' });
+      const replacement = await control.getPhysicalRecord();
+      expect(replacement.createIntent?.vercel?.resources).toEqual(resources);
+      expect(replacement.createIntent?.allocationName).not.toBe(
+        uncertain.createIntent?.allocationName
+      );
+      expect(vercel.runtime.createInputs).toHaveLength(2);
+      expect(vercel.runtime.createInputs[1]?.resources).toEqual(resources);
+      expect(vercel.runtime.launches).toHaveLength(1);
+    }
+  );
+
+  it.each([false, true])(
+    'shares compatible Cloudflare allocation when explicit selection comes first: %s',
+    async explicitFirst => {
+      const fixture = await credentialFixture(
+        'cloudflare',
+        undefined,
+        explicitFirst ? 'cloudflare-shared' : undefined
+      );
+      const { control, registration, containers } = fixture;
+      await control.ensureReady({
+        ...credentialInput(registration),
+        provider: 'cloudflare',
+        allowCreate: true,
+      });
+      const original = await control.getPhysicalRecord();
+      const sibling = await registerSiblingWorktree({
+        ...registration,
+        workspace: {
+          ...registration.workspace,
+          sandboxAllocation: explicitFirst ? undefined : 'cloudflare-shared',
+          sandboxRoute: { kind: 'shared', routeKey: fixture.sandboxId },
+        },
+      });
+      await expect(
+        control.ensureReady({
+          ...credentialInput(sibling),
+          provider: 'cloudflare',
+          allowCreate: true,
+        })
+      ).resolves.toMatchObject({ physical: 'running' });
+      expect((await control.getPhysicalRecord()).createIntent).toEqual(original.createIntent);
+      expect(containers.launches).toHaveLength(1);
+    }
+  );
+
   it.each(['malformed', 'cross-sandbox'] as const)(
     'rejects a %s Vercel handshake before binding a creating instance',
     async identityKind => {

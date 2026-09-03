@@ -1,5 +1,6 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
-  basePrepareSessionNextSchema,
+  organizationPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
   baseCreateWorktreeChatNextOutputSchema,
@@ -131,12 +132,6 @@ async function assertOrganizationOwnsSession(params: {
 }
 
 // Extend base schemas with organizationId for organization context
-const PrepareSessionInput = basePrepareSessionNextSchema.and(
-  z.object({
-    organizationId: z.uuid(),
-  })
-);
-
 const CreateWorktreeChatInput = baseCreateWorktreeChatNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -236,6 +231,17 @@ const ListBitbucketRepositoriesInput = z.object({
  * separately via WebSocket connection.
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
+  getSandboxSelectionOptions: organizationMemberProcedure
+    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .output(sandboxSelectionCapabilitiesSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = generateCloudAgentToken(ctx.user);
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
+        kilocodeOrganizationId: input.organizationId,
+        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
+      });
+    }),
+
   /**
    * Prepare a new cloud agent session (organization context).
    *
@@ -244,7 +250,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * initiateFromPreparedSession.
    */
   prepareSession: organizationMemberMutationProcedure
-    .input(PrepareSessionInput)
+    .input(organizationPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
       if (

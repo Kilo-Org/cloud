@@ -14,9 +14,11 @@ import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
+import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 
 export const appRouter = router({
   deleteWorktree,
+  getSandboxSelectionOptions,
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),

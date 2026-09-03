@@ -1,3 +1,4 @@
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -44,8 +45,8 @@ export type SessionRepositoryRequest =
     };
 
 export type SessionRuntimeIntent = {
+  sandboxAllocation?: SandboxAllocation;
   devcontainer?: boolean;
-  sandboxAllocation?: 'isolated-standard';
 };
 
 export type SessionCreateRequest = {

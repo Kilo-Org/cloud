@@ -22,7 +22,7 @@ file before you change any file in this package.
    |---|---|
    | Identifiers | `ulid` (`monotonicFactory`) |
    | Server-sent events | `eventsource-parser` |
-   | Schemas and validation | `zod` |
+   | Schemas and validation | `typia` (compile time, via `ttsc`) |
    | Effects, streams, retry, layers | `effect` |
    | Request body shapes | `@anthropic-ai/sdk` and `openai`, types only |
 
@@ -30,10 +30,18 @@ file before you change any file in this package.
    add no runtime code. They make the compiler reject a wrong field name in a
    request body.
 9. Prove behavior with a local end-to-end run.
-10. Validate every incoming value with Zod at the edge. An edge is any point
+10. Validate every incoming value at the edge with typia. An edge is any point
     where a value enters from outside the package: a store, a model reply, a
     tool result, a caller's input. Do not validate a value the package already
     made; that costs CPU and proves nothing.
+
+    The TypeScript type is the schema. `createIs<T>()` returns a boolean and
+    `createAssert<T>()` throws; both are rewritten into inlined checks when
+    `ttsc` compiles the file, so no schema object exists at run time.
+
+    Prefer a boolean check on a hot path. Building an error is far more
+    expensive than answering no: an is-check that misses costs about 0.005 us,
+    an assert that throws costs about 0.2 us.
 11. Keep the package maintainable. Keep a file small and give it one job. If a
     file passes about 100 lines, split it.
 12. Keep the core free of a runtime. The package must run on Node, in a
@@ -52,6 +60,40 @@ These are requirements, not goals:
 A change that adds an allocation on a hot path needs a measurement. A change
 that reorders or rewrites the prompt prefix breaks the cache; treat it as a
 regression until a measurement says otherwise.
+
+Measured on the SSE hot path, per streamed token, 200k events:
+
+| | codegen allowed | codegen blocked |
+|---|---|---|
+| zod 4, three schemas per event | 10.34 us | — |
+| typia, boolean checks | 0.241 us | 0.220 us |
+
+The second column is what a Cloudflare Worker, an MV3 extension and a React
+Native release build see, because all three reject `new Function()`. typia
+costs the same in both because its checks are generated at compile time. Do
+not reintroduce a validator that builds its checks at run time.
+
+## The toolchain
+
+The compiler is `ttsc`, not `tsc` or `tsgo`. It is the TypeScript-Go compiler
+with a plugin host, and typia's transform runs inside it. Stock `tsc`, `tsgo`
+and `tsx` all emit code where every `createIs` and `createAssert` call throws
+`no transform has been configured` when it runs.
+
+| Job | Command |
+|---|---|
+| Typecheck | `pnpm typecheck` (`ttsc --noEmit`) |
+| Build | `pnpm build` (`ttsc -p tsconfig.build.json`) |
+| Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
+| End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
+
+Because the transform rewrites source, the package ships `dist/` and not
+`src/`. A consumer importing the TypeScript directly would get the throwing
+version. Run `pnpm build` after changing a validated shape, or a dependent
+package reads a stale check.
+
+The first `ttsc` run on a machine compiles typia's plugin from Go and takes
+minutes. Later runs read a cache and take about a second.
 
 ## Rules
 
@@ -293,8 +335,7 @@ turn one off, and give the reason.
 `new-cap` stays on with `Tag` and `GenericTag` as exceptions, because
 `Context.Tag` is a call, not a constructor.
 
-`isolatedDeclarations` is off. It cannot infer a Zod schema type, and the
-package ships its source, so it buys no build time.
+`isolatedDeclarations` is off. It cannot infer a typia validator's type.
 
 `import/group-exports` stays on. Declare a name, then export it in one
 `export type { ... }` block and one `export { ... }` block at the end of the

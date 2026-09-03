@@ -1,5 +1,5 @@
 import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
-import { type AskOptions, askWith, onStore, type Wiring } from './ask.js';
+import { type AskOptions, askWith, onStore, type SessionBusyError, type Wiring } from './ask.js';
 import { ModelCatalog } from './catalog.js';
 import {
   type Effort,
@@ -39,7 +39,7 @@ interface SessionHandle {
   readonly ask: (
     text: string,
     options?: AskOptions
-  ) => Stream.Stream<ModelEvent, ModelError | StoreError>;
+  ) => Stream.Stream<ModelEvent, ModelError | StoreError | SessionBusyError>;
   readonly history: Effect.Effect<Chunk.Chunk<Turn>>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
   readonly usage: Effect.Effect<ModelUsage>;
@@ -61,25 +61,25 @@ const openSession = (
   PromptAssembler | ModelClient | ModelCatalog | Scope.Scope
 > =>
   Effect.gen(function* () {
+    const opened = yield* makeSession();
     const wiring: Wiring = {
       ...options,
+      id: opened.id,
       assembler: yield* PromptAssembler,
       client: yield* ModelClient,
       catalog: yield* ModelCatalog,
       store: yield* Effect.serviceOption(SessionStore),
-      state: yield* Ref.make(yield* makeSession()),
+      state: yield* Ref.make(opened),
       totals: yield* Ref.make(zeroUsage),
-      gate: yield* Effect.makeSemaphore(1),
+      busy: yield* Ref.make(false),
     };
-    const { id } = yield* Ref.get(wiring.state);
-
     yield* Effect.addFinalizer(() =>
       Effect.ignore(onStore(wiring.store, plugin => plugin.flush()))
     );
 
     return {
-      id,
-      ask: askWith(wiring, id),
+      id: opened.id,
+      ask: askWith(wiring),
       history: Effect.map(Ref.get(wiring.state), session => session.turns),
       usage: Ref.get(wiring.totals),
     };

@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
-import { type Counts, set } from './usage.js';
+import { type Counts, set, type TokenCount } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
 type ContentBlock = Anthropic.TextBlockParam;
@@ -31,19 +31,19 @@ const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): Mes
  * frames are named. Extra fields are allowed; typia's `is` ignores them.
  */
 interface WireUsage {
-  input_tokens?: number | null;
-  output_tokens?: number | null;
-  cache_read_input_tokens?: number | null;
-  cache_creation_input_tokens?: number | null;
+  input_tokens?: TokenCount | null;
+  output_tokens?: TokenCount | null;
+  cache_read_input_tokens?: TokenCount | null;
+  cache_creation_input_tokens?: TokenCount | null;
 }
 
 interface Reply {
   content: { type: string; text?: string }[];
   usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens?: number | null;
-    cache_creation_input_tokens?: number | null;
+    input_tokens: TokenCount;
+    output_tokens: TokenCount;
+    cache_read_input_tokens?: TokenCount | null;
+    cache_creation_input_tokens?: TokenCount | null;
   };
 }
 

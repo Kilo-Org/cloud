@@ -12,6 +12,7 @@ import {
 } from '../../core/model.js';
 import { RetryPolicy } from '../../core/retry.js';
 import { TokenSource } from '../../core/token.js';
+import { raise } from '../../core/usage.js';
 import { sseReader } from './sse.js';
 import type { Wire } from './wire/wire.js';
 import { wireFor } from './wires.js';
@@ -59,7 +60,7 @@ const eventsOf = (wire: Wire, usage: Ref.Ref<ModelUsage>, data: string) =>
   }).pipe(
     Effect.tap(event => {
       const part = wire.toUsage(event);
-      return part === undefined ? Effect.void : Ref.update(usage, held => ({ ...held, ...part }));
+      return part === undefined ? Effect.void : Ref.update(usage, held => raise(held, part));
     }),
     Effect.map(event => Option.fromNullable(wire.toDelta(event)))
   );

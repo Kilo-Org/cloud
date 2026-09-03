@@ -9,11 +9,10 @@
     ".": "./dist/index.js",
     "./core": "./dist/core/index.js",
     "./plugins/gateway": "./dist/plugins/gateway/index.js",
-    "./plugins/id": "./dist/plugins/id/ulid.js",
     "./plugins/prompt": "./dist/plugins/prompt/default.js"
   },
   "scripts": {
-    "build": "ttsc -p tsconfig.build.json",
+    "build": "rm -rf dist && ttsc -p tsconfig.build.json",
     "check": "pnpm typecheck && pnpm lint && pnpm check:boundaries && pnpm test && pnpm build",
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v '\\.test\\.ts$'",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",

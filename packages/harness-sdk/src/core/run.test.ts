@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { layerTableCatalog } from '../plugins/catalog/table.js';
 import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
+import type { SessionBusyError } from './ask.js';
 import { ModelError } from './model.js';
 import { openSession, type SessionHandle } from './run.js';
 import { SessionStore, type StoreError } from './storage.js';
@@ -33,7 +34,7 @@ const recordingStore = (): {
 
 const run = <A>(
   replies: readonly FakeReply[],
-  use: (session: SessionHandle) => Effect.Effect<A, ModelError | StoreError>,
+  use: (session: SessionHandle) => Effect.Effect<A, ModelError | StoreError | SessionBusyError>,
   store?: Layer.Layer<SessionStore>
 ) => {
   const model = fakeModel(replies);
@@ -155,4 +156,47 @@ it('lets the session and then the question beat the catalog', async () => {
     )
   );
   expect(model.calls.map(call => call.maxTokens)).toEqual([512, 99]);
+});
+
+it('refuses a second question asked while the first is still streaming', async () => {
+  const { value } = await run([{ deltas: ['one'] }, { deltas: ['two'] }], session =>
+    Stream.runCollect(
+      Stream.merge(
+        Stream.map(session.ask('a'), () => 'a'),
+        Stream.catchTag(
+          Stream.map(session.ask('b'), () => 'b'),
+          'harness/SessionBusyError',
+          () => Stream.succeed('refused')
+        )
+      )
+    ).pipe(Effect.map(chunk => [...new Set(Chunk.toReadonlyArray(chunk))].toSorted()))
+  );
+
+  expect(value).toEqual(['a', 'refused']);
+});
+
+it('takes the next question once the first stream has ended', async () => {
+  const { value } = await run([{ deltas: ['one'] }, { deltas: ['two'] }], session =>
+    Effect.zipRight(
+      Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
+      Effect.map(session.history, texts)
+    )
+  );
+
+  expect(value).toEqual(['user:a', 'assistant:one', 'user:b', 'assistant:two']);
+});
+
+it('takes the next question after one fails part way', async () => {
+  const failure = new ModelError({ reason: 'transport', cause: 'cut' });
+  const { value } = await run([{ deltas: ['par'], fail: failure }, { deltas: ['ok'] }], session =>
+    Effect.zipRight(
+      Effect.zipRight(
+        Effect.ignore(Stream.runDrain(session.ask('a'))),
+        Stream.runDrain(session.ask('b'))
+      ),
+      Effect.map(session.history, texts)
+    )
+  );
+
+  expect(value).toEqual(['user:a', 'user:b', 'assistant:ok']);
 });

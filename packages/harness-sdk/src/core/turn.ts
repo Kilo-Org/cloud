@@ -1,5 +1,4 @@
 import { Effect } from 'effect';
-import { createIs } from 'typia';
 import { makeId } from './id.js';
 
 /**
@@ -17,16 +16,10 @@ interface Turn {
 
 type TurnRole = 'user' | 'assistant';
 
-/**
- * Rows read back from a storage plugin are an edge: the package did not write
- * them this run, and no storage engine promises the shape it returns.
- */
-const isTurn = createIs<Turn>();
-
 const idPrefix = 'trn';
 
 const makeTurn = (sessionId: string, role: TurnRole, content: string): Effect.Effect<Turn> =>
   Effect.map(makeId(idPrefix), id => ({ id, sessionId, role, content }));
 
 export type { Turn, TurnRole };
-export { isTurn, makeTurn };
+export { makeTurn };

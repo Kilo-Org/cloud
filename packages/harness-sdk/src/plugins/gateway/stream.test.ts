@@ -101,3 +101,46 @@ it('streams a responses reply and names the cache key', async () => {
   expect(textOf(events)).toBe('yo');
   expect(events.at(-1)).toMatchObject({ usage: { cacheReadTokens: 19, inputTokens: 1 } });
 });
+
+const doneUsage = (events: readonly ModelEvent[]) => {
+  const last = events.at(-1);
+  return last?.kind === 'done' ? last.usage : undefined;
+};
+
+it('keeps the input counts when a later frame echoes zeros', async () => {
+  const { events } = await collect(
+    ['messages'],
+    sse(
+      {
+        type: 'message_start',
+        message: { usage: { input_tokens: 3, cache_read_input_tokens: 11_822 } },
+      },
+      { type: 'content_block_delta', delta: { text: 'hi' } },
+      {
+        type: 'message_delta',
+        usage: { input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 42 },
+      }
+    )
+  );
+
+  expect(doneUsage(events)).toEqual({
+    inputTokens: 3,
+    outputTokens: 42,
+    cacheReadTokens: 11_822,
+    cacheWriteTokens: 0,
+  });
+});
+
+it('ignores a token count that JSON.parse turned into Infinity', async () => {
+  const { events } = await collect(
+    ['chat_completions'],
+    ['data: {"usage":{"prompt_tokens":1e999,"completion_tokens":1}}\n\n']
+  );
+
+  expect(doneUsage(events)).toEqual({
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+  });
+});

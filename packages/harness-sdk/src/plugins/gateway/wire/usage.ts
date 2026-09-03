@@ -1,4 +1,13 @@
+import type { tags } from 'typia';
 import type { ModelUsage } from '../../../core/model.js';
+
+/**
+ * A token count as a provider reports it. `uint32` is what makes the check
+ * reject `NaN` and `Infinity`: `JSON.parse` turns an overflowing literal into
+ * `Infinity`, and a bare `number` accepts it, which then poisons every later
+ * sum with `NaN`.
+ */
+type TokenCount = number & tags.Type<'uint32'>;
 
 type Counts = { -readonly [K in keyof ModelUsage]?: number };
 
@@ -10,5 +19,5 @@ const set = (target: Counts, key: keyof ModelUsage, value: number | null | undef
   }
 };
 
-export type { Counts };
+export type { Counts, TokenCount };
 export { set };

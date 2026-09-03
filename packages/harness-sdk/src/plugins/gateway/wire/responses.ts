@@ -2,6 +2,7 @@ import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
+import type { TokenCount } from './usage.js';
 
 /**
  * The OpenAI Responses shape. It has no cache breakpoint. It caches on
@@ -31,9 +32,9 @@ const toBody = ({
 });
 
 interface Counts {
-  input_tokens: number;
-  output_tokens: number;
-  input_tokens_details?: { cached_tokens?: number | null } | null;
+  input_tokens: TokenCount;
+  output_tokens: TokenCount;
+  input_tokens_details?: { cached_tokens?: TokenCount | null } | null;
 }
 
 interface Reply {

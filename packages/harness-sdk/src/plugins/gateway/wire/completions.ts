@@ -2,6 +2,7 @@ import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 import type { Wire } from './wire.js';
+import type { TokenCount } from './usage.js';
 import type { ContentBlock } from './messages.js';
 
 /**
@@ -42,9 +43,9 @@ const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): Com
 });
 
 interface Counts {
-  prompt_tokens: number;
-  completion_tokens: number;
-  prompt_tokens_details?: { cached_tokens?: number | null } | null;
+  prompt_tokens: TokenCount;
+  completion_tokens: TokenCount;
+  prompt_tokens_details?: { cached_tokens?: TokenCount | null } | null;
 }
 
 interface Reply {
@@ -53,8 +54,7 @@ interface Reply {
 }
 
 interface DeltaEvent {
-  /** A tuple with a rest element: the frame is only a delta if a choice is present. */
-  choices: [{ delta: { content?: string | null } }, ...{ delta: { content?: string | null } }[]];
+  choices: { delta: { content?: string | null } }[];
 }
 
 interface UsageEvent {
@@ -89,8 +89,13 @@ const toReply = (raw: unknown): ModelReply => {
   };
 };
 
+/**
+ * The empty-choices frame is filtered here rather than in the type. A tuple
+ * with a rest element expresses it, but typia then copies the rest on every
+ * check, which costs three times as much on the per-token path.
+ */
 const toDelta = (event: unknown): string | undefined =>
-  isDelta(event) ? (event.choices[0].delta.content ?? undefined) : undefined;
+  isDelta(event) ? (event.choices[0]?.delta.content ?? undefined) : undefined;
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
   isUsage(event) ? readUsage(event.usage) : undefined;

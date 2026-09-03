@@ -1,3 +1,5 @@
+export type { AskOptions } from './ask.js';
+export { SessionBusyError } from './ask.js';
 export * from './catalog.js';
 export * from './fetch.js';
 export * from './id.js';

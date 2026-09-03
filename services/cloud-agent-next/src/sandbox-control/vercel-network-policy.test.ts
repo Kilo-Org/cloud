@@ -101,6 +101,56 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     });
   });
 
+  it('authenticates only packaged CLI provider paths through the runtime proxy', () => {
+    const policy = buildVercelCredentialNetworkPolicy({
+      kilo: kiloInput({
+        runtimeProxy: {
+          handle: 'runtime-proxy-handle',
+          targets: {
+            backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
+            providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
+            sessionIngestBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/ingest',
+          },
+        },
+      }),
+    });
+    const authorization = 'Bearer runtime-proxy-handle';
+    const base = 'https://worker.example.com/api/runtime-credential-proxy/provider/api/openrouter';
+
+    for (const [path, method] of [
+      ['/models', 'GET'],
+      ['/models/validate', 'POST'],
+      ['/chat/completions', 'POST'],
+      ['/messages', 'POST'],
+      ['/responses', 'POST'],
+      ['/embeddings', 'POST'],
+    ]) {
+      expect(effectiveAuthorization(policy, { url: `${base}${path}`, authorization, method })).toBe(
+        authorization
+      );
+    }
+
+    for (const [path, method] of [
+      ['/models', 'POST'],
+      ['/chat/completions', 'GET'],
+      ['/api/organizations/trusted-org/models', 'GET'],
+      ['/unknown', 'POST'],
+      ['/../chat/completions', 'POST'],
+      ['/models', 'DELETE'],
+    ]) {
+      expect(
+        effectiveAuthorization(policy, { url: `${base}${path}`, authorization, method })
+      ).toBeUndefined();
+    }
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/runtime-credential-proxy/provider/chat/completions',
+        authorization,
+        method: 'POST',
+      })
+    ).toBeUndefined();
+  });
+
   it.each([
     ['trusted organization', 'trusted-org', 'trusted-org'],
     ['personal account', undefined, ''],

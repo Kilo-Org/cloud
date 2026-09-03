@@ -266,10 +266,7 @@ function runtimeProxyInjectionRules(
     ['/responses', ['POST']],
     ['/embeddings', ['POST']],
   ] as const) {
-    add(provider, `${basePath(provider)}${path}`, [...methods]);
-  }
-  if (organizationId !== undefined) {
-    add(provider, `${basePath(provider)}/api/organizations/${organizationId}/models`, ['GET']);
+    add(provider, `${basePath(provider)}/api/openrouter${path}`, [...methods]);
   }
   add(ingest, `${basePath(ingest)}/api/session`, ['POST']);
   for (const sessionId of kilo.rootSessionIds) {

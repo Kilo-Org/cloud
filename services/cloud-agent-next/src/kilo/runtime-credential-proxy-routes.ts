@@ -60,20 +60,6 @@ function targetUrl(base: string, pathname: string, search: string): URL | null {
   }
 }
 
-function providerPath(pathname: string, providerBaseUrl: string): string | null {
-  let provider: URL;
-  try {
-    provider = new URL(providerBaseUrl);
-  } catch {
-    return null;
-  }
-  const prefix = provider.pathname.replace(/\/+$/, '');
-  if (prefix && (pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    pathname = pathname.slice(prefix.length) || '/';
-  }
-  return pathname;
-}
-
 function isAllowedBackendRoute(
   method: string,
   path: string,
@@ -108,6 +94,38 @@ function isAllowedProviderRoute(method: string, path: string): boolean {
     method === 'POST' &&
     ['/chat/completions', '/messages', '/responses', '/embeddings'].includes(path)
   );
+}
+
+function logicalProviderPath(pathname: string): string | null {
+  const prefix = '/api/openrouter';
+  if (!pathname.startsWith(`${prefix}/`)) return null;
+  const path = pathname.slice(prefix.length);
+  return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
+}
+
+function providerTargetUrl(base: string, path: string, search: string): URL | null {
+  let provider: URL;
+  try {
+    provider = new URL(base);
+  } catch {
+    return null;
+  }
+  if (
+    (provider.protocol !== 'https:' && provider.protocol !== 'http:') ||
+    provider.username ||
+    provider.password ||
+    provider.search ||
+    provider.hash
+  ) {
+    return null;
+  }
+
+  if (provider.origin === 'https://api.kilo.ai' && provider.pathname === '/') {
+    provider.pathname = `/api/gateway${path}`;
+    provider.search = search;
+    return provider;
+  }
+  return targetUrl(base, path, search);
 }
 
 function hasAuthorizedSessionBody(input: ResolveRuntimeCredentialProxyRouteInput): boolean {
@@ -162,13 +180,9 @@ export function resolveRuntimeCredentialProxyRoute(
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {
-    const resolvedProviderPath = providerPath(path, input.targets.providerBaseUrl);
-    if (resolvedProviderPath && isAllowedProviderRoute(input.method, resolvedProviderPath)) {
-      return targetUrl(input.targets.providerBaseUrl, resolvedProviderPath, input.search);
-    }
-    const organizationModels = /^\/api\/organizations\/([A-Za-z0-9._-]+)\/models$/.exec(path);
-    if (input.method === 'GET' && organizationModels?.[1] === input.organizationId) {
-      return targetUrl(input.targets.backendBaseUrl, path, input.search);
+    const logicalPath = logicalProviderPath(path);
+    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath)) {
+      return providerTargetUrl(input.targets.providerBaseUrl, logicalPath, input.search);
     }
   }
   if (input.route === 'ingest' && isAllowedIngestRoute(input, path)) {

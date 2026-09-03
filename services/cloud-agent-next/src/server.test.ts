@@ -789,7 +789,7 @@ describe('server runtime credential proxy', () => {
     vi.stubGlobal('fetch', upstream);
     const response = await fetchWorker(
       new Request(
-        'https://worker.test/api/runtime-credential-proxy/provider/chat/completions?stream=true',
+        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
         {
           method: 'POST',
           headers: {
@@ -807,6 +807,30 @@ describe('server runtime credential proxy', () => {
     expect(response.headers.get('location')).toBe('https://other.test');
     await expect(response.text()).resolves.toBe('stream-body');
     expect(resolve).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it('forwards packaged CLI inference requests to the production gateway', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({ token: jwt.sign({ exp: 4_000_000_000 }, secret) });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('POST');
+      expect(request.url).toBe('https://api.kilo.ai/api/gateway/chat/completions?stream=true');
+      return new Response('ok');
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await fetchWorker(
+      new Request(
+        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
+        { method: 'POST', headers: { Authorization: `Bearer ${await handle()}` } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();
   });
 

@@ -80,6 +80,16 @@ module.exports = function withAndroidWidgetLocalizations(config, options) {
     } else {
       resources.string.push({ $: { name: labelName }, _: english.displayName });
     }
+    // The library writes the description as translatable="false", which aapt2
+    // reads as a promise that no `values-<tag>` override exists. The 86 written
+    // below are exactly that, so the flag has to go.
+    const description = resources.string.find(entry => entry.$?.name === descriptionName);
+    if (!description) {
+      throw new Error(
+        `withAndroidWidgetLocalizations: no "${descriptionName}" resource; it must run after the widget plugin.`
+      );
+    }
+    delete description.$.translatable;
     return cfg;
   });
 

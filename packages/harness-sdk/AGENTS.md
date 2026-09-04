@@ -866,10 +866,17 @@ must be one instance shared by the session and the gateway, not two that agree
 each. Every plugin is still a plugin: a caller who needs a token that refreshes
 composes the layers themselves.
 
-There are four entry points: `@kilocode/harness-sdk`, `/core`,
-`/plugins/gateway` and `/plugins/prompt`. The catalog, token and retry plugins
-have none — a consumer reaches them through the root barrel, which also pulls
-the gateway. Add a subpath when one of them is wanted on its own.
+There are six entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/gateway`, `/plugins/prompt`, `/plugins/store/node` and
+`/plugins/store/expo`. The two stores have subpaths of their own because each
+names a platform: exporting them from the root would pull `node:sqlite` or
+`expo-sqlite` into every bundle. The catalog, token and retry plugins have
+none — a consumer reaches them through the root barrel, which also pulls the
+gateway. Add a subpath when one of them is wanted on its own.
+
+`src/index.test.ts` asserts what the root barrel carries, because a module left
+out of a barrel is invisible from outside the package and every test here
+imports by path.
 
 `pnpm build` empties `dist/` first. It once did not, and a subpath whose source
 had been deleted went on resolving against a stale artifact.

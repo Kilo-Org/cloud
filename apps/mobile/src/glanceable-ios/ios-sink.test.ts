@@ -462,9 +462,11 @@ describe('iosSink end', () => {
       expect(mockState.started[0]?.ended).toBe(true);
     });
 
+    // The replacement waits behind the older card's dismissal, so it opens on
+    // the newest counts instead of raising the stale ones and updating after.
     expect(mockState.started).toMatchObject([
       { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
-      { ended: false, props: { status: 'happy', running: 0, needsInput: 1 } },
+      { ended: false, props: { status: 'happy', running: 0, needsInput: 2 } },
     ]);
 
     // The older end must not reset the new revision or forget its pending update.

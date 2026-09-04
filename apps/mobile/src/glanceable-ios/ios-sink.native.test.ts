@@ -171,7 +171,8 @@ describe('native adapter recovery', () => {
         sink.publish(fresh);
       }
       sink.startOrUpdate(fresh, CTX);
-      await Promise.resolve();
+      // The replacement waits on the remotely ended card's dismissal.
+      await sink.waitForNativeTerminal?.();
 
       expect(native.records.filter(record => record.state === 'active')).toMatchObject([
         {
@@ -365,5 +366,32 @@ describe('native adapter idle window', () => {
       { props: { running: 1, idle: 0 } },
     ]);
     expect(native.records).toHaveLength(2);
+  });
+});
+
+describe('native adapter idle window shortening', () => {
+  it('shrinks a submitted idle dismissal to the terminal one once work goes empty', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+    expect(firstActivity().dismissAt).toBe(NOW + 600_000);
+
+    sink.publish(snapshot([], 2));
+    await sink.waitForNativeTerminal?.();
+    expect(firstActivity().dismissAt).toBe(NOW + 8000);
+  });
+
+  it('holds the replacement card until the idle card is dismissed', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    const resumed = snapshot([{ status: 'busy' }], 2);
+    sink.publish(resumed);
+    sink.startOrUpdate(resumed, CTX);
+    const onScreen = native.records.filter(record => record.state !== 'dismissed');
+    expect(onScreen).toHaveLength(1);
   });
 });

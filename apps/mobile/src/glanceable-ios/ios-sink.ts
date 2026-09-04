@@ -2,18 +2,30 @@ import {
   GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
+  type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
   isIdleOnlyGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
-import { after, type LiveActivity } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
-import { getGlanceableDelivery, type GlanceableSink } from '@/lib/glanceable/sink-registry';
+import {
+  getGlanceableDelivery,
+  type GlanceableSink,
+  type GlanceableSinkContext,
+} from '@/lib/glanceable/sink-registry';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
+import {
+  type Activity,
+  endExtra,
+  endingActivities,
+  readEndingToken,
+  scheduleEnd,
+  settleEnds,
+} from './ending-activities';
 import { ActiveAgentsWidget } from './active-agents-widget';
 import {
   buildExpiredWidgetProps,
@@ -24,8 +36,6 @@ import {
 
 /** ActivityKit takes the stale window in seconds. */
 const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
-
-type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
@@ -48,6 +58,37 @@ function isActivityKitUnavailable(error: unknown): boolean {
   return (
     error instanceof Error && 'code' in error && error.code === 'ERR_LIVE_ACTIVITIES_NOT_SUPPORTED'
   );
+}
+
+/** A start waiting on a dismissal, so a replacement card never overlaps the one it replaces. */
+let pendingStart: Promise<void> | null = null;
+/** What that deferred start will raise; a newer snapshot replaces it before it runs. */
+let pendingStartInput: {
+  contentState: Partial<GlanceableLiveActivityContentState>;
+  snapshot: GlanceableAgentsSnapshot;
+  ctx: GlanceableSinkContext;
+} | null = null;
+let pendingStartAt = 0;
+
+/** Raise the card. Shared by the immediate start and the one deferred behind a dismissal. */
+function startCard(
+  contentState: Partial<GlanceableLiveActivityContentState>,
+  snapshot: GlanceableAgentsSnapshot,
+  ctx: GlanceableSinkContext
+): void {
+  try {
+    activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL, STALE_AFTER_SECONDS);
+    inFlightUpdate = null;
+  } catch (error) {
+    // Only ActivityKit unavailability is permanent; transient starts retry later.
+    if (isActivityKitUnavailable(error)) {
+      activityKitDeniedState = true;
+    }
+    return;
+  }
+  lastProps = contentState;
+  revision = snapshot.revision;
+  getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
 }
 
 /** Recheck native state even when JavaScript missed the remote terminal snapshot. */
@@ -92,106 +133,21 @@ function refreshActivity(): boolean {
   }
 }
 
-async function readEndingToken(instance: Activity): Promise<string | null> {
-  try {
-    return await instance.getPushToken();
-  } catch {
-    // Recorded tokens still need cleanup when the native lookup fails.
-    return null;
-  }
-}
-
-type EndIntent = {
-  /** Milliseconds ActivityKit retains the card, or null to dismiss it at once. */
-  dismissMs: number | null;
-  props: Partial<GlanceableLiveActivityContentState> | null;
-};
-type EndingActivity = {
-  id: string;
-  instance: Activity;
-  update: Promise<void> | null;
-  token: Promise<string | null>;
-  intent: EndIntent;
-  pending: Promise<void> | null;
-};
-// Only pending native submissions live in JS. Native discovery owns terminal visibility.
-const endingActivities = new Map<string, EndingActivity>();
-
-async function finishEnd(ending: EndingActivity): Promise<void> {
-  let completed = false;
-  try {
-    try {
-      await ending.update;
-    } catch {
-      // A rejected update must not block the end; its contentDate still advances.
-    }
-    await ending.token;
-    // Read the latest intent at the native boundary. Privacy can supersede an
-    // empty snapshot during either await, including an already-submitted end.
-    // The retention window is measured from here, so the awaits never eat it.
-    for (;;) {
-      const intent = ending.intent;
-      // eslint-disable-next-line no-await-in-loop -- serialize a privacy dismissal after an in-flight native end
-      await ending.instance.end(
-        intent.dismissMs === null ? 'immediate' : after(new Date(Date.now() + intent.dismissMs)),
-        intent.props ?? undefined,
-        new Date()
-      );
-      if (intent === ending.intent) {
-        break;
-      }
-    }
-    completed = true;
-  } catch (error) {
-    // Native reports missing IDs as dismissed; only confirmed absence settles a failed end.
-    if (ending.instance.getInfo().state !== 'dismissed') {
-      throw error;
-    }
-    completed = true;
-  } finally {
-    ending.pending = null;
-    if (completed) {
-      endingActivities.delete(ending.id);
-    }
-  }
-}
-
-async function scheduleEnd(ending: EndingActivity): Promise<void> {
-  if (ending.pending !== null) {
-    return;
-  }
-  ending.pending = finishEnd(ending);
-  try {
-    await ending.pending;
-  } catch {
-    // Foreground publication is best-effort; background callers await the original task.
-  }
-}
-
 /**
- * End one activity this sink does not own, at once. Its push token belongs to
- * an earlier process or to a push-to-start, so no local token cleanup runs
- * here: the server drops the row when APNs reports the activity ended.
+ * End the adopted card. Returns the pending native work, or null when there was
+ * nothing to end.
+ *
+ * `reachEnded` widens the scan to cards ActivityKit has already ended but not
+ * yet dismissed. Only a terminal caller may set it: an idle end must never
+ * touch a card whose dismissal is already sooner than its own window.
  */
-function endExtra(instance: Activity, id: string): void {
-  const ending: EndingActivity = {
-    id,
-    instance,
-    update: null,
-    token: readEndingToken(instance),
-    intent: { dismissMs: null, props: null },
-    pending: null,
-  };
-  endingActivities.set(id, ending);
-  void scheduleEnd(ending);
-}
-
 function endNow(
   dismissMs: number | null = null,
-  props: Partial<GlanceableLiveActivityContentState> | null = lastProps
-): void {
+  props: Partial<GlanceableLiveActivityContentState> | null = lastProps,
+  reachEnded = dismissMs === null
+): Promise<void> | null {
   const targets = new Map<string, Activity>();
-  if (dismissMs === null) {
+  if (reachEnded) {
     try {
       // Privacy must include terminal content, even after JS state was discarded.
       for (const instance of ActiveAgentsLiveActivity.getInstances(true)) {
@@ -203,7 +159,7 @@ function endNow(
       }
     }
   } else if (!refreshActivity()) {
-    return;
+    return null;
   }
   const currentId = activity?.getInfo().id;
   if (activity !== null && currentId !== undefined) {
@@ -228,18 +184,25 @@ function endNow(
   inFlightUpdate = null;
   lastProps = null;
   revision = 0;
+  const pending: Promise<void>[] = [];
   for (const ending of endingActivities.values()) {
-    if (
-      dismissMs === null &&
-      (ending.intent.dismissMs !== null || (props !== null && props !== ending.intent.props))
-    ) {
-      ending.intent = { dismissMs: null, props: props ?? ending.intent.props };
+    const submitted = ending.intent.dismissMs;
+    if (dismissMs === null) {
+      if (submitted !== null || (props !== null && props !== ending.intent.props)) {
+        ending.intent = { dismissMs: null, props: props ?? ending.intent.props };
+      }
+    } else if (submitted !== null && dismissMs < submitted) {
+      // Work that ended for good outranks the idle window it interrupts: an
+      // already-submitted 10 minute dismissal must shrink to the terminal one,
+      // or the card keeps idle counts on screen long after the agents are gone.
+      ending.intent = { dismissMs, props: props ?? ending.intent.props };
     }
-    void scheduleEnd(ending);
+    pending.push(scheduleEnd(ending));
   }
   if (dismissMs === null && endingActivities.size === 0) {
     getGlanceableDelivery().cleanupTokens('activity');
   }
+  return pending.length === 0 ? null : settleEnds(pending);
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
@@ -276,6 +239,9 @@ export function _resetIosSinkForTests(): void {
   inFlightUpdate = null;
   lastProps = null;
   endingActivities.clear();
+  pendingStart = null;
+  pendingStartInput = null;
+  pendingStartAt = 0;
 }
 
 export const iosSink: GlanceableSink = {
@@ -283,6 +249,8 @@ export const iosSink: GlanceableSink = {
     await Promise.all(
       [...endingActivities.values()].map((ending): Promise<void> | null => ending.pending)
     );
+    // A replacement card deferred behind a dismissal is part of that terminal work.
+    await pendingStart;
   },
 
   publish(snapshot) {
@@ -300,7 +268,10 @@ export const iosSink: GlanceableSink = {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
       const immediate = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
-      endNow(immediate ? null : GLANCEABLE_TERMINAL_MS, contentState);
+      // `reachEnded`: work can go empty while an idle card is already counting
+      // down its 10 minute window. That card is still on screen and still shows
+      // the idle counts, so the terminal window has to reach it.
+      void endNow(immediate ? null : GLANCEABLE_TERMINAL_MS, contentState, true);
       return;
     }
     // Never start here. Recheck cached native work and preserve update/end ordering.
@@ -315,7 +286,7 @@ export const iosSink: GlanceableSink = {
         // above, so the card keeps the idle counts until it is removed. Work
         // resuming inside the window starts a fresh card, and `startOrUpdate`
         // dismisses this one first.
-        endNow(GLANCEABLE_IDLE_ONLY_MS, contentState);
+        void endNow(GLANCEABLE_IDLE_ONLY_MS, contentState);
       }
     }
   },
@@ -327,13 +298,27 @@ export const iosSink: GlanceableSink = {
     if (
       !getLiveActivityEnabled() ||
       activityKitDeniedState ||
-      !isEligibleGlanceableWork(snapshot) ||
-      !refreshActivity()
+      !isEligibleGlanceableWork(snapshot)
     ) {
       return;
     }
 
     const contentState = buildGlanceableLiveActivityContentState(snapshot);
+
+    if (pendingStart !== null) {
+      // A start is already waiting on a dismissal. There is no card to update
+      // yet, and raising a second one is the duplicate this sink exists to stop.
+      // Hand the waiting start the newer counts so it does not open stale.
+      if (isStartableGlanceableWork(snapshot) && snapshot.revision >= pendingStartAt) {
+        pendingStartInput = { contentState, snapshot, ctx };
+        pendingStartAt = snapshot.revision;
+      }
+      return;
+    }
+
+    if (!refreshActivity()) {
+      return;
+    }
 
     if (activity === null) {
       // Idle work never raises a card. It keeps one alive once real work put it
@@ -345,24 +330,23 @@ export const iosSink: GlanceableSink = {
       // `ended` and waiting out its dismissal date. Native discovery hides an
       // ended card, and only a second, immediate end removes it: dismiss it
       // here, keeping its own content, so two cards never share the screen.
-      endNow(null, null);
-      try {
-        activity = ActiveAgentsLiveActivity.start(
-          contentState,
-          OPEN_AGENTS_URL,
-          STALE_AFTER_SECONDS
-        );
-        inFlightUpdate = null;
-      } catch (error) {
-        // Only ActivityKit unavailability is permanent; transient starts retry later.
-        if (isActivityKitUnavailable(error)) {
-          activityKitDeniedState = true;
-        }
+      const dismissal = endNow(null, null);
+      if (dismissal !== null) {
+        // ActivityKit keeps the ended card on screen until the dismissal lands.
+        // Starting before then puts two cards up, so the replacement waits.
+        pendingStartInput = { contentState, snapshot, ctx };
+        pendingStartAt = snapshot.revision;
+        pendingStart = (async () => {
+          await dismissal;
+          const input = pendingStartInput;
+          pendingStart = null;
+          pendingStartInput = null;
+          pendingStartAt = 0;
+          startCard(input.contentState, input.snapshot, input.ctx);
+        })();
         return;
       }
-      lastProps = contentState;
-      revision = snapshot.revision;
-      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
+      startCard(contentState, snapshot, ctx);
       return;
     }
 
@@ -380,6 +364,6 @@ export const iosSink: GlanceableSink = {
   },
 
   endImmediate() {
-    endNow();
+    void endNow();
   },
 };

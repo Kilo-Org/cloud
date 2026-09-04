@@ -140,7 +140,7 @@ by hand.
 
 | Tag | Means | What a caller does |
 |---|---|---|
-| `harness/ModelError` | The call did not come back. `reason` is `transport`, `status`, `body`, or `unsupported`, and `status` is the HTTP status when there is one | The retry policy has already tried. A `status` of 402 or 429 is the account, not the code |
+| `harness/ModelError` | The call did not come back. `reason` is `transport`, `status`, `body`, `unsupported`, or `stream`, and `status` is the HTTP status when there is one | The retry policy has already tried. A `status` of 402 or 429 is the account, not the code. A `stream` failure arrived after the answer started, so throw the fragment away and ask again |
 | `harness/StoreError` | The store could not read or write. `operation` names which one | The turn is in memory and the answer is intact. The conversation cannot be continued later |
 | `harness/SessionBusyError` | A second question, or a compaction, was started while the first answer was still streaming | Wait for the stream to end, then try again |
 | `harness/SessionNotFoundError` | `continueSession` or `cloneSession` was given an id the store does not hold | Open a new session |

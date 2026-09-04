@@ -22,7 +22,7 @@ import { RetryPolicy } from '../../core/retry.js';
 import { TokenSource } from '../../core/token.js';
 import { raise } from '../../core/usage.js';
 import { sseReader } from './sse.js';
-import type { Wire } from './wire/wire.js';
+import { isFailure, type Wire } from './wire/wire.js';
 import { wireFor } from './wires.js';
 
 /** Everything the gateway resolved once, at layer build. */
@@ -94,6 +94,10 @@ const eventsOf = (wire: Wire, tally: Tally, data: string) =>
     try: () => JSON.parse(data) as unknown,
     catch: cause => new ModelError({ reason: 'body', cause }),
   }).pipe(
+    Effect.filterOrFail(
+      event => !isFailure(event),
+      event => new ModelError({ reason: 'stream', cause: event })
+    ),
     Effect.tap(event => {
       const part = wire.toUsage(event);
       return part === undefined ? Effect.void : Ref.update(tally.usage, held => raise(held, part));

@@ -710,6 +710,22 @@ ponytail: one reasoning part per turn. A model interleaves thinking with tool
 calls, so several blocks arrive per turn once this package has tools, and each
 needs its own signature. Give the wire the block boundary then.
 
+### A provider may fail after the answer has started
+
+All three shapes may report a failure in the middle of a stream that they would
+have reported as a status had the call not been streamed. Anthropic's streaming
+reference names the case: an `overloaded_error` frame, which is a 529 on a call
+that is not streamed. All three mark it the same way, with an `error` object on
+the frame, so `isFailure` in `wire/wire.ts` reads it once rather than three
+times.
+
+The stream fails with `ModelError` and `reason: 'stream'`. It is a reason of
+its own because the caller already holds part of an answer and has to throw it
+away; no other reason leaves anything behind. The exchange is never written, so
+the fragment reaches the caller and nothing else. Before 2026-09-04 the frame
+matched no reader, was dropped as an unknown event, and the stream ended on
+`done` with a fragment stored as a whole answer.
+
 ### Why the model stopped is part of the answer
 
 `done` carries a `StopReason` beside the counts: `end`, `maxTokens`, `refusal`,

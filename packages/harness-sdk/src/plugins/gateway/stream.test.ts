@@ -145,3 +145,31 @@ it('ignores a token count that JSON.parse turned into Infinity', async () => {
     cacheWriteTokens: 0,
   });
 });
+
+it('fails the stream when the provider reports an error part way through it', async () => {
+  /* Anthropic's streaming reference: "The API may occasionally send errors in
+     the event stream", such as an `overloaded_error` that would be a 529 on a
+     call that was not streamed. Swallowing the frame stores a truncated answer
+     as a whole one, and every later request is built on it. */
+  const reply: Reply = {
+    ok: true,
+    status: 200,
+    body: '',
+    chunks: sse(
+      { type: 'message_start', message: { usage: { input_tokens: 5 } } },
+      { type: 'content_block_delta', delta: { text: 'half an ans' } },
+      { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }
+    ),
+  };
+  const { fetch } = fakeFetch([reply]);
+  const result = await ModelClient.pipe(
+    Effect.map(client => client.stream(sampleRequest(true))),
+    Stream.unwrap,
+    Stream.runCollect,
+    Effect.either,
+    Effect.provide(testGateway({ fetch, kinds: ['messages'] })),
+    Effect.runPromise
+  );
+
+  expect(result).toMatchObject({ left: { reason: 'stream' } });
+});

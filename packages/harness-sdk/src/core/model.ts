@@ -53,9 +53,17 @@ interface ModelReply {
   readonly stop: StopReason;
 }
 
-/** A model call failed. `status` is the HTTP status when the transport has one. */
+/**
+ * A model call failed. `status` is the HTTP status when the transport has one.
+ *
+ * `stream` is the one that arrives after the answer started. Every shape may
+ * report a failure part way through a stream that it would have reported as a
+ * status had the call not been streamed, so the answer already in the caller's
+ * hands is a fragment. It is a reason of its own because the caller has
+ * something to throw away, which is true of no other one.
+ */
 class ModelError extends Data.TaggedError('harness/ModelError')<{
-  readonly reason: 'transport' | 'status' | 'body' | 'unsupported';
+  readonly reason: 'transport' | 'status' | 'body' | 'unsupported' | 'stream';
   readonly status?: number;
   readonly cause: unknown;
 }> {}

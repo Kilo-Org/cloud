@@ -1,3 +1,4 @@
+import { createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 
 /**
@@ -49,5 +50,25 @@ const stopFrom =
   (named: string | null | undefined): StopReason | undefined =>
     named === null || named === undefined ? undefined : (reasons[named] ?? 'unknown');
 
+/**
+ * A failure the provider reported after the answer started.
+ *
+ * All three shapes mark one the same way, with an `error` object on the frame,
+ * so it is read once here rather than per shape. Anthropic's streaming
+ * reference says so outright: the API may send an error in the event stream,
+ * such as an `overloaded_error` that would have been a 529 had the call not
+ * been streamed. Letting the frame pass ends the stream on `done` and stores a
+ * fragment as a whole answer.
+ *
+ * Only a top-level `error` object counts. A shape that reports `error: null`
+ * on a frame that succeeded, as the responses shape does inside `response`,
+ * does not match.
+ */
+interface FailureEvent {
+  error: { message?: string; type?: string };
+}
+
+const isFailure = createIs<FailureEvent>();
+
 export type { Wire, WirePart };
-export { stopFrom };
+export { isFailure, stopFrom };

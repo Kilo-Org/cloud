@@ -117,14 +117,15 @@ const thinking = (
   event: Extract<ModelEvent, { kind: 'reasoning' }>
 ): Effect.Effect<void> =>
   Ref.update(spoken, held => {
-    const open = held.thought.at(-1);
-    const sealed = event.signature ?? (open?.kind === 'reasoning' ? open.signature : undefined);
+    const last = held.thought.at(-1);
+    const open = last?.kind === 'reasoning' ? last : undefined;
+    const sealed = event.signature ?? open?.signature;
     const grown: PartDraft = {
       kind: 'reasoning',
-      body: (open?.kind === 'reasoning' ? open.body : '') + event.text,
+      body: (open?.body ?? '') + event.text,
       ...(sealed === undefined ? {} : { signature: sealed }),
     };
-    const before = open?.kind === 'reasoning' ? held.thought.slice(0, -1) : held.thought;
+    const before = open === undefined ? held.thought : held.thought.slice(0, -1);
     return { ...held, thought: [...before, grown] };
   });
 
@@ -134,7 +135,8 @@ const thinking = (
  * A transcript that ends on an unanswered question sends it again with every
  * later request: the caller pays for it each time, and the model may answer it
  * late, on top of whatever was asked next. Nothing else may have touched the
- * session in between, because one session answers one question at a time.
+ * session in between, because one session does one thing at a time — that is
+ * what `whileFree` in `ask.ts` holds, for a compaction as much as a question.
  */
 const rollback = (wiring: Wiring, exchange: Exchange): Effect.Effect<void> =>
   Effect.flatMap(Ref.get(exchange.answered), done =>

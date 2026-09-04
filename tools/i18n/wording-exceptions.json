@@ -307,7 +307,18 @@
     "tokens",
     "unknown"
   ],
-  "sr": ["edit", "open", "open pull request", "starting…", "tokens"],
+  "sr": [
+    "comment",
+    "commit",
+    "edit",
+    "files",
+    "open",
+    "open pull request",
+    "plan",
+    "reactions",
+    "starting…",
+    "tokens"
+  ],
   "sv": ["block", "commit", "copied", "open", "open pull request", "review", "tokens"],
   "sw": ["off", "open", "review"],
   "ta": ["open", "open pull request"],

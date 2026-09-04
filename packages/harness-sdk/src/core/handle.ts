@@ -5,7 +5,7 @@ import { compactSession } from './compact.js';
 import type { ModelError, ModelEvent, ModelUsage } from './model.js';
 import { cancelQueued, type Continued, enqueueMessage, type Waiting } from './queue.js';
 import type { StoreError } from './storage.js';
-import { backgroundNow, type RunningCall, runningIn } from './tools.js';
+import { backgroundNow, type RunningCall, runningIn } from './waiting.js';
 import type { PartDraft, Turn } from './turn.js';
 import type { Wiring } from './wiring.js';
 

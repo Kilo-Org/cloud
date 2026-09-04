@@ -983,6 +983,28 @@ one session still does one thing at a time. The driver retries while the session
 is busy, for up to five minutes, and a session busy longer than that surfaces on
 `session.continued` rather than spinning forever.
 
+### Four parties decide how long the model waits
+
+`waiting.ts` holds all of it, and the most specific answer wins. The tool author
+names a default with `inlineFor`. The session names a fallback. The model answers
+`wait` on the call. And whoever is watching a running call can end the waiting
+now.
+
+The model's answer is honoured in both directions, which was a decision. The
+argument against honouring `wait: true` over a tool's `inlineFor: 0` is that it
+holds something open — and it does not. Tools run in `afterRound`, between
+requests, so nothing is open at the provider while a tool runs. What waiting
+spends is the caller's `ask` stream and the session lock, and the caller already
+has `session.background` to take those back. A tool cannot know which call the
+model is stuck on; the model can.
+
+The field is added to every offered tool by `asOffered` in `tool.ts`, and taken
+back off by `wanted` in `waiting.ts` before the tool sees the call. Tool authors
+never write it and never receive it — a tool that validates its arguments
+strictly would refuse a key its author never wrote. Arguments that are not a
+JSON object pass through untouched, because a malformed call is the tool's to
+complain about and a rewritten one changes the words of the complaint.
+
 ### The deadline can be brought forward
 
 `Tool.inlineFor` and the session's own limit are guesses made before a call

@@ -19,6 +19,9 @@
  * - **A call outlives the request.** The question tool takes longer than the
  *   deadline, the model is told so and carries on, and the session runs a round
  *   of its own when the answer lands.
+ * - **The model decides for itself.** A tool that named no deadline is walked
+ *   away from because the model set `wait: false` on the call, and what it says
+ *   still comes back.
  */
 import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Stream } from 'effect';
@@ -143,7 +146,15 @@ const runBackgrounded = async (): Promise<void> => {
   const tool = questionTool(asker, { inlineFor: Duration.millis(500) });
 
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 256, tools: ['question'] });
+    const session = yield* openSession({
+      /* The claim here is the harness's deadline, so the model's veto over it is
+         taken away. A model that sets `wait` is honoured, which is what
+         `runWanted` is for. */
+      system: `${system} Never set wait on a tool call.`,
+      model,
+      maxTokens: 256,
+      tools: ['question'],
+    });
     /* Watch first: the round the session starts on its own happens whether or
        not anybody is listening, and a late subscriber hears none of it. */
     const watching = yield* Effect.fork(
@@ -189,6 +200,67 @@ const runBackgrounded = async (): Promise<void> => {
   }
 };
 
+/**
+ * The model choosing not to wait, on a tool that never asked to be backgrounded.
+ *
+ * This is the one claim a fake cannot make: that a real model reads the `wait`
+ * field it is offered and answers it. The tool takes three seconds and names no
+ * deadline of its own, so the session's thirty would hold the model there. Only
+ * the model's own `wait: false` moves it on — and the answer still arrives, in
+ * a round of its own, exactly as a deadline's would.
+ */
+const runWanted = async (): Promise<void> => {
+  ran.length = 0;
+  const program = Effect.gen(function* () {
+    const session = yield* openSession({
+      system: `${system} A tool call you set wait to false on runs without you. Set wait to false whenever a call would take a while and you can say something useful before it answers.`,
+      model,
+      maxTokens: 256,
+      tools: ['weather'],
+    });
+    const watching = yield* Effect.fork(
+      Effect.timeout(
+        Stream.runFold(
+          Stream.takeUntil(session.continued, one => 'failed' in one || one.event.kind === 'done'),
+          '',
+          (held: string, one) =>
+            !('failed' in one) && one.event.kind === 'delta' ? held + one.event.text : held
+        ),
+        '60 seconds'
+      )
+    );
+    const first = yield* answering(
+      session,
+      'What is the weather in Oslo? Do not wait for the tool — tell me you have asked, and I will hear the rest when it answers.'
+    );
+    return { first, later: yield* watching.await };
+  });
+
+  const got = await Effect.runPromise(
+    Effect.either(
+      Effect.scoped(Effect.provide(program, withTools('messages', [weather('3 seconds')])))
+    )
+  );
+
+  if (got._tag === 'Left') {
+    console.log(`\nwait: false       FAILED    ${JSON.stringify(got.left)}`);
+    failures.push('the round the model chose not to wait for failed');
+    return;
+  }
+
+  const { first, later } = got.right;
+  const said = later._tag === 'Success' ? later.value : '';
+  console.log(`\ndid not wait:      ${JSON.stringify(first)}`);
+  console.log(`told later:        ${JSON.stringify(said)}`);
+
+  if (first.includes('kestrel')) {
+    failures.push('the model waited for the call, so it never set wait to false');
+  }
+  if (!said.includes('kestrel')) {
+    failures.push('the call the model walked away from never came back');
+  }
+};
+
 console.log('model', model);
 console.log('\nshape             calls     answered');
 
@@ -197,8 +269,9 @@ for (const kind of ['messages', 'responses', 'chat_completions'] as const) {
 }
 await runTogether();
 await runBackgrounded();
+await runWanted();
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
 console.log(
-  '\nPASS: every shape ran a tool, the calls overlapped, and a late answer drove a round.'
+  '\nPASS: every shape ran a tool, the calls overlapped, a late answer drove a round, and the model chose not to wait.'
 );

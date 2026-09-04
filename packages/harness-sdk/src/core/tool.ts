@@ -91,6 +91,9 @@ interface Tool {
    * Zero backgrounds every call to it at once, which is what a tool that waits
    * on a person wants: no model should sit on an open request while somebody
    * reads a question.
+   *
+   * It is a default and not a rule. The model answers `wait` on the call when
+   * it knows better, in either direction, and its answer wins.
    */
   readonly inlineFor?: Duration.DurationInput;
   /**
@@ -121,9 +124,43 @@ class ToolRegistry extends Context.Tag('harness/ToolRegistry')<
 const toolNamed = (tools: readonly Tool[], name: string): Option.Option<Tool> =>
   Option.fromNullable(tools.find(tool => tool.definition.name === name));
 
-/** What the model is told about the tools, in the order the session named them. */
+/**
+ * The name of the field the model sets to choose whether it waits.
+ *
+ * It is the harness's field and not the tool's: every tool carries it, no tool
+ * author writes it, and the runner takes it off again before the tool ever sees
+ * the arguments.
+ */
+const waitField = 'wait';
+
+const waitProperty = {
+  type: 'boolean',
+  description:
+    'Whether to wait for this call. False hands you a note saying it is ' +
+    'still running, so you can carry on with what does not depend on it, and ' +
+    'the result reaches you in a later message. True waits for it. Leave it ' +
+    'out to let the harness decide, which is right unless you know better.',
+};
+
+/** One tool as the model is told it, with the field the harness adds to all of them. */
+const asOffered = (definition: ToolDefinition): ToolDefinition => ({
+  ...definition,
+  parameters: {
+    ...definition.parameters,
+    properties: { ...definition.parameters.properties, [waitField]: waitProperty },
+  },
+});
+
+/**
+ * What the model is told about the tools, in the order the session named them.
+ *
+ * Every one of them gains `wait`, because whether the model waits for a call is
+ * the model's decision to make and not the tool author's. What the tool author
+ * decided is the default: `Tool.inlineFor` is what happens when the model says
+ * nothing.
+ */
 const definitionsOf = (tools: readonly Tool[]): readonly ToolDefinition[] =>
-  tools.map(tool => tool.definition);
+  tools.map(tool => asOffered(tool.definition));
 
 /**
  * Resolves the names a session was opened with, in that order, against the
@@ -167,11 +204,13 @@ const locksFor = (tools: readonly Tool[]): Effect.Effect<ReadonlyMap<string, Eff
 
 export type { JsonSchema, Tool, ToolCall, ToolDefinition, ToolRegistryService, ToolResult };
 export {
+  asOffered,
   definitionsOf,
   locksFor,
   resolveTools,
   ToolFailure,
   ToolMissingError,
+  waitField,
   ToolRegistry,
   toolNamed,
 };

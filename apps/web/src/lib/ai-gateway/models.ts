@@ -23,8 +23,6 @@ import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
-import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
-import { longcat_2_free_model } from '@/lib/ai-gateway/providers/longcat';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -52,29 +50,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
         } satisfies AutoFreeModel,
       ]
     : []),
-  ...(tencent_hy3_free_model.status === 'public'
-    ? [
-        {
-          model: tencent_hy3_free_model.public_id,
-          weight: 1,
-          reasoning: { enabled: true, effort: 'high' },
-        } satisfies AutoFreeModel,
-      ]
-    : []),
   {
     model: 'poolside/laguna-s-2.1:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
-  ...(longcat_2_free_model.status === 'public'
-    ? [
-        {
-          model: longcat_2_free_model.public_id,
-          weight: 1,
-          reasoning: { enabled: true, effort: 'high' },
-        } satisfies AutoFreeModel,
-      ]
-    : []),
   {
     model: 'minimax/minimax-m3:free',
     weight: 1,
@@ -152,8 +132,6 @@ export const kiloExclusiveModels = [
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
   stepfun_37_flash_free_model,
-  tencent_hy3_free_model,
-  longcat_2_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

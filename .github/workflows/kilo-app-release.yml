@@ -41,6 +41,13 @@ jobs:
       - name: Check for changes since last release
         id: check
         run: |
+          # A manual run is the override: build and submit whatever main holds.
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual run — building regardless of changes"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Find the latest kilo-app release tag
           LAST_TAG=$(git tag --list 'kilo-app-release/*' --sort=-creatordate | head -n 1)
 

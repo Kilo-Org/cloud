@@ -74,7 +74,6 @@ export async function renewStoredRuntimeAuthorization(input: {
     }
   };
   if (Date.parse(authorization.data.delegationExpiresAt) <= now) {
-    await revokeIfCurrent();
     throw new RuntimeAuthorizationExpiredError();
   }
   const token = metadata.auth.kilocodeToken;
@@ -114,12 +113,7 @@ export async function renewStoredRuntimeAuthorization(input: {
     );
     return renewed.token;
   } catch (error) {
-    if (
-      error instanceof RuntimeAuthorizationRevokedError ||
-      error instanceof RuntimeAuthorizationExpiredError
-    ) {
-      await revokeIfCurrent();
-    }
+    if (error instanceof RuntimeAuthorizationRevokedError) await revokeIfCurrent();
     throw error;
   }
 }

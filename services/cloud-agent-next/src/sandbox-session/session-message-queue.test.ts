@@ -1062,6 +1062,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
       return session;
     },
     control,
+    env,
     metadata,
     storage,
     values,
@@ -3158,6 +3159,26 @@ describe('SandboxSession orchestration', () => {
       expect.objectContaining({ stream_event_type: 'preparing' })
     );
     expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
+  });
+
+  it('keeps a persisted modern attachment isolated after the rollout flag is disabled', async () => {
+    const fixture = sessionFixture({
+      auth: {
+        kiloSessionId: 'kilo_root',
+        kilocodeToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6e319.',
+      },
+    });
+    fixture.env.RUNTIME_ISOLATION_ENABLED = 'false';
+
+    await fixture.admit('modern');
+    await fixture.flush();
+
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.attach',
+        payload: expect.objectContaining({ runtimeIsolation: 'per-session' }),
+      })
+    );
   });
 
   it.each(['cloudflare', 'vercel'] as const)(

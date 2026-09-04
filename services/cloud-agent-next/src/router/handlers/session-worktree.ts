@@ -31,6 +31,7 @@ import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { generateSessionId, isControlPlaneOwner } from '../../session-plane.js';
 import {
   assertSessionOperationIdentity,
+  assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
 import type { TRPCContext } from '../../types.js';
@@ -367,6 +368,10 @@ async function createDestinationRuntimeAuthorization(
   }
 }
 
+async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<void> {
+  if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
+}
+
 function buildRegistrationInput(
   source: WorktreeSource,
   ctx: TRPCContext,
@@ -673,6 +678,7 @@ async function registerWorktreeSession(
           }
         }
         registrationAttempted = true;
+        await assertNewDestinationRuntimeIsolation(ctx);
         const runtimeAuthorization = await createDestinationRuntimeAuthorization(
           ctx,
           progress,
@@ -791,6 +797,7 @@ async function executeWorktreeCreate(
   fingerprint: string
 ): Promise<WorktreeResult> {
   const startedAt = Date.now();
+  await assertNewDestinationRuntimeIsolation(ctx);
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: generateSessionId('control'),
     kiloSessionId: generateKiloSessionId(),
@@ -893,6 +900,8 @@ async function reconcileWorktreeCreate(
       throw error;
     }
     await assertDestinationRuntimeAuthorizationActive(ctx, progress.cloudAgentSessionId);
+  } else {
+    await assertNewDestinationRuntimeIsolation(ctx);
   }
 
   const ownership = await findOwnershipRow(

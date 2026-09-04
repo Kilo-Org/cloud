@@ -44,6 +44,7 @@ import {
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  sessionAttachPayloadSchema,
   sessionRequestIdentitySchema,
   wrapperInstanceIdSchema,
   type ResponseFrame,
@@ -629,6 +630,15 @@ export class SandboxControl extends DurableObject<Env> {
     if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
       const payload = parseOperationPayload(input.operation, input.payload);
       if (!payload.ok) throw new Error(payload.error.message);
+      const attach =
+        input.operation === 'session.attach'
+          ? sessionAttachPayloadSchema.parse(payload.payload)
+          : undefined;
+      if (attach?.runtimeIsolation === 'per-session') {
+        if (runtime.runtimeIsolation !== true) {
+          throw new Error('Sandbox wrapper does not support per-session runtime isolation');
+        }
+      }
       const identity = sessionRequestIdentitySchema.safeParse(input.session);
       if (!identity.success) throw new Error('session identity is required');
       await this.ctx.storage.transaction(async () => {

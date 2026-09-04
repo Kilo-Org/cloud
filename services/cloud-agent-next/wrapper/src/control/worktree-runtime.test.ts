@@ -241,11 +241,25 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
   return {
     registry: {
       ...registry,
+      attach(
+        identity: SessionRequestIdentity,
+        kilo: WorktreeKiloAuth,
+        env?: Record<string, string>,
+        canRefreshCredentials?: () => boolean
+      ) {
+        return registry.attach(identity, kilo, env, canRefreshCredentials, 'per-session');
+      },
       get kiloCliVersion() {
         return registry.kiloCliVersion;
       },
       async ensure(directory: string, kilo: WorktreeKiloAuth, env?: Record<string, string>) {
-        const attachment = registry.attach(rootIdentity(directory), kilo, env);
+        const attachment = registry.attach(
+          rootIdentity(directory),
+          kilo,
+          env,
+          undefined,
+          'per-session'
+        );
         try {
           const runtime = await attachment.ready;
           attachment.commit();
@@ -255,6 +269,7 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
         }
       },
     },
+    rawRegistry: registry,
     launches,
     get closes() {
       return closes;
@@ -509,6 +524,29 @@ describe('worktree Kilo environments', () => {
 });
 
 describe('worktree Kilo runtime registry', () => {
+  it('defaults missing runtime isolation to a directory-shared runtime', async () => {
+    const { rawRegistry, launches } = createRegistry();
+    const directory = path.join(tmpDir, 'legacy-shared');
+    const firstIdentity = rootIdentity(directory, 'first');
+    const secondIdentity = rootIdentity(directory, 'second');
+    const first = rawRegistry.attach(firstIdentity, auth);
+    const second = rawRegistry.attach(secondIdentity, auth);
+    try {
+      const [firstRuntime, secondRuntime] = await Promise.all([first.ready, second.ready]);
+      first.commit();
+      second.commit();
+      expect(secondRuntime).toBe(firstRuntime);
+      expect(firstRuntime.isolation).toBe('directory-shared');
+      expect(launches).toHaveLength(1);
+      expect(rawRegistry.detach(firstIdentity)).toBe(true);
+      expect(secondRuntime.signal.aborted).toBe(false);
+      expect(rawRegistry.get(secondIdentity)).toBe(secondRuntime);
+    } finally {
+      first.release();
+      second.release();
+    }
+  });
+
   it('starts lazily and reuses one server and feed for concurrent same-worktree roots', async () => {
     const { registry, launches } = createRegistry();
     const directory = path.join(tmpDir, 'worktree-a');

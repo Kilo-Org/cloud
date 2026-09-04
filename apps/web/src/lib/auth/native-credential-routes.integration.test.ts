@@ -31,9 +31,12 @@ jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) 
 
 const nativeResourceTokensKey = 'NATIVE_RESOURCE_TOKENS_ENABLED';
 const originalNativeResourceTokens = process.env[nativeResourceTokensKey];
+const sharedResourceTokensKey = 'SHARED_RESOURCE_TOKENS_ENABLED';
+const originalSharedResourceTokens = process.env[sharedResourceTokensKey];
 
 function setNativeResourceTokens(enabled: boolean) {
   process.env[nativeResourceTokensKey] = String(enabled);
+  process.env[sharedResourceTokensKey] = String(enabled);
 }
 
 function request(url: string, body: unknown, headers: Record<string, string> = {}) {
@@ -72,6 +75,11 @@ afterEach(() => {
     delete process.env[nativeResourceTokensKey];
   } else {
     process.env[nativeResourceTokensKey] = originalNativeResourceTokens;
+  }
+  if (originalSharedResourceTokens === undefined) {
+    delete process.env[sharedResourceTokensKey];
+  } else {
+    process.env[sharedResourceTokensKey] = originalSharedResourceTokens;
   }
 });
 
@@ -164,6 +172,24 @@ describe('native credential routes with PostgreSQL-backed sessions', () => {
     if (!pair?.refreshToken) throw new Error('Expected legacy refresh token');
     const payload = jwt.verify(pair.token, NEXTAUTH_SECRET, { algorithms: ['HS256'] });
     expect(payload).toMatchObject({ kiloUserId: user.id });
+  });
+
+  test('does not issue a modern native bundle before shared issuer readiness', async () => {
+    process.env[nativeResourceTokensKey] = 'true';
+    process.env[sharedResourceTokensKey] = 'false';
+    const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
+
+    const response = await exchange(
+      request(
+        'http://localhost:3000/api/auth/native/exchange',
+        { credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT },
+        { Authorization: `Bearer ${generateApiToken(user)}` }
+      )
+    );
+    const body: unknown = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(parseNativeTokenPair(body)?.metadata).toBeUndefined();
   });
 
   test('redeems an approved device code into a complete native credential envelope', async () => {

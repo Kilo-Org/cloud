@@ -84,7 +84,10 @@ describe('device-sessions', () => {
   test('rotates an actual negotiated bundle and supports legacy rollout rollback', async () => {
     const key = 'NATIVE_RESOURCE_TOKENS_ENABLED';
     const previous = process.env[key];
+    const sharedKey = 'SHARED_RESOURCE_TOKENS_ENABLED';
+    const previousShared = process.env[sharedKey];
     process.env[key] = 'true';
+    process.env[sharedKey] = 'true';
     try {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const first = await issueSessionCredentials(fakeUser, sessionId, {
@@ -125,6 +128,8 @@ describe('device-sessions', () => {
     } finally {
       if (previous === undefined) delete process.env[key];
       else process.env[key] = previous;
+      if (previousShared === undefined) delete process.env[sharedKey];
+      else process.env[sharedKey] = previousShared;
     }
   });
 

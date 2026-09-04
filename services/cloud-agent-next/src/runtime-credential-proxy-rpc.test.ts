@@ -256,6 +256,66 @@ describe('persisted runtime credential proxy RPC', () => {
     ).resolves.toBeNull();
   });
 
+  it('rejects a proxy credential when authorization is revoked while token I/O is pending', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, token });
+    let currentAuthorization = authorization();
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+
+    const result = resolvePersistedRuntimeProxyCredential({
+      env,
+      storage: store,
+      handle: handle!,
+      metadata: async () => metadata(),
+      authorization: async () => currentAuthorization,
+      fence: async () => fence(),
+      token: async () => {
+        started.resolve();
+        await release.promise;
+        return token;
+      },
+    });
+    await started.promise;
+    currentAuthorization = authorization('revoked');
+    release.resolve();
+
+    await expect(result).resolves.toBeNull();
+  });
+
+  it('rejects a proxy credential when authorization expires while token I/O is pending', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const store = storage();
+    const expiringAuthorization = authorization();
+    expiringAuthorization.delegationExpiresAt = new Date(Date.now() + 1_000).toISOString();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, currentAuthorization: expiringAuthorization, token });
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+
+    const result = resolvePersistedRuntimeProxyCredential({
+      env,
+      storage: store,
+      handle: handle!,
+      metadata: async () => metadata(),
+      authorization: async () => expiringAuthorization,
+      fence: async () => fence(),
+      token: async () => {
+        started.resolve();
+        await release.promise;
+        return token;
+      },
+    });
+    await started.promise;
+    vi.advanceTimersByTime(1_000);
+    release.resolve();
+
+    await expect(result).resolves.toBeNull();
+    vi.useRealTimers();
+  });
+
   it.each(['fence', 'grant'] as const)(
     '%s changes are handled according to the stable grant fence',
     async replacement => {

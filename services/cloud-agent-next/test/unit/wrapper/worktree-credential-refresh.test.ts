@@ -76,7 +76,13 @@ function fixture() {
     requestedAuth = auth,
     environment = { GH_TOKEN: 'github-original' }
   ) {
-    const attachment = registry.attach(identity, requestedAuth, environment, () => true);
+    const attachment = registry.attach(
+      identity,
+      requestedAuth,
+      environment,
+      () => true,
+      'per-session'
+    );
     const runtime = await attachment.ready;
     attachment.commit();
     attachment.release();

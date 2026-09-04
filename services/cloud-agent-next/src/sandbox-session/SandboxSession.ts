@@ -97,6 +97,7 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
 import {
   getRuntimeAuthorizationStatus,
+  hasModernRuntimeAuthorization,
   renewStoredRuntimeAuthorization,
   RUNTIME_AUTHORIZATION_KEY,
 } from '../session/runtime-authorization-persistence.js';
@@ -1914,6 +1915,9 @@ export class SandboxSession extends DurableObject<Env> {
           throw new Error('Contained session attachment is unavailable');
         const attachPayload = {
           ...status.attachment,
+          ...(hasModernRuntimeAuthorization(metadata)
+            ? { runtimeIsolation: 'per-session' as const }
+            : {}),
           ...(needsPreparation
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),

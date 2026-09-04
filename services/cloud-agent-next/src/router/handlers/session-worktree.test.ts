@@ -240,6 +240,7 @@ function fixture(options?: {
   ownershipResults?: OwnershipFixture[][];
   internalSecret?: string;
   controlPlaneIds?: string;
+  runtimeIsolationEnabled?: string;
   botId?: string;
   authToken?: string;
 }) {
@@ -284,6 +285,7 @@ function fixture(options?: {
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
       CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
       WORKTREE_CREATION_ENABLED_IDS: '',
+      RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -545,6 +547,19 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it('rejects a new destination before recording ownership when runtime isolation is disabled', async () => {
+    const { caller, input, destinationStub } = fixture({ runtimeIsolationEnabled: 'false' });
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { runtimeAdmission: {} } });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'runtime_isolation_unavailable',
+    });
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
   it('preserves legacy registration for audience-bound tokens without modern policy markers', async () => {
     const controlToken = 'legacy.header.signature';
     verifyKiloTokenForPolicyMock.mockResolvedValue({

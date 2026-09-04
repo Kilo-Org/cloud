@@ -1,11 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { API_GATEWAY_CREDENTIAL_FORMAT } from '@kilocode/app-shared/native-auth';
 
-const config = { enabled: true };
+const config = { enabled: true, sharedReady: true };
 
 jest.mock('@/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'native-access-credentials-secret',
-  isNativeResourceCredentialIssuanceEnabled: () => config.enabled,
+  isNativeResourceCredentialIssuanceEnabled: () => config.enabled && config.sharedReady,
 }));
 
 import { generateNativeAccessCredentials } from './native-access-credentials';
@@ -27,6 +27,7 @@ const user = {
 describe('generateNativeAccessCredentials', () => {
   beforeEach(() => {
     config.enabled = true;
+    config.sharedReady = true;
   });
 
   test('issues separated API and gateway credentials sharing one-hour timestamps', async () => {
@@ -86,6 +87,17 @@ describe('generateNativeAccessCredentials', () => {
     expect(unnegotiated.metadata).toBeUndefined();
     expect(jwt.decode(disabled.token)).toMatchObject({ deviceSessionId: 'device-session' });
     expect(jwt.decode(unnegotiated.token)).toMatchObject({ deviceSessionId: 'device-session' });
+  });
+
+  test('does not adopt resource credentials until the shared control issuer is ready', () => {
+    config.sharedReady = false;
+    const result = generateNativeAccessCredentials(
+      user,
+      'device-session',
+      API_GATEWAY_CREDENTIAL_FORMAT
+    );
+
+    expect(result.metadata).toBeUndefined();
   });
 
   test('rejects an unsupported requested format instead of silently falling back', () => {

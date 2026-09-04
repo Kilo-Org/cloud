@@ -151,6 +151,10 @@ export const sandboxHelloPayloadSchema = z.object({
   providerInstanceId: z.string().min(1).max(256),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   wrapperVersion: z.string().min(1).max(128).optional(),
+  capabilities: z
+    .object({ runtimeIsolation: z.literal(true).optional() })
+    .strict()
+    .optional(),
 });
 
 export const sandboxHelloResultSchema = z.object({
@@ -255,6 +259,7 @@ export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
 export const sessionAttachPayloadSchema = z
   .object({
+    runtimeIsolation: z.literal('per-session').optional(),
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
@@ -617,6 +622,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
+  runtimeIsolation: z.literal(true).optional(),
   observation: sandboxControlObservationSchema.optional(),
 });
 

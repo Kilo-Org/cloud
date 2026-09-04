@@ -183,7 +183,7 @@ describe('runtime authorization persistence', () => {
     expect(record.state).toBe('revoked');
   });
 
-  it('fails closed and revokes only the current record at the delegation deadline', async () => {
+  it('fails closed without revoking the current record at the delegation deadline', async () => {
     let record = {
       ...authorization('00000000-0000-4000-8000-000000000008'),
       delegationExpiresAt: '2026-01-02T00:00:00.000Z',
@@ -203,8 +203,29 @@ describe('runtime authorization persistence', () => {
         now: Date.UTC(2026, 0, 2),
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
-    expect(record.state).toBe('revoked');
+    expect(record.state).toBe('active');
     expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('keeps an active record recoverable when a background renewal observes expiration', async () => {
+    let record = authorization('00000000-0000-4000-8000-000000000009');
+
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: metadata(),
+        getAuthorization: async () => record,
+        putAuthorization: async value => {
+          record = value;
+        },
+        getMetadata: async () => metadata(),
+        putMetadata: async () => {},
+        renew: async () => {
+          throw new RuntimeAuthorizationExpiredError();
+        },
+        now: Date.UTC(2026, 0, 1),
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
+    expect(record.state).toBe('active');
   });
 
   it('treats modern-token metadata without a valid private record as revoked', async () => {

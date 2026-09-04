@@ -174,13 +174,16 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
     input.storage.get<unknown>(RUNTIME_PROXY_GRANT_KEY),
   ]);
   const latest = latestMetadata && latestFence ? context(latestMetadata, latestFence) : null;
+  const latestNow = Date.now();
   if (
     !latest ||
     !latestAuthorization ||
+    latestAuthorization.state !== 'active' ||
+    Date.parse(latestAuthorization.delegationExpiresAt) <= latestNow ||
     !matchesRuntimeProxyGrant(latestGrant, claims, {
       ...latest,
       authorizationId: latestAuthorization.id,
-      now,
+      now: latestNow,
     })
   ) {
     return null;

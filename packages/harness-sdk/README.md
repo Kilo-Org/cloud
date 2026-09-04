@@ -115,6 +115,27 @@ counts of every call so far — pass it to `hitRatio`), and `compact`.
 One session answers one question at a time. A second question asked while the
 first is still streaming fails with `SessionBusyError` rather than queueing.
 
+## When it fails
+
+Every failure is a tagged error, so `Effect.catchTag` picks one out by name.
+`ask` fails with the first three; the rest reach a caller who wires the plugins
+by hand.
+
+| Tag | Means | What a caller does |
+|---|---|---|
+| `harness/ModelError` | The call did not come back. `reason` is `transport`, `status`, `body`, or `unsupported`, and `status` is the HTTP status when there is one | The retry policy has already tried. A `status` of 402 or 429 is the account, not the code |
+| `harness/StoreError` | The store could not read or write. `operation` names which one | The turn is in memory and the answer is intact. The conversation cannot be continued later |
+| `harness/SessionBusyError` | A second question was asked while the first was streaming | Wait for the first stream to end, then ask again |
+| `harness/SessionNotFoundError` | `continueSession` or `cloneSession` was given an id the store does not hold | Open a new session |
+| `harness/TokenError` | The `TokenSource` could not produce a credential | Reported as a `ModelError` with `reason: 'transport'`, because it is the one failure this package cannot tell from a flaky network |
+| `harness/CatalogError` | The catalog does not know the model | Never fatal on its own: the ceiling falls back to 4096 and compaction is skipped |
+| `harness/EntropyError` | The runtime gave no random bytes | The layer fails to build, so no session opens |
+
+A question that fails leaves the session as it was. The question and the answer
+reach the store together or not at all, and an unanswered question is taken back
+out of memory, so the next request builds on the same prefix rather than asking
+again for something the model may still answer late.
+
 ## Storing a conversation
 
 Without a store a session runs in memory and cannot be continued. With one,

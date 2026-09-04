@@ -45,3 +45,19 @@ export const resumed = Effect.provide(
 
 export const run = (): Promise<void> =>
   Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
+
+/* The tags the README's failure table names. `catchTag` rejects a tag the
+   error union does not hold, so renaming one fails here rather than in a
+   caller's editor. */
+export const handled = Effect.gen(function* () {
+  const session = yield* openSession({ system: 'sys', model: 'm' });
+  return yield* Stream.runDrain(session.ask('hi')).pipe(
+    Effect.catchTag('harness/ModelError', error => Effect.succeed(error.reason)),
+    Effect.catchTag('harness/StoreError', error => Effect.succeed(error.operation)),
+    Effect.catchTag('harness/SessionBusyError', error => Effect.succeed(error.sessionId))
+  );
+});
+
+export const reopened = continueSession('ses_1').pipe(
+  Effect.catchTag('harness/SessionNotFoundError', error => Effect.succeed(error.sessionId))
+);

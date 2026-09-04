@@ -64,7 +64,7 @@ export function SessionListSearchHeader({
         {hasText ? (
           <Pressable
             onPress={onClearSearch}
-            accessibilityLabel={t('agents.search.clearSearch')}
+            accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
             hitSlop={12}
             className="active:opacity-70"

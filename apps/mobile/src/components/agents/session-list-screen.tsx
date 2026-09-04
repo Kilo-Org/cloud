@@ -213,9 +213,7 @@ export function AgentSessionListScreen() {
             variant="outline"
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
           >
-            <Text>
-              {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
-            </Text>
+            <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>
         }
       />
@@ -246,7 +244,7 @@ export function AgentSessionListScreen() {
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('tabs.agents')}
+          title={t('common.agents')}
           eyebrow={
             !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
               ? t('agents.liveCount', { count: activeSessions.length })
@@ -282,7 +280,7 @@ export function AgentSessionListScreen() {
         {showFab && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('agentChat.newSession.title')}
+            accessibilityLabel={t('common.newSession')}
             testID="agents-new-session-fab"
             onPress={() => {
               router.push(getNewAgentSessionPath(organizationId) as Href);

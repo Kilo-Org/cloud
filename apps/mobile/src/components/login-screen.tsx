@@ -310,7 +310,7 @@ export function LoginScreen() {
                     }}
                     accessibilityLabel={t('login.copySignInLink')}
                   >
-                    <Text className="text-center">{t('login.copyLink')}</Text>
+                    <Text className="text-center">{t('common.copyLink')}</Text>
                   </Button>
                 </View>
                 <Button

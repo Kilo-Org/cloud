@@ -39,7 +39,7 @@ function selectorLabel({
     return `${value.name} · ${value.projectName}`;
   }
   if (isLoading) {
-    return i18n.t('agentChat.instancePicker.loading');
+    return i18n.t('common.loading');
   }
   return i18n.t('agentChat.instancePicker.cloudAgent');
 }

@@ -128,7 +128,7 @@ export function PrReviewOverview({
         <EmptyState
           refreshControl={refreshControl}
           icon={GitPullRequest}
-          title={t('prReview.accessDenied')}
+          title={t('common.accessDenied')}
           description={t('prReview.accessDeniedDescription')}
         />
       );
@@ -138,8 +138,8 @@ export function PrReviewOverview({
         <EmptyState
           refreshControl={refreshControl}
           icon={GitPullRequest}
-          title={t('prReview.connectionExpiredTitle')}
-          description={t('prReview.connectionExpiredDescription')}
+          title={t('prReview.reconnectNotice.title')}
+          description={t('prReview.reconnectNotice.message')}
           action={
             <Button
               className="mt-3 w-full"

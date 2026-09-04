@@ -13,7 +13,7 @@ import sr from './locales/sr.json';
  * not see.
  */
 const MESSAGE_KEYS = [
-  'authErrors.emailAlreadyUsed',
+  'authErrors.differentOauth',
   'authErrors.differentOauth',
   'authErrors.ssoError',
   'authErrors.admissionRequired',

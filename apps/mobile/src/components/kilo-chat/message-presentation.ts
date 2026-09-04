@@ -65,7 +65,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
     return i18n.t('chat.messageBubble.deleted');
   }
   if ('previewText' in replyToMessage) {
-    return replyToMessage.previewText ?? i18n.t('chat.messageBubble.message');
+    return replyToMessage.previewText ?? i18n.t('common.message');
   }
   const text = contentBlocksToText(replyToMessage.content).trim();
   if (text) {
@@ -73,7 +73,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   }
   const labels = contentBlocksAttachmentPreviewLabels(replyToMessage.content);
   if (labels.length === 0) {
-    return i18n.t('chat.messageBubble.message');
+    return i18n.t('common.message');
   }
   return labels
     .map(label => {
@@ -83,7 +83,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
       if (label.kind === 'image') {
         return i18n.t('chat.messageBubble.image');
       }
-      return i18n.t('chat.messageBubble.attachment');
+      return i18n.t('chat.attachment.defaultName');
     })
     .join(', ');
 }
@@ -137,7 +137,7 @@ export function resolveMessageAuthorLabel({
 }): string {
   const member = members.find(candidate => candidate.id === senderId);
   if (senderId.startsWith('bot:')) {
-    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('kiloclaw.title');
+    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('common.kiloclaw');
   }
   return firstDisplayValue([member?.displayName]) ?? senderId;
 }

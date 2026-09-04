@@ -11,11 +11,9 @@ type ChatLinkActionOption = { kind: ChatLinkAction | 'cancel'; label: string };
 
 export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: boolean } = {}) {
   const actions: ChatLinkActionOption[] = [
-    ...(isPrLink
-      ? ([{ kind: 'review-pr', label: i18n.t('agentChat.chatLink.reviewPr') }] as const)
-      : []),
+    ...(isPrLink ? ([{ kind: 'review-pr', label: i18n.t('common.reviewPr') }] as const) : []),
     { kind: 'open', label: i18n.t('agentChat.chatLink.openLink') },
-    { kind: 'copy', label: i18n.t('agentChat.chatLink.copyLink') },
+    { kind: 'copy', label: i18n.t('common.copyLink') },
     { kind: 'share', label: i18n.t('agentChat.chatLink.shareLink') },
     { kind: 'cancel', label: i18n.t('common.cancel') },
   ];
@@ -35,7 +33,7 @@ export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: bool
  */
 export function buildPrLinkTapActionSheet() {
   const actions: ChatLinkActionOption[] = [
-    { kind: 'review-pr', label: i18n.t('agentChat.chatLink.reviewPr') },
+    { kind: 'review-pr', label: i18n.t('common.reviewPr') },
     { kind: 'open', label: i18n.t('common.openInBrowser') },
     { kind: 'share', label: i18n.t('agentChat.chatLink.share') },
     { kind: 'cancel', label: i18n.t('common.cancel') },

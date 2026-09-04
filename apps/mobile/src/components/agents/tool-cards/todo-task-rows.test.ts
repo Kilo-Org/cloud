@@ -155,7 +155,7 @@ describe('TodoTaskRows', () => {
     const labels = findByType(root, 'Text').filter(
       el =>
         (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
-        'agentChat.toolCard.contentTruncated'
+        'common.contentTruncated'
     );
     expect(labels).toHaveLength(1);
   });
@@ -165,7 +165,7 @@ describe('TodoTaskRows', () => {
     const labels = findByType(root, 'Text').filter(
       el =>
         (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
-        'agentChat.toolCard.contentTruncated'
+        'common.contentTruncated'
     );
     expect(labels).toHaveLength(0);
   });

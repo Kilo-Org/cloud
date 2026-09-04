@@ -42,7 +42,7 @@ function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.repositories.title')} />
+      <ScreenHeader title={t('common.repositories')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -100,7 +100,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title={t('securityAgent.repositories.title')}
+        title={t('common.repositories')}
         variant="offline"
         message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
@@ -124,7 +124,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.repositories.title')}
+        title={t('common.repositories')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -141,17 +141,15 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {!canManage && (
           <Text className="pb-4 text-center text-xs text-muted-foreground">
-            {t('securityAgent.repositories.readOnly')}
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <RadioGroup label={t('securityAgent.repositories.title')}>
+        <RadioGroup label={t('common.repositories')}>
           {(['all', 'selected'] as const).map(option => (
             <ChoiceRow
               key={option}
               label={
-                option === 'all'
-                  ? t('securityAgent.repositories.allRepositories')
-                  : t('securityAgent.repositories.selectedRepositories')
+                option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
               }
               selected={mode === option}
               disabled={!canManage}
@@ -166,7 +164,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         {mode === 'selected' && (
           <View className="mt-6">
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              {t('securityAgent.repositories.title')}
+              {t('common.repositories')}
             </Text>
             {repositories.isLoading && (
               <View className="gap-3 pt-2">
@@ -178,7 +176,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               <QueryError
                 variant="server"
                 placement="top"
-                title={t('securityAgent.repositories.couldNotLoadRepositories')}
+                title={t('common.couldNotLoadRepositories')}
                 onRetry={() => void repositories.refetch()}
                 isRetrying={repositories.isFetching}
               />
@@ -207,7 +205,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                             }
                           );
                         } catch {
-                          toast.error(t('securityAgent.repositories.couldNotOpenGithubSettings'));
+                          toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
                         }
                       })();
                     }}

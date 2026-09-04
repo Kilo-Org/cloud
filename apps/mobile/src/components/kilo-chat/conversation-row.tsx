@@ -69,7 +69,7 @@ export function ConversationRow({
     showActionSheetWithOptions(
       {
         title: title,
-        options: [t('chat.conversation.rename'), t('chat.conversation.leave'), t('common.cancel')],
+        options: [t('common.rename'), t('chat.conversation.leave'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
         containerStyle: { paddingBottom: bottom },

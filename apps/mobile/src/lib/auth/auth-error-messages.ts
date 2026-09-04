@@ -6,7 +6,7 @@ import { i18n } from '@/i18n';
  * in one place with every other string.
  */
 const AUTH_ERROR_KEYS = {
-  'EMAIL-ALREADY-USED': 'authErrors.emailAlreadyUsed',
+  'EMAIL-ALREADY-USED': 'authErrors.differentOauth',
   'DIFFERENT-OAUTH': 'authErrors.differentOauth',
   SSO_ERROR: 'authErrors.ssoError',
   // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains

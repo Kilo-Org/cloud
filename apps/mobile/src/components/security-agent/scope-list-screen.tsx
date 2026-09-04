@@ -41,7 +41,7 @@ export function ScopeListScreen() {
         <QueryError
           placement="top"
           variant="server"
-          title={t('securityAgent.scopeList.couldNotLoad')}
+          title={t('common.couldNotLoadOrganizations')}
           onRetry={() => void refetch()}
           isRetrying={isFetching}
           className="mt-3"
@@ -66,12 +66,12 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.scopeList.title')} />
+      <ScreenHeader title={t('common.securityAgent')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <ConfigureRow
           icon={User}
-          title={t('securityAgent.scopeList.personal')}
-          subtitle={t('securityAgent.scopeList.personalSubtitle')}
+          title={t('common.personal')}
+          subtitle={t('common.yourOwnRepositories')}
           onPress={() => {
             openScope(PERSONAL_SECURITY_SCOPE);
           }}

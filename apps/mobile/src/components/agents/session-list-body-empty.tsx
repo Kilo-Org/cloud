@@ -50,7 +50,7 @@ export function BodyEmpty({
             message={
               isSearching
                 ? t('agents.sessionList.couldNotSearch')
-                : t('agents.sessionList.couldNotLoad')
+                : t('common.couldNotLoadSessions')
             }
             onRetry={onRetry}
           />

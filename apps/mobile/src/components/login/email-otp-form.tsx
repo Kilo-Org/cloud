@@ -83,9 +83,9 @@ export function EmailOtpForm({
         variant="ghost"
         disabled={authBusy}
         onPress={onBack}
-        accessibilityLabel={t('login.back')}
+        accessibilityLabel={t('common.back')}
       >
-        <Text>{t('login.back')}</Text>
+        <Text>{t('common.back')}</Text>
       </Button>
     </View>
   );

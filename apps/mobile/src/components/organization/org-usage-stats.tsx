@@ -63,7 +63,7 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
       <Animated.View entering={FadeIn.duration(200)} className="gap-3">
         <View className="flex-row gap-3">
           <StatTile
-            label={t('organization.usageStats.cost')}
+            label={t('common.cost')}
             value={formatMoney(fromMicrodollars(data.totalCost), i18n.language)}
           />
           <StatTile

@@ -158,7 +158,7 @@ function ScopedQuickChatScreen() {
       return (
         <QueryError
           variant="server"
-          title={t('quickChat.catalogRetry')}
+          title={t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetchModels();
           }}
@@ -201,7 +201,7 @@ function ScopedQuickChatScreen() {
           <View className="flex-row items-center gap-2 px-4 py-2">
             <ActivityIndicator />
             <Text variant="muted" className="text-xs">
-              {t('quickChat.working')}
+              {t('common.working')}
             </Text>
           </View>
         ) : null}
@@ -214,7 +214,7 @@ function ScopedQuickChatScreen() {
               variant="outline"
               size="sm"
               accessibilityLabel={
-                catalogError ? t('quickChat.catalogRetry') : t('quickChat.historyRetry')
+                catalogError ? t('common.couldNotLoadModels') : t('quickChat.historyRetry')
               }
               onPress={() => {
                 void chat.refetch();
@@ -238,7 +238,7 @@ function ScopedQuickChatScreen() {
             onExitSession={noopExitSession}
             onStop={handleStop}
             isStreaming={chat.isStreaming}
-            placeholder={t('quickChat.composer.placeholder')}
+            placeholder={t('common.message')}
             mode="ask"
             onModeChange={() => {
               // Mode is locked to ask; any picker change snaps back on the next render.
@@ -258,11 +258,7 @@ function ScopedQuickChatScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('quickChat.title')}
-        showBackButton={false}
-        context={<ContextControl />}
-      />
+      <ScreenHeader title={t('common.chat')} showBackButton={false} context={<ContextControl />} />
       {keyboardContainerKind === 'app-aware-padding' ? (
         <AppAwareKeyboardPaddingView className="flex-1">
           {renderKeyboardBody()}

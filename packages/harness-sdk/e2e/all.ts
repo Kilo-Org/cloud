@@ -21,6 +21,7 @@ const runs = [
   'image',
   'cancel',
   'queue',
+  'together',
   'session',
   'resume',
   'clone',

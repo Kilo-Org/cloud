@@ -167,6 +167,15 @@ yield* Stream.runForEach(session.continued, ({ answering, event }) =>
 );
 ```
 
+`done` ends one call to the model, not the round: a round that calls a tool
+makes several, and `stop` is `'tools'` on each one that is waiting for a call
+the session is about to answer. So a queued message has been answered in full on
+the first `done` whose stop is anything else:
+
+```ts
+const over = ({ event }: Continued) => event.kind === 'done' && event.stop !== 'tools';
+```
+
 The rounds happen whether or not anybody reads `continued`. A caller that does
 not watch loses the events, never the work, and `history` holds all of it. The
 stream replays its recent events to a new reader, so queueing a message and only

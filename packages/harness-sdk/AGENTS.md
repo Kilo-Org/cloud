@@ -300,6 +300,8 @@ package.
 - Do not add a dependency for work that a few lines do.
 - Keep the file count low. Put one plugin point in one file.
 - Name a file in kebab case. Export a type with `export type`.
+- Format first, then check. `pnpm -w run format:changed` can reflow a file past
+  the 300-line cap, and a check run before it says nothing about what it wrote.
 - Run `pnpm check` in this directory before you commit. It runs the compiler
   over `src/` and over `e2e/`, the linter, the boundary check, the migration
   check, the tests, the build, the platform check, the package check, and the
@@ -398,23 +400,24 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 7 minutes 32 seconds:
+The whole sweep, 2026-09-04, 6 minutes 41 seconds:
 
 ```
-PASS  live        20s  the second call read the prefix from the cache
-PASS  shapes      26s  every shape carried the conversation
-PASS  stop        26s  a finished answer, told from one the ceiling cut off
-PASS  tools       80s  every shape ran a tool, and a late answer drove a round
-PASS  image       19s  every shape carried the picture and replayed it
-PASS  cancel      15s  the call stopped when the caller did
-PASS  queue       11s  two handed over while busy, one taken back, order kept
-PASS  session     27s  the prefix held across 10 calls, a busy session refused
-PASS  resume      15s  the stored count is the provider's own
-PASS  clone       43s  the clone read 11848 tokens of prefix and wrote 0
-PASS  reasoning   29s  every shape took its own thinking back
-PASS  replay      33s  every shape took back thinking that had been stored
-PASS  compact     21s  the session compacted itself and kept what it was told
-PASS  models      87s  10 of 10 models answered every turn
+PASS  live         9s  the second call read the prefix from the cache
+PASS  shapes      17s  every shape carried the conversation
+PASS  stop        19s  a finished answer, told from one the ceiling cut off
+PASS  tools       27s  every shape ran a tool, and a late answer drove a round
+PASS  image       22s  every shape carried the picture and replayed it
+PASS  cancel      19s  the call stopped when the caller did
+PASS  queue       16s  two handed over while busy, one taken back, order kept
+PASS  together    53s  a late answer and a typed message shared one line
+PASS  session     28s  the prefix held across 10 calls, a busy session refused
+PASS  resume      17s  the stored count is the provider's own
+PASS  clone       15s  the clone read 11848 tokens of prefix and wrote 0
+PASS  reasoning   27s  every shape took its own thinking back
+PASS  replay      37s  every shape took back thinking that had been stored
+PASS  compact     22s  the session compacted itself and kept what it was told
+PASS  models      67s  10 of 10 models answered every turn
 ```
 
 `models` fails about one run in five on a single third-party model that answers
@@ -537,6 +540,52 @@ prompt rather than for the line.
 
 Breaking `cancelQueued` so it removes nothing fails five of the run's claims,
 including `the cancelled message was said to the model anyway`.
+
+### One line, contended
+
+`pnpm test:e2e:together` is the run that makes a late tool result and a queued
+message wait for the same session at the same moment. They are the same thing to
+the session — a message it owes when it is free — and they are held in one line
+so the order between them is defined rather than a race.
+
+The model is asked to find out two things, and takes both in one call to the
+question tool, with choices: the tool's richer shape, exercised by a model
+rather than by a test. The asker sleeps far longer than the model waits, so the
+model is told the question is out and answers without it. A message is queued
+that holds the session open on a tool that sleeps, and the run then waits until
+it can see the answer waiting in the line before queueing a second message
+behind it. All three are certainly in the line together.
+
+The claim is that the rounds run in the order the entries joined. It is checked
+against the identifiers rather than against a clock: an identifier is made when
+its entry joins the line and sorts by when it was made, so sorting the three is
+the order the session owes them. An earlier draft asserted a fixed sequence and
+failed twice on timing the model controls, not on anything the package did.
+
+Measured 2026-09-04, `anthropic/claude-haiku-4.5`:
+
+```
+asked in one call: 2 questions
+  [colour] Which colour do you want for your bicycle? {ultramarine, vermilion}
+  [animal] Which animal should be on the bell? {marmoset, kestrel}
+
+the line, once the answer had joined it: ["toolResult","message"]
+and once a message was typed after it:  ["toolResult","message","message"]
+
+round 1 (the late answer): "You picked ultramarine for your bicycle colour and a marmoset for the animal on the bell."
+round 2 (the slow message): "Narwhal."
+round 3 (the message typed after): "Pelican."
+```
+
+Breaking `takeRun` so it prefers a message to a tool result fails exactly one
+claim, and names the order it ran instead.
+
+This run found a gap in what the package said. `done` ends one call to the
+model, not the round: a round that calls a tool makes several. A caller watching
+`continued` therefore cannot count rounds by `done`, and knows a queued message
+is answered in full only on the first `done` that stops on anything but
+`tools`. That was true and undocumented; `SessionHandle.continued` and the
+README say it now.
 
 ### A picture, and a caller who walks away
 

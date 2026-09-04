@@ -96,20 +96,30 @@ const askAndHand = (session: SessionHandle) =>
     return { said: held.text, handed: held.handed };
   });
 
+/**
+ * True when a round is over rather than paused on a tool.
+ *
+ * `done` ends one call to the model, and a round that calls a tool makes
+ * several. `tools` is the model waiting on a call the session is about to
+ * answer, so it is the one stop reason that is not the end of anything. This is
+ * how a caller knows a queued message has been answered in full.
+ */
+const over = (one: Continued): boolean => one.event.kind === 'done' && one.event.stop !== 'tools';
+
 /** Collects the rounds the session runs on its own, until `count` have ended. */
 const watch = (session: SessionHandle, count: number) => {
   const rounds: Round[] = [];
   let ended = 0;
   const held = { answering: [] as readonly string[], text: '' };
   return Stream.runForEach(
-    Stream.takeUntil(session.continued, one => one.event.kind === 'done' && ++ended === count),
+    Stream.takeUntil(session.continued, one => over(one) && ++ended === count),
     (one: Continued) =>
       Effect.sync(() => {
         held.answering = one.answering;
         if (one.event.kind === 'delta') {
           held.text += one.event.text;
         }
-        if (one.event.kind === 'done') {
+        if (over(one)) {
           rounds.push({ answering: held.answering, text: held.text });
           held.text = '';
         }

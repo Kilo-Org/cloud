@@ -57,6 +57,11 @@ interface SessionHandle {
    * message's answer is told from another's. Reading it a second time starts a
    * second subscription rather than continuing the first.
    *
+   * `done` ends one call to the model and not the round: a round that calls a
+   * tool makes several, and every one of those but the last stops on `tools`.
+   * A queued message is answered in full on the first `done` that stops on
+   * anything else.
+   *
    * The rounds happen whether or not anybody reads this. A caller that does not
    * watch loses the events, never the work, and the transcript holds all of it.
    */

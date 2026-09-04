@@ -1,6 +1,6 @@
 import { Clock, Effect, Option } from 'effect';
 import type { Prompt, PromptAssemblerService } from './prompt.js';
-import type { SessionStoreService, StoredSession } from './storage.js';
+import type { SessionStoreService, StoredExchange, StoredSession } from './storage.js';
 import type { Turn } from './turn.js';
 
 /**
@@ -14,15 +14,9 @@ import type { Turn } from './turn.js';
  *
  * Neither of those shows up as an error. They show up as a bill. So the package
  * ships the checks rather than describing them: run one against your plugin in
- * whatever test runner you already have, and assert the answer is empty.
- *
- * ```ts
- * const wrong = await Effect.runPromise(checkStore(myStore));
- * expect(wrong).toEqual([]);
- * ```
- *
- * Each answers a list of what it found, in the words the author needs. Empty
- * means it conforms. Neither fails: a store that refuses a write is a finding.
+ * whatever test runner you already have, and assert the answer is empty. Each
+ * answers a list of what it found, in the words the author needs, and neither
+ * fails: a store that refuses a write is a finding. PLUGINS.md has the rest.
  */
 
 /** What a plugin got wrong. Empty means it conforms. */
@@ -164,16 +158,17 @@ const checkSession = (store: SessionStoreService, id: string): Effect.Effect<Bro
     ];
   });
 
+/** One exchange written, and whatever the store said about writing it. */
+const appended = (store: SessionStoreService, exchange: StoredExchange) =>
+  tried(store.append(exchange), 'append');
+
 /** Turns come back in the order they were written, byte for byte. */
 const checkTurns = (store: SessionStoreService, id: string): Effect.Effect<Broken> =>
   Effect.gen(function* () {
     const first: readonly Turn[] = [questionFor(id), answerFor(id)];
     const second: readonly Turn[] = [laterFor(id)];
-    const one = yield* tried(store.append({ sessionId: id, turns: first, prompted: 11 }), 'append');
-    const two = yield* tried(
-      store.append({ sessionId: id, turns: second, prompted: 22 }),
-      'append'
-    );
+    const one = yield* appended(store, { sessionId: id, turns: first, prompted: 11 });
+    const two = yield* appended(store, { sessionId: id, turns: second, prompted: 22 });
     const flushed = yield* tried(store.flush(), 'flush');
     const loaded = yield* tried(store.load(id), 'load');
     const got = Option.getOrElse(loaded.got, (): readonly Turn[] => []);
@@ -214,10 +209,7 @@ const checkApart = (store: SessionStoreService, id: string): Effect.Effect<Broke
   Effect.gen(function* () {
     const other = `${id}_other`;
     yield* tried(store.create(sessionFor(other)), 'create');
-    yield* tried(
-      store.append({ sessionId: other, turns: [laterFor(other)], prompted: 1 }),
-      'append'
-    );
+    yield* appended(store, { sessionId: other, turns: [laterFor(other)], prompted: 1 });
     const loaded = yield* tried(store.load(id), 'load');
     const got = Option.getOrElse(loaded.got, (): readonly Turn[] => []);
     return [

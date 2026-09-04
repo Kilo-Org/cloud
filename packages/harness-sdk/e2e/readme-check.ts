@@ -9,6 +9,7 @@ import { TokenError, type TokenSourceService } from '../src/core/token.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
 import { hitRatio } from '../src/core/usage.js';
+import type { Continued } from '../src/core/queue.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
 import { nodeFetch } from './node-fetch.js';
@@ -142,6 +143,10 @@ export const asking = Effect.gen(function* () {
 
 /* The README's queue: the identifier, the line, taking one back, and reading
    one message's answer out of the rounds the session ran on its own. */
+/* The README's rule for knowing a queued message is answered in full. */
+export const over = ({ event }: Continued): boolean =>
+  event.kind === 'done' && event.stop !== 'tools';
+
 export const queueing = Effect.gen(function* () {
   const session = yield* openSession({ system: 'sys', model: 'm' });
   const id = yield* session.queue('and what about Lisbon?');

@@ -1,4 +1,4 @@
-import { Chunk, Effect } from 'effect';
+import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { seededEntropy } from '../plugins/entropy/seeded.js';
 import { appendTurn, makeSession } from './session.js';
@@ -35,6 +35,6 @@ it('appends turns in order and leaves the earlier session untouched', () => {
   );
   const appended = appendTurn(appendTurn(session, first), second);
 
-  expect(Chunk.toReadonlyArray(appended.turns).map(textOf)).toEqual(['a', 'b']);
-  expect(Chunk.isEmpty(session.turns)).toBe(true);
+  expect(appended.turns.map(textOf)).toEqual(['a', 'b']);
+  expect(session.turns).toEqual([]);
 });

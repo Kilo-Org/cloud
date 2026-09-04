@@ -1,4 +1,4 @@
-import { Chunk, Data, Effect, Option } from 'effect';
+import { Data, Effect, Option } from 'effect';
 import { EntropySource, type EntropySourceService } from './entropy.js';
 import { makeSession } from './session.js';
 import {
@@ -62,7 +62,7 @@ const continueSession = (
     const turns = yield* store.load(sessionId);
     const wiring = yield* wiringFor(optionsOf(stored), {
       id: sessionId,
-      turns: Chunk.fromIterable(turns),
+      turns,
     });
     return handleOf(wiring);
   });
@@ -107,7 +107,7 @@ const cloneSession = (
     const options = optionsOf(stored);
     yield* store.create({ ...options, id: opened.id });
     const copies = yield* copyTurns(store, entropy, { sessionId: opened.id, source });
-    const wiring = yield* wiringFor(options, { id: opened.id, turns: Chunk.fromIterable(copies) });
+    const wiring = yield* wiringFor(options, { id: opened.id, turns: copies });
     return handleOf(wiring);
   });
 

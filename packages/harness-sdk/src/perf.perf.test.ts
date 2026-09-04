@@ -1,4 +1,4 @@
-import { Chunk, Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { layerTableCatalog } from './plugins/catalog/table.js';
 import { messagesWire } from './plugins/gateway/wire/messages.js';
@@ -62,14 +62,14 @@ const sessionOf = (turns: number) => {
 };
 
 it('assembles a 200 turn prompt in well under 20 us', () => {
-  const turns = Chunk.toReadonlyArray(sessionOf(200).turns);
+  const { turns } = sessionOf(200);
   const cost = medianMicros(2000, () => void assemble({ system: 'sys', turns }));
   expect(cost).toBeLessThan(20);
 });
 
 it('assembles in time linear in the turn count, not quadratic', () => {
-  const small = Chunk.toReadonlyArray(sessionOf(100).turns);
-  const large = Chunk.toReadonlyArray(sessionOf(800).turns);
+  const small = sessionOf(100).turns;
+  const large = sessionOf(800).turns;
   const smallCost = medianMicros(2000, () => void assemble({ system: 'sys', turns: small }));
   const largeCost = medianMicros(500, () => void assemble({ system: 'sys', turns: large }));
 
@@ -79,7 +79,7 @@ it('assembles in time linear in the turn count, not quadratic', () => {
 });
 
 it('builds a whole 200 turn request in well under 250 us', () => {
-  const turns = Chunk.toReadonlyArray(sessionOf(200).turns);
+  const { turns } = sessionOf(200);
   const system = Array.from({ length: 200 }, (_, index) => `Rule ${String(index)}: be terse.`).join(
     '\n'
   );
@@ -192,16 +192,18 @@ it('holds a 2000 turn session in memory linear in the turn count', () => {
   const before = sessionOf(1000);
   const after = sessionOf(2000);
 
-  /* Chunk shares its earlier turns, so the count is what grows, not a copy of
-     the history per append. Reading sizes rather than the heap keeps this
-     deterministic; a quadratic copy would show up as a timing failure above. */
-  expect(Chunk.size(before.turns)).toBe(1000);
-  expect(Chunk.size(after.turns)).toBe(2000);
+  /* An append copies the array of turns, so the cost of growing a session is
+     quadratic in principle. What the number below says is that it does not
+     matter at any length a context window allows: a hundred appends cost less
+     than one round trip's first byte by four orders of magnitude. */
+  expect(before.turns).toHaveLength(1000);
+  expect(after.turns).toHaveLength(2000);
 
+  const hundred = before.turns.slice(0, 100);
   const growth = medianMicros(200, () => {
     let held = sessionOf(0);
-    for (let index = 0; index < 100; index += 1) {
-      held = appendTurn(held, Chunk.unsafeHead(before.turns));
+    for (const turn of hundred) {
+      held = appendTurn(held, turn);
     }
   });
   expect(growth).toBeLessThan(500);

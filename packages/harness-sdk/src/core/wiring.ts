@@ -1,4 +1,4 @@
-import { Chunk, Effect, type Option, Ref, type Scope, type Stream } from 'effect';
+import { Effect, type Option, Ref, type Scope, type Stream } from 'effect';
 import { type AskOptions, askWith, type SessionBusyError } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { compactSession } from './compact.js';
@@ -75,7 +75,7 @@ interface SessionHandle {
     input: string | readonly PartDraft[],
     options?: AskOptions
   ) => Stream.Stream<ModelEvent, ModelError | StoreError | SessionBusyError>;
-  /** Every turn so far, oldest first. A copy: appending to it changes nothing. */
+  /** Every turn so far, oldest first. Appending a turn never changes this one. */
   readonly history: Effect.Effect<readonly Turn[]>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
   readonly usage: Effect.Effect<ModelUsage>;
@@ -124,7 +124,7 @@ const wiringFor = (
 const handleOf = (wiring: Wiring): SessionHandle => ({
   id: wiring.id,
   ask: askWith(wiring),
-  history: Effect.map(Ref.get(wiring.state), session => Chunk.toReadonlyArray(session.turns)),
+  history: Effect.map(Ref.get(wiring.state), session => session.turns),
   usage: Ref.get(wiring.totals),
   compact: compactSession(wiring),
 });

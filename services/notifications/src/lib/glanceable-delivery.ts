@@ -92,6 +92,7 @@ export function buildGlanceableExpoMessages(
         // Android collapse key = the opaque scope key, so every aggregate update
         // for one user+org collapses into the same ongoing notification.
         tag: snapshot.scopeKey,
+        collapseId: snapshot.scopeKey,
       }) satisfies ExpoPushMessage
   );
 }

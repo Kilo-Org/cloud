@@ -1662,7 +1662,7 @@ describe('toGlanceableContentState', () => {
 
 describe('buildGlanceableExpoMessages', () => {
   it.each([0, 1, 3])(
-    'emits badge %i in one data-only, tag-collapsed message per Expo token',
+    'emits badge %i in one data-only, collapsed message per Expo token',
     needsInput => {
       const messages = buildGlanceableExpoMessages(
         [
@@ -1683,6 +1683,7 @@ describe('buildGlanceableExpoMessages', () => {
         expect(message.priority).toBe('default');
         expect(message.channelId).toBe('active-agents');
         expect(message.tag).toBe('deadbeef');
+        expect(message.collapseId).toBe('deadbeef');
       }
       expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
     }

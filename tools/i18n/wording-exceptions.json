@@ -196,7 +196,7 @@
   "kn": ["commit", "merge", "open", "open pull request", "review"],
   "ko": ["open", "open pull request", "plan", "session exited"],
   "lo": ["review"],
-  "lt": ["commit", "edit", "open", "open pull request", "outdated", "plan"],
+  "lt": ["commit", "edit", "files", "open", "open pull request", "outdated", "plan", "reactions"],
   "lv": ["open", "open pull request", "review"],
   "mg": ["block", "open", "open pull request"],
   "mi": ["commit", "open", "open pull request"],

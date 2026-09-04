@@ -20,6 +20,15 @@ const token = await kiloToken();
 const everyShape: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 
 /**
+ * The model a run uses when it does not care which. Cheap, quick, and it speaks
+ * every shape. `KILO_MODEL` points a run at another one.
+ *
+ * Eleven runs wrote this line each, so eleven had to be edited to try a
+ * different model, and one of them was always missed.
+ */
+const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+
+/**
  * The facts go in the fallback rather than in the table, because a live run
  * names its model on the command line and a table would have to know it. Only
  * a run that needs one shape, or a context window, passes anything: the layer
@@ -58,4 +67,4 @@ const cachedSystem = [
   ...Array.from({ length: 200 }, (_, index) => rule(index)),
 ].join('\n');
 
-export { baseUrl, cachedSystem, everyShape, kilo, organizationId, token };
+export { baseUrl, cachedSystem, everyShape, kilo, model, organizationId, token };

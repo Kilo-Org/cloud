@@ -19,17 +19,14 @@
  *   answers without the subagent, and is told the result in a round of its own
  *   when it lands.
  */
-import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Schedule, Stream } from 'effect';
-import type { SessionHandle } from '../src/core/handle.js';
 import { said } from '../src/core/model.js';
 import type { Continued } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { ToolRegistry } from '../src/core/tool.js';
 import { type SubagentReport, subagentTool } from '../src/plugins/tools/subagent.js';
-import { kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { kilo, model } from './setup.js';
+import { failures, passed, wrongIf } from './report.js';
 
 const system =
   'You are a test harness with a subagent tool. When the person asks for ' +
@@ -72,13 +69,6 @@ const subagent = (inlineFor: Duration.DurationInput) =>
 
 const withSubagent = (inlineFor: Duration.DurationInput) =>
   Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [subagent(inlineFor)] }));
-
-const failures: string[] = [];
-const wrongIf = (broken: boolean, why: string): void => {
-  if (broken) {
-    failures.push(why);
-  }
-};
 
 /** A task handed down, and one answer handed up. */
 const runHandOff = async (): Promise<void> => {
@@ -202,8 +192,7 @@ console.log('model', model);
 await runHandOff();
 await runSentAway();
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
-  '\nPASS: a task went down to a session of its own and one answer came up, and ' +
+passed(
+  'a task went down to a session of its own and one answer came up, and ' +
     'a running subagent was sent away by the caller.'
 );

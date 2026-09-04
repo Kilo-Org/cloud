@@ -11,18 +11,16 @@
  * picture itself. An assembler that dropped the image from the second request
  * would leave the model with its own earlier word and nothing else.
  */
-import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Effect, Stream } from 'effect';
+import { Effect } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
 const system =
   'You look at pictures and answer about them. ' +
@@ -78,8 +76,6 @@ const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
 console.log('model', model);
 console.log('\nshape             sent      named     background');
 
-const failures: string[] = [];
-
 for (const { kind, colour } of shapes) {
   const result = await runShape(kind, colour);
   if (result._tag === 'Left') {
@@ -103,5 +99,4 @@ for (const { kind, colour } of shapes) {
   }
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every shape carried the picture, and every shape replayed it.');
+passed('every shape carried the picture, and every shape replayed it.');

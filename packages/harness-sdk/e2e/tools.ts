@@ -23,17 +23,14 @@
  *   away from because the model set `wait: false` on the call, and what it says
  *   still comes back.
  */
-import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { said } from '../src/core/model.js';
-import type { SessionHandle } from '../src/core/handle.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, questionTool } from '../src/plugins/tools/question.js';
-import { kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
 const system =
   'You are a test harness with tools. Call a tool whenever one answers the ' +
@@ -75,8 +72,6 @@ const weather = (takes: Duration.DurationInput): Tool => ({
 
 const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
   Layer.merge(kilo({ apiKinds: [kind] }), Layer.succeed(ToolRegistry, { tools }));
-
-const failures: string[] = [];
 
 /** One round on one shape: the model calls, reads, and answers with the word. */
 const runShape = async (kind: ApiKind): Promise<void> => {
@@ -269,7 +264,6 @@ await runTogether();
 await runBackgrounded();
 await runWanted();
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
-  '\nPASS: every shape ran a tool, the calls overlapped, a late answer drove a round, and the model chose not to wait.'
+passed(
+  'every shape ran a tool, the calls overlapped, a late answer drove a round, and the model chose not to wait.'
 );

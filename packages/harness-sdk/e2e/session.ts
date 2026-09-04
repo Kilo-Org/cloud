@@ -13,16 +13,15 @@
  * fake model that answers instantly; this proves it while a real answer is
  * still streaming, which is the only time the race can actually happen.
  */
-import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { SessionBusyError } from '../src/core/ask.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo } from './setup.js';
+import { cachedSystem as system, kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 const questions = 10;
 
 interface Answer {
@@ -83,8 +82,6 @@ console.log('model', model, '\n');
 const answers = await Effect.runPromise(Effect.scoped(Effect.provide(growing, layers)));
 
 console.log('call  said     input  cache read  cache write  ratio');
-const failures: string[] = [];
-
 answers.forEach((answer, index) => {
   const usage = answer.usage;
   if (usage === undefined) {
@@ -122,7 +119,4 @@ if (!(refused._tag === 'Left' && refused.left instanceof SessionBusyError)) {
   failures.push('a second question was accepted while the first was still streaming');
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
-  `\nPASS: the prefix held across ${String(questions)} calls, and a busy session refused.`
-);
+passed(`\nPASS: the prefix held across ${String(questions)} calls, and a busy session refused.`);

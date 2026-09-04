@@ -11,7 +11,6 @@
  * ten times larger must leave it alone. Both windows come from the count the
  * provider gave, so neither depends on a guess about how a model tokenises.
  */
-import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { continueSession, type ResumeContext } from '../src/core/resume.js';
@@ -20,9 +19,8 @@ import { SessionStore } from '../src/core/storage.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { everyShape, kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { everyShape, kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
 const system = 'You answer briefly and remember what you are told.';
 
@@ -112,8 +110,6 @@ console.log(`\nreopened under a window of ${String(roomy)}`);
 console.log('  summaries before the question', wide.before, 'after', wide.after);
 console.log('  recalled', JSON.stringify(wide.said));
 
-const failures: string[] = [];
-
 if (first.prompted === 0) {
   failures.push('the provider reported no input tokens, so this run measures nothing');
 }
@@ -149,5 +145,4 @@ if (!wide.said.includes('4417')) {
   );
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: the stored count is the provider’s own, and it decides what happens next.');
+passed('the stored count is the provider’s own, and it decides what happens next.');

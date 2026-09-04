@@ -17,13 +17,13 @@
  * thinking. If the seal were wrong — dropped, edited, put in the wrong place —
  * the second call would fail, not answer differently.
  */
-import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
+import { failures, passed } from './report.js';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
 
@@ -97,8 +97,6 @@ console.log(
   'shape             model                        thought  seal   blocks input  answered'
 );
 
-const failures: string[] = [];
-
 for (const { kind, model, seals } of shapes) {
   const result = await runShape(kind, model);
   if (result._tag === 'Left') {
@@ -142,5 +140,4 @@ for (const { kind, model, seals } of shapes) {
   }
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every shape took its own thinking back and answered on top of it.');
+passed('every shape took its own thinking back and answered on top of it.');

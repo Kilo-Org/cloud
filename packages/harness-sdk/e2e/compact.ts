@@ -11,14 +11,12 @@
  * live here is the summariser, the prompt it builds, and whether the fact
  * survives the round trip.
  */
-import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { everyShape, kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { everyShape, kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
 /** Small enough that a few turns of chat fill it. */
 const contextWindow = 80;
@@ -93,8 +91,6 @@ console.log(
   result.asked
 );
 
-const failures: string[] = [];
-
 if (summaries.length === 0) {
   failures.push(
     'the session never compacted, so this run proves nothing; lower the window or add filler'
@@ -127,5 +123,4 @@ if (!result.answer.includes('4417')) {
   );
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: the session compacted itself and kept what it was told.');
+passed('the session compacted itself and kept what it was told.');

@@ -21,11 +21,10 @@
  * - **The order is the order they joined.** The slow message, then the answer,
  *   then the message typed after it — and each round names what it answers.
  */
-import assert from 'node:assert/strict';
-import { Duration, Effect, Layer, Schedule, Stream } from 'effect';
+import { Duration, Effect, Layer, Schedule } from 'effect';
 import type { SessionHandle } from '../src/core/handle.js';
 import { said } from '../src/core/model.js';
-import type { Continued, Waiting } from '../src/core/queue.js';
+import type { Waiting } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import {
@@ -34,9 +33,9 @@ import {
   type Question,
   questionTool,
 } from '../src/plugins/tools/question.js';
-import { kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { kilo, model } from './setup.js';
+import { passed, wrongIf } from './report.js';
+import { refused, watch, type Round } from './rounds.js';
 
 const system =
   'You are a test harness with tools. Call a tool whenever the person names ' +
@@ -91,58 +90,6 @@ const tools = Layer.succeed(ToolRegistry, {
   tools: [questionTool(asker, { inlineFor: Duration.millis(500) }), waitTool],
 });
 
-/** What one round the session ran on its own said, and which message it answers. */
-interface Round {
-  readonly answering: readonly string[];
-  readonly text: string;
-}
-
-/** The event of one thing that happened, or nothing when the round failed. */
-const eventIn = (one: Continued) => ('failed' in one ? undefined : one.event);
-
-/**
- * True when a round is over rather than paused on a tool.
- *
- * `done` ends one call to the model, and a round that calls a tool makes
- * several. `tools` is the model waiting on a call the session is about to
- * answer, so it is the one stop reason that is not the end of anything. This is
- * how a caller knows a queued message has been answered in full.
- */
-const over = (one: Continued): boolean => {
-  const event = eventIn(one);
-  return event?.kind === 'done' && event.stop !== 'tools';
-};
-
-/** The rounds that were refused rather than answered. Empty is the healthy shape. */
-const refused: (readonly string[])[] = [];
-
-/** Collects the rounds the session runs on its own, until `count` have ended. */
-const watch = (session: SessionHandle, count: number) => {
-  const rounds: Round[] = [];
-  let ended = 0;
-  const held = { answering: [] as readonly string[], text: '' };
-  return Stream.runForEach(
-    Stream.takeUntil(session.continued, one => over(one) && ++ended === count),
-    (one: Continued) =>
-      Effect.sync(() => {
-        held.answering = one.answering;
-        const event = eventIn(one);
-        if (event?.kind === 'delta') {
-          held.text += event.text;
-        }
-        /* A refused round is one message's bad news, not the end of the feed.
-           The run says so rather than waiting for words that never come. */
-        if ('failed' in one) {
-          refused.push(one.answering);
-        }
-        if (over(one) || 'failed' in one) {
-          rounds.push({ answering: held.answering, text: held.text });
-          held.text = '';
-        }
-      })
-  ).pipe(Effect.as(rounds));
-};
-
 /**
  * Waits until the line holds the answer to the question, and says what it held.
  *
@@ -185,13 +132,6 @@ const program = Effect.gen(function* () {
 const got = await Effect.runPromise(
   Effect.scoped(Effect.provide(program, tools.pipe(Layer.merge(kilo()))))
 );
-
-const failures: string[] = [];
-const wrongIf = (broken: boolean, why: string): void => {
-  if (broken) {
-    failures.push(why);
-  }
-};
 
 const rounds = got.rounds._tag === 'Success' ? got.rounds.value : [];
 const askedFor = takenUp[0] ?? [];
@@ -288,8 +228,7 @@ wrongIf(
   `the session was refused ${String(refused.length)} of the rounds it ran on its own`
 );
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
-  '\nPASS: two questions went out in one call, and a late answer and a typed ' +
+passed(
+  'two questions went out in one call, and a late answer and a typed ' +
     'message waited in one line and were said in the order they joined it.'
 );

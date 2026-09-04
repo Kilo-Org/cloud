@@ -16,7 +16,6 @@
  * Each shape is run on its own, because each seals differently, and each is
  * asked its second question in a second run against the same database.
  */
-import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { Effect, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
@@ -26,6 +25,7 @@ import type { Turn, TurnPart } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { kilo } from './setup.js';
+import { failures, passed } from './report.js';
 
 /* Named here and not taken from the environment, as in `reasoning.ts`. What is
    under test is the seal, so a model that seals nothing would report the run's
@@ -114,8 +114,6 @@ const through = async (kind: ApiKind) => {
 
 console.log('shape             seal written  seal read  answered');
 
-const failures: string[] = [];
-
 for (const { kind, seals } of shapes) {
   const { opened, reopened } = await through(kind);
   const written = sealOf(opened.parts);
@@ -152,5 +150,4 @@ for (const { kind, seals } of shapes) {
   }
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every shape took back thinking that had been through the store.');
+passed('every shape took back thinking that had been through the store.');

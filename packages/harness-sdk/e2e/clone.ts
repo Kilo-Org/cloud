@@ -10,7 +10,6 @@
  * A clone that copied one identifier into the prompt, or reordered one part,
  * would still pass every unit test here and quietly double the bill.
  */
-import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { Effect, Layer, Stream } from 'effect';
 import type { ModelUsage } from '../src/core/model.js';
@@ -19,9 +18,8 @@ import type { ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { cachedSystem as system, kilo } from './setup.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+import { cachedSystem as system, kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 
 /** One database, two runs, as a second start of an application would have. */
 const database = new DatabaseSync(':memory:');
@@ -84,7 +82,6 @@ show('second clone', original.usage);
 console.log('\nclone id  ', cloned.id, '\nsource id ', first.id);
 console.log('clone said', JSON.stringify(cloned.said), 'over', cloned.turns.length, 'turns');
 
-const failures: string[] = [];
 const read = cloned.usage?.cacheReadTokens ?? 0;
 const written = cloned.usage?.cacheWriteTokens ?? 0;
 
@@ -118,7 +115,6 @@ if ((original.usage?.cacheReadTokens ?? 0) === 0) {
   failures.push('a second clone of the same session read nothing, so the first one changed it');
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
+passed(
   `\nPASS: the clone read ${String(read)} tokens of prefix from the cache and wrote ${String(written)}.`
 );

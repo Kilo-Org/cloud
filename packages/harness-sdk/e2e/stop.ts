@@ -10,13 +10,13 @@
  * `end` for both would let a caller store half a sentence as a finished answer
  * and build every later request on it.
  */
-import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { StopReason } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
+import { failures, passed } from './report.js';
 
 const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';
 
@@ -62,8 +62,6 @@ const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 console.log('model', model);
 console.log('\nshape             finished  cut off   said when cut');
 
-const failures: string[] = [];
-
 for (const kind of kinds) {
   const result = await runShape(kind);
   if (result._tag === 'Left') {
@@ -91,5 +89,4 @@ for (const kind of kinds) {
   }
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every shape tells a finished answer from one the ceiling cut off.');
+passed('every shape tells a finished answer from one the ceiling cut off.');

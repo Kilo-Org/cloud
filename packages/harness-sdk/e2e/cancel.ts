@@ -11,15 +11,13 @@
  * What it cannot prove: that the provider stops generating and stops charging.
  * Nothing this package can read reports that.
  */
-import assert from 'node:assert/strict';
-import { Duration, Effect, Fiber, Layer, Ref, Stream } from 'effect';
+import { Duration, Effect, Fiber, Ref, Stream } from 'effect';
 import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo } from './setup.js';
+import { kilo, model } from './setup.js';
+import { failures, passed } from './report.js';
 import { webFetch } from '../src/plugins/fetch/web.js';
-
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
 const system = 'You do exactly what you are told, at length, with no preamble.';
 const long = 'Count from 1 to 300. Put one number on each line. Do not stop early.';
@@ -112,8 +110,6 @@ console.log('asked again   ', JSON.stringify(result.after));
 console.log('signals       ', signals.map(signal => signal?.aborted ?? 'none').join(' '));
 console.log('loose errors  ', loose.length);
 
-const failures: string[] = [];
-
 if (result.whole.said === 0) {
   failures.push('the baseline answer carried no text, so there is nothing to compare against');
 }
@@ -154,5 +150,4 @@ if (loose.length > 0) {
   );
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: the call stopped when the caller did, and the session survived it.');
+passed('the call stopped when the caller did, and the session survived it.');

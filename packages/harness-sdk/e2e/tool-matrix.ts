@@ -31,7 +31,6 @@
  * the tool can read — and reports the rest as numbers. A model that batches
  * badly is a description to tune, not a broken package.
  */
-import assert from 'node:assert/strict';
 import { Effect, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { ModelEvent } from '../src/core/model.js';
@@ -40,6 +39,7 @@ import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
 import { subagentTool } from '../src/plugins/tools/subagent.js';
 import { kilo } from './setup.js';
+import { failures, passed } from './report.js';
 
 /** The ten of `e2e/models.ts`, and Haiku for the one lab that list leaves out. */
 const models = [
@@ -235,8 +235,6 @@ console.log(
     `${pad('', 32)}${pad('called valid batch  waited', 32)}called valid waited`
 );
 
-const failures: string[] = [];
-
 for (const { model, question, subagent } of rows) {
   console.log(
     pad(model, 32) +
@@ -271,5 +269,4 @@ console.log(
     `\noverrode subagent's, as it had to: ${share(row => row.subagent.called && row.subagent.waited)}`
 );
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: every model called both tools and sent each one a payload it could read.');
+passed('every model called both tools and sent each one a payload it could read.');

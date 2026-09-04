@@ -14,7 +14,6 @@
  * - `chat_completions` has no cache control at all, so the only thing worth
  *   asserting is that the call works and the conversation carries.
  */
-import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { ModelUsage } from '../src/core/model.js';
@@ -22,6 +21,7 @@ import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
 import { cachedSystem as system, kilo } from './setup.js';
+import { failures, passed } from './report.js';
 
 const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';
 
@@ -59,8 +59,6 @@ const mustCache = new Set<ApiKind>(['messages', 'responses']);
 console.log('model', model);
 console.log('\nshape             answered  cache read  input   ratio');
 
-const failures: string[] = [];
-
 for (const kind of kinds) {
   const result = await runShape(kind);
   if (result._tag === 'Left') {
@@ -89,7 +87,4 @@ for (const kind of kinds) {
   }
 }
 
-assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log(
-  '\nPASS: every shape carried the conversation, and both cache-controlling shapes cached.'
-);
+passed('every shape carried the conversation, and both cache-controlling shapes cached.');

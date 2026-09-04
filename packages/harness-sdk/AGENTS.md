@@ -521,6 +521,14 @@ which is the inverse of Anthropic direct. Raising rather than overwriting is
 right for both: `max(0, 6899)` is 6899 either way round. When you doubt a
 count, dump the frames before you reason about the aggregate.
 
+The cache also expires. Anthropic's entries live five minutes, measured from
+the start of the request that wrote or read them, and a read refreshes them at
+no cost. A `ttl: '1h'` on the `cache_control` block buys an hour at twice the
+base input price. This package does not send it: the trade depends on how long
+a caller's sessions idle and what its tokens cost, which is the caller's number
+and not one this package can guess. Read on 2026-09-04. Anything measured after
+an idle gap is measuring the expiry, not the breakpoints.
+
 Two lessons hold beyond any one run:
 
 - **The ratio is partly the provider's.** The package places the same

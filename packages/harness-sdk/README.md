@@ -213,6 +213,13 @@ the bill and most of the wait.
 
 Measured live: 0.9997 of the input read from the cache on a ten-call session.
 
+The cache is the provider's, and it does not last. Anthropic's entries live
+five minutes from the start of the request that wrote or read them, and every
+call refreshes them for free — so a session that keeps talking stays warm, and
+one that pauses longer than that pays to build its prefix again on the next
+question. Nothing here can hold it open, and a low ratio after a pause is not a
+fault in your wiring.
+
 ## Plugin points
 
 Each of these is a `Context.Tag`, and each ships a default the package owns.

@@ -1,6 +1,11 @@
+import React from 'react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { checkInstallState } from '@/lib/integrations/github/install-state';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 
 export const metadata: Metadata = {
@@ -47,7 +52,17 @@ export default async function GitHubAppPage({
   const installState = search.installState;
   const returnPath = getGitHubAppReturnPath(search.organizationId, installState, search.fromApp);
 
-  await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`);
+  const user = await getUserFromAuthOrRedirect(
+    `/users/sign_in?callbackPath=${encodeURIComponent(returnPath)}`
+  );
+  const preflight =
+    installState !== undefined ? await checkInstallState(installState, user.id) : null;
+  const blocked = preflight && preflight.status !== 'valid';
+  const mismatch = preflight?.status === 'user_mismatch';
+  const recoveryError = mismatch ? 'install_state_user_mismatch' : 'install_state_unusable';
+  const recoveryOrgParam = search.organizationId
+    ? `&organizationId=${encodeURIComponent(search.organizationId)}`
+    : '';
 
   return (
     <main className="min-h-screen bg-background px-4 py-5 sm:px-6">
@@ -62,18 +77,42 @@ export default async function GitHubAppPage({
           </p>
         </header>
 
-        <GitHubIntegrationDetails
-          organizationId={search.organizationId}
-          installState={installState}
-          fromApp={isFromApp}
-          success={search.github_install === 'success' || search.success === 'installed'}
-          error={search.error}
-          pendingApproval={
-            search.github_pending_approval === 'true' || search.pending_approval === 'true'
-          }
-          existingPendingOrg={search.org}
-          appReturnPath={isFromApp ? returnPath : undefined}
-        />
+        {blocked ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{mismatch ? 'Account mismatch' : 'Restart GitHub setup'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground text-sm">
+                {mismatch
+                  ? 'This connection was started by a different Kilo account. Sign in with the account that started it, then restart setup.'
+                  : 'This setup link has expired, has already been used, or is invalid. Return to Kilo and start GitHub setup again.'}
+              </p>
+              <Button asChild variant="outline">
+                <Link
+                  href={
+                    isFromApp ? `/cloud/sessions?error=${recoveryError}${recoveryOrgParam}` : '/'
+                  }
+                >
+                  {isFromApp ? 'Return to Kilo App' : 'Go to dashboard'}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <GitHubIntegrationDetails
+            organizationId={search.organizationId}
+            installState={installState}
+            fromApp={isFromApp}
+            success={search.github_install === 'success' || search.success === 'installed'}
+            error={search.error}
+            pendingApproval={
+              search.github_pending_approval === 'true' || search.pending_approval === 'true'
+            }
+            existingPendingOrg={search.org}
+            appReturnPath={isFromApp ? returnPath : undefined}
+          />
+        )}
       </div>
     </main>
   );

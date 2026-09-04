@@ -117,8 +117,9 @@ regression until a measurement says otherwise.
 The cache hit ratio is a requirement on this package's own work: place the
 breakpoints so the prefix stays byte-identical as the session grows. It is not
 a requirement on the number a given provider returns, which the package does
-not control. See the model run below, where served models range from 0.61 to
-0.9997 on identical breakpoints.
+not control. See the model run below, where served models range from 0.28 to
+0.9997 on identical breakpoints, and where the same model moved from 0.80 to
+0.9987 between two runs of the same prompts.
 
 ### The validator
 
@@ -466,16 +467,16 @@ the median wait for the first piece of an answer, `whole` for all of it:
 
 | Model | Recalled | First | Whole | Cache read | Input | Ratio |
 |---|---|---:|---:|---:|---:|---:|
-| `openai/gpt-5.6-luna` | yes | 1221 ms | 1484 ms | 56324 | 15 | 0.9997 |
-| `qwen/qwen3.8-flash` | yes | 1893 ms | 1921 ms | 47162 | 30 | 0.9994 |
-| `xiaomi/mimo-v2.5` | yes | 20028 ms | 20776 ms | 57600 | 194 | 0.9966 |
-| `deepseek/deepseek-v4-flash` | yes | 3906 ms | 3908 ms | 54528 | 2116 | 0.9626 |
-| `deepseek/deepseek-v4-flash-0731` | yes | 3605 ms | 3618 ms | 53504 | 3140 | 0.9446 |
-| `minimax/minimax-m3` | yes | 3022 ms | 3050 ms | 45702 | 11382 | 0.8006 |
-| `tencent/hy3` | yes | 2857 ms | 2974 ms | 44608 | 11691 | 0.7923 |
-| `z-ai/glm-5.3-flash` | yes | 1360 ms | 1556 ms | 34560 | 21754 | 0.6137 |
-| `nvidia/nemotron-3-ultra-550b-a55b` | yes | 945 ms | 958 ms | 8192 | 50667 | 0.1392 |
-| `google/gemini-3.7-flash` | yes | 2162 ms | 2374 ms | 8137 | 50502 | 0.1388 |
+| `openai/gpt-5.6-luna` | yes | 1124 ms | 1309 ms | 56324 | 15 | 0.9997 |
+| `qwen/qwen3.8-flash` | yes | 2480 ms | 2481 ms | 59014 | 30 | 0.9995 |
+| `minimax/minimax-m3` | yes | 1109 ms | 1122 ms | 57009 | 75 | 0.9987 |
+| `xiaomi/mimo-v2.5` | yes | 2023 ms | 2348 ms | 57600 | 194 | 0.9966 |
+| `tencent/hy3` | yes | 3143 ms | 3223 ms | 55808 | 491 | 0.9913 |
+| `deepseek/deepseek-v4-flash` | yes | 3671 ms | 3671 ms | 54528 | 2116 | 0.9626 |
+| `deepseek/deepseek-v4-flash-0731` | yes | 3891 ms | 3948 ms | 53760 | 2884 | 0.9491 |
+| `z-ai/glm-5.3-flash` | yes | 1373 ms | 1471 ms | 34560 | 21754 | 0.6137 |
+| `google/gemini-3.7-flash` | yes | 2266 ms | 2370 ms | 24432 | 34207 | 0.4167 |
+| `nvidia/nemotron-3-ultra-550b-a55b` | yes | 869 ms | 869 ms | 16384 | 42475 | 0.2784 |
 
 Ten of ten answered every turn from the history. Every one used the `messages`
 shape.
@@ -484,10 +485,21 @@ shape.
 reading `model_not_allowed` — so `qwen/qwen3.8-flash` took its place.
 
 The waits are the provider's, not the package's: building a whole request
-costs 48 us on this side, against a first piece between 945 ms and 20 s. The
+costs 48 us on this side, against a first piece between 869 ms and 20 s. The
 same model varies by a factor of ten between runs — `xiaomi/mimo-v2.5` took
-1419 ms on one run and 20 s on the next — so read one column of one run as
-weather, and the ratios, which are stable per model across runs, as climate.
+1419 ms on one run, 20 s on the next, and 2023 ms on the one above.
+
+The ratios move too, and by more than the request does. `tencent/hy3` read
+0.79 of its input from the cache on one run and 0.99 on the next; `minimax/
+minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to 0.42, on
+the same prompts through the same code. What the ratio measures is whether the
+upstream provider still held the prefix, which is its decision and not this
+package's. Read one run as weather. The one number that is climate is the top
+of the table: a model whose provider caches at all lands above 0.99, and that
+has held on every run.
+
+The prompts are identical between runs, so a ratio that fell is the provider
+having dropped a prefix it once held, not a change here. Do not chase one.
 
 These ratios are lower than the ones recorded before the usage merge was
 fixed, and the lower ones are the honest ones. The earlier table had
@@ -512,10 +524,11 @@ count, dump the frames before you reason about the aggregate.
 Two lessons hold beyond any one run:
 
 - **The ratio is partly the provider's.** The package places the same
-  breakpoints for every model, and the spread above runs from 0.14 to 0.9997
-  on identical breakpoints. Read a low number as a question, not a bug — but
-  rule out the package first, and check the arithmetic closes before trusting
-  a high one.
+  breakpoints for every model, the spread above runs from 0.28 to 0.9997 on
+  identical breakpoints, and one model moved 0.80 to 0.9987 between two runs
+  of the same prompts. Read a low number as a question, not a bug — but rule
+  out the package first, and check the arithmetic closes before trusting a
+  high one.
 - **A small token budget reads as a broken transport.** At 64 tokens a
   reasoning model spends the budget before it writes a word. The run uses 1024.
 

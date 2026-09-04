@@ -840,6 +840,7 @@ Add a row when you turn one off, and give the reason.
 | `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
 | `unicorn/require-module-specifiers` | Off for the config files, which use bare re-exports. |
+| `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 
 The `**/*.test.ts` override also covers `**/*-fixture.ts`, and
 `pnpm check:boundaries` exempts both. A fixture is test code: it may reach for a

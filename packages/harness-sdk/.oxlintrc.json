@@ -65,6 +65,12 @@
       }
     },
     {
+      "files": ["src/index.test.ts"],
+      "rules": {
+        "import/no-namespace": "off"
+      }
+    },
+    {
       "files": ["src/index.ts"],
       "rules": {
         "unicorn/require-module-specifiers": "off"

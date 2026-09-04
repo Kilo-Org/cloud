@@ -2,7 +2,8 @@ import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ModelFacts } from '../core/catalog.js';
 import { openSession } from '../core/run.js';
-import { fakeFetch, type Reply } from './gateway/fake.js';
+import { fakeFetch, type Reply, sse } from './gateway/fake.js';
+import type { TokenSourceService } from '../core/token.js';
 import { layerKilo } from './kilo.js';
 
 /**
@@ -10,9 +11,6 @@ import { layerKilo } from './kilo.js';
  * everything it asks for, and that the request that comes out is the one the
  * hand-wired layers made. How each plugin behaves is that plugin's own test.
  */
-
-const sse = (...events: readonly unknown[]): readonly string[] =>
-  events.map(event => `data: ${JSON.stringify(event)}\n\n`);
 
 const answer: Reply = {
   ok: true,
@@ -25,7 +23,7 @@ const answer: Reply = {
   ),
 };
 
-const ask = (token: string, facts?: ModelFacts) => {
+const ask = (token: string | TokenSourceService, facts?: ModelFacts) => {
   const { fetch, calls } = fakeFetch([answer]);
   const layers = layerKilo({
     baseUrl: 'https://gateway.test',
@@ -72,4 +70,24 @@ it('sends the model to the shape its catalog names', async () => {
   const { calls } = await Effect.runPromise(ask('tok_4', { apiKinds: ['chat_completions'] }));
 
   expect(calls[0]?.url).toBe('https://gateway.test/api/gateway/v1/chat/completions');
+});
+
+it('asks a token source for the credential rather than holding a string', async () => {
+  /* The credential is the one plugin a long-lived caller has to replace, and
+     the kilo token expires. Rewriting `layerKilo` to replace it means
+     rebuilding the shared catalog by hand, which is the trap `layerKilo`
+     closes, so the option takes a source too. */
+  let asked = 0;
+  const minting: TokenSourceService = {
+    get: () =>
+      Effect.sync(() => {
+        asked += 1;
+        return `tok_${String(asked)}`;
+      }),
+  };
+
+  const { calls } = await Effect.runPromise(ask(minting));
+
+  expect(asked).toBe(1);
+  expect(calls[0]?.request.headers['authorization']).toBe('Bearer tok_1');
 });

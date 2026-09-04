@@ -5,6 +5,7 @@ import { Effect, Layer, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import { layerKilo } from '../src/plugins/kilo.js';
 import { continueSession, cloneSession } from '../src/core/resume.js';
+import { TokenError, type TokenSourceService } from '../src/core/token.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
@@ -73,3 +74,32 @@ export const handled = Effect.gen(function* () {
 export const reopened = continueSession('ses_1').pipe(
   Effect.catchTag('harness/SessionNotFoundError', error => Effect.succeed(error.sessionId))
 );
+
+/* The README's refreshing credential. What it proves is that the cache is read
+   inside the effect: a `get` that reads it while building one hands the same
+   expired credential to every retry, and that is not something a type says. */
+declare const mintFromYourAuthServer: () => Promise<{ value: string; until: number }>;
+
+let held: { value: string; until: number } | undefined;
+
+const refreshing: TokenSourceService = {
+  get: () =>
+    Effect.suspend(() =>
+      held !== undefined && held.until > Date.now()
+        ? Effect.succeed(held.value)
+        : Effect.tryPromise({
+            try: async () => {
+              held = await mintFromYourAuthServer();
+              return held.value;
+            },
+            catch: cause => new TokenError({ cause }),
+          })
+    ),
+};
+
+export const refreshed = layerKilo({
+  baseUrl: 'https://app.kilo.ai',
+  org: { kind: 'organization', id: 'org_...' },
+  fetch: nodeFetch,
+  token: refreshing,
+});

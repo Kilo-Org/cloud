@@ -185,7 +185,31 @@ describe('MarkdownImage inert-until-load', () => {
     await unmount(renderer);
   });
 
-  it('keeps the fallback ratio through consent, load, failure, retry, refresh, and remount', async () => {
+  it.each([
+    { dimensions: { width: 800, height: 1000 }, expectedRatio: 0.8, shape: 'portrait' },
+    { dimensions: { width: 2500, height: 1000 }, expectedRatio: 2.5, shape: 'panorama' },
+  ])(
+    'uses the intrinsic ratio for a plain Markdown $shape image',
+    async ({ dimensions, expectedRatio }) => {
+      const uri = `https://example.com/${dimensions.width}x${dimensions.height}.png`;
+      confirmMarkdownImage(uri);
+      const renderer = await mount(uri, 'shot');
+      const image = ofType(renderer.root, 'Image')[0];
+      if (!image) {
+        throw new Error('image not found');
+      }
+
+      await act(async () => {
+        await Promise.resolve();
+        (image.props.onLoad as (event: unknown) => void)({ source: dimensions });
+      });
+
+      expect(slotCount(renderer.root, expectedRatio)).toBe(1);
+      await unmount(renderer);
+    }
+  );
+
+  it('keeps the measured ratio through failure, retry, and refresh', async () => {
     const uri = 'https://example.com/a.png';
     let renderer = await mount(uri, 'shot');
 
@@ -211,13 +235,13 @@ describe('MarkdownImage inert-until-load', () => {
         source: { width: 100, height: 400 },
       });
     });
-    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(renderer.root, 0.75)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(0);
     await act(async () => {
       await Promise.resolve();
       (image.props.onError as () => void)();
     });
-    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(renderer.root, 0.75)).toBe(1);
 
     const retry = renderer.root.find(
       node => node.props.accessibilityLabel === 'Image unavailable, retry loading'
@@ -226,7 +250,7 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (retry.props.onPress as () => void)();
     });
-    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(renderer.root, 0.75)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
     image = ofType(renderer.root, 'Image')[0];
@@ -240,7 +264,7 @@ describe('MarkdownImage inert-until-load', () => {
       });
       renderer.update(createElement(MarkdownImage, { uri, alt: 'shot' }));
     });
-    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(renderer.root, 0.75)).toBe(1);
 
     await unmount(renderer);
     renderer = await mount(uri, 'shot');
@@ -249,8 +273,23 @@ describe('MarkdownImage inert-until-load', () => {
   });
 
   it('keeps an explicit HTML image ratio', async () => {
-    const renderer = await mount('https://example.com/a.png', 'shot', { aspectRatio: 2 });
+    const uri = 'https://example.com/html.png';
+    confirmMarkdownImage(uri);
+    const renderer = await mount(uri, 'shot', { aspectRatio: 2 });
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onLoad as (event: unknown) => void)({
+        source: { width: 100, height: 400 },
+      });
+    });
+
     expect(slotCount(renderer.root, 2)).toBe(1);
+    expect(slotCount(renderer.root, 0.75)).toBe(0);
     await unmount(renderer);
   });
 

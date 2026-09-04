@@ -12,7 +12,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
 import { resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
-import { IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO } from './tool-card-attachments';
+import {
+  IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
+  resolveImagePreviewAspectRatio,
+} from './tool-card-attachments';
 import { getFilename } from './tool-card-utils';
 
 type MarkdownImageKind = 'https' | 'http' | 'data' | null;
@@ -143,6 +146,7 @@ export function MarkdownImage({
   // the render after confirmMarkdownImage mutates the module Set.
   const [, forceRender] = useReducer((n: number) => n + 1, 0);
   const [loaded, setLoaded] = useState(false);
+  const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -157,6 +161,7 @@ export function MarkdownImage({
     setViewerVisible(false);
     setAttempt(0);
     setLoaded(false);
+    setMeasuredAspectRatio(undefined);
   }
 
   const filename =
@@ -196,7 +201,7 @@ export function MarkdownImage({
 
   if (failed) {
     return (
-      <FixedImageSlot aspectRatio={aspectRatio}>
+      <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
         <Pressable
           onPress={() => {
             setFailed(false);
@@ -227,7 +232,7 @@ export function MarkdownImage({
 
   return (
     <>
-      <FixedImageSlot aspectRatio={aspectRatio}>
+      <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>
         <Pressable
           onPress={
             onPress ??
@@ -260,7 +265,10 @@ export function MarkdownImage({
             contentFit="contain"
             transition={0}
             accessibilityIgnoresInvertColors
-            onLoad={() => {
+            onLoad={event => {
+              setMeasuredAspectRatio(
+                resolveImagePreviewAspectRatio(event.source.width, event.source.height)
+              );
               setLoaded(true);
             }}
             onError={() => {

@@ -105,7 +105,13 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     const policy = buildVercelCredentialNetworkPolicy({
       kilo: kiloInput({
         runtimeProxy: {
-          worktreeHandle: 'runtime-proxy-handle',
+          members: [
+            {
+              sessionId: 'workspace_a',
+              kiloSessionId: ROOT_SESSION_ID,
+              handle: 'runtime-proxy-handle',
+            },
+          ],
           targets: {
             backendBaseUrl: 'https://worker.example.com',
             providerBaseUrl: 'https://worker.example.com',
@@ -174,13 +180,11 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     ).toBeUndefined();
   });
 
-  it('keeps a shared worktree handle static while rewriting only exact member roots', () => {
-    const worktreeHandle = 'worktree-runtime-handle';
+  it('uses the owning member handle for every proxy route', () => {
     const policy = buildVercelCredentialNetworkPolicy({
       kilo: kiloInput({
         rootSessionIds: [ROOT_SESSION_ID, OTHER_SESSION_ID],
         runtimeProxy: {
-          worktreeHandle,
           members: [
             { sessionId: 'workspace_a', kiloSessionId: ROOT_SESSION_ID, handle: 'member-a' },
             { sessionId: 'workspace_b', kiloSessionId: OTHER_SESSION_ID, handle: 'member-b' },
@@ -193,14 +197,14 @@ describe('buildVercelCredentialNetworkPolicy', () => {
         },
       }),
     });
-    const authorization = `Bearer ${worktreeHandle}`;
+    const authorization = 'Bearer member-a';
     expect(
       effectiveAuthorization(policy, {
         url: 'https://worker.example.com/api/openrouter/chat/completions',
         method: 'POST',
         authorization,
       })
-    ).toBe(authorization);
+    ).toBe('Bearer member-a');
     expect(
       effectiveAuthorization(policy, {
         url: `https://worker.example.com/api/session/${ROOT_SESSION_ID}/ingest`,
@@ -212,7 +216,7 @@ describe('buildVercelCredentialNetworkPolicy', () => {
       effectiveAuthorization(policy, {
         url: `https://worker.example.com/api/session/${OTHER_SESSION_ID}/title`,
         method: 'POST',
-        authorization,
+        authorization: 'Bearer member-b',
       })
     ).toBe('Bearer member-b');
     expect(
@@ -220,6 +224,22 @@ describe('buildVercelCredentialNetworkPolicy', () => {
         url: 'https://worker.example.com/api/session/unrelated/ingest',
         method: 'POST',
         authorization,
+      })
+    ).toBeUndefined();
+    // The policy can only key `/api/session` on the injected handle; the
+    // facade validates its JSON body against that handle's root identity.
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/session',
+        method: 'POST',
+        authorization: 'Bearer member-b',
+      })
+    ).toBe('Bearer member-b');
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/session/${ROOT_SESSION_ID}/export`,
+        method: 'GET',
+        authorization: 'Bearer member-b',
       })
     ).toBeUndefined();
   });

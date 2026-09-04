@@ -58,10 +58,7 @@ type SandboxControlRpc = {
     kiloSessionId: string;
     directory: string;
     handle: string;
-  }): Promise<string>;
-  resolveWorktreeRuntimeCredentialProxyGrant(input: {
-    handle: string;
-  }): Promise<Array<{ sessionId: string; kiloSessionId: string; handle: string }>>;
+  }): Promise<{ bound: true }>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
@@ -97,12 +94,6 @@ export function sandboxControlRpc(env: Env, sandboxId: string): SandboxControlRp
         stub,
         control => control.bindRuntimeCredentialProxyHandle(input),
         'bindRuntimeCredentialProxyHandle'
-      ),
-    resolveWorktreeRuntimeCredentialProxyGrant: input =>
-      withDORetry(
-        stub,
-        control => control.resolveWorktreeRuntimeCredentialProxyGrant(input),
-        'resolveWorktreeRuntimeCredentialProxyGrant'
       ),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),

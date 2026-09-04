@@ -14,8 +14,6 @@ export type VercelCredentialPolicyInput = {
     rootSessionIds: string[];
     organizationId?: string;
     runtimeProxy?: {
-      worktreeHandle?: string;
-      grant?: unknown;
       members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
       targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
     };
@@ -212,8 +210,7 @@ function runtimeProxyInjectionRules(
   organizationId: string | undefined
 ): VercelSandboxInjectionRule[] {
   const input = kilo.runtimeProxy;
-  const worktreeHandle = input?.worktreeHandle;
-  if (!input || !worktreeHandle) return [];
+  if (!input) return [];
   const targets = [
     new URL(input.targets.backendBaseUrl),
     new URL(input.targets.providerBaseUrl),
@@ -241,54 +238,59 @@ function runtimeProxyInjectionRules(
   ) {
     invalidPolicy();
   }
-  const authorization = `Bearer ${worktreeHandle}`;
   const rules: VercelSandboxInjectionRule[] = [];
-  const add = (target: URL, path: string, methods: string[], injected = authorization) =>
+  const add = (target: URL, path: string, methods: string[], authorization: string) =>
     rules.push(
       createCredentialRule({
         target,
         path: { exact: path },
         methods,
         expectedAuthorization: authorization,
-        injectedAuthorization: injected,
+        injectedAuthorization: authorization,
       })
     );
-  for (const path of [
-    '/api/user',
-    '/api/profile',
-    '/api/profile/balance',
-    '/api/defaults',
-    '/api/users/notifications',
-  ]) {
-    add(backend, `${basePath(backend)}${path}`, ['GET']);
-  }
-  if (organizationId !== undefined) {
-    for (const path of ['models', 'defaults', 'modes']) {
-      add(backend, `${basePath(backend)}/api/organizations/${organizationId}/${path}`, ['GET']);
-    }
-    add(backend, `${basePath(backend)}/api/organizations/${organizationId}/models/validate`, [
-      'POST',
-    ]);
-  }
-  for (const [path, methods] of [
-    ['/models', ['GET']],
-    ['/models/validate', ['POST']],
-    ['/chat/completions', ['POST']],
-    ['/messages', ['POST']],
-    ['/responses', ['POST']],
-    ['/embeddings', ['POST']],
-  ] as const) {
-    for (const prefix of ['/api/openrouter', '/api/gateway']) {
-      add(provider, `${basePath(provider)}${prefix}${path}`, [...methods]);
-    }
-  }
-  for (const path of ['/v1/chat/completions', '/v1/responses']) {
-    add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST']);
-  }
-  // `/api/session` selects the exact member from its strict JSON body in the
-  // Worker. Rooted routes can be rewritten directly to that member handle.
-  add(ingest, `${basePath(ingest)}/api/session`, ['POST']);
   for (const member of input.members ?? []) {
+    const authorization = `Bearer ${member.handle}`;
+    for (const path of [
+      '/api/user',
+      '/api/profile',
+      '/api/profile/balance',
+      '/api/defaults',
+      '/api/users/notifications',
+    ])
+      add(backend, `${basePath(backend)}${path}`, ['GET'], authorization);
+    if (organizationId !== undefined) {
+      for (const path of ['models', 'defaults', 'modes']) {
+        add(
+          backend,
+          `${basePath(backend)}/api/organizations/${organizationId}/${path}`,
+          ['GET'],
+          authorization
+        );
+      }
+      add(
+        backend,
+        `${basePath(backend)}/api/organizations/${organizationId}/models/validate`,
+        ['POST'],
+        authorization
+      );
+    }
+    for (const [path, methods] of [
+      ['/models', ['GET']],
+      ['/models/validate', ['POST']],
+      ['/chat/completions', ['POST']],
+      ['/messages', ['POST']],
+      ['/responses', ['POST']],
+      ['/embeddings', ['POST']],
+    ] as const) {
+      for (const prefix of ['/api/openrouter', '/api/gateway']) {
+        add(provider, `${basePath(provider)}${prefix}${path}`, [...methods], authorization);
+      }
+    }
+    for (const path of ['/v1/chat/completions', '/v1/responses']) {
+      add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST'], authorization);
+    }
+    add(ingest, `${basePath(ingest)}/api/session`, ['POST'], authorization);
     const sessionId = member.kiloSessionId;
     for (const [suffix, methods] of [
       ['export', ['GET']],
@@ -299,7 +301,7 @@ function runtimeProxyInjectionRules(
         ingest,
         `${basePath(ingest)}/api/session/${sessionId}/${suffix}`,
         [...methods],
-        `Bearer ${member.handle}`
+        authorization
       );
     }
   }

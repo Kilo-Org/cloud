@@ -306,39 +306,36 @@ export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayloa
 export async function refreshHeartbeatPayload(deps: HandlerDeps): Promise<SandboxHeartbeatPayload> {
   const { activity, kiloRuntimes } = deps;
   if (activity && kiloRuntimes) {
-    const rootsByDirectory = new Map<string, string[]>();
-    for (const { kiloSessionId } of activity.snapshots()) {
+    const roots = activity.snapshots().flatMap(({ kiloSessionId }) => {
       const directory = directoryForSession(kiloSessionId);
-      if (!directory) continue;
-      const roots = rootsByDirectory.get(directory) ?? [];
-      roots.push(kiloSessionId);
-      rootsByDirectory.set(directory, roots);
-    }
+      const runtime = directory
+        ? kiloRuntimes
+            .getAll(directory)
+            .find(runtime => runtime.identity.kiloSessionId === kiloSessionId)
+        : undefined;
+      return runtime ? [runtime] : [];
+    });
     await Promise.all(
-      [...rootsByDirectory].map(async ([directory, roots]) => {
-        const runtime = kiloRuntimes.get(directory);
-        if (!runtime) return;
-        const revisions = new Map(roots.map(root => [root, activity.revision(root)]));
+      roots.map(async runtime => {
+        const { identity } = runtime;
+        if (!identity) return;
+        const revision = activity.revision(identity.kiloSessionId);
         const kiloClient = runtime.kiloClient;
         try {
           const statuses = await withKiloRequestDeadline(
-            signal => kiloClient.getSessionStatuses(directory, signal),
+            signal => kiloClient.getSessionStatuses(identity.directory, signal),
             deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal
           );
           if (
             runtime.signal.aborted ||
             deps.signal?.aborted ||
-            kiloRuntimes.get(directory) !== runtime ||
+            kiloRuntimes.get(identity) !== runtime ||
             runtime.kiloClient !== kiloClient
           )
             return;
           activity.reconcile(
             statuses,
-            roots.filter(
-              root =>
-                directoryForSession(root) === directory &&
-                activity.revision(root) === revisions.get(root)
-            )
+            activity.revision(identity.kiloSessionId) === revision ? [identity.kiloSessionId] : []
           );
         } catch {
           return;
@@ -497,13 +494,18 @@ export async function handleControlRequest(
         return fail('not_ready', 'Worktree cancellation is incomplete', true);
       }
       failureStage = 'runtime_lookup';
-      const runtime = kiloRuntimes.get(input.directory);
-      const client =
-        deps.worktreeCleanupClient ??
-        (runtime ? createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl) : undefined);
+      const runtimes = kiloRuntimes.getAll(input.directory);
+      // An injected cleanup client is a fallback for a checkout whose runtime has
+      // already gone away. Live runtimes each retain their own Kilo state.
+      const clients =
+        runtimes.length > 0
+          ? runtimes.map(runtime => createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl))
+          : deps.worktreeCleanupClient
+            ? [deps.worktreeCleanupClient]
+            : [];
       const cleanupDeps = {
         onDiagnostic: deps.onDiagnostic,
-        client,
+        clients,
         detachRoot: (id: string) => {
           deps.activity?.detach(id);
           const index = deps.sessions.findIndex(snapshot => snapshot.kiloSessionId === id);
@@ -663,7 +665,7 @@ function sessionKiloRuntime(
     rootForSession(session.kiloSessionId) !== session.kiloSessionId
   )
     return undefined;
-  return deps.kiloRuntimes?.get(session.directory);
+  return deps.kiloRuntimes?.get(session);
 }
 
 function terminalFailure(error: unknown): ControlHandlerResult {

@@ -3720,18 +3720,9 @@ describe('SandboxControl native worktree containment', () => {
       const second = await control.bindRuntimeCredentialProxyHandle(input);
       const [stored] = await storedGrants(control);
 
-      expect(second).toBe(first);
-      await expect(
-        control.resolveWorktreeRuntimeCredentialProxyGrant({ handle: first })
-      ).resolves.toEqual([
-        {
-          sessionId: registration.identity.sessionId,
-          kiloSessionId: registration.auth.kiloSessionId,
-          handle: memberHandle,
-        },
-      ]);
+      expect(first).toEqual({ bound: true });
+      expect(second).toEqual({ bound: true });
       expect(stored.kilo.runtimeProxy).toMatchObject({
-        worktreeHandle: first,
         members: [
           {
             sessionId: registration.identity.sessionId,

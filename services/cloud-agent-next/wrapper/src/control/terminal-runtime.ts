@@ -150,7 +150,7 @@ function waitForSocketOpen(socket: WebSocket): Promise<void> {
 export function createControlTerminalRuntime(options: {
   controlUrl: string;
   wrapperInstanceId: string;
-  getKiloRuntime: (directory: string) => WorktreeKiloRuntime | undefined;
+  getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;
   const controlOrigin = new URL(options.controlUrl).origin;
@@ -177,7 +177,8 @@ export function createControlTerminalRuntime(options: {
         false
       );
     }
-    if (options.getKiloRuntime(identity.directory) !== attached.kiloRuntime) {
+    const runtime = options.getKiloRuntime(identity);
+    if (runtime !== attached.kiloRuntime || !sameSession(runtime?.identity ?? attached, identity)) {
       throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
     }
     return attached;
@@ -404,10 +405,11 @@ export function createControlTerminalRuntime(options: {
 
   return {
     rememberAttachedSession(identity) {
-      const kiloRuntime = options.getKiloRuntime(identity.directory);
+      const kiloRuntime = options.getKiloRuntime(identity);
       if (
         shutDown ||
         !kiloRuntime ||
+        !sameSession(kiloRuntime?.identity ?? identity, identity) ||
         directoryForSession(identity.kiloSessionId) !== identity.directory ||
         rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
       ) {

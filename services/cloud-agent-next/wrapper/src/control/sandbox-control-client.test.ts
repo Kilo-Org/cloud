@@ -128,6 +128,8 @@ function versionHeartbeat(version: string | null) {
       detach: () => false,
       deleteDirectory: async () => {},
       get: () => undefined,
+      getAll: () => [],
+      isCurrent: () => false,
       isHealthy: () => true,
       shutdown() {},
     },

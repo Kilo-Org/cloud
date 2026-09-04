@@ -1848,23 +1848,25 @@ describe('native Vercel worktree policies', () => {
       ])
     );
 
-    const worktreeHandle = 'opaque-runtime-proxy-handle';
     const policy = buildControlNetworkPolicy([
       {
         ...grant,
         kilo: {
           ...grant.kilo,
-          runtimeProxy: { ...grant.kilo.runtimeProxy!, worktreeHandle },
+          runtimeProxy: {
+            ...grant.kilo.runtimeProxy!,
+            members: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID, handle: 'member-handle' }],
+          },
         },
       },
     ]);
     const serialized = JSON.stringify(policy);
-    expect(serialized).toContain(worktreeHandle);
+    expect(serialized).toContain('member-handle');
     expect(serialized).not.toContain(backingToken);
     expect(serialized).not.toContain('runtimeAuthorization');
     expect(
       policy.injectionRules
-        .filter(rule => rule.headers.authorization === `Bearer ${worktreeHandle}`)
+        .filter(rule => rule.headers.authorization === 'Bearer member-handle')
         .every(rule => rule.domain === 'worker.example.test')
     ).toBe(true);
     expect(
@@ -1873,7 +1875,7 @@ describe('native Vercel worktree policies', () => {
           'https://worker.example.test/api/runtime-credential-proxy/provider/anything-else'
         ),
         method: 'POST',
-        headers: new Headers({ authorization: `Bearer ${worktreeHandle}` }),
+        headers: new Headers({ authorization: 'Bearer member-handle' }),
       })
     ).toBeUndefined();
   });
@@ -1926,7 +1928,7 @@ describe('native Vercel worktree policies', () => {
     });
   });
 
-  it('keeps the control worktree credential stable for distinct modern sibling authorities', async () => {
+  it('keeps distinct modern sibling runtime credentials isolated', async () => {
     const { broker } = createBroker();
     const env = { ...environment(broker), WORKER_URL: 'https://worker.example.test' };
     const firstToken = jwt.sign(
@@ -1949,7 +1951,7 @@ describe('native Vercel worktree policies', () => {
       }),
       first.grant
     );
-    expect(second.grant.kilo.token).toBe(firstToken);
+    expect(second.grant.kilo.token).not.toBe(firstToken);
     expect(second.grant.members).toEqual([
       { sessionId: SESSION_ID, kiloSessionId: ROOT_ID },
       { sessionId: SECOND_SESSION_ID, kiloSessionId: SECOND_ROOT_ID },

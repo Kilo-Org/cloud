@@ -1,4 +1,4 @@
-import { type ReactElement, useReducer, useState } from 'react';
+import { type ReactElement, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -9,7 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
+import {
+  confirmMarkdownImage,
+  isMarkdownImageConfirmed,
+  subscribeMarkdownImageConfirmMemory,
+} from './markdown-image-confirm';
 import { resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
@@ -144,10 +148,6 @@ export function MarkdownImage({
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // Confirmation follows the current uri on every render, so a recycled
-  // instance never keeps a previous uri's consent. forceRender only re-runs
-  // the render after confirmMarkdownImage mutates the module Set.
-  const [, forceRender] = useReducer((n: number) => n + 1, 0);
   const [loaded, setLoaded] = useState(false);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
@@ -171,7 +171,9 @@ export function MarkdownImage({
     alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
 
   const kind = classifyUri(uri);
-  const confirmed = isMarkdownImageConfirmed(uri);
+  const confirmed = useSyncExternalStore(subscribeMarkdownImageConfirmMemory, () =>
+    isMarkdownImageConfirmed(uri)
+  );
 
   if (kind === 'http' || kind === 'data') {
     return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
@@ -185,7 +187,6 @@ export function MarkdownImage({
           onShowLinkActions={onShowLinkActions}
           onLoad={() => {
             confirmMarkdownImage(uri);
-            forceRender();
           }}
         />
       </FixedImageSlot>

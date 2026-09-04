@@ -138,6 +138,40 @@ describe('MarkdownImage inert-until-load', () => {
     await unmount(second);
   });
 
+  it('loads every mounted slot for a confirmed HTTPS URI', async () => {
+    const uri = 'https://example.com/a.png';
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(
+          'View',
+          null,
+          createElement(MarkdownImage, { uri, alt: 'first' }),
+          createElement(MarkdownImage, { uri, alt: 'second' })
+        )
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const load = findLoadButtons(renderer.root, uri)[0];
+    if (!load) {
+      throw new Error('load button not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (load.props.onPress as () => void)();
+    });
+
+    expect(ofType(renderer.root, 'Image')).toHaveLength(2);
+    await unmount(renderer);
+  });
+
   it('renders http and data URIs as static chips without fetching', async () => {
     const httpRenderer = await mount('http://insecure.com/a.png');
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);

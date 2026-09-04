@@ -140,7 +140,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
             <SessionContextMetrics
@@ -192,7 +192,7 @@ export default function SessionDetailScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('agentChat.session.title')}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
         />
         <SessionConnectionIndicator />

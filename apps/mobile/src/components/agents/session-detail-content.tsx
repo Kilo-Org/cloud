@@ -1391,7 +1391,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive

@@ -10,6 +10,7 @@
     "./core": "./dist/core/index.js",
     "./plugins/gateway": "./dist/plugins/gateway/index.js",
     "./plugins/prompt": "./dist/plugins/prompt/default.js",
+    "./plugins/tools": "./dist/plugins/tools/index.js",
     "./plugins/store/node": "./dist/plugins/store/node.js",
     "./plugins/store/expo": "./dist/plugins/store/expo.js"
   },

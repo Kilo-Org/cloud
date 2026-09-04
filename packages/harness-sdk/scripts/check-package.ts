@@ -37,6 +37,7 @@ const entries: readonly Entry[] = [
   { subpath: './core', promises: ['ModelClient', 'SessionStore', 'wiringFor', 'makeId'] },
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
+  { subpath: './plugins/tools', promises: ['questionTool'] },
   { subpath: './plugins/store/node', promises: ['layerNodeStore'] },
   { subpath: './plugins/store/expo', promises: ['layerExpoStore'] },
 ];

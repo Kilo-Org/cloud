@@ -35,7 +35,6 @@ const functions = [
   'continueSession',
   'cloneSession',
   'hitRatio',
-  'compactSession',
   'textOf',
 ] as const;
 
@@ -67,8 +66,27 @@ it('keeps the core entry point free of plugins', () => {
   expect(plugins).toStrictEqual([]);
 });
 
-it('offers the same core from both entry points', () => {
-  const missing = Object.keys(core).filter(name => !(name in sdk));
+it('keeps the machinery of a session out of the root', () => {
+  /* The root is what a consumer calls. These run a session from the inside and
+     are reached through `/core`, so a caller reading `history` is not offered
+     them. Deleting a name from this list is fine; adding one to the root by
+     accident is what the test is for. */
+  const machinery = [
+    'appendTurn',
+    'compactIfFull',
+    'draftOf',
+    'handleOf',
+    'makeId',
+    'makePart',
+    'makeSession',
+    'makeTurn',
+    'onStore',
+    'promptedOf',
+    'sinceSummary',
+    'wiringFor',
+  ];
+  const leaked = machinery.filter(name => name in sdk);
 
-  expect(missing).toStrictEqual([]);
+  expect(leaked).toStrictEqual([]);
+  expect(machinery.filter(name => !(name in core))).toStrictEqual([]);
 });

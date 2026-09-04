@@ -806,7 +806,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 
 | Path | Purpose |
 |---|---|
-| `src/index.ts` | The public entry point; core and every owned plugin |
+| `src/index.ts` | The public entry point; what a caller uses, and every owned plugin |
 | `src/core/index.ts` | The `/core` entry point; every core module, no plugin |
 | `src/core/run.ts` | `openSession`: a new session |
 | `src/core/resume.ts` | `continueSession` and `cloneSession`: one the store already holds |
@@ -876,9 +876,16 @@ names a platform: exporting them from the root would pull `node:sqlite` or
 none — a consumer reaches them through the root barrel, which also pulls the
 gateway. Add a subpath when one of them is wanted on its own.
 
-`src/index.test.ts` asserts what the root barrel carries, because a module left
-out of a barrel is invisible from outside the package and every test here
-imports by path.
+The root is narrower than `/core` on purpose. It re-exports whole only the
+modules a caller uses whole, and names what it takes from the seven that hold
+the machinery a session runs on: `wiringFor`, `makeId`, `sinceSummary`,
+`onStore` and the rest are reached through `/core` instead. That is 33 names at
+the root rather than 50, and every one of them is in the README.
+
+`src/index.test.ts` asserts both halves, because a module left out of a barrel
+is invisible from outside the package and every test here imports by path. It
+has caught two unreachable features — compaction and the composed layer — and
+it now also fails when a name from the machinery list reaches the root.
 
 `pnpm build` empties `dist/` first. It once did not, and a subpath whose source
 had been deleted went on resolving against a stale artifact.

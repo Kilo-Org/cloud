@@ -217,8 +217,8 @@ model the moment one of them is a fetching plugin. `layerKilo` shares it.
 
 | Import | Holds |
 |---|---|
-| `@kilocode/harness-sdk` | Everything: the core and every plugin the package owns |
-| `@kilocode/harness-sdk/core` | The contracts and the pure domain, no plugin |
+| `@kilocode/harness-sdk` | What a caller uses: the layers, the tags, the errors, and the types they carry |
+| `@kilocode/harness-sdk/core` | The contracts and the pure domain, no plugin. Wider than the root: it also holds the machinery a session runs on, which a plugin author sometimes needs |
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |

@@ -184,6 +184,13 @@ identifiers spanning 179 ms: 180 draws, one per millisecond, 1111 identifiers
 each. The cost of randomness is bounded by the clock, not by how many
 identifiers are asked for.
 
+That cost does not grow with the answer. Measured 2026-09-04 through the whole
+session: 19.6 us per token over 200 deltas, 9.3 over 1000, 7.0 over 5000, and
+7.1 over 20000. The figure falls and then flattens, because the fixed cost of
+opening a session is spread over more tokens and the append itself is flat. A
+copy of the answer per delta would be quadratic, so `pnpm test:perf` compares
+the short answer against the long one rather than pinning either number.
+
 Nothing here is being changed: 7 us per token is 7 ms on a thousand token
 answer, against seconds of model latency. The table exists so the next change
 to this path argues from data, in either direction.

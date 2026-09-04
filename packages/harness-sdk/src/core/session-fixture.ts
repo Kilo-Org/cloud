@@ -119,7 +119,6 @@ const catalogWindowed = (contextWindow: number): Layer.Layer<ModelCatalog> =>
 const texts = (turns: readonly Turn[]): readonly string[] =>
   turns.map(turn => `${turn.role}:${textOf(turn)}`);
 
-export type { Setup };
 export {
   brokenStore,
   catalogSaying,

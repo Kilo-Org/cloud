@@ -219,5 +219,4 @@ const responsesWire: Wire = {
   toStop,
 };
 
-export type { ResponsesBody };
 export { responsesWire };

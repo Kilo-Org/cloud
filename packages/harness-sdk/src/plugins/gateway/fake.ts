@@ -61,5 +61,5 @@ const fakeFetch = (replies: readonly Reply[]): { calls: Call[]; fetch: FetchLike
   return { calls, fetch };
 };
 
-export type { Call, Reply };
+export type { Reply };
 export { fakeFetch, sampleRequest, sse, toAsync };

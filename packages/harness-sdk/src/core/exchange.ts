@@ -169,5 +169,4 @@ const hidden = (spoken: Ref.Ref<Spoken>, data: string): Effect.Effect<void> => {
   return Ref.update(spoken, held => ({ ...held, thought: [...held.thought, block] }));
 };
 
-export type { Exchange, Spoken };
 export { exchangeFor, finish, hidden, remember, rollback, said, thinking };

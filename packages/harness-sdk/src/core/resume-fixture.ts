@@ -58,5 +58,4 @@ const asked = (session: SessionHandle, text: string): Effect.Effect<void, unknow
 const prompted = (request: ModelRequest | undefined): string =>
   JSON.stringify(request?.prompt ?? {});
 
-export type { Bench };
 export { asked, bench, options, prompted };

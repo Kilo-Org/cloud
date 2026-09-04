@@ -49,4 +49,4 @@ const nodeDriver =
 const layerNodeStore = (database: DatabaseSync): Layer.Layer<SessionStore, StoreError> =>
   layerSqliteStore(nodeDriver(database));
 
-export { layerNodeStore, nodeDriver };
+export { layerNodeStore };

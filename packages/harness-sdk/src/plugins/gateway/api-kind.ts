@@ -12,4 +12,4 @@ const ranked: readonly ApiKind[] = ['messages', 'responses', 'chat_completions']
 const pickKind = (supported: readonly ApiKind[]): ApiKind | undefined =>
   ranked.find(kind => supported.includes(kind));
 
-export { pickKind, ranked };
+export { pickKind };

@@ -170,5 +170,5 @@ const completionsWire: Wire = {
   toStop,
 };
 
-export type { CompletionsBody, ContentBlock };
+export type { ContentBlock };
 export { completionsWire };

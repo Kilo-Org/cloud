@@ -208,5 +208,5 @@ const messagesWire: Wire = {
   toStop,
 };
 
-export type { ContentBlock, MessagesBody, WireUsage };
+export type { ContentBlock };
 export { messagesWire };

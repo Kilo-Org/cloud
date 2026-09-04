@@ -72,5 +72,5 @@ const expoDriver =
 const layerExpoStore = (database: SQLiteDatabase): Layer.Layer<SessionStore, StoreError> =>
   layerSqliteStore(expoDriver(database));
 
-export type { ExpoDatabase, ExpoStatement };
+export type { ExpoDatabase };
 export { expoDriver, layerExpoStore };

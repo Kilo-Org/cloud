@@ -116,5 +116,5 @@ const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse,
     Effect.retry(caller.retry.schedule)
   );
 
-export type { AbortHandle, HttpCaller, HttpConfig, HttpPlugins, OrgContext, Sending };
+export type { AbortHandle, HttpCaller, HttpConfig, OrgContext };
 export { abortHandle, post };

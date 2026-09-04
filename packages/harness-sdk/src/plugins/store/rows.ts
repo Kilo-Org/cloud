@@ -87,5 +87,4 @@ const asStoredSession = (row: SessionRow): StoredSession => ({
   ...(row.maxTokens === null ? {} : { maxTokens: row.maxTokens }),
 });
 
-export type { PartRow, SessionRow, TurnRow };
 export { assertParts, assertSessions, assertTurns, asStoredSession, byTurn };

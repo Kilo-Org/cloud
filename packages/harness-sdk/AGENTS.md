@@ -280,6 +280,27 @@ The older `/api/openrouter` prefix also works; the package does not use it.
 
 ## The local end-to-end run
 
+`pnpm test:e2e:all` runs every live check in one sweep, cheapest first, and
+reports one line each. One failure does not stop the rest: the point of a sweep
+is to learn everything that broke. Name one or more to run a subset, as in
+`pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
+they are not part of `pnpm check` and never will be.
+
+The whole sweep, 2026-09-04, 3 minutes 46 seconds:
+
+```
+PASS  live         7s   the second call read the prefix from the cache
+PASS  shapes      11s   every shape carried the conversation
+PASS  stop        11s   a finished answer, told from one the ceiling cut off
+PASS  image       12s   every shape carried the picture and replayed it
+PASS  cancel       9s   the call stopped when the caller did
+PASS  session     25s   the prefix held across 10 calls, a busy session refused
+PASS  reasoning   25s   every shape took its own thinking back
+PASS  compact     11s   the session compacted itself and kept what it was told
+PASS  models     115s   10 of 10 models answered every turn
+```
+
+
 `pnpm test:e2e` asks two questions in one session against the real gateway and
 checks that the second call reads the cache the first one wrote. It uses the
 kilo CLI token from `~/.local/share/kilo/auth.json`, never prints it, and

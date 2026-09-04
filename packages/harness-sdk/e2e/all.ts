@@ -30,6 +30,7 @@ const runs = [
   'replay',
   'compact',
   'models',
+  'tool-matrix',
 ] as const;
 
 const only = process.argv.slice(2);

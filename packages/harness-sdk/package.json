@@ -44,6 +44,7 @@
     "test:e2e:shapes": "ttsx e2e/shapes.ts",
     "test:e2e:stop": "ttsx e2e/stop.ts",
     "test:e2e:together": "ttsx e2e/together.ts",
+    "test:e2e:tool-matrix": "ttsx e2e/tool-matrix.ts",
     "test:e2e:tools": "ttsx e2e/tools.ts",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:watch": "vitest",

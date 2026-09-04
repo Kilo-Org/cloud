@@ -276,7 +276,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `tool-matrix` |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -1087,9 +1087,9 @@ crosses between parent and subagent was the only real decision:
   it can start one of its own. Nothing here stops that, because nothing here
   knows what the harness is for.
 
-### The one tool the package ships
+### The tool no harness can write for itself
 
-`questionTool` is in `plugins/`, not `core/`, and it is the only tool here.
+`questionTool` is in `plugins/`, not `core/`.
 Everything about the question is the model's — how many, what each says, what
 may be picked, one answer or several, whether it may be skipped. Everything
 about the asking is the caller's, in one function. The package holds the middle:
@@ -1102,6 +1102,63 @@ dialog, therefore needs no lock of its own.
 It renders the answers by walking the questions, not the answers: a caller who
 answers two of three is reported as answering two of three, and an answer to a
 question nobody asked is dropped rather than shown as one the model wrote.
+
+### One tool version, measured across every lab
+
+A tool ships one description for everybody. There is no per-model branch and
+there must not be one: eleven descriptions cannot be kept honest, and a model
+this package has never seen has to work anyway. So a description is tuned by
+measuring it across labs and changing the one text.
+
+`pnpm test:e2e:tool-matrix` is that measurement. It offers each model one
+shipped tool at a time and scores what the model chose, never what it said:
+whether it called the tool, whether the payload matched the schema, whether it
+put several questions in one call, and whether it waited. Waiting is read out
+of the event stream rather than out of the arguments — a call the model did not
+wait for gets the still-running note — so the score is what the harness actually
+did.
+
+The models are the ten of `pnpm test:e2e:models` plus `anthropic/claude-haiku-4.5`,
+which is the one lab that list leaves out.
+
+Measured on 2026-09-04, eleven models, both shipped tools:
+
+| | question | subagent |
+|---|---:|---:|
+| Called the tool | 11 of 11 | 11 of 11 |
+| Sent a payload the schema accepted | 11 of 11 | 11 of 11 |
+| Asked everything in one call | 11 of 11 | — |
+| Waited | 11 of 11 | 7 of 11 |
+
+There is no right answer to the waiting column, which is why `Tool.wait` is a
+default and not a rule. Both scenarios block — a deployment nobody has answered
+about, a codename the model cannot know — so waiting is correct in both, and the
+two tools ship opposite defaults. What the column measures is whether the model
+reads the field: `question` defaults to waiting and every model kept it,
+`subagent` defaults to not and seven of eleven overrode it. A model that never
+overrode would be a model ignoring the field.
+
+The question tool was clean on the first run and was not touched. The subagent
+description was not, and what it cost is the point of keeping this run:
+
+| Description | Delegated |
+|---|---:|
+| Two uses named: several steps, or more reading than you need | 9 of 11 |
+| Uses opened up, led by "anything you cannot answer yourself" | 10 of 11 |
+| Plus what a subagent is: "it starts from instructions of its own" | 11 of 11 |
+
+Both failures said the same thing in their own words — `tencent/hy3` answered
+that "none of my available tools can look that up", and `minimax/minimax-m3`
+asked the person for a source. Neither was wrong given the first version: a
+description that names two uses reads as a description that allows two, and a
+one-shot lookup is neither of them.
+
+One earlier run measured the prompt instead of the tool, and is worth
+remembering before writing another scenario. Asked for "this quarter's
+codename", four models answered by asking which project was meant. That is the
+right move on a question that names none — a model that will not guess is doing
+its job — and it scored as a tool failure. Naming the release left one reason
+not to delegate, which is the description, which is the thing under test.
 
 ### The session does not write to the store
 

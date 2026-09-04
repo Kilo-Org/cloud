@@ -113,11 +113,30 @@ const parameters: JsonSchema = {
   additionalProperties: false,
 };
 
+/**
+ * Three sentences, two of which `e2e/tool-matrix.ts` bought.
+ *
+ * The first version named two uses — work of several steps, work that produces
+ * more reading than you need — and two of eleven models read those as the only
+ * two. Asked one thing they could not know, they answered that no tool of
+ * theirs could look it up and asked the person for a source. That is the right
+ * move if a subagent is only for long work, so the uses became a list to lead
+ * with rather than a gate, and the first one is what those two needed:
+ * something you cannot answer yourself. It moved one of them.
+ *
+ * The one left doubted the subagent could reach anything it could not, so the
+ * second sentence says what a subagent is: a session started from instructions
+ * of its own. That is true of every subagent, including one given no tools at
+ * all, which is why it can be said here rather than by the harness.
+ */
 const description =
-  'Hands one task to a subagent, which does it in a conversation of its own ' +
-  'and answers with the result. Use it for work that takes several steps, or ' +
-  'produces more reading than you need to keep. It remembers nothing between ' +
-  'calls, and it cannot ask you anything, so give it everything at once.';
+  'Hands one task to a subagent, which goes and does it in a conversation of ' +
+  'its own and answers with the result. It starts from instructions of its own, ' +
+  'so it can reach what this conversation cannot. Use it for anything you ' +
+  'cannot answer from what you already know: something to look up, somewhere to ' +
+  'search, work that takes several steps, or work that produces more reading ' +
+  'than you need to keep. It remembers nothing between calls and cannot ask you ' +
+  'anything, so give it everything at once and say what you want back.';
 
 /** What the model sent, or a failed result saying what was wrong with it. */
 const asked = (call: ToolCall): Effect.Effect<Asked, ToolFailure> =>

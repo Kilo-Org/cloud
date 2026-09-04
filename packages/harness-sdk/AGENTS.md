@@ -183,6 +183,20 @@ there is nothing here worth optimising, and a change that claims to speed up
 a request has to say what it is actually speeding up. The perf suite gates it
 at 250 us to catch a rewrite that makes it matter.
 
+### What CI runs
+
+`pnpm check` is the local gate. `pnpm check:ci` is the same thing without the
+timing gate, which needs a machine nobody else is using, and it is what the
+`harness-sdk` job in `.github/workflows/ci.yml` runs whenever a file under
+`packages/harness-sdk/` changes.
+
+The job exists for `check:migrations`. The repository's own workspace test job
+runs `pnpm test` and nothing else, so without it the inlined SQL could drift
+from the schema and every check in the repository would still be green.
+
+The live runs are not in CI and must not be: they cost money and they need a
+kilo token.
+
 ## The toolchain
 
 The compiler is `ttsc`, not `tsc` or `tsgo`. It is the TypeScript-Go compiler

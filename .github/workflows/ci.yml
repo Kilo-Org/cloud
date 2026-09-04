@@ -24,6 +24,7 @@ jobs:
     outputs:
       kilocode_backend: ${{ steps.filter.outputs.kilocode_backend }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
+      harness_sdk: ${{ steps.filter.outputs.harness_sdk }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -74,6 +75,8 @@ jobs:
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+            harness_sdk:
+              - 'packages/harness-sdk/**'
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
@@ -353,6 +356,35 @@ jobs:
       - name: Run cloud-agent-next tests
         run: pnpm --filter cloud-agent-next test:all
 
+  harness-sdk:
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    if: needs.changes.outputs.harness_sdk == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Everything but the timing gate, which needs a machine nobody else is
+      # using. The migration check is why this job exists: the store's SQL is
+      # inlined into the bundle, and nothing at run time notices when the
+      # inlined copy stops matching the schema.
+      - name: Check harness-sdk
+        run: pnpm --filter @kilocode/harness-sdk check:ci
+
   workspace-tests:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: ${{ needs.changes.outputs.workspace_matrix != '[]' }}
@@ -390,7 +422,17 @@ jobs:
   notify-main-failure:
     if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
     needs:
-      [typecheck, lint, format-check, drizzle-check, test, build, cloud-agent-next, workspace-tests]
+      [
+        typecheck,
+        lint,
+        format-check,
+        drizzle-check,
+        test,
+        build,
+        cloud-agent-next,
+        harness-sdk,
+        workspace-tests,
+      ]
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:

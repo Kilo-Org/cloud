@@ -64,7 +64,12 @@ function findLoadButtons(
 async function mount(
   uri: string,
   alt = '',
-  options: { onShowLinkActions?: () => void; aspectRatio?: number } = {}
+  options: {
+    accessibilityLabel?: string;
+    aspectRatio?: number;
+    onPress?: () => void;
+    onShowLinkActions?: () => void;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -464,6 +469,31 @@ describe('MarkdownImage inert-until-load', () => {
       (imageButton.props.onPress as () => void)();
     });
     expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('uses the linked destination as the loaded image action and label', async () => {
+    confirmMarkdownImage('https://example.com/a.png');
+    const onPress = vi.fn<() => void>();
+    const renderer = await mount('https://example.com/a.png', 'shot', {
+      accessibilityLabel: 'Example',
+      onPress,
+    });
+    const imageLink = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === 'Example'
+    );
+    expect(imageLink.props.accessibilityRole).toBe('link');
+
+    await act(async () => {
+      await Promise.resolve();
+      (imageLink.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
 
     await unmount(renderer);
   });

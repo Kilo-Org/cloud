@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
 import { useMemo } from 'react';
 import { type Token } from 'marked';
 import {
@@ -19,7 +20,7 @@ import RenderHTML, {
 import { isSupportedScheme } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
-import { getLinkAccessibilityActions } from './markdown-link';
+import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
 import { type MarkdownPalette } from './markdown-palette';
 import {
   type MarkdownLinkLongPressHandler,
@@ -275,6 +276,9 @@ export function MarkdownHtml({
       }
       const anchor = parentAnchor(tnode);
       const href = anchor?.attributes.href;
+      const linkLabel = href
+        ? resolveLinkAccessibilityLabel(tnode.attributes.alt ?? '', href, anchor.attributes.title)
+        : undefined;
       return (
         <MarkdownImage
           uri={src}
@@ -283,6 +287,16 @@ export function MarkdownHtml({
             Number(tnode.attributes.width),
             Number(tnode.attributes.height)
           )}
+          accessibilityLabel={linkLabel}
+          onPress={
+            href
+              ? () => {
+                  if (!onPressLink?.(href)) {
+                    confirmAndOpenMarkdownLink(href, { label: linkLabel });
+                  }
+                }
+              : undefined
+          }
           onShowLinkActions={
             href
               ? () => {
@@ -294,7 +308,7 @@ export function MarkdownHtml({
       );
     };
     return { a: HtmlAnchor, img: HtmlImage };
-  }, [onLongPressLink]);
+  }, [onLongPressLink, onPressLink]);
 
   return (
     <RenderHTML

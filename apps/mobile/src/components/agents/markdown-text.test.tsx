@@ -74,6 +74,8 @@ vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link', () => ({
   getLinkAccessibilityActions: (enabled: boolean) =>
     enabled ? [{ name: 'showLinkActions', label: 'Show link actions' }] : undefined,
+  resolveLinkAccessibilityLabel: (_children: unknown, _href: string, title?: string) =>
+    title ?? 'link',
 }));
 vi.mock('./markdown-link-confirm', () => ({
   confirmAndOpenMarkdownLink: vi.fn(),
@@ -293,6 +295,32 @@ describe('MarkdownText HTML routing', () => {
 });
 
 describe('MarkdownText HTML links and images', () => {
+  it('routes a linked image press with the link accessibility label', async () => {
+    const onPressLink = vi.fn(() => true);
+    const value = 'Text <img src="https://example.com/a.png" alt="shot">';
+    const renderer = await mount(<MarkdownText value={value} />);
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={value} onPressLink={onPressLink} />);
+    });
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const image = await renderCustom(ImageRenderer, {
+      attributes: { src: 'https://example.com/a.png', alt: 'shot' },
+      parent: {
+        tagName: 'a',
+        attributes: { href: 'https://example.com', title: 'Example' },
+        parent: null,
+      },
+    });
+    const imageProps = image.root.findByType(MarkdownImageType).props as Record<string, unknown>;
+
+    expect(imageProps.accessibilityLabel).toBe('Example');
+    expect(imageProps.onPress).toBeTypeOf('function');
+    (imageProps.onPress as () => void)();
+    expect(onPressLink).toHaveBeenCalledWith('https://example.com');
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
+  });
+
   it('routes anchor press and long press without forwarding executable attributes', async () => {
     const onPressLink = vi.fn(() => true);
     const onLongPressLink = vi.fn<(href: string, event?: GestureResponderEvent) => void>();

@@ -125,11 +125,15 @@ export function MarkdownImage({
   uri,
   alt,
   aspectRatio,
+  accessibilityLabel,
+  onPress,
   onShowLinkActions,
 }: Readonly<{
   uri: string;
   alt: string;
   aspectRatio?: number;
+  accessibilityLabel?: string;
+  onPress?: () => void;
   onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
@@ -225,16 +229,20 @@ export function MarkdownImage({
     <>
       <FixedImageSlot aspectRatio={aspectRatio}>
         <Pressable
-          onPress={() => {
-            setViewerVisible(true);
-          }}
+          onPress={
+            onPress ??
+            (() => {
+              setViewerVisible(true);
+            })
+          }
           onLongPress={onShowLinkActions}
           className="h-full w-full active:opacity-80"
-          accessibilityRole="button"
+          accessibilityRole={onPress ? 'link' : 'button'}
           accessibilityLabel={
-            alt
+            accessibilityLabel ??
+            (alt
               ? t('agentChat.filePart.viewImageWithAlt', { alt })
-              : t('agentChat.filePart.viewImage')
+              : t('agentChat.filePart.viewImage'))
           }
           accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
           onAccessibilityAction={event => {

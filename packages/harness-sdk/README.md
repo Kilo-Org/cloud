@@ -107,7 +107,10 @@ because its `fetch` does not stream a response body without a polyfill.
 `done` is always last, and it is the only event that reports usage. `stop` is
 one of `end`, `maxTokens`, `refusal`, or `unknown`: an answer cut off at the
 ceiling is not a finished answer, and a caller that retries needs to tell them
-apart.
+apart. `maxTokens` covers both walls — the ceiling you set and the model's own
+context window — because both leave half a sentence. `unknown` means no frame
+said why, which on the shapes served here means the stream ended early; treat
+it the same way.
 
 ```ts
 yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
@@ -135,8 +138,8 @@ started while the first answer is still streaming fails with
 ## When it fails
 
 Every failure is a tagged error, so `Effect.catchTag` picks one out by name.
-`ask` fails with the first three; the rest reach a caller who wires the plugins
-by hand.
+`ask` and `compact` fail with the first three; the rest reach a caller who
+opens a stored session or wires the plugins by hand.
 
 | Tag | Means | What a caller does |
 |---|---|---|

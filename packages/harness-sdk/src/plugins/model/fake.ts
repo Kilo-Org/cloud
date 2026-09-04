@@ -38,8 +38,12 @@ interface FakeReply {
 }
 
 /**
- * A model that answers from a script and records what it was asked. It lets a
- * consumer test its own code without a network and without spending credit.
+ * A model that answers from a script and records what it was asked. It is how
+ * this package tests a session without a network and without spending credit.
+ *
+ * It is not exported: `dist/` carries no test double. A consumer who wants one
+ * writes two functions against `ModelClientService`, which is the whole of the
+ * plugin point. Ship this instead the day somebody asks for it.
  */
 const fakeModel = (
   replies: readonly FakeReply[]

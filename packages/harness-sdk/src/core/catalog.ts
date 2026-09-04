@@ -31,8 +31,11 @@ class CatalogError extends Data.TaggedError('harness/CatalogError')<{
  * nowhere, a hard-coded table goes stale, and a live lookup costs a request.
  * The caller decides which trade it wants.
  *
- * It returns an Effect so a plugin may fetch. A plugin that fetches must cache:
- * this sits on the request path.
+ * It returns an Effect so a plugin may fetch. A plugin that fetches must cache,
+ * because this sits on the request path and one question asks two or three
+ * times: the gateway asks which shape to send, the session asks for the window
+ * before it decides whether to compact, and it asks for the output ceiling too
+ * unless the caller named one.
  */
 interface ModelCatalogService {
   readonly facts: (model: string) => Effect.Effect<ModelFacts, CatalogError>;

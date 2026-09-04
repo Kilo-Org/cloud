@@ -23,6 +23,7 @@ const runs = [
   'resume',
   'clone',
   'reasoning',
+  'replay',
   'compact',
   'models',
 ] as const;

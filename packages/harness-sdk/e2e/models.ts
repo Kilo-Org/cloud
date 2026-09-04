@@ -4,14 +4,15 @@ import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
-import { kilo } from './setup.js';
+import { cachedSystem as system, kilo } from './setup.js';
 
 /**
  * The ten most used models on OpenRouter this week, from six vendors, so a
  * change is not tuned to one provider's quirks. Every one is cheap.
- * `deepseek-v4-flash-0423` is not served, so the floating alias stands in, and
+ * `deepseek-v4-flash-0423` is not served, so the floating alias stands in,
  * `tencent/hy4-preview` is not sold to this team, so a qwen flash takes its
- * place.
+ * place, and `nvidia/nemotron-3-ultra-550b-a55b` is served by nobody — every
+ * provider refused it on 2026-09-04 — so a nemotron that is takes its place.
  */
 const models = [
   'openai/gpt-5.6-luna',
@@ -22,7 +23,7 @@ const models = [
   'tencent/hy3',
   'deepseek/deepseek-v4-flash',
   'minimax/minimax-m3',
-  'nvidia/nemotron-3-ultra-550b-a55b',
+  'nvidia/nemotron-3.5-lightning',
   'google/gemini-3.7-flash',
 ] as const;
 
@@ -34,16 +35,6 @@ const chosen = process.env['KILO_MODELS']?.split(',') ?? models;
  */
 const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
 const effort = process.env['KILO_EFFORT'] as Effort | undefined;
-
-const rule = (index: number) =>
-  `Rule ${String(index)}: when the user asks for a word, answer with that one word and nothing else. ` +
-  'Do not explain. Do not add punctuation beyond the word itself. Do not greet the user. ' +
-  'Do not restate the question. Keep the answer to a single lowercase word.';
-
-const system = [
-  'You are a test harness. Follow every rule below.',
-  ...Array.from({ length: 200 }, (_, index) => rule(index)),
-].join('\n');
 
 /** The last question can only be answered from the history of the session. */
 const questions = [

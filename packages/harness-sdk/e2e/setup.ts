@@ -20,7 +20,9 @@ const everyShape: readonly ApiKind[] = ['messages', 'responses', 'chat_completio
 
 /**
  * The facts go in the fallback rather than in the table, because a live run
- * names its model on the command line and a table would have to know it.
+ * names its model on the command line and a table would have to know it. Only
+ * a run that needs one shape, or a context window, passes anything: the layer
+ * already assumes all three.
  */
 const kilo = (
   facts: ModelFacts = { apiKinds: everyShape },

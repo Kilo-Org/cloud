@@ -319,5 +319,4 @@ jobs:
             --title "chore(kilo-app): bump version to $NEW" \
             --body-file /tmp/bump-pr-body.md \
             --assignee iscekic \
-            --reviewer iscekic \
-            || echo "A bump PR for $NEW is already open"
+            --reviewer iscekic

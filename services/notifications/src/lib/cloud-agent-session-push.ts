@@ -28,6 +28,17 @@ export type UserNotificationPreferences = {
   securityFindingsEnabled: boolean;
 };
 
+/** Default-on value used when a preference read returns no row. */
+export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  chatMessagesEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  kiloclawActivityEnabled: true,
+  balanceAlertsEnabled: true,
+  securityFindingsEnabled: true,
+};
+
 const TITLE_MAX_LENGTH = 80;
 
 export function sanitizeTitle(title: string | null | undefined): string | null {
@@ -90,15 +101,7 @@ async function dispatchSessionPush(
   let prefs: UserNotificationPreferences;
   try {
     const row = await deps.readPreferences(userId);
-    prefs = row ?? {
-      agentPushEnabled: true,
-      chatMessagesEnabled: true,
-      agentAttentionEnabled: true,
-      sessionStatusEnabled: true,
-      kiloclawActivityEnabled: true,
-      balanceAlertsEnabled: true,
-      securityFindingsEnabled: true,
-    };
+    prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
   } catch {
     return { dispatched: false, reason: 'dispatch_failed' };
   }

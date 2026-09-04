@@ -34,7 +34,9 @@ type ResponseListener = (response: Response) => void;
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android' as string },
+  setBadgeCountAsync: vi.fn(),
   setNotificationChannelAsync: vi.fn(),
+  setNotificationHandler: vi.fn(),
   getPermissionsAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
   getExpoPushTokenAsync: vi.fn(),
@@ -59,11 +61,12 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-notifications', () => ({
+  setBadgeCountAsync: mocks.setBadgeCountAsync,
   setNotificationChannelAsync: mocks.setNotificationChannelAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
-  setNotificationHandler: vi.fn(),
+  setNotificationHandler: mocks.setNotificationHandler,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -167,7 +170,12 @@ async function loadNotifications() {
     deleteItemAsync: vi.fn().mockResolvedValue(undefined),
     getItemAsync: vi.fn().mockResolvedValue(null),
   });
-  return { ...(await import('./notifications')), pending };
+  const [notifications, registry, persist] = await Promise.all([
+    import('./notifications'),
+    import('@/lib/glanceable/sink-registry'),
+    import('@/lib/glanceable/persist'),
+  ]);
+  return { ...notifications, pending, persist, registry };
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -192,6 +200,7 @@ async function flushMicrotasks(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.platform.OS = 'android';
+  mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -512,6 +521,133 @@ const secureStoreMock = {
     return secureStore.get(key) ?? null;
   }),
 };
+
+describe('glanceable app badge sink', () => {
+  async function loadBadgeSink() {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    loaded.setupNotificationBackgroundHandler();
+    const [sink] = loaded.registry.getGlanceableSinks();
+    if (!sink) {
+      throw new Error('The app badge sink was not registered');
+    }
+    return { loaded, sink };
+  }
+
+  it('sets the needs-input count for a local happy snapshot', async () => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 3 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(3);
+  });
+
+  it('keeps the stale count until a successful retry publishes a replacement', async () => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 3 }));
+    sink.publish(glanceableSnapshot({ status: 'stale', needsInput: 3 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 1 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[3], [3], [1]]);
+  });
+
+  it.each([
+    ['busy-only', { status: 'happy', running: 2, needsInput: 0 }],
+    ['empty', { status: 'empty', running: 0, needsInput: 0, needsInputSince: null }],
+    ['waiting', { status: 'waiting', running: 0, needsInput: 0, needsInputSince: null }],
+    ['signed-out', { status: 'signed_out', running: 0, needsInput: 0, needsInputSince: null }],
+    ['privacy', { status: 'privacy', running: 0, needsInput: 0, needsInputSince: null }],
+  ] as const)('clears the badge for a %s snapshot', async (_label, overrides) => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot(overrides));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(0);
+  });
+
+  it('serializes native writes so the newest count finishes last', async () => {
+    const gate = deferred();
+    mocks.setBadgeCountAsync
+      .mockImplementationOnce(async () => {
+        await gate.promise;
+        return true;
+      })
+      .mockResolvedValue(true);
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 2 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 7 }));
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    gate.resolve();
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [7]]);
+  });
+
+  it('captures a failed write and continues with the next count', async () => {
+    const error = new Error('badge write failed');
+    mocks.setBadgeCountAsync.mockRejectedValueOnce(error).mockResolvedValue(true);
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 2 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 5 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [5]]);
+    expect(mocks.captureException).toHaveBeenCalledWith(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'set_glanceable_badge',
+      },
+    });
+  });
+
+  it('owns foreground glanceable counts and disables ordinary push badges', async () => {
+    const { loaded } = await loadBadgeSink();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot());
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { content: { data: unknown } };
+      }) => Promise<{ shouldSetBadge: boolean }>;
+    };
+
+    const ordinary = await registration.handleNotification({
+      request: {
+        content: {
+          data: {
+            type: 'chat.message',
+            sandboxId: 'sandbox-1',
+            conversationId: 'conversation-1',
+            messageId: 'message-1',
+          },
+        },
+      },
+    });
+    expect(ordinary.shouldSetBadge).toBe(false);
+    expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
+
+    const glanceable = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            needsInput: 4,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+
+    expect(glanceable.shouldSetBadge).toBe(false);
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
+  });
+});
 
 describe('applyGlanceablePushData', () => {
   beforeEach(() => {
@@ -947,6 +1083,7 @@ describe('setupNotificationBackgroundHandler', () => {
               scopeKey: SCOPE_KEY,
               updatedAt: '2026-01-02T00:00:00.000Z',
               organizationBound: true,
+              needsInput: 6,
             })
           ),
         },
@@ -965,6 +1102,7 @@ describe('setupNotificationBackgroundHandler', () => {
       userId: 'u1',
       organizationId: 'org-9',
     });
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(6);
 
     unregisterGlanceableSink(sink);
   });

@@ -22,16 +22,13 @@ export async function markReadConversation({
   return result;
 }
 
-type ApplyBadgeClearResultInput<T> = {
+type ApplyBadgeClearResultInput = {
   badgeClear: MarkConversationReadResponse['badgeClear'];
-  startBadgeFreshnessEpoch: number;
-  currentBadgeFreshnessEpoch: number;
   userId: string | null;
   updateBadgeRows: (
     queryKey: readonly ['badges', string],
     updater: (badges: BadgeCountRow[] | undefined) => BadgeCountRow[] | undefined
   ) => void;
-  setBadgeCount: (badgeCount: number) => Promise<T>;
 };
 
 export function filterClearedBadgeBucket(
@@ -45,26 +42,14 @@ export function filterClearedBadgeBucket(
   return badges?.filter(row => row.badgeBucket !== badgeClear.badgeBucket);
 }
 
-export function applyBadgeClearResult<T>({
+export function applyBadgeClearResult({
   badgeClear,
-  startBadgeFreshnessEpoch,
-  currentBadgeFreshnessEpoch,
   userId,
   updateBadgeRows,
-  setBadgeCount,
-}: ApplyBadgeClearResultInput<T>): boolean {
-  if (badgeClear === null) {
-    return false;
+}: ApplyBadgeClearResultInput): void {
+  if (badgeClear === null || userId === null) {
+    return;
   }
 
-  if (userId !== null) {
-    updateBadgeRows(['badges', userId], badges => filterClearedBadgeBucket(badges, badgeClear));
-  }
-
-  if (currentBadgeFreshnessEpoch !== startBadgeFreshnessEpoch) {
-    return false;
-  }
-
-  void setBadgeCount(badgeClear.badgeCount);
-  return true;
+  updateBadgeRows(['badges', userId], badges => filterClearedBadgeBucket(badges, badgeClear));
 }

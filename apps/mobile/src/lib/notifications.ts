@@ -33,7 +33,12 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
-import { getGlanceableSinks, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import {
+  getGlanceableSinks,
+  type GlanceableSink,
+  registerGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
@@ -55,6 +60,33 @@ function getProjectId(): string {
 // A module-level variable (not React state) because the notification handler
 // is registered once and must always read the latest value without stale closures.
 let activeChatLocation: { sandboxId: string; conversationId: string } | null = null;
+
+async function setAppBadge(count: number): Promise<void> {
+  try {
+    await chainSave('glanceable-app-badge', async () => {
+      await Notifications.setBadgeCountAsync(count);
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'set_glanceable_badge',
+      },
+    });
+  }
+}
+
+const appBadgeSink: GlanceableSink = {
+  publish(snapshot) {
+    void setAppBadge(snapshot.needsInput);
+  },
+  endImmediate() {
+    // A terminal snapshot already published zero.
+  },
+  startOrUpdate() {
+    // The publish operation owns every badge write.
+  },
+};
 
 export function setActiveChatLocation(
   location: { sandboxId: string; conversationId: string } | null
@@ -216,7 +248,7 @@ async function getActiveUserId(): Promise<string | null> {
 
 const shown = {
   shouldPlaySound: true,
-  shouldSetBadge: true,
+  shouldSetBadge: false,
   shouldShowBanner: true,
   shouldShowList: true,
 } satisfies Notifications.NotificationBehavior;
@@ -274,6 +306,7 @@ export function _setGlanceableSinksLoaderForTests(loader: (() => void) | null): 
  * sinks must be registered here before `applyGlanceablePushData` runs.
  */
 function ensureGlanceableSinksLoaded(): void {
+  registerGlanceableSink(appBadgeSink);
   if (glanceableSinksLoaderForTests) {
     glanceableSinksLoaderForTests();
     return;

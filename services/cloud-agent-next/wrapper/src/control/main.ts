@@ -8,6 +8,7 @@ import {
 import {
   buildHeartbeatPayload,
   cancelControlTasks,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   refreshHeartbeatPayload,
   handleControlRequest,
@@ -92,7 +93,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         getKiloRuntime: directory => kiloRuntimes.get(directory),
       })
     : undefined;
-  const deps: HandlerDeps = {
+  const deps: HandlerDeps = createControlHandlerDeps({
     onDiagnostic: diagnostics.onDiagnostic,
     kiloRuntimes,
     version: WRAPPER_VERSION,
@@ -117,7 +118,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
     },
     retireRuntime: reason => shutdown(1, reason),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
-  };
+  });
 
   const mutationNotifications = createWorktreeMutationNotifications({
     sessions: deps.sessions,
@@ -215,7 +216,8 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
           }
         },
       }),
-    getHeartbeatPayload: async () => withHeartbeatReason(await refreshHeartbeatPayload(deps)),
+    getHeartbeatPayload: () => withHeartbeatReason(buildHeartbeatPayload(deps)),
+    sampleHeartbeat: signal => refreshHeartbeatPayload(deps, signal).then(() => undefined),
   });
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'started', ok: Boolean(control) });

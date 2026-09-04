@@ -1,10 +1,12 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import {
   KILO_FEED_FRESHNESS_TIMEOUT_MS,
+  SANDBOX_CONTROL_REPORT_INTERVAL_MS,
   maybeStartSandboxControlClient,
   startSandboxControlEventFeed,
 } from './sandbox-control-runtime';
 import type { SandboxControlClient, SandboxControlClientOptions } from './sandbox-control-client';
+import type { SandboxHeartbeatPayload } from '../../../src/shared/sandbox-control-protocol';
 
 function fakeClient(): SandboxControlClient {
   return {
@@ -16,6 +18,14 @@ function fakeClient(): SandboxControlClient {
 
 async function flushAsyncWork(): Promise<void> {
   await new Promise<void>(resolve => setImmediate(resolve));
+}
+
+function idlePayload(): SandboxHeartbeatPayload {
+  return {
+    state: 'idle',
+    kilo: { ready: true },
+    sessions: [],
+  };
 }
 
 describe('maybeStartSandboxControlClient', () => {
@@ -139,11 +149,7 @@ describe('maybeStartSandboxControlClient', () => {
 
   it('emits sandbox.ready then an immediate heartbeat when getHeartbeatPayload is set', async () => {
     const events: Array<{ event: string; payload: unknown }> = [];
-    const heartbeatPayload = {
-      state: 'idle',
-      kilo: { ready: true },
-      sessions: [],
-    };
+    const heartbeatPayload = idlePayload();
     const client: SandboxControlClient = {
       connect: async () => {},
       close: () => {},
@@ -177,7 +183,7 @@ describe('maybeStartSandboxControlClient', () => {
 
   it('emits readiness and heartbeats only while the Kilo event feed is live', async () => {
     const events: Array<{ event: string; payload: unknown }> = [];
-    const heartbeatPayload = { state: 'idle', kilo: { ready: true }, sessions: [] };
+    const heartbeatPayload = idlePayload();
     let ready = false;
     let received: SandboxControlClientOptions | undefined;
     const client: SandboxControlClient = {
@@ -219,7 +225,7 @@ describe('maybeStartSandboxControlClient', () => {
   it('does not re-advertise readiness after an established disconnect', async () => {
     const events: Array<{ event: string; payload: unknown }> = [];
     const connected: SandboxControlClient[] = [];
-    const heartbeatPayload = { state: 'idle' };
+    const heartbeatPayload = idlePayload();
     let received: SandboxControlClientOptions | undefined;
     const client: SandboxControlClient = {
       connect: async () => {},
@@ -258,77 +264,12 @@ describe('maybeStartSandboxControlClient', () => {
     client.close();
   });
 
-  it.each(['readiness', 'close', 'disconnect'] as const)(
-    'discards an asynchronous status poll after %s is lost',
-    async loss => {
-      const timers = spyOn(globalThis, 'setTimeout');
-      const events: Array<{ event: string; payload: unknown }> = [];
-      const pending = Promise.withResolvers<unknown>();
-      let ready = true;
-      let polls = 0;
-      let disconnected = 0;
-      let received: SandboxControlClientOptions | undefined;
-      const started = maybeStartSandboxControlClient(
-        {
-          SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
-          SANDBOX_CONTROL_CREDENTIAL: 'secret',
-          PROVIDER_INSTANCE_ID: 'inst_1',
-        },
-        () => {},
-        {
-          wrapperVersion: '2.4.0',
-          isReady: () => ready,
-          onDisconnected: () => {
-            disconnected++;
-          },
-          getHeartbeatPayload: async () => {
-            polls++;
-            return pending.promise;
-          },
-          createClient: options => {
-            received = options;
-            return {
-              connect: async () => {},
-              close: () => {},
-              sendEvent: (event, payload) => {
-                events.push({ event, payload });
-                return true;
-              },
-            };
-          },
-        }
-      );
-      try {
-        await flushAsyncWork();
-        expect(polls).toBe(1);
-        expect(events).toEqual([
-          { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
-        ]);
-        if (loss === 'readiness') ready = false;
-        else if (loss === 'close') started?.close();
-        else received?.onDisconnected?.();
-        pending.resolve({ state: 'active' });
-        await flushAsyncWork();
-        expect(events).toEqual([
-          { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
-        ]);
-        expect(polls).toBe(1);
-        expect(disconnected).toBe(loss === 'disconnect' ? 1 : 0);
-        expect(timers.mock.calls.filter(([, ms]) => ms === 30_000)).toHaveLength(0);
-      } finally {
-        started?.close();
-        pending.resolve({ state: 'idle' });
-        await flushAsyncWork();
-        timers.mockRestore();
-      }
-    }
-  );
-
-  it('awaits status results and permits at most one heartbeat poll at a time', async () => {
-    const timers = spyOn(globalThis, 'setTimeout');
+  it('sends heartbeats on a 15-second interval independent of sampling', async () => {
+    const timers = spyOn(globalThis, 'setInterval');
     const events: Array<{ event: string; payload: unknown }> = [];
-    const pending = Promise.withResolvers<unknown>();
-    let polls = 0;
+    let sampleCalls = 0;
+    const samplePending = Promise.withResolvers<void>();
+    const heartbeatPayload = idlePayload();
     const started = maybeStartSandboxControlClient(
       {
         SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
@@ -338,9 +279,10 @@ describe('maybeStartSandboxControlClient', () => {
       () => {},
       {
         wrapperVersion: '2.4.0',
-        getHeartbeatPayload: async () => {
-          polls++;
-          return polls === 1 ? { state: 'idle', poll: 1 } : pending.promise;
+        getHeartbeatPayload: () => heartbeatPayload,
+        sampleHeartbeat: async () => {
+          sampleCalls++;
+          await samplePending.promise;
         },
         createClient: () => ({
           connect: async () => {},
@@ -356,35 +298,32 @@ describe('maybeStartSandboxControlClient', () => {
       await flushAsyncWork();
       expect(events).toEqual([
         { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
-        { event: 'sandbox.heartbeat', payload: { state: 'idle', poll: 1 } },
+        { event: 'sandbox.heartbeat', payload: heartbeatPayload },
       ]);
-      const tick = timers.mock.calls.find(([, ms]) => ms === 30_000)?.[0];
-      if (typeof tick !== 'function') throw new Error('Missing heartbeat timer');
-      tick();
-      tick();
-      await flushAsyncWork();
-      expect(polls).toBe(2);
-      expect(events).toHaveLength(2);
-      pending.resolve({ state: 'active', poll: 2 });
-      await flushAsyncWork();
-      expect(events.filter(item => item.event === 'sandbox.heartbeat')).toEqual([
-        { event: 'sandbox.heartbeat', payload: { state: 'idle', poll: 1 } },
-        { event: 'sandbox.heartbeat', payload: { state: 'active', poll: 2 } },
-      ]);
-      started?.close();
+      expect(sampleCalls).toBe(1);
+      const tick = timers.mock.calls.find(
+        ([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS
+      )?.[0];
+      if (typeof tick !== 'function') throw new Error('Missing heartbeat interval');
       tick();
       await flushAsyncWork();
-      expect(polls).toBe(2);
+      expect(sampleCalls).toBe(1);
+      expect(events.filter(e => e.event === 'sandbox.heartbeat')).toHaveLength(2);
+      samplePending.resolve();
+      await flushAsyncWork();
+      tick();
+      await flushAsyncWork();
+      expect(sampleCalls).toBe(2);
     } finally {
       started?.close();
-      pending.resolve({ state: 'idle' });
+      samplePending.resolve();
       await flushAsyncWork();
       timers.mockRestore();
     }
   });
 
-  it('retries failed status polling without emitting fabricated idle state or logging private errors', async () => {
-    const timers = spyOn(globalThis, 'setTimeout');
+  it('retries failed payload construction without emitting fabricated state', async () => {
+    const timers = spyOn(globalThis, 'setInterval');
     const events: Array<{ event: string; payload: unknown }> = [];
     const logs: string[] = [];
     let polls = 0;
@@ -402,15 +341,13 @@ describe('maybeStartSandboxControlClient', () => {
           disconnected++;
         },
         getHeartbeatPayload: () => {
-          if (++polls === 1) {
-            const failed = Promise.reject(new Error('private-status-credential'));
-            void failed.catch(() => {});
-            return failed;
-          }
-          return Promise.resolve({
-            state: 'active',
-            sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing' }],
-          });
+          polls++;
+          if (polls === 1) throw new Error('private-status-credential');
+          return {
+            state: 'active' as const,
+            kilo: { ready: true },
+            sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing' as const, idleForMs: 0 }],
+          };
         },
         createClient: () => ({
           connect: async () => {},
@@ -428,15 +365,14 @@ describe('maybeStartSandboxControlClient', () => {
         { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
       ]);
       expect(disconnected).toBe(0);
-      const tick = timers.mock.calls.find(([, ms]) => ms === 30_000)?.[0];
-      if (typeof tick !== 'function') throw new Error('Missing heartbeat retry');
+      const tick = timers.mock.calls.find(
+        ([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS
+      )?.[0];
+      if (typeof tick !== 'function') throw new Error('Missing heartbeat interval');
       tick();
       await flushAsyncWork();
       expect(polls).toBe(2);
-      expect(events.at(-1)).toEqual({
-        event: 'sandbox.heartbeat',
-        payload: { state: 'active', sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing' }] },
-      });
+      expect(events.at(-1)?.event).toBe('sandbox.heartbeat');
       expect(disconnected).toBe(0);
       expect(logs.join('\n')).not.toContain('private-status-credential');
     } finally {
@@ -446,9 +382,9 @@ describe('maybeStartSandboxControlClient', () => {
   });
 
   it.each(['false', 'throw'] as const)(
-    'retires the connection when an awaited heartbeat delivery returns %s',
+    'retires the connection when heartbeat delivery returns %s',
     async failure => {
-      const timers = spyOn(globalThis, 'setTimeout');
+      const timers = spyOn(globalThis, 'setInterval');
       let disconnected = 0;
       const started = maybeStartSandboxControlClient(
         {
@@ -459,7 +395,7 @@ describe('maybeStartSandboxControlClient', () => {
         () => {},
         {
           wrapperVersion: '2.4.0',
-          getHeartbeatPayload: async () => ({ state: 'idle' }),
+          getHeartbeatPayload: () => idlePayload(),
           onDisconnected: () => {
             disconnected++;
           },
@@ -477,7 +413,9 @@ describe('maybeStartSandboxControlClient', () => {
       try {
         await flushAsyncWork();
         expect(disconnected).toBe(1);
-        expect(timers.mock.calls.filter(([, ms]) => ms === 30_000)).toHaveLength(0);
+        expect(
+          timers.mock.calls.filter(([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS)
+        ).toHaveLength(0);
       } finally {
         started?.close();
         timers.mockRestore();
@@ -526,6 +464,135 @@ describe('maybeStartSandboxControlClient', () => {
     expect(logs.join('\n')).not.toContain('Authorization');
     expect(logs.some(line => line.includes('sandbox control client failed'))).toBe(true);
   });
+
+  it.each(['readiness', 'close', 'disconnect'] as const)(
+    'cancels owned sampling and permanently stops reports after %s is lost',
+    async loss => {
+      const timers = spyOn(globalThis, 'setInterval');
+      const cleared = spyOn(globalThis, 'clearInterval');
+      const events: string[] = [];
+      const sampleBlocked = Promise.withResolvers<void>();
+      let ready = true;
+      let sampleCalls = 0;
+      let signal: AbortSignal | undefined;
+      let received: SandboxControlClientOptions | undefined;
+      let disconnected = 0;
+      const started = maybeStartSandboxControlClient(
+        {
+          SANDBOX_CONTROL_URL: 'wss://example.test/control',
+          SANDBOX_CONTROL_CREDENTIAL: 'secret',
+          PROVIDER_INSTANCE_ID: 'inst_1',
+        },
+        () => {},
+        {
+          wrapperVersion: '2.4.0',
+          isReady: () => ready,
+          getHeartbeatPayload: idlePayload,
+          onDisconnected: () => {
+            disconnected++;
+          },
+          sampleHeartbeat: async input => {
+            signal = input;
+            sampleCalls++;
+            await sampleBlocked.promise;
+          },
+          createClient: options => {
+            received = options;
+            return {
+              connect: async () => {},
+              close: () => {},
+              sendEvent: event => {
+                events.push(event);
+                return true;
+              },
+            };
+          },
+        }
+      );
+      try {
+        await flushAsyncWork();
+        const tick = timers.mock.calls.find(
+          ([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS
+        )?.[0];
+        if (typeof tick !== 'function') throw new Error('Missing heartbeat interval');
+        expect(events).toEqual(['sandbox.ready', 'sandbox.heartbeat']);
+        expect(signal?.aborted).toBe(false);
+        if (loss === 'readiness') ready = false;
+        else if (loss === 'close') started?.close();
+        else received?.onDisconnected?.();
+        tick();
+        expect(signal?.aborted).toBe(true);
+        expect(cleared).toHaveBeenCalledTimes(1);
+        sampleBlocked.resolve();
+        await flushAsyncWork();
+        ready = true;
+        tick();
+        await flushAsyncWork();
+        expect(events).toEqual(['sandbox.ready', 'sandbox.heartbeat']);
+        expect(sampleCalls).toBe(1);
+        expect(disconnected).toBe(loss === 'disconnect' ? 1 : 0);
+        expect(
+          timers.mock.calls.filter(([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS)
+        ).toHaveLength(1);
+      } finally {
+        started?.close();
+        sampleBlocked.resolve();
+        await flushAsyncWork();
+        timers.mockRestore();
+        cleared.mockRestore();
+      }
+    }
+  );
+
+  it.each(['throw', 'reject'] as const)(
+    'keeps reporting and retries when sampling callbacks %s',
+    async failure => {
+      const timers = spyOn(globalThis, 'setInterval');
+      const events: string[] = [];
+      const logs: string[] = [];
+      let samples = 0;
+      const started = maybeStartSandboxControlClient(
+        {
+          SANDBOX_CONTROL_URL: 'wss://example.test/control',
+          SANDBOX_CONTROL_CREDENTIAL: 'secret',
+          PROVIDER_INSTANCE_ID: 'inst_1',
+        },
+        message => logs.push(message),
+        {
+          wrapperVersion: '2.4.0',
+          getHeartbeatPayload: idlePayload,
+          sampleHeartbeat: () => {
+            samples++;
+            if (failure === 'throw') throw new Error('private-native-error');
+            return Promise.reject(new Error('private-native-error'));
+          },
+          createClient: () => ({
+            connect: async () => {},
+            close: () => {},
+            sendEvent: event => {
+              events.push(event);
+              return true;
+            },
+          }),
+        }
+      );
+      try {
+        await flushAsyncWork();
+        const tick = timers.mock.calls.find(
+          ([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS
+        )?.[0];
+        if (typeof tick !== 'function') throw new Error('Missing heartbeat interval');
+        tick();
+        await flushAsyncWork();
+        expect(events).toEqual(['sandbox.ready', 'sandbox.heartbeat', 'sandbox.heartbeat']);
+        expect(samples).toBe(2);
+        expect(logs.join(' ')).not.toContain('private-native-error');
+      } finally {
+        started?.close();
+        timers.mockRestore();
+      }
+    }
+  );
 });
 
 describe('startSandboxControlEventFeed', () => {

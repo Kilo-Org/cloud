@@ -68,6 +68,7 @@ import {
   type WorktreeKiloCleanupClient,
 } from './delete-worktree';
 import { collectWorktreeChanges } from './worktree-changes';
+import { createNativeObservations, type NativeObservations } from './native-observations.js';
 
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
@@ -220,6 +221,7 @@ export type HandlerDeps = {
   tasks: Map<string, OwnedSessionTask>;
   signal?: AbortSignal;
   activity?: SessionActivityRegistry;
+  nativeObservations?: NativeObservations;
   emitSessionEvent: (session: SessionRequestIdentity, payload: SessionEventPayload) => void;
   retireRuntime: (reason: string) => void;
   onShutdown?: () => void;
@@ -303,50 +305,31 @@ export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayloa
   };
 }
 
-export async function refreshHeartbeatPayload(deps: HandlerDeps): Promise<SandboxHeartbeatPayload> {
-  const { activity, kiloRuntimes } = deps;
-  if (activity && kiloRuntimes) {
-    const rootsByDirectory = new Map<string, string[]>();
-    for (const { kiloSessionId } of activity.snapshots()) {
-      const directory = directoryForSession(kiloSessionId);
-      if (!directory) continue;
-      const roots = rootsByDirectory.get(directory) ?? [];
-      roots.push(kiloSessionId);
-      rootsByDirectory.set(directory, roots);
-    }
-    await Promise.all(
-      [...rootsByDirectory].map(async ([directory, roots]) => {
-        const runtime = kiloRuntimes.get(directory);
-        if (!runtime) return;
-        const revisions = new Map(roots.map(root => [root, activity.revision(root)]));
-        const kiloClient = runtime.kiloClient;
-        try {
-          const statuses = await withKiloRequestDeadline(
-            signal => kiloClient.getSessionStatuses(directory, signal),
-            deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal
-          );
-          if (
-            runtime.signal.aborted ||
-            deps.signal?.aborted ||
-            kiloRuntimes.get(directory) !== runtime ||
-            runtime.kiloClient !== kiloClient
-          )
-            return;
-          activity.reconcile(
-            statuses,
-            roots.filter(
-              root =>
-                directoryForSession(root) === directory &&
-                activity.revision(root) === revisions.get(root)
-            )
-          );
-        } catch {
-          return;
-        }
-      })
-    );
-  }
+export async function refreshHeartbeatPayload(
+  deps: HandlerDeps,
+  signal?: AbortSignal
+): Promise<SandboxHeartbeatPayload> {
+  await deps.nativeObservations?.refresh(signal);
   return buildHeartbeatPayload(deps);
+}
+
+export function createControlHandlerDeps(deps: HandlerDeps): HandlerDeps {
+  if (!deps.nativeObservations && deps.activity && deps.kiloRuntimes) {
+    deps.nativeObservations = createNativeObservations({
+      get signal() {
+        return deps.signal;
+      },
+      roots: () =>
+        (deps.activity?.snapshots() ?? []).map(({ kiloSessionId }) => ({
+          kiloSessionId,
+          directory: directoryForSession(kiloSessionId),
+          revision: deps.activity?.revision(kiloSessionId),
+        })),
+      getRuntime: directory => deps.kiloRuntimes?.get(directory),
+      reconcileActivity: (statuses, roots) => deps.activity?.reconcile(statuses, roots),
+    });
+  }
+  return deps;
 }
 
 function startSessionTask(
@@ -1149,22 +1132,30 @@ async function readRootRequests<Request extends { id: string; sessionID: string 
   session: SessionRequestIdentity,
   read: (directory: string, signal: AbortSignal) => Promise<Request[]>,
   signal: AbortSignal
-): Promise<Array<{ directory: string; request: Request }>> {
+): Promise<{ matches: Array<{ directory: string; request: Request }>; complete: boolean }> {
   const rootDirectory = directoryForSession(session.kiloSessionId) ?? session.directory;
   const scopes = await Promise.all(
     directoriesForRoot(session.kiloSessionId, rootDirectory).map(async directory => {
       const requests = await read(directory, signal);
-      return requests
-        .filter(
-          request =>
-            (request.sessionID === session.kiloSessionId ||
-              rootForSession(request.sessionID) === session.kiloSessionId) &&
-            (directoryForSession(request.sessionID) ?? rootDirectory) === directory
-        )
-        .map(request => ({ directory, request }));
+      const matches: Array<{ directory: string; request: Request }> = [];
+      let complete = true;
+      for (const request of requests) {
+        const root = rootForSession(request.sessionID);
+        if (request.sessionID === session.kiloSessionId || root === session.kiloSessionId) {
+          const requestDirectory = directoryForSession(request.sessionID);
+          if (requestDirectory === directory) matches.push({ directory, request });
+          else if (!requestDirectory) complete = false;
+        } else if (root === undefined) {
+          complete = false;
+        }
+      }
+      return { matches, complete };
     })
   );
-  return scopes.flat();
+  return {
+    matches: scopes.flatMap(scope => scope.matches),
+    complete: scopes.every(scope => scope.complete),
+  };
 }
 
 async function handlePermissionResolve(
@@ -1183,7 +1174,9 @@ async function handlePermissionResolve(
         (directory, signal) => kiloClient.getPermissions(directory, signal),
         signal
       );
-      const pending = permissions.find(item => item.request.id === parsed.data.permissionId);
+      const pending = permissions.matches.find(
+        item => item.request.id === parsed.data.permissionId
+      );
       if (!pending)
         return fail('unauthorized', 'Permission is not pending for this session', false);
       const success = await kiloClient.answerPermission(
@@ -1219,7 +1212,7 @@ async function handleQuestionResolve(
         (directory, signal) => kiloClient.getQuestions(directory, signal),
         signal
       );
-      const pending = questions.find(item => item.request.id === parsed.data.questionId);
+      const pending = questions.matches.find(item => item.request.id === parsed.data.questionId);
       if (!pending) return fail('unauthorized', 'Question is not pending for this session', false);
       const success =
         parsed.data.action === 'answer'
@@ -1337,7 +1330,7 @@ async function handleSync(
               signal
             ),
           questions => {
-            questionCount = questions.length;
+            questionCount = questions.matches.length;
           }
         ),
         query(
@@ -1349,24 +1342,27 @@ async function handleSync(
               signal
             ),
           permissions => {
-            permissionCount = permissions.length;
+            permissionCount = permissions.matches.length;
           }
         ),
       ]);
     }, deps.signal);
+    if (!questions.complete || !permissions.complete) {
+      throw new Error('Native requests contain unresolved ancestry');
+    }
     const ownedTask = deps.tasks.has(session.kiloSessionId);
     const status = ownedTask
       ? { type: 'busy' }
       : (statuses[session.kiloSessionId] ?? { type: 'idle' });
     const result = ok({
       status,
-      questions: questions.map(({ request }) =>
-        request.sessionID === session.kiloSessionId
+      questions: questions.matches.map(({ request }) =>
+        request.sessionID === session.kiloSessionId && !('rootKiloSessionId' in request)
           ? request
           : { ...request, rootKiloSessionId: session.kiloSessionId }
       ),
-      permissions: permissions.map(({ request }) =>
-        request.sessionID === session.kiloSessionId
+      permissions: permissions.matches.map(({ request }) =>
+        request.sessionID === session.kiloSessionId && !('rootKiloSessionId' in request)
           ? request
           : { ...request, rootKiloSessionId: session.kiloSessionId }
       ),

@@ -67,19 +67,6 @@ jobs:
             fi
           fi
 
-          # If main still carries the version that the last release submitted, the
-          # bump PR is not merged yet. Wait for it: building now submits the same
-          # version twice. Merging the bump PR runs this workflow again and picks
-          # these changes up, so nothing is lost.
-          read_version() { sed -n "s/^  version: '\([0-9][0-9.]*\)',$/\1/p"; }
-          PREV_VERSION=$(git show "$LAST_TAG":apps/mobile/app.config.ts | read_version)
-          CUR_VERSION=$(read_version < apps/mobile/app.config.ts)
-          if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" = "$CUR_VERSION" ]; then
-            echo "::warning::Version $CUR_VERSION was already submitted at $LAST_TAG — skipping the build. Merge the open kilo-app-version-bump PR; the release resumes on the next push to main."
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           if [ -z "$CHANGES" ]; then
             echo "No changes since $LAST_TAG — skipping build"
             echo "should_build=false" >> "$GITHUB_OUTPUT"

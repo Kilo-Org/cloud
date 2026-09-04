@@ -706,9 +706,11 @@ instead of the provider would be a change to what the provider sealed.
 .delta`, so both are read. Two providers relayed through the chat shape name it
 `reasoning` and `reasoning_content`, so both are read there.
 
-ponytail: one reasoning part per turn. A model interleaves thinking with tool
-calls, so several blocks arrive per turn once this package has tools, and each
-needs its own signature. Give the wire the block boundary then.
+A turn holds as many reasoning parts as the model produced, and an encrypted
+block closes the one open at the time. What still merges is two signed blocks
+with nothing between them: a signature does not close a block here, so both
+land in one part with the second signature. A model produces those between tool
+calls, which this package does not have. Split on the signature when it does.
 
 ### A provider may fail after the answer has started
 
@@ -739,6 +741,12 @@ shorten the prompt that follows.
 `unknown` is the honest answer for a name this package has not seen, and it is
 never a guess. `tool_use` and `tool_calls` map to `unknown` on purpose: this
 package has no tools, so naming them would claim a meaning nothing has tested.
+
+It is also what a caller gets when the stream ended and no frame said why. All
+three shapes served here always send one, on every live run recorded in this
+file, so treat that case the way you treat `maxTokens`: the answer in hand may
+not be the whole answer. Whether the package should fail instead of reporting
+`unknown` there is open, and needs a live case before anyone decides.
 
 The three shapes report it in three places — `message_delta.delta.stop_reason`,
 `response.incomplete.response.incomplete_details.reason`, and

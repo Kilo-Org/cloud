@@ -133,14 +133,14 @@ describe('numeric spoken label', () => {
       sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
     });
     expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
-      '1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+      '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
   });
 
   it('speaks the status word, numeric counts, then Open agents for stale', () => {
     const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
     expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
-      'glanceable.stale, 1 glanceable.running, glanceable.openAgents'
+      'glanceable.stale, 1 common.working, glanceable.openAgents'
     );
   });
 

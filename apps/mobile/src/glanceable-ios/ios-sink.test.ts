@@ -991,11 +991,11 @@ describe('buildGlanceableViewProps', () => {
       key => key
     );
     expect(stale.accessibilityLabel).toBe(
-      'glanceable.stale, 1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+      'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(happy.accessibilityLabel).toBe('1 glanceable.running, glanceable.openAgents');
+    expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
     expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');

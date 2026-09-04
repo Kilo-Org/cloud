@@ -38,20 +38,39 @@ const filler = [
 
 const recall = 'What was the vault code I gave you? Answer with the number only.';
 
+/**
+ * One question, keeping what it said and what the `done` event reported.
+ *
+ * The counts matter here: added up they are every call the caller made, so
+ * `session.usage` above them is the summary call, which the caller never made
+ * and is still billed for.
+ */
 const say = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: 200 }), '', (held, event) =>
-    event.kind === 'delta' ? held + event.text : held
-  );
+  Stream.runFold(session.ask(text, { maxTokens: 200 }), { said: '', output: 0 }, (held, event) => {
+    if (event.kind === 'delta') {
+      return { ...held, said: held.said + event.text };
+    }
+    return event.kind === 'done'
+      ? { ...held, output: held.output + event.usage.outputTokens }
+      : held;
+  });
 const layers = kilo({ apiKinds: everyShape, contextWindow });
 
 const program = Effect.gen(function* () {
   const session = yield* openSession({ system, model });
-  yield* say(session, plant);
+  let asked = 0;
+  asked += (yield* say(session, plant)).output;
   for (const question of filler) {
-    yield* say(session, question);
+    asked += (yield* say(session, question)).output;
   }
-  const answer = yield* say(session, recall);
-  return { answer, history: yield* session.history, used: yield* session.usage };
+  const last = yield* say(session, recall);
+  asked += last.output;
+  return {
+    answer: last.said,
+    asked,
+    history: yield* session.history,
+    used: yield* session.usage,
+  };
 });
 
 const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
@@ -67,6 +86,12 @@ console.log('turns kept ', turns.length);
 console.log('summaries  ', summaries.length);
 console.log('summary    ', JSON.stringify(summary.slice(0, 160)));
 console.log('recalled   ', JSON.stringify(result.answer));
+console.log(
+  'output used',
+  result.used.outputTokens,
+  'of which the questions asked for',
+  result.asked
+);
 
 const failures: string[] = [];
 
@@ -84,6 +109,16 @@ if (!summary.includes('4417')) {
 }
 if (turns.findIndex(isSummary) === 0) {
   failures.push('the summary is the first turn, so nothing was summarised');
+}
+if (result.used.outputTokens <= result.asked) {
+  /* Every `done` event added up is what the questions cost. The session's own
+     total has to be larger, because it also holds the summary call, which the
+     caller never asked for and is billed for all the same. */
+  failures.push(
+    `the counts leave out the summary call: the session reports ` +
+      `${String(result.used.outputTokens)} output tokens and the questions alone ` +
+      `account for ${String(result.asked)}`
+  );
 }
 if (!result.answer.includes('4417')) {
   failures.push(

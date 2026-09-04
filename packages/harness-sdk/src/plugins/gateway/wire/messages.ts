@@ -208,5 +208,4 @@ const messagesWire: Wire = {
   toStop,
 };
 
-export type { ContentBlock };
 export { messagesWire };

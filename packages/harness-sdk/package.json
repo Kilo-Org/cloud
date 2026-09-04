@@ -40,18 +40,26 @@
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.104.1",
     "drizzle-orm": "catalog:",
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",
-    "openai": "6.49.0",
     "typia": "14.0.4"
   },
+  "peerDependencies": {
+    "expo-sqlite": "~57.0.1"
+  },
+  "peerDependenciesMeta": {
+    "expo-sqlite": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@anthropic-ai/sdk": "0.104.1",
     "@ttsc/unplugin": "0.28.3",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
     "expo-sqlite": "~57.0.1",
+    "openai": "6.49.0",
     "ttsc": "0.28.3",
     "typescript": "7.0.2",
     "vitest": "catalog:"

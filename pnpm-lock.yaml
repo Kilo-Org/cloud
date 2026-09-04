@@ -1495,9 +1495,6 @@ importers:
 
   packages/harness-sdk:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: 0.104.1
-        version: 0.104.1(zod@4.4.3)
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.18.0)(@upstash/redis@1.38.0)(bun-types@1.3.14)(expo-sqlite@57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.20.0)
@@ -1507,13 +1504,13 @@ importers:
       eventsource-parser:
         specifier: 3.0.8
         version: 3.0.8
-      openai:
-        specifier: 6.49.0
-        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       typia:
         specifier: 14.0.4
         version: 14.0.4(ttsc@0.28.3)
     devDependencies:
+      '@anthropic-ai/sdk':
+        specifier: 0.104.1
+        version: 0.104.1(zod@4.4.3)
       '@ttsc/unplugin':
         specifier: 0.28.3
         version: 0.28.3(ttsc@0.28.3)
@@ -1526,6 +1523,9 @@ importers:
       expo-sqlite:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.15)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
+      openai:
+        specifier: 6.49.0
+        version: 6.49.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.4.3)
       ttsc:
         specifier: 0.28.3
         version: 0.28.3

@@ -2,7 +2,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 /**
- * Fails when the built package names a platform where it must not.
+ * Fails when the built package names something it must not: a platform in the
+ * code, or a dev dependency in the published types.
  *
  * Principle 12 says anything a runtime does differently is a plugin point, and
  * `tsconfig.json` sets `"types": []` so a first-party `process` or `Buffer` is
@@ -17,13 +18,13 @@ import { join, relative } from 'node:path';
 const root = join(import.meta.dirname, '..');
 const dist = join(root, 'dist');
 
-const filesUnder = (folder: string): readonly string[] =>
+const filesUnder = (folder: string, ending: string): readonly string[] =>
   readdirSync(folder).flatMap(name => {
     const path = join(folder, name);
     if (statSync(path).isDirectory()) {
-      return filesUnder(path);
+      return filesUnder(path, ending);
     }
-    return path.endsWith('.js') ? [path] : [];
+    return path.endsWith(ending) ? [path] : [];
   });
 
 /**
@@ -60,7 +61,7 @@ const rules: readonly {
 
 const broken: string[] = [];
 
-for (const file of filesUnder(dist)) {
+for (const file of filesUnder(dist, '.js')) {
   const path = relative(dist, file);
   const lines = readFileSync(file, 'utf8').split('\n');
   for (const rule of rules) {
@@ -75,13 +76,37 @@ for (const file of filesUnder(dist)) {
   }
 }
 
+/**
+ * A dependency used only for its types must not reach the published types.
+ *
+ * `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
+ * against, and nothing of either survives the build: every import of them is a
+ * type. That is what lets them be dev dependencies, which is two large packages
+ * a consumer does not install. Exporting a type built out of one puts it back
+ * in a `.d.ts`, and the consumer's own typecheck then fails on a package they
+ * were never told to add. The compiler cannot see this: here they are
+ * installed.
+ */
+const buildOnly = ['openai', '@anthropic-ai/sdk'];
+
+for (const file of filesUnder(dist, '.d.ts')) {
+  const path = relative(dist, file);
+  const lines = readFileSync(file, 'utf8').split('\n');
+  lines.forEach((line, index) => {
+    const named = buildOnly.find(name => line.includes(`'${name}'`));
+    if (named !== undefined) {
+      broken.push(`dist/${path}:${String(index + 1)} names ${named}, which a consumer does not install`);
+    }
+  });
+}
+
 if (broken.length === 0) {
-  process.stdout.write('the build names no platform\n');
+  process.stdout.write('the build names no platform and no dev dependency\n');
   process.exit(0);
 }
 
 process.stdout.write(
-  `the build names a platform it must not. Make it a plugin point, or move it under plugins/:\n${broken.join('\n')}\n\n` +
+  `the build names something it must not. Make a platform a plugin point, or move it under plugins/. Stop exporting a type built out of a dev dependency:\n${broken.join('\n')}\n\n` +
     rules.map(rule => `  ${rule.what}: ${rule.why}`).join('\n') +
     '\n'
 );

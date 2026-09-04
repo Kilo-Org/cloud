@@ -33,7 +33,10 @@ import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
-import { consumeInstallState } from '@/lib/integrations/github/install-state';
+import {
+  consumeInstallState,
+  type InstallStateRejectionReason,
+} from '@/lib/integrations/github/install-state';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
@@ -149,6 +152,7 @@ export async function GET(request: NextRequest) {
     const installationId = searchParams.get('installation_id') ?? '';
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
+    let rejectionReason: InstallStateRejectionReason | 'missing' = 'missing';
 
     // 3. Atomically consume a database-backed install state before attempting
     // bot-link parsing. Database tokens are opaque and unambiguous once found.
@@ -171,6 +175,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL(`/github-app?${query}`, APP_URL));
       }
 
+      rejectionReason = result.reason;
+
       // 4. Bot-link callback hand-off. Bot-link state tokens use a signed
       // dot-separated format and never collide with database tokens, which are
       // base64url (no dots).
@@ -180,17 +186,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    captureMessage('GitHub callback with unrecognized state', {
-      level: 'warning',
-      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: {
-        installationId,
-        setupAction,
-        stateClass: classifyInstallState(rawState),
-        reason: 'state_not_bot_link_or_install_token',
-      },
-    });
-    return NextResponse.redirect(new URL('/', APP_URL));
+    const expectedRejection = rejectionReason === 'expired' || rejectionReason === 'consumed';
+    captureMessage(
+      expectedRejection
+        ? 'GitHub callback with unusable install state'
+        : 'GitHub callback with unrecognized state',
+      {
+        level: expectedRejection ? 'info' : 'warning',
+        tags: { endpoint: 'github/callback', source: 'github_app_installation', rejectionReason },
+        extra: {
+          hasInstallationId: Boolean(installationId),
+          setupAction,
+          stateClass: classifyInstallState(rawState),
+          reason: 'state_not_bot_link_or_install_token',
+          rejectionReason,
+        },
+      }
+    );
+    return NextResponse.redirect(new URL('/github-app?error=install_state_invalid', APP_URL));
   } catch (error) {
     console.error('Error handling GitHub App callback:', error);
 

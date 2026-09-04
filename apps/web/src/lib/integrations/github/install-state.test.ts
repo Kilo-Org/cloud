@@ -118,7 +118,10 @@ describe('install-state', () => {
       if (first.status !== 'success') throw new Error('Expected successful consumption');
       expect(first.state).toEqual(await readState(token));
       expect(first.state.consumed_at).not.toBeNull();
-      await expect(consumeInstallState(token, testUserId)).resolves.toEqual({ status: 'unusable' });
+      await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+        status: 'unusable',
+        reason: 'consumed',
+      });
     });
 
     test('a foreign callback cannot burn state before the initiator consumes it', async () => {
@@ -134,7 +137,10 @@ describe('install-state', () => {
         status: 'success',
         state: { kilo_user_id: testUserId },
       });
-      await expect(consumeInstallState(token, testUserId)).resolves.toEqual({ status: 'unusable' });
+      await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+        status: 'unusable',
+        reason: 'consumed',
+      });
     });
 
     test('a session change after valid preflight does not authorize consumption', async () => {
@@ -166,6 +172,7 @@ describe('install-state', () => {
         consumeInstallState(token, testUserId),
       ]);
       expect(results.map(result => result.status).sort()).toEqual(['success', 'unusable']);
+      expect(results).toContainEqual({ status: 'unusable', reason: 'consumed' });
     });
   });
 
@@ -186,11 +193,52 @@ describe('install-state', () => {
         const before = kind === 'unknown' ? null : await readState(token);
         for (const userId of [testUserId, otherUserId]) {
           await expect(checkInstallState(token, userId)).resolves.toEqual({ status: 'unusable' });
-          await expect(consumeInstallState(token, userId)).resolves.toEqual({ status: 'unusable' });
+          await expect(consumeInstallState(token, userId)).resolves.toEqual({
+            status: 'unusable',
+            reason: kind === 'unknown' ? 'not_found' : kind,
+          });
         }
         if (before) expect(await readState(token)).toEqual(before);
       }
     );
+  });
+
+  test('does not claim a deleted expired token was never issued', async () => {
+    const token = await mintState();
+    await db
+      .update(github_install_states)
+      .set({ expires_at: sql`NOW() - INTERVAL '1 second'` })
+      .where(eq(github_install_states.token, token));
+    await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+      status: 'unusable',
+      reason: 'expired',
+    });
+    await cleanupExpiredInstallStates();
+    await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+      status: 'unusable',
+      reason: 'not_found',
+    });
+  });
+
+  test('rejects the expiry boundary without consuming and prioritizes an observed consumption', async () => {
+    const token = await mintState();
+    await db
+      .update(github_install_states)
+      .set({ expires_at: sql`NOW()` })
+      .where(eq(github_install_states.token, token));
+    await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+      status: 'unusable',
+      reason: 'expired',
+    });
+    expect((await readState(token)).consumed_at).toBeNull();
+    await db
+      .update(github_install_states)
+      .set({ consumed_at: sql`NOW()` })
+      .where(eq(github_install_states.token, token));
+    await expect(consumeInstallState(token, testUserId)).resolves.toEqual({
+      status: 'unusable',
+      reason: 'consumed',
+    });
   });
 
   describe('cleanupExpiredInstallStates', () => {

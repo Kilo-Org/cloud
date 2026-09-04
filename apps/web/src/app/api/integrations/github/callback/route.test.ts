@@ -110,7 +110,7 @@ const INSTALL_STATE_TOKEN = 'valid-database-token-for-callback-tests';
 
 beforeEach(() => {
   mockedConsumeInstallState.mockReset();
-  mockedConsumeInstallState.mockResolvedValue({ status: 'unusable' });
+  mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
   mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
   mockedExchangeGitHubOAuthCode.mockResolvedValue({
     id: GITHUB_USER_ID,
@@ -183,7 +183,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
@@ -412,15 +412,13 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     };
     mockedConsumeInstallState.mockImplementation(async (token: string) => {
-      return token === DB_TOKEN ? { status: 'success', state: mockRow } : { status: 'unusable' };
+      return token === DB_TOKEN
+        ? { status: 'success', state: mockRow }
+        : { status: 'unusable', reason: 'not_found' };
     });
 
     const { GET } = await import('./route');
 
-    // If a producer erroneously sends a suffixed state, consumeInstallState
-    // receives the full suffix. The real DB returns null because it stores
-    // only the bare token. The callback must redirect to the home page
-    // instead of proceeding with the install.
     const suffixed = `${DB_TOKEN}|return=${encodeURIComponent('/github-app')}`;
     const response = await GET(
       makeRequest(
@@ -429,7 +427,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedConsumeInstallState).toHaveBeenCalledWith(suffixed, USER_ID);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
@@ -538,7 +536,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
         expect.anything()
       );
       const replayed = await GET(makeRequest(callbackPath));
-      expectRedirectLocation(replayed, '/');
+      expectRedirectLocation(replayed, '/github-app?error=install_state_invalid');
       expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledTimes(1);
     } finally {
       await db.delete(kilocode_users).where(eq(kilocode_users.id, initiatorId));
@@ -560,22 +558,40 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('rejects a replayed (already consumed) token', async () => {
-    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable' });
+  test.each(['consumed', 'expired', 'not_found', 'unavailable'] as const)(
+    'recovers a %s token without OAuth or installation writes',
+    async reason => {
+      mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason });
 
-    const { GET } = await import('./route');
-    const response = await GET(
-      makeRequest(
-        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}`
-      ) as never
-    );
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${DB_TOKEN}&code=synthetic-oauth-code&organizationId=untrusted-org&fromApp=1`
+        ) as never
+      );
 
-    // Replayed tokens fall through to unrecognized state
-    expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
-    expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
-    expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(307);
+      expectRedirectLocation(response, '/github-app?error=install_state_invalid');
+      expect(mockedConsumeInstallState).toHaveBeenCalledWith(DB_TOKEN, USER_ID);
+      expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+      expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+      expect(mockedCreateAppAuth).not.toHaveBeenCalled();
+      const { createPendingIntegration } =
+        await import('@/lib/integrations/db/platform-integrations');
+      expect(createPendingIntegration).not.toHaveBeenCalled();
+      expect(mockedCaptureMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          level: reason === 'expired' || reason === 'consumed' ? 'info' : 'warning',
+          extra: expect.objectContaining({ stateClass: 'install_token', rejectionReason: reason }),
+        })
+      );
+      const diagnostics = JSON.stringify(mockedCaptureMessage.mock.calls);
+      for (const value of [DB_TOKEN, USER_ID, INSTALLATION_ID]) {
+        expect(diagnostics).not.toContain(value);
+      }
+    }
+  );
 
   test('treats a prefixed state as opaque when it matches a database token', async () => {
     const PREFIXED_DB_TOKEN = `user_${DB_TOKEN}`;
@@ -985,7 +1001,7 @@ describe('GET /api/integrations/github/callback plaintext state rejection', () =
       authFailedResponse: null,
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable' });
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
   });
 
   test.each(['org_', 'user_'])('always rejects %s prefixed plaintext state', async prefix => {
@@ -997,7 +1013,7 @@ describe('GET /api/integrations/github/callback plaintext state rejection', () =
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
@@ -1231,7 +1247,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
       authFailedResponse: null,
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
-    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable' });
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
     mockedCreateAppAuth.mockReturnValue(
       jest.fn(async () => ({ token: 'github-app-token' })) as never
     );
@@ -1257,7 +1273,7 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
 
   test('unrecognized-state warning does not include the raw state token', async () => {
     const RAW_TOKEN = `sentry-redaction-unknown-${Date.now()}`;
-    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable' });
+    mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
 
     const { GET } = await import('./route');
     const response = await GET(
@@ -1267,15 +1283,15 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/');
+    expectRedirectLocation(response, '/github-app?error=install_state_invalid');
     expect(mockedCaptureMessage).toHaveBeenCalled();
     const serializedMessage = JSON.stringify(mockedCaptureMessage.mock.calls);
     // The raw state is a bearer token and must never reach Sentry.
     expect(serializedMessage).not.toContain(RAW_TOKEN);
-    // Safe diagnostics survive: state class, reason, and the callback ids.
     expect(serializedMessage).toContain('install_token');
     expect(serializedMessage).toContain('state_not_bot_link_or_install_token');
-    expect(serializedMessage).toContain(INSTALLATION_ID);
+    expect(serializedMessage).not.toContain(INSTALLATION_ID);
+    expect(serializedMessage).toContain('not_found');
   });
 
   test('catch-path exception does not include the raw state token', async () => {

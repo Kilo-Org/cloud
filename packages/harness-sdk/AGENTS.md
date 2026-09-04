@@ -270,6 +270,13 @@ made `pnpm test:e2e` fail inside `wire/completions.ts`. If a `ttsx` run throws
 that message, run `pnpm typecheck` first and read the error it reports, not the
 stack it printed.
 
+**A filtered install breaks the same thing, with `pnpm typecheck` still green.**
+`pnpm install --filter @kilocode/harness-sdk` left `ttsx` throwing
+`no transform has been configured` on 2026-09-04 while `ttsc` and vitest kept
+transforming, so only the live runs failed. A full `pnpm install` from the
+repository root fixed it. Install for the whole workspace, not for this
+package.
+
 ## Rules
 
 - Do not add an abstraction with one implementation, unless it is a declared

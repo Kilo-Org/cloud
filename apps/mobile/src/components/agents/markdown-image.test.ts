@@ -225,7 +225,7 @@ describe('MarkdownImage inert-until-load', () => {
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
-    let image = ofType(renderer.root, 'Image')[0];
+    const image = ofType(renderer.root, 'Image')[0];
     if (!image) {
       throw new Error('image not found');
     }
@@ -253,13 +253,13 @@ describe('MarkdownImage inert-until-load', () => {
     expect(slotCount(renderer.root, 0.75)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
-    image = ofType(renderer.root, 'Image')[0];
-    if (!image) {
+    const retryImage = ofType(renderer.root, 'Image')[0];
+    if (!retryImage) {
       throw new Error('image not found after retry');
     }
     await act(async () => {
       await Promise.resolve();
-      (image.props.onLoad as (event: unknown) => void)({
+      (retryImage.props.onLoad as (event: unknown) => void)({
         source: { width: 100, height: 400 },
       });
       renderer.update(createElement(MarkdownImage, { uri, alt: 'shot' }));

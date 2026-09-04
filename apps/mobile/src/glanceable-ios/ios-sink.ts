@@ -1,7 +1,9 @@
 import {
+  GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_TERMINAL_MS,
-  type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
+  isIdleOnlyGlanceableWork,
+  isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 import { after, type LiveActivity } from 'expo-widgets';
@@ -13,9 +15,9 @@ import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import { ActiveAgentsLiveActivity } from './active-agents-live-activity';
 import { ActiveAgentsWidget } from './active-agents-widget';
 import {
+  buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
-  type GlanceableViewProps,
   toWidgetProps,
 } from './view-props';
 
@@ -52,20 +54,33 @@ function refreshActivity(): boolean {
   try {
     if (activity !== null) {
       const { state } = activity.getInfo();
-      if (state === 'active' || state === 'stale') {
-        return true;
+      if (state !== 'active' && state !== 'stale') {
+        getGlanceableDelivery().cleanupTokens('activity', readEndingToken(activity));
+        activity = null;
+        inFlightUpdate = null;
+        lastProps = null;
+        revision = 0;
       }
-      getGlanceableDelivery().cleanupTokens('activity', readEndingToken(activity));
-      activity = null;
-      inFlightUpdate = null;
-      lastProps = null;
-      revision = 0;
     }
     // Wrappers change on discovery; only native IDs identify pending ends.
-    activity =
-      ActiveAgentsLiveActivity.getInstances().findLast(
-        instance => !endingActivities.has(instance.getInfo().id)
-      ) ?? null;
+    const live = ActiveAgentsLiveActivity.getInstances().filter(
+      instance => !endingActivities.has(instance.getInfo().id)
+    );
+    activity ??= live.at(-1) ?? null;
+    // Exactly one card may ever be on screen. A push-to-start that raced a
+    // local start, or a card left behind by an earlier organization scope, is
+    // adopted by nobody: it is never updated and never ended, so it sits frozen
+    // on the Lock Screen for the whole 8 hour lifetime. Retire every instance
+    // except the adopted one here, in the one native read every path shares.
+    // Which one is adopted does not matter — native order is a dictionary
+    // order, not a start order — only that the others do not survive it.
+    const keptId = activity?.getInfo().id;
+    for (const instance of live) {
+      const id = instance.getInfo().id;
+      if (id !== keptId) {
+        endExtra(instance, id);
+      }
+    }
     return true;
   } catch (error) {
     if (isActivityKitUnavailable(error)) {
@@ -74,23 +89,6 @@ function refreshActivity(): boolean {
     // Do not update an unverified cached handle or start a duplicate on a read failure.
     return false;
   }
-}
-
-function buildExpiredProps(snapshot: GlanceableAgentsSnapshot): Partial<GlanceableViewProps> {
-  return toWidgetProps(
-    buildGlanceableViewProps(
-      {
-        ...snapshot,
-        status: 'expired',
-        running: 0,
-        needsInput: 0,
-        idle: 0,
-        needsInputSince: null,
-      },
-      {},
-      translate
-    )
-  );
 }
 
 async function readEndingToken(instance: Activity): Promise<string | null> {
@@ -103,7 +101,8 @@ async function readEndingToken(instance: Activity): Promise<string | null> {
 }
 
 type EndIntent = {
-  dismissAt: number | null;
+  /** Milliseconds ActivityKit retains the card, or null to dismiss it at once. */
+  dismissMs: number | null;
   props: Partial<GlanceableLiveActivityContentState> | null;
 };
 type EndingActivity = {
@@ -126,16 +125,14 @@ async function finishEnd(ending: EndingActivity): Promise<void> {
       // A rejected update must not block the end; its contentDate still advances.
     }
     await ending.token;
-    if (ending.intent.dismissAt !== null) {
-      ending.intent.dismissAt = Date.now() + GLANCEABLE_TERMINAL_MS;
-    }
     // Read the latest intent at the native boundary. Privacy can supersede an
     // empty snapshot during either await, including an already-submitted end.
+    // The retention window is measured from here, so the awaits never eat it.
     for (;;) {
       const intent = ending.intent;
       // eslint-disable-next-line no-await-in-loop -- serialize a privacy dismissal after an in-flight native end
       await ending.instance.end(
-        intent.dismissAt === null ? 'immediate' : after(new Date(intent.dismissAt)),
+        intent.dismissMs === null ? 'immediate' : after(new Date(Date.now() + intent.dismissMs)),
         intent.props ?? undefined,
         new Date()
       );
@@ -170,12 +167,30 @@ async function scheduleEnd(ending: EndingActivity): Promise<void> {
   }
 }
 
+/**
+ * End one activity this sink does not own, at once. Its push token belongs to
+ * an earlier process or to a push-to-start, so no local token cleanup runs
+ * here: the server drops the row when APNs reports the activity ended.
+ */
+function endExtra(instance: Activity, id: string): void {
+  const ending: EndingActivity = {
+    id,
+    instance,
+    update: null,
+    token: readEndingToken(instance),
+    intent: { dismissMs: null, props: null },
+    pending: null,
+  };
+  endingActivities.set(id, ending);
+  void scheduleEnd(ending);
+}
+
 function endNow(
-  dismissAt: number | null = null,
+  dismissMs: number | null = null,
   props: Partial<GlanceableLiveActivityContentState> | null = lastProps
 ): void {
   const targets = new Map<string, Activity>();
-  if (dismissAt === null) {
+  if (dismissMs === null) {
     try {
       // Privacy must include terminal content, even after JS state was discarded.
       for (const instance of ActiveAgentsLiveActivity.getInstances(true)) {
@@ -203,7 +218,7 @@ function endNow(
         instance,
         update: id === currentId ? inFlightUpdate : null,
         token,
-        intent: { dismissAt, props },
+        intent: { dismissMs, props },
         pending: null,
       });
     }
@@ -214,14 +229,14 @@ function endNow(
   revision = 0;
   for (const ending of endingActivities.values()) {
     if (
-      dismissAt === null &&
-      (ending.intent.dismissAt !== null || (props !== null && props !== ending.intent.props))
+      dismissMs === null &&
+      (ending.intent.dismissMs !== null || (props !== null && props !== ending.intent.props))
     ) {
-      ending.intent = { dismissAt: null, props: props ?? ending.intent.props };
+      ending.intent = { dismissMs: null, props: props ?? ending.intent.props };
     }
     void scheduleEnd(ending);
   }
-  if (dismissAt === null && endingActivities.size === 0) {
+  if (dismissMs === null && endingActivities.size === 0) {
     getGlanceableDelivery().cleanupTokens('activity');
   }
 }
@@ -276,7 +291,7 @@ export const iosSink: GlanceableSink = {
     if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {
       ActiveAgentsWidget.updateTimeline([
         { date: new Date(), props },
-        { date: new Date(snapshot.expiresAt), props: buildExpiredProps(snapshot) },
+        { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
       ]);
     }
     const contentState = buildGlanceableLiveActivityContentState(snapshot);
@@ -284,13 +299,23 @@ export const iosSink: GlanceableSink = {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
       const immediate = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
-      endNow(immediate ? null : Date.now() + GLANCEABLE_TERMINAL_MS, contentState);
+      endNow(immediate ? null : GLANCEABLE_TERMINAL_MS, contentState);
       return;
     }
     // Never start here. Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
       inFlightUpdate = activity.update(lastProps);
+      if (isIdleOnlyGlanceableWork(snapshot)) {
+        // Everything went idle: hand ActivityKit the dismissal date and stop
+        // owning the surface. A JavaScript timer would never fire — the app is
+        // asleep whenever this matters — and an idle agent produces no further
+        // snapshot to check a deadline against. `endNow` awaits the update
+        // above, so the card keeps the idle counts until it is removed. Work
+        // resuming inside the window starts a fresh card, and `startOrUpdate`
+        // dismisses this one first.
+        endNow(GLANCEABLE_IDLE_ONLY_MS, contentState);
+      }
     }
   },
 
@@ -310,6 +335,16 @@ export const iosSink: GlanceableSink = {
     const contentState = buildGlanceableLiveActivityContentState(snapshot);
 
     if (activity === null) {
+      // Idle work never raises a card. It keeps one alive once real work put it
+      // there, and `publish` hands ActivityKit the idle dismissal date.
+      if (!isStartableGlanceableWork(snapshot)) {
+        return;
+      }
+      // Work resumed inside an idle window, so the card it replaces is already
+      // `ended` and waiting out its dismissal date. Native discovery hides an
+      // ended card, and only a second, immediate end removes it: dismiss it
+      // here, keeping its own content, so two cards never share the screen.
+      endNow(null, null);
       try {
         activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL);
         inFlightUpdate = null;

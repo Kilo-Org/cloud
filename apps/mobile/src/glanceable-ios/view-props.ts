@@ -83,6 +83,23 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
 }
 
 /**
+ * The widget's expiry frame: the same snapshot with its counts zeroed and the
+ * expired copy, for the timeline entry that lands at `expiresAt`.
+ */
+export function buildExpiredWidgetProps(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): Partial<GlanceableViewProps> {
+  return toWidgetProps(
+    buildGlanceableViewProps(
+      { ...snapshot, status: 'expired', running: 0, needsInput: 0, idle: 0, needsInputSince: null },
+      {},
+      translate
+    )
+  );
+}
+
+/**
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).

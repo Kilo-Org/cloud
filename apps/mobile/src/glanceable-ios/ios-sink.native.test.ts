@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive native-adapter suite sharing the ActivityKit mock harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -293,6 +294,74 @@ describe('native adapter terminal privacy', () => {
     });
     expect(native.records.filter(record => record.state === 'active')).toMatchObject([
       { props: { needsInput: 1, running: 0 } },
+    ]);
+    expect(native.records).toHaveLength(2);
+  });
+});
+
+describe('native adapter single card', () => {
+  it('ends every activity it did not adopt, including one a push-to-start created', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    // A remote push-to-start that raced the local start, and a card left behind
+    // by an earlier organization scope. Neither is known to this sink.
+    native.add(JSON.stringify({ running: 2 }));
+    native.add(JSON.stringify({ idle: 5 }));
+    const fresh = snapshot([{ status: 'busy' }, { status: 'question' }], 1);
+    sink.publish(fresh);
+    sink.startOrUpdate(fresh, CTX);
+    await sink.waitForNativeTerminal?.();
+
+    expect(native.records.filter(record => record.state === 'active')).toMatchObject([
+      { props: { running: 1, needsInput: 1 } },
+    ]);
+    expect(native.records).toHaveLength(3);
+    expect(native.ignoredUpdates).toEqual([]);
+  });
+});
+
+describe('native adapter idle window', () => {
+  it('never raises a card for idle-only work', async () => {
+    const sink = await loadSink();
+    const idle = snapshot([{ status: 'idle' }, { status: 'idle' }]);
+    sink.publish(idle);
+    sink.startOrUpdate(idle, CTX);
+    await Promise.resolve();
+
+    expect(native.records).toEqual([]);
+  });
+
+  it('hands ActivityKit the idle dismissal date once every agent goes idle', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }, { status: 'idle' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    expect(firstActivity()).toMatchObject({
+      state: 'ended',
+      dismissAt: NOW + 600_000,
+      props: { running: 0, idle: 1 },
+      policies: ['after'],
+    });
+  });
+
+  it('replaces the idle card when work resumes inside its window', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    const resumed = snapshot([{ status: 'busy' }], 2);
+    sink.publish(resumed);
+    sink.startOrUpdate(resumed, CTX);
+    await sink.waitForNativeTerminal?.();
+
+    expect(firstActivity()).toMatchObject({
+      state: 'dismissed',
+      policies: ['after', 'immediate'],
+    });
+    expect(native.records.filter(record => record.state === 'active')).toMatchObject([
+      { props: { running: 1, idle: 0 } },
     ]);
     expect(native.records).toHaveLength(2);
   });

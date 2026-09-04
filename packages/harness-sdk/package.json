@@ -24,6 +24,7 @@
     "test:e2e:cancel": "ttsx e2e/cancel.ts",
     "test:e2e:image": "ttsx e2e/image.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
+    "test:e2e:reasoning": "ttsx e2e/reasoning.ts",
     "test:e2e:session": "ttsx e2e/session.ts",
     "test:e2e:shapes": "ttsx e2e/shapes.ts",
     "test:perf": "vitest run --config vitest.perf.config.ts",

@@ -177,7 +177,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:image`, `…:cancel`, `…:shapes`, `…:session`, `…:models` |
+| One live run | `pnpm test:e2e:image`, `…:cancel`, `…:reasoning`, `…:shapes`, `…:session`, `…:models` |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
 unit tests: parallel workers compete for the CPU being measured. Its ceilings
@@ -338,6 +338,25 @@ only the socket leaks. The signal assertion is what catches it.
 **What neither run proves:** that the provider stops generating and stops
 charging. Nothing this package can read reports that.
 
+### The thinking, handed back to the provider
+
+`pnpm test:e2e:reasoning` asks a reasoning model two questions in one session,
+so the second request carries the first answer's thinking block. The provider is
+the only judge of whether the block is right, and it answers with a status, not
+with a different answer.
+
+Measured on 2026-09-04 with `anthropic/claude-sonnet-4.5` at `medium` effort:
+363 characters of thinking, one reasoning part stored, a 792 character
+signature, and a second answer that built on the first.
+
+Checked by reversing the signature before sending it:
+
+    400 messages.1.content.0: Invalid `signature` in `thinking` block
+
+So the provider does validate it, and a pass means the block went back intact.
+Pick a model that thinks when changing `KILO_MODEL` — one that does not would
+pass this run vacuously, which is why the run fails when no thinking arrives.
+
 ### Many models, a longer conversation
 
 `pnpm test:e2e:models` holds a five turn conversation with each of the ten most
@@ -497,18 +516,38 @@ prompt builder, and it is the path that matters.
 them. Resuming under a system prompt that differs by one byte drops the whole
 cached prefix, and the only symptom is the bill.
 
-### Reasoning is kept and never sent back
+### Reasoning goes back exactly as it came
 
 A reasoning model's thinking arrives as its own stream event and is stored as
-its own part, ahead of what the model then said. `assemble` drops it.
+its own part, ahead of what the model then said. It is then **sent back
+unchanged** with every later request.
 
-A provider issues a signature with a thinking block and refuses the block when
-it comes back without one. So the reasoning is there for whoever reads the
-session, and never for a prompt. `reasoning.test.ts` holds that: the second call
-of a session carries the answer and not the thinking.
+Do not strip it. The API drops what the target model cannot read and does not
+bill for it, so there are no input tokens to save, and removing a block by hand
+can fail the request on ordering or on its signature. Hand back what the
+provider gave and let the provider decide.
 
-The three shapes name the field differently, and two providers relayed through
-the chat shape disagree with each other, so each is read on its own terms.
+**The signature is the part that matters.** A provider signs the thinking and
+refuses a block whose signature it cannot read, so `TurnPart` carries an opaque
+`signature` and the `parts` table has a column for it. The signature streams on
+its own event, after the thinking and with no text on it. A reasoning part with
+no signature is left out of the prompt: it would only be refused.
+
+**An empty thinking block is still a block.** A provider returns thinking as a
+summary and defaults to no summary at all, so `thinking` is `''` while the model
+thought and was billed. The part is kept whenever there is a signature, never on
+whether there are words. Dropping empty ones would drop every block on the
+default setting.
+
+Only the messages shape replays. The responses shape replays thinking as an
+encrypted reasoning item the request has to ask for, and the chat shape has no
+replay at all, so both leave reasoning out. The three shapes also name the
+thinking field differently, and two providers relayed through the chat shape
+disagree with each other, so each is read on its own terms.
+
+ponytail: one reasoning part per turn. A model interleaves thinking with tool
+calls, so several blocks arrive per turn once this package has tools, and each
+needs its own signature. Give the wire the block boundary then.
 
 ### A dropped stream stops the call
 

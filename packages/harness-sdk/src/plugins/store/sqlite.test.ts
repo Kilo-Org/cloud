@@ -104,12 +104,13 @@ it('refuses a row the schema cannot explain rather than handing it back', async 
       store.append([{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }])
     )
   );
-  db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)').run(
     'prt_1',
     'trn_1',
     session.id,
     'banana',
     'hello',
+    null,
     null
   );
 

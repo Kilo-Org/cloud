@@ -84,6 +84,8 @@ type Answer = Stream.Stream<ModelEvent, ModelError | StoreError>;
 interface Spoken {
   readonly text: Ref.Ref<string>;
   readonly reasoning: Ref.Ref<string>;
+  /** Empty when the shape issues none, or when the model did not think. */
+  readonly signature: Ref.Ref<string>;
 }
 
 /** One question and the answer it is waiting for. */
@@ -96,18 +98,39 @@ interface Exchange {
   readonly before: Session;
 }
 
+/** What the model thought, if it thought at all, in the order it produced it. */
+interface Thought {
+  readonly body: string;
+  readonly signature: string;
+}
+
 /**
- * The reasoning comes first, in the order the model produced it, and only when
- * there was any. The text part is always there: an answer of no words is still
- * an answer, and a turn with no text would shorten the prompt that follows.
+ * The reasoning comes first, in the order the model produced it. It is kept
+ * whenever there is a signature, even with no words: a provider that returns
+ * the thinking as a summary defaults to no summary at all, so the block is
+ * empty and still has to go back exactly as it came.
+ *
+ * The text part is always there: an answer of no words is still an answer, and
+ * a turn with no text would shorten the prompt that follows.
+ *
+ * ponytail: one reasoning part per turn. A model interleaves thinking with tool
+ * calls, so several blocks per turn arrive once this package has tools, and
+ * each needs its own signature. Give the wire the block boundary then.
  */
-const partsSaid = (said: string, thought: string): readonly PartDraft[] =>
-  thought === ''
-    ? [{ kind: 'text', body: said }]
-    : [
-        { kind: 'reasoning', body: thought },
-        { kind: 'text', body: said },
-      ];
+const partsSaid = (said: string, thought: Thought): readonly PartDraft[] => {
+  const answer: PartDraft = { kind: 'text', body: said };
+  if (thought.body === '' && thought.signature === '') {
+    return [answer];
+  }
+  return [
+    {
+      kind: 'reasoning',
+      body: thought.body,
+      ...(thought.signature === '' ? {} : { signature: thought.signature }),
+    },
+    answer,
+  ];
+};
 
 /**
  * Writes the whole exchange and adds this call's counts to the session's. The
@@ -121,13 +144,14 @@ const finish = (
 ): Effect.Effect<void, StoreError> =>
   Effect.all({
     said: Ref.get(exchange.spoken.text),
-    thought: Ref.get(exchange.spoken.reasoning),
+    body: Ref.get(exchange.spoken.reasoning),
+    signature: Ref.get(exchange.spoken.signature),
   }).pipe(
-    Effect.flatMap(({ said, thought }) =>
+    Effect.flatMap(({ said, body, signature }) =>
       makeTurn(wiring.entropy, {
         sessionId: wiring.id,
         role: 'assistant',
-        parts: partsSaid(said, thought),
+        parts: partsSaid(said, { body, signature }),
       })
     ),
     Effect.tap(answer => remember(wiring, answer)),
@@ -136,6 +160,20 @@ const finish = (
     ),
     Effect.zipRight(Ref.set(exchange.answered, true)),
     Effect.zipRight(Ref.update(wiring.totals, held => add(held, usage)))
+  );
+
+/**
+ * Collects one thinking event. The text and the signature arrive on separate
+ * events, so each is kept where it belongs.
+ */
+const thinking = (
+  spoken: Spoken,
+  event: Extract<ModelEvent, { kind: 'reasoning' }>
+): Effect.Effect<void> =>
+  Ref.update(spoken.reasoning, held => held + event.text).pipe(
+    Effect.zipRight(
+      event.signature === undefined ? Effect.void : Ref.set(spoken.signature, event.signature)
+    )
   );
 
 /**
@@ -170,7 +208,11 @@ const answerOf = (
         role: 'user',
         parts: partsOf(input),
       }),
-      spoken: { text: yield* Ref.make(''), reasoning: yield* Ref.make('') },
+      spoken: {
+        text: yield* Ref.make(''),
+        reasoning: yield* Ref.make(''),
+        signature: yield* Ref.make(''),
+      },
       answered: yield* Ref.make(false),
     };
     yield* remember(wiring, exchange.question);
@@ -193,7 +235,7 @@ const answerOf = (
               return Ref.update(exchange.spoken.text, held => held + event.text);
             }
             case 'reasoning': {
-              return Ref.update(exchange.spoken.reasoning, held => held + event.text);
+              return thinking(exchange.spoken, event);
             }
             case 'done': {
               return finish(wiring, exchange, event.usage);

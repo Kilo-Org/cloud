@@ -19,6 +19,8 @@ const migrations: readonly (readonly string[])[] = [
     'CREATE INDEX `parts_session_id_id` ON `parts` (`session_id`,`id`);',
     'ALTER TABLE `turns` DROP COLUMN `content`;',
   ],
+  /* 0002_bent_susan_delgado */
+  ['ALTER TABLE `parts` ADD `signature` text;'],
 ];
 
 export { migrations };

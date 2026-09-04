@@ -16,11 +16,24 @@ type ResponsesBody = OpenAI.Responses.ResponseCreateParams;
 /**
  * This shape has no cache breakpoint, so a part carries no mark. An image goes
  * as a data URI, which is the only way this shape takes bytes.
+ *
+ * Reasoning is left out. This shape replays thinking as a reasoning item with
+ * the provider's encrypted content, which the request has to ask for and which
+ * this package does not read, so there is nothing here that could be sent back.
  */
-const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent =>
-  part.kind === 'text'
-    ? { type: 'input_text', text: part.text }
-    : { type: 'input_image', image_url: dataUri(part), detail: 'auto' };
+const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent | undefined => {
+  switch (part.kind) {
+    case 'text': {
+      return { type: 'input_text', text: part.text };
+    }
+    case 'image': {
+      return { type: 'input_image', image_url: dataUri(part), detail: 'auto' };
+    }
+    case 'reasoning': {
+      return undefined;
+    }
+  }
+};
 
 const toBody = ({
   prompt,
@@ -38,7 +51,7 @@ const toBody = ({
   ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
   input: prompt.messages.map(message => ({
     role: message.role,
-    content: message.parts.map(renderPart),
+    content: message.parts.map(renderPart).filter(part => part !== undefined),
   })),
 });
 

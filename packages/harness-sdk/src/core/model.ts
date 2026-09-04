@@ -53,12 +53,15 @@ class ModelError extends Data.TaggedError('harness/ModelError')<{
  * One piece of a streamed reply. The last event of a stream is always `done`.
  *
  * `reasoning` is the model thinking aloud. It is a separate kind because it is
- * not the answer: a caller may show it, and the package stores it, but it never
- * goes back into a prompt.
+ * not the answer: a caller shows it apart from the answer, or not at all.
+ *
+ * The signature arrives on its own `reasoning` event, after the thinking and
+ * with no text, because that is how the provider streams it. A shape that
+ * issues no signature sends none, and that thinking cannot be replayed.
  */
 type ModelEvent =
   | { readonly kind: 'delta'; readonly text: string }
-  | { readonly kind: 'reasoning'; readonly text: string }
+  | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
   | { readonly kind: 'done'; readonly usage: ModelUsage };
 
 const zeroUsage: ModelUsage = {

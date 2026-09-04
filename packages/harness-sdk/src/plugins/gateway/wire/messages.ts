@@ -7,7 +7,10 @@ import type { Wire, WirePart } from './wire.js';
 import { type Counts, set, type TokenCount } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
-type ContentBlock = Anthropic.TextBlockParam | Anthropic.ImageBlockParam;
+type ContentBlock =
+  | Anthropic.TextBlockParam
+  | Anthropic.ImageBlockParam
+  | Anthropic.ThinkingBlockParam;
 type MessagesBody = Anthropic.MessageCreateParams;
 type MediaType = Anthropic.Base64ImageSource['media_type'];
 
@@ -29,14 +32,39 @@ const imageBlock = (media: string, data: string, cache: boolean): ContentBlock =
   return cache ? { type: 'image', source, cache_control: ephemeral } : { type: 'image', source };
 };
 
-const renderPart = (part: PromptPart, cache: boolean): ContentBlock =>
-  part.kind === 'text' ? textBlock(part.text, cache) : imageBlock(part.media, part.data, cache);
+/**
+ * A thinking block goes back exactly as it came, so it carries no breakpoint of
+ * its own: a `cache_control` this package added would be a change to the block.
+ */
+const thinkingBlock = (text: string, signature: string): Anthropic.ThinkingBlockParam => ({
+  type: 'thinking',
+  thinking: text,
+  signature,
+});
+
+const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined => {
+  switch (part.kind) {
+    case 'text': {
+      return textBlock(part.text, cache);
+    }
+    case 'image': {
+      return imageBlock(part.media, part.data, cache);
+    }
+    case 'reasoning': {
+      /* Without a signature the provider refuses the block, so it is left out
+         rather than sent and rejected. */
+      return part.signature === undefined ? undefined : thinkingBlock(part.text, part.signature);
+    }
+  }
+};
 
 const renderMessage = (
   message: PromptMessage
 ): { role: 'user' | 'assistant'; content: ContentBlock[] } => ({
   role: message.role,
-  content: message.parts.map((part, index) => renderPart(part, isLast(message, index))),
+  content: message.parts
+    .map((part, index) => renderPart(part, isLast(message, index)))
+    .filter(block => block !== undefined),
 });
 
 const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): MessagesBody => ({
@@ -79,6 +107,14 @@ interface ThinkingEvent {
   delta: { thinking: string };
 }
 
+/**
+ * The signature closes a thinking block. It arrives on its own event, with no
+ * thinking on it, so it is read on its own and never mixed into the text.
+ */
+interface SignatureEvent {
+  delta: { signature: string };
+}
+
 interface UsageEvent {
   usage: WireUsage;
 }
@@ -92,6 +128,7 @@ interface StartEvent {
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isThinking = createIs<ThinkingEvent>();
+const isSignature = createIs<SignatureEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStart = createIs<StartEvent>();
 
@@ -112,7 +149,12 @@ const toDelta = (event: unknown): WirePart | undefined => {
   if (isDelta(event)) {
     return { kind: 'delta', text: event.delta.text };
   }
-  return isThinking(event) ? { kind: 'reasoning', text: event.delta.thinking } : undefined;
+  if (isThinking(event)) {
+    return { kind: 'reasoning', text: event.delta.thinking };
+  }
+  return isSignature(event)
+    ? { kind: 'reasoning', text: '', signature: event.delta.signature }
+    : undefined;
 };
 
 const readUsage = (usage: WireUsage): Partial<ModelUsage> => {

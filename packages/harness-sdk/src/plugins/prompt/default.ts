@@ -10,9 +10,10 @@ import type { TurnPart } from '../../core/turn.js';
 /**
  * Maps one turn part onto what the transport sends.
  *
- * Reasoning is dropped. A provider issues a signature with a thinking block and
- * rejects the block when it comes back without one, so the package keeps the
- * reasoning for whoever reads the session and never puts it in a prompt.
+ * Reasoning goes back out with the rest. The provider drops what the model
+ * cannot read and does not bill for it, and a block removed by hand can fail
+ * the request on ordering or on its signature, so the package hands back what
+ * it was given and lets the provider decide.
  */
 const renderPart = (part: TurnPart): readonly PromptPart[] => {
   switch (part.kind) {
@@ -23,7 +24,13 @@ const renderPart = (part: TurnPart): readonly PromptPart[] => {
       return [{ kind: 'image', media: part.media, data: part.body }];
     }
     case 'reasoning': {
-      return [];
+      return [
+        {
+          kind: 'reasoning',
+          text: part.body,
+          ...(part.signature === undefined ? {} : { signature: part.signature }),
+        },
+      ];
     }
   }
 };

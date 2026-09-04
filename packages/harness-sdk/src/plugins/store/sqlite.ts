@@ -59,6 +59,7 @@ interface PartRow {
   readonly kind: TurnPart['kind'];
   readonly body: string;
   readonly media: string | null;
+  readonly signature: string | null;
 }
 
 const assertSessions = createAssert<readonly SessionRow[]>();
@@ -71,6 +72,14 @@ const assertParts = createAssert<readonly PartRow[]>();
  * rather than repaired.
  */
 const asPart = (row: PartRow): TurnPart => {
+  if (row.kind === 'reasoning') {
+    return {
+      id: row.id,
+      kind: 'reasoning',
+      body: row.body,
+      ...(row.signature === null ? {} : { signature: row.signature }),
+    };
+  }
   if (row.kind !== 'image') {
     return { id: row.id, kind: row.kind, body: row.body };
   }
@@ -165,7 +174,7 @@ const migrate = async (driver: SqlDriver): Promise<void> => {
 
 type Db = ReturnType<typeof drizzle>;
 
-/** One part, as its row. */
+/** One part, as its row. Only the kind that has a column fills it. */
 const partRow = (turn: Turn, part: TurnPart) => ({
   id: part.id,
   turnId: turn.id,
@@ -173,6 +182,9 @@ const partRow = (turn: Turn, part: TurnPart) => ({
   kind: part.kind,
   body: part.body,
   ...(part.kind === 'image' ? { media: part.media } : {}),
+  ...(part.kind === 'reasoning' && part.signature !== undefined
+    ? { signature: part.signature }
+    : {}),
 });
 
 /**

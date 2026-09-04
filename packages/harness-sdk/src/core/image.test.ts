@@ -73,8 +73,8 @@ it('refuses to load an image row that names no media type', async () => {
           yield* store.create(session);
           yield* store.append([{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }]);
           database
-            .prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?)')
-            .run('prt_1', 'trn_1', session.id, 'image', pixel, null);
+            .prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .run('prt_1', 'trn_1', session.id, 'image', pixel, null, null);
           return yield* Effect.flip(store.load(session.id));
         })
       ),
@@ -86,13 +86,13 @@ it('refuses to load an image row that names no media type', async () => {
   expect(String(failed.cause)).toContain('names no media type');
 });
 
-it('puts the image in the prompt beside the text, and the reasoning nowhere', () => {
+it('puts every part of the turn in the prompt, in the order it arrived', () => {
   const turn = Effect.runSync(
     makeTurn(entropy, {
       sessionId: session.id,
       role: 'assistant',
       parts: [
-        { kind: 'reasoning', body: 'thinking about it' },
+        { kind: 'reasoning', body: 'thinking about it', signature: 'sig' },
         { kind: 'text', body: 'a picture' },
         { kind: 'image', body: pixel, media: 'image/png' },
       ],
@@ -101,9 +101,11 @@ it('puts the image in the prompt beside the text, and the reasoning nowhere', ()
 
   const prompt = assemble({ system: 'sys', turns: Chunk.of(turn) });
 
-  /* Reasoning is dropped: a thinking block sent back without the signature the
-     provider issued is refused, so it is kept for the reader only. */
+  /* The reasoning goes back with the rest. The provider drops what the model
+     cannot read and does not bill for it, and a block removed by hand can fail
+     the request on its ordering or on its signature. */
   expect(prompt.messages[0]?.parts).toEqual([
+    { kind: 'reasoning', text: 'thinking about it', signature: 'sig' },
     { kind: 'text', text: 'a picture' },
     { kind: 'image', media: 'image/png', data: pixel },
   ]);

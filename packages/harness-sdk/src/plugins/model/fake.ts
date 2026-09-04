@@ -20,6 +20,8 @@ interface FakeReply {
   readonly reasoning?: readonly string[];
   readonly usage?: Partial<ModelUsage>;
   readonly fail?: ModelError;
+  /** Closes the thinking, the way a provider does, on its own event. */
+  readonly signature?: string;
   /** Never reaches `done`, so a test can interrupt the stream part way. */
   readonly stall?: boolean;
 }
@@ -41,6 +43,9 @@ const fakeModel = (
     const reply = nextReply(request);
     const deltas = Stream.fromIterable([
       ...(reply.reasoning ?? []).map((text): ModelEvent => ({ kind: 'reasoning', text })),
+      ...(reply.signature === undefined
+        ? []
+        : [{ kind: 'reasoning', text: '', signature: reply.signature } as ModelEvent]),
       ...reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text })),
     ]);
     const done = Stream.succeed<ModelEvent>({

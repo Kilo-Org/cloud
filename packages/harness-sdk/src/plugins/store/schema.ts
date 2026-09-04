@@ -55,7 +55,10 @@ const turns = sqliteTable(
  *
  * `body` is the only payload column, because every kind has exactly one payload
  * — the text, the reasoning, or the base64 of the image. `media` names the
- * media type and is empty for everything but an image.
+ * media type and is empty for everything but an image. `signature` is what the
+ * provider issued with a thinking block and reads back to know the thinking is
+ * its own; it is empty for everything but reasoning, and for reasoning from a
+ * shape that issues none.
  */
 const parts = sqliteTable(
   'parts',
@@ -70,6 +73,7 @@ const parts = sqliteTable(
     kind: text('kind', { enum: ['text', 'reasoning', 'image'] }).notNull(),
     body: text('body').notNull(),
     media: text('media'),
+    signature: text('signature'),
   },
   table => [index('parts_session_id_id').on(table.sessionId, table.id)]
 );

@@ -1,9 +1,15 @@
 import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
 
-/** What one streamed event says, when it says anything. */
+/**
+ * What one streamed event says, when it says anything.
+ *
+ * A signature arrives on its own event, after the thinking and with no text,
+ * because that is how a provider streams it.
+ */
 interface WirePart {
   readonly kind: 'delta' | 'reasoning';
   readonly text: string;
+  readonly signature?: string;
 }
 
 /**

@@ -126,7 +126,13 @@ const streamWith = (
           Stream.mapConcat(chunk => read(chunk)),
           Stream.mapEffect(data => eventsOf(wire, usage, data)),
           Stream.filterMap(part => part),
-          Stream.map((part): ModelEvent => ({ kind: part.kind, text: part.text })),
+          Stream.map(
+            (part): ModelEvent => ({
+              kind: part.kind,
+              text: part.text,
+              ...(part.signature === undefined ? {} : { signature: part.signature }),
+            })
+          ),
           Stream.concat(
             Stream.fromEffect(Ref.get(usage)).pipe(
               Stream.map((counts): ModelEvent => ({ kind: 'done', usage: counts }))

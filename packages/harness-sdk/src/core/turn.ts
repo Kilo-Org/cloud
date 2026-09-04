@@ -13,7 +13,18 @@ import { makeId } from './id.js';
  */
 type TurnPart =
   | { readonly id: string; readonly kind: 'text'; readonly body: string }
-  | { readonly id: string; readonly kind: 'reasoning'; readonly body: string }
+  | {
+      readonly id: string;
+      readonly kind: 'reasoning';
+      readonly body: string;
+      /**
+       * What the provider issued with the thinking, and reads back to know the
+       * thinking is its own. It is opaque: nothing here parses it or builds
+       * one. A reasoning part without it cannot be replayed, so the shape that
+       * renders the prompt leaves it out.
+       */
+      readonly signature?: string;
+    }
   | {
       readonly id: string;
       readonly kind: 'image';
@@ -25,7 +36,7 @@ type TurnPart =
 /** A part before it has an identifier. */
 type PartDraft =
   | { readonly kind: 'text'; readonly body: string }
-  | { readonly kind: 'reasoning'; readonly body: string }
+  | { readonly kind: 'reasoning'; readonly body: string; readonly signature?: string }
   | { readonly kind: 'image'; readonly body: string; readonly media: string };
 
 /**
@@ -71,10 +82,23 @@ const textOf = (turn: Turn): string =>
     .join('');
 
 /** A part without its identifier, so a copy of it becomes a part of its own. */
-const draftOf = (part: TurnPart): PartDraft =>
-  part.kind === 'image'
-    ? { kind: 'image', body: part.body, media: part.media }
-    : { kind: part.kind, body: part.body };
+const draftOf = (part: TurnPart): PartDraft => {
+  switch (part.kind) {
+    case 'image': {
+      return { kind: 'image', body: part.body, media: part.media };
+    }
+    case 'reasoning': {
+      return {
+        kind: 'reasoning',
+        body: part.body,
+        ...(part.signature === undefined ? {} : { signature: part.signature }),
+      };
+    }
+    case 'text': {
+      return { kind: 'text', body: part.body };
+    }
+  }
+};
 
 /** What a caller means by a bare string: one turn of one text part. */
 const partsOf = (input: string | readonly PartDraft[]): readonly PartDraft[] =>

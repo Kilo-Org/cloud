@@ -38,21 +38,35 @@ const ephemeral: Ephemeral = { type: 'ephemeral' };
 const block = (text: string, cache: boolean): ContentBlock =>
   cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
 
-const renderPart = (part: PromptPart, cache: boolean): ContentBlock => {
-  if (part.kind === 'text') {
-    return block(part.text, cache);
+/**
+ * Reasoning is left out. Providers relayed through this shape report their
+ * thinking under two different field names and neither takes it back, so there
+ * is no block this shape could replay.
+ */
+const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined => {
+  switch (part.kind) {
+    case 'text': {
+      return block(part.text, cache);
+    }
+    case 'image': {
+      const image_url = { url: dataUri(part) };
+      return cache
+        ? { type: 'image_url', image_url, cache_control: ephemeral }
+        : { type: 'image_url', image_url };
+    }
+    case 'reasoning': {
+      return undefined;
+    }
   }
-  const image_url = { url: dataUri(part) };
-  return cache
-    ? { type: 'image_url', image_url, cache_control: ephemeral }
-    : { type: 'image_url', image_url };
 };
 
 const renderMessage = (
   message: PromptMessage
 ): { role: 'user' | 'assistant'; content: readonly ContentBlock[] } => ({
   role: message.role,
-  content: message.parts.map((part, index) => renderPart(part, isLast(message, index))),
+  content: message.parts
+    .map((part, index) => renderPart(part, isLast(message, index)))
+    .filter(part => part !== undefined),
 });
 
 const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): CompletionsBody => ({

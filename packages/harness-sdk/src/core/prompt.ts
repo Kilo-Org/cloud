@@ -11,13 +11,17 @@ interface PromptBlock {
 }
 
 /**
- * One piece of a message, as the transport plugin will render it. A turn's
- * reasoning never becomes one of these: a thinking block sent back without the
- * signature the provider issued is rejected, so reasoning is kept for the
- * reader and left out of the prompt.
+ * One piece of a message, as the transport plugin will render it.
+ *
+ * Reasoning is here, and it goes back to the provider unchanged. Stripping it
+ * saves nothing — the API drops what the model cannot read, unbilled — and
+ * removing a block can fail the request on ordering or on the signature. A
+ * reasoning part with no signature cannot be replayed at all, so the shape
+ * leaves that one out.
  */
 type PromptPart =
   | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
   | { readonly kind: 'image'; readonly media: string; readonly data: string };
 
 /** `cache` marks the breakpoint, which belongs to the message, not to a part. */

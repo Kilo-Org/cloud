@@ -54,6 +54,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerGitlab',
   'profile.providerGoogle',
   'profile.providerLinkedin',
+  'consent.kilo',
   'tabs.kiloclaw',
   'tabs.kiloclawWrapped',
   'kiloclaw.title',

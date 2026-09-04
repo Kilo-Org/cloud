@@ -60,6 +60,8 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const nativeResourceTokensKey = 'NATIVE_RESOURCE_TOKENS_ENABLED';
 const originalNativeResourceTokens = process.env[nativeResourceTokensKey];
+const sharedResourceTokensKey = 'SHARED_RESOURCE_TOKENS_ENABLED';
+const originalSharedResourceTokens = process.env[sharedResourceTokensKey];
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockReserveSignInCode = jest.mocked(reserveSignInCode);
@@ -80,6 +82,7 @@ function request(body: unknown, userAgent: string) {
 
 function setNativeResourceTokens(enabled: boolean) {
   process.env[nativeResourceTokensKey] = String(enabled);
+  process.env[sharedResourceTokensKey] = String(enabled);
 }
 
 function verifyAccessToken(token: string, userId: string, sessionId: string, audience: string) {
@@ -116,6 +119,11 @@ afterEach(() => {
     delete process.env[nativeResourceTokensKey];
   } else {
     process.env[nativeResourceTokensKey] = originalNativeResourceTokens;
+  }
+  if (originalSharedResourceTokens === undefined) {
+    delete process.env[sharedResourceTokensKey];
+  } else {
+    process.env[sharedResourceTokensKey] = originalSharedResourceTokens;
   }
 });
 

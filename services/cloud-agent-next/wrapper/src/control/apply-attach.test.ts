@@ -1556,7 +1556,7 @@ describe('applySessionAttach', () => {
     const grant = { ...kilo, targets: { ...kilo.targets } };
     const attaching = applySessionAttach(
       identity,
-      { kilo: grant },
+      { kilo: grant, runtimeIsolation: 'per-session' },
       {
         ...noFs,
         kiloRuntimes: runtimes,
@@ -1580,7 +1580,9 @@ describe('applySessionAttach', () => {
       grant.token = 'mutated-guest';
       grant.targets.sessionIngestBaseUrl = 'https://other.example.test';
       const deps = { ...noFs, kiloRuntimes: runtimes };
-      expect(await applySessionAttach(sibling, { kilo: grant }, deps)).toMatchObject({ ok: true });
+      expect(
+        await applySessionAttach(sibling, { kilo: grant, runtimeIsolation: 'per-session' }, deps)
+      ).toMatchObject({ ok: true });
       const siblingRuntime = runtimes.get(sibling);
       expect(siblingRuntime).toBeDefined();
       expect(siblingRuntime).not.toBe(runtime);

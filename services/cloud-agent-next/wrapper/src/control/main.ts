@@ -65,8 +65,8 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       });
       if (
         !identity?.rootKiloSessionId ||
-        runtime.identity === undefined ||
-        identity.rootKiloSessionId !== runtime.identity.kiloSessionId
+        (runtime.isolation === 'per-session' &&
+          identity.rootKiloSessionId !== runtime.identity.kiloSessionId)
       )
         return;
       updateSessionSnapshots(event, deps.sessions);

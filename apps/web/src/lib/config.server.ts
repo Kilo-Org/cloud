@@ -64,7 +64,10 @@ export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }
 export function isNativeResourceCredentialIssuanceEnabled(): boolean {
-  return getEnvVariable('NATIVE_RESOURCE_TOKENS_ENABLED') === 'true';
+  return (
+    getEnvVariable('NATIVE_RESOURCE_TOKENS_ENABLED') === 'true' &&
+    isSharedResourceTokenIssuanceEnabled()
+  );
 }
 export function isSharedResourceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('SHARED_RESOURCE_TOKENS_ENABLED') === 'true';

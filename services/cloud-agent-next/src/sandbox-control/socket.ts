@@ -227,6 +227,7 @@ function readConnectionIdentity(
     providerInstanceId: attachment.providerInstanceId,
     ...(attachment.recoveryCapable ? { recoveryCapable: true } : {}),
     ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
+    ...(attachment.runtimeIsolation ? { runtimeIsolation: true } : {}),
   };
 }
 
@@ -546,6 +547,7 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: identity.providerInstanceId,
           ...(payload.capabilities ? { capabilities: payload.capabilities } : {}),
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          ...(identity.runtimeIsolation ? { runtimeIsolation: true } : {}),
         };
         const superseded: WebSocket[] = [];
         let replaced = false;

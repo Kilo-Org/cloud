@@ -897,6 +897,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
+  runtimeIsolation: z.literal(true).optional(),
   observation: sandboxControlObservationSchema.optional(),
 });
 

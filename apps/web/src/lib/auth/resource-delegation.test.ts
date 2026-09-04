@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { device_sessions, kilocode_users } from '@kilocode/db/schema';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 
@@ -182,6 +182,63 @@ describe('resource delegation authority', () => {
     await expect(
       createControlTokenForRequest(current, 'wasteland', { headers: bearer(modernToken(current)) })
     ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+  });
+
+  test('continues bounded control issuance for an active modern device after shared rollout rollback', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'resource-delegation-test' })
+      .returning({ id: device_sessions.id });
+    const headers = bearer(
+      modernToken(current, {
+        purpose: 'device-access',
+        exchange: false,
+        deviceSessionId: session.id,
+      })
+    );
+
+    const active = await createControlTokenForRequest(current, 'cloud-agent-next', { headers });
+    expect(jwt.verify(active.token, secret)).toMatchObject({
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'device-access',
+      credentialExchange: false,
+      deviceSessionId: session.id,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+
+    shared.enabled = false;
+    const rollback = await createControlTokenForRequest(current, 'gastown', { headers });
+    const claims = jwt.verify(rollback.token, secret) as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      aud: 'gastown',
+      tokenPurpose: 'device-access',
+      credentialExchange: false,
+      deviceSessionId: session.id,
+      runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+    expect(claims.exp! - claims.iat!).toBeLessThanOrEqual(1800);
+
+    const rotatedPepper = crypto.randomUUID();
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: rotatedPepper })
+      .where(eq(kilocode_users.id, current.id));
+    await expect(createControlTokenForRequest(current, 'wasteland', { headers })).rejects.toThrow(
+      'Unauthorized resource delegation request'
+    );
+    await db
+      .update(kilocode_users)
+      .set({ api_token_pepper: current.api_token_pepper })
+      .where(eq(kilocode_users.id, current.id));
+
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'test' })
+      .where(eq(device_sessions.id, session.id));
+    await expect(createControlTokenForRequest(current, 'wasteland', { headers })).rejects.toThrow(
+      'Unauthorized resource delegation request'
+    );
   });
 
   test('mints a non-exchangeable delegated token for exactly the selected audience', async () => {

@@ -29,6 +29,7 @@ import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-cont
 import { createWorktreeFeed, type KiloFeedEvent, type WorktreeFeed } from './worktree-feed.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
+type RuntimeIsolation = 'directory-shared' | 'per-session';
 
 type WorktreeKiloFailure = {
   retirementId: string;
@@ -41,6 +42,7 @@ type WorktreeKiloFailure = {
 
 export type WorktreeKiloRuntime = {
   readonly identity: SessionRequestIdentity;
+  readonly isolation?: RuntimeIsolation;
   readonly scopeId: string;
   readonly runtimeId: string;
   readonly directory: string;
@@ -106,6 +108,7 @@ type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
 
 type RuntimeEntry = {
   identity: SessionRequestIdentity;
+  isolation: RuntimeIsolation;
   kilo: WorktreeKiloAuth;
   directory: string;
   env: Record<string, string>;
@@ -353,6 +356,9 @@ export function createWorktreeKiloRuntimes(options: {
   const identityKey = (identity: SessionRequestIdentity): string =>
     `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
 
+  const entryKey = (identity: SessionRequestIdentity, isolation: RuntimeIsolation): string =>
+    isolation === 'per-session' ? identityKey(identity) : identity.directory;
+
   function findRoot(identity: SessionRequestIdentity): RootAttachment | undefined {
     return roots.get(identityKey(identity));
   }
@@ -506,6 +512,7 @@ export function createWorktreeKiloRuntimes(options: {
       entry.kiloClient = runtimeKiloClient;
       const runtime: WorktreeKiloRuntime = entry.runtime ?? {
         identity: { ...entry.identity },
+        isolation: entry.isolation,
         scopeId: entry.kilo.scopeId,
         get runtimeId() {
           return entry.runtimeId;
@@ -738,7 +745,7 @@ export function createWorktreeKiloRuntimes(options: {
       }
       if (!entry) {
         const homeId = createHash('sha256')
-          .update(key)
+          .update(isolation === 'per-session' ? key : kilo.scopeId)
           .update('\0')
           .update(directory)
           .digest('hex');
@@ -748,6 +755,7 @@ export function createWorktreeKiloRuntimes(options: {
         );
         entry = {
           identity: { ...identity },
+          isolation,
           kilo: { ...kilo, targets: { ...kilo.targets } },
           directory,
           env: buildWorktreeKiloEnvironment(
@@ -778,7 +786,7 @@ export function createWorktreeKiloRuntimes(options: {
           attached: false,
           pending: new Set(),
         };
-        roots.set(key, root);
+        roots.set(identityKey(identity), root);
         entry.roots.add(root);
         rememberAttachedRoot(identity.kiloSessionId, directory);
       }
@@ -891,7 +899,8 @@ export function createWorktreeKiloRuntimes(options: {
     isCurrent(runtime) {
       return (
         !closed &&
-        entries.get(identityKey(runtime.identity))?.runtime === runtime &&
+        entries.get(entryKey(runtime.identity, runtime.isolation ?? 'directory-shared'))
+          ?.runtime === runtime &&
         !runtime.signal.aborted
       );
     },

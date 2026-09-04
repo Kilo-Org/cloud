@@ -46,6 +46,7 @@ export type ResourceDelegationAuthority = {
   organizationId?: string;
   audience?: string | string[];
   tokenSource?: string;
+  deviceSessionId?: string;
   isModern: boolean;
   runtimeAdmission: RuntimeAdmission;
 };
@@ -277,6 +278,7 @@ export async function getResourceDelegationAuthority(
       organizationId: claims.organizationId,
       audience: claims.aud,
       tokenSource: claims.tokenSource,
+      deviceSessionId: claims.deviceSessionId,
       isModern: true,
       runtimeAdmission: {
         source: 'user',
@@ -321,6 +323,51 @@ export async function isModernResourceDelegationRequest(requestHeaders: Headers)
   return verified.claims.tokenPurpose !== undefined;
 }
 
+async function createModernControlToken(
+  authority: ResourceDelegationAuthority,
+  resource: ControlResource,
+  options?: CreateControlTokenOptions
+): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const now = Math.floor(Date.now() / 1000);
+  const requested = options?.expiresIn ?? ONE_HOUR_SECONDS;
+  const expiresIn = Math.min(
+    requested,
+    ONE_HOUR_SECONDS,
+    authority.expiresAt ? authority.expiresAt - now : requested
+  );
+  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  const memberships =
+    resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
+  const payload = buildModernKiloTokenPayload({
+    userId: authority.user.id,
+    pepper: authority.user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: resourceAudience(resource),
+    issuedAt: now,
+    expiresAt: now + expiresIn,
+    tokenPurpose: authority.credentialKind,
+    credentialExchange: false,
+    extra: {
+      organizationId: options?.organizationId ?? authority.organizationId,
+      tokenSource: options?.tokenSource ?? authority.tokenSource,
+      deviceSessionId: authority.deviceSessionId,
+      botId: options?.extra?.botId,
+      createdOnPlatform: options?.extra?.createdOnPlatform,
+      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
+      gastownAccess: options?.extra?.gastownAccess,
+      orgMemberships: memberships,
+      ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
+    },
+  });
+  const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
+  return {
+    token,
+    expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
+    user: authority.user,
+    tokenSource: options?.tokenSource ?? authority.tokenSource,
+  };
+}
+
 export async function createControlTokenForRequest(
   user: User,
   resource: ControlResource,
@@ -332,6 +379,9 @@ export async function createControlTokenForRequest(
   }
   if (!isSharedResourceTokenIssuanceEnabled()) {
     if (authority.isModern) {
+      if (authority.credentialKind === 'device-access' && authority.deviceSessionId) {
+        return await createModernControlToken(authority, resource, options);
+      }
       throw new TypedResourceDelegationError(
         503,
         'MIGRATION_UNAVAILABLE',
@@ -362,43 +412,7 @@ export async function createControlTokenForRequest(
       tokenSource: options?.tokenSource,
     };
   }
-  const now = Math.floor(Date.now() / 1000);
-  const requested = options?.expiresIn ?? ONE_HOUR_SECONDS;
-  const expiresIn = Math.min(
-    requested,
-    ONE_HOUR_SECONDS,
-    authority.expiresAt ? authority.expiresAt - now : requested
-  );
-  if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
-  const memberships =
-    resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
-  const payload = buildModernKiloTokenPayload({
-    userId: authority.user.id,
-    pepper: authority.user.api_token_pepper,
-    env: process.env.NODE_ENV,
-    audience: resourceAudience(resource),
-    issuedAt: now,
-    expiresAt: now + expiresIn,
-    tokenPurpose: authority.credentialKind,
-    credentialExchange: false,
-    extra: {
-      organizationId: options?.organizationId ?? authority.organizationId,
-      tokenSource: options?.tokenSource ?? authority.tokenSource,
-      botId: options?.extra?.botId,
-      createdOnPlatform: options?.extra?.createdOnPlatform,
-      isAdmin: options?.extra?.isAdmin === true && authority.user.is_admin,
-      gastownAccess: options?.extra?.gastownAccess,
-      orgMemberships: memberships,
-      ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
-    },
-  });
-  const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
-  return {
-    token,
-    expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
-    user: authority.user,
-    tokenSource: options?.tokenSource ?? authority.tokenSource,
-  };
+  return await createModernControlToken(authority, resource, options);
 }
 
 export async function createDelegatedResourceToken(

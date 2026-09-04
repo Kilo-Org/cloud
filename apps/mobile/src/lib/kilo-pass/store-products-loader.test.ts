@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  getAuthoredProductsErrorMessage,
+  KiloPassProductsError,
   loadAppStoreKiloPassProducts,
   NO_MATCHING_KILO_PASS_PRODUCTS_KEY,
+  NO_MATCHING_KILO_PASS_PRODUCTS_PLAY_KEY,
 } from './store-products-loader';
 import { type BackendStoreKiloPassProduct } from './store-products';
 import { i18n } from '@/i18n';
@@ -40,6 +43,7 @@ describe('loadAppStoreKiloPassProducts', () => {
     ]);
 
     const products = await loadAppStoreKiloPassProducts({
+      storefront: 'app_store',
       fetchStoreProducts,
       loadBackendProducts: vi.fn().mockResolvedValue({
         appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
@@ -63,6 +67,7 @@ describe('loadAppStoreKiloPassProducts', () => {
   it('throws the empty App Store message after the store fetch returns no matching products', async () => {
     await expect(
       loadAppStoreKiloPassProducts({
+        storefront: 'app_store',
         fetchStoreProducts: vi.fn().mockResolvedValue([]),
         loadBackendProducts: vi.fn().mockResolvedValue({
           appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
@@ -70,5 +75,57 @@ describe('loadAppStoreKiloPassProducts', () => {
         }),
       })
     ).rejects.toThrow(i18n.t(NO_MATCHING_KILO_PASS_PRODUCTS_KEY));
+  });
+
+  it('throws the empty Google Play message after the store fetch returns no matching products', async () => {
+    await expect(
+      loadAppStoreKiloPassProducts({
+        storefront: 'play',
+        fetchStoreProducts: vi.fn().mockResolvedValue([]),
+        loadBackendProducts: vi.fn().mockResolvedValue({
+          appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+          products: backendProducts,
+        }),
+      })
+    ).rejects.toThrow(i18n.t(NO_MATCHING_KILO_PASS_PRODUCTS_PLAY_KEY));
+  });
+
+  it('fetches Google product ids for the Play storefront', async () => {
+    const fetchStoreProducts = vi.fn().mockResolvedValue([
+      {
+        id: 'kilopass_tier19',
+        displayPrice: '$24.99',
+        title: 'Kilo Pass 19',
+        description: 'Kilo Pass',
+      },
+    ]);
+
+    await loadAppStoreKiloPassProducts({
+      storefront: 'play',
+      fetchStoreProducts,
+      loadBackendProducts: vi.fn().mockResolvedValue({
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+        products: backendProducts,
+      }),
+    });
+
+    expect(fetchStoreProducts).toHaveBeenCalledWith(['kilopass_tier19', 'kilopass_tier49']);
+  });
+});
+
+describe('getAuthoredProductsErrorMessage', () => {
+  it('keeps a message this app wrote', () => {
+    expect(
+      getAuthoredProductsErrorMessage(new KiloPassProductsError('No matching products.'))
+    ).toBe('No matching products.');
+  });
+
+  it('drops a store SDK message so the screen uses its own localized copy', () => {
+    expect(getAuthoredProductsErrorMessage(new Error('Failed to query product'))).toBeNull();
+  });
+
+  it('drops a non-error rejection', () => {
+    expect(getAuthoredProductsErrorMessage('Failed to query product')).toBeNull();
+    expect(getAuthoredProductsErrorMessage(null)).toBeNull();
   });
 });

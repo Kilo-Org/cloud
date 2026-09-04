@@ -29,6 +29,7 @@ export type AppStoreKiloPassOwnershipPreflight = 'owned-by-another-account' | nu
 
 type AppStoreKiloPassAvailablePurchase = {
   appAccountToken?: string | null;
+  obfuscatedAccountIdAndroid?: string | null;
   productId: string;
   purchaseState?: string | null;
   store?: string | null;
@@ -55,7 +56,8 @@ type KiloPassSubscriptionCardAccessibility = {
 };
 
 export function getKiloPassSubscriptionCardAccessibility(
-  cardState: KiloPassSubscriptionCardState
+  cardState: KiloPassSubscriptionCardState,
+  platformOS: string
 ): KiloPassSubscriptionCardAccessibility {
   const accessibilityLabel = [cardState.title, cardState.description, cardState.actionLabel]
     .filter(Boolean)
@@ -64,7 +66,9 @@ export function getKiloPassSubscriptionCardAccessibility(
   if (cardState.action === 'open-web') {
     accessibilityHint = i18n.t('kiloPass.opensManagementOnWeb');
   } else if (cardState.action === 'open-store-management') {
-    accessibilityHint = i18n.t('kiloPass.opensAppStoreManagement');
+    accessibilityHint = i18n.t(
+      platformOS === 'android' ? 'kiloPass.opensPlayManagement' : 'kiloPass.opensAppStoreManagement'
+    );
   } else if (cardState.action === 'open-native') {
     accessibilityHint = i18n.t('kiloPass.opensPlans');
   }
@@ -76,24 +80,42 @@ export function getAppStoreKiloPassOwnershipPreflight(params: {
   availablePurchases: readonly AppStoreKiloPassAvailablePurchase[];
   currentAppAccountToken: string | null | undefined;
   enabledAppleProductIds: readonly string[];
+  enabledGoogleProductIds: readonly string[];
   platformOS: string;
 }): AppStoreKiloPassOwnershipPreflight {
-  if (params.platformOS !== 'ios' || !params.currentAppAccountToken) {
+  if (!params.currentAppAccountToken) {
     return null;
   }
 
-  const enabledAppleProductIds = new Set(params.enabledAppleProductIds);
   // StoreKit returns `Transaction.appAccountToken` as an uppercase `UUID.uuidString`,
   // while the backend stores the lowercase Postgres uuid. Compare case-insensitively
   // or every restore on a device that already owns the pass reads as another owner.
   const currentAppAccountToken = params.currentAppAccountToken.toLowerCase();
+
+  if (params.platformOS === 'ios') {
+    const enabledAppleProductIds = new Set(params.enabledAppleProductIds);
+    const hasDifferentOwnerPurchase = params.availablePurchases.some(
+      purchase =>
+        purchase.store === 'apple' &&
+        purchase.purchaseState !== 'pending' &&
+        enabledAppleProductIds.has(purchase.productId) &&
+        Boolean(purchase.appAccountToken) &&
+        purchase.appAccountToken?.toLowerCase() !== currentAppAccountToken
+    );
+
+    return hasDifferentOwnerPurchase ? 'owned-by-another-account' : null;
+  }
+
+  // Play uses an obfuscated account id, still case-insensitive, still only for
+  // enabled Google Play products.
+  const enabledGoogleProductIds = new Set(params.enabledGoogleProductIds);
   const hasDifferentOwnerPurchase = params.availablePurchases.some(
     purchase =>
-      purchase.store === 'apple' &&
+      purchase.store === 'google' &&
       purchase.purchaseState !== 'pending' &&
-      enabledAppleProductIds.has(purchase.productId) &&
-      Boolean(purchase.appAccountToken) &&
-      purchase.appAccountToken?.toLowerCase() !== currentAppAccountToken
+      enabledGoogleProductIds.has(purchase.productId) &&
+      Boolean(purchase.obfuscatedAccountIdAndroid) &&
+      purchase.obfuscatedAccountIdAndroid?.toLowerCase() !== currentAppAccountToken
   );
 
   return hasDifferentOwnerPurchase ? 'owned-by-another-account' : null;
@@ -142,7 +164,7 @@ export function getKiloPassSubscriptionCardContentState(params: {
       state: {
         action: 'open-native',
         actionLabel: null,
-        description: i18n.t('kiloPass.unavailableDescription'),
+        description: i18n.t('kiloPass.purchaseUnavailable'),
         title: KILO_PASS_TITLE,
       },
     };
@@ -154,7 +176,7 @@ export function getKiloPassSubscriptionCardContentState(params: {
       state: {
         action: 'open-web',
         actionLabel: i18n.t('kiloPass.manage'),
-        description: i18n.t('kiloPass.webManagementDescription'),
+        description: i18n.t('kiloPass.managedOnWeb'),
         title: KILO_PASS_TITLE,
       },
     };
@@ -177,7 +199,11 @@ export function getKiloPassSubscriptionCardContentState(params: {
 
   return {
     kind: 'card',
-    state: getActiveSubscriptionCardState(subscription, presentation.statusClass),
+    state: getActiveSubscriptionCardState(
+      subscription,
+      presentation.statusClass,
+      params.platformOS
+    ),
   };
 }
 
@@ -213,7 +239,8 @@ function getStatusClassTitle(statusClass: PurchaseStatusClass, cancelAtPeriodEnd
 
 function getActiveSubscriptionCardState(
   subscription: KiloPassSubscriptionCardSubscription,
-  statusClass: PurchaseStatusClass
+  statusClass: PurchaseStatusClass,
+  platformOS: string
 ): KiloPassSubscriptionCardState {
   const credits = i18n.t('kiloPass.monthlyCredits', {
     credits: formatUsd(subscription.currentPeriodBaseCreditsUsd, i18n.language, {
@@ -224,19 +251,49 @@ function getActiveSubscriptionCardState(
   const title = getStatusClassTitle(statusClass, subscription.cancelAtPeriodEnd);
 
   if (subscription.paymentProvider === 'google_play') {
+    if (platformOS !== 'android') {
+      // A Play-owned pass on an iOS device is managed in Google Play, which the
+      // iOS device cannot open — show it inert.
+      return {
+        action: 'none',
+        actionLabel: null,
+        description: subscription.cancelAtPeriodEnd
+          ? `${credits} · ${i18n.t('kiloPass.ends', {
+              date: formatSubscriptionEndDate(subscription.refillAt),
+            })} · ${i18n.t('kiloPass.managedOnGooglePlay')}`
+          : `${credits} · ${i18n.t('kiloPass.managedOnGooglePlay')}`,
+        title,
+      };
+    }
+
     return {
-      action: 'none',
-      actionLabel: null,
+      action: 'open-store-management',
+      actionLabel: i18n.t('kiloPass.manage'),
       description: subscription.cancelAtPeriodEnd
         ? `${credits} · ${i18n.t('kiloPass.ends', {
             date: formatSubscriptionEndDate(subscription.refillAt),
-          })} · ${i18n.t('kiloPass.managedOnGooglePlay')}`
+          })}`
         : `${credits} · ${i18n.t('kiloPass.managedOnGooglePlay')}`,
       title,
     };
   }
 
   if (subscription.paymentProvider === 'app_store') {
+    if (platformOS !== 'ios') {
+      // An App Store-owned pass on a Play device is managed in the App Store,
+      // which the Play device cannot open — show it inert.
+      return {
+        action: 'none',
+        actionLabel: null,
+        description: subscription.cancelAtPeriodEnd
+          ? `${credits} · ${i18n.t('kiloPass.ends', {
+              date: formatSubscriptionEndDate(subscription.refillAt),
+            })} · ${i18n.t('kiloPass.managedInAppStore')}`
+          : `${credits} · ${i18n.t('kiloPass.managedInAppStore')}`,
+        title,
+      };
+    }
+
     return {
       action: 'open-store-management',
       actionLabel: i18n.t('kiloPass.manage'),

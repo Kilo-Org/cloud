@@ -9,6 +9,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 const currentAppAccountToken = '550e8400-e29b-41d4-a716-446655440000';
 const otherAppAccountToken = '550e8400-e29b-41d4-a716-446655440001';
 const appleProductId = 'com.kilo.pass.tier19.monthly';
+const googleProductId = 'kilopass_tier19';
 
 describe('getAppStoreKiloPassOwnershipPreflight', () => {
   it('flags an iOS Kilo Pass purchase owned by a different app account token', () => {
@@ -24,6 +25,7 @@ describe('getAppStoreKiloPassOwnershipPreflight', () => {
         ],
         currentAppAccountToken,
         enabledAppleProductIds: [appleProductId],
+        enabledGoogleProductIds: [],
         platformOS: 'ios',
       })
     ).toBe('owned-by-another-account');
@@ -42,6 +44,7 @@ describe('getAppStoreKiloPassOwnershipPreflight', () => {
         ],
         currentAppAccountToken,
         enabledAppleProductIds: [appleProductId],
+        enabledGoogleProductIds: [],
         platformOS: 'ios',
       })
     ).toBeNull();
@@ -60,6 +63,7 @@ describe('getAppStoreKiloPassOwnershipPreflight', () => {
         ],
         currentAppAccountToken,
         enabledAppleProductIds: [appleProductId],
+        enabledGoogleProductIds: [],
         platformOS: 'ios',
       })
     ).toBeNull();
@@ -92,6 +96,7 @@ describe('getAppStoreKiloPassOwnershipPreflight', () => {
         availablePurchases: purchases,
         currentAppAccountToken,
         enabledAppleProductIds: [appleProductId],
+        enabledGoogleProductIds: [],
         platformOS: 'ios',
       })
     ).toBeNull();
@@ -107,8 +112,28 @@ describe('getAppStoreKiloPassOwnershipPreflight', () => {
         ],
         currentAppAccountToken,
         enabledAppleProductIds: [appleProductId],
+        enabledGoogleProductIds: [],
         platformOS: 'android',
       })
     ).toBeNull();
+  });
+
+  it('flags an Android Kilo Pass purchase owned by a different Play account id', () => {
+    expect(
+      getAppStoreKiloPassOwnershipPreflight({
+        availablePurchases: [
+          {
+            obfuscatedAccountIdAndroid: otherAppAccountToken,
+            productId: googleProductId,
+            purchaseState: 'purchased',
+            store: 'google',
+          },
+        ],
+        currentAppAccountToken,
+        enabledAppleProductIds: [],
+        enabledGoogleProductIds: [googleProductId],
+        platformOS: 'android',
+      })
+    ).toBe('owned-by-another-account');
   });
 });

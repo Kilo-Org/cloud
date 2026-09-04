@@ -215,20 +215,25 @@ it('refuses to compact while a question is still streaming', async () => {
      store keeps it, so the session and its record disagree. One session does
      one thing at a time, which is the rule `ask` already follows. */
   const { value, calls } = await runWith({
-    replies: [{ deltas: ['said'], stall: true }, { deltas: ['the notes'] }],
+    replies: [{ deltas: ['said'], stall: true }, { deltas: ['after'] }],
     use: session =>
       Effect.gen(function* () {
         const reading = yield* Effect.fork(Stream.runDrain(session.ask('why')));
         yield* Effect.sleep('10 millis');
         const refused = yield* Effect.either(session.compact);
         yield* Fiber.interrupt(reading);
-        return refused;
+        /* The refusal must not hold the lock it did not take, so the session
+           still answers. */
+        yield* Stream.runDrain(session.ask('and'));
+        return { refused, history: yield* session.history };
       }),
   });
 
-  expect(Either.getLeft(value).pipe(Option.map(error => error._tag))).toStrictEqual(
+  expect(Either.getLeft(value.refused).pipe(Option.map(error => error._tag))).toStrictEqual(
     Option.some('harness/SessionBusyError')
   );
-  /* One call, the question. A summary was never asked for. */
-  expect(calls).toHaveLength(1);
+  /* Two calls: the question that stalled, and the one after it. No summary was
+     ever asked for. */
+  expect(calls).toHaveLength(2);
+  expect(texts(value.history)).toEqual(['user:and', 'assistant:after']);
 });

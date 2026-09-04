@@ -378,6 +378,21 @@ index caf1e050224d595d8c57c0a832de182fd35ad897..7fb7ff2f6cb54e55fc1ff2be6bc5e06c
      }
    }
  }
+diff --git a/ios/Widgets/WidgetLiveActivity.swift b/ios/Widgets/WidgetLiveActivity.swift
+index 3e192e10b9bc6d76f0f27cc268fbbf8e48a4b870..5640361c614b412c1e7845135827b5d70bfe1994 100644
+--- a/ios/Widgets/WidgetLiveActivity.swift
++++ b/ios/Widgets/WidgetLiveActivity.swift
+@@ -30,6 +30,10 @@ public struct WidgetLiveActivity: Widget {
+         environment: environment
+       )
+       LiveActivityBannerView(context: context, nodes: nodes)
++        // The Lock Screen banner is where people actually tap. Upstream gives
++        // the tap destination to the Dynamic Island only, so a banner tap just
++        // reopened the app on whatever screen it left.
++        .widgetURL(getLiveActivityUrl(forName: context.state.name))
+     } dynamicIsland: { context in
+       let nodes = getLiveActivityNodes(
+         forName: context.state.name,
 diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
 index 678a7d1d567b865af31ff7d8957db3a7c63100d1..44e3ff6e49e9a0b53511d7398a03df2fe869bba7 100644
 --- a/ios/WidgetsModule.swift

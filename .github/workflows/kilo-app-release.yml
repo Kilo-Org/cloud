@@ -31,6 +31,9 @@ jobs:
   check-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
+    permissions:
+      contents: read # read the release tags
+      pull-requests: read # look for an open bump PR
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
     steps:
@@ -40,7 +43,21 @@ jobs:
 
       - name: Check for changes since last release
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # An open bump PR means main still holds the version that was already
+          # submitted. Building it submits that version again, so wait for the
+          # merge. This gate is before the manual-run override on purpose: a
+          # store submission of an already-released version fails either way.
+          OPEN=$(gh pr list --state open --limit 100 --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("kilo-app-version-bump-"))] | length')
+          if [ "$OPEN" != "0" ]; then
+            echo "::warning::A kilo-app version bump PR is open — skipping the release. Merge it, then release again."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # A manual run is the override: build and submit whatever main holds.
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Manual run — building regardless of changes"
@@ -247,23 +264,8 @@ jobs:
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
-      # An open bump PR already carries the next version. A second one would
-      # bump to the same number and conflict with it.
-      - name: Look for an open bump PR
-        id: pending
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          OPEN=$(gh pr list --state open --limit 100 --json headRefName \
-            --jq '[.[] | select(.headRefName | startswith("kilo-app-version-bump-"))] | length')
-          if [ "$OPEN" != "0" ]; then
-            echo "::warning::A kilo-app version bump PR is already open — not opening another. Merge it to release the next version."
-          fi
-          echo "open=$OPEN" >> "$GITHUB_OUTPUT"
-
       - name: Bump patch version
         id: bump
-        if: steps.pending.outputs.open == '0'
         working-directory: apps/mobile
         run: |
           OLD=$(sed -n "s/^  version: '\([0-9][0-9.]*\)',$/\1/p" app.config.ts)
@@ -278,7 +280,6 @@ jobs:
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Push bump branch
-        if: steps.pending.outputs.open == '0'
         run: |
           NEW="${{ steps.bump.outputs.new }}"
           git config user.name "github-actions[bot]"
@@ -290,7 +291,6 @@ jobs:
           git push -fu origin "kilo-app-version-bump-$NEW"
 
       - name: Open bump PR
-        if: steps.pending.outputs.open == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

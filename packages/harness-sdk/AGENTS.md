@@ -766,6 +766,15 @@ The three shapes report it in three places — `message_delta.delta.stop_reason`
 `choices[].finish_reason` — so `pnpm test:e2e:stop` asks each shape twice, once
 with room to finish and once with a ceiling of 24 tokens.
 
+`maxTokens` covers two walls on the Anthropic shape. `max_tokens` is the
+caller's ceiling and `model_context_window_exceeded` is the model's window, and
+the provider's own guidance for the second is to treat it as truncated. Both
+leave half a sentence, which is the whole of what the reason has to tell a
+caller. The full list, read on 2026-09-04: `end_turn`, `max_tokens`,
+`stop_sequence`, `tool_use`, `pause_turn`, `refusal`, and
+`model_context_window_exceeded`. `tool_use` and `pause_turn` both wait on
+tools.
+
 ### A dropped stream stops the call
 
 Every call carries an abort signal, and the handle is scoped to the stream

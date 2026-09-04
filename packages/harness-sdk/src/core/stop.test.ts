@@ -36,6 +36,11 @@ it('reads the stop reason of the messages shape', () => {
   expect(messagesWire.toStop({ delta: { stop_reason: 'stop_sequence' } })).toBe('end');
   expect(messagesWire.toStop({ delta: { stop_reason: 'max_tokens' } })).toBe('maxTokens');
   expect(messagesWire.toStop({ delta: { stop_reason: 'refusal' } })).toBe('refusal');
+  /* The other wall. The provider's guidance is to treat it as truncated, and
+     truncated is what `maxTokens` means here. */
+  expect(messagesWire.toStop({ delta: { stop_reason: 'model_context_window_exceeded' } })).toBe(
+    'maxTokens'
+  );
   /* A name this package has never seen is `unknown`, never a guess. */
   expect(messagesWire.toStop({ delta: { stop_reason: 'tool_use' } })).toBe('unknown');
   /* Every other frame says nothing, so it must not overwrite what was said. */

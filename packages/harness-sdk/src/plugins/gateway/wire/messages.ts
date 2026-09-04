@@ -103,6 +103,11 @@ const stopReasons: Readonly<Record<string, StopReason>> = {
   end_turn: 'end',
   stop_sequence: 'end',
   max_tokens: 'maxTokens',
+  /* A second wall, and the provider's own guidance is to treat it as
+     truncated: the answer stopped because the model's window filled, not
+     because `max_tokens` did. Both leave half a sentence, which is what
+     `maxTokens` names here. */
+  model_context_window_exceeded: 'maxTokens',
   refusal: 'refusal',
 };
 

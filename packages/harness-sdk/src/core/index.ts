@@ -2,6 +2,7 @@ export type { AskOptions } from './ask.js';
 export { SessionBusyError } from './ask.js';
 export * from './catalog.js';
 export * from './compact.js';
+export * from './conformance.js';
 export * from './entropy.js';
 export * from './fetch.js';
 export * from './handle.js';

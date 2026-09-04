@@ -36,6 +36,8 @@ const functions = [
   'cloneSession',
   'hitRatio',
   'textOf',
+  'checkStore',
+  'checkAssembler',
   'questionTool',
 ] as const;
 

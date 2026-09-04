@@ -63,7 +63,11 @@ interface PromptInput {
  *
  * 1. The same input gives the same bytes. No clock, no random value, no key
  *    order that varies.
- * 2. Appending a turn changes nothing before that turn.
+ * 2. Appending a turn changes nothing it said before that turn. `cache` is the
+ *    exception and not content: the breakpoint marks the last message, so it
+ *    moves with every turn while everything sent before it stays as it was.
+ *
+ * `checkAssembler` runs both against an assembler.
  */
 interface PromptAssemblerService {
   readonly assemble: (input: PromptInput) => Prompt;

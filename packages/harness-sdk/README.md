@@ -450,6 +450,31 @@ The catalog must be one instance shared by the session and the gateway. Building
 it twice typechecks and answers the same, and the two then disagree about a
 model the moment one of them is a fetching plugin. `layerKilo` shares it.
 
+Writing one is an object and a `Layer.succeed`. [PLUGINS.md](./PLUGINS.md) has a
+worked example for each point and the invariants that are not in the types.
+
+Two of them are easy to get silently wrong: a store that reorders turns or drops
+a signature, and an assembler that rewrites an earlier message, both typecheck
+and both cost the whole prefix on every question afterwards. So the package
+ships the checks. Run one against yours and assert it found nothing:
+
+```ts
+import { checkAssembler, checkStore, PromptAssembler, SessionStore } from '@kilocode/harness-sdk';
+
+const conforms = Effect.gen(function* () {
+  const store = yield* SessionStore;
+  const assembler = yield* PromptAssembler;
+  const wrongInStore = yield* checkStore(store);
+  const wrongInAssembler = checkAssembler(assembler);
+  return [...wrongInStore, ...wrongInAssembler];
+});
+```
+
+Each answers a list of what it found, in words that say what is wrong and what
+it costs. Neither fails: a store that refuses a write is a finding, not an
+exception to handle. `checkStore` writes under identifiers of its own, so it is
+safe against a real database.
+
 ## Entry points
 
 | Import | Holds |

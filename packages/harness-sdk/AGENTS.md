@@ -307,7 +307,8 @@ package.
 - If you change a code block in the README, change `e2e/readme-check.ts` with
   it. It is every README snippet against this source tree, and it is
   typechecked and never run: a snippet that does not compile is worse than no
-  snippet. `pnpm typecheck:e2e` is what catches it.
+  snippet. `pnpm typecheck:e2e` is what catches it. `e2e/plugins-check.ts` does
+  the same for `PLUGINS.md`.
 
 ## The kilo gateway
 
@@ -1226,6 +1227,40 @@ differs from the written turn in one byte or in the order, the prefix changes
 and the model cache misses. The SQLite plugin must prove the round trip with a
 local end-to-end run.
 
+### A plugin point that is easy to break ships its check
+
+`SessionStore` and `PromptAssembler` hold invariants no type states. A store
+that reorders turns, drops a reasoning signature, or writes the turns without
+the count typechecks and answers every call; an assembler that rewrites an
+earlier message typechecks too. Neither shows up as an error. Both show up as a
+bill, because the prompt prefix moves and every question after it is written to
+the cache again.
+
+So `core/conformance.ts` ships `checkStore` and `checkAssembler`. Each answers
+`readonly string[]`, and each finding names what is wrong and what it costs.
+**Neither fails.** A store that refuses a write is a finding: a caller running
+these in their own test runner wants one list, not an exception to catch.
+`checkStore` writes under identifiers of its own, so it is safe against a real
+database.
+
+The checks are held to the same rule as a guard: `plugins/conformance.test.ts`
+runs both against the shipped plugins, and then breaks a plugin seven ways —
+reversed load, a dropped signature, foreign turns, a stale count, a refused
+append, a drifting assembler, a rewriting assembler — and asserts each one is
+caught. Both checks found a real defect on their first run against the code
+that was already shipped, one in the check and one in the docblock it was
+reading.
+
+### There is no `layerModelClient` helper
+
+Making plugin authoring easy was read once as a set of constructor aliases —
+`layerModelClient(impl)` for each point. `Layer.succeed(ModelClient, impl)` is
+already one line and is the idiom every other layer in this package uses. An
+alias per point would be eight more exports, eight more names to keep in step,
+and not one keystroke saved. The lever that actually shortens the work is
+saying what the invariants are and shipping the checks: `PLUGINS.md` and
+`conformance.ts`.
+
 ## What is not pluggable, and why
 
 Two seams were cut after they were built, and one default was tried and could
@@ -1282,6 +1317,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/storage.ts` | The `SessionStore` plugin point |
 | `src/core/id.ts` | `{prefix}_{ulid}`; the encoding, and the monotonic order |
 | `src/core/entropy.ts` | The `EntropySource` plugin point; random bytes |
+| `src/core/conformance.ts` | `checkStore` and `checkAssembler`: what a plugin author runs |
 | `src/core/session-fixture.ts` | What the session tests share. Excluded from `dist/` |
 | `src/perf.perf.test.ts` | The timing gate; run by `pnpm test:perf`, not `pnpm test` |
 | `src/core/catalog.ts` | The `ModelCatalog` plugin point; shapes and output limit |
@@ -1303,7 +1339,9 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/store/migrate.ts` | Applying the migrations the bundle carries |
 | `src/plugins/store/node.ts`, `expo.ts` | One adapter per platform |
 | `src/plugins/gateway/` | The kilo gateway plugin |
+| `src/plugins/conformance.test.ts` | The checks, against the shipped plugins and against seven broken ones |
 | `README.md` | What a consumer reads: the example, the events, the plugin table |
+| `PLUGINS.md` | What a plugin author reads: one worked example per point, and the invariants |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config. The repo has no root `tsconfig.json`; this one stands alone |
 

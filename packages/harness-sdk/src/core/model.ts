@@ -1,4 +1,4 @@
-import { Context, Data, type Stream } from 'effect';
+import { Context, Data, type Effect, Stream } from 'effect';
 import type { Prompt } from './prompt.js';
 import type { ToolCall, ToolDefinition, ToolResult } from './tool.js';
 
@@ -125,5 +125,24 @@ interface ModelClientService {
 
 class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelClientService>() {}
 
+/**
+ * What the model said, once it has said all of it.
+ *
+ * A stream of events is what a harness wants — it shows the words as they
+ * arrive, and it shows the tools it ran. Something that only wants the answer
+ * has to fold the stream, keeping the deltas and dropping everything else, and
+ * that fold was written out by hand in twelve of this package's own live runs
+ * before it was written here.
+ *
+ * It keeps the words and nothing else. Thinking is not the answer, a tool call
+ * is not the answer, and a round that called a tool contributes whatever the
+ * model said after it — which is why this is a fold over the whole stream and
+ * not a read of the last event.
+ */
+const said = <E, R>(answer: Stream.Stream<ModelEvent, E, R>): Effect.Effect<string, E, R> =>
+  Stream.runFold(answer, '', (held: string, event) =>
+    event.kind === 'delta' ? held + event.text : held
+  );
+
 export type { Effort, ModelClientService, ModelEvent, ModelRequest, ModelUsage, StopReason };
-export { ModelClient, ModelError, zeroUsage };
+export { ModelClient, ModelError, said, zeroUsage };

@@ -52,10 +52,22 @@ who needs a catalog that asks the gateway composes the layers themselves; see
 ## Your fetch
 
 The package never calls a runtime's `fetch` itself. It declares the smallest
-part of one it uses and the caller adapts theirs, which is what lets the same
-code run on Node, in a browser, and in a mobile app. The adapter is short, and
-this is the whole of it on any runtime with a WHATWG `fetch`. It is
-`e2e/node-fetch.ts` in this package, which every live run uses:
+part of one it uses, so the same code runs on Node, in a browser, in a Worker
+and in a mobile app.
+
+On any runtime that has a WHATWG `fetch`, the adapter ships:
+
+```ts
+import { webFetch } from '@kilocode/harness-sdk/plugins/fetch';
+
+const layers = layerKilo({ baseUrl, org, token, fetch: webFetch });
+```
+
+It is an entry point of its own, so a caller who brings their own carries
+nothing. `e2e/node-fetch.ts` re-exports it and every live run goes through it,
+which is how it is proven rather than described.
+
+A runtime without one writes one, and this is the whole of it:
 
 ```ts
 import type { FetchLike } from '@kilocode/harness-sdk';
@@ -86,10 +98,11 @@ const myFetch: FetchLike = async (url, request) => {
 };
 ```
 
-The package cannot ship this. That one cast is the reason: `AbortLike` is
-deliberately not `AbortSignal`, so only code that has the runtime's own type can
-join the two, and that code is yours. React Native needs its own adapter anyway,
-because its `fetch` does not stream a response body without a polyfill.
+That one cast is why the core cannot hold this, and why `webFetch` is a plugin
+rather than part of it: `AbortLike` is deliberately not `AbortSignal`, so only
+code that has the runtime's own type can join the two. React Native may need its
+own adapter, because its `fetch` does not stream a response body without a
+polyfill.
 
 ## What comes back
 
@@ -103,6 +116,16 @@ because its `fetch` does not stream a response body without a polyfill.
 | `toolCall` | A tool the model asked for, whole: its id, its name, its arguments |
 | `toolResult` | What that tool said, and whether it failed |
 | `done` | This call's token counts, and why the model stopped |
+
+When only the answer matters, `said` folds the stream into it:
+
+```ts
+const answer = yield* said(session.ask('Name three fruits.'));
+```
+
+It keeps the words and nothing else. Thinking is not the answer and a tool call
+is not the answer, so a round that ran a tool gives back what the model said
+after it.
 
 `done` is always last, and it is the only event that reports usage. `stop` is
 one of `end`, `maxTokens`, `refusal`, `tools`, or `unknown`: an answer cut off at the
@@ -552,7 +575,8 @@ and both cost the whole prefix on every question afterwards. So the package
 ships the checks. Run one against yours and assert it found nothing:
 
 ```ts
-import { checkAssembler, checkStore, PromptAssembler, SessionStore } from '@kilocode/harness-sdk';
+import { PromptAssembler, SessionStore } from '@kilocode/harness-sdk';
+import { checkAssembler, checkStore } from '@kilocode/harness-sdk/testing';
 
 const conforms = Effect.gen(function* () {
   const store = yield* SessionStore;

@@ -2,6 +2,8 @@
    source tree. It is typechecked, never run: a plugin author copies these, so
    one that does not compile is worse than no example at all. */
 import { Effect, Layer, Option, Schedule, Stream } from 'effect';
+/* PLUGINS.md imports these from `@kilocode/harness-sdk/testing`, which is this
+   file. They are out of the main entry so a consumer does not bundle them. */
 import { checkAssembler, checkStore } from '../src/core/conformance.js';
 import { EntropySource } from '../src/core/entropy.js';
 import { ModelCatalog } from '../src/core/catalog.js';

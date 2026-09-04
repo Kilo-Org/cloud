@@ -6,12 +6,20 @@
  * has no use for `wiringFor`, `makeId` or `sinceSummary`. Everything left out
  * here is still reachable from `@kilocode/harness-sdk/core`, which is the whole
  * of the core and is where a plugin author goes.
+ *
+ * `conformance.ts` is not here either, and for a different reason: `checkStore`
+ * and `checkAssembler` are run by a plugin author in their own test suite, and
+ * nobody runs them in production. Three hundred lines in the entry every
+ * consumer imports is three hundred lines every consumer bundles. They live at
+ * `@kilocode/harness-sdk/testing`, and in `/core` with the rest.
+ *
+ * `plugins/fetch` is left out for the same kind of reason, the other way round:
+ * a caller who brings their own adapter should not carry this one.
  */
 
 export type { AskOptions } from './core/ask.js';
 export { SessionBusyError } from './core/ask.js';
 export * from './core/catalog.js';
-export * from './core/conformance.js';
 export * from './core/entropy.js';
 export * from './core/fetch.js';
 export * from './core/model.js';

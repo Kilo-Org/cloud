@@ -14,6 +14,11 @@ import * as core from './core/index.js';
  * The two store plugins are deliberately absent. Each names a platform, so
  * exporting them from the root would pull `node:sqlite` or `expo-sqlite` into
  * every bundle. They have subpaths of their own.
+ *
+ * So are the conformance checks and the shipped `fetch`. An entry point is what
+ * a consumer bundles, and neither is run in production: `checkStore` and
+ * `checkAssembler` belong to a plugin author's test suite, and a caller with a
+ * `fetch` adapter of their own should not carry this one.
  */
 
 /** Every layer the README's plugin table names. */
@@ -35,11 +40,14 @@ const functions = [
   'continueSession',
   'cloneSession',
   'hitRatio',
+  'said',
   'textOf',
-  'checkStore',
-  'checkAssembler',
   'questionTool',
+  'subagentTool',
 ] as const;
+
+/** What has an entry point of its own, and must not be reachable from the root. */
+const elsewhere = ['checkStore', 'checkAssembler', 'webFetch'] as const;
 
 const tags = [
   'ModelClient',
@@ -62,6 +70,15 @@ it('exports every call a consumer makes', () => {
   const missing = [...functions, ...tags].filter(name => !(name in sdk));
 
   expect(missing).toStrictEqual([]);
+});
+
+it('keeps what has its own entry point out of the root', () => {
+  const leaked = elsewhere.filter(name => name in sdk);
+
+  expect(leaked).toStrictEqual([]);
+  /* And they are still reachable. A name in neither place is a name nobody can
+     call, which is the failure this whole file exists to catch. */
+  expect(['checkStore', 'checkAssembler'].filter(name => !(name in core))).toStrictEqual([]);
 });
 
 it('keeps the core entry point free of plugins', () => {

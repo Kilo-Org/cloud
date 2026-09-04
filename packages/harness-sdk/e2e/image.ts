@@ -16,6 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
+import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
@@ -45,9 +46,7 @@ const pictureOf = async (colour: string): Promise<PartDraft> => ({
 });
 
 const say = (session: SessionHandle, input: string | readonly PartDraft[]) =>
-  Stream.runFold(session.ask(input), '', (held, event) =>
-    event.kind === 'delta' ? held + event.text : held
-  );
+  said(session.ask(input));
 
 const runShape = async (kind: ApiKind, colour: string) => {
   const layers = kilo({ apiKinds: [kind] });

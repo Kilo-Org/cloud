@@ -33,14 +33,21 @@ interface Entry {
 
 /** Every `exports` subpath, and a name a caller reaches it for. */
 const entries: readonly Entry[] = [
-  { subpath: '.', promises: ['layerKilo', 'openSession', 'ModelClient', 'SessionBusyError'] },
+  { subpath: '.', promises: ['layerKilo', 'openSession', 'ModelClient', 'said'] },
   { subpath: './core', promises: ['ModelClient', 'SessionStore', 'wiringFor', 'makeId'] },
+  { subpath: './plugins/fetch', promises: ['webFetch'] },
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
   { subpath: './plugins/tools', promises: ['questionTool'] },
   { subpath: './plugins/store/node', promises: ['layerNodeStore'] },
   { subpath: './plugins/store/expo', promises: ['layerExpoStore'] },
+  { subpath: './testing', promises: ['checkStore', 'checkAssembler'] },
 ];
+
+/** What the main entry must not carry, because nobody runs it in production. */
+const withheld: Readonly<Record<string, readonly string[]>> = {
+  '.': ['checkStore', 'checkAssembler', 'webFetch'],
+};
 
 const map = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   exports: Readonly<Record<string, string>>;
@@ -70,6 +77,16 @@ for (const entry of entries) {
     }
   } catch (cause) {
     broken.push(`${entry.subpath} does not import: ${String(cause)}`);
+  }
+}
+
+/* An entry point is what a consumer bundles. A name that leaks back into the
+   main one takes its whole file with it, and nothing in a type says so. */
+for (const [subpath, names] of Object.entries(withheld)) {
+  const module = loaded[subpath];
+  const found = names.filter(name => module?.[name] !== undefined);
+  if (found.length > 0) {
+    broken.push(`${subpath} exports ${found.join(', ')}, which belongs to another entry point`);
   }
 }
 

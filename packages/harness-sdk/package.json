@@ -8,11 +8,13 @@
   "exports": {
     ".": "./dist/index.js",
     "./core": "./dist/core/index.js",
+    "./plugins/fetch": "./dist/plugins/fetch/web.js",
     "./plugins/gateway": "./dist/plugins/gateway/index.js",
     "./plugins/prompt": "./dist/plugins/prompt/default.js",
     "./plugins/tools": "./dist/plugins/tools/index.js",
     "./plugins/store/node": "./dist/plugins/store/node.js",
-    "./plugins/store/expo": "./dist/plugins/store/expo.js"
+    "./plugins/store/expo": "./dist/plugins/store/expo.js",
+    "./testing": "./dist/core/conformance.js"
   },
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",

@@ -22,6 +22,7 @@
 import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Schedule, Stream } from 'effect';
 import type { SessionHandle } from '../src/core/handle.js';
+import { said } from '../src/core/model.js';
 import type { Continued } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { ToolRegistry } from '../src/core/tool.js';
@@ -72,11 +73,6 @@ const subagent = (inlineFor: Duration.DurationInput) =>
 const withSubagent = (inlineFor: Duration.DurationInput) =>
   Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [subagent(inlineFor)] }));
 
-const said = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), '', (held: string, event) =>
-    event.kind === 'delta' ? held + event.text : held
-  );
-
 const failures: string[] = [];
 const wrongIf = (broken: boolean, why: string): void => {
   if (broken) {
@@ -93,7 +89,7 @@ const runHandOff = async (): Promise<void> => {
       maxTokens: 256,
       tools: ['subagent'],
     });
-    const answer = yield* said(session, 'Ask the subagent for this quarter’s codename.');
+    const answer = yield* said(session.ask('Ask the subagent for this quarter’s codename.'));
     return { id: session.id, answer, history: yield* session.history, usage: yield* session.usage };
   });
 
@@ -172,7 +168,7 @@ const runSentAway = async (): Promise<void> => {
         Schedule.spaced('50 millis').pipe(Schedule.upTo('60 seconds'))
       )
     );
-    const answer = yield* said(session, 'Ask the subagent for this quarter’s codename.');
+    const answer = yield* said(session.ask('Ask the subagent for this quarter’s codename.'));
     const sent = yield* sending.await;
     yield* watching.await;
     return { answer, sent };

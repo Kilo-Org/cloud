@@ -42,7 +42,8 @@ So the package ships the checks. Run one in whatever test runner you already
 have and assert the answer is empty:
 
 ```ts
-import { checkAssembler, checkStore, PromptAssembler, SessionStore } from '@kilocode/harness-sdk';
+import { PromptAssembler, SessionStore } from '@kilocode/harness-sdk';
+import { checkAssembler, checkStore } from '@kilocode/harness-sdk/testing';
 
 const conforms = Effect.gen(function* () {
   const store = yield* SessionStore;
@@ -56,6 +57,9 @@ const conforms = Effect.gen(function* () {
 Each answers a list of what it found, in words that say what is wrong and what
 it costs. Empty means it conforms. Neither fails: a store that refuses a write
 is a finding, not an exception to handle.
+
+They are at `/testing` and not in the main entry, because nobody runs them in
+production and an entry point is what a consumer bundles.
 
 `checkStore` writes two sessions under identifiers of its own, so it is safe to
 run against a real database. Run it against a fresh one for the clearest answer.

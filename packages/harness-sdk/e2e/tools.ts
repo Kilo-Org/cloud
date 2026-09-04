@@ -26,6 +26,7 @@
 import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
+import { said } from '../src/core/model.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
@@ -72,11 +73,6 @@ const weather = (takes: Duration.DurationInput): Tool => ({
     }),
 });
 
-const answering = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), '', (held: string, event) =>
-    event.kind === 'delta' ? held + event.text : held
-  );
-
 const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
   Layer.merge(kilo({ apiKinds: [kind] }), Layer.succeed(ToolRegistry, { tools }));
 
@@ -87,22 +83,22 @@ const runShape = async (kind: ApiKind): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
-    return yield* answering(session, 'What is the weather in Oslo?');
+    return yield* said(session.ask('What is the weather in Oslo?'));
   });
-  const said = await Effect.runPromise(
+  const answer = await Effect.runPromise(
     Effect.either(Effect.scoped(Effect.provide(program, withTools(kind, [weather(0)]))))
   );
 
-  if (said._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(said.left)}`);
+  if (answer._tag === 'Left') {
+    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.left)}`);
     failures.push(`${kind}: the round failed`);
     return;
   }
-  console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(said.right)}`);
+  console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.right)}`);
   if (ran.length !== 1) {
     failures.push(`${kind}: the tool ran ${String(ran.length)} times, not once`);
   }
-  if (!said.right.includes('kestrel')) {
+  if (!answer.right.includes('kestrel')) {
     failures.push(`${kind}: the answer did not carry what the tool said`);
   }
 };
@@ -112,7 +108,7 @@ const runTogether = async (): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
-    return yield* answering(session, 'What is the weather in Oslo and in Lisbon?');
+    return yield* said(session.ask('What is the weather in Oslo and in Lisbon?'));
   });
   await Effect.runPromise(
     Effect.scoped(Effect.provide(program, withTools('messages', [weather('600 millis')])))
@@ -170,9 +166,10 @@ const runBackgrounded = async (): Promise<void> => {
         '60 seconds'
       )
     );
-    const first = yield* answering(
-      session,
-      'Ask me for my favourite colour with the question tool, then tell me what I said.'
+    const first = yield* said(
+      session.ask(
+        'Ask me for my favourite colour with the question tool, then tell me what I said.'
+      )
     );
     return { first, later: yield* watching.await };
   });
@@ -188,14 +185,14 @@ const runBackgrounded = async (): Promise<void> => {
   }
 
   const { first, later } = got.right;
-  const said = later._tag === 'Success' ? later.value : '';
+  const told = later._tag === 'Success' ? later.value : '';
   console.log(`\nasked, not waited: ${JSON.stringify(first)}`);
-  console.log(`told later:        ${JSON.stringify(said)}`);
+  console.log(`told later:        ${JSON.stringify(told)}`);
 
   if (first.includes('ultramarine')) {
     failures.push('the model was given the answer inline, so nothing was backgrounded');
   }
-  if (!said.includes('ultramarine')) {
+  if (!told.includes('ultramarine')) {
     failures.push('the session never told the model what the person answered');
   }
 };
@@ -229,9 +226,10 @@ const runWanted = async (): Promise<void> => {
         '60 seconds'
       )
     );
-    const first = yield* answering(
-      session,
-      'What is the weather in Oslo? Do not wait for the tool — tell me you have asked, and I will hear the rest when it answers.'
+    const first = yield* said(
+      session.ask(
+        'What is the weather in Oslo? Do not wait for the tool — tell me you have asked, and I will hear the rest when it answers.'
+      )
     );
     return { first, later: yield* watching.await };
   });
@@ -249,14 +247,14 @@ const runWanted = async (): Promise<void> => {
   }
 
   const { first, later } = got.right;
-  const said = later._tag === 'Success' ? later.value : '';
+  const told = later._tag === 'Success' ? later.value : '';
   console.log(`\ndid not wait:      ${JSON.stringify(first)}`);
-  console.log(`told later:        ${JSON.stringify(said)}`);
+  console.log(`told later:        ${JSON.stringify(told)}`);
 
   if (first.includes('kestrel')) {
     failures.push('the model waited for the call, so it never set wait to false');
   }
-  if (!said.includes('kestrel')) {
+  if (!told.includes('kestrel')) {
     failures.push('the call the model walked away from never came back');
   }
 };

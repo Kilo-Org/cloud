@@ -14,6 +14,17 @@ import type { Continued } from '../src/core/queue.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
 import { nodeFetch } from './node-fetch.js';
+import { said } from '../src/core/model.js';
+import { webFetch } from '../src/plugins/fetch/web.js';
+
+/* README, "Your fetch": the adapter the package ships. */
+const shipped = layerKilo({
+  baseUrl: 'https://app.kilo.ai',
+  org: { kind: 'organization', id: 'org_...' },
+  token: '...',
+  fetch: webFetch,
+});
+void shipped;
 
 const layers = layerKilo({
   baseUrl: 'https://app.kilo.ai',
@@ -35,6 +46,9 @@ const program = Effect.gen(function* () {
       }
     })
   );
+  /* README, "What comes back": the fold, for a caller that wants the answer. */
+  const answer = yield* said(session.ask('Name three fruits.'));
+  void answer;
   /* The README's second snippet, which reads the last event rather than only
      the text. */
   yield* Stream.runForEach(session.ask('Name three fruits.'), event =>

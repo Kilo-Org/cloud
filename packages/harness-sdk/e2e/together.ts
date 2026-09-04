@@ -24,6 +24,7 @@
 import assert from 'node:assert/strict';
 import { Duration, Effect, Layer, Schedule, Stream } from 'effect';
 import type { SessionHandle } from '../src/core/handle.js';
+import { said } from '../src/core/model.js';
 import type { Continued, Waiting } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
@@ -142,11 +143,6 @@ const watch = (session: SessionHandle, count: number) => {
   ).pipe(Effect.as(rounds));
 };
 
-const said = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), '', (held: string, event) =>
-    event.kind === 'delta' ? held + event.text : held
-  );
-
 /**
  * Waits until the line holds the answer to the question, and says what it held.
  *
@@ -176,7 +172,7 @@ const program = Effect.gen(function* () {
     tools: ['question', 'wait'],
   });
   const watching = yield* Effect.fork(Effect.timeout(watch(session, 3), '180 seconds'));
-  const first = yield* said(session, opening);
+  const first = yield* said(session.ask(opening));
   /* The question is still out: the asker sleeps longer than the model waited. */
   const long = yield* session.queue(slowly);
   const waiting = yield* untilAnswerWaits(session);

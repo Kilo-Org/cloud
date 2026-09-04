@@ -34,7 +34,6 @@ interface Spoken {
   readonly redacted: Ref.Ref<readonly string[]>;
 }
 
-/** One question and the answer it is waiting for. */
 interface Exchange {
   readonly question: Turn;
   readonly spoken: Spoken;

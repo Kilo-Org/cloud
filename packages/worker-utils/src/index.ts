@@ -150,28 +150,6 @@ export {
   verifyKiloTokenForResource,
   verifyKiloTokenForPolicy,
 } from './kilo-token-policy.js';
-export {
-  createRuntimeAuthorization,
-  renewRuntimeAuthorization,
-  sealRuntimeAuthorization,
-  unsealRuntimeAuthorization,
-  RuntimeAuthorizationRevokedError,
-} from './runtime-authorization.js';
-export {
-  RuntimeAdmissionSchema,
-  RuntimeAuthorizationSchema,
-  RuntimeResourceKindSchema,
-} from './runtime-authorization-contract.js';
-export type {
-  RuntimeAdmission,
-  RuntimeAuthorization,
-  RuntimeResourceKind,
-} from './runtime-authorization-contract.js';
-export type {
-  RuntimeAuthorizationAdapters,
-  RuntimeAuthorizationMembership,
-  RuntimeAuthorizationPrincipal,
-} from './runtime-authorization.js';
 export type {
   KiloCredentialExchangeEligibilityPolicy,
   KiloResourceAudiencePolicy,

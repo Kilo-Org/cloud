@@ -50,6 +50,33 @@ it('keeps a thinking block that carries a signature and no words', async () => {
   ]);
 });
 
+it('does not open a second block on the empty event that ends the first', async () => {
+  /* The gateway ends a thinking block with a reasoning event carrying no words
+     and no signature, after the signature has already arrived. Opening a block
+     on it leaves an unsigned block behind the signed one, and the wire drops
+     what it cannot sign: the thinking would go back with a hole in it, and only
+     a live run would ever say so. */
+  const { value } = await run(
+    [
+      {
+        deltas: ['the answer'],
+        events: [
+          { kind: 'reasoning', text: 'first' },
+          { kind: 'reasoning', text: '', signature: 'sig_abc' },
+          { kind: 'reasoning', text: '' },
+          { kind: 'delta', text: 'the answer' },
+        ],
+      },
+    ],
+    session => Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
+  );
+
+  expect(value[1]?.parts).toMatchObject([
+    { kind: 'reasoning', body: 'first', signature: 'sig_abc' },
+    { kind: 'text', body: 'the answer' },
+  ]);
+});
+
 it('sends the thinking back on the next question, unchanged', async () => {
   const { calls } = await run([thinking], session =>
     Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and then')))

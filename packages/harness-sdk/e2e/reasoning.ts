@@ -93,7 +93,9 @@ const runShape = async (kind: ApiKind, model: string) => {
 const reasoningOf = (turn: Turn | undefined) =>
   turn?.parts.filter(part => part.kind === 'reasoning') ?? [];
 
-console.log('shape             model                        thought  seal   input  answered');
+console.log(
+  'shape             model                        thought  seal   blocks input  answered'
+);
 
 const failures: string[] = [];
 
@@ -113,6 +115,7 @@ for (const { kind, model, seals } of shapes) {
   console.log(
     `${kind.padEnd(18)}${model.padEnd(29)}${String(thought).padEnd(9)}` +
       `${(seal === undefined ? 'none' : String(seal.length)).padEnd(7)}` +
+      `${String(stored.length).padEnd(7)}` +
       `${String(two.input).padEnd(7)}` +
       JSON.stringify(two.said.slice(0, 24))
   );
@@ -120,13 +123,18 @@ for (const { kind, model, seals } of shapes) {
   if (seals && !thought) {
     failures.push(`${kind}: the model produced no thinking, so this shape proves nothing`);
   }
-  if (seals && stored.length !== 1) {
-    failures.push(`${kind}: the answer kept ${String(stored.length)} reasoning parts, not one`);
+  /* One thinking block or several: the model decides, and a model that thinks
+     again after answering part way produces two. What may never happen is a
+     stored block without a seal — the wire drops it, so the thinking the
+     provider signed would go back with a hole in it. */
+  const unsealed = stored.filter(part => part.signature === undefined).length;
+  if (seals && stored.length === 0) {
+    failures.push(`${kind}: the answer kept no thinking at all, so nothing can be replayed`);
   }
-  if (seals && seal === undefined) {
+  if (seals && unsealed > 0) {
     failures.push(
-      `${kind}: the stored thinking carries no seal, so it can never be replayed and the ` +
-        'provider would refuse it'
+      `${kind}: ${String(unsealed)} of ${String(stored.length)} stored thinking blocks carry ` +
+        'no seal, so the wire drops them and the thinking goes back with a hole in it'
     );
   }
   if (two.said.length === 0) {

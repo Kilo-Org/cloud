@@ -167,6 +167,13 @@ const thinking = (
   event: Extract<ModelEvent, { kind: 'reasoning' }>
 ): Effect.Effect<void> =>
   Ref.update(spoken, held => {
+    /* Nothing said and nothing sealed. A provider ends a thinking block with
+       one of these, and opening a block on it leaves an unsigned block after
+       the signed one: the wire drops what it cannot sign, so the thinking would
+       go back to the provider with a hole in it. */
+    if (event.text === '' && event.signature === undefined) {
+      return held;
+    }
     const last = held.thought.at(-1);
     const open = last?.kind === 'reasoning' && last.signature === undefined ? last : undefined;
     const sealed = event.signature;

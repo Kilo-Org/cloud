@@ -415,8 +415,14 @@ for (const catalog of CATALOGS) {
 
   // One key per piece of copy. Two keys holding the same English string cannot
   // be translated apart without the catalogs drifting, so the copy belongs to
-  // one key and every call site points at it. A plural family shares copy by
-  // design, so its members are exempt.
+  // one key and every call site points at it.
+  //
+  // Every plural key is exempt, not only the members of one family. So two
+  // plural families holding the same copy pass here. That is deliberate: the
+  // one-wording rule below groups plural keys too, so the catalogs still cannot
+  // drift apart, and only the duplicate key survives. Narrowing the exemption
+  // has to compare stems, because a family's bare key carries its `_other` copy
+  // by i18next convention and is not a second key for the same string.
   if (catalog.name === 'mobile') {
     const byCopy = new Map();
     for (const [key, value] of english) {

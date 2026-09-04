@@ -790,7 +790,8 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/run.ts` | `openSession`: a new session |
 | `src/core/resume.ts` | `continueSession` and `cloneSession`: one the store already holds |
 | `src/core/wiring.ts` | What every session shares: the options, the handle, the bridge |
-| `src/core/ask.ts` | One question and one answer, with the turn rules |
+| `src/core/ask.ts` | One question and one answer: the guard, the ceiling, the stream |
+| `src/core/exchange.ts` | What an exchange is, and the rule that it is written whole |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
 | `src/core/turn.ts` | One turn and its parts: text, reasoning, or an image |

@@ -25,6 +25,7 @@ import {
 import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { worktreeRuntimeProxyGrantSchema } from '../runtime-credential-proxy.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
@@ -378,9 +379,7 @@ function safeUrl(value: string): URL | null {
   }
 }
 
-function deriveRuntimeProxyTargets(
-  targets: z.infer<typeof targetsSchema>
-): { backend: URL; provider: URL; ingest: URL } | null {
+function deriveRuntimeProxyTargets(targets: z.infer<typeof targetsSchema>): { facade: URL } | null {
   const parsed = [
     targets.backendBaseUrl,
     targets.providerBaseUrl,
@@ -397,42 +396,27 @@ function deriveRuntimeProxyTargets(
     provider.port !== '' ||
     ingest.protocol !== 'https:' ||
     ingest.port !== '' ||
-    backend.origin !== provider.origin ||
-    backend.origin !== ingest.origin ||
+    backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
+    backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
     backend.search ||
     provider.search ||
     ingest.search ||
-    backend.pathname !== '/api/runtime-credential-proxy/backend' ||
-    provider.pathname !== '/api/runtime-credential-proxy/provider' ||
-    ingest.pathname !== '/api/runtime-credential-proxy/ingest'
+    runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !==
+      backend.toString().replace(/\/+$/, '')
   ) {
     return null;
   }
-  return { backend, provider, ingest };
+  return { facade: backend };
 }
 
 function runtimeProxyTargets(env: CredentialEnv): z.infer<typeof targetsSchema> | null {
   if (!env.WORKER_URL) return null;
-  let worker: URL;
-  try {
-    worker = new URL(env.WORKER_URL);
-  } catch {
-    return null;
-  }
-  if (
-    worker.protocol !== 'https:' ||
-    worker.username ||
-    worker.password ||
-    worker.search ||
-    worker.hash
-  ) {
-    return null;
-  }
-  const base = `${worker.origin}${worker.pathname.replace(/\/+$/, '')}/api/runtime-credential-proxy`;
+  const base = runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL);
+  if (!base) return null;
   const targets = {
-    backendBaseUrl: `${base}/backend`,
-    providerBaseUrl: `${base}/provider`,
-    sessionIngestBaseUrl: `${base}/ingest`,
+    backendBaseUrl: base,
+    providerBaseUrl: base,
+    sessionIngestBaseUrl: base,
   };
   return deriveRuntimeProxyTargets(targets) ? targets : null;
 }

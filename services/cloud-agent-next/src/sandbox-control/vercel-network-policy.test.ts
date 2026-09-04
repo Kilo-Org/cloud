@@ -107,15 +107,15 @@ describe('buildVercelCredentialNetworkPolicy', () => {
         runtimeProxy: {
           worktreeHandle: 'runtime-proxy-handle',
           targets: {
-            backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
-            providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
-            sessionIngestBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/ingest',
+            backendBaseUrl: 'https://worker.example.com',
+            providerBaseUrl: 'https://worker.example.com',
+            sessionIngestBaseUrl: 'https://worker.example.com',
           },
         },
       }),
     });
     const authorization = 'Bearer runtime-proxy-handle';
-    const base = 'https://worker.example.com/api/runtime-credential-proxy/provider/api/openrouter';
+    const base = 'https://worker.example.com/api/openrouter';
 
     for (const [path, method] of [
       ['/models', 'GET'],
@@ -128,6 +128,29 @@ describe('buildVercelCredentialNetworkPolicy', () => {
       expect(effectiveAuthorization(policy, { url: `${base}${path}`, authorization, method })).toBe(
         authorization
       );
+    }
+    for (const path of ['/v1/chat/completions', '/v1/responses']) {
+      expect(
+        effectiveAuthorization(policy, {
+          url: `https://worker.example.com/api/gateway${path}`,
+          authorization,
+          method: 'POST',
+        })
+      ).toBe(authorization);
+      expect(
+        effectiveAuthorization(policy, {
+          url: `${base}${path}`,
+          authorization,
+          method: 'POST',
+        })
+      ).toBeUndefined();
+      expect(
+        effectiveAuthorization(policy, {
+          url: `https://worker.example.com/api/gateway${path}`,
+          authorization,
+          method: 'GET',
+        })
+      ).toBeUndefined();
     }
 
     for (const [path, method] of [
@@ -144,7 +167,7 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     }
     expect(
       effectiveAuthorization(policy, {
-        url: 'https://worker.example.com/api/runtime-credential-proxy/provider/chat/completions',
+        url: 'https://worker.example.com/chat/completions',
         authorization,
         method: 'POST',
       })
@@ -163,9 +186,9 @@ describe('buildVercelCredentialNetworkPolicy', () => {
             { sessionId: 'workspace_b', kiloSessionId: OTHER_SESSION_ID, handle: 'member-b' },
           ],
           targets: {
-            backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
-            providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
-            sessionIngestBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/ingest',
+            backendBaseUrl: 'https://worker.example.com',
+            providerBaseUrl: 'https://worker.example.com',
+            sessionIngestBaseUrl: 'https://worker.example.com',
           },
         },
       }),
@@ -173,28 +196,28 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     const authorization = `Bearer ${worktreeHandle}`;
     expect(
       effectiveAuthorization(policy, {
-        url: 'https://worker.example.com/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+        url: 'https://worker.example.com/api/openrouter/chat/completions',
         method: 'POST',
         authorization,
       })
     ).toBe(authorization);
     expect(
       effectiveAuthorization(policy, {
-        url: `https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/${ROOT_SESSION_ID}/ingest`,
+        url: `https://worker.example.com/api/session/${ROOT_SESSION_ID}/ingest`,
         method: 'POST',
         authorization,
       })
     ).toBe('Bearer member-a');
     expect(
       effectiveAuthorization(policy, {
-        url: `https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/${OTHER_SESSION_ID}/title`,
+        url: `https://worker.example.com/api/session/${OTHER_SESSION_ID}/title`,
         method: 'POST',
         authorization,
       })
     ).toBe('Bearer member-b');
     expect(
       effectiveAuthorization(policy, {
-        url: 'https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/unrelated/ingest',
+        url: 'https://worker.example.com/api/session/unrelated/ingest',
         method: 'POST',
         authorization,
       })

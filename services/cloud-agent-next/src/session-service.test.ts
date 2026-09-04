@@ -2504,9 +2504,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.runtimeCredentialProxy).toEqual({
       handle: 'stable-proxy-handle',
       targets: {
-        backendBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/backend',
-        providerBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/provider',
-        sessionIngestBaseUrl: 'https://cloud-agent.example.com/api/runtime-credential-proxy/ingest',
+        backendBaseUrl: 'https://cloud-agent.example.com',
+        providerBaseUrl: 'https://cloud-agent.example.com',
+        sessionIngestBaseUrl: 'https://cloud-agent.example.com',
       },
     });
     expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('stable-proxy-handle');

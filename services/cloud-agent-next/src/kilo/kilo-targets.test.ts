@@ -4,6 +4,26 @@ import {
   deriveKiloSandboxTargets,
   providerBaseUrlEncodedInToken,
 } from './kilo-targets.js';
+import {
+  historicalCliRoute,
+  historicalRouteFixtures,
+} from './__fixtures__/runtime-url-normalization.js';
+
+describe('immutable historical Kilo route normalization', () => {
+  it.each([
+    ['origin facade', 'https://worker.example.test'],
+    ['safe prefixed facade', 'https://worker.example.test/runtime-proxy'],
+  ])('%s keeps v7.4.20 and current requests inside the Worker facade', (_name, facade) => {
+    for (const fixture of historicalRouteFixtures) {
+      const routed = new URL(historicalCliRoute(facade, fixture.path));
+      expect(routed.origin).toBe('https://worker.example.test');
+      expect(routed.pathname).toBe(
+        `${new URL(facade).pathname.replace(/\/+$/, '')}${fixture.path}`
+      );
+      if (new URL(facade).pathname !== '/') expect(routed.pathname).not.toBe(fixture.path);
+    }
+  });
+});
 
 describe('providerBaseUrlEncodedInToken', () => {
   it('extracts and normalizes a provider base while preserving the full token separately', () => {

@@ -17,7 +17,7 @@ import {
   resolvePersistedRuntimeProxyCredential,
 } from '../runtime-credential-proxy-rpc.js';
 import {
-  runtimeCredentialProxyBaseUrl,
+  runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
   verifyRuntimeCredentialProxyHandle,

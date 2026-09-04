@@ -3235,9 +3235,9 @@ describe('runtime credential proxy ready request validation', () => {
     request.runtimeCredentialProxy = {
       handle: 'stable-proxy-handle',
       targets: {
-        backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
-        providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
-        sessionIngestBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/ingest',
+        backendBaseUrl: 'https://worker.example.com',
+        providerBaseUrl: 'https://worker.example.com',
+        sessionIngestBaseUrl: 'https://worker.example.com',
       },
     };
     expect(isWrapperSessionReadyRequest(request)).toBe(true);
@@ -3247,6 +3247,26 @@ describe('runtime credential proxy ready request validation', () => {
         runtimeCredentialProxy: { ...request.runtimeCredentialProxy, credential: 'backing-token' },
       })
     ).toBe(false);
+    for (const [requiredKey, wrongKey] of [
+      ['backendBaseUrl', 'backendUrl'],
+      ['providerBaseUrl', 'providerUrl'],
+      ['sessionIngestBaseUrl', 'ingestUrl'],
+    ]) {
+      expect(
+        isWrapperSessionReadyRequest({
+          ...request,
+          runtimeCredentialProxy: {
+            handle: 'stable-proxy-handle',
+            targets: Object.fromEntries(
+              Object.entries(request.runtimeCredentialProxy.targets).map(([key, value]) => [
+                key === requiredKey ? wrongKey : key,
+                value,
+              ])
+            ),
+          },
+        })
+      ).toBe(false);
+    }
     expect(
       isWrapperSessionReadyRequest({
         ...request,

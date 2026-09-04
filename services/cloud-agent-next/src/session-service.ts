@@ -26,7 +26,7 @@ import {
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
-import { runtimeCredentialProxyBaseUrl } from './runtime-credential-proxy.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 import { ExecutionError } from './execution/errors.js';
 import {
   checkDiskAndCleanBeforeSetup,
@@ -2082,7 +2082,7 @@ export class SessionService {
     let kiloSessionIngestBaseUrl: string | undefined;
     if (modernRuntimeAuthorization) {
       const workerUrl = env.WORKER_URL;
-      const proxyBaseUrl = workerUrl ? runtimeCredentialProxyBaseUrl(workerUrl) : null;
+      const proxyBaseUrl = workerUrl ? runtimeCredentialProxyFacadeBaseUrl(workerUrl) : null;
       const targets = deriveKiloSandboxTargets(env, metadata.auth.kilocodeToken);
       if (!proxyBaseUrl || !targets.success) {
         throw ExecutionError.invalidRequest(
@@ -2100,9 +2100,9 @@ export class SessionService {
         throw ExecutionError.invalidRequest('Runtime credential proxy grant is unavailable');
       }
       const proxyTargets = {
-        backendBaseUrl: `${proxyBaseUrl}/backend`,
-        providerBaseUrl: `${proxyBaseUrl}/provider`,
-        sessionIngestBaseUrl: `${proxyBaseUrl}/ingest`,
+        backendBaseUrl: proxyBaseUrl,
+        providerBaseUrl: proxyBaseUrl,
+        sessionIngestBaseUrl: proxyBaseUrl,
       };
       runtimeCredentialProxy = { handle, targets: proxyTargets };
       kiloCapability = handle;

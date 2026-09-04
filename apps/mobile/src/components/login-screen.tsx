@@ -57,7 +57,7 @@ export function LoginScreen() {
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
 
-  const { persistError, persistToken } = useDeviceApprovalPersistence({
+  const { persistError, isPersisting, persistToken } = useDeviceApprovalPersistence({
     status,
     credentials,
     signIn,
@@ -155,6 +155,7 @@ export function LoginScreen() {
                 }
               }}
               accessibilityLabel={t('login.retrySignIn')}
+              disabled={isPersisting}
             >
               <Text>{t('common.retry')}</Text>
             </Button>

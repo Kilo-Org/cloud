@@ -4,6 +4,7 @@ import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { hasHtmlToken, MarkdownHtml, parseMarkdownHtml } from './markdown-html';
 import {
   getMarkdownStyles,
   getPalette,
@@ -42,7 +43,48 @@ export function MarkdownText({
   const colors = useThemeColors();
 
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
+  const containsHtml = useMemo(() => hasHtmlToken(value), [value]);
+  const html = useMemo(
+    () => (containsHtml ? parseMarkdownHtml(value) : null),
+    [containsHtml, value]
+  );
 
+  if (html !== null) {
+    return (
+      <View>
+        <MarkdownHtml
+          html={html}
+          palette={palette}
+          selectable={selectable}
+          onLongPressLink={onLongPressLink}
+          onPressLink={onPressLink}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <MarkdownContent
+      value={value}
+      palette={palette}
+      selectable={selectable}
+      onLongPressLink={onLongPressLink}
+      onPressLink={onPressLink}
+    />
+  );
+}
+
+type MarkdownContentProps = Omit<MarkdownTextProps, 'variant'> & {
+  palette: MarkdownPalette;
+};
+
+function MarkdownContent({
+  value,
+  palette,
+  selectable = true,
+  onLongPressLink,
+  onPressLink,
+}: Readonly<MarkdownContentProps>) {
   // Tables are extracted before any renderer runs: each table becomes a chip
   // (parsed on open), and the remaining markdown runs render through useMarkdown.
   const [snapshot, setSnapshot] = useState(() => ({ value, segments: splitMarkdownTables(value) }));

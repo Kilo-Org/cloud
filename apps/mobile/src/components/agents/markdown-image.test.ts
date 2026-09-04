@@ -58,7 +58,7 @@ function findLoadButtons(
 async function mount(
   uri: string,
   alt = '',
-  onShowLinkActions?: () => void
+  options: { onShowLinkActions?: () => void; aspectRatio?: number } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
     current: undefined,
@@ -66,7 +66,7 @@ async function mount(
   await act(async () => {
     await Promise.resolve();
     rendererRef.current = TestRenderer.create(
-      createElement(MarkdownImage, { uri, alt, onShowLinkActions })
+      createElement(MarkdownImage, { uri, alt, ...options })
     );
   });
   const renderer = rendererRef.current;
@@ -172,6 +172,64 @@ describe('MarkdownImage inert-until-load', () => {
     await unmount(renderer);
   });
 
+  it('keeps a fixed HTML image ratio through consent, success, failure, retry, and blocking', async () => {
+    const aspectRatio = 2;
+    const renderer = await mount('https://example.com/a.png', 'shot', { aspectRatio });
+    const fixedSlots = () =>
+      renderer.root.findAll(
+        node =>
+          (node.props.style as { aspectRatio?: number } | undefined)?.aspectRatio === aspectRatio
+      );
+
+    expect(fixedSlots()).toHaveLength(1);
+    const loadButton = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    if (!loadButton) {
+      throw new Error('load button not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (loadButton.props.onPress as () => void)();
+    });
+    expect(fixedSlots()).toHaveLength(1);
+
+    const image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onLoad as (event: unknown) => void)({
+        source: { width: 100, height: 400 },
+      });
+    });
+    expect(fixedSlots()).toHaveLength(1);
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onError as () => void)();
+    });
+    expect(fixedSlots()).toHaveLength(1);
+
+    const retry = renderer.root.find(
+      node => node.props.accessibilityLabel === 'Image unavailable, retry loading'
+    );
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+    expect(fixedSlots()).toHaveLength(1);
+
+    await unmount(renderer);
+
+    const blocked = await mount('http://example.com/a.png', '', { aspectRatio });
+    expect(
+      blocked.root.findAll(
+        node =>
+          (node.props.style as { aspectRatio?: number } | undefined)?.aspectRatio === aspectRatio
+      )
+    ).toHaveLength(1);
+    await unmount(blocked);
+  });
+
   it('renders alt text for an empty src', async () => {
     const renderer = await mount('', 'photo');
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
@@ -268,7 +326,9 @@ describe('MarkdownImage inert-until-load', () => {
 
   it('exposes showLinkActions on the Load chip and routes it to the callback', async () => {
     const onShow = vi.fn<() => void>();
-    const renderer = await mount('https://example.com/a.png', '', onShow);
+    const renderer = await mount('https://example.com/a.png', '', {
+      onShowLinkActions: onShow,
+    });
     const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
     if (!load) {
       throw new Error('load button not found');
@@ -300,7 +360,9 @@ describe('MarkdownImage inert-until-load', () => {
 
   it('exposes showLinkActions on the blocked chip when a callback is supplied', async () => {
     const onShow = vi.fn<() => void>();
-    const renderer = await mount('http://insecure.com/a.png', '', onShow);
+    const renderer = await mount('http://insecure.com/a.png', '', {
+      onShowLinkActions: onShow,
+    });
     const chip = renderer.root.find(
       node =>
         typeof node.type === 'string' &&
@@ -324,7 +386,9 @@ describe('MarkdownImage inert-until-load', () => {
   it('exposes showLinkActions on the retry chip when a callback is supplied', async () => {
     confirmMarkdownImage('https://example.com/a.png');
     const onShow = vi.fn<() => void>();
-    const renderer = await mount('https://example.com/a.png', 'shot', onShow);
+    const renderer = await mount('https://example.com/a.png', 'shot', {
+      onShowLinkActions: onShow,
+    });
 
     const image = ofType(renderer.root, 'Image')[0];
     if (!image) {
@@ -363,7 +427,9 @@ describe('MarkdownImage inert-until-load', () => {
   it('keeps the viewer as the default action after load and carries showLinkActions', async () => {
     confirmMarkdownImage('https://example.com/a.png');
     const onShow = vi.fn<() => void>();
-    const renderer = await mount('https://example.com/a.png', 'shot', onShow);
+    const renderer = await mount('https://example.com/a.png', 'shot', {
+      onShowLinkActions: onShow,
+    });
     const imageButton = renderer.root.find(
       node =>
         typeof node.type === 'string' &&

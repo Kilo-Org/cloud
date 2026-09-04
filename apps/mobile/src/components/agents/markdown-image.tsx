@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react';
+import { type ReactElement, useReducer, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +39,24 @@ function imageHostDisplay(uri: string): string | null {
   } catch {
     return null;
   }
+}
+
+function FixedImageSlot({
+  aspectRatio,
+  children,
+}: Readonly<{ aspectRatio: number | undefined; children: ReactElement }>): ReactElement {
+  if (aspectRatio === undefined) {
+    return children;
+  }
+  return (
+    <View
+      className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+      // eslint-disable-next-line react-native/no-inline-styles -- an HTML image attribute determines this reserved ratio
+      style={{ aspectRatio }}
+    >
+      {children}
+    </View>
+  );
 }
 
 /** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
@@ -150,19 +168,25 @@ export function MarkdownImage({
   const confirmed = isMarkdownImageConfirmed(uri);
 
   if (kind === 'http' || kind === 'data') {
-    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
+    return (
+      <FixedImageSlot aspectRatio={aspectRatio}>
+        <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />
+      </FixedImageSlot>
+    );
   }
 
   if (kind === 'https' && !confirmed) {
     return (
-      <UnconfirmedImageChip
-        uri={uri}
-        onShowLinkActions={onShowLinkActions}
-        onLoad={() => {
-          confirmMarkdownImage(uri);
-          forceRender();
-        }}
-      />
+      <FixedImageSlot aspectRatio={aspectRatio}>
+        <UnconfirmedImageChip
+          uri={uri}
+          onShowLinkActions={onShowLinkActions}
+          onLoad={() => {
+            confirmMarkdownImage(uri);
+            forceRender();
+          }}
+        />
+      </FixedImageSlot>
     );
   }
 
@@ -174,30 +198,32 @@ export function MarkdownImage({
 
   if (failed) {
     return (
-      <Pressable
-        onPress={() => {
-          setFailed(false);
-          setMeasuredAspectRatio(undefined);
-          setAttempt(prev => prev + 1);
-        }}
-        onLongPress={onShowLinkActions}
-        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
-        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-        onAccessibilityAction={event => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            onShowLinkActions?.();
-          }
-        }}
-      >
-        <AlertCircle size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">
-          {alt
-            ? t('agentChat.filePart.imageUnavailableWithAlt', { alt })
-            : t('agentChat.filePart.imageUnavailable')}
-        </Text>
-      </Pressable>
+      <FixedImageSlot aspectRatio={aspectRatio}>
+        <Pressable
+          onPress={() => {
+            setFailed(false);
+            setMeasuredAspectRatio(undefined);
+            setAttempt(prev => prev + 1);
+          }}
+          onLongPress={onShowLinkActions}
+          className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+          accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+          onAccessibilityAction={event => {
+            if (event.nativeEvent.actionName === 'showLinkActions') {
+              onShowLinkActions?.();
+            }
+          }}
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">
+            {alt
+              ? t('agentChat.filePart.imageUnavailableWithAlt', { alt })
+              : t('agentChat.filePart.imageUnavailable')}
+          </Text>
+        </Pressable>
+      </FixedImageSlot>
     );
   }
 
@@ -223,7 +249,7 @@ export function MarkdownImage({
         }}
         // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
         style={{
-          aspectRatio: measuredAspectRatio ?? aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
+          aspectRatio: aspectRatio ?? measuredAspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
         }}
       >
         {measuredAspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}

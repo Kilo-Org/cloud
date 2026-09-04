@@ -75,12 +75,16 @@ it('keeps the machinery of a session out of the root', () => {
      accident is what the test is for. */
   const machinery = [
     'appendTurn',
+    'cancelQueued',
     'compactIfFull',
     'definitionsOf',
     'draftOf',
+    'enqueue',
+    'enqueueMessage',
     'handleOf',
     'locksFor',
     'makeId',
+    'makePending',
     'makePart',
     'makeSession',
     'makeTurn',
@@ -88,6 +92,7 @@ it('keeps the machinery of a session out of the root', () => {
     'promptedOf',
     'resolveTools',
     'sinceSummary',
+    'takeRun',
     'toolNamed',
     'wiringFor',
   ];

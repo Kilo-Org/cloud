@@ -1,13 +1,4 @@
-import {
-  type Duration,
-  Effect,
-  type Option,
-  PubSub,
-  Queue,
-  Ref,
-  type Scope,
-  type Take,
-} from 'effect';
+import { type Duration, Effect, type Option, PubSub, Ref, type Scope, type Take } from 'effect';
 import type { SessionBusyError } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { EntropySource, type EntropySourceService } from './entropy.js';
@@ -16,20 +7,14 @@ import {
   ModelClient,
   type ModelClientService,
   type ModelError,
-  type ModelEvent,
   type ModelUsage,
   zeroUsage,
 } from './model.js';
 import { PromptAssembler, type PromptAssemblerService } from './prompt.js';
+import { type Continued, makePending, type Pending } from './queue.js';
 import type { Session } from './session.js';
 import { onStore, SessionStore, type SessionStoreService, type StoreError } from './storage.js';
-import {
-  type LateResult,
-  locksFor,
-  resolveTools,
-  type Tool,
-  type ToolMissingError,
-} from './tool.js';
+import { locksFor, resolveTools, type Tool, type ToolMissingError } from './tool.js';
 
 /**
  * What a session is opened with. Every value is frozen for the life of the
@@ -118,14 +103,18 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    * eventually says. Closing the session stops all of it.
    */
   readonly scope: Scope.Scope;
-  /** Results that arrived after the model stopped waiting. See `background.ts`. */
-  readonly late: Queue.Queue<LateResult>;
+  /**
+   * What the session has been given to say and has not said yet: the messages a
+   * caller queued, and the results of tools the model stopped waiting for. See
+   * `queue.ts` and `background.ts`.
+   */
+  readonly pending: Pending;
   /**
    * What the session did without being asked, for a caller that wants to show
    * it. Values are dropped rather than held when nobody is listening: these are
    * for display, and the transcript is the record.
    */
-  readonly continued: PubSub.PubSub<Take.Take<ModelEvent, ContinuedError>>;
+  readonly continued: PubSub.PubSub<Take.Take<Continued, ContinuedError>>;
 }
 
 /**
@@ -136,9 +125,14 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
 type ContinuedError = ModelError | StoreError | SessionBusyError;
 
 /**
- * How many unwatched rounds the session keeps before it drops the oldest. It is
- * a display buffer, not a log, so it is small and it slides rather than blocking
- * the round that is publishing.
+ * How many events of unwatched rounds the session keeps before it drops the
+ * oldest. It is a display buffer, not a log, so it is small and it slides rather
+ * than blocking the round that is publishing.
+ *
+ * The same number is the replay window, so a caller that queues a message and
+ * only then reads `continued` still sees the answer. Without it the order of
+ * two lines of a caller's own code would decide whether they see anything at
+ * all, and the round can start before the subscription does.
  */
 const continuedCapacity = 256;
 
@@ -179,8 +173,11 @@ const wiringFor = (
       tools,
       locks: yield* locksFor(tools),
       scope: yield* Effect.scope,
-      late: yield* Queue.unbounded<LateResult>(),
-      continued: yield* PubSub.sliding<Take.Take<ModelEvent, ContinuedError>>(continuedCapacity),
+      pending: yield* makePending(yield* EntropySource),
+      continued: yield* PubSub.sliding<Take.Take<Continued, ContinuedError>>({
+        capacity: continuedCapacity,
+        replay: continuedCapacity,
+      }),
     };
     yield* Effect.addFinalizer(() =>
       Effect.ignore(onStore(wiring.store, plugin => plugin.flush()))

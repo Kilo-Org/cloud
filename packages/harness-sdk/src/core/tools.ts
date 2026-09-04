@@ -1,4 +1,5 @@
-import { Cause, Duration, Effect, type Exit, Fiber, Option, Queue } from 'effect';
+import { Cause, Duration, Effect, type Exit, Fiber, Option } from 'effect';
+import { enqueue } from './queue.js';
 import { type Tool, type ToolCall, type ToolFailure, type ToolResult, toolNamed } from './tool.js';
 import { makeTurn, type PartDraft, type Turn } from './turn.js';
 import type { Wiring } from './wiring.js';
@@ -110,7 +111,18 @@ const under = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolRe
     });
   });
 
-/** Hands the model on, and puts what the call says on the queue when it says it. */
+/**
+ * How the answer reads to the model when it arrives out of turn.
+ *
+ * It goes back as words the conversation says, not as a second tool result: the
+ * call it belongs to was already answered, and every shape refuses a second
+ * result for one call.
+ */
+const lateText = (call: ToolCall, result: ToolResult): string =>
+  `The ${call.name} call you made earlier (id ${call.id}) has ` +
+  `${result.failed ? 'failed' : 'finished'}:\n\n${result.body}`;
+
+/** Hands the model on, and puts what the call says in the line when it says it. */
 const later = (
   wiring: Wiring,
   call: ToolCall,
@@ -118,7 +130,12 @@ const later = (
 ): Effect.Effect<ToolResult> =>
   Effect.as(
     Effect.forkIn(
-      Effect.flatMap(Fiber.join(fiber), result => Queue.offer(wiring.late, { call, result })),
+      Effect.flatMap(Fiber.join(fiber), result =>
+        enqueue(wiring.pending, {
+          kind: 'toolResult',
+          parts: [{ kind: 'text', body: lateText(call, result) }],
+        })
+      ),
       wiring.scope
     ),
     stillRunning(call)
@@ -165,4 +182,4 @@ const callsIn = (turn: Turn): readonly ToolCall[] =>
     .filter(part => part.kind === 'toolCall')
     .map(part => ({ id: part.callId, name: part.name, arguments: part.body }));
 
-export { callsIn, defaultInlineFor, resultsTurn, runCalls };
+export { callsIn, defaultInlineFor, lateText, resultsTurn, runCalls };

@@ -104,17 +104,6 @@ interface Tool {
 }
 
 /**
- * A call that outlived the model's patience, and what it eventually gave back.
- *
- * The model was told the call was still running and carried on without it. This
- * is the answer arriving late, on its way into a turn of its own.
- */
-interface LateResult {
-  readonly call: ToolCall;
-  readonly result: ToolResult;
-}
-
-/**
  * Every tool a session may be opened with. It is one service and not one per
  * tool, because a caller assembles the set once and the session picks from it
  * by name.
@@ -176,15 +165,7 @@ const locksFor = (tools: readonly Tool[]): Effect.Effect<ReadonlyMap<string, Eff
     entries => new Map(entries)
   );
 
-export type {
-  JsonSchema,
-  LateResult,
-  Tool,
-  ToolCall,
-  ToolDefinition,
-  ToolRegistryService,
-  ToolResult,
-};
+export type { JsonSchema, Tool, ToolCall, ToolDefinition, ToolRegistryService, ToolResult };
 export {
   definitionsOf,
   locksFor,

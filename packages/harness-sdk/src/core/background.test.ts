@@ -83,7 +83,7 @@ it('starts a round of its own when the call finally answers', async () => {
   });
 
   /* Nobody asked a question. The result landing is what started the round. */
-  expect(seen.value.filter(event => event.kind === 'delta').map(event => event.text)).toEqual([
+  expect(seen.value.flatMap(one => (one.event.kind === 'delta' ? [one.event.text] : []))).toEqual([
     'the build passed',
   ]);
   /* And the request carried the answer as something the conversation said,
@@ -174,14 +174,14 @@ it('waits for the question in flight rather than asking over it', async () => {
   expect(askedWith(calls[2]?.prompt.messages.at(-1)?.parts ?? []).join('')).toContain('exit 0');
 });
 
-it('runs no driver at all for a session with no tools', async () => {
+it('continues nothing on its own when nothing is waiting', async () => {
   const { calls } = await runWith({
     replies: [{ deltas: ['hello'] }],
     use: session =>
       Effect.zipRight(
         Stream.runDrain(session.ask('hi')),
-        /* Nothing can ever reach the queue, so this ends on the timeout rather
-           than on an event, and the session is none the worse for it. */
+        /* Nothing joined the line, so this ends on the timeout rather than on
+           an event, and the session is none the worse for it. */
         Effect.ignore(Effect.timeout(Stream.runDrain(session.continued), Duration.millis(30)))
       ),
   });

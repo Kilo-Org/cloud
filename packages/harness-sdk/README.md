@@ -129,11 +129,48 @@ yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
 ```
 
 The handle also carries `history` (every turn, as a plain array), `usage` (the
-counts of every call so far — pass it to `hitRatio`), and `compact`.
+counts of every call so far — pass it to `hitRatio`), `compact`, and the three
+that work the queue: `queue`, `cancel` and `queued`.
 
 One session does one thing at a time. A second question, or a `compact`,
 started while the first answer is still streaming fails with
-`SessionBusyError` rather than queueing.
+`SessionBusyError` rather than waiting. To send one anyway, queue it.
+
+## Queueing a message
+
+`ask` answers where you stand, so it cannot wait for a session that is busy.
+`queue` is for the other case: a person typing while the last answer is still
+arriving. It never refuses. The message joins a line, the line is answered in
+the order it formed, and the answer arrives on `continued`.
+
+```ts
+const id = yield* session.queue('and what about Lisbon?');
+
+// The line, in the order it will be asked. Show it, or take one back.
+const waiting = yield* session.queued;
+
+// True while it is still waiting. False once it has been asked, which is not
+// an error: a message the provider has seen cannot be taken back.
+const dropped = yield* session.cancel(id);
+```
+
+Every event on `continued` names the queued entries its round answers, so one
+message's answer is told from another's:
+
+```ts
+yield* Stream.runForEach(session.continued, ({ answering, event }) =>
+  Effect.sync(() => {
+    if (event.kind === 'delta' && answering.includes(id)) {
+      process.stdout.write(event.text);
+    }
+  })
+);
+```
+
+The rounds happen whether or not anybody reads `continued`. A caller that does
+not watch loses the events, never the work, and `history` holds all of it. The
+stream replays its recent events to a new reader, so queueing a message and only
+then subscribing still shows you the answer.
 
 ## Tools
 
@@ -186,7 +223,8 @@ queue while everything else overlaps.
 Every call is run under a deadline, and every call can outlive it. When the
 deadline passes, the model is told the call is still running and carries on with
 what does not depend on it; the work keeps going; and when it finally answers,
-the session asks the model about it without anybody having asked a question.
+the session joins the same line a queued message joins, and asks the model about
+it without anybody having asked a question.
 
 ```ts
 const session = yield* openSession({
@@ -197,19 +235,12 @@ const session = yield* openSession({
      default, and a single tool may name its own with `inlineFor`. */
   inlineFor: '5 seconds',
 });
-
-/* The rounds the session ran without being asked. Reading it is optional: the
-   rounds happen either way, and the transcript holds all of them. */
-yield* Effect.fork(
-  Stream.runForEach(session.continued, event =>
-    Effect.sync(() => {
-      if (event.kind === 'delta') {
-        process.stdout.write(event.text);
-      }
-    })
-  )
-);
 ```
+
+The round it starts arrives on `continued`, like a queued message's. Several
+tool results waiting at the front of the line are answered together, in one
+round, because the model asked for those calls in one turn and is waiting on all
+of them.
 
 The answer goes back as a turn the conversation says, never as a second tool
 result: the call it belongs to was already answered, and every shape refuses a

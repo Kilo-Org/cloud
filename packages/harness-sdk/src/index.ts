@@ -15,6 +15,7 @@ export * from './core/entropy.js';
 export * from './core/fetch.js';
 export * from './core/model.js';
 export * from './core/prompt.js';
+export type { Continued, Waiting } from './core/queue.js';
 export * from './core/retry.js';
 export * from './core/resume.js';
 export * from './core/run.js';

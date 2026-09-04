@@ -8,6 +8,7 @@ export * from './handle.js';
 export * from './id.js';
 export * from './model.js';
 export * from './prompt.js';
+export * from './queue.js';
 export * from './retry.js';
 export * from './resume.js';
 export * from './run.js';

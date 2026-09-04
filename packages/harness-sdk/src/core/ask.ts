@@ -51,6 +51,23 @@ const answerOf = (
   });
 
 /**
+ * Asks the model with the session already held.
+ *
+ * It is what `askWith` does once it has the lock, and what the driver in
+ * `background.ts` uses under `whileFree`: that driver has to hold the session
+ * before it takes anything out of the line, or a message could be taken out,
+ * find the session busy, and be neither queued nor asked while a caller is
+ * looking at it.
+ */
+const askHeld =
+  (wiring: Wiring) =>
+  (
+    input: string | readonly PartDraft[],
+    options?: AskOptions
+  ): Stream.Stream<ModelEvent, ModelError | StoreError> =>
+    Stream.unwrap(answerOf(wiring, input, options));
+
+/**
  * Asks the model and streams the reply.
  *
  * One session does one thing at a time: two answers at once would both build
@@ -100,4 +117,4 @@ const whileFree = <A, E>(
   );
 
 export type { AskOptions };
-export { askWith, SessionBusyError, whileFree };
+export { askHeld, askWith, SessionBusyError, whileFree };

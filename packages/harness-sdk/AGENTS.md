@@ -723,14 +723,55 @@ session back while the store keeps the summary, and the two then disagree
 forever. `whileFree` in `ask.ts` is the lock, and `compactIfFull` does not take
 it — it runs inside a question that already holds it.
 
-It is refused rather than queued. Queueing cannot work: under `Stream.merge`
-the merged stream holds every child resource until all children finish, so the
-first question cannot release what the second waits on, and the acquire is
-uninterruptible, so `Effect.timeout` cannot break the deadlock either. Four
-acquire shapes were tried and every one that waits deadlocks.
+`ask` is refused rather than made to wait. A waiting `ask` cannot work: under
+`Stream.merge` the merged stream holds every child resource until all children
+finish, so the first question cannot release what the second waits on, and the
+acquire is uninterruptible, so `Effect.timeout` cannot break the deadlock
+either. Four acquire shapes were tried and every one that waits deadlocks.
+
+A caller who wants to send anyway calls `queue`, which is a different thing and
+not a waiting `ask`: it hands the message over and returns, and the answer comes
+back somewhere else. See below.
 
 An answer turn is added only when the stream reaches `done`. A half written turn
 would sit in the prefix of every later request.
+
+### A queued message is handed over, not waited on
+
+`ask` streams the answer where the caller stands, so it cannot wait: the stream
+it would have to return is the same stream holding the lock it is waiting for.
+`queue` sidesteps that by not returning a stream at all. It puts the message in
+a line, returns the identifier that cancels it, and the answer comes back on
+`continued`.
+
+One line holds two kinds of thing, because both are the same shape — words to
+put in front of the model, in a turn of their own. A message a caller queued,
+and the result of a tool the model stopped waiting for. Keeping them in one line
+is what makes the order between them defined: a tool result that arrived before
+a caller's message reaches the model first, which is the order they happened in.
+
+A message is a round of its own — a caller who wrote two of them meant two turns
+— and tool results waiting at the front run together, because the model asked
+for those calls in one turn and is waiting on all of them. Answering them one at
+a time would cost a request each and tell the model less every time.
+
+**The driver holds the session before it takes anything out of the line.** That
+order is the whole of why `cancel` can be honest. Taking first and then finding
+the session busy would leave a message neither waiting nor asked: `queued` would
+not show it, and `cancel` would say it was too late while nothing had been sent.
+So `background.ts` runs the take and the round inside one `whileFree`, and
+`ask.ts` exposes `askHeld` for a caller that already holds the lock.
+
+`continued` carries `{ answering, event }` rather than a bare `ModelEvent`.
+Without the identifiers a caller with two messages in the line cannot tell which
+answer is which, and `ModelEvent` is the transport's union — a marker event of
+the session's own would have to be handled by every `switch` over it.
+
+The stream replays its recent events to a new reader. Otherwise the order of two
+lines of a caller's own code — queue, then subscribe — would decide whether they
+saw anything at all, because the round can start before the subscription does.
+It is still a display buffer and not a log: it slides at 256 events, and the
+transcript is the record.
 
 ### A session names its tools; the registry defines them
 
@@ -780,18 +821,19 @@ stop waiting, not the tool. A tool that always outlives a request says
 `inlineFor: 0`, which is read rather than timed — a zero-length deadline raced
 against the work is a race the work usually wins.
 
-When the answer lands, the session asks the model about it without anybody
-having asked a question, and a caller watches through `session.continued`. It is
-not "wait for the next question": a build that finishes, or a person who answers
-ten minutes later, is work to do at that moment and not at whatever moment
-somebody next types. The rounds happen whether or not anybody reads the stream.
+When the answer lands it joins the same line a queued message joins, and the
+session asks the model about it without anybody having asked a question. A
+caller watches through `session.continued`. It is not "wait for the next
+question": a build that finishes, or a person who answers ten minutes later, is
+work to do at that moment and not at whatever moment somebody next types. The
+rounds happen whether or not anybody reads the stream.
 
 The answer goes back as a turn the conversation says, never as a second tool
 result: the call it belongs to was already answered, and every shape refuses a
 second result for one call.
 
 A result that lands while a question is still streaming waits for it, because
-one session still does one thing at a time. `roundFor` retries while the session
+one session still does one thing at a time. The driver retries while the session
 is busy, for up to five minutes, and a session busy longer than that surfaces on
 `session.continued` rather than spinning forever.
 
@@ -1225,12 +1267,13 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/resume.ts` | `continueSession` and `cloneSession`: one the store already holds |
 | `src/core/wiring.ts` | What every session shares: the options, the handle, the bridge |
 | `src/core/ask.ts` | One question and one answer: the guard, the ceiling, the stream |
+| `src/core/queue.ts` | The line a queued message and a late tool result wait in |
 | `src/core/exchange.ts` | What an exchange is, and the rule that it is written whole |
 | `src/core/handle.ts` | `SessionHandle`: what a caller holds, and the driver behind it |
 | `src/core/loop.ts` | The rounds one question makes, and the three ways they end |
 | `src/core/tool.ts` | The `ToolRegistry` plugin point, and what a tool is |
 | `src/core/tools.ts` | Running the calls of one turn, under a deadline they can outlive |
-| `src/core/background.ts` | The rounds the session runs when a late result lands |
+| `src/core/background.ts` | The driver: what the session says when nobody is streaming |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
 | `src/core/turn.ts` | One turn and its parts: text, reasoning, or an image |

@@ -1,82 +1,95 @@
-import { Chunk, Duration, Effect, PubSub, Queue, Schedule, Stream, Take } from 'effect';
-import { askWith, SessionBusyError } from './ask.js';
-import type { ModelEvent } from './model.js';
-import type { LateResult } from './tool.js';
-import type { PartDraft } from './turn.js';
+import { Duration, Effect, PubSub, Queue, Schedule, Stream, Take } from 'effect';
+import { askHeld, SessionBusyError, whileFree } from './ask.js';
+import type { ModelError, ModelEvent } from './model.js';
+import { type Continued, takeRun, type Waiting } from './queue.js';
+import type { StoreError } from './storage.js';
 import type { ContinuedError, Wiring } from './wiring.js';
 
 /**
- * What the session does when a backgrounded call finally answers.
+ * What the session says when nobody is streaming an answer out of it.
  *
- * The model was told the call was still running and carried on. The answer
- * cannot go back as a tool result: the call it belongs to was already answered,
- * and every shape refuses a second result for one call. So it goes back as
- * something the conversation says, in a turn of its own, and the session asks
- * the model about it without anybody having asked a question.
+ * Two things reach the model this way. A message a caller queued while the
+ * session was busy, and the result of a tool the model stopped waiting for. The
+ * second cannot go back as a tool result: the call it belongs to was already
+ * answered, and every shape refuses a second result for one call. So it goes
+ * back as something the conversation says, in a turn of its own.
  *
- * That is the difference between this and waiting for the next question. A
- * harness that finishes a build in the background, or asks a person something
- * and gets an answer ten minutes later, has work to do at that moment and not
- * at whatever moment somebody next types. The session drives itself, and a
- * caller watches through `session.continued`.
+ * Either way the session asks the model without anybody having asked a
+ * question, and a caller watches through `session.continued`. That is the
+ * difference between this and waiting for the next question: a build that
+ * finishes, a person who answers ten minutes later, a message typed while the
+ * last answer was still arriving — each is work to do at that moment, not at
+ * whatever moment somebody next types.
  */
-
-/** How the answer reads to the model when it arrives out of turn. */
-const lateText = (late: LateResult): string =>
-  `The ${late.call.name} call you made earlier (id ${late.call.id}) has ` +
-  `${late.result.failed ? 'failed' : 'finished'}:\n\n${late.result.body}`;
-
-const partsOf = (late: readonly LateResult[]): readonly PartDraft[] =>
-  late.map(one => ({ kind: 'text', body: lateText(one) }));
 
 /**
  * How long to wait before trying again when a question is already streaming.
  *
- * One session does one thing at a time, so a result that lands mid-question
- * waits for it. Nothing is lost by waiting: the results are already in hand,
- * and the round they start is built fresh on each attempt.
+ * One session does one thing at a time, so a round that is ready mid-question
+ * waits for it. Nothing is lost by waiting: what it will say is already in
+ * hand, and the round is built fresh on each attempt.
  */
 const whenBusy = Schedule.spaced(Duration.millis(50)).pipe(Schedule.upTo(Duration.minutes(5)));
 
-/** Everything waiting now, so a burst of results becomes one round, not several. */
-const waiting = (wiring: Wiring): Effect.Effect<readonly LateResult[]> =>
-  Effect.zipWith(Queue.take(wiring.late), Queue.takeAll(wiring.late), (first, rest) => [
-    first,
-    ...Chunk.toReadonlyArray(rest),
-  ]);
+const partsIn = (run: readonly Waiting[]) => run.flatMap(one => one.parts);
+
+const idsIn = (run: readonly Waiting[]) => run.map(one => one.id);
 
 /**
- * One self-driven round: the results go in as a turn, the model answers, and
- * everything it says reaches whoever is watching.
+ * One round: what waited goes in as a turn, the model answers, and everything
+ * it says reaches whoever is watching.
  *
- * The round is retried while the session is busy and given up on when the model
- * or the store refuses it. The failure reaches the watcher, which ends that
- * subscription and not the session: reading `session.continued` again starts a
- * new one, and the next backgrounded call still drives a round of its own.
+ * The session is held before anything is taken out of the line, and for the
+ * whole round. That order is the point. Taking first and then finding the
+ * session busy would leave a message neither waiting nor asked, so a caller
+ * looking at `queued` would not see it and `cancel` would say it was too late
+ * while nothing had been sent.
  */
-const roundFor = (wiring: Wiring, late: readonly LateResult[]): Effect.Effect<void> =>
-  Stream.runForEach(askWith(wiring)(partsOf(late)), event =>
-    PubSub.publish(wiring.continued, Take.of<ModelEvent>(event))
-  ).pipe(
-    Effect.retry({
-      while: (refused: ContinuedError) => refused instanceof SessionBusyError,
-      schedule: whenBusy,
-    }),
-    Effect.catchAll(refused => Effect.asVoid(PubSub.publish(wiring.continued, Take.fail(refused))))
+const attempt = (wiring: Wiring): Effect.Effect<void, ContinuedError> =>
+  whileFree(
+    wiring,
+    Effect.flatMap(takeRun(wiring.pending), (run): Effect.Effect<void, ModelError | StoreError> => {
+      const answering = idsIn(run);
+      const publish = (event: ModelEvent) =>
+        PubSub.publish(wiring.continued, Take.of<Continued>({ answering, event }));
+      /* An empty run is what a cancelled message leaves behind. It starts no
+         round rather than asking the model nothing at all. */
+      return run.length === 0
+        ? Effect.void
+        : Stream.runForEach(askHeld(wiring)(partsIn(run), run[0]?.options), publish);
+    })
   );
 
 /**
- * Waits on the queue for as long as the session lives.
+ * Waits on the line for as long as the session lives.
  *
  * Forked into the session's own scope, so it stops when the session closes and
- * runs whether or not anybody is watching. A backgrounded call that nobody
- * listens for still gets answered; only the events go unseen.
+ * runs whether or not anybody is watching. A queued message that nobody listens
+ * for is still asked; only the events go unseen, and the transcript holds them.
+ *
+ * A round is retried while the session is busy and given up on when the model
+ * or the store refuses it. The failure reaches the watcher, which ends that
+ * subscription and not the session: reading `session.continued` again starts a
+ * new one, and the next thing to join the line still gets its round.
  */
-const driveLate = (wiring: Wiring): Effect.Effect<void> =>
-  Effect.forever(Effect.flatMap(waiting(wiring), late => roundFor(wiring, late)));
+const drivePending = (wiring: Wiring): Effect.Effect<void> =>
+  Effect.forever(
+    Effect.zipRight(
+      Queue.take(wiring.pending.arrived),
+      attempt(wiring).pipe(
+        Effect.retry({
+          while: (refused: ContinuedError) => refused instanceof SessionBusyError,
+          schedule: whenBusy,
+        }),
+        Effect.catchAll(refused =>
+          Effect.asVoid(PubSub.publish(wiring.continued, Take.fail(refused)))
+        )
+      )
+    )
+  );
 
 /** What a caller reads to see the rounds it did not ask for. */
-const continuedOf = (wiring: Wiring): Stream.Stream<ModelEvent, ContinuedError> =>
+const continuedOf = (wiring: Wiring): Stream.Stream<Continued, ContinuedError> =>
   Stream.flattenTake(Stream.fromPubSub(wiring.continued));
 
-export { continuedOf, driveLate, lateText };
+export { continuedOf, drivePending };

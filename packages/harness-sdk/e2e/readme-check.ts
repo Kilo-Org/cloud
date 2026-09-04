@@ -137,16 +137,24 @@ export const asking = Effect.gen(function* () {
     tools: ['weather'],
     inlineFor: '5 seconds',
   });
-  yield* Effect.fork(
-    Stream.runForEach(session.continued, event =>
-      Effect.sync(() => {
-        if (event.kind === 'delta') {
-          process.stdout.write(event.text);
-        }
-      })
-    )
-  );
   yield* Stream.runDrain(session.ask('What is the weather in Oslo?'));
+});
+
+/* The README's queue: the identifier, the line, taking one back, and reading
+   one message's answer out of the rounds the session ran on its own. */
+export const queueing = Effect.gen(function* () {
+  const session = yield* openSession({ system: 'sys', model: 'm' });
+  const id = yield* session.queue('and what about Lisbon?');
+  const waiting = yield* session.queued;
+  const dropped = yield* session.cancel(id);
+  yield* Stream.runForEach(session.continued, ({ answering, event }) =>
+    Effect.sync(() => {
+      if (event.kind === 'delta' && answering.includes(id)) {
+        process.stdout.write(event.text);
+      }
+    })
+  );
+  return { waiting, dropped };
 });
 
 declare const promptTheUser: (question: Question) => Effect.Effect<string>;

@@ -4,24 +4,9 @@ import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
-import { kilo } from './setup.js';
+import { cachedSystem as system, kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
-
-/**
- * The cached prefix must clear the model's minimum, which is 4096 tokens on
- * Haiku 4.5. A short system prompt caches nothing at all and the check would
- * read as a failure of the package rather than of the prompt.
- */
-const rule = (index: number) =>
-  `Rule ${String(index)}: when the user asks for a word, answer with that one word and nothing else. ` +
-  'Do not explain. Do not add punctuation beyond the word itself. Do not greet the user. ' +
-  'Do not restate the question. Keep the answer to a single lowercase word.';
-
-const system = [
-  'You are a test harness. Follow every rule below.',
-  ...Array.from({ length: 200 }, (_, index) => rule(index)),
-].join('\n');
 
 interface Answer {
   readonly said: string;

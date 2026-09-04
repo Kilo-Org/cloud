@@ -28,6 +28,7 @@
     "test:e2e:all": "ttsx e2e/all.ts",
     "test:e2e:cancel": "ttsx e2e/cancel.ts",
     "test:e2e:compact": "ttsx e2e/compact.ts",
+    "test:e2e:clone": "ttsx e2e/clone.ts",
     "test:e2e:image": "ttsx e2e/image.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
     "test:e2e:probe": "ttsx e2e/probe.ts",

@@ -20,20 +20,10 @@ import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
-import { kilo } from './setup.js';
+import { cachedSystem as system, kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 const questions = 10;
-
-const rule = (index: number) =>
-  `Rule ${String(index)}: when the user asks for a word, answer with that one word and nothing else. ` +
-  'Do not explain. Do not add punctuation beyond the word itself. Do not greet the user. ' +
-  'Do not restate the question. Keep the answer to a single lowercase word.';
-
-const system = [
-  'You are a test harness. Follow every rule below.',
-  ...Array.from({ length: 200 }, (_, index) => rule(index)),
-].join('\n');
 
 interface Answer {
   readonly said: string;

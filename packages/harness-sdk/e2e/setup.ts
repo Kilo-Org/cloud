@@ -38,4 +38,23 @@ const kilo = (
     ...over,
   });
 
-export { baseUrl, everyShape, kilo, organizationId, token };
+/**
+ * A system prompt long enough to be cached, and rules strict enough that an
+ * answer is one word.
+ *
+ * The cached prefix must clear the model's minimum, which is 4096 tokens on
+ * Haiku 4.5. A short system prompt caches nothing at all, and a run that
+ * measured the cache would read as a failure of the package rather than of the
+ * prompt it was given.
+ */
+const rule = (index: number) =>
+  `Rule ${String(index)}: when the user asks for a word, answer with that one word and nothing else. ` +
+  'Do not explain. Do not add punctuation beyond the word itself. Do not greet the user. ' +
+  'Do not restate the question. Keep the answer to a single lowercase word.';
+
+const cachedSystem = [
+  'You are a test harness. Follow every rule below.',
+  ...Array.from({ length: 200 }, (_, index) => rule(index)),
+].join('\n');
+
+export { baseUrl, cachedSystem, everyShape, kilo, organizationId, token };

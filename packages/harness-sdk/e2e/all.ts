@@ -21,6 +21,7 @@ const runs = [
   'cancel',
   'session',
   'resume',
+  'clone',
   'reasoning',
   'compact',
   'models',

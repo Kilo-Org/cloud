@@ -925,6 +925,25 @@ in its types, so `expo-sqlite` is an optional peer dependency. `plugins/store/
 node` names `node:sqlite`, which needs Node 22.13 or newer to import without a
 flag.
 
+### A reopened session does not know how full it is
+
+`prompted` is the provider's own count of the last request, and nothing here
+estimates one. A session that has just been reopened has made no request, so
+`prompted` is zero, `isFull` is false, and the first question goes out with the
+whole stored conversation in front of it. Two tests in `resume.test.ts` pin it:
+the first question after a resume does not check the window, and the question
+after that one does, because the first answer reported a real count.
+
+So the gap is one question wide and it closes itself — unless that first
+question is the one that will not fit. Then it is refused, `finish` never runs,
+`prompted` stays zero, and every retry is identical: the session cannot compact
+itself out of it. `session.compact` is the way out, and that is what it is for.
+
+Closing it properly means storing the count beside the session, which is a
+column, a migration, and a widening of `append` — the store's contract would
+have to carry more than turns. That is a decision, not a tidy-up, so it is
+written down here rather than made in passing.
+
 ### A reloaded turn must equal the turn that was written
 
 The prompt prefix is rebuilt from the store. If `load` returns a turn that

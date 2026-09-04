@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { Effect, Layer, Stream } from 'effect';
 import { layerTableCatalog } from '../plugins/catalog/table.js';
 import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
-import { fakeModel } from '../plugins/model/fake.js';
+import { fakeModel, type FakeReply } from '../plugins/model/fake.js';
 import { layerAssembler } from '../plugins/prompt/default.js';
 import { layerNodeStore } from '../plugins/store/node.js';
 import type { ModelRequest } from './model.js';
@@ -26,18 +26,31 @@ interface Bench {
   ) => Promise<{ readonly value: A; readonly calls: readonly ModelRequest[] }>;
 }
 
+/** What a bench varies: the model's answer, and the window it is measured against. */
+interface Setup {
+  readonly reply?: FakeReply;
+  /** Without one the catalog names no window, and nothing ever compacts. */
+  readonly window?: number;
+}
+
 /**
  * One database, many sessions. Each run builds its own layers, which is what a
  * second start of an application does.
  */
-const bench = (): Bench => {
+const bench = (setup: Setup = {}): Bench => {
   const database = new DatabaseSync(':memory:');
   return {
     run: use => {
-      const model = fakeModel([{ deltas: ['an answer'] }]);
+      const model = fakeModel([setup.reply ?? { deltas: ['an answer'] }]);
       const layers = Layer.mergeAll(
         layerAssembler,
-        layerTableCatalog({}, { apiKinds: ['messages'] }),
+        layerTableCatalog(
+          {},
+          {
+            apiKinds: ['messages'],
+            ...(setup.window === undefined ? {} : { contextWindow: setup.window }),
+          }
+        ),
         layerSeededEntropy(1),
         model.layer,
         layerNodeStore(database)

@@ -113,3 +113,55 @@ it('leaves the original alone when the clone is asked something', async () => {
 
   expect(texts(original.value)).toEqual(['user:first', 'assistant:an answer']);
 });
+
+/**
+ * A resumed session does not know how full it is.
+ *
+ * The compaction trigger is the provider's own count of the last request, and
+ * nothing here estimates one. A session that is reopened has made no request
+ * yet, so the count is zero and the first question goes out with the whole
+ * stored conversation in front of it, however long that is. The answer to that
+ * question reports a real count, and every question after it is measured.
+ *
+ * This is a known limit, not a decision that reads well. Closing it means
+ * storing the count beside the session, which is a column and a migration.
+ * Until then a caller that reopens a long conversation calls `session.compact`
+ * itself, which is what that method is for.
+ */
+it('asks its first question after a resume without checking the window', async () => {
+  const desk = bench({
+    window: 1000,
+    reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
+  });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
+  );
+
+  /* One call, not two. The same session asked twice in one run compacts on the
+     second question, because the first answer reported 900 of a 1000 window. */
+  expect(resumed.calls).toHaveLength(1);
+});
+
+it('learns the count from the first answer, and compacts on the question after it', async () => {
+  const desk = bench({
+    window: 1000,
+    reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
+  });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const resumed = await desk.run(
+    Effect.flatMap(continueSession(opened.value), session =>
+      Effect.zipRight(asked(session, 'second'), asked(session, 'third'))
+    )
+  );
+
+  /* Three: the second question, the summary it triggers, and the third. So the
+     gap is one question wide, and it closes itself. */
+  expect(resumed.calls).toHaveLength(3);
+});

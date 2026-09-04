@@ -314,7 +314,7 @@ type AuthContextValue = {
   sessionEnded: boolean;
   authEpoch: number;
   isSigningOut: boolean;
-  signIn: (pair: NativeTokenPair) => Promise<void>;
+  signIn: (pair: NativeTokenPair) => Promise<boolean>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -556,7 +556,7 @@ describe('sign-out teardown ordering', () => {
     const { ctx, unmount } = await mountAndGetContext();
 
     await act(async () => {
-      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+      await ctx.signIn(tokenPair(makeToken({ kiloUserId: 'user-2' })));
     });
 
     // The switch unregisters the prior scope's activity tokens (tombstone on
@@ -1203,6 +1203,23 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('returns false without publishing React auth state when credential persistence is fenced', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const credentials = await import('@/lib/auth/credentials');
+    const setCredentials = vi.spyOn(credentials, 'setCredentials').mockResolvedValueOnce(false);
+
+    let persisted = true;
+    await act(async () => {
+      persisted = await getCtx().signIn(tokenPair('unpublished-token'));
+    });
+
+    expect(persisted).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
+    setCredentials.mockRestore();
+    unmount();
+  });
+
   it('regression: sign-out during bootstrap wins over changed stored credentials', async () => {
     let releaseRead: (() => void) | undefined = undefined;
     const readGate = new Promise<void>(resolve => {
@@ -1262,6 +1279,81 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBe(storedToken);
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
 
+    unmount();
+  });
+
+  it('refreshes a near-expiry modern bundle when the app enters the foreground', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const initial = {
+      ...modernCredentialBundle,
+      metadata: {
+        ...modernCredentialBundle.metadata,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    } satisfies NativeTokenPair;
+    const refreshed = {
+      ...initial,
+      token: 'refreshed-api-token',
+      refreshToken: 'refreshed-refresh-token',
+      metadata: {
+        ...initial.metadata,
+        gatewayToken: 'refreshed-gateway-token',
+        expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    } satisfies NativeTokenPair;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(refreshed));
+
+    await act(async () => {
+      await getCtx().signIn(initial);
+    });
+
+    expect(hoisted.secureStoreValues.has('token-expires-at')).toBe(false);
+    const eventListener = hoisted.appState.addEventListener.mock.calls.at(-1)?.[1];
+
+    await act(async () => {
+      eventListener?.('active');
+      await vi.waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    expect(getCtx().token).toBe(refreshed.token);
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()?.token).toBe(refreshed.token);
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
+  it('refreshes a near-expiry legacy credential pair from the persisted expiry fallback', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const initial = {
+      token: 'legacy-api-token',
+      refreshToken: 'legacy-refresh-token',
+      expiresIn: 60,
+    } satisfies NativeTokenPair;
+    const refreshed = {
+      token: 'refreshed-api-token',
+      refreshToken: 'refreshed-refresh-token',
+      expiresIn: 3600,
+    } satisfies NativeTokenPair;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(refreshed));
+
+    await act(async () => {
+      await getCtx().signIn(initial);
+    });
+
+    expect(hoisted.secureStoreValues.has('token-expires-at')).toBe(true);
+    const eventListener = hoisted.appState.addEventListener.mock.calls.at(-1)?.[1];
+    await act(async () => {
+      eventListener?.('active');
+      await vi.waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    expect(getCtx().token).toBe(refreshed.token);
+    fetchSpy.mockRestore();
     unmount();
   });
 

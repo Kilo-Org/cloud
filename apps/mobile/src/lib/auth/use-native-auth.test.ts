@@ -78,7 +78,7 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: vi.fn(() => ({ signIn: vi.fn() })),
+  useAuth: vi.fn(() => ({ signIn: vi.fn().mockResolvedValue(true) })),
 }));
 
 // Mock getAdmission so resolveAdmission tests can control the three paths:
@@ -452,7 +452,7 @@ describe('useNativeAuth created-account announcement', () => {
   });
 
   it('negotiates gateway credentials and forwards their metadata', async () => {
-    const signIn = vi.fn().mockResolvedValue(undefined);
+    const signIn = vi.fn().mockResolvedValue(true);
     vi.mocked(useAuth).mockReturnValue({
       token: undefined,
       isLoading: false,
@@ -506,6 +506,29 @@ describe('useNativeAuth created-account announcement', () => {
       await result?.verifyEmailCode('user@example.com', '123456');
     });
 
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('does not report successful email sign-in when credentials are not published', async () => {
+    const signIn = vi.fn().mockResolvedValue(false);
+    vi.mocked(useAuth).mockReturnValue({
+      token: undefined,
+      isLoading: false,
+      sessionEnded: false,
+      authEpoch: 0,
+      isSigningOut: false,
+      signIn,
+      signOut: vi.fn(),
+    });
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: true },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+
+    expect(result).toBe(false);
     expect(announcingToast.success).not.toHaveBeenCalled();
   });
 });

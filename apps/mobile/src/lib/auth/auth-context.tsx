@@ -36,7 +36,11 @@ import {
   setCredentials,
   writeCredentials,
 } from '@/lib/auth/credentials';
-import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import {
+  clearActiveToken,
+  getActiveTokenSnapshot,
+  setSignOutTeardownActive,
+} from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -90,7 +94,7 @@ type AuthContextValue = {
    *  publication succeeds. The read-cache mount refuses to subscribe while it
    *  is set, and the persister fence reads the same flag at write time. */
   isSigningOut: boolean;
-  signIn: (pair: NativeTokenPair) => Promise<void>;
+  signIn: (pair: NativeTokenPair) => Promise<boolean>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -113,12 +117,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   useAuthBootstrap({ setToken, setIsLoading });
 
+  // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so a
+  // sign-in queued behind an in-flight sign-out lands only after the full
+  // teardown, and a sign-out queued behind a sign-in signs that new session
+  // out (documented, correct FIFO semantics).
   const signIn = useCallback(async (pair: NativeTokenPair) => {
-    // The ENTIRE sign-in body runs inside the FIFO auth-transition queue, so
-    // a sign-in queued behind an in-flight sign-out lands only after the
-    // full teardown, and a sign-out queued behind a sign-in signs that new
-    // session out (documented, correct FIFO semantics).
-    await chainSave('auth-transition', async () => {
+    const persisted = await chainSave('auth-transition', async () => {
       // Close admission before publishing the pending generation or writing credentials.
       setSignOutTeardownActive(true);
       setSignOutActive(true);
@@ -145,7 +149,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // credential write was fenced must not clear the signed-out guard,
       // update React auth state, or run login side effects.
       if (!published || !isCurrentAuthEpoch(epoch)) {
-        return;
+        return false;
       }
       // Clear the guard so a later refused refresh can sign out again.
       isSignedOutReference.current = false;
@@ -168,7 +172,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // A direct account switch must not keep the prior account's session
       // state: trusted hosts, image confirms, media caches, temp copies.
       clearSessionScopedState();
+      return true;
     });
+    return persisted;
   }, []);
 
   const signOut = useCallback(async (ended = false) => {
@@ -347,12 +353,15 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       const epoch = currentAuthEpoch();
 
       void (async () => {
-        const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
-        if (!expiresAtStr) {
-          return;
+        let expiresAt = getActiveTokenSnapshot()?.expiresAtMs;
+        if (expiresAt === null || expiresAt === undefined) {
+          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          if (!expiresAtStr) {
+            return;
+          }
+          expiresAt = Number(expiresAtStr);
         }
 
-        const expiresAt = Number(expiresAtStr);
         if (Date.now() <= expiresAt - REFRESH_MARGIN_MS) {
           return;
         }

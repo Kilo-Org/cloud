@@ -66,14 +66,16 @@ async function getAdmissionBody() {
 
 async function completeNativeSignIn(
   data: unknown,
-  signIn: (pair: NativeTokenPair) => Promise<void>
+  signIn: (pair: NativeTokenPair) => Promise<boolean>
 ): Promise<boolean> {
   const pair = parseTokenPair(data);
   if (!pair) {
     toast.error(defaultErrorMessage());
     return false;
   }
-  await signIn(pair);
+  if (!(await signIn(pair))) {
+    return false;
+  }
   if (pair.created === true) {
     announcingToast.success(i18n.t('login.accountCreated'));
   }

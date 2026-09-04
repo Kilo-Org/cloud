@@ -1057,6 +1057,7 @@ async function credentialFixture(
   const environment = {
     ...env,
     ...VERCEL_ENV,
+    NEXTAUTH_SECRET: 'integration-runtime-proxy-secret',
     GIT_TOKEN_SERVICE: broker.binding,
     WORKER_URL: 'https://worker.test',
     KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,

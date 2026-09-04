@@ -63,7 +63,7 @@ const runShape = async (kind: ApiKind) => {
 };
 
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
-/** `chat_completions` publishes no cache control, so it is not held to a ratio. */
+/** `chat_completions` sends no cache control, so it is not held to a ratio. */
 const mustCache = new Set<ApiKind>(['messages', 'responses']);
 
 console.log('model', model);

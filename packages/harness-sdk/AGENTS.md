@@ -306,11 +306,11 @@ The route serves three shapes. A model does not always speak all three, and the
 gateway resolves that from the serving provider without publishing it, so the
 caller gives the plugin an `apiKinds` function.
 
-| Shape | Path | How it caches |
+| Shape | Path | What it sends about the cache |
 |---|---|---|
 | `messages` | `/api/gateway/v1/messages` | An explicit `cache_control` breakpoint |
 | `responses` | `/api/gateway/v1/responses` | A `prompt_cache_key` the caller names |
-| `chat_completions` | `/api/gateway/v1/chat/completions` | Whatever the gateway does on its own |
+| `chat_completions` | `/api/gateway/v1/chat/completions` | Nothing |
 
 **The hit ratio is not comparable between shapes.** `pnpm test:e2e:shapes` asks
 the same two questions of the same model through each one:
@@ -329,17 +329,43 @@ cache write, and only the `messages` column can be read as a cache figure. Hold
 a shape to `cacheReadTokens > 0`, not to a ratio, unless it is `messages`.
 
 The plugin picks `messages` first, then `responses`, then `chat_completions`.
-That order is the cache order: an explicit breakpoint beats a key, and a key
-beats no control at all.
+That order is what each shape lets a caller control, best first.
 
-The last of the three controls nothing, and that was measured rather than
-assumed. Until 2026-09-04 it sent Anthropic's `cache_control` on the last
-block. Against a prefix nobody had sent before — a nonce in all 200 system
-rules, so the first call is cold — the second call read 12229 cached tokens for
-`openai/gpt-5.6-luna` and 13630 for `anthropic/claude-haiku-4.5`, the same to
-the token with the breakpoint and without it. So the field bought nothing on
-either provider and the shape stopped sending it. Re-run that measurement
-before putting it back; `wire/image.test.ts` holds the method.
+**On this gateway, none of it changes the cache.** Measured on 2026-09-04 with
+a prefix nobody had sent before — a nonce in the header and in all 200 system
+rules, so the first call of every run is cold and the second measures a cache
+that run wrote:
+
+| Shape | Model | Sent | Cache read on the second call |
+|---|---|---|---:|
+| `messages` | `anthropic/claude-haiku-4.5` | breakpoint | 14032 |
+| `messages` | `anthropic/claude-haiku-4.5` | nothing | 14032 |
+| `messages` | `openai/gpt-5.6-luna` | breakpoint | 12229 |
+| `messages` | `openai/gpt-5.6-luna` | nothing | 12229 |
+| `responses` | `openai/gpt-5.6-luna` | `prompt_cache_key` | 12229 |
+| `responses` | `openai/gpt-5.6-luna` | nothing | 12229 |
+| `chat_completions` | `anthropic/claude-haiku-4.5` | breakpoint | 13630 |
+| `chat_completions` | `anthropic/claude-haiku-4.5` | nothing | 13630 |
+| `chat_completions` | `openai/gpt-5.6-luna` | breakpoint | 12229 |
+| `chat_completions` | `openai/gpt-5.6-luna` | nothing | 12229 |
+
+Every pair is identical to the token, on a native Anthropic model as much as on
+a relayed one. The gateway places its own breakpoints, so what this package
+sends is redundant there today.
+
+What that does **not** change: the prefix discipline is still what makes the
+cache work. Append-only turns, a frozen system prompt, model and effort, and
+images kept as the base64 the wire wants — the gateway's own breakpoints need a
+stable prefix as much as ours would. Only the marker is redundant, not the rule
+that nothing in front of it may move.
+
+`chat_completions` stopped sending its breakpoint on 2026-09-04, because
+`cache_control` is not part of that API at all — it was a non-standard field
+the gateway would have had to translate, and it bought nothing. `messages`
+keeps its breakpoint: it is the documented mechanism for the body being sent,
+it costs nothing, and its absence would show up only as a bill if the gateway
+ever stopped inserting its own. Re-run the measurement before changing that;
+`wire/image.test.ts` holds the method.
 
 A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 502, 503, and 504. The retry stops as soon as the status is good, before the

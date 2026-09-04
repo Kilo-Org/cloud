@@ -278,21 +278,22 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     vi.mocked(triageSecurityFinding).mockResolvedValue(existingTriage);
     const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-    await startSecurityAnalysis(
-      createParams(
-        false,
-        vi
-          .fn()
-          .mockResolvedValueOnce(
-            Response.json({
-              result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
-            })
-          )
-          .mockResolvedValueOnce(
-            Response.json({ result: { data: { executionId: 'exec-123' } } })
-          ) as never
-      )
+    const params = createParams(
+      false,
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          })
+        )
+        .mockResolvedValueOnce(
+          Response.json({ result: { data: { executionId: 'exec-123' } } })
+        ) as never
     );
+    params.organizationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+    await startSecurityAnalysis(params);
 
     expect(generateControlToken).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-123' }),
@@ -301,6 +302,14 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       undefined,
       organizationId
     );
+    expect(generateTriageToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-123' }),
+      'next-auth-secret',
+      'development',
+      undefined,
+      organizationId
+    );
+    expect(triageSecurityFinding).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
   });
 
   it('reuses existing triage and launches sandbox without retriaging', async () => {

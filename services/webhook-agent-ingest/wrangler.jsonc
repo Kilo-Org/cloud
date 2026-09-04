@@ -175,7 +175,6 @@
           {
             "name": "TRIGGER_DO",
             "class_name": "TriggerDO",
-            "script_name": "cloudflare-webhook-agent-ingest-dev",
           },
         ],
       },

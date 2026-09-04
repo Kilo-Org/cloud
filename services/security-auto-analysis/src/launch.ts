@@ -202,13 +202,14 @@ export async function startSecurityAnalysis(
         params.nextAuthSecret,
         environment,
         params.env.SHARED_RESOURCE_TOKENS_ENABLED,
-        params.organizationId
+        finding.owned_by_organization_id ?? undefined
       ),
       generateTriageToken(
         params.actorUser,
         params.nextAuthSecret,
         environment,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED
+        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+        finding.owned_by_organization_id ?? undefined
       ),
     ]);
     const triage = skipTriage
@@ -218,7 +219,7 @@ export async function startSecurityAnalysis(
           authToken: triageToken,
           model: params.triageModel,
           backendBaseUrl: params.env.KILOCODE_BACKEND_BASE_URL,
-          organizationId: params.organizationId,
+          organizationId: finding.owned_by_organization_id ?? undefined,
         });
 
     const runSandbox =
@@ -287,7 +288,7 @@ export async function startSecurityAnalysis(
       model: params.analysisModel,
       githubRepo: finding.repo_full_name,
       githubToken: params.githubToken,
-      kilocodeOrganizationId: params.organizationId,
+      kilocodeOrganizationId: finding.owned_by_organization_id ?? undefined,
       createdOnPlatform: 'security-agent',
       callbackTarget,
     };

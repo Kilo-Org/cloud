@@ -54,6 +54,7 @@ export async function prepareTriagePayload(
 
     // 3. Generate auth token for cloud agent with bot identifier
     const authToken = generateCloudAgentWorkflowToken(user, {
+      organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'auto-triage',
       botId: 'auto-triage',
       expiresIn: TOKEN_EXPIRY.default,

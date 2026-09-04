@@ -10,6 +10,7 @@ import { getKiloChat } from './kilo-chat-binding';
 import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { getSecretValue } from './util/secret';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
 const TOKEN_CACHE_TTL_SECONDS = 30 * 60;
@@ -29,11 +30,6 @@ function tokenCacheKey(
       ? 'modern'
       : 'legacy';
   return `webhook-token:${format}:${principal}`;
-}
-
-function sharedResourceTokensEnabled(env: Env): string | boolean | undefined {
-  const value: unknown = Reflect.get(env, 'SHARED_RESOURCE_TOKENS_ENABLED');
-  return typeof value === 'string' || typeof value === 'boolean' ? value : undefined;
 }
 
 const PrepareSessionResponseSchema = z.object({
@@ -69,7 +65,7 @@ async function getOrMintToken(
   env: Env,
   triggerConfig: TriggerConfig
 ): Promise<{ token: string; cached: boolean }> {
-  const cacheKey = tokenCacheKey(triggerConfig, sharedResourceTokensEnabled(env));
+  const cacheKey = tokenCacheKey(triggerConfig, env.SHARED_RESOURCE_TOKENS_ENABLED);
 
   // Check KV cache first
   const cachedToken = await env.WEBHOOK_TOKEN_CACHE.get(cacheKey);
@@ -368,8 +364,8 @@ async function processWebhookMessage(
 
     // Fetch callback signing and internal API credentials once for Cloud Agent calls.
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
-      env.INTERNAL_API_SECRET.get(),
-      env.CALLBACK_TOKEN_SECRET.get(),
+      getSecretValue(env.INTERNAL_API_SECRET),
+      getSecretValue(env.CALLBACK_TOKEN_SECRET),
     ]);
 
     if (!cloudAgentSessionId) {

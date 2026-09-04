@@ -4,6 +4,7 @@ import { type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  Text,
   useWindowDimensions,
 } from 'react-native';
 import { MarkedLexer } from 'react-native-marked';
@@ -12,7 +13,6 @@ import RenderHTML, {
   type CustomMixedRenderer,
   type CustomTagRendererRecord,
   type DomVisitorCallbacks,
-  type MixedStyleDeclaration,
   type RenderersProps,
   type TNode,
 } from 'react-native-render-html';
@@ -224,7 +224,7 @@ export function MarkdownHtml({
 }: Readonly<MarkdownHtmlProps>) {
   const { width } = useWindowDimensions();
   const source = useMemo(() => ({ html }), [html]);
-  const baseStyle = useMemo<MixedStyleDeclaration>(
+  const baseStyle = useMemo(
     () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
     [palette]
   );
@@ -272,7 +272,11 @@ export function MarkdownHtml({
     const HtmlImage: CustomBlockRenderer = ({ tnode }) => {
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
-        return null;
+        return (
+          <Text selectable={selectable} style={baseStyle}>
+            {tnode.attributes.alt ?? ''}
+          </Text>
+        );
       }
       const anchor = parentAnchor(tnode);
       const href = anchor?.attributes.href;
@@ -308,7 +312,7 @@ export function MarkdownHtml({
       );
     };
     return { a: HtmlAnchor, img: HtmlImage };
-  }, [onLongPressLink, onPressLink]);
+  }, [baseStyle, onLongPressLink, onPressLink, selectable]);
 
   return (
     <RenderHTML

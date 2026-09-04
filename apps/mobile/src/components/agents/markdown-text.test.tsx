@@ -95,6 +95,7 @@ const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
 const AnchorType = 'Anchor' as unknown as ComponentType;
 const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
 const MarkdownTableType = 'MarkdownTable' as unknown as ComponentType;
+const TextType = 'Text' as unknown as ComponentType;
 const ViewType = 'View' as unknown as ComponentType;
 
 async function mount(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
@@ -358,7 +359,7 @@ describe('MarkdownText HTML links and images', () => {
     expect(onLongPressLink).toHaveBeenCalledWith('https://example.com', undefined);
   });
 
-  it('routes supported images with a fixed ratio and drops unsupported sources', async () => {
+  it('routes supported images with a fixed ratio and renders unsupported alt text', async () => {
     const renderer = await mount(
       <MarkdownText value='Text <img src="https://example.com/a.png" width="400" height="200">' />
     );
@@ -378,24 +379,36 @@ describe('MarkdownText HTML links and images', () => {
       aspectRatio: 2,
     });
 
-    const allowedSources = ['http://example.com/a.png', 'data:image/png;base64,abc'];
-    const allowed = await Promise.all(
-      allowedSources.map(async src => {
-        const allowedRenderer = await renderCustom(ImageRenderer, {
-          attributes: { src },
-          parent: null,
-        });
-        return allowedRenderer;
-      })
-    );
-    expect(allowed.map(item => item.root.findByType(MarkdownImageType).props.uri)).toEqual(
-      allowedSources
-    );
-
-    const unsupported = await renderCustom(ImageRenderer, {
-      attributes: { src: 'file:///secret.png' },
+    const http = await renderCustom(ImageRenderer, {
+      attributes: { src: 'http://example.com/a.png' },
       parent: null,
     });
-    expect(unsupported.toJSON()).toBeNull();
+    const data = await renderCustom(ImageRenderer, {
+      attributes: { src: 'data:image/png;base64,abc' },
+      parent: null,
+    });
+    expect([
+      http.root.findByType(MarkdownImageType).props.uri,
+      data.root.findByType(MarkdownImageType).props.uri,
+    ]).toEqual(['http://example.com/a.png', 'data:image/png;base64,abc']);
+
+    const unsupported = await renderCustom(ImageRenderer, {
+      attributes: { src: 'file:///secret.png', alt: 'diagram' },
+      parent: null,
+    });
+    const textProps = unsupported.root.findByType(TextType).props;
+    expect(textProps).toMatchObject({
+      children: 'diagram',
+      selectable: true,
+    });
+    expect(textProps).not.toHaveProperty('onPress');
+    expect(unsupported.root.findAllByType(MarkdownImageType)).toHaveLength(0);
+
+    const empty = await renderCustom(ImageRenderer, {
+      attributes: { src: '' },
+      parent: null,
+    });
+    expect(empty.root.findByType(TextType).props.children).toBe('');
+    expect(empty.root.findAllByType(MarkdownImageType)).toHaveLength(0);
   });
 });

@@ -1,4 +1,4 @@
-import { Effect, Either } from 'effect';
+import { Effect, Either, Option } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest } from './fake.js';
@@ -125,6 +125,19 @@ it('tries again after a rate limit and then succeeds', async () => {
   const { calls, result } = await call({ replies: [limited, limited, reply] });
   expect(calls).toHaveLength(3);
   expect(Either.getOrThrow(result).content).toBe('hi');
+});
+
+it('does not try again on a status the gateway will answer the same way', async () => {
+  /* A bad request, a bad token or an unknown model answers the same on the
+     fourth attempt as on the first. Retrying one costs three more requests and
+     three more waits, and hides the real reason behind the last of them. */
+  const refused: Reply = { ok: false, status: 400, body: 'max_tokens is required' };
+  const { calls, result } = await call({ replies: [refused, reply, reply, reply] });
+
+  expect(calls).toHaveLength(1);
+  expect(Either.getLeft(result).pipe(Option.map(error => error.status))).toStrictEqual(
+    Option.some(400)
+  );
 });
 
 it('gives up after the retry budget and reports the last status', async () => {

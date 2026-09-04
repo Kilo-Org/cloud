@@ -40,6 +40,11 @@ interface SessionOptions {
    * The share of the model's context window a session may fill before it
    * compacts itself. `0.8` by default. A catalog that names no window for the
    * model never compacts, whatever this says.
+   *
+   * A share above 1 never compacts, and the session ends when the provider
+   * refuses the request. A share at or below 0 compacts before every question,
+   * which costs a summary call each time. Neither is checked: both are what
+   * the number asks for, and the range is 0 to 1.
    */
   readonly compactAt?: number;
   /** The ceiling on one summary. 2048 by default. */

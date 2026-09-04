@@ -137,8 +137,9 @@ and the only symptom is the bill.
 ## Compaction
 
 A session summarises itself when it has filled a share of the model's context
-window — 0.8 by default, set with `compactAt`. The trigger is the provider's own
-count of the last request, so nothing here estimates and nothing drifts.
+window — 0.8 by default, set with `compactAt`, and the range is 0 to 1. The
+trigger is the provider's own count of the last request, so nothing here
+estimates and nothing drifts.
 
 This needs the catalog to name a `contextWindow` for the model. Without one the
 session never compacts, because a guessed window either cuts a conversation that

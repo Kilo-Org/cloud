@@ -34,20 +34,24 @@ it('reads the turns back in the order they were appended', async () => {
     Effect.gen(function* () {
       yield* store.create(session);
       for (const [index, role] of (['user', 'assistant', 'user'] as const).entries()) {
-        yield* store.append([
-          {
-            id: `trn_${String(index)}`,
-            sessionId: session.id,
-            role,
-            parts: [
-              {
-                id: `prt_${String(`message ${String(index)}`)}`,
-                kind: 'text',
-                body: `message ${String(index)}`,
-              },
-            ],
-          },
-        ]);
+        yield* store.append({
+          sessionId: session.id,
+          turns: [
+            {
+              id: `trn_${String(index)}`,
+              sessionId: session.id,
+              role,
+              parts: [
+                {
+                  id: `prt_${String(`message ${String(index)}`)}`,
+                  kind: 'text',
+                  body: `message ${String(index)}`,
+                },
+              ],
+            },
+          ],
+          prompted: 0,
+        });
       }
       return yield* store.load(session.id);
     })
@@ -71,9 +75,11 @@ it('reads the parts of a turn back in the order they were written', async () => 
   const loaded = await use(db, store =>
     Effect.gen(function* () {
       yield* store.create(session);
-      yield* store.append([
-        { id: 'trn_0', sessionId: session.id, role: 'assistant', parts: written },
-      ]);
+      yield* store.append({
+        sessionId: session.id,
+        turns: [{ id: 'trn_0', sessionId: session.id, role: 'assistant', parts: written }],
+        prompted: 0,
+      });
       return yield* store.load(session.id);
     })
   );
@@ -107,14 +113,18 @@ it('answers with nothing for a session it has never heard of', async () => {
 it('refuses a turn whose session was never created', async () => {
   const failed = await use(database(), store =>
     store
-      .append([
-        {
-          id: 'trn_1',
-          sessionId: 'ses_missing',
-          role: 'user',
-          parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-        },
-      ])
+      .append({
+        sessionId: 'ses_missing',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_missing',
+            role: 'user',
+            parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+          },
+        ],
+        prompted: 0,
+      })
       .pipe(Effect.flip)
   );
 
@@ -126,7 +136,11 @@ it('refuses a row the schema cannot explain rather than handing it back', async 
   await use(db, store =>
     Effect.zipRight(
       store.create(session),
-      store.append([{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }])
+      store.append({
+        sessionId: session.id,
+        turns: [{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }],
+        prompted: 0,
+      })
     )
   );
   db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)').run(
@@ -153,22 +167,30 @@ it('keeps two sessions apart', async () => {
     Effect.gen(function* () {
       yield* store.create(session);
       yield* store.create({ ...session, id: 'ses_2' });
-      yield* store.append([
-        {
-          id: 'trn_1',
-          sessionId: 'ses_1',
-          role: 'user',
-          parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
-        },
-      ]);
-      yield* store.append([
-        {
-          id: 'trn_2',
-          sessionId: 'ses_2',
-          role: 'user',
-          parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
-        },
-      ]);
+      yield* store.append({
+        sessionId: 'ses_1',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_1',
+            role: 'user',
+            parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
+          },
+        ],
+        prompted: 0,
+      });
+      yield* store.append({
+        sessionId: 'ses_2',
+        turns: [
+          {
+            id: 'trn_2',
+            sessionId: 'ses_2',
+            role: 'user',
+            parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
+          },
+        ],
+        prompted: 0,
+      });
       return yield* store.load('ses_2');
     })
   );

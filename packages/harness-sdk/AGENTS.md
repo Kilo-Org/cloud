@@ -918,7 +918,7 @@ asked next. Seen live before the fix, after a cancelled question:
 
 Rolling back is a `Ref.set` to the session as it stood, which is safe because
 one session answers one question at a time and nothing else can have touched it.
-`SessionStore.append` takes a list for the same reason: two calls would leave a
+`StoredExchange.turns` is a list for the same reason: two appends would leave a
 question committed without its answer if the second failed.
 
 ### A session that fills the window summarises itself
@@ -940,7 +940,8 @@ the prompt starts after them, so a continued session lands in the same place.
 **The trigger is the provider's own count.** After each call the session records
 what that request put in front of the model, cached tokens included, and
 compacts before the next question when it passes `compactAt` (0.8) of the
-catalog's `contextWindow`. No tokeniser, and no estimate that can drift. A
+catalog's `contextWindow`. The count is stored with the session, so a resumed
+one is measured too. No tokeniser, and no estimate that can drift. A
 catalog that names no window never compacts: a guessed window would either cut a
 conversation that fit, or fail to save one that did not.
 
@@ -961,9 +962,10 @@ gateway overwrote on every call anyway.
 
 **The summary call is counted.** It is a call to the model, it is billed, and
 until 2026-09-04 its tokens went nowhere: `session.usage` under-reported every
-session that had ever compacted, by the whole cost of every summary. It does
-not touch `prompted`, which is deliberate — the next request starts from the
-summary, so what the last one cost says nothing about what the next one will.
+session that had ever compacted, by the whole cost of every summary. It sets
+`prompted` to zero rather than adding to it, which is deliberate — the next
+request starts from the summary, so what the last one cost says nothing about
+what the next one will.
 
 ### The two model SDKs are types, not code
 
@@ -984,24 +986,36 @@ in its types, so `expo-sqlite` is an optional peer dependency. `plugins/store/
 node` names `node:sqlite`, which needs Node 22.13 or newer to import without a
 flag.
 
-### A reopened session does not know how full it is
+### The count is stored beside the session
 
 `prompted` is the provider's own count of the last request, and nothing here
-estimates one. A session that has just been reopened has made no request, so
-`prompted` is zero, `isFull` is false, and the first question goes out with the
-whole stored conversation in front of it. Two tests in `resume.test.ts` pin it:
-the first question after a resume does not check the window, and the question
-after that one does, because the first answer reported a real count.
+estimates one. So it is written down: a `prompted` column on `sessions`, filled
+by `append`, and read back by `continueSession`. A session reopened onto a
+conversation that already fills the window compacts before it asks anything.
 
-So the gap is one question wide and it closes itself — unless that first
-question is the one that will not fit. Then it is refused, `finish` never runs,
-`prompted` stays zero, and every retry is identical: the session cannot compact
-itself out of it. `session.compact` is the way out, and that is what it is for.
+Until 2026-09-04 it was not stored. A reopened session started at zero, `isFull`
+was false, and its first question went out with the whole stored conversation in
+front of it. That closed itself after one answer — unless that first question was
+the one that would not fit. Then it was refused, `finish` never ran, the count
+stayed zero, and every retry was identical: the session could not compact itself
+out of it.
 
-Closing it properly means storing the count beside the session, which is a
-column, a migration, and a widening of `append` — the store's contract would
-have to carry more than turns. That is a decision, not a tidy-up, so it is
-written down here rather than made in passing.
+`append` therefore takes a `StoredExchange`, not a list of turns: the session,
+its new turns, and the count that goes with them. They are one write because
+they describe one request. A store that kept the turns and lost the count would
+hand back a session that does not know how full it is; one that kept the count
+and lost the turns would hand back a session that thinks it is fuller than it
+is. The SQLite plugin does both inside the same transaction.
+
+A compaction records zero, in the store as well as in memory. The next request
+starts from the summary, so what the last one cost says nothing about what the
+next one will. `resume.test.ts` pins both directions: a session whose stored
+count fills the window compacts before its first question, and a session
+reopened after a compaction does not compact again.
+
+An older database has no column and reads back as absent, which is treated as
+zero — the behaviour it had before, for the one session that was mid-flight
+when the migration ran.
 
 ### A reloaded turn must equal the turn that was written
 

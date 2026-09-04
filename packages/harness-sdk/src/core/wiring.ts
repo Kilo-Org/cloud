@@ -99,7 +99,13 @@ type SessionContext = PromptAssembler | ModelClient | ModelCatalog | EntropySour
  */
 const wiringFor = (
   options: SessionOptions,
-  session: Session
+  session: Session,
+  /**
+   * What the session's last request put in front of the model. A new session
+   * has made none, and a resumed one takes what the store recorded: without it
+   * a full conversation would go back out whole before anything compacts.
+   */
+  prompted = 0
 ): Effect.Effect<Wiring, never, SessionContext> =>
   Effect.gen(function* () {
     const wiring: Wiring = {
@@ -112,7 +118,7 @@ const wiringFor = (
       store: yield* Effect.serviceOption(SessionStore),
       state: yield* Ref.make(session),
       totals: yield* Ref.make(zeroUsage),
-      prompted: yield* Ref.make(0),
+      prompted: yield* Ref.make(prompted),
       busy: yield* Ref.make(false),
     };
     yield* Effect.addFinalizer(() =>

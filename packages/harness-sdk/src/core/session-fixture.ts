@@ -8,7 +8,7 @@ import type { SessionBusyError } from './ask.js';
 import type { ModelError, ModelRequest } from './model.js';
 import { openSession } from './run.js';
 import type { SessionHandle, SessionOptions } from './wiring.js';
-import { SessionStore, StoreError } from './storage.js';
+import { SessionStore, StoreError, type StoredExchange } from './storage.js';
 import { textOf, type Turn } from './turn.js';
 
 /**
@@ -37,9 +37,9 @@ const recordingStore = (): {
   const layer = Layer.succeed(SessionStore, {
     create: () => Effect.void,
     read: () => Effect.succeed(Option.none()),
-    append: (written: readonly Turn[]) =>
+    append: ({ turns }: StoredExchange) =>
       Effect.sync(() => {
-        for (const turn of written) {
+        for (const turn of turns) {
           seen.push(`${turn.role}:${textOf(turn)}`);
         }
       }),
@@ -63,11 +63,11 @@ const brokenStore = (
   const layer = Layer.succeed(SessionStore, {
     create: () => Effect.void,
     read: () => Effect.succeed(Option.none()),
-    append: (written: readonly Turn[]) =>
+    append: ({ turns }: StoredExchange) =>
       broken === 'append'
         ? refuse('append')
         : Effect.sync(() => {
-            for (const turn of written) {
+            for (const turn of turns) {
               seen.push(`${turn.role}:${textOf(turn)}`);
             }
           }),

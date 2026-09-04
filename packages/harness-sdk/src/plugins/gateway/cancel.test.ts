@@ -78,9 +78,9 @@ it('gives back every event of a stream that ends on its own', async () => {
   const { fetch, signals } = watched(once);
 
   const events = await Effect.runPromise(
-    Effect.flatMap(ModelClient, client =>
-      Stream.runCollect(client.stream(sampleRequest()))
-    ).pipe(Effect.provide(testGateway({ fetch })))
+    Effect.flatMap(ModelClient, client => Stream.runCollect(client.stream(sampleRequest()))).pipe(
+      Effect.provide(testGateway({ fetch }))
+    )
   );
 
   expect(Chunk.toReadonlyArray(events).map(event => event.kind)).toEqual(['delta', 'done']);

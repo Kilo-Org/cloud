@@ -95,7 +95,9 @@ for (const file of filesUnder(dist, '.d.ts')) {
   lines.forEach((line, index) => {
     const named = buildOnly.find(name => line.includes(`'${name}'`));
     if (named !== undefined) {
-      broken.push(`dist/${path}:${String(index + 1)} names ${named}, which a consumer does not install`);
+      broken.push(
+        `dist/${path}:${String(index + 1)} names ${named}, which a consumer does not install`
+      );
     }
   });
 }

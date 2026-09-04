@@ -60,11 +60,7 @@ const continueSession = (
     const store = yield* SessionStore;
     const stored = yield* storedOf(store, sessionId);
     const turns = yield* store.load(sessionId);
-    const wiring = yield* wiringFor(optionsOf(stored), {
-      id: sessionId,
-      turns,
-    });
-    return handleOf(wiring);
+    return handleOf(yield* wiringFor(optionsOf(stored), { id: sessionId, turns }, stored.prompted));
   });
 
 /**
@@ -78,7 +74,12 @@ const continueSession = (
 const copyTurns = (
   store: SessionStoreService,
   entropy: EntropySourceService,
-  into: { readonly sessionId: string; readonly source: readonly Turn[] }
+  into: {
+    readonly sessionId: string;
+    readonly source: readonly Turn[];
+    /** The source's count: the copy renders to the same bytes, so it is as full. */
+    readonly prompted: number;
+  }
 ): Effect.Effect<readonly Turn[], StoreError> =>
   Effect.forEach(into.source, turn =>
     makeTurn(entropy, {
@@ -86,7 +87,11 @@ const copyTurns = (
       role: turn.role,
       parts: turn.parts.map(draftOf),
     })
-  ).pipe(Effect.tap(copies => store.append(copies)));
+  ).pipe(
+    Effect.tap(copies =>
+      store.append({ sessionId: into.sessionId, turns: copies, prompted: into.prompted })
+    )
+  );
 
 /**
  * Opens a new session holding a copy of another session's turns.
@@ -105,10 +110,10 @@ const cloneSession = (
     const source = yield* store.load(sessionId);
     const opened = yield* makeSession(entropy);
     const options = optionsOf(stored);
-    yield* store.create({ ...options, id: opened.id });
-    const copies = yield* copyTurns(store, entropy, { sessionId: opened.id, source });
-    const wiring = yield* wiringFor(options, { id: opened.id, turns: copies });
-    return handleOf(wiring);
+    const prompted = stored.prompted ?? 0;
+    yield* store.create({ ...options, id: opened.id, prompted });
+    const turns = yield* copyTurns(store, entropy, { sessionId: opened.id, source, prompted });
+    return handleOf(yield* wiringFor(options, { id: opened.id, turns }, prompted));
   });
 
 export type { ResumeContext, ResumeError };

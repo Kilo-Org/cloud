@@ -88,13 +88,7 @@ const itemsOf = (message: PromptMessage): OpenAI.Responses.ResponseInputItem[] =
   return content.length === 0 ? thinking : [...thinking, { role: message.role, content }];
 };
 
-const toBody = ({
-  prompt,
-  model,
-  maxTokens,
-  cacheKey,
-  effort,
-}: ModelRequest): ResponsesBody => ({
+const toBody = ({ prompt, model, maxTokens, cacheKey, effort }: ModelRequest): ResponsesBody => ({
   model,
   max_output_tokens: maxTokens,
   stream: true,

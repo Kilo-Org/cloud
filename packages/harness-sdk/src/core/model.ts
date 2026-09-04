@@ -99,12 +99,5 @@ interface ModelClientService {
 
 class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelClientService>() {}
 
-export type {
-  Effort,
-  ModelClientService,
-  ModelEvent,
-  ModelRequest,
-  ModelUsage,
-  StopReason,
-};
+export type { Effort, ModelClientService, ModelEvent, ModelRequest, ModelUsage, StopReason };
 export { ModelClient, ModelError, zeroUsage };

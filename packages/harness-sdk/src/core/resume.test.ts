@@ -115,20 +115,15 @@ it('leaves the original alone when the clone is asked something', async () => {
 });
 
 /**
- * A resumed session does not know how full it is.
+ * A resumed session knows how full it is.
  *
  * The compaction trigger is the provider's own count of the last request, and
- * nothing here estimates one. A session that is reopened has made no request
- * yet, so the count is zero and the first question goes out with the whole
- * stored conversation in front of it, however long that is. The answer to that
- * question reports a real count, and every question after it is measured.
- *
- * This is a known limit, not a decision that reads well. Closing it means
- * storing the count beside the session, which is a column and a migration.
- * Until then a caller that reopens a long conversation calls `session.compact`
- * itself, which is what that method is for.
+ * nothing here estimates one. So the count is stored beside the session and
+ * read back with it: a session reopened onto a conversation that already fills
+ * the window compacts before it asks anything, rather than sending the whole
+ * thing once and learning from the answer.
  */
-it('asks its first question after a resume without checking the window', async () => {
+it('compacts before its first question when the stored count fills the window', async () => {
   const desk = bench({
     window: 1000,
     reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
@@ -141,12 +136,16 @@ it('asks its first question after a resume without checking the window', async (
     Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
   );
 
-  /* One call, not two. The same session asked twice in one run compacts on the
-     second question, because the first answer reported 900 of a 1000 window. */
-  expect(resumed.calls).toHaveLength(1);
+  /* Two calls: the summary, then the question. The first answer reported 900
+     of a 1000 window, and that is what the store handed back. */
+  expect(resumed.calls).toHaveLength(2);
+  const sent = resumed.calls[1]?.prompt.messages.map(textIn) ?? [];
+  expect(sent).toHaveLength(2);
+  expect(sent[0]).toContain('Summary of the conversation');
+  expect(sent[1]).toBe('second');
 });
 
-it('learns the count from the first answer, and compacts on the question after it', async () => {
+it('reopens a compacted session without compacting it again', async () => {
   const desk = bench({
     window: 1000,
     reply: { deltas: ['an answer'], usage: { inputTokens: 900, cacheReadTokens: 0 } },
@@ -154,14 +153,13 @@ it('learns the count from the first answer, and compacts on the question after i
   const opened = await desk.run(
     Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
   );
+  await desk.run(Effect.flatMap(continueSession(opened.value), session => session.compact));
 
   const resumed = await desk.run(
-    Effect.flatMap(continueSession(opened.value), session =>
-      Effect.zipRight(asked(session, 'second'), asked(session, 'third'))
-    )
+    Effect.flatMap(continueSession(opened.value), session => asked(session, 'second'))
   );
 
-  /* Three: the second question, the summary it triggers, and the third. So the
-     gap is one question wide, and it closes itself. */
-  expect(resumed.calls).toHaveLength(3);
+  /* One call. A compaction records zero, because the next request starts from
+     the summary; a store that kept the old count would summarise the summary. */
+  expect(resumed.calls).toHaveLength(1);
 });

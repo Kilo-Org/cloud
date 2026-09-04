@@ -19,6 +19,7 @@ interface SessionRow {
   readonly model: string;
   readonly effort: Effort | null;
   readonly maxTokens: number | null;
+  readonly prompted: number | null;
 }
 
 interface TurnRow {
@@ -85,6 +86,7 @@ const asStoredSession = (row: SessionRow): StoredSession => ({
   model: row.model,
   ...(row.effort === null ? {} : { effort: row.effort }),
   ...(row.maxTokens === null ? {} : { maxTokens: row.maxTokens }),
+  ...(row.prompted === null ? {} : { prompted: row.prompted }),
 });
 
 export { assertParts, assertSessions, assertTurns, asStoredSession, byTurn };

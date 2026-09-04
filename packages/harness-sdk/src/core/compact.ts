@@ -132,9 +132,11 @@ const compactSession = (wiring: Wiring): Effect.Effect<void, ModelError | StoreE
       parts: [{ kind: 'summary', body: `${heading}\n\n${said}` }],
     });
     yield* Ref.update(wiring.state, session => appendTurn(session, turn));
-    yield* onStore(wiring.store, plugin => plugin.append([turn]));
     /* The next request starts from the summary, so what the last one cost says
-       nothing about what the next one will. */
+       nothing about what the next one will, in memory and in the store alike. */
+    yield* onStore(wiring.store, plugin =>
+      plugin.append({ sessionId: wiring.id, turns: [turn], prompted: 0 })
+    );
     yield* Ref.set(wiring.prompted, 0);
   });
 

@@ -199,12 +199,10 @@ build its prefix again. Both take the options from the store, never from the
 caller: a system prompt that differs by one byte drops the whole cached prefix,
 and the only symptom is the bill.
 
-A reopened session does not know how full it is. The compaction trigger is the
-provider's own count of the last request, and a session that has just been
-reopened has not made one, so its first question goes out with the whole stored
-conversation however long that is. The answer to it reports a real count and
-every question after that is measured. Reopening a long conversation, call
-`session.compact` first; `usage` starts from zero for the same reason.
+A reopened session knows how full it is: the store keeps the provider's count of
+the last request beside the session, so one reopened onto a conversation that
+already fills the window compacts before it asks anything. `usage` still starts
+from zero, because it counts what this run spent.
 
 ## Compaction
 

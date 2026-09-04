@@ -1,11 +1,6 @@
 import type OpenAI from 'openai';
 import { createIs } from 'typia';
-import type {
-  Effort,
-  ModelRequest,
-  ModelUsage,
-  StopReason,
-} from '../../../core/model.js';
+import type { Effort, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';

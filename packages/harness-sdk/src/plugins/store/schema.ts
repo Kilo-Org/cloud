@@ -14,6 +14,11 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
  * these a resumed session would take whatever the caller passed the second
  * time, and a system prompt that differs by one byte drops the whole prefix.
  *
+ * `prompted` is the one column here that changes: it is the provider's own
+ * count of the last request's input, and it is what decides whether the next
+ * question compacts first. It is stored because nothing estimates a token
+ * count, so a session reopened without it would not know how full it is.
+ *
  * There is no created column. The identifier is a ULID, so it already carries
  * the time and sorts by it.
  */
@@ -23,6 +28,7 @@ const sessions = sqliteTable('sessions', {
   model: text('model').notNull(),
   effort: text('effort', { enum: ['low', 'medium', 'high', 'xhigh', 'max'] }),
   maxTokens: integer('max_tokens'),
+  prompted: integer('prompted'),
 });
 
 /**

@@ -1,7 +1,12 @@
 import { asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { Effect, Layer, Option } from 'effect';
-import { SessionStore, StoreError, type SessionStoreService } from '../../core/storage.js';
+import {
+  SessionStore,
+  StoreError,
+  type SessionStoreService,
+  type StoredExchange,
+} from '../../core/storage.js';
 import type { Turn, TurnPart } from '../../core/turn.js';
 import { transact, type SqlDriver } from './driver.js';
 import { migrate } from './migrate.js';
@@ -40,23 +45,28 @@ const partRow = (turn: Turn, part: TurnPart) => ({
 });
 
 /**
- * Writes the turns and their parts as one unit. A turn whose parts went missing
- * would read back as an empty message and quietly shorten the prompt, and a
- * question written without its answer would go back out with every later
- * request.
+ * Writes the turns, their parts, and the session's new count as one unit. A
+ * turn whose parts went missing would read back as an empty message and quietly
+ * shorten the prompt, a question written without its answer would go back out
+ * with every later request, and a count written apart from either would say the
+ * session holds something it does not.
  */
-const insertTurns = (db: Db, driver: SqlDriver, written: readonly Turn[]): Promise<void> =>
+const insertExchange = (db: Db, driver: SqlDriver, exchange: StoredExchange): Promise<void> =>
   transact(driver, async () => {
-    if (written.length === 0) {
-      return;
+    const written = exchange.turns;
+    if (written.length > 0) {
+      await db
+        .insert(turns)
+        .values(written.map(turn => ({ id: turn.id, sessionId: turn.sessionId, role: turn.role })));
+      const rows = written.flatMap(turn => turn.parts.map(part => partRow(turn, part)));
+      if (rows.length > 0) {
+        await db.insert(parts).values(rows);
+      }
     }
     await db
-      .insert(turns)
-      .values(written.map(turn => ({ id: turn.id, sessionId: turn.sessionId, role: turn.role })));
-    const rows = written.flatMap(turn => turn.parts.map(part => partRow(turn, part)));
-    if (rows.length > 0) {
-      await db.insert(parts).values(rows);
-    }
+      .update(sessions)
+      .set({ prompted: exchange.prompted })
+      .where(eq(sessions.id, exchange.sessionId));
   });
 
 /**
@@ -99,7 +109,7 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
         return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
       }),
 
-    append: written => attempt('append', () => insertTurns(db, driver, written)),
+    append: exchange => attempt('append', () => insertExchange(db, driver, exchange)),
 
     load: sessionId => attempt('load', () => selectTurns(db, sessionId)),
 

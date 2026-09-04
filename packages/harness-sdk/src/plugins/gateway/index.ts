@@ -1,11 +1,5 @@
 import { Effect, Layer, Option, Ref, Stream } from 'effect';
-import {
-  abortHandle,
-  post,
-  type AbortHandle,
-  type HttpCaller,
-  type HttpConfig,
-} from './http.js';
+import { abortHandle, post, type AbortHandle, type HttpCaller, type HttpConfig } from './http.js';
 import { ModelCatalog, type ModelCatalogService } from '../../core/catalog.js';
 import {
   ModelClient,
@@ -110,9 +104,7 @@ const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEve
       const wire = yield* wireFor(gateway.catalog, request.model);
       const read = sseReader();
 
-      return Stream.fromEffect(
-        bodyFor(gateway, { wire, request, handle })
-      ).pipe(
+      return Stream.fromEffect(bodyFor(gateway, { wire, request, handle })).pipe(
         Stream.flatMap(chunksOf),
         Stream.mapConcat(chunk => read(chunk)),
         Stream.mapEffect(data => eventsOf(wire, tally, data)),

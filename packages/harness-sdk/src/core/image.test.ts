@@ -33,7 +33,7 @@ it('carries an image and its media type through the store, in place', async () =
         role: 'user',
         parts: question,
       });
-      yield* store.append([turn]);
+      yield* store.append({ sessionId: session.id, turns: [turn], prompted: 0 });
       return yield* store.load(session.id);
     })
   );
@@ -71,7 +71,11 @@ it('refuses to load an image row that names no media type', async () => {
       Effect.flatMap(SessionStore, store =>
         Effect.gen(function* () {
           yield* store.create(session);
-          yield* store.append([{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }]);
+          yield* store.append({
+            sessionId: session.id,
+            turns: [{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }],
+            prompted: 0,
+          });
           database
             .prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)')
             .run('prt_1', 'trn_1', session.id, 'image', pixel, null, null);

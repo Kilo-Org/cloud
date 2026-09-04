@@ -78,7 +78,6 @@ const fakeModel = (
       : Stream.concat(deltas, Stream.fail(reply.fail));
   };
 
-
   return { calls, layer: Layer.succeed(ModelClient, { stream }) };
 };
 

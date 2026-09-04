@@ -91,7 +91,13 @@ const finish = (
     ),
     Effect.tap(answer => remember(wiring, answer)),
     Effect.flatMap(answer =>
-      onStore(wiring.store, plugin => plugin.append([exchange.question, answer]))
+      onStore(wiring.store, plugin =>
+        plugin.append({
+          sessionId: wiring.id,
+          turns: [exchange.question, answer],
+          prompted: promptedOf(usage),
+        })
+      )
     ),
     Effect.zipRight(Ref.set(exchange.answered, true)),
     /* What this call put in front of the model, which is what decides whether

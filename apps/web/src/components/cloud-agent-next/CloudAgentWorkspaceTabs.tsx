@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
 import { SessionStatusIndicator } from '@/components/shared/SessionStatusIndicator';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { Button } from '@/components/ui/button';
@@ -12,14 +12,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { ChevronDown, LoaderCircle, MessageSquare, Plus, Terminal, X } from 'lucide-react';
+import {
+  ChevronDown,
+  FileDiff,
+  LoaderCircle,
+  MessageSquare,
+  Plus,
+  Terminal,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { SessionPrIndicator } from './SessionPrIndicator';
-import { CHAT_TAB_ID, terminalTabId } from './terminal-tabs';
-import type { TerminalWorkspaceTab, WorkspaceTabId } from './terminal-tabs';
+import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
+import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
 
 type TerminalStatusSummary = {
@@ -51,6 +59,7 @@ const renameHint = 'Double-click to rename.';
 
 export function CloudAgentWorkspaceTabs({
   activeTabId,
+  activeTabRef,
   chatSessions,
   currentSessionId,
   worktreeId,
@@ -63,6 +72,8 @@ export function CloudAgentWorkspaceTabs({
   onRenameChat,
   deletingSessionIds = [],
   terminals,
+  files,
+  onCloseFile,
   terminalStatuses,
   canCreateTerminal,
   onSelectTab,
@@ -71,6 +82,9 @@ export function CloudAgentWorkspaceTabs({
   className,
 }: {
   activeTabId: WorkspaceTabId;
+  activeTabRef?: RefObject<HTMLButtonElement | null>;
+  files: FileWorkspaceTab[];
+  onCloseFile: (path: string) => void;
   chatSessions: StoredSession[];
   currentSessionId: string | null;
   worktreeId?: string | null;
@@ -99,7 +113,8 @@ export function CloudAgentWorkspaceTabs({
   const touchStartRef = useRef<RenameTap | null>(null);
   const lastTapRef = useRef<RenameTap | null>(null);
   const lastPointerTypeRef = useRef('');
-  const selectedTabRef = useRef<HTMLButtonElement>(null);
+  const localSelectedTabRef = useRef<HTMLButtonElement>(null);
+  const selectedTabRef = activeTabRef ?? localSelectedTabRef;
   const activeTabWrapperRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const tabOptionsTriggerRef = useRef<HTMLButtonElement>(null);
@@ -152,7 +167,7 @@ export function CloudAgentWorkspaceTabs({
     resizeObserver.observe(tabList);
     if (activeTabWrapperRef.current) resizeObserver.observe(activeTabWrapperRef.current);
     return () => resizeObserver.disconnect();
-  }, [selectedValue, visibleChatSessions.length, terminals.length]);
+  }, [selectedValue, visibleChatSessions.length, terminals.length, files.length, selectedTabRef]);
 
   const handleStartRename = (session: StoredSession, trigger: HTMLButtonElement) => {
     if (
@@ -203,29 +218,8 @@ export function CloudAgentWorkspaceTabs({
     }
   };
 
-  const handleValueChange = (value: string) => {
-    if (value === CHAT_TAB_ID) {
-      onSelectTab(CHAT_TAB_ID);
-      return;
-    }
-
-    const selectedChat = visibleChatSessions.find(session => value === `chat:${session.sessionId}`);
-    if (selectedChat) {
-      if (activeTabId !== CHAT_TAB_ID) onSelectTab(CHAT_TAB_ID);
-      if (selectedChat.sessionId !== currentSessionId) onSelectChat(selectedChat.sessionId);
-      return;
-    }
-
-    const selectedTerminal = terminals.find(terminal => value === terminalTabId(terminal.id));
-    if (selectedTerminal) onSelectTab(terminalTabId(selectedTerminal.id));
-  };
-
   return (
-    <Tabs
-      value={selectedValue}
-      onValueChange={handleValueChange}
-      className={cn('flex min-w-0 max-w-full items-center gap-1 overflow-hidden', className)}
-    >
+    <div className={cn('flex min-w-0 max-w-full items-center gap-1 overflow-hidden', className)}>
       <TabsList
         ref={tabListRef}
         aria-label="Cloud Agent workspace"
@@ -471,6 +465,40 @@ export function CloudAgentWorkspaceTabs({
             </div>
           );
         })}
+        {files.map(tab => {
+          const tabId = fileTabId(tab.path);
+          const active = activeTabId === tabId;
+          const name = tab.path.slice(tab.path.lastIndexOf('/') + 1);
+          return (
+            <div
+              key={tabId}
+              ref={active ? activeTabWrapperRef : undefined}
+              className={cn(tabClassName, active && activeTabClassName)}
+            >
+              <TabsTrigger
+                ref={active ? selectedTabRef : undefined}
+                value={tabId}
+                title={tab.path}
+                className={tabTriggerClassName}
+              >
+                <FileDiff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="max-w-48 truncate">{name}</span>
+              </TabsTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={tabActionClassName}
+                aria-label={`Close ${name}`}
+                onClick={() => {
+                  onCloseFile(tab.path);
+                  requestAnimationFrame(() => selectedTabRef.current?.focus());
+                }}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </div>
+          );
+        })}
       </TabsList>
 
       <div className="flex shrink-0 items-center gap-1 py-1 pr-1">
@@ -597,6 +625,6 @@ export function CloudAgentWorkspaceTabs({
           </Button>
         ) : null}
       </div>
-    </Tabs>
+    </div>
   );
 }

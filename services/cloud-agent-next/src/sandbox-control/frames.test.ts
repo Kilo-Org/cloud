@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
+  MAX_WORKTREE_FILE_BYTES,
+  MAX_WORKTREE_SNAPSHOT_BYTES,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   sandboxControlSocketAttachmentSchema,
   sandboxHelloResultSchema,
+  sessionGitSnapshotResultSchema,
+  type SessionGitSnapshotResult,
   sessionTerminalCloseResultSchema,
   sessionTerminalConnectResultSchema,
   sessionTerminalCreateResultSchema,
@@ -83,8 +87,170 @@ describe('sandbox control frames', () => {
     const parsed = parseControlFrame('x'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES + 1));
     expect(parsed).toEqual({
       ok: false,
-      error: { code: 'payload_too_large', message: 'Frame exceeds 1 MiB limit' },
+      error: { code: 'payload_too_large', message: 'Frame exceeds 12 MiB limit' },
     });
+  });
+
+  it.each([
+    {
+      name: 'request',
+      frame: (text: string) => ({
+        type: 'request',
+        requestId: 'quote"\\漢',
+        operation: 'session.prompt',
+        session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace/漢' },
+        payload: { messageId: 'message_1', turn: { type: 'prompt', prompt: text } },
+      }),
+    },
+    {
+      name: 'success response',
+      frame: (text: string) => okResponse('quote"\\漢', { nested: { text } }),
+    },
+    {
+      name: 'error response',
+      frame: (text: string) => errorResponse('quote"\\漢', 'protocol_error', text),
+    },
+    {
+      name: 'event',
+      frame: (text: string) => ({
+        type: 'event',
+        event: 'session.event',
+        session: { directory: '/workspace/漢' },
+        payload: { type: 'message', properties: { text } },
+      }),
+    },
+  ])('checks the final UTF-8 $name envelope at the inclusive 12 MiB ceiling', ({ frame }) => {
+    const prefix = '漢"\\\t'.repeat(1000);
+    const availableBytes =
+      MAX_SANDBOX_CONTROL_FRAME_BYTES - Buffer.byteLength(JSON.stringify(frame(prefix)));
+    const text = prefix + 'x'.repeat(availableBytes);
+    const encoded = JSON.stringify(frame(text));
+    expect(Buffer.byteLength(encoded)).toBe(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    expect(encoded.length).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    const parsed = parseControlFrame(encoded);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.bytes).toBe(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    expect(parseControlFrame(JSON.stringify(frame(`${text}x`)))).toEqual({
+      ok: false,
+      error: { code: 'payload_too_large', message: 'Frame exceeds 12 MiB limit' },
+    });
+  });
+
+  it('keeps a maximum capture nested as an object with room for its final response envelope', () => {
+    const files = Array.from(
+      { length: 21 },
+      (_, index) =>
+        ({
+          schemaVersion: 1,
+          revision: 1,
+          path: `quote"\\漢-${index}.ts`,
+          diff: { status: 'available', patch: '"\\漢' },
+          content: { status: 'unavailable', reason: 'budget_exhausted' },
+        }) satisfies SessionGitSnapshotResult['files'][number]
+    );
+    const snapshot = {
+      summary: {
+        revision: 1,
+        comparison: {
+          baseRef: 'refs/remotes/origin/main',
+          mergeBase: 'a'.repeat(40),
+          head: 'b'.repeat(40),
+        },
+        files: files.map(file => ({
+          path: file.path,
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        })),
+        truncated: false,
+      },
+      files,
+    } satisfies SessionGitSnapshotResult;
+    let padding = MAX_WORKTREE_SNAPSHOT_BYTES - Buffer.byteLength(JSON.stringify(snapshot));
+    for (const file of files) {
+      const size = Math.min(
+        padding,
+        MAX_WORKTREE_FILE_BYTES - Buffer.byteLength(JSON.stringify(file))
+      );
+      file.diff.patch += 'x'.repeat(size);
+      padding -= size;
+    }
+    expect(padding).toBe(0);
+    expect(Buffer.byteLength(JSON.stringify(snapshot))).toBe(MAX_WORKTREE_SNAPSHOT_BYTES);
+    const requestId = '"\\漢'.repeat(42);
+    const encoded = JSON.stringify(okResponse(requestId, snapshot));
+    expect(Buffer.byteLength(encoded)).toBeGreaterThan(MAX_WORKTREE_SNAPSHOT_BYTES);
+    expect(Buffer.byteLength(encoded)).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+    const parsed = parseControlFrame(encoded);
+    if (!parsed.ok || parsed.frame.type !== 'response')
+      throw new Error('Expected a response frame');
+    expect(typeof parsed.frame.result).toBe('object');
+    expect(sessionGitSnapshotResultSchema.safeParse(parsed.frame.result).success).toBe(true);
+    expect(sessionGitSnapshotResultSchema.safeParse(JSON.stringify(snapshot)).success).toBe(false);
+
+    const oversized = {
+      ...snapshot,
+      files: files.map((file, index) =>
+        index === files.length - 1
+          ? { ...file, diff: { ...file.diff, patch: `${file.diff.patch}x` } }
+          : file
+      ),
+    };
+    const oversizedFrame = parseControlFrame(JSON.stringify(okResponse(requestId, oversized)));
+    if (!oversizedFrame.ok || oversizedFrame.frame.type !== 'response')
+      throw new Error('Expected a response frame');
+    expect(sessionGitSnapshotResultSchema.safeParse(oversizedFrame.frame.result).success).toBe(
+      false
+    );
+  });
+
+  it('rejects binary and malformed frames with generic errors and no payload logging', () => {
+    const logs = (['error', 'warn', 'log'] as const).map(method =>
+      vi.spyOn(console, method).mockImplementation(() => undefined)
+    );
+    try {
+      expect(parseControlFrame(new ArrayBuffer(4))).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Binary frames are not supported' },
+      });
+      expect(parseControlFrame('{"private-body":')).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Frame is not valid JSON' },
+      });
+      for (const frame of [
+        { type: 'response', requestId: 'request_1', ok: 'true', result: 'private-body' },
+        { type: 'response', requestId: '', ok: true, result: 'private-body' },
+        {
+          type: 'response',
+          requestId: 'request_1',
+          ok: false,
+          error: { code: 'failure', message: 'private-body' },
+        },
+        {
+          type: 'response',
+          requestId: 'request_1',
+          ok: false,
+          error: { code: 'failure', message: {}, retryable: false },
+        },
+      ]) {
+        expect(parseControlFrame(JSON.stringify(frame))).toEqual({
+          ok: false,
+          error: { code: 'protocol_error', message: 'Frame does not match the control envelope' },
+        });
+      }
+      expect(
+        parseOperationPayload('session.git.snapshot', { revision: 1, patch: 'private-body' })
+      ).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid session.git.snapshot payload' },
+      });
+      for (const log of logs) expect(log).not.toHaveBeenCalled();
+    } finally {
+      for (const log of logs) log.mockRestore();
+    }
   });
 
   it('recognizes known operations', () => {
@@ -92,6 +258,8 @@ describe('sandbox control frames', () => {
     expect(isControlOperation('session.prompt')).toBe(true);
     expect(isControlOperation('session.git.summary')).toBe(true);
     expect(isSessionOperation('session.git.summary')).toBe(true);
+    expect(isControlOperation('session.git.snapshot')).toBe(true);
+    expect(isSessionOperation('session.git.snapshot')).toBe(true);
     expect(isControlOperation('http.tunnel')).toBe(false);
     for (const operation of [
       'session.terminal.create',
@@ -255,31 +423,36 @@ describe('sandbox control frames', () => {
     ).toBe(false);
   });
 
-  it('validates summary requests without accepting a payload directory', () => {
-    expect(parseOperationPayload('session.git.summary', { revision: 1 })).toEqual({
-      ok: true,
-      payload: { revision: 1 },
-    });
-    expect(
-      parseOperationPayload('session.git.summary', {
-        revision: 2,
-        baseRef: 'refs/remotes/origin/main',
-      }).ok
-    ).toBe(true);
-    for (const payload of [
-      {},
-      { revision: 0 },
-      { revision: 1.5 },
-      { revision: Number.MAX_SAFE_INTEGER + 1 },
-      { revision: 1, baseRef: '--help' },
-      { revision: 1, directory: '/outside' },
-    ]) {
-      expect(parseOperationPayload('session.git.summary', payload)).toEqual({
-        ok: false,
-        error: { code: 'protocol_error', message: 'Invalid session.git.summary payload' },
+  it.each(['session.git.summary', 'session.git.snapshot'] as const)(
+    'validates %s requests without accepting a payload directory',
+    operation => {
+      expect(parseOperationPayload(operation, { revision: 1 })).toEqual({
+        ok: true,
+        payload: { revision: 1 },
       });
+      expect(
+        parseOperationPayload(operation, {
+          revision: 2,
+          baseRef: 'refs/remotes/origin/main',
+        }).ok
+      ).toBe(true);
+      for (const payload of [
+        {},
+        { revision: 0 },
+        { revision: 1.5 },
+        { revision: Number.MAX_SAFE_INTEGER + 1 },
+        { revision: 1, baseRef: '--help' },
+        { revision: 1, baseRef: 'main\0suffix' },
+        { revision: 1, baseRef: 'x'.repeat(1025) },
+        { revision: 1, directory: '/outside' },
+      ]) {
+        expect(parseOperationPayload(operation, payload)).toEqual({
+          ok: false,
+          error: { code: 'protocol_error', message: `Invalid ${operation} payload` },
+        });
+      }
     }
-  });
+  );
 
   it('accepts a full sandbox.heartbeat payload', () => {
     expect(

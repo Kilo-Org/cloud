@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
-import type { WorktreeChangesSnapshot } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type {
+  GetWorktreeFileOutput,
+  WorktreeChangesSnapshot,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { TRPCContext } from '../../types.js';
 
 const { queryAccess } = vi.hoisted(() => ({ queryAccess: vi.fn() }));
@@ -32,9 +35,27 @@ const snapshot: WorktreeChangesSnapshot = {
   truncated: false,
 };
 
+const fileQuery = { path: 'src/exact\nfile.ts', expectedRevision: 1 };
+const savedFile: GetWorktreeFileOutput = {
+  status: 'available',
+  file: {
+    schemaVersion: 1,
+    revision: 1,
+    path: fileQuery.path,
+    diff: {
+      status: 'available',
+      patch: 'diff --git a/file.ts b/file.ts\nold mode 100644\nnew mode 100755\n',
+    },
+    content: { status: 'available', source: 'current', text: '' },
+  },
+  capturedAt: snapshot.capturedAt,
+  comparison: snapshot.comparison,
+};
+
 function setup(userId = 'user_owner') {
   const stub = {
     getWorktreeChanges: vi.fn().mockResolvedValue({ snapshot }),
+    getWorktreeFile: vi.fn().mockResolvedValue(savedFile),
     refreshWorktreeChanges: vi.fn().mockResolvedValue({ status: 'offline', snapshot }),
   };
   const session = { idFromName: vi.fn(name => name), get: vi.fn(() => stub) };
@@ -52,7 +73,23 @@ function setup(userId = 'user_owner') {
       SANDBOX_CONTROL: control,
     },
   } as unknown as TRPCContext;
-  return { stub, session, legacy, control, context, caller: appRouter.createCaller(context) };
+  const caller = appRouter.createCaller(context);
+  return {
+    stub,
+    session,
+    legacy,
+    control,
+    context,
+    caller,
+    call(
+      procedure: 'getWorktreeChanges' | 'refreshWorktreeChanges' | 'getWorktreeFile',
+      cloudAgentSessionId: string
+    ) {
+      return procedure === 'getWorktreeFile'
+        ? caller.getWorktreeFile({ cloudAgentSessionId, ...fileQuery })
+        : caller[procedure]({ cloudAgentSessionId });
+    },
+  };
 }
 
 describe('Worker worktree changes procedures', () => {
@@ -61,13 +98,17 @@ describe('Worker worktree changes procedures', () => {
     queryAccess.mockResolvedValue(access);
   });
 
-  it.each(['getWorktreeChanges', 'refreshWorktreeChanges'] as const)(
+  it.each(['getWorktreeChanges', 'refreshWorktreeChanges', 'getWorktreeFile'] as const)(
     '%s authorizes existing control sessions without a creation allowlist or runtime work',
     async procedure => {
       const harness = setup();
-      const result = await harness.caller[procedure]({ cloudAgentSessionId: sessionId });
+      const result = await harness.call(procedure, sessionId);
       expect(result).toEqual(
-        procedure === 'getWorktreeChanges' ? { snapshot } : { status: 'offline', snapshot }
+        procedure === 'getWorktreeFile'
+          ? savedFile
+          : procedure === 'getWorktreeChanges'
+            ? { snapshot }
+            : { status: 'offline', snapshot }
       );
       expect(harness.session.idFromName).toHaveBeenCalledWith(`user_owner:${sessionId}`);
       expect(harness.legacy.get).not.toHaveBeenCalled();
@@ -79,14 +120,40 @@ describe('Worker worktree changes procedures', () => {
     }
   );
 
-  describe.each(['getWorktreeChanges', 'refreshWorktreeChanges'] as const)(
+  it.each([
+    { ...fileQuery, path: '../secret' },
+    { ...fileQuery, path: '/secret' },
+    { ...fileQuery, expectedRevision: 0 },
+    { ...fileQuery, expectedRevision: 1.5 },
+    { ...fileQuery, directory: '/workspace/other' },
+    { ...fileQuery, baseRef: 'HEAD' },
+  ])('rejects invalid selected-file input before accessing storage', async query => {
+    const harness = setup();
+    await expect(
+      harness.caller.getWorktreeFile({ cloudAgentSessionId: sessionId, ...query })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(harness.session.get).not.toHaveBeenCalled();
+    expect(queryAccess).not.toHaveBeenCalled();
+  });
+
+  it('passes exact paths and revisions without a refresh or runtime request', async () => {
+    const harness = setup();
+    await expect(
+      harness.caller.getWorktreeFile({ cloudAgentSessionId: sessionId, ...fileQuery })
+    ).resolves.toEqual(savedFile);
+    expect(harness.stub.getWorktreeFile).toHaveBeenCalledWith(fileQuery);
+    expect(harness.stub.refreshWorktreeChanges).not.toHaveBeenCalled();
+    expect(harness.control.getByName).not.toHaveBeenCalled();
+  });
+
+  describe.each(['getWorktreeChanges', 'refreshWorktreeChanges', 'getWorktreeFile'] as const)(
     '%s access checks',
     procedure => {
       it('rejects an unauthenticated request before access lookup or DO routing', async () => {
         const harness = setup('');
-        await expect(
-          harness.caller[procedure]({ cloudAgentSessionId: sessionId })
-        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        await expect(harness.call(procedure, sessionId)).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+        });
         expect(queryAccess).not.toHaveBeenCalled();
         expect(harness.session.get).not.toHaveBeenCalled();
       });
@@ -96,9 +163,9 @@ describe('Worker worktree changes procedures', () => {
         async () => {
           queryAccess.mockResolvedValue(null);
           const harness = setup();
-          await expect(
-            harness.caller[procedure]({ cloudAgentSessionId: sessionId })
-          ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+          await expect(harness.call(procedure, sessionId)).rejects.toMatchObject({
+            code: 'FORBIDDEN',
+          });
           expect(harness.session.idFromName).not.toHaveBeenCalled();
           expect(harness.session.get).not.toHaveBeenCalled();
           expect(harness.legacy.get).not.toHaveBeenCalled();
@@ -109,9 +176,9 @@ describe('Worker worktree changes procedures', () => {
       it('fails closed when the authoritative access lookup fails', async () => {
         queryAccess.mockRejectedValueOnce(new Error('database unavailable'));
         const harness = setup();
-        await expect(
-          harness.caller[procedure]({ cloudAgentSessionId: sessionId })
-        ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+        await expect(harness.call(procedure, sessionId)).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+        });
         expect(harness.session.get).not.toHaveBeenCalled();
       });
 
@@ -123,7 +190,7 @@ describe('Worker worktree changes procedures', () => {
           return authorized.promise;
         });
         const harness = setup();
-        const result = harness.caller[procedure]({ cloudAgentSessionId: sessionId });
+        const result = harness.call(procedure, sessionId);
         await started.promise;
         expect(harness.session.idFromName).not.toHaveBeenCalled();
         expect(harness.session.get).not.toHaveBeenCalled();
@@ -134,16 +201,16 @@ describe('Worker worktree changes procedures', () => {
 
       it('rejects legacy sessions after authorization without calling either session DO', async () => {
         const harness = setup();
-        await expect(
-          harness.caller[procedure]({ cloudAgentSessionId: legacySessionId })
-        ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+        await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+        });
         expect(queryAccess).toHaveBeenCalledTimes(1);
         expect(harness.session.get).not.toHaveBeenCalled();
         expect(harness.legacy.get).not.toHaveBeenCalled();
         queryAccess.mockResolvedValue(null);
-        await expect(
-          harness.caller[procedure]({ cloudAgentSessionId: legacySessionId })
-        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        await expect(harness.call(procedure, legacySessionId)).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+        });
       });
 
       it('validates the session DO output before exposing cached data', async () => {
@@ -152,9 +219,9 @@ describe('Worker worktree changes procedures', () => {
           status: 'refreshed',
           snapshot: { ...snapshot, schemaVersion: 2 },
         });
-        await expect(
-          harness.caller[procedure]({ cloudAgentSessionId: sessionId })
-        ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+        await expect(harness.call(procedure, sessionId)).rejects.toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+        });
       });
     }
   );

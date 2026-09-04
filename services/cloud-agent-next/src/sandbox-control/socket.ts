@@ -691,7 +691,8 @@ export function createSandboxControlSocketHandler(
       }
 
       const current = currentHandshakenSocket(state);
-      const readyOnly = input.operation === 'session.git.summary';
+      const readyOnly =
+        input.operation === 'session.git.summary' || input.operation === 'session.git.snapshot';
       if (readyOnly && (!current || readAttachment(current.socket)?.kiloReady !== true)) {
         return errorResponse(crypto.randomUUID(), 'not_ready', 'No ready wrapper socket', true);
       }

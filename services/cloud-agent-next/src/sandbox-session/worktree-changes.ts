@@ -3,10 +3,16 @@ import {
   WORKTREE_CHANGES_SCHEMA_VERSION,
   worktreeChangesCaptureSchema,
   worktreeChangesSnapshotSchema,
+  worktreeFileQuerySchema,
+  worktreeFileRecordSchema,
+  worktreeSnapshotCaptureSchema,
   type GetWorktreeChangesOutput,
+  type GetWorktreeFileOutput,
   type RefreshWorktreeChangesOutput,
   type WorktreeChangesCaptureRequest,
   type WorktreeChangesSnapshot,
+  type WorktreeFileRecord,
+  type WorktreeSnapshotCapture,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
@@ -14,6 +20,7 @@ import type { ResponseFrame, SessionRequestIdentity } from '../shared/sandbox-co
 import { WORKTREE_CHANGED_EVENT } from '../shared/worktree-changes-wire.js';
 
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
+export const WORKTREE_FILE_PREFIX = 'worktree_file:';
 
 export type WorktreeChangesContext = {
   session: SessionRequestIdentity;
@@ -31,13 +38,20 @@ type CaptureTrigger = { generation: number; context?: WorktreeChangesContext };
 
 type WorktreeChangesDependencies = {
   storage: {
-    get(key: string): Promise<unknown>;
-    put(key: string, value: WorktreeChangesSnapshot): Promise<void>;
+    kv: {
+      get(key: string): unknown;
+      put(key: string, value: WorktreeChangesSnapshot | WorktreeFileRecord): void;
+      delete(key: string): boolean;
+      list(options: { prefix: string }): Iterable<[string, unknown]>;
+    };
+    transactionSync<T>(callback: () => T): T;
   };
+  saveSnapshotEvent?(snapshot: WorktreeChangesSnapshot): (() => void) | undefined;
   readContext(): Promise<WorktreeChangesContext | null>;
   requestCapture(
     context: WorktreeChangesContext,
-    payload: WorktreeChangesCaptureRequest
+    payload: WorktreeChangesCaptureRequest,
+    operation: 'session.git.snapshot' | 'session.git.summary'
   ): Promise<ResponseFrame>;
   waitUntil(promise: Promise<unknown>): void;
 };
@@ -86,17 +100,35 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
   let pending: CaptureTrigger | undefined;
   let pendingInterruption: { generation: number; context: WorktreeChangesContext } | undefined;
 
-  async function readSnapshot(): Promise<WorktreeChangesSnapshot | null> {
+  function readSnapshot(): WorktreeChangesSnapshot | null {
     const parsed = worktreeChangesSnapshotSchema.safeParse(
-      await deps.storage.get(WORKTREE_CHANGES_KEY)
+      deps.storage.kv.get(WORKTREE_CHANGES_KEY)
     );
-    return parsed.success ? parsed.data : null;
+    return parsed.success &&
+      new Set(parsed.data.files.map(file => file.path)).size === parsed.data.files.length
+      ? parsed.data
+      : null;
+  }
+
+  function replaceSnapshot(snapshot: WorktreeChangesSnapshot, files: WorktreeFileRecord[]): void {
+    const broadcast = deps.storage.transactionSync(() => {
+      const keys = new Set(files.map(file => `${WORKTREE_FILE_PREFIX}${file.path}`));
+      for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
+        if (!keys.has(key)) deps.storage.kv.delete(key);
+      }
+      for (const file of files) {
+        deps.storage.kv.put(`${WORKTREE_FILE_PREFIX}${file.path}`, file);
+      }
+      deps.storage.kv.put(WORKTREE_CHANGES_KEY, snapshot);
+      return deps.saveSnapshotEvent?.(snapshot);
+    });
+    broadcast?.();
   }
 
   async function capture(trigger: CaptureTrigger): Promise<RefreshWorktreeChangesOutput> {
     let snapshot: WorktreeChangesSnapshot | null = null;
     try {
-      snapshot = await readSnapshot();
+      snapshot = readSnapshot();
       if (trigger.generation !== generation) return { status: 'failed', snapshot };
       if (suppressed || preparing) return { status: 'offline', snapshot };
       const context = await deps.readContext();
@@ -108,24 +140,40 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       revision = Math.max(revision, snapshot?.revision ?? 0) + 1;
       if (!Number.isSafeInteger(revision)) return { status: 'failed', snapshot };
       const requestedRevision = revision;
-      const response = await deps.requestCapture(context, {
+      const payload = {
         revision: requestedRevision,
         ...(context.baseRef ? { baseRef: context.baseRef } : {}),
-      });
+      };
+      let response = await deps.requestCapture(context, payload, 'session.git.snapshot');
       if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      const legacy = !response.ok && response.error?.code === 'unknown_operation';
+      if (legacy) {
+        response = await deps.requestCapture(context, payload, 'session.git.summary');
+        if (trigger.generation !== generation) return { status: 'failed', snapshot };
+      }
       if (!response.ok) {
         return { status: response.error?.code === 'not_ready' ? 'offline' : 'failed', snapshot };
       }
-      const parsed = worktreeChangesCaptureSchema.safeParse(response.result);
+      let captured: WorktreeSnapshotCapture;
+      if (legacy) {
+        const parsed = worktreeChangesCaptureSchema.safeParse(response.result);
+        if (!parsed.success) return { status: 'failed', snapshot };
+        captured = { summary: parsed.data, files: [] };
+      } else {
+        const parsed = worktreeSnapshotCaptureSchema.safeParse(response.result);
+        if (!parsed.success) return { status: 'failed', snapshot };
+        captured = parsed.data;
+      }
       if (
-        !parsed.success ||
-        parsed.data.revision !== requestedRevision ||
-        (context.baseRef !== undefined && parsed.data.comparison.baseRef !== context.baseRef)
+        captured.summary.revision !== requestedRevision ||
+        new Set(captured.summary.files.map(file => file.path)).size !==
+          captured.summary.files.length ||
+        (context.baseRef !== undefined && captured.summary.comparison.baseRef !== context.baseRef)
       ) {
         return { status: 'failed', snapshot };
       }
       const saved = worktreeChangesSnapshotSchema.safeParse({
-        ...parsed.data,
+        ...captured.summary,
         schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
         capturedAt: new Date().toISOString(),
       });
@@ -135,12 +183,12 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         suppressed ||
         preparing ||
         trigger.generation !== generation ||
-        parsed.data.revision !== revision ||
+        captured.summary.revision !== revision ||
         !sameContext(context, current)
       ) {
         return { status: 'failed', snapshot };
       }
-      await deps.storage.put(WORKTREE_CHANGES_KEY, saved.data);
+      replaceSnapshot(saved.data, captured.files);
       return { status: 'refreshed', snapshot: saved.data };
     } catch {
       return { status: 'failed', snapshot };
@@ -181,7 +229,41 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
 
   return {
     async get(): Promise<GetWorktreeChangesOutput> {
-      return { snapshot: await readSnapshot() };
+      return { snapshot: readSnapshot() };
+    },
+
+    getFile(input: unknown): GetWorktreeFileOutput {
+      const query = worktreeFileQuerySchema.safeParse(input);
+      if (!query.success) throw new Error('Invalid worktree file query');
+      if (suppressed) return { status: 'not_captured' };
+      return deps.storage.transactionSync((): GetWorktreeFileOutput => {
+        const snapshot = readSnapshot();
+        if (!snapshot) return { status: 'not_captured' };
+        const listed = snapshot.files.find(file => file.path === query.data.path);
+        if (!listed) return { status: 'no_longer_listed', currentRevision: snapshot.revision };
+        if (snapshot.revision !== query.data.expectedRevision) {
+          return { status: 'stale', currentRevision: snapshot.revision };
+        }
+        const parsed = worktreeFileRecordSchema.safeParse(
+          deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${query.data.path}`)
+        );
+        if (
+          !parsed.success ||
+          parsed.data.revision !== snapshot.revision ||
+          parsed.data.path !== query.data.path ||
+          (parsed.data.content.status === 'available' &&
+            parsed.data.content.source !==
+              (listed.status === 'deleted' ? 'deleted-original' : 'current'))
+        ) {
+          return { status: 'not_captured' };
+        }
+        return {
+          status: parsed.data.diff.status,
+          file: parsed.data,
+          capturedAt: snapshot.capturedAt,
+          comparison: snapshot.comparison,
+        };
+      });
     },
 
     refresh(): Promise<RefreshWorktreeChangesOutput> {
@@ -236,6 +318,13 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
     suppress(): void {
       suppressed = true;
       invalidate();
+    },
+
+    purge(): void {
+      deps.storage.kv.delete(WORKTREE_CHANGES_KEY);
+      for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
+        deps.storage.kv.delete(key);
+      }
     },
   };
 }

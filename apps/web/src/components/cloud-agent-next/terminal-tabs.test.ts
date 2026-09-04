@@ -16,7 +16,7 @@ import {
   selectWorkspaceTab,
   terminalIdFromTabId,
   terminalTabId,
-} from './terminal-tabs';
+} from './workspace-tabs';
 
 Object.assign(globalThis, { React });
 
@@ -139,14 +139,34 @@ jest.mock('./WorktreeChanges', () => ({
     cloudAgentSessionId,
     organizationId,
     open,
+    onSelectFile,
   }: ComponentProps<typeof WorktreeChangesDrawer>) =>
     createElement('aside', {
+      onClick: () => onSelectFile?.('README.md'),
       'data-changes-owner': cloudAgentSessionId,
       'data-changes-organization': organizationId ?? 'personal',
       hidden: !open,
     }),
 }));
-jest.mock('./ChatInput', () => ({ ChatInput: () => null }));
+jest.mock('./WorktreeFilePane', () => ({
+  WorktreeFilePane: ({
+    cloudAgentSessionId,
+    organizationId,
+  }: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }) =>
+    createElement('pre', {
+      'data-file-owner': cloudAgentSessionId,
+      'data-file-organization': organizationId ?? 'personal',
+    }),
+}));
+jest.mock('./ChatInput', () => ({
+  ChatInput: () => createElement('input', { 'data-composer': true }),
+}));
+jest.mock('./ConversationMessages', () => ({
+  ConversationMessages: () => createElement('section', { 'data-conversation': true }),
+}));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
@@ -176,6 +196,7 @@ function installTerminalTestDom() {
     HTMLElement: globalThis.HTMLElement,
     Element: globalThis.Element,
     Node: globalThis.Node,
+    getComputedStyle: globalThis.getComputedStyle,
     requestAnimationFrame: globalThis.requestAnimationFrame,
     cancelAnimationFrame: globalThis.cancelAnimationFrame,
     IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -187,6 +208,7 @@ function installTerminalTestDom() {
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
     requestAnimationFrame: () => 0,
     cancelAnimationFrame: () => {},
     IS_REACT_ACT_ENVIRONMENT: true,
@@ -200,6 +222,7 @@ describe('cloud agent workspace terminal tabs', () => {
   it('starts on the chat tab without terminals', () => {
     expect(createWorkspaceTabsState()).toEqual({
       activeTabId: CHAT_TAB_ID,
+      files: [],
       terminals: [],
       nextTerminalNumber: 1,
     });
@@ -212,6 +235,7 @@ describe('cloud agent workspace terminal tabs', () => {
     expect(second).toEqual({
       activeTabId: terminalTabId('tab-b'),
       nextTerminalNumber: 3,
+      files: [],
       terminals: [
         { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
         { id: 'tab-b', title: 'Terminal 2', cloudAgentSessionId: 'cloud-agent-session-b' },
@@ -249,6 +273,7 @@ describe('cloud agent workspace terminal tabs', () => {
     expect(closeTerminalTab(state, 'tab-b')).toEqual({
       activeTabId: terminalTabId('tab-a'),
       nextTerminalNumber: 3,
+      files: [],
       terminals: [
         { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
       ],
@@ -265,6 +290,7 @@ describe('cloud agent workspace terminal tabs', () => {
     expect(closeTerminalTab(state, 'tab-b')).toEqual({
       activeTabId: terminalTabId('tab-a'),
       nextTerminalNumber: 3,
+      files: [],
       terminals: [
         { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'cloud-agent-session-a' },
       ],
@@ -284,6 +310,7 @@ describe('cloud agent workspace terminal tabs', () => {
     expect(closeTerminalTab(state, 'tab-a')).toEqual({
       activeTabId: terminalTabId('tab-b'),
       nextTerminalNumber: 3,
+      files: [],
       terminals: [
         { id: 'tab-b', title: 'Terminal 2', cloudAgentSessionId: 'cloud-agent-session-b' },
       ],
@@ -298,6 +325,7 @@ describe('cloud agent workspace terminal tabs', () => {
 
     expect(closeTerminalTab(state, 'tab-a')).toEqual({
       activeTabId: CHAT_TAB_ID,
+      files: [],
       terminals: [],
       nextTerminalNumber: 2,
     });
@@ -422,6 +450,35 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
     expect(mockTabs.terminals[0]?.cloudAgentSessionId).toBe('workspace_recent');
     expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('keeps the conversation, composer and PTY mounted while files are selected and clears files before sibling identity resolves', () => {
+    render();
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const composer = dom.container.querySelector('[data-composer]');
+    const terminal = openTerminal();
+    const drawer = openChanges();
+    act(() => drawer?.click());
+    expect(dom.container.querySelector('[data-file-owner]')?.getAttribute('data-file-owner')).toBe(
+      'workspace_recent'
+    );
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    mockSessionId = 'ses_historical';
+    render();
+    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
+    expect(mockTabs.files).toEqual([]);
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
+    const siblingDrawer = openChanges();
+    act(() => siblingDrawer?.click());
+    expect(dom.container.querySelector('[data-file-owner]')?.getAttribute('data-file-owner')).toBe(
+      'workspace_ses_historical'
+    );
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
+    expect(mockTabs.files).toEqual([]);
   });
 
   it('scopes changes to each sibling control session without replacing its worktree terminal', () => {

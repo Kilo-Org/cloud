@@ -6,7 +6,8 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import type * as DropdownMenuComponents from '@/components/ui/dropdown-menu';
 import type * as DropdownMenuPrimitives from '@radix-ui/react-dropdown-menu';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { CHAT_TAB_ID, terminalTabId, type WorkspaceTabId } from './terminal-tabs';
+import { CHAT_TAB_ID, fileTabId, terminalTabId, type WorkspaceTabId } from './workspace-tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import type { StoredSession } from './types';
 
 Object.assign(globalThis, { React });
@@ -75,6 +76,8 @@ function renderWorkspaceTabs(
     onCreateChat: () => undefined,
     onRenameChat: async () => undefined,
     terminals: [],
+    files: [],
+    onCloseFile: () => undefined,
     terminalStatuses: {},
     canCreateTerminal: false,
     onSelectTab: () => undefined,
@@ -83,7 +86,22 @@ function renderWorkspaceTabs(
     ...overrides,
   };
 
-  return renderToStaticMarkup(createElement(CloudAgentWorkspaceTabs, props));
+  const worktreeId =
+    props.worktreeId === undefined
+      ? props.chatSessions.find(chat => chat.sessionId === props.currentSessionId)?.worktreeId
+      : props.worktreeId;
+  const value =
+    props.activeTabId === CHAT_TAB_ID && worktreeId && props.currentSessionId
+      ? `chat:${props.currentSessionId}`
+      : props.activeTabId;
+  return renderToStaticMarkup(
+    createElement(
+      Tabs,
+      { value },
+      createElement(CloudAgentWorkspaceTabs, props),
+      createElement(TabsContent, { value }, 'Selected workspace panel')
+    )
+  );
 }
 
 function findButtonMarkup(html: string, text: string): string {
@@ -117,6 +135,23 @@ function getSessionMenuItemProps(title: string): ComponentProps<typeof DropdownM
 }
 
 describe('CloudAgentWorkspaceTabs', () => {
+  it('composes selected file and sibling chat values with their shared Radix panels', () => {
+    for (const activeTabId of [CHAT_TAB_ID, fileTabId('src/file.ts')] as const) {
+      const html = renderWorkspaceTabs({
+        activeTabId,
+        files: [{ path: 'src/file.ts' }],
+        worktreeId: 'worktree_shared',
+      });
+      const active = (html.match(/<button\b[^>]*>/g) ?? []).filter(
+        button => button.includes('role="tab"') && button.includes('data-state="active"')
+      );
+      expect(active).toHaveLength(1);
+      const controls = active[0]?.match(/aria-controls="([^"]+)"/)?.[1];
+      expect(controls).toBeDefined();
+      expect(html).toContain(`id="${controls}"`);
+      expect(html).toContain('Selected workspace panel');
+    }
+  });
   it('renders complete grouped chat titles and selects only the current session tab', () => {
     const firstTitle = 'Investigate the complete authentication regression across every provider';
     const secondTitle = 'Fix the separate billing synchronization flow';

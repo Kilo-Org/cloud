@@ -1,5 +1,6 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcessByStdio } from 'child_process';
 import { appendFileSync } from 'fs';
+import type { Readable } from 'stream';
 
 export type ExecResult = {
   stdout: string;
@@ -9,12 +10,15 @@ export type ExecResult = {
   terminationReason?: TerminationReason;
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
+  stdoutBytes?: Buffer;
+  stderrBytes?: Buffer;
 };
 
 export type ProcessOutputStream = 'stdout' | 'stderr';
 
 export type ProcessOptions = {
   cwd?: string;
+  stdinFd?: number;
   env?: NodeJS.ProcessEnv;
   inheritEnv?: boolean;
   timeoutMs?: number;
@@ -23,6 +27,7 @@ export type ProcessOptions = {
   signal?: AbortSignal;
   terminationGraceMs?: number;
   maxOutputBytes?: number;
+  rawOutput?: boolean;
   onOutput?: (stream: ProcessOutputStream, output: string) => void;
 };
 
@@ -115,6 +120,7 @@ export function runProcess(
       exitCode: EXEC_TIMEOUT_EXIT_CODE,
       elapsedMs: 0,
       terminationReason: 'abort',
+      ...(opts.rawOutput ? { stdoutBytes: Buffer.alloc(0), stderrBytes: Buffer.alloc(0) } : {}),
     });
   }
 
@@ -127,12 +133,21 @@ export function runProcess(
           ? { env: { ...process.env, ...opts.env } }
           : {}),
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+      stdio: [opts?.stdinFd ?? 'ignore', 'pipe', 'pipe'],
+    }) as ChildProcessByStdio<null, Readable, Readable>;
     let stdout = '';
     let stderr = '';
     let stdoutTruncated = false;
     let stderrTruncated = false;
+    const rawChunks: Record<ProcessOutputStream, Buffer[]> = { stdout: [], stderr: [] };
+    const rawLengths: Record<ProcessOutputStream, number> = { stdout: 0, stderr: 0 };
+    const rawOutput = () =>
+      opts?.rawOutput
+        ? {
+            stdoutBytes: Buffer.concat(rawChunks.stdout, rawLengths.stdout),
+            stderrBytes: Buffer.concat(rawChunks.stderr, rawLengths.stderr),
+          }
+        : {};
     const maxOutputBytes = opts?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     let settled = false;
     let terminationReason: TerminationReason | null = null;
@@ -181,6 +196,7 @@ export function runProcess(
         exitCode: EXEC_TIMEOUT_EXIT_CODE,
         elapsedMs: Date.now() - startedAt,
         terminationReason: reason,
+        ...rawOutput(),
         ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
         ...(stderrTruncated || boundedStderr.truncated ? { stderrTruncated: true } : {}),
       });
@@ -258,10 +274,28 @@ export function runProcess(
       hardTimeoutTimer = setTimeout(() => terminate('hard_timeout'), opts.hardTimeoutMs);
     }
 
-    proc.stdout.setEncoding('utf8');
-    proc.stderr.setEncoding('utf8');
-    proc.stdout.on('data', (output: string) => captureOutput('stdout', output));
-    proc.stderr.on('data', (output: string) => captureOutput('stderr', output));
+    if (opts?.rawOutput) {
+      const captureBytes = (stream: ProcessOutputStream, bytes: Buffer): void => {
+        const available = Math.max(0, maxOutputBytes - rawLengths[stream]);
+        const retained = Math.min(available, bytes.length);
+        if (retained > 0) {
+          rawChunks[stream].push(Buffer.from(bytes.subarray(0, retained)));
+          rawLengths[stream] += retained;
+        }
+        if (retained < bytes.length) {
+          if (stream === 'stdout') stdoutTruncated = true;
+          else stderrTruncated = true;
+        }
+        resetInactivityTimer();
+      };
+      proc.stdout.on('data', (output: Buffer) => captureBytes('stdout', output));
+      proc.stderr.on('data', (output: Buffer) => captureBytes('stderr', output));
+    } else {
+      proc.stdout.setEncoding('utf8');
+      proc.stderr.setEncoding('utf8');
+      proc.stdout.on('data', (output: string) => captureOutput('stdout', output));
+      proc.stderr.on('data', (output: string) => captureOutput('stderr', output));
+    }
 
     if (opts?.signal) {
       if (opts.signal.aborted) {
@@ -284,6 +318,7 @@ export function runProcess(
         stderr,
         exitCode: code ?? (signal === null ? 0 : 1),
         elapsedMs: Date.now() - startedAt,
+        ...rawOutput(),
         ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
         ...(stderrTruncated ? { stderrTruncated: true } : {}),
       });

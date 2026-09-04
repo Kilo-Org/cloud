@@ -632,7 +632,12 @@ describe('glanceable app badge sink', () => {
     expect(ordinary.shouldSetBadge).toBe(false);
     expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
 
-    const glanceable = await registration.handleNotification({
+    const badgeWrite = deferred();
+    mocks.setBadgeCountAsync.mockImplementation(async () => {
+      await badgeWrite.promise;
+      return true;
+    });
+    const handling = registration.handleNotification({
       request: {
         content: {
           data: activeGlanceablePush({
@@ -643,9 +648,13 @@ describe('glanceable app badge sink', () => {
       },
     });
     await flushMicrotasks();
+    const completedBeforeWrite = await Promise.race([handling, Promise.resolve(null)]);
+    badgeWrite.resolve();
+    const glanceable = await handling;
 
     expect(glanceable.shouldSetBadge).toBe(false);
     expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
+    expect(completedBeforeWrite).toBeNull();
   });
 });
 

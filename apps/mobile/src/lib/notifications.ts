@@ -218,6 +218,9 @@ export async function applyGlanceablePushData(
     // Keep the existing fallback for other sinks; widgets retain their timeline.
     scheduleGlanceableTerminalEnd();
   }
+  if (appBadgeWrite) {
+    await appBadgeWrite;
+  }
   // Do not finish a background task before ActivityKit accepts the native end.
   // All publication happens before this await, so it cannot restore an old scope.
   if (!eligible) {

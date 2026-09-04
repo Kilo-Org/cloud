@@ -35,6 +35,35 @@ it('renders the thinking block the way the provider issued it', () => {
   });
 });
 
+it('keeps an encrypted block between the thinking blocks around it', () => {
+  /* The provider will not take the sequence rearranged. This is the whole
+     point of holding the thinking as an ordered list rather than as words
+     beside a list of encrypted blocks: the bytes on the wire come out in the
+     order the model produced them. */
+  const body = bodyOf(
+    messagesWire,
+    promptOf([
+      { kind: 'reasoning', text: 'before', signature: 'sig_one' },
+      { kind: 'redacted', data: 'ENCRYPTED' },
+      { kind: 'reasoning', text: 'after', signature: 'sig_two' },
+      { kind: 'text', text: 'the answer' },
+    ])
+  );
+
+  expect(body).toMatchObject({
+    messages: [
+      {
+        content: [
+          { type: 'thinking', thinking: 'before', signature: 'sig_one' },
+          { type: 'redacted_thinking', data: 'ENCRYPTED' },
+          { type: 'thinking', thinking: 'after', signature: 'sig_two' },
+          { type: 'text', text: 'the answer' },
+        ],
+      },
+    ],
+  });
+});
+
 it('leaves out a thinking block that has no signature', () => {
   /* The provider refuses a block whose signature is missing, so a shape that
      cannot prove the thinking is the model's own says nothing rather than

@@ -25,16 +25,19 @@ const turn = (role: Turn['role'], content: string): Turn => ({
 });
 
 /** A request over a two turn session, used by every gateway test. */
-const sampleRequest = (stream: boolean): ModelRequest => ({
+const sampleRequest = (): ModelRequest => ({
   prompt: assemble({
     system: 'sys',
     turns: [turn('user', 'a'), turn('assistant', 'b')],
   }),
   model: 'claude-opus-5',
   maxTokens: 1024,
-  stream,
   cacheKey: 'ses_1',
 });
+
+/** One server-sent event per frame, the way every shape sends them. */
+const sse = (...events: readonly unknown[]): readonly string[] =>
+  events.map(event => `data: ${JSON.stringify(event)}\n\n`);
 
 const toAsync = async function* toAsync(chunks: readonly string[]): AsyncIterable<string> {
   for (const chunk of chunks) {
@@ -59,4 +62,4 @@ const fakeFetch = (replies: readonly Reply[]): { calls: Call[]; fetch: FetchLike
 };
 
 export type { Call, Reply };
-export { fakeFetch, sampleRequest };
+export { fakeFetch, sampleRequest, sse, toAsync };

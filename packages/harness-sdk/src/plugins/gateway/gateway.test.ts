@@ -1,26 +1,39 @@
-import { Effect, Either, Option } from 'effect';
+import { Effect, Either, Option, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
-import { fakeFetch, type Reply, sampleRequest } from './fake.js';
+import { fakeFetch, type Reply, sampleRequest, sse, toAsync } from './fake.js';
 import { testGateway } from './test-gateway.js';
 import type { FetchLike } from '../../core/fetch.js';
 import type { OrgContext } from './http.js';
-import { ModelClient } from '../../core/model.js';
+import { ModelClient, type ModelEvent, zeroUsage } from '../../core/model.js';
 import { TokenError, type TokenSourceService } from '../../core/token.js';
 
-const reply: Reply = {
-  ok: true,
-  status: 200,
-  body: JSON.stringify({
-    content: [{ type: 'text', text: 'hi' }],
-    stop_reason: 'end_turn',
-    usage: {
-      input_tokens: 7,
-      output_tokens: 3,
-      cache_read_input_tokens: 900,
-      cache_creation_input_tokens: 100,
+/** These are the transport's tests: one short answer, told the same way twice. */
+const chunks = sse(
+  {
+    type: 'message_start',
+    message: {
+      usage: { input_tokens: 7, cache_read_input_tokens: 900, cache_creation_input_tokens: 100 },
     },
-  }),
+  },
+  { type: 'content_block_delta', delta: { text: 'hi' } },
+  { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 3 } }
+);
+
+const reply: Reply = { ok: true, status: 200, body: '', chunks };
+
+/** What the old non-streamed reply used to be: the answer, the cost, the end. */
+const summary = (events: readonly ModelEvent[]) => {
+  const last = events.at(-1);
+  const done = last?.kind === 'done' ? last : undefined;
+  return {
+    content: events
+      .filter(event => event.kind === 'delta')
+      .map(event => event.text)
+      .join(''),
+    usage: done?.usage ?? zeroUsage,
+    stop: done?.stop ?? 'unknown',
+  };
 };
 
 const call = async (options: {
@@ -31,7 +44,10 @@ const call = async (options: {
 }) => {
   const { calls, fetch } = fakeFetch(options.replies ?? [reply]);
   const result = await ModelClient.pipe(
-    Effect.flatMap(client => client.send(sampleRequest(false))),
+    Effect.map(client => client.stream(sampleRequest())),
+    Stream.unwrap,
+    Stream.runCollect,
+    Effect.map(collected => summary([...collected])),
     Effect.either,
     Effect.provide(
       testGateway({
@@ -73,7 +89,7 @@ it('marks a cache breakpoint on the system block and on the last message', async
   });
 });
 
-it('reads the token counts out of the reply', async () => {
+it('reads the token counts out of the stream', async () => {
   const { result } = await call({});
   expect(Either.getOrThrow(result)).toEqual({
     content: 'hi',
@@ -88,17 +104,20 @@ it('prefers messages over the other two shapes', async () => {
 });
 
 it('falls back to the completions shape when a model speaks only that', async () => {
-  const completion = {
+  const completion: Reply = {
     ok: true,
     status: 200,
-    body: JSON.stringify({
-      choices: [{ message: { content: 'hi' } }],
-      usage: {
-        prompt_tokens: 10,
-        completion_tokens: 3,
-        prompt_tokens_details: { cached_tokens: 9 },
-      },
-    }),
+    body: '',
+    chunks: sse(
+      { choices: [{ delta: { content: 'hi' } }] },
+      {
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 3,
+          prompt_tokens_details: { cached_tokens: 9 },
+        },
+      }
+    ),
   };
   const { calls, result } = await call({ kinds: ['chat_completions'], replies: [completion] });
   expect(calls[0]?.url).toMatch(/\/chat\/completions$/u);
@@ -187,12 +206,16 @@ it('retries a transport failure, which carries no status to judge', async () => 
       : Promise.resolve({
           ok: true,
           status: 200,
-          text: () => Promise.resolve(reply.body),
+          text: () => Promise.resolve(''),
+          stream: () => toAsync(chunks),
           request,
         });
   };
   const result = await ModelClient.pipe(
-    Effect.flatMap(client => client.send(sampleRequest(false))),
+    Effect.map(client => client.stream(sampleRequest())),
+    Stream.unwrap,
+    Stream.runCollect,
+    Effect.map(collected => summary([...collected])),
     Effect.either,
     Effect.provide(testGateway({ fetch: failing, retries: 2 })),
     Effect.runPromise

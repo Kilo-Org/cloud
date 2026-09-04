@@ -1,10 +1,10 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
-import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
+import type { ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { readCached, whole, type TokenCount } from './usage.js';
+import { readCached, type TokenCount } from './usage.js';
 
 /**
  * The OpenAI Responses shape. It has no cache breakpoint. It caches on
@@ -92,13 +92,12 @@ const toBody = ({
   prompt,
   model,
   maxTokens,
-  stream,
   cacheKey,
   effort,
 }: ModelRequest): ResponsesBody => ({
   model,
   max_output_tokens: maxTokens,
-  stream,
+  stream: true,
   ...(effort === undefined ? {} : { reasoning: { effort } }),
   /* Without this the provider keeps the reasoning and hands back only an
      identifier, which is no use to a package that stores the session itself. */
@@ -113,13 +112,6 @@ interface Counts {
   input_tokens: TokenCount;
   output_tokens: TokenCount;
   input_tokens_details?: { cached_tokens?: TokenCount | null } | null;
-}
-
-interface Reply {
-  output: { content?: { text?: string }[] | null }[];
-  status?: string | null;
-  incomplete_details?: { reason?: string | null } | null;
-  usage: Counts;
 }
 
 /**
@@ -178,7 +170,6 @@ interface ReasoningDoneEvent {
   item: { type: 'reasoning'; id: string; encrypted_content: string };
 }
 
-const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isCompleted = createIs<CompletedEvent>();
 const isEnd = createIs<EndEvent>();
@@ -191,18 +182,6 @@ const readUsage = (usage: Counts): Partial<ModelUsage> =>
     usage.output_tokens,
     usage.input_tokens_details?.cached_tokens ?? 0
   );
-
-const toReply = (raw: unknown): ModelReply => {
-  const parsed = assertReply(raw);
-  return {
-    content: parsed.output
-      .flatMap(item => item.content ?? [])
-      .map(part => part.text ?? '')
-      .join(''),
-    stop: asStop(parsed.status, parsed.incomplete_details?.reason),
-    usage: whole(readUsage(parsed.usage)),
-  };
-};
 
 const toDelta = (event: unknown): WirePart | undefined => {
   if (isDelta(event)) {
@@ -235,7 +214,6 @@ const toStop = (event: unknown): StopReason | undefined =>
 const responsesWire: Wire = {
   path: '/api/gateway/v1/responses',
   toBody,
-  toReply,
   toDelta,
   toUsage,
   toStop,

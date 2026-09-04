@@ -1,9 +1,8 @@
-import { Effect, Layer, Stream } from 'effect';
+import { Layer, Stream } from 'effect';
 import {
   ModelClient,
   type ModelError,
   type ModelEvent,
-  type ModelReply,
   type ModelRequest,
   type ModelUsage,
   type StopReason,
@@ -79,18 +78,8 @@ const fakeModel = (
       : Stream.concat(deltas, Stream.fail(reply.fail));
   };
 
-  const send = (request: ModelRequest): Effect.Effect<ModelReply, ModelError> => {
-    const reply = nextReply(request);
-    return reply.fail === undefined
-      ? Effect.succeed({
-          content: reply.deltas.join(''),
-          usage: { ...zeroUsage, ...reply.usage },
-          stop: reply.stop ?? 'end',
-        })
-      : Effect.fail(reply.fail);
-  };
 
-  return { calls, layer: Layer.succeed(ModelClient, { send, stream }) };
+  return { calls, layer: Layer.succeed(ModelClient, { stream }) };
 };
 
 export type { FakeReply };

@@ -45,7 +45,7 @@ const interrupted = (fetch: FetchLike, after: Duration.DurationInput): Promise<v
   Effect.runPromise(
     Effect.gen(function* () {
       const client = yield* ModelClient;
-      const reading = yield* Effect.fork(Stream.runDrain(client.stream(sampleRequest(true))));
+      const reading = yield* Effect.fork(Stream.runDrain(client.stream(sampleRequest())));
       yield* Effect.sleep(after);
       yield* Fiber.interrupt(reading);
     }).pipe(Effect.provide(testGateway({ fetch })))
@@ -79,7 +79,7 @@ it('gives back every event of a stream that ends on its own', async () => {
 
   const events = await Effect.runPromise(
     Effect.flatMap(ModelClient, client =>
-      Stream.runCollect(client.stream(sampleRequest(true)))
+      Stream.runCollect(client.stream(sampleRequest()))
     ).pipe(Effect.provide(testGateway({ fetch })))
   );
 

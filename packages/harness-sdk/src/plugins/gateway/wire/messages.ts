@@ -1,10 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { createAssert, createIs } from 'typia';
-import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
+import type { ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { isLast } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { type Counts, set, type TokenCount, whole } from './usage.js';
+import { type Counts, set, type TokenCount } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
 type ContentBlock =
@@ -73,10 +73,10 @@ const renderMessage = (
     .filter(block => block !== undefined),
 });
 
-const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): MessagesBody => ({
+const toBody = ({ prompt, model, maxTokens, effort }: ModelRequest): MessagesBody => ({
   model,
   max_tokens: maxTokens,
-  stream,
+  stream: true,
   ...(effort === undefined ? {} : { output_config: { effort } }),
   system: prompt.system.map(part => textBlock(part.text, part.cache)),
   messages: prompt.messages.map(renderMessage),
@@ -120,17 +120,6 @@ const stopReasons: Readonly<Record<string, StopReason>> = {
 
 const asStop = stopFrom(stopReasons);
 
-interface Reply {
-  content: { type: string; text?: string }[];
-  stop_reason?: string | null;
-  usage: {
-    input_tokens: TokenCount;
-    output_tokens: TokenCount;
-    cache_read_input_tokens?: TokenCount | null;
-    cache_creation_input_tokens?: TokenCount | null;
-  };
-}
-
 interface DeltaEvent {
   delta: { text: string };
 }
@@ -170,8 +159,7 @@ interface StartEvent {
   message: UsageEvent;
 }
 
-/** The reply is an edge, so it is validated before the package believes it. */
-const assertReply = createAssert<Reply>();
+/** A stream event is an edge, so it is validated before the package believes it. */
 const isDelta = createIs<DeltaEvent>();
 const isThinking = createIs<ThinkingEvent>();
 const isSignature = createIs<SignatureEvent>();
@@ -187,15 +175,6 @@ const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
   set(counts, 'cacheReadTokens', usage.cache_read_input_tokens);
   set(counts, 'cacheWriteTokens', usage.cache_creation_input_tokens);
   return counts;
-};
-
-const toReply = (raw: unknown): ModelReply => {
-  const parsed = assertReply(raw);
-  return {
-    content: parsed.content.map(part => part.text ?? '').join(''),
-    stop: asStop(parsed.stop_reason) ?? 'unknown',
-    usage: whole(readUsage(parsed.usage)),
-  };
 };
 
 const toDelta = (event: unknown): WirePart | undefined => {
@@ -224,11 +203,10 @@ const toStop = (event: unknown): StopReason | undefined =>
 const messagesWire: Wire = {
   path: '/api/gateway/v1/messages',
   toBody,
-  toReply,
   toDelta,
   toUsage,
   toStop,
 };
 
 export type { ContentBlock, MessagesBody, WireUsage };
-export { assertReply, messagesWire };
+export { messagesWire };

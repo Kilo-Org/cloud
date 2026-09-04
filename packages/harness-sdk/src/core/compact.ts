@@ -1,4 +1,4 @@
-import { Effect, Option, Ref } from 'effect';
+import { Effect, Option, Ref, Stream } from 'effect';
 import type { ModelError } from './model.js';
 import { appendTurn, sinceSummary } from './session.js';
 import { onStore, type StoreError } from './storage.js';
@@ -88,7 +88,7 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
       turns: sinceSummary(session.turns),
     });
     return wiring.client
-      .send({
+      .stream({
         prompt: {
           system: prompt.system,
           messages: [
@@ -98,11 +98,14 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
         },
         model: wiring.model,
         maxTokens: wiring.summaryTokens ?? defaultSummaryTokens,
-        stream: false,
       })
       .pipe(
-        Effect.tap(reply => Ref.update(wiring.totals, held => add(held, reply.usage))),
-        Effect.map(reply => reply.content)
+        Stream.tap(event =>
+          event.kind === 'done'
+            ? Ref.update(wiring.totals, held => add(held, event.usage))
+            : Effect.void
+        ),
+        Stream.runFold('', (held, event) => (event.kind === 'delta' ? held + event.text : held))
       );
   });
 

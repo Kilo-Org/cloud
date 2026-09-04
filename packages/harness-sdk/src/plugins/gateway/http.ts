@@ -33,11 +33,6 @@ const host: AbortHost = globalThis;
 const abortHandle = (): Effect.Effect<AbortHandle | undefined> =>
   Effect.sync(() => (host.AbortController === undefined ? undefined : new host.AbortController()));
 
-const withAbort = <A, E, R>(
-  use: (handle: AbortHandle | undefined) => Effect.Effect<A, E, R>
-): Effect.Effect<A, E, R> =>
-  Effect.acquireUseRelease(abortHandle(), use, handle => Effect.sync(() => handle?.abort()));
-
 /** Whose credit pays for the call. */
 type OrgContext =
   | { readonly kind: 'personal' }
@@ -122,4 +117,4 @@ const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse,
   );
 
 export type { AbortHandle, HttpCaller, HttpConfig, HttpPlugins, OrgContext, Sending };
-export { abortHandle, post, withAbort };
+export { abortHandle, post };

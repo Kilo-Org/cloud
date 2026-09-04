@@ -1,18 +1,15 @@
 import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
-import { fakeFetch, type Reply, sampleRequest } from './fake.js';
+import { fakeFetch, type Reply, sampleRequest, sse } from './fake.js';
 import { testGateway } from './test-gateway.js';
 import { ModelClient, type ModelEvent } from '../../core/model.js';
-
-const sse = (...events: readonly unknown[]): readonly string[] =>
-  events.map(event => `data: ${JSON.stringify(event)}\n\n`);
 
 const collect = async (kinds: readonly ApiKind[], chunks: readonly string[]) => {
   const reply: Reply = { ok: true, status: 200, body: '', chunks };
   const { calls, fetch } = fakeFetch([reply]);
   const events = await ModelClient.pipe(
-    Effect.map(client => client.stream(sampleRequest(true))),
+    Effect.map(client => client.stream(sampleRequest())),
     Stream.unwrap,
     Stream.runCollect,
     Effect.map(chunk => [...chunk]),
@@ -163,7 +160,7 @@ it('fails the stream when the provider reports an error part way through it', as
   };
   const { fetch } = fakeFetch([reply]);
   const result = await ModelClient.pipe(
-    Effect.map(client => client.stream(sampleRequest(true))),
+    Effect.map(client => client.stream(sampleRequest())),
     Stream.unwrap,
     Stream.runCollect,
     Effect.either,

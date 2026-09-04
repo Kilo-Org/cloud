@@ -81,7 +81,6 @@ const answerOf = (
         model: wiring.model,
         maxTokens,
         ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
-        stream: true,
         cacheKey: wiring.id,
       })
       .pipe(

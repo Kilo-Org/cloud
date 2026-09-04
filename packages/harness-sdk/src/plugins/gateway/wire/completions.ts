@@ -1,8 +1,7 @@
 import type OpenAI from 'openai';
-import { createAssert, createIs } from 'typia';
+import { createIs } from 'typia';
 import type {
   Effort,
-  ModelReply,
   ModelRequest,
   ModelUsage,
   StopReason,
@@ -10,7 +9,7 @@ import type {
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri, isLast } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
-import { readCached, whole, type TokenCount } from './usage.js';
+import { readCached, type TokenCount } from './usage.js';
 
 /**
  * The OpenAI chat shape, with one extension. `cache_control` on a content block
@@ -76,12 +75,12 @@ const renderMessage = (
     .filter(part => part !== undefined),
 });
 
-const toBody = ({ prompt, model, maxTokens, stream, effort }: ModelRequest): CompletionsBody => ({
+const toBody = ({ prompt, model, maxTokens, effort }: ModelRequest): CompletionsBody => ({
   model,
   max_tokens: maxTokens,
-  stream,
+  stream: true,
+  stream_options: { include_usage: true },
   ...(effort === undefined ? {} : { reasoning: { effort } }),
-  ...(stream ? { stream_options: { include_usage: true } as const } : {}),
   messages: [
     ...prompt.system.map(part => ({
       role: 'system' as const,
@@ -95,11 +94,6 @@ interface Counts {
   prompt_tokens: TokenCount;
   completion_tokens: TokenCount;
   prompt_tokens_details?: { cached_tokens?: TokenCount | null } | null;
-}
-
-interface Reply {
-  choices: { message: { content?: string | null }; finish_reason?: string | null }[];
-  usage: Counts;
 }
 
 /** Why this shape says the model stopped. `tool_calls` waits on tool support. */
@@ -132,7 +126,6 @@ interface StopEvent {
   choices: { finish_reason: string }[];
 }
 
-const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
@@ -144,15 +137,6 @@ const readUsage = (usage: Counts): Partial<ModelUsage> =>
     usage.completion_tokens,
     usage.prompt_tokens_details?.cached_tokens ?? 0
   );
-
-const toReply = (raw: unknown): ModelReply => {
-  const parsed = assertReply(raw);
-  return {
-    content: parsed.choices.map(choice => choice.message.content ?? '').join(''),
-    stop: asStop(parsed.choices[0]?.finish_reason) ?? 'unknown',
-    usage: whole(readUsage(parsed.usage)),
-  };
-};
 
 /**
  * The empty-choices frame is filtered here rather than in the type. A tuple
@@ -181,7 +165,6 @@ const toStop = (event: unknown): StopReason | undefined =>
 const completionsWire: Wire = {
   path: '/api/gateway/v1/chat/completions',
   toBody,
-  toReply,
   toDelta,
   toUsage,
   toStop,

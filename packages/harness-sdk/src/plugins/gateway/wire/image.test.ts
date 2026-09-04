@@ -26,7 +26,6 @@ const request = (media: string): ModelRequest => ({
   prompt: promptWith(media),
   model: 'claude-opus-5',
   maxTokens: 64,
-  stream: false,
   cacheKey: 'ses_1',
 });
 

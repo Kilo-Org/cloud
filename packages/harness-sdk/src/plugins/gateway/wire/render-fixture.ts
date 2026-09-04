@@ -9,7 +9,7 @@ import type { Wire } from './wire.js';
 
 /** What one shape puts on the wire for a prompt, so a test can read the blocks. */
 const bodyOf = (wire: Wire, prompt: Prompt): unknown =>
-  wire.toBody({ prompt, model: 'm', maxTokens: 8, stream: false });
+  wire.toBody({ prompt, model: 'm', maxTokens: 8 });
 
 /** One assistant message of the given parts, with a system prompt in front. */
 const promptOf = (parts: readonly PromptPart[]): Prompt => ({

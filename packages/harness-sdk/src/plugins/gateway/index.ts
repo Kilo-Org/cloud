@@ -2,7 +2,6 @@ import { Effect, Layer, Option, Ref, Stream } from 'effect';
 import {
   abortHandle,
   post,
-  withAbort,
   type AbortHandle,
   type HttpCaller,
   type HttpConfig,
@@ -12,7 +11,6 @@ import {
   ModelClient,
   ModelError,
   type ModelEvent,
-  type ModelReply,
   type ModelRequest,
   type ModelUsage,
   type StopReason,
@@ -38,8 +36,6 @@ interface Sent {
 }
 
 /**
- * `request.stream` is already set by the caller; the wire reads it.
- *
  * Rendering is wrapped because a wire refuses what its shape cannot carry: an
  * image in a media type the provider does not take throws here, and that is a
  * failed call, not a crash.
@@ -51,28 +47,6 @@ const bodyFor = (gateway: Gateway, sent: Sent) =>
   }).pipe(
     Effect.flatMap(body =>
       post(gateway, { path: sent.wire.path, body, signal: sent.handle?.signal })
-    )
-  );
-
-const send = (gateway: Gateway, request: ModelRequest): Effect.Effect<ModelReply, ModelError> =>
-  withAbort(handle =>
-    wireFor(gateway.catalog, request.model).pipe(
-      Effect.flatMap(wire =>
-        bodyFor(gateway, { wire, request: { ...request, stream: false }, handle }).pipe(
-          Effect.flatMap(response =>
-            Effect.tryPromise({
-              try: () => response.text(),
-              catch: cause => new ModelError({ reason: 'transport', cause }),
-            })
-          ),
-          Effect.flatMap(text =>
-            Effect.try({
-              try: () => wire.toReply(JSON.parse(text)),
-              catch: cause => new ModelError({ reason: 'body', cause }),
-            })
-          )
-        )
-      )
     )
   );
 
@@ -137,7 +111,7 @@ const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEve
       const read = sseReader();
 
       return Stream.fromEffect(
-        bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
+        bodyFor(gateway, { wire, request, handle })
       ).pipe(
         Stream.flatMap(chunksOf),
         Stream.mapConcat(chunk => read(chunk)),
@@ -167,7 +141,6 @@ const layerKiloGateway = (
         retry: yield* RetryPolicy,
       };
       return {
-        send: request => send(gateway, request),
         stream: request => stream(gateway, request),
       };
     })

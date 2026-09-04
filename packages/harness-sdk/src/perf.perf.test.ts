@@ -98,7 +98,6 @@ it('builds a whole 200 turn request in well under 250 us', () => {
           prompt: assemble({ system, turns }),
           model: 'm',
           maxTokens: 1024,
-          stream: true,
           cacheKey: 'ses_1',
         })
       )

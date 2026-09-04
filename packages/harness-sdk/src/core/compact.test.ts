@@ -36,7 +36,6 @@ it('summarises the conversation once it fills the window', async () => {
      carries the transcript plus the instruction. */
   expect(calls).toHaveLength(3);
   expect(calls[1]?.prompt.messages.map(textIn).at(-1)).toContain('Summarise the conversation');
-  expect(calls[1]?.stream).toBeFalsy();
 
   expect(texts(value)).toEqual([
     'user:one',

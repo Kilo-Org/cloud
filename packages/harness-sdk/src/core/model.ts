@@ -1,4 +1,4 @@
-import { Context, Data, type Effect, type Stream } from 'effect';
+import { Context, Data, type Stream } from 'effect';
 import type { Prompt } from './prompt.js';
 
 /**
@@ -21,7 +21,6 @@ interface ModelRequest {
   readonly model: string;
   readonly maxTokens: number;
   readonly effort?: Effort;
-  readonly stream: boolean;
   /** Groups the requests of one session onto one cache entry. Use the session id. */
   readonly cacheKey?: string;
 }
@@ -46,12 +45,6 @@ interface ModelUsage {
  * `unknown` is a shape that reported nothing, which is not an error.
  */
 type StopReason = 'end' | 'maxTokens' | 'refusal' | 'unknown';
-
-interface ModelReply {
-  readonly content: string;
-  readonly usage: ModelUsage;
-  readonly stop: StopReason;
-}
 
 /**
  * A model call failed. `status` is the HTTP status when the transport has one.
@@ -93,11 +86,14 @@ const zeroUsage: ModelUsage = {
 };
 
 /**
- * Sends an assembled prompt and returns the reply. Transport only: a plugin
+ * Sends an assembled prompt and streams the reply. Transport only: a plugin
  * must not build or change the prompt, because a changed prefix drops the cache.
+ *
+ * Streaming is the only way in. Every caller inside the harness wants the reply
+ * as it arrives, and a second non-streaming path would be a second parsing of
+ * every shape, exercised by one caller and free to disagree with this one.
  */
 interface ModelClientService {
-  readonly send: (request: ModelRequest) => Effect.Effect<ModelReply, ModelError>;
   readonly stream: (request: ModelRequest) => Stream.Stream<ModelEvent, ModelError>;
 }
 
@@ -107,7 +103,6 @@ export type {
   Effort,
   ModelClientService,
   ModelEvent,
-  ModelReply,
   ModelRequest,
   ModelUsage,
   StopReason,

@@ -81,7 +81,11 @@ for (const kind of kinds) {
     failures.push(`${kind}: an answer carried no text`);
   }
   if (mustCache.has(kind) && total.cacheReadTokens === 0) {
-    failures.push(`${kind}: nothing was read from the cache, and this shape controls one`);
+    failures.push(
+      `${kind}: nothing was read from the cache, and this shape controls one. ` +
+        'An Anthropic model on the responses shape caches nothing on this gateway, ' +
+        'measured 2026-09-04; see AGENTS.md. Anything else here is a regression.'
+    );
   }
 }
 

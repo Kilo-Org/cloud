@@ -622,6 +622,20 @@ Two lessons hold beyond any one run:
   high one.
 - **A small token budget reads as a broken transport.** At 64 tokens a
   reasoning model spends the budget before it writes a word. The run uses 1024.
+- **An Anthropic model on the `responses` shape caches nothing here.** Measured
+  2026-09-04 with `anthropic/claude-sonnet-4.5` and the same two questions:
+  `messages` read 23635 tokens of cache, `chat_completions` read 23644, and
+  `responses` read 0 against 23663 of input. A raw probe outside this package
+  sent the same body twice, with `prompt_cache_key` and without, and got
+  `cached_tokens: 0` on all four calls, while `openai/gpt-5.6-luna` on the same
+  shape cached either way. So it is the gateway's translation, not the body
+  this package renders, and no field it could send would change it.
+
+  Nothing acts on that. `pickKind` ranks `messages` first, so a catalog that
+  lists all three never reaches the trap, and vendor-sniffing in the core to
+  reorder the rest would be a guess about a relay that can change next week.
+  What it does mean: if `shapes.ts` is ever run against an Anthropic model, the
+  `responses` row reads 0 and that is the relay, not a regression.
 
 ### Effort is not the token ceiling
 

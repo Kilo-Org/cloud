@@ -109,6 +109,22 @@ one of `end`, `maxTokens`, `refusal`, or `unknown`: an answer cut off at the
 ceiling is not a finished answer, and a caller that retries needs to tell them
 apart.
 
+```ts
+yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
+  Effect.sync(() => {
+    if (event.kind === 'delta') {
+      process.stdout.write(event.text);
+    }
+    if (event.kind === 'done' && event.stop === 'maxTokens') {
+      // The answer stopped mid-sentence. Ask again with a higher maxTokens,
+      // or tell the reader — storing it as finished builds every later
+      // request on half a thought.
+      process.stdout.write('\n[cut off at the token ceiling]\n');
+    }
+  })
+);
+```
+
 The handle also carries `history` (every turn, as a plain array), `usage` (the
 counts of every call so far — pass it to `hitRatio`), and `compact`.
 

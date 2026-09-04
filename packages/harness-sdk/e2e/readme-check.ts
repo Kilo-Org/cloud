@@ -30,6 +30,18 @@ const program = Effect.gen(function* () {
       }
     })
   );
+  /* The README's second snippet, which reads the last event rather than only
+     the text. */
+  yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
+    Effect.sync(() => {
+      if (event.kind === 'delta') {
+        process.stdout.write(event.text);
+      }
+      if (event.kind === 'done' && event.stop === 'maxTokens') {
+        process.stdout.write('\n[cut off at the token ceiling]\n');
+      }
+    })
+  );
   yield* session.compact;
   console.log(hitRatio(yield* session.usage));
 });

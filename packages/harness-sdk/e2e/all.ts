@@ -4,10 +4,11 @@
  * These runs cost real money and real time, so they are not part of
  * `pnpm check` and never will be. This exists because a change to the wire or
  * to the session has to be answered by the provider, not by a fake, and
- * running eight commands by hand invites running seven.
+ * running nine commands by hand invites running eight.
  *
  * `pnpm test:e2e:all`. One failure does not stop the rest: the point of a
- * sweep is to learn everything that broke, not the first thing.
+ * sweep is to learn everything that broke, not the first thing. Name runs to
+ * pick a few: `pnpm test:e2e:all stop reasoning`.
  */
 import { spawn } from 'node:child_process';
 
@@ -25,6 +26,14 @@ const runs = [
 ] as const;
 
 const only = process.argv.slice(2);
+/* A name nobody runs is a name nobody meant. Reporting "0 of 0 passed" and
+   exiting 0 on a typo is the worst answer a sweep can give. */
+const known: ReadonlySet<string> = new Set(runs);
+const unknown = only.filter(name => !known.has(name));
+if (unknown.length > 0) {
+  console.log(`no such live run: ${unknown.join(', ')}\nthere is: ${runs.join(', ')}`);
+  process.exit(1);
+}
 const chosen = only.length === 0 ? runs : runs.filter(name => only.includes(name));
 
 /** The cache run is the default one, so its script has no suffix. */

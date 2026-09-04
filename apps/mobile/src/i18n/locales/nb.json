@@ -120,10 +120,21 @@
     "reply": "Svar",
     "reportSubmittedReceipt": "Rapporten er sendt. Kvittering: {{receiptId}}",
     "retryLoadingMore": "Prøv igjen å laste inn flere",
-    "reviewPr": "Gjennomgå PR"
+    "reviewPr": "Gjennomgå PR",
+    "role": "Rolle",
+    "searchModels": "Søk etter modeller...",
+    "selectedRepositories": "Valgte kodelagre",
+    "selectRepositories": "Velg kodelagre",
+    "sendMessage": "Send melding",
+    "sessionExited": "Økten er avsluttet.",
+    "starting": "Starter…",
+    "status": "Tilstand",
+    "truncated": "Forkortet",
+    "updated": "Oppdatert",
+    "working": "Jobber",
+    "yourOwnRepositories": "Dine egne kodelagre"
   },
   "language": {
-    "title": "Språk",
     "restarting": "Starter på nytt for å bruke språket",
     "couldNotRestart": "Kunne ikke starte på nytt",
     "languageSaved": "Språkvalget ditt er lagret.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Økten din er avsluttet. Logg inn igjen.",
     "signInCodeExpired": "Innloggingskoden din er utløpt. Prøv igjen.",
     "accessDenied": "Tilgangen ble nektet.",
-    "somethingWentWrong": "Noe gikk galt. Prøv igjen.",
     "codeSent": "Kode sendt",
     "accountCreated": "Konto opprettet. Velkommen til Kilo.",
     "pleaseEnterEmail": "Skriv inn e-postadressen din.",
@@ -584,7 +594,6 @@
     "eventChips": {
       "comment": "Kommenter",
       "requestChanges": "Be om endringer",
-      "approve": "Godkjenn",
       "label": "Type kodegjennomgang"
     },
     "overview": {
@@ -680,7 +689,6 @@
     "disabledMessage": "Slå på varsler i innstillingene på enheten for å aktivere dem.",
     "disableTitle": "Deaktiver varsler",
     "disableMessage": "Slå av varsler i innstillingene på enheten for å deaktivere dem.",
-    "openSettings": "Åpne innstillinger",
     "registrationFailed": "Registreringen mislyktes. Sjekk varslingstillatelsene dine.",
     "couldNotEnable": "Kunne ikke aktivere varsler. Prøv igjen.",
     "previewAlways": "Alltid",
@@ -756,15 +764,13 @@
       "cancelReply": "Avbryt svar",
       "openInstance": "Åpne instans",
       "attachFile": "Legg ved fil",
-      "cancelEdit": "Avbryt redigering",
-      "sendMessage": "Send melding"
+      "cancelEdit": "Avbryt redigering"
     },
     "conversationList": {
       "couldNotLoad": "Kunne ikke laste inn samtalene.",
       "emptyTitle": "Ingen samtaler ennå",
       "emptyDescription": "Opprett en samtale for å chatte med KiloClaw-instansen din.",
       "create": "Opprett samtale",
-      "starting": "Starter…",
       "newConversation": "Ny samtale",
       "openInstanceSettings": "Åpne innstillingene for instansen",
       "today": "I dag",
@@ -805,8 +811,7 @@
       "moreActions": "Flere handlinger",
       "notDelivered": "Ikke levert",
       "edited": "(redigert)",
-      "image": "Bilde",
-      "attachment": "Vedlegg"
+      "image": "Bilde"
     },
     "messageActions": {
       "copied": "Kopiert",
@@ -866,7 +871,6 @@
       "managedByAdmin": "Administratoren i organisasjonen din håndterer faktureringen.",
       "couldNotLoad": "Kunne ikke laste inn faktureringsinformasjonen.",
       "manageOnWeb": "Administrer fakturering på nettet",
-      "commitPlan": "Innsjekking",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Den siste bindingsperioden for Commit-abonnementet ditt utløper {{date}}. Fortsett med Standard til {{price}}, ellers avsluttes driften.",
       "freeTrial": "Gratis prøveperiode",
@@ -883,9 +887,9 @@
       "trialDaysRemaining": "Det gjenstår {{remaining}} av prøveperioden.",
       "trialEndingSoon": "Prøveperioden utløper snart. Det gjenstår {{remaining}}.",
       "planName": {
-        "commit": "Innsjekking",
         "standard": "Standard"
-      }
+      },
+      "commit": "Innsjekking"
     },
     "changelog": {
       "title": "Nyheter",
@@ -935,7 +939,6 @@
       "approveDeviceTitle": "Godkjenn enhet",
       "approveMessage": "Vil du tillate at {{label}} (kode: {{code}}) kobler til instansen din?",
       "approveTitle": "Godkjenn forespørsel om sammenkobling",
-      "device": "Enhet",
       "unknownDevice": "Ukjent enhet"
     },
     "execPolicy": {
@@ -950,7 +953,6 @@
       "title": "Google-konto",
       "couldNotLoad": "Kunne ikke laste inn statusen for Google-kontoen.",
       "disconnected": "Google-kontoen er koblet fra. Distribuer instansen på nytt for at endringen skal tre i kraft.",
-      "redeploy": "Distribuer på nytt",
       "setupCommand": "Oppsettskommando",
       "setupCommandHelp": "Kjør denne kommandoen i en terminal på datamaskinen din for å koble til Google-kontoen din. Docker må være installert.",
       "failedToLoadCommand": "Kunne ikke laste inn oppsettskommandoen.",
@@ -963,7 +965,6 @@
       "disconnectTitle": "Koble fra Google"
     },
     "modelList": {
-      "searchPlaceholder": "Søk etter modeller...",
       "noMatches": "Ingen modeller passer til søket ditt",
       "noModelsDescription": "Modeller vises her når de blir tilgjengelige.",
       "noResultsFor": "Ingen treff for «{{query}}»."
@@ -1021,7 +1022,6 @@
       "start": "Start opp",
       "startMessage": "Er du sikker på at du vil starte denne instansen?",
       "startTitle": "Start instans",
-      "starting": "Starter…",
       "stop": "Stopp",
       "stopMessage": "Er du sikker på at du vil stoppe denne instansen?",
       "stopTitle": "Stopp instans",
@@ -1117,7 +1117,6 @@
         "timeoutBody": "Oppsettet av {{name}} tar lengre tid enn vanlig (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsett i bakgrunnen",
         "settingUp": "Setter opp {{name}}",
-        "finishingSetup": "Fullfører oppsettet",
         "connectingToAgent": "Kobler til agenten",
         "startingSandbox": "Starter sandkassen",
         "backgroundHint": "Dette tar vanligvis under et minutt. Du kan lukke denne siden. Vi fortsetter i bakgrunnen."
@@ -1157,24 +1156,18 @@
       "browseAllModelsA11y": "Bla gjennom alle de over 500 modellene"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Abonner på nettet",
       "trialExpiredBody": "Gå til kilo.ai/claw i nettleseren for å fortsette å bruke KiloClaw. Du kan ikke tegne abonnement i appen.",
-      "trialExpiredCta": "Åpne kilo.ai/claw",
       "subscriptionCanceledTitle": "Abonner på nettet",
       "subscriptionCanceledBody": "Gå til kilo.ai/claw i nettleseren for å bruke KiloClaw. Du kan ikke tegne abonnement i appen.",
       "subscriptionCanceledCta": "Åpne kilo.ai/claw",
       "subscriptionPastDueTitle": "Oppdater betalingsopplysningene på nettet",
       "subscriptionPastDueBody": "Vi hadde problemer med den siste betalingen din. Gå til kilo.ai/claw i nettleseren for å oppdatere betalingsopplysningene. Du kan ikke administrere fakturering i appen.",
-      "subscriptionPastDueCta": "Åpne kilo.ai/claw",
       "quarantinedTitle": "Instansen må utbedres",
       "quarantinedBody": "KiloClaw-instansen din er i karantene og kan ikke brukes nå. Teamet vårt må hjelpe til med å gjenopprette den.",
-      "quarantinedCta": "Fortsett på kilo.ai",
-      "multipleCurrentConflictTitle": "Kontoen må gjennomgås",
       "multipleCurrentConflictBody": "Vi fant flere aktive abonnementer på kontoen din. Vi har derfor satt tjenesten på pause for å unngå å fakturere deg dobbelt.",
       "multipleCurrentConflictCta": "Fortsett på kilo.ai",
       "nonCanonicalEarlybirdTitle": "Eldre abonnement funnet",
       "nonCanonicalEarlybirdBody": "Abonnementet ditt for tidlig tilgang må gjennomgås manuelt før det kan brukes på mobilen.",
-      "nonCanonicalEarlybirdCta": "Fortsett på kilo.ai",
       "iosTitle": "KiloClaw ikke tilgjengelig på iOS",
       "iosBody": "KiloClaw-tilgang administreres utenfor iOS-appen for denne kontoen.",
       "iosContact": "Spørsmål? Kontakt hi@kilo.ai."
@@ -1189,16 +1182,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanaler",
       "devicePairingDescription": "Godkjenn enhetsforespørsler",
-      "devicePairingLabel": "Sammenkobling av enheter",
       "execPolicyDescription": "Sikkerhetsinnstillinger",
-      "execPolicyLabel": "Kjøringsregler",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google-konto",
       "modelDescription": "Valg av KI-modell",
       "secretsDescription": "Krypterte påloggingsopplysninger",
-      "secretsLabel": "Hemmeligheter",
       "versionPinDescription": "Lås til en bestemt versjon",
       "versionPinLabel": "Versjonslåsing"
     },
@@ -1249,14 +1237,11 @@
       "finishSetup": "Fullfør oppsettet",
       "manageAccess": "Administrer tilgang",
       "bitbucketNoRepositoriesDescription": "Ingen kodelagre er tilgjengelige i dette Bitbucket-arbeidsområdet.",
-      "bitbucketSetup": "Bitbucket-oppsett",
-      "couldNotOpenGithubSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
       "noRepositoriesFound": "Ingen kodelagre funnet",
-      "repositoryAccess": "tilgang til kodelagre",
-      "selectedRepositories": "Valgte kodelagre"
+      "repositoryAccess": "tilgang til kodelagre"
     },
     "style": {
       "title": "Gjennomgangsstil",
@@ -1280,7 +1265,6 @@
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
-      "completed": "Fullført",
       "tokens": "tokener",
       "tokensInOut": "{{input}} inn / {{output}} ut",
       "council": "Vurderingspanel",
@@ -1289,7 +1273,6 @@
       "gateNone": "Ingen",
       "gateHidden": "Skjult",
       "checkRun": "Kontrollkjøring",
-      "status": "Tilstand",
       "threshold": "Terskel",
       "transcriptWaiting": "Venter på loggen fra gjennomgangen.",
       "transcriptEmpty": "Det finnes ingen logg for denne gjennomgangen.",
@@ -1305,8 +1288,7 @@
       "sessionError": "Feil i økten: {{error}}.",
       "statusWithValue": "Tilstand: {{status}}",
       "toolName": "Verktøy: {{name}}",
-      "toolNameError": "Verktøyet {{name}} feilet.",
-      "unknownError": "Det oppstod en ukjent feil."
+      "toolNameError": "Verktøyet {{name}} feilet."
     },
     "reviewMemory": {
       "title": "Gjennomgangsminne",
@@ -1339,7 +1321,6 @@
     "webhookSetupDescription": "Noen kodelagre får kanskje ikke automatiske gjennomganger.",
     "autoReviews": "Automatiske gjennomganger",
     "selectRepository": "Velg minst ett kodelager for å aktivere automatiske gjennomganger.",
-    "selectRepositories": "Velg kodelagre",
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruksjonene i REVIEW.md i hvert kodelager",
     "bitbucket": {
@@ -1354,7 +1335,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
-      "personalSubtitle": "Dine egne kodelagre",
       "viewOnly": "Kun visning"
     },
     "reviewList": {
@@ -1385,9 +1365,7 @@
       "allAreas": "Alle områder",
       "customInstructions": "Egendefinerte instruksjoner",
       "set": "Angitt",
-      "mergeGate": "Flettekrav",
       "nSelected": "{{displayCount}} valgt",
-      "reviewMemory": "Gjennomgangsminne",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -1452,7 +1430,6 @@
       "noFiltersDescription": "Gå tilbake og åpne filtrene på nytt fra funnlisten.",
       "title": "Filtrer funn",
       "reset": "Tilbakestill",
-      "status": "Tilstand",
       "severity": "Alvorlighetsgrad",
       "outcome": "Utfall",
       "slaStatus": "SLA-status",
@@ -1463,13 +1440,8 @@
       "severityHigh": "Høy",
       "severityMedium": "Middels",
       "severityLow": "Lav",
-      "outcomeNotAnalyzed": "Ikke analysert",
-      "outcomeAnalyzing": "Analyserer",
-      "outcomeFailed": "Analysen mislyktes",
       "outcomeNotExploitable": "Kan ikke utnyttes",
-      "outcomeSafeToDismiss": "Kan trygt avvises",
       "outcomeTriageComplete": "Innledende vurdering fullført",
-      "outcomeDismissed": "Avvist",
       "sortSeverityDesc": "Alvorlighetsgrad: høy til lav",
       "sortSeverityAsc": "Alvorlighetsgrad: lav til høy",
       "sortSlaDue": "SLA-frist",
@@ -1594,7 +1566,6 @@
     },
     "dismiss": {
       "title": "Avvis funn",
-      "submit": "Avvis funn",
       "reason": "Årsak",
       "reasonFixStarted": "retting er allerede i gang",
       "reasonNoBandwidth": "ingen ledig kapasitet",
@@ -1615,7 +1586,6 @@
     "findingDetails": {
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
-      "dismissed": "Avvist",
       "dismissedBecause": "Avvist {{reason}}.",
       "severityLabel": "Alvorlighetsgrad: {{severity}}",
       "package": "Pakke",
@@ -1626,7 +1596,6 @@
       "ghsa": "GHSA",
       "manifest": "Manifestfil",
       "detected": "Oppdaget",
-      "updated": "Oppdatert",
       "slaDeadline": "SLA-frist",
       "sourceRecord": "Kildepost",
       "source": "Kilde",
@@ -1650,7 +1619,6 @@
       "repositoriesCount_one": "{{displayCount}} kodelager valgt",
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
-      "selectRepositories": "Velg kodelagre",
       "selectRepositoriesSubtitle": "Velg hvilke kodelagre sikkerhetsagenten overvåker",
       "modelsAndAnalysis": "Modeller og analyse",
       "analysisModeSubtitle": "Analyse: {{mode}}",
@@ -1726,8 +1694,7 @@
       "tabRemediation": "Utbedring",
       "notFound": "Fant ikke funnet",
       "notFoundDescription": "Dette funnet kan ha blitt fjernet, eller du har ikke lenger tilgang til det.",
-      "couldNotLoad": "Kunne ikke laste inn dette funnet.",
-      "dismissA11y": "Avvis funn"
+      "couldNotLoad": "Kunne ikke laste inn dette funnet."
     },
     "findingList": {
       "couldNotLoad": "Kunne ikke laste inn funnene.",
@@ -1736,9 +1703,6 @@
       "noMatchesDescription": "Prøv å justere eller fjerne de valgte filtrene.",
       "emptyTitle": "Ingen åpne funn",
       "emptyDescription": "Ingen åpne funn krever oppfølging akkurat nå."
-    },
-    "scopeList": {
-      "personalSubtitle": "Dine egne kodelagre"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Utbedrings-PR åpen",
@@ -1798,13 +1762,11 @@
     },
     "repositories": {
       "couldNotLoad": "Kunne ikke laste inn innstillingene for kodelagre.",
-      "couldNotOpenGithubSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
       "githubAppSettings": "innstillinger for GitHub-appen",
       "manageAccess": "Administrer tilgangen til GitHub-appen",
       "noRepositories": "Ingen kodelagre",
       "noRepositoriesDescription": "Gi Kilos GitHub-app tilgang til kodelagre.",
-      "selectAtLeastOne": "Velg minst ett kodelager.",
-      "selectedRepositories": "Valgte kodelagre"
+      "selectAtLeastOne": "Velg minst ett kodelager."
     },
     "scopeEntry": {
       "connectDescription": "Installer Kilos GitHub-app for å synkronisere Dependabot-varsler automatisk og administrere sikkerhetsfunn i kodelagrene dine.",
@@ -1839,10 +1801,8 @@
       "queuedTitle": "Analyse i kø",
       "queuedDescription": "Venter på ledig analysekapasitet.",
       "analyzing": "Analyserer",
-      "analyzingTitle": "Analyserer",
       "analyzingDescription": "Sjekker om programkoden kan nå den berørte funksjonen.",
       "failed": "Analysen mislyktes",
-      "failedTitle": "Analysen mislyktes",
       "failedDescription": "Sikkerhetsagenten kunne ikke fullføre analysen.",
       "extractionFailedDescription": "Den tekniske rapporten kunne ikke gjøres om til et strukturert resultat.",
       "exploitableDescription": "Programkoden kan nå den berørte funksjonen.",
@@ -1852,18 +1812,14 @@
       "unknown": "Må gjennomgås",
       "unknownDescription": "Analysen kunne ikke bekrefte om programkoden kan nå den sårbare funksjonen.",
       "safeToDismiss": "Kan trygt avvises",
-      "safeToDismissTitle": "Kan trygt avvises",
       "safeToDismissDescription": "Den innledende vurderingen viste at funnet trygt kan avvises uten å analysere kodebasen.",
       "manualReviewTitle": "Må gjennomgås manuelt",
       "manualReviewDescription": "Den innledende vurderingen viste at funnet trenger manuell gjennomgang.",
       "analysisRequired": "Analyse kreves",
       "analysisRequiredTitle": "Analyse av kodebasen kreves",
       "analysisRequiredDescription": "Den innledende vurderingen anbefaler å analysere kodelageret før du velger tiltak.",
-      "completed": "Analysert",
-      "completedTitle": "Analysert",
       "completedDescription": "Analysen ble fullført, men det ble ikke registrert noe bestemt utfall.",
       "notAnalyzed": "Ikke analysert",
-      "notAnalyzedTitle": "Ikke analysert",
       "notAnalyzedDescription": "Kodebasen er ennå ikke analysert for dette funnet."
     },
     "deadline": {
@@ -1998,7 +1954,6 @@
       "didNotCompleteTitle": "Installasjonen ble ikke fullført",
       "didNotCompleteMessage": "Installasjonen av GitHub-appen ble ikke fullført. Prøv igjen fra appen."
     },
-    "sessionExited": "Økten er avsluttet.",
     "remoteSpawnRetryable": "Kunne ikke nå instansen. Den kan ha mistet tilkoblingen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte økten. Sjekk maskinen eller oppdater CLI-en.",
     "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans.",
@@ -2038,7 +1993,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke opprette en ekstern økt.",
-      "exited": "Økten er avsluttet.",
       "failedToExit": "Kunne ikke avslutte økten.",
       "exitTitle": "Avslutte økten?",
       "exitMessage": "Dette stopper økten som kjører, men beholder historikken.",
@@ -2072,7 +2026,6 @@
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
       "promptPlaceholder": "Hva vil du jobbe med?",
-      "addAttachment": "Legg til vedlegg",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den opprinnelige økten er ikke lenger tilgjengelige. Velg nye nedenfor.",
       "prefillRepoUnavailable": "{{repo}} er ikke lenger tilgjengelig. Velg et kodelager nedenfor.",
@@ -2106,15 +2059,10 @@
       "updatedFileCount": "{{displayCount}} filer er oppdatert.",
       "updatedFileCount_other": "{{displayCount}} filer er oppdatert."
     },
-    "toolPatch": {
-      "operationUpdated": "Oppdatert"
-    },
     "toolCard": {
       "accessibility": "Verktøyet {{label}}, {{status}}",
       "accessibilityLabel": "Verktøyet {{name}}, {{status}}",
-      "fileEmpty": "Denne filen er tom.",
       "noTasks": "Det er ingen oppgaver.",
-      "truncated": "Forkortet",
       "toolRead": "les",
       "toolEdit": "Rediger",
       "toolWrite": "skriv",
@@ -2183,7 +2131,6 @@
       "noMatches": "Ingen treff",
       "noRepositories": "Ingen kodelagre tilgjengelige",
       "noRepositoriesDescription": "Ingen kodelagre er koblet til kontoen din.",
-      "tryDifferentSearch": "Prøv et annet søkeord.",
       "loading": "Laster inn…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2196,7 +2143,6 @@
       "reportAiResponse": "Rapporter AI-svar",
       "reportAiResponseConfirm": "Vil du rapportere dette svaret for vurdering?",
       "report": "Rapporter",
-      "role": "Rolle",
       "roleUser": "Bruker",
       "roleAssistant": "Assistent",
       "sent": "Sendt",
@@ -2383,7 +2329,6 @@
     },
     "modelPicker": {
       "title": "Velg modell",
-      "searchPlaceholder": "Søk etter modeller...",
       "noModelsDescription": "Det er ingen modeller å velge mellom.",
       "favorites": "Favoritter"
     },
@@ -2411,7 +2356,6 @@
       "uploading": "Laster opp…",
       "uploaded": "Lastet opp",
       "uploadFailedRetry": "Opplastingen mislyktes. Trykk for å prøve igjen.",
-      "uploadFailedTerminal": "Denne filen kan ikke lastes opp.",
       "moveLeft": "Flytt {{filename}} til venstre",
       "moveRight": "Flytt {{filename}} til høyre"
     },
@@ -2423,7 +2367,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessMessage": "Gi appen tilgang til kameraet i Innstillinger for å ta et bilde.",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne bildevelgeren. Start Kilo på nytt og prøv igjen.",
       "maxFilesAllowed": "Du kan legge til maksimalt {{displayCount}} filer.",
       "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})"
@@ -2436,7 +2379,6 @@
       "waitForUploads": "Vent til vedleggene er ferdig opplastet.",
       "pasteFromClipboard": "Lim inn fra utklippstavlen",
       "stopGenerating": "Stopp generering",
-      "sendMessage": "Send melding",
       "selectModelBeforeSending": "Velg en modell før du sender.",
       "preparingPlaceholder": "Klargjør miljøet…",
       "finalizingPlaceholder": "Avslutter…",
@@ -2490,7 +2432,6 @@
     "contextUsage": {
       "windowUnavailable": "Størrelsen på kontekstvinduet er ukjent",
       "tapToViewDetails": "Trykk for å se kontekstdetaljer.",
-      "costPrefix": "kostnad {{cost}}",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokener, størrelsen på kontekstvinduet er ukjent",
       "tokensUsage": "Kontekst: {{used}} av {{window}} tokener, {{percentage}} brukt",
@@ -2603,7 +2544,6 @@
     "title": "Siden ble ikke funnet"
   },
   "monoScrollBlock": {
-    "truncated": "Forkortet",
     "wrap": "Linjebryting",
     "scroll": "Rull"
   },
@@ -2798,7 +2738,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Maskerte skjermbilder når en feil oppstår, og maskerte opptak av et lite utvalg økter.",
     "errorScreenshotsWhy": "For å se hva appen viste da noe gikk galt.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Installasjonskilde og kampanjeidentifikatorer.",
     "installAttributionWhy": "For å forstå hvilke kanaler nye brukere kommer fra.",
     "installAttributionWho": "AppsFlyer.",
@@ -2853,7 +2792,6 @@
       "emailError": "Angi en gyldig e-postadresse.",
       "emailPlaceholder": "navn@firma.no",
       "permissionDenied": "Du har ikke tillatelse til å invitere medlemmer.",
-      "roleLabel": "Rolle",
       "roleMember": "Rolle: medlem",
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem"
@@ -2959,7 +2897,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Det finnes allerede en konto med denne e-postadressen som bruker en annen påloggingsmetode. Prøv en annen metode eller bruk «$t(login.moreSignInOptions)».",
     "differentOauth": "Det finnes allerede en konto med denne e-postadressen som bruker en annen påloggingsmetode. Prøv en annen metode eller bruk «$t(login.moreSignInOptions)».",
     "ssoError": "Organisasjonen din krever SSO. Bruk «$t(login.moreSignInOptions)».",
     "blocked": "Denne kontoen er blokkert. Kontakt brukerstøtte.",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "Kunne ikke starte påloggingen. Prøv igjen.",
     "couldNotOpenBrowser": "Kunne ikke åpne nettleseren. Prøv igjen.",
     "signInTimedOut": "Tiden for pålogging er utløpt. Prøv igjen.",
-    "signInFailed": "Påloggingen mislyktes. Prøv igjen.",
     "networkError": "Nettverksfeil. Prøv igjen.",
     "accessDeniedByUser": "Brukeren nektet tilgang.",
     "codeExpired": "Koden er utløpt.",
@@ -3010,7 +2946,6 @@
       "title": "Start en chat",
       "description": "Send en melding for å snakke med en modell."
     },
-    "working": "Jobber",
     "historyRetry": "Kunne ikke laste inn chathistorikken.",
     "sendError": "Kunne ikke sende meldingen. Prøv igjen."
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "Logg på for å se agenter",
     "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
-    "running": "Jobber",
     "needsInput": "venter på svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."

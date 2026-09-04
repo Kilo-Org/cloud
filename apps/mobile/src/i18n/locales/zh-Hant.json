@@ -120,10 +120,21 @@
     "reply": "回覆",
     "reportSubmittedReceipt": "已送出檢舉。受理編號：{{receiptId}}",
     "retryLoadingMore": "再次載入更多內容",
-    "reviewPr": "審查 PR"
+    "reviewPr": "審查 PR",
+    "role": "角色",
+    "searchModels": "搜尋模型…",
+    "selectedRepositories": "已選取的存放庫",
+    "selectRepositories": "選擇存放庫",
+    "sendMessage": "傳送訊息",
+    "sessionExited": "工作階段已結束",
+    "starting": "啟動中…",
+    "status": "狀態",
+    "truncated": "已截斷",
+    "updated": "已更新",
+    "working": "處理中",
+    "yourOwnRepositories": "你自己的存放庫"
   },
   "language": {
-    "title": "語言",
     "restarting": "正在重新啟動以套用語言",
     "couldNotRestart": "無法重新啟動",
     "languageSaved": "語言設定已儲存。",
@@ -166,7 +177,6 @@
     "sessionEnded": "你的工作階段已結束。請重新登入。",
     "signInCodeExpired": "你的登入驗證碼已過期。請再試一次。",
     "accessDenied": "存取遭拒。",
-    "somethingWentWrong": "發生錯誤。請再試一次。",
     "codeSent": "驗證碼已傳送",
     "signInCodeField": "登入驗證碼",
     "accountCreated": "帳戶已建立。歡迎使用 Kilo。",
@@ -254,7 +264,6 @@
     "disabledMessage": "若要啟用通知，請在裝置設定中開啟。",
     "disableTitle": "停用通知",
     "disableMessage": "若要停用通知，請在裝置設定中關閉。",
-    "openSettings": "開啟設定",
     "registrationFailed": "註冊失敗。請檢查通知權限。",
     "couldNotEnable": "無法啟用通知。請再試一次。",
     "previewAlways": "一律",
@@ -330,15 +339,13 @@
       "cancelReply": "取消回覆",
       "openInstance": "開啟執行個體",
       "attachFile": "附加檔案",
-      "cancelEdit": "取消編輯",
-      "sendMessage": "傳送訊息"
+      "cancelEdit": "取消編輯"
     },
     "conversationList": {
       "couldNotLoad": "無法載入對話。",
       "emptyTitle": "尚無對話",
       "emptyDescription": "建立對話，即可開始與你的 KiloClaw 執行個體聊天。",
       "create": "建立對話",
-      "starting": "啟動中…",
       "newConversation": "新對話",
       "openInstanceSettings": "開啟執行個體設定",
       "today": "今天",
@@ -379,8 +386,7 @@
       "moreActions": "更多操作",
       "notDelivered": "未送達",
       "edited": "（已編輯）",
-      "image": "圖片",
-      "attachment": "附件"
+      "image": "圖片"
     },
     "messageActions": {
       "copied": "已複製",
@@ -440,7 +446,6 @@
       "managedByAdmin": "帳單由你的組織管理員管理。",
       "couldNotLoad": "無法載入帳單資訊。",
       "manageOnWeb": "前往網頁管理帳單",
-      "commitPlan": "提交",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "你的最後一期 Commit 方案將於 {{date}} 到期。可改以 {{price}} 續訂 Standard 方案，否則託管服務將終止。",
       "freeTrial": "免費試用",
@@ -457,9 +462,9 @@
       "trialDaysRemaining": "試用期還剩 {{remaining}}。",
       "trialEndingSoon": "試用即將結束，剩餘 {{remaining}}。",
       "planName": {
-        "commit": "提交",
         "standard": "Standard"
-      }
+      },
+      "commit": "提交"
     },
     "changelog": {
       "title": "最新消息",
@@ -509,7 +514,6 @@
       "approveDeviceTitle": "核准裝置",
       "approveMessage": "要允許 {{label}}（代碼：{{code}}）連線到你的執行個體嗎？",
       "approveTitle": "核准配對要求",
-      "device": "裝置",
       "unknownDevice": "未知裝置"
     },
     "execPolicy": {
@@ -524,7 +528,6 @@
       "title": "Google 帳戶",
       "couldNotLoad": "無法載入 Google 帳戶狀態。",
       "disconnected": "Google 帳戶已中斷連線。請重新部署執行個體以套用變更。",
-      "redeploy": "重新部署",
       "setupCommand": "設定指令",
       "setupCommandHelp": "請在自己的電腦上安裝 Docker，再開啟終端機執行此指令，即可連結你的 Google 帳戶。",
       "failedToLoadCommand": "無法載入設定指令。",
@@ -537,7 +540,6 @@
       "disconnectTitle": "中斷 Google 連線"
     },
     "modelList": {
-      "searchPlaceholder": "搜尋模型…",
       "noMatches": "沒有符合搜尋條件的模型",
       "noModelsDescription": "有可用模型時，會顯示在這裡。",
       "noResultsFor": "找不到「{{query}}」的搜尋結果。"
@@ -592,22 +594,16 @@
       "iosTitle": "無法在 iOS 上使用 KiloClaw",
       "multipleCurrentConflictBody": "你的帳戶有多個有效訂閱。為避免重複收費，我們已暫停服務。",
       "multipleCurrentConflictCta": "前往 kilo.ai 繼續操作",
-      "multipleCurrentConflictTitle": "帳戶待審查",
       "nonCanonicalEarlybirdBody": "你的搶先體驗方案必須通過人工審核，才能在行動裝置上使用。",
-      "nonCanonicalEarlybirdCta": "前往 kilo.ai 繼續操作",
       "nonCanonicalEarlybirdTitle": "偵測到舊版方案",
       "quarantinedBody": "你的 KiloClaw 執行個體已隔離，目前無法使用，需要由我們的團隊協助恢復。",
-      "quarantinedCta": "前往 kilo.ai 繼續操作",
       "quarantinedTitle": "執行個體需要修復",
       "subscriptionCanceledBody": "若要使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
       "subscriptionCanceledCta": "開啟 kilo.ai/claw",
       "subscriptionCanceledTitle": "前往網頁版訂閱",
       "subscriptionPastDueBody": "你最近一次付款出了問題。請透過瀏覽器前往 kilo.ai/claw 更新付款方式。應用程式內無法管理帳單。",
-      "subscriptionPastDueCta": "開啟 kilo.ai/claw",
       "subscriptionPastDueTitle": "在網頁上更新付款方式",
-      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
-      "trialExpiredCta": "開啟 kilo.ai/claw",
-      "trialExpiredTitle": "前往網頁版訂閱"
+      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。"
     },
     "controls": {
       "redeploying": "正在重新部署…",
@@ -618,7 +614,6 @@
       "start": "啟動",
       "startMessage": "確定要啟動此執行個體嗎？",
       "startTitle": "啟動執行個體",
-      "starting": "啟動中…",
       "stop": "停止",
       "stopMessage": "確定要停止此執行個體嗎？",
       "stopTitle": "停止執行個體",
@@ -723,7 +718,6 @@
         "backgroundHint": "通常不到一分鐘就能完成。你可以關閉此畫面，設定會繼續在背景執行。",
         "connectingToAgent": "正在連線至代理程式",
         "continueInBackground": "繼續在背景執行",
-        "finishingSetup": "正在完成最後設定",
         "queryErrorBody": "查詢 {{name}} 的設定進度時，連線中斷了。設定可能仍在進行，請再試一次或稍後查看。",
         "queryErrorTitle": "無法確認設定進度",
         "settingUp": "正在設定 {{name}}",
@@ -763,16 +757,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram、Discord、Slack",
-      "channelsLabel": "頻道",
       "devicePairingDescription": "核准裝置配對要求",
-      "devicePairingLabel": "裝置配對",
       "execPolicyDescription": "安全性設定",
-      "execPolicyLabel": "執行原則",
       "googleDescription": "Gmail、Calendar、Docs",
-      "googleLabel": "Google 帳戶",
       "modelDescription": "選擇 AI 模型",
       "secretsDescription": "加密的驗證資訊",
-      "secretsLabel": "機密資料",
       "versionPinDescription": "固定至特定版本",
       "versionPinLabel": "版本鎖定"
     },
@@ -823,14 +812,11 @@
       "finishSetup": "完成設定",
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
-      "bitbucketSetup": "Bitbucket 設定",
-      "couldNotOpenGithubSettings": "無法開啟 GitHub 應用程式設定。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
       "noRepositoriesFound": "找不到存放庫",
-      "repositoryAccess": "存放庫存取權限",
-      "selectedRepositories": "已選取的存放庫"
+      "repositoryAccess": "存放庫存取權限"
     },
     "style": {
       "title": "審查風格",
@@ -886,7 +872,6 @@
       "cancelReview": "取消審查",
       "cancelTitle": "要取消審查嗎？",
       "checkRun": "檢查作業",
-      "completed": "已完成",
       "couldNotGetLatest": "無法取得最新內容。",
       "couldNotLoad": "無法載入審查。",
       "council": "審查小組",
@@ -901,7 +886,6 @@
       "retryTitle": "要重新嘗試審查嗎？",
       "showMore": "顯示更多",
       "started": "開始時間",
-      "status": "狀態",
       "threshold": "門檻",
       "title": "審查",
       "tokens": "詞元",
@@ -920,8 +904,7 @@
       "sessionError": "工作階段發生錯誤：{{error}}。",
       "statusWithValue": "狀態：{{status}}",
       "toolName": "工具：{{name}}",
-      "toolNameError": "工具 {{name}} 發生錯誤。",
-      "unknownError": "未知錯誤"
+      "toolNameError": "工具 {{name}} 發生錯誤。"
     },
     "reviewList": {
       "configureProvider": "設定平台",
@@ -946,10 +929,8 @@
     },
     "scopeList": {
       "personalStillAvailable": "你仍可使用下方的個人存放庫。",
-      "personalSubtitle": "你自己的存放庫",
       "viewOnly": "僅供檢視"
     },
-    "selectRepositories": "選擇存放庫",
     "selectRepository": "請至少選取一個存放庫，以啟用自動審查。",
     "webhookSetup": "Webhook 設定尚未完成。",
     "webhookSetupDescription": "部分存放庫可能無法自動執行審查。",
@@ -963,10 +944,8 @@
       "allAreas": "所有面向",
       "customInstructions": "自訂指示",
       "focusAreas": "審查重點",
-      "mergeGate": "合併條件",
       "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
-      "reviewMemory": "審查記憶",
       "reviewStyle": "審查風格",
       "set": "已設定"
     },
@@ -1027,12 +1006,7 @@
       "title": "篩選資安問題",
       "fixed": "已修復",
       "outcome": "結果",
-      "outcomeAnalyzing": "分析中",
-      "outcomeDismissed": "已忽略",
-      "outcomeFailed": "分析失敗",
-      "outcomeNotAnalyzed": "未分析",
       "outcomeNotExploitable": "無法被利用",
-      "outcomeSafeToDismiss": "可放心忽略",
       "outcomeTriageComplete": "初步評估完成",
       "overdueOnly": "僅顯示已逾期項目",
       "reset": "重設",
@@ -1045,7 +1019,6 @@
       "sortSeverityAsc": "嚴重程度：低到高",
       "sortSeverityDesc": "嚴重程度：高到低",
       "sortSlaDue": "SLA 到期日",
-      "status": "狀態",
       "statusIgnored": "已忽略",
       "statusOpen": "開啟"
     },
@@ -1211,12 +1184,10 @@
       "reasonNoBandwidth": "無暇處理",
       "reasonNotUsed": "未使用有漏洞的程式碼",
       "reasonTolerableRisk": "風險可以接受",
-      "submit": "忽略問題",
       "title": "忽略問題"
     },
     "findingDetail": {
       "couldNotLoad": "無法載入這項問題。",
-      "dismissA11y": "忽略問題",
       "notFound": "找不到問題",
       "notFoundDescription": "這項資安問題可能已移除，或你已無權存取。",
       "tabAnalysis": "分析",
@@ -1226,7 +1197,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "偵測時間",
-      "dismissed": "已忽略",
       "dismissedBecause": "已忽略，原因：{{reason}}。",
       "ghsa": "GHSA",
       "manifest": "套件清單檔",
@@ -1240,7 +1210,6 @@
       "sourceRecord": "來源記錄",
       "supersededBy": "已由最新的資安問題記錄取代",
       "supersededByDescription": "點按以開啟最新記錄，檢視狀態、分析與修復資訊。",
-      "updated": "已更新",
       "viewAdvisory": "在 GitHub 上檢視資安公告",
       "vulnerableVersions": "有漏洞的版本",
       "statusSuperseded": "已被取代",
@@ -1321,13 +1290,11 @@
     },
     "repositories": {
       "couldNotLoad": "無法載入存放庫設定。",
-      "couldNotOpenGithubSettings": "無法開啟 GitHub 應用程式設定。",
       "githubAppSettings": "GitHub App 設定",
       "manageAccess": "管理 GitHub App 存取權限",
       "noRepositories": "沒有存放庫",
       "noRepositoriesDescription": "請授權 Kilo GitHub App 存取存放庫。",
-      "selectAtLeastOne": "請至少選取一個存放庫。",
-      "selectedRepositories": "已選取的存放庫"
+      "selectAtLeastOne": "請至少選取一個存放庫。"
     },
     "scopeEntry": {
       "connectDescription": "安裝 Kilo GitHub App，即可自動同步 Dependabot 警報，並管理各個存放庫的資安問題。",
@@ -1339,9 +1306,6 @@
       "reauthorizeFailed": "無法開始重新授權。請再試一次。",
       "reauthorizeTitle": "需要額外權限",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
-    },
-    "scopeList": {
-      "personalSubtitle": "你自己的存放庫"
     },
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} 分析",
@@ -1359,7 +1323,6 @@
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫",
-      "selectRepositories": "選擇存放庫",
       "selectRepositoriesSubtitle": "選取要由資安代理監控的存放庫",
       "slaPolicy": "SLA 原則",
       "title": "設定"
@@ -1413,10 +1376,8 @@
       "queuedTitle": "等待分析",
       "queuedDescription": "正在等待空出的分析名額。",
       "analyzing": "分析中",
-      "analyzingTitle": "分析中",
       "analyzingDescription": "正在檢查應用程式的程式碼是否有路徑可執行到受影響的功能。",
       "failed": "分析失敗",
-      "failedTitle": "分析失敗",
       "failedDescription": "資安代理無法完成分析。",
       "extractionFailedDescription": "技術報告無法轉換為結構化結果。",
       "exploitableDescription": "應用程式的程式碼有路徑可執行到受影響的功能。",
@@ -1426,18 +1387,14 @@
       "unknown": "待審查",
       "unknownDescription": "分析無法確認是否有路徑可執行到有漏洞的功能。",
       "safeToDismiss": "可放心忽略",
-      "safeToDismissTitle": "可放心忽略",
       "safeToDismissDescription": "初步評估判定這項資安問題可安全忽略，無需分析程式碼庫。",
       "manualReviewTitle": "待人工審查",
       "manualReviewDescription": "初步評估已將這項資安問題標記為需要人工審查。",
       "analysisRequired": "需要分析",
       "analysisRequiredTitle": "需要分析程式碼庫",
       "analysisRequiredDescription": "初步評估建議先分析存放庫，再決定處理方式。",
-      "completed": "已分析",
-      "completedTitle": "已分析",
       "completedDescription": "分析已完成，未記錄特定結果。",
       "notAnalyzed": "未分析",
-      "notAnalyzedTitle": "未分析",
       "notAnalyzedDescription": "尚未針對這項資安問題執行程式碼庫分析。"
     },
     "deadline": {
@@ -1572,7 +1529,6 @@
       "didNotCompleteTitle": "安裝未完成",
       "didNotCompleteMessage": "GitHub App 尚未完成安裝。請回到應用程式再試一次。"
     },
-    "sessionExited": "工作階段已結束",
     "remoteSpawnRetryable": "無法連線到此執行個體，可能已中斷連線。",
     "remoteSpawnNonRetryable": "此執行個體無法啟動工作階段。請檢查電腦或更新 CLI。",
     "remoteSpawnInstanceDisconnected": "選取的執行個體已中斷連線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。",
@@ -1612,7 +1568,6 @@
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段。",
-      "exited": "工作階段已結束",
       "failedToExit": "無法結束工作階段。",
       "exitTitle": "結束工作階段？",
       "exitMessage": "這會停止執行中的工作階段，但保留其記錄。",
@@ -1646,7 +1601,6 @@
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
       "promptPlaceholder": "你想處理什麼？",
-      "addAttachment": "新增附件",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",
       "prefillRepoUnavailable": "{{repo}} 已無法使用。請在下方選取儲存庫。",
@@ -1680,15 +1634,10 @@
       "updatedFileCount": "已更新 {{displayCount}} 個檔案。",
       "updatedFileCount_other": "已更新 {{displayCount}} 個檔案。"
     },
-    "toolPatch": {
-      "operationUpdated": "已更新"
-    },
     "toolCard": {
       "accessibility": "{{label}} 工具，{{status}}",
       "accessibilityLabel": "{{name}} 工具，{{status}}",
-      "fileEmpty": "這個檔案沒有內容。",
       "noTasks": "沒有任務。",
-      "truncated": "已截斷",
       "toolRead": "讀取",
       "toolEdit": "編輯",
       "toolWrite": "寫入",
@@ -1757,7 +1706,6 @@
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
       "noRepositoriesDescription": "你的帳戶尚未連結任何儲存庫。",
-      "tryDifferentSearch": "請嘗試其他搜尋字詞。",
       "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"
@@ -1770,7 +1718,6 @@
       "reportAiResponse": "檢舉 AI 回覆",
       "reportAiResponseConfirm": "要檢舉這則回覆並交由審查嗎？",
       "report": "檢舉",
-      "role": "角色",
       "roleUser": "使用者",
       "roleAssistant": "助理",
       "sent": "傳送時間",
@@ -1957,7 +1904,6 @@
     },
     "modelPicker": {
       "title": "選取模型",
-      "searchPlaceholder": "搜尋模型…",
       "noModelsDescription": "沒有可選取的模型。",
       "favorites": "我的最愛"
     },
@@ -1985,7 +1931,6 @@
       "uploading": "上傳中…",
       "uploaded": "已上傳",
       "uploadFailedRetry": "上傳失敗。點一下即可再試一次。",
-      "uploadFailedTerminal": "無法上傳這個檔案。",
       "moveLeft": "將 {{filename}} 向左移動",
       "moveRight": "將 {{filename}} 向右移動"
     },
@@ -1997,7 +1942,6 @@
       "camera": "相機",
       "photoLibrary": "照片圖庫",
       "files": "檔案",
-      "cameraAccessMessage": "請在設定中允許使用相機，才能拍照。",
       "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
       "maxFilesAllowed": "最多可附加 {{displayCount}} 個檔案。",
       "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
@@ -2010,7 +1954,6 @@
       "waitForUploads": "請等待附件上傳完成。",
       "pasteFromClipboard": "從剪貼簿貼上",
       "stopGenerating": "停止產生回覆",
-      "sendMessage": "傳送訊息",
       "selectModelBeforeSending": "傳送前請先選取模型。",
       "preparingPlaceholder": "設定環境中…",
       "finalizingPlaceholder": "收尾中…",
@@ -2064,7 +2007,6 @@
     "contextUsage": {
       "windowUnavailable": "無法取得上下文視窗大小",
       "tapToViewDetails": "點一下即可檢視上下文詳細資料。",
-      "costPrefix": "費用 {{cost}}",
       "costSuffix": "，費用 {{cost}}",
       "tokensWindowUnavailable": "上下文已用 {{used}} 個詞元，無法取得視窗大小",
       "tokensUsage": "上下文已用 {{used}} 個詞元，上限為 {{window}} 個，已使用 {{percentage}}",
@@ -2177,7 +2119,6 @@
     "title": "找不到頁面"
   },
   "monoScrollBlock": {
-    "truncated": "已截斷",
     "wrap": "換行",
     "scroll": "捲動"
   },
@@ -2372,7 +2313,6 @@
     "productAnalyticsWho": "PostHog。",
     "errorScreenshotsWhat": "發生錯誤時的螢幕截圖，以及少量抽樣工作階段的操作錄影，均經過遮蔽處理。",
     "errorScreenshotsWhy": "查看應用程式在發生問題時顯示的內容。",
-    "errorScreenshotsWho": "Sentry。",
     "installAttributionWhat": "安裝來源與行銷活動識別碼。",
     "installAttributionWhy": "了解哪些管道帶來新使用者。",
     "installAttributionWho": "AppsFlyer。",
@@ -2539,7 +2479,6 @@
       "urlAccessibility": "GitHub 提取請求 URL"
     },
     "eventChips": {
-      "approve": "核准",
       "comment": "留言",
       "label": "審查類型",
       "requestChanges": "要求變更"
@@ -2852,7 +2791,6 @@
       "emailError": "請輸入有效的電子郵件地址。",
       "emailPlaceholder": "例如：name@company.com",
       "permissionDenied": "你沒有邀請成員的權限。",
-      "roleLabel": "角色",
       "roleMember": "角色：成員",
       "sendInvite": "傳送邀請",
       "title": "邀請成員"
@@ -2959,7 +2897,6 @@
     "sendFeedback": "傳送意見回饋"
   },
   "authErrors": {
-    "emailAlreadyUsed": "此電子郵件地址已有帳戶，但使用其他方式登入。請改用其他登入方式，或選擇「$t(login.moreSignInOptions)」。",
     "differentOauth": "此電子郵件地址已有帳戶，但使用其他方式登入。請改用其他登入方式，或選擇「$t(login.moreSignInOptions)」。",
     "ssoError": "你的組織規定必須使用單一登入（SSO）。請選擇「$t(login.moreSignInOptions)」。",
     "blocked": "此帳戶已封鎖。請聯絡客服。",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "無法開始登入。請再試一次。",
     "couldNotOpenBrowser": "無法開啟瀏覽器。請再試一次。",
     "signInTimedOut": "登入逾時。請再試一次。",
-    "signInFailed": "登入失敗。請再試一次。",
     "networkError": "網路錯誤。請再試一次。",
     "accessDeniedByUser": "你已拒絕授權。",
     "codeExpired": "驗證碼已過期。",
@@ -3010,7 +2946,6 @@
       "title": "開始聊天",
       "description": "傳送訊息，即可與模型對話。"
     },
-    "working": "處理中",
     "historyRetry": "無法載入聊天記錄。",
     "sendError": "無法傳送訊息。請再試一次。"
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "登入以查看代理程式",
     "privacy": "開啟 Kilo 以查看代理程式",
     "openAgents": "開啟代理程式",
-    "running": "處理中",
     "needsInput": "等待輸入",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"

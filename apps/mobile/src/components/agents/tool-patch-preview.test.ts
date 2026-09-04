@@ -102,7 +102,7 @@ describe('ToolPatchPreview', () => {
     const del = makeFile({ path: 'src/c.ts', operation: 'delete' });
     const root = rootElement(render(makeModel({ files: [add, update, del] })));
     expect(findText(root, 'common.added')).toHaveLength(1);
-    expect(findText(root, 'agentChat.toolPatch.operationUpdated')).toHaveLength(1);
+    expect(findText(root, 'common.updated')).toHaveLength(1);
     expect(findText(root, 'common.deleted')).toHaveLength(1);
   });
 
@@ -176,9 +176,7 @@ describe('ToolPatchPreview', () => {
     if (!truncatedLabel) {
       throw new Error('truncatedLabel not found');
     }
-    expect((truncatedLabel.props as { children?: string }).children).toBe(
-      'monoScrollBlock.truncated'
-    );
+    expect((truncatedLabel.props as { children?: string }).children).toBe('common.truncated');
   });
 
   it('does not show the Truncated label when the model is not truncated', () => {

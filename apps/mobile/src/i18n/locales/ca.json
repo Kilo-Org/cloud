@@ -120,10 +120,21 @@
     "reply": "Respon",
     "reportSubmittedReceipt": "S'ha enviat la denúncia. Comprovant: {{receiptId}}.",
     "retryLoadingMore": "Torna a provar de carregar-ne més",
-    "reviewPr": "Revisa la PR"
+    "reviewPr": "Revisa la PR",
+    "role": "Rol",
+    "searchModels": "Cerca de models",
+    "selectedRepositories": "Repositoris seleccionats",
+    "selectRepositories": "Selecciona repositoris",
+    "sendMessage": "Envia el missatge",
+    "sessionExited": "Sessió finalitzada",
+    "starting": "S'està iniciant…",
+    "status": "Estat",
+    "truncated": "Truncat",
+    "updated": "Actualitzat",
+    "working": "En curs",
+    "yourOwnRepositories": "Els teus repositoris"
   },
   "language": {
-    "title": "Idioma",
     "restarting": "S'està reiniciant per aplicar l'idioma",
     "couldNotRestart": "No s'ha pogut reiniciar",
     "languageSaved": "S'ha desat l'idioma que has triat.",
@@ -166,7 +177,6 @@
     "sessionEnded": "La teva sessió ha acabat. Torna a iniciar la sessió.",
     "signInCodeExpired": "El teu codi d'inici de sessió ha caducat. Torna-ho a provar.",
     "accessDenied": "S'ha denegat l'accés.",
-    "somethingWentWrong": "S'ha produït un error. Torna-ho a provar.",
     "codeSent": "Codi enviat",
     "accountCreated": "S'ha creat el compte. Et donem la benvinguda a Kilo.",
     "pleaseEnterEmail": "Introdueix la teva adreça de correu electrònic.",
@@ -589,7 +599,6 @@
     "eventChips": {
       "comment": "Comentari",
       "requestChanges": "Sol·licita canvis",
-      "approve": "Aprova",
       "label": "Tipus de revisió"
     },
     "overview": {
@@ -687,7 +696,6 @@
     "disabledMessage": "Per activar les notificacions, activa-les a la configuració del dispositiu.",
     "disableTitle": "Desactiva les notificacions",
     "disableMessage": "Per desactivar les notificacions, desactiva-les a la configuració del dispositiu.",
-    "openSettings": "Obre la configuració",
     "registrationFailed": "El registre ha fallat. Comprova els teus permisos de notificacions.",
     "couldNotEnable": "No s'han pogut activar les notificacions. Torna-ho a provar.",
     "previewAlways": "Sempre",
@@ -763,15 +771,13 @@
       "cancelReply": "Cancel·la la resposta",
       "openInstance": "Obre la instància",
       "attachFile": "Adjunta un fitxer",
-      "cancelEdit": "Cancel·la l'edició",
-      "sendMessage": "Envia el missatge"
+      "cancelEdit": "Cancel·la l'edició"
     },
     "conversationList": {
       "couldNotLoad": "No s'han pogut carregar les converses.",
       "emptyTitle": "Encara no hi ha converses",
       "emptyDescription": "Crea una conversa per començar a xatejar amb la teva instància de KiloClaw.",
       "create": "Crea una conversa",
-      "starting": "S'està iniciant…",
       "newConversation": "Conversa nova",
       "openInstanceSettings": "Obre la configuració de la instància",
       "today": "Avui",
@@ -812,8 +818,7 @@
       "moreActions": "Més accions",
       "notDelivered": "No lliurat",
       "edited": "(editat)",
-      "image": "Imatge",
-      "attachment": "Fitxer adjunt"
+      "image": "Imatge"
     },
     "messageActions": {
       "copied": "Copiat",
@@ -873,7 +878,6 @@
       "managedByAdmin": "La facturació la gestiona l'administrador de la teva organització.",
       "couldNotLoad": "No s'ha pogut carregar la informació de facturació.",
       "manageOnWeb": "Gestiona la facturació al web",
-      "commitPlan": "canvi",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "L'últim període del teu pla Commit acaba el {{date}}. Continua amb el pla Standard per {{price}}; si no, l'allotjament finalitzarà.",
       "freeTrial": "Prova gratuïta",
@@ -891,9 +895,9 @@
       "trialEndingSoon": "La prova s'acaba aviat: {{remaining}}.",
       "lessThanOneDay": "Menys d'1 dia",
       "planName": {
-        "commit": "canvi",
         "standard": "Standard"
-      }
+      },
+      "commit": "canvi"
     },
     "changelog": {
       "title": "Novetats",
@@ -943,7 +947,6 @@
       "approveDeviceTitle": "Autorització del dispositiu",
       "approveMessage": "Vols permetre que {{label}} (codi: {{code}}) es connecti a la teva instància?",
       "approveTitle": "Aprovació de l'aparellament",
-      "device": "Dispositiu",
       "unknownDevice": "Dispositiu desconegut"
     },
     "execPolicy": {
@@ -958,7 +961,6 @@
       "title": "Compte de Google",
       "couldNotLoad": "No s'ha pogut carregar l'estat del compte de Google.",
       "disconnected": "S'ha desconnectat el compte de Google. Torna a desplegar la instància per aplicar el canvi.",
-      "redeploy": "Torna a desplegar",
       "setupCommand": "Ordre de configuració",
       "setupCommandHelp": "Per connectar el teu compte de Google, executa aquesta ordre al terminal del teu ordinador. Cal tenir-hi Docker instal·lat.",
       "failedToLoadCommand": "No s'ha pogut carregar l'ordre de configuració.",
@@ -971,7 +973,6 @@
       "disconnectTitle": "Desconnexió de Google"
     },
     "modelList": {
-      "searchPlaceholder": "Cerca de models",
       "noMatches": "Cap model coincideix amb la teva cerca",
       "noModelsDescription": "Els models apareixeran aquí quan estiguin disponibles.",
       "noResultsFor": "No hi ha cap resultat per a «{{query}}»."
@@ -1029,7 +1030,6 @@
       "start": "Inicia",
       "startMessage": "Segur que vols iniciar aquesta instància?",
       "startTitle": "Inici de la instància",
-      "starting": "S'està iniciant…",
       "stop": "Atura",
       "stopMessage": "Segur que vols aturar aquesta instància?",
       "stopTitle": "Aturada de la instància",
@@ -1125,7 +1125,6 @@
         "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
         "continueInBackground": "Continua en segon pla",
         "settingUp": "Configuració de {{name}}",
-        "finishingSetup": "S'està acabant la configuració",
         "connectingToAgent": "S'està connectant amb l'agent",
         "startingSandbox": "S'està iniciant l'entorn aïllat",
         "backgroundHint": "Normalment triga menys d'un minut. Pots tancar aquesta pantalla. Continuarem treballant en segon pla."
@@ -1165,24 +1164,18 @@
       "browseAllModelsA11y": "Explora els més de 500 models"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Subscriu-te des del web",
       "trialExpiredBody": "Per continuar utilitzant KiloClaw, vés a kilo.ai/claw des del navegador. No pots subscriure't des de l'aplicació.",
-      "trialExpiredCta": "Obre kilo.ai/claw",
       "subscriptionCanceledTitle": "Subscriu-te des del web",
       "subscriptionCanceledBody": "Per utilitzar KiloClaw, vés a kilo.ai/claw des del navegador. No pots subscriure't des de l'aplicació.",
       "subscriptionCanceledCta": "Obre kilo.ai/claw",
       "subscriptionPastDueTitle": "Actualització del pagament al web",
       "subscriptionPastDueBody": "Hem tingut problemes amb el teu últim pagament. Vés a kilo.ai/claw des del navegador per actualitzar les dades de pagament. No pots gestionar la facturació des de l'aplicació.",
-      "subscriptionPastDueCta": "Obre kilo.ai/claw",
       "quarantinedTitle": "Cal reparar la instància",
       "quarantinedBody": "La teva instància de KiloClaw està en quarantena i no es pot utilitzar ara mateix. El nostre equip ha d'ajudar a restaurar-la.",
-      "quarantinedCta": "Continua a kilo.ai",
-      "multipleCurrentConflictTitle": "Compte pendent de revisió",
       "multipleCurrentConflictBody": "Hem trobat més d'una subscripció activa al teu compte. Hem aturat el procés per evitar cobrar-te dues vegades.",
       "multipleCurrentConflictCta": "Continua a kilo.ai",
       "nonCanonicalEarlybirdTitle": "S'ha detectat un pla antic",
       "nonCanonicalEarlybirdBody": "El teu pla d'accés anticipat requereix una revisió manual abans de poder-se utilitzar al mòbil.",
-      "nonCanonicalEarlybirdCta": "Continua a kilo.ai",
       "iosTitle": "KiloClaw no està disponible a iOS",
       "iosBody": "L'accés d'aquest compte a KiloClaw es gestiona fora de l'aplicació per a iOS.",
       "iosContact": "Tens preguntes? Contacta amb hi@kilo.ai."
@@ -1198,16 +1191,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Canals",
       "devicePairingDescription": "Aprova les sol·licituds de dispositius",
-      "devicePairingLabel": "Aparellament de dispositius",
       "execPolicyDescription": "Configuració de seguretat",
-      "execPolicyLabel": "Política d'execució",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Compte de Google",
       "modelDescription": "Selecció del model d'IA",
       "secretsDescription": "Credencials xifrades",
-      "secretsLabel": "Dades secretes",
       "versionPinDescription": "Fixa una versió específica",
       "versionPinLabel": "Fixació de la versió"
     },
@@ -1258,14 +1246,11 @@
       "finishSetup": "Acaba la configuració",
       "manageAccess": "Gestiona l'accés",
       "bitbucketNoRepositoriesDescription": "No hi ha cap repositori disponible en aquest espai de treball de Bitbucket.",
-      "bitbucketSetup": "Configuració de Bitbucket",
-      "couldNotOpenGithubSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
       "noRepositoriesFound": "No s'han trobat repositoris",
-      "repositoryAccess": "accés als repositoris",
-      "selectedRepositories": "Repositoris seleccionats"
+      "repositoryAccess": "accés als repositoris"
     },
     "style": {
       "title": "Estil de revisió",
@@ -1289,7 +1274,6 @@
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
-      "completed": "Finalitzada",
       "tokens": "unitats de text",
       "tokensInOut": "{{input}} d'entrada / {{output}} de sortida",
       "council": "Consell",
@@ -1298,7 +1282,6 @@
       "gateNone": "Cap",
       "gateHidden": "Ocult",
       "checkRun": "Execució de la comprovació",
-      "status": "Estat",
       "threshold": "Llindar",
       "transcriptWaiting": "S'espera la transcripció de la revisió.",
       "transcriptEmpty": "No hi ha transcripció per a aquesta revisió.",
@@ -1314,8 +1297,7 @@
       "sessionError": "S'ha produït un error a la sessió: {{error}}.",
       "statusWithValue": "Estat: {{status}}",
       "toolName": "Eina: {{name}}",
-      "toolNameError": "S'ha produït un error a l'eina {{name}}.",
-      "unknownError": "S'ha produït un error desconegut."
+      "toolNameError": "S'ha produït un error a l'eina {{name}}."
     },
     "reviewMemory": {
       "title": "Memòria de revisió",
@@ -1348,7 +1330,6 @@
     "webhookSetupDescription": "És possible que alguns repositoris no rebin revisions automàtiques.",
     "autoReviews": "Revisions automàtiques",
     "selectRepository": "Selecciona almenys un repositori per activar les revisions automàtiques.",
-    "selectRepositories": "Selecciona repositoris",
     "followReviewMd": "Segueix REVIEW.md",
     "followReviewMdSubtitle": "Respecta els fitxers d'instruccions REVIEW.md de cada repositori",
     "bitbucket": {
@@ -1363,7 +1344,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "Els repositoris personals encara estan disponibles a continuació.",
-      "personalSubtitle": "Els teus repositoris",
       "viewOnly": "Només lectura"
     },
     "reviewList": {
@@ -1394,9 +1374,7 @@
       "allAreas": "Totes les àrees",
       "customInstructions": "Instruccions personalitzades",
       "set": "Definit",
-      "mergeGate": "Control de fusió",
       "nSelected": "{{displayCount}} àrees seleccionades",
-      "reviewMemory": "Memòria de revisió",
       "proposedReviewMdGuidance": "Pautes proposades per a REVIEW.md"
     },
     "decision": {
@@ -1461,7 +1439,6 @@
       "noFiltersDescription": "Torna enrere i obre els filtres de nou des de la llista d'incidències.",
       "title": "Filtres d'incidències",
       "reset": "Restableix",
-      "status": "Estat",
       "severity": "Gravetat",
       "outcome": "Resultat",
       "slaStatus": "Estat de l'SLA",
@@ -1472,13 +1449,8 @@
       "severityHigh": "Alt",
       "severityMedium": "Mitjà",
       "severityLow": "Baix",
-      "outcomeNotAnalyzed": "Pendent d'anàlisi",
-      "outcomeAnalyzing": "En anàlisi",
-      "outcomeFailed": "L'anàlisi ha fallat",
       "outcomeNotExploitable": "No explotable",
-      "outcomeSafeToDismiss": "Es pot descartar sense risc",
       "outcomeTriageComplete": "Triatge completat",
-      "outcomeDismissed": "Descartat",
       "sortSeverityDesc": "Gravetat: d'alta a baixa",
       "sortSeverityAsc": "Gravetat: de baixa a alta",
       "sortSlaDue": "Data límit de l'SLA",
@@ -1604,7 +1576,6 @@
     },
     "dismiss": {
       "title": "Descarta el problema",
-      "submit": "Descarta el problema",
       "reason": "Motiu",
       "reasonFixStarted": "la correcció ja està en curs",
       "reasonNoBandwidth": "no hi ha recursos disponibles",
@@ -1625,7 +1596,6 @@
     "findingDetails": {
       "supersededBy": "Substituïda per una incidència actual",
       "supersededByDescription": "Toca per obrir el registre actual i consultar-ne l'estat, l'anàlisi i la correcció.",
-      "dismissed": "Descartat",
       "dismissedBecause": "S'ha descartat: {{reason}}.",
       "severityLabel": "Gravetat: {{severity}}",
       "package": "Paquet",
@@ -1636,7 +1606,6 @@
       "ghsa": "GHSA",
       "manifest": "Fitxer de manifest",
       "detected": "Detectada",
-      "updated": "Actualitzat",
       "slaDeadline": "Termini de l'SLA",
       "sourceRecord": "Registre d'origen",
       "source": "Origen",
@@ -1660,7 +1629,6 @@
       "repositoriesCount_one": "{{displayCount}} repositori seleccionat",
       "repositoriesCount": "{{displayCount}} repositoris seleccionats",
       "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
-      "selectRepositories": "Selecciona repositoris",
       "selectRepositoriesSubtitle": "Tria quins repositoris supervisa l'agent de seguretat",
       "modelsAndAnalysis": "Models i anàlisi",
       "analysisModeSubtitle": "Anàlisi {{mode}}",
@@ -1737,8 +1705,7 @@
       "tabRemediation": "Correcció",
       "notFound": "No s'ha trobat el problema",
       "notFoundDescription": "És possible que aquesta incidència s'hagi eliminat o que ja no hi tinguis accés.",
-      "couldNotLoad": "No s'ha pogut carregar aquest problema.",
-      "dismissA11y": "Descarta el problema"
+      "couldNotLoad": "No s'ha pogut carregar aquest problema."
     },
     "findingList": {
       "couldNotLoad": "No s'han pogut carregar les incidències.",
@@ -1747,9 +1714,6 @@
       "noMatchesDescription": "Prova d'ajustar o esborrar els filtres seleccionats.",
       "emptyTitle": "Cap incidència oberta",
       "emptyDescription": "Ara mateix, cap incidència oberta no requereix atenció."
-    },
-    "scopeList": {
-      "personalSubtitle": "Els teus repositoris"
     },
     "findingRow": {
       "nextRemediationPrOpen": "PR de correcció oberta",
@@ -1809,13 +1773,11 @@
     },
     "repositories": {
       "couldNotLoad": "No s'ha pogut carregar la configuració dels repositoris.",
-      "couldNotOpenGithubSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
       "githubAppSettings": "configuració de l'aplicació de GitHub",
       "manageAccess": "Gestiona l'accés de l'aplicació de GitHub",
       "noRepositories": "Cap repositori",
       "noRepositoriesDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris.",
-      "selectAtLeastOne": "Selecciona almenys un repositori.",
-      "selectedRepositories": "Repositoris seleccionats"
+      "selectAtLeastOne": "Selecciona almenys un repositori."
     },
     "scopeEntry": {
       "connectDescription": "Instal·la l'aplicació de GitHub de Kilo per sincronitzar automàticament les alertes de Dependabot i gestionar les incidències de seguretat de tots els teus repositoris.",
@@ -1850,10 +1812,8 @@
       "queuedTitle": "Anàlisi en cua",
       "queuedDescription": "L'anàlisi espera que s'alliberi capacitat per executar-se.",
       "analyzing": "En anàlisi",
-      "analyzingTitle": "En anàlisi",
       "analyzingDescription": "S'està comprovant si el codi de l'aplicació pot accedir a la funcionalitat afectada.",
       "failed": "L'anàlisi ha fallat",
-      "failedTitle": "L'anàlisi ha fallat",
       "failedDescription": "L'agent de seguretat no ha pogut completar l'anàlisi.",
       "extractionFailedDescription": "L'informe tècnic no s'ha pogut convertir en un resultat estructurat.",
       "exploitableDescription": "El codi de l'aplicació pot accedir a la funcionalitat afectada.",
@@ -1863,18 +1823,14 @@
       "unknown": "Pendent de revisió",
       "unknownDescription": "L'anàlisi no ha pogut confirmar si es pot accedir a la funcionalitat vulnerable.",
       "safeToDismiss": "Es pot descartar sense risc",
-      "safeToDismissTitle": "Es pot descartar sense risc",
       "safeToDismissDescription": "El triatge ha determinat que aquesta incidència es pot descartar amb seguretat sense analitzar la base de codi.",
       "manualReviewTitle": "Pendent de revisió manual",
       "manualReviewDescription": "El triatge ha marcat aquesta incidència per a una revisió manual.",
       "analysisRequired": "Cal una anàlisi",
       "analysisRequiredTitle": "Cal analitzar la base de codi",
       "analysisRequiredDescription": "El triatge recomana analitzar el repositori abans de decidir com actuar.",
-      "completed": "Analitzat",
-      "completedTitle": "Analitzat",
       "completedDescription": "L'anàlisi s'ha completat sense cap resultat específic registrat.",
       "notAnalyzed": "Pendent d'anàlisi",
-      "notAnalyzedTitle": "Pendent d'anàlisi",
       "notAnalyzedDescription": "Encara no s'ha analitzat la base de codi per a aquesta incidència."
     },
     "deadline": {
@@ -2013,7 +1969,6 @@
       "didNotCompleteTitle": "La instal·lació no s'ha completat",
       "didNotCompleteMessage": "La instal·lació de l'aplicació de GitHub no s'ha completat. Torna-ho a provar des de l'aplicació."
     },
-    "sessionExited": "Sessió finalitzada",
     "remoteSpawnRetryable": "No s'ha pogut connectar amb la instància. Pot ser que s'hagi desconnectat.",
     "remoteSpawnNonRetryable": "La instància no ha pogut iniciar la sessió. Comprova la màquina o actualitza la CLI.",
     "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicia una sessió a Cloud Agent o tria una altra instància.",
@@ -2054,7 +2009,6 @@
     },
     "remoteSession": {
       "failedToCreate": "No s'ha pogut crear la sessió remota.",
-      "exited": "Sessió finalitzada",
       "failedToExit": "No s'ha pogut finalitzar la sessió.",
       "exitTitle": "Vols finalitzar la sessió?",
       "exitMessage": "S'aturarà la sessió en execució, però se'n conservarà l'historial.",
@@ -2088,7 +2042,6 @@
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
       "promptPlaceholder": "En què vols treballar?",
-      "addAttachment": "Afegeix un fitxer adjunt",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",
       "prefillRepoUnavailable": "{{repo}} ja no està disponible. Tria un repositori a continuació.",
@@ -2123,15 +2076,10 @@
       "updatedFileCount_other": "S'han actualitzat {{displayCount}} fitxers.",
       "updatedFileCount_many": "S'han actualitzat {{displayCount}} fitxers."
     },
-    "toolPatch": {
-      "operationUpdated": "Actualitzat"
-    },
     "toolCard": {
       "accessibility": "Eina {{label}}, {{status}}",
       "accessibilityLabel": "Eina {{name}}, {{status}}",
-      "fileEmpty": "Aquest fitxer està buit.",
       "noTasks": "No hi ha cap tasca.",
-      "truncated": "Truncat",
       "toolRead": "llegeix",
       "toolEdit": "Edita",
       "toolWrite": "escriu",
@@ -2200,7 +2148,6 @@
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
       "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
-      "tryDifferentSearch": "Prova un altre terme de cerca.",
       "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2213,7 +2160,6 @@
       "reportAiResponse": "Denuncia la resposta de la IA",
       "reportAiResponseConfirm": "Vols denunciar aquesta resposta perquè es revisi?",
       "report": "Denuncia",
-      "role": "Rol",
       "roleUser": "Usuari",
       "roleAssistant": "Assistent",
       "sent": "Enviat",
@@ -2403,7 +2349,6 @@
     },
     "modelPicker": {
       "title": "Model",
-      "searchPlaceholder": "Cerca de models",
       "favorites": "Preferits",
       "noModelsDescription": "No hi ha cap model per seleccionar."
     },
@@ -2431,7 +2376,6 @@
       "uploading": "Penjant…",
       "uploaded": "Penjat",
       "uploadFailedRetry": "No s'ha pogut penjar el fitxer. Toca'l per tornar-ho a provar.",
-      "uploadFailedTerminal": "Aquest fitxer no es pot penjar.",
       "moveLeft": "Mou {{filename}} a l'esquerra",
       "moveRight": "Mou {{filename}} a la dreta"
     },
@@ -2443,7 +2387,6 @@
       "camera": "Càmera",
       "photoLibrary": "Fototeca",
       "files": "fitxers",
-      "cameraAccessMessage": "Permet l'accés a la càmera a la configuració per fer una foto.",
       "couldNotOpenPhotoPicker": "No s'ha pogut obrir el selector de fotos. Reinicia Kilo i torna-ho a provar.",
       "maxFilesAllowed": "Es permeten com a màxim {{displayCount}} fitxers.",
       "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
@@ -2456,7 +2399,6 @@
       "waitForUploads": "Espera que s'acabin de penjar els fitxers adjunts.",
       "pasteFromClipboard": "Enganxa del portapapers",
       "stopGenerating": "Atura la generació",
-      "sendMessage": "Envia el missatge",
       "selectModelBeforeSending": "Selecciona un model abans d'enviar el missatge.",
       "preparingPlaceholder": "Configurant l'entorn…",
       "finalizingPlaceholder": "Finalitzant…",
@@ -2510,7 +2452,6 @@
     "contextUsage": {
       "windowUnavailable": "Mida de la finestra de context no disponible",
       "tapToViewDetails": "Toca per veure els detalls del context.",
-      "costPrefix": "import de {{cost}}",
       "costSuffix": ", amb un cost de {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tòkens, mida de la finestra no disponible",
       "tokensUsage": "Context: {{used}} de {{window}} tòkens, {{percentage}} utilitzat",
@@ -2624,7 +2565,6 @@
     "title": "Pàgina no trobada"
   },
   "monoScrollBlock": {
-    "truncated": "Truncat",
     "wrap": "Ajust de línia",
     "scroll": "Desplaçament"
   },
@@ -2819,7 +2759,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Captures de pantalla quan es produeix un error i enregistraments d'una petita mostra de sessions, amb el text i les imatges ocults.",
     "errorScreenshotsWhy": "Per veure què mostrava l'aplicació quan es va produir una fallada.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Origen de la instal·lació i identificadors de campanya.",
     "installAttributionWhy": "Per entendre per quins canals arriben els usuaris nous.",
     "installAttributionWho": "AppsFlyer.",
@@ -2874,7 +2813,6 @@
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
       "emailPlaceholder": "nom@empresa.com",
       "permissionDenied": "No tens permís per convidar membres.",
-      "roleLabel": "Rol",
       "roleMember": "El rol és de membre.",
       "sendInvite": "Envia la invitació",
       "title": "Convida un membre"
@@ -2981,7 +2919,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Ja hi ha un compte amb aquesta adreça de correu electrònic i un altre mètode d'inici de sessió. Prova un altre mètode o utilitza «$t(login.moreSignInOptions)».",
     "differentOauth": "Ja hi ha un compte amb aquesta adreça de correu electrònic i un altre mètode d'inici de sessió. Prova un altre mètode o utilitza «$t(login.moreSignInOptions)».",
     "ssoError": "La teva organització requereix SSO. Utilitza «$t(login.moreSignInOptions)».",
     "blocked": "Aquest compte s'ha bloquejat. Contacta amb el servei d'assistència.",
@@ -2999,7 +2936,6 @@
     "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
     "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
     "signInTimedOut": "S'ha esgotat el temps per iniciar la sessió. Torna-ho a provar.",
-    "signInFailed": "L'inici de sessió ha fallat. Torna-ho a provar.",
     "networkError": "Error de xarxa. Torna-ho a provar.",
     "accessDeniedByUser": "L'usuari ha denegat l'accés.",
     "codeExpired": "El codi ha caducat.",
@@ -3032,7 +2968,6 @@
       "title": "Comença un xat",
       "description": "Envia un missatge per parlar amb un model."
     },
-    "working": "En curs",
     "historyRetry": "No s'ha pogut carregar l'historial del xat.",
     "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
   },
@@ -3044,7 +2979,6 @@
     "signedOut": "Inicia la sessió per veure els agents",
     "privacy": "Obre Kilo per veure els agents",
     "openAgents": "Obre els agents",
-    "running": "En curs",
     "needsInput": "pendent de resposta",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."

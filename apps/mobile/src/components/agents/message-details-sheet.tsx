@@ -232,7 +232,7 @@ export function MessageDetailsSheet({
               ) : null}
 
               <View className="gap-4">
-                <Row label={t('agentChat.messageDetails.role')}>
+                <Row label={t('common.role')}>
                   <Text className="text-base font-medium text-foreground">{content.roleLabel}</Text>
                 </Row>
 

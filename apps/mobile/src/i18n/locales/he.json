@@ -120,10 +120,21 @@
     "reply": "מענה",
     "reportSubmittedReceipt": "הדיווח נשלח. מספר אישור: {{receiptId}}",
     "retryLoadingMore": "ניסיון חוזר לטעון פריטים נוספים",
-    "reviewPr": "סקירת PR"
+    "reviewPr": "סקירת PR",
+    "role": "תפקיד",
+    "searchModels": "חיפוש מודלים...",
+    "selectedRepositories": "מאגרים שנבחרו",
+    "selectRepositories": "בחירת מאגרים",
+    "sendMessage": "שליחת הודעה",
+    "sessionExited": "הסשן הסתיים",
+    "starting": "מתחיל…",
+    "status": "סטטוס",
+    "truncated": "קוצר",
+    "updated": "עודכן",
+    "working": "בפעולה",
+    "yourOwnRepositories": "המאגרים שלך"
   },
   "language": {
-    "title": "שפה",
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
     "couldNotRestart": "ההפעלה מחדש נכשלה",
     "languageSaved": "בחירת השפה נשמרה.",
@@ -166,7 +177,6 @@
     "sessionEnded": "תוקף החיבור שלך פג. היכנס שוב.",
     "signInCodeExpired": "תוקף קוד הכניסה שלך פג. נסה שוב.",
     "accessDenied": "הגישה נדחתה.",
-    "somethingWentWrong": "משהו השתבש. אפשר לנסות שוב.",
     "codeSent": "הקוד נשלח",
     "signInCodeField": "קוד כניסה",
     "accountCreated": "החשבון נוצר. ברוך הבא ל-Kilo.",
@@ -254,7 +264,6 @@
     "disabledMessage": "כדי להפעיל התראות, הפעל אותן בהגדרות המכשיר שלך.",
     "disableTitle": "השבתת התראות",
     "disableMessage": "כדי להשבית התראות, כבה אותן בהגדרות המכשיר שלך.",
-    "openSettings": "פתיחת ההגדרות",
     "registrationFailed": "הרישום נכשל. בדוק את הרשאות ההתראות שלך.",
     "couldNotEnable": "לא ניתן היה להפעיל התראות. נסה שוב.",
     "previewAlways": "תמיד",
@@ -330,15 +339,13 @@
       "cancelReply": "ביטול התשובה",
       "openInstance": "פתיחת המופע",
       "attachFile": "צירוף קובץ",
-      "cancelEdit": "ביטול העריכה",
-      "sendMessage": "שליחת הודעה"
+      "cancelEdit": "ביטול העריכה"
     },
     "conversationList": {
       "couldNotLoad": "לא ניתן לטעון את השיחות.",
       "emptyTitle": "אין עדיין שיחות",
       "emptyDescription": "צור שיחה כדי להתחיל לשוחח עם מופע ה-KiloClaw שלך.",
       "create": "יצירת שיחה",
-      "starting": "מתחיל…",
       "newConversation": "שיחה חדשה",
       "openInstanceSettings": "פתיחת הגדרות המופע",
       "today": "היום",
@@ -379,8 +386,7 @@
       "moreActions": "פעולות נוספות",
       "notDelivered": "לא נמסרה",
       "edited": "(נערכה)",
-      "image": "תמונה",
-      "attachment": "קובץ מצורף"
+      "image": "תמונה"
     },
     "messageActions": {
       "copied": "הועתק",
@@ -440,7 +446,6 @@
       "managedByAdmin": "החיוב מנוהל על ידי מנהל הארגון שלך.",
       "couldNotLoad": "לא ניתן היה לטעון את פרטי החיוב.",
       "manageOnWeb": "ניהול חיובים באתר",
-      "commitPlan": "קומיט",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "תקופת ההתחייבות האחרונה שלך בתוכנית Commit מסתיימת ב-{{date}}. המשך בתוכנית Standard במחיר {{price}}, אחרת האירוח יסתיים.",
       "freeTrial": "תקופת ניסיון בחינם",
@@ -458,9 +463,9 @@
       "trialDaysRemaining": "הזמן שנותר בתקופת הניסיון: {{remaining}}.",
       "trialEndingSoon": "תקופת הניסיון מסתיימת בקרוב. הזמן שנותר: {{remaining}}.",
       "planName": {
-        "commit": "קומיט",
         "standard": "Standard"
-      }
+      },
+      "commit": "קומיט"
     },
     "changelog": {
       "title": "מה חדש",
@@ -510,7 +515,6 @@
       "approveDeviceTitle": "אישור מכשיר",
       "approveMessage": "לאפשר ל-{{label}} (קוד: {{code}}) להתחבר למופע שלך?",
       "approveTitle": "אישור בקשת צימוד",
-      "device": "מכשיר",
       "unknownDevice": "מכשיר לא ידוע"
     },
     "execPolicy": {
@@ -525,7 +529,6 @@
       "title": "חשבון Google",
       "couldNotLoad": "לא ניתן היה לטעון את מצב חשבון Google.",
       "disconnected": "חשבון Google נותק. פרוס מחדש את המופע שלך כדי להחיל את השינוי.",
-      "redeploy": "פריסה מחדש",
       "setupCommand": "פקודת הגדרה",
       "setupCommandHelp": "כדי לחבר את חשבון Google שלך, הרץ את הפקודה הזו במסוף במחשב שלך. Docker חייב להיות מותקן במחשב.",
       "failedToLoadCommand": "לא ניתן היה לטעון את פקודת ההגדרה.",
@@ -538,7 +541,6 @@
       "disconnectTitle": "ניתוק Google"
     },
     "modelList": {
-      "searchPlaceholder": "חיפוש מודלים...",
       "noMatches": "אין מודלים התואמים לחיפוש שלך",
       "noModelsDescription": "מודלים יופיעו כאן כשיהיו זמינים.",
       "noResultsFor": "לא נמצאו תוצאות עבור \"{{query}}\"."
@@ -593,22 +595,16 @@
       "iosTitle": "KiloClaw אינו זמין ב-iOS",
       "multipleCurrentConflictBody": "מצאנו יותר ממינוי פעיל אחד בחשבון שלך, ולכן השהינו את הפעילות כדי למנוע חיוב כפול.",
       "multipleCurrentConflictCta": "המשך באתר kilo.ai",
-      "multipleCurrentConflictTitle": "נדרשת בדיקה של החשבון",
       "nonCanonicalEarlybirdBody": "תוכנית הגישה המוקדמת שלך דורשת בדיקה ידנית לפני שניתן להשתמש בה בנייד.",
-      "nonCanonicalEarlybirdCta": "המשך באתר kilo.ai",
       "nonCanonicalEarlybirdTitle": "זוהתה תוכנית ישנה",
       "quarantinedBody": "מופע ה-KiloClaw שלך בודד ולא ניתן להשתמש בו כרגע. נדרשת עזרה מהצוות שלנו כדי להחזיר אותו לפעילות.",
-      "quarantinedCta": "המשך באתר kilo.ai",
       "quarantinedTitle": "המופע דורש טיפול",
       "subscriptionCanceledBody": "כדי להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
       "subscriptionCanceledCta": "פתיחת kilo.ai/claw",
       "subscriptionCanceledTitle": "רכישת מינוי באתר",
       "subscriptionPastDueBody": "הייתה בעיה בתשלום האחרון שלך. פתח את kilo.ai/claw בדפדפן כדי לעדכן את אמצעי התשלום. לא ניתן לנהל חיובים באפליקציה.",
-      "subscriptionPastDueCta": "פתיחת kilo.ai/claw",
       "subscriptionPastDueTitle": "עדכון אמצעי התשלום באתר",
-      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
-      "trialExpiredCta": "פתיחת kilo.ai/claw",
-      "trialExpiredTitle": "רכישת מינוי באתר"
+      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה."
     },
     "controls": {
       "redeploying": "פריסה מחדש…",
@@ -619,7 +615,6 @@
       "start": "הפעלה",
       "startMessage": "להפעיל את המופע הזה?",
       "startTitle": "הפעלת המופע",
-      "starting": "מתחיל…",
       "stop": "עצירה",
       "stopMessage": "לעצור את המופע הזה?",
       "stopTitle": "עצירת המופע",
@@ -725,7 +720,6 @@
         "backgroundHint": "בדרך כלל זה לוקח פחות מדקה. אפשר לסגור את המסך הזה — נמשיך לעבוד ברקע.",
         "connectingToAgent": "התחברות לסוכן",
         "continueInBackground": "המשך ברקע",
-        "finishingSetup": "ההגדרה מסתיימת",
         "queryErrorBody": "החיבור נותק בזמן בדיקת ההגדרה של {{name}}. ייתכן שההגדרה עדיין מתבצעת. נסה שוב או חזור לבדוק בעוד רגע.",
         "queryErrorTitle": "לא ניתן היה לבדוק את התקדמות ההגדרה",
         "settingUp": "הגדרת {{name}}",
@@ -765,16 +759,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "ערוצים",
       "devicePairingDescription": "אישור בקשות לצימוד מכשירים",
-      "devicePairingLabel": "צימוד מכשירים",
       "execPolicyDescription": "הגדרות אבטחה",
-      "execPolicyLabel": "מדיניות הרצה",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "חשבון Google",
       "modelDescription": "בחירת מודל בינה מלאכותית",
       "secretsDescription": "פרטי הזדהות מוצפנים",
-      "secretsLabel": "סודות",
       "versionPinDescription": "הצמדה לגרסה מסוימת",
       "versionPinLabel": "נעילת גרסה"
     },
@@ -825,14 +814,11 @@
       "finishSetup": "השלמת ההגדרה",
       "manageAccess": "ניהול גישה",
       "bitbucketNoRepositoriesDescription": "אין מאגרים זמינים בסביבת העבודה הזו של Bitbucket.",
-      "bitbucketSetup": "הגדרת Bitbucket",
-      "couldNotOpenGithubSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
       "noRepositoriesFound": "לא נמצאו מאגרים",
-      "repositoryAccess": "גישה למאגר",
-      "selectedRepositories": "מאגרים שנבחרו"
+      "repositoryAccess": "גישה למאגר"
     },
     "style": {
       "title": "סגנון סקירה",
@@ -888,7 +874,6 @@
       "cancelReview": "ביטול הסקירה",
       "cancelTitle": "לבטל את הסקירה?",
       "checkRun": "הרצת בדיקה",
-      "completed": "הושלם",
       "couldNotGetLatest": "לא ניתן לקבל את הנתונים העדכניים.",
       "couldNotLoad": "לא ניתן לטעון את הסקירה.",
       "council": "צוות הסוקרים",
@@ -903,7 +888,6 @@
       "retryTitle": "להריץ את הסקירה שוב?",
       "showMore": "הצגת עוד",
       "started": "התחילה",
-      "status": "סטטוס",
       "threshold": "סף",
       "title": "סקירה",
       "tokens": "טוקנים",
@@ -922,8 +906,7 @@
       "sessionError": "שגיאה בסשן: {{error}}.",
       "statusWithValue": "מצב: {{status}}",
       "toolName": "כלי: {{name}}",
-      "toolNameError": "אירעה שגיאה בכלי: {{name}}.",
-      "unknownError": "שגיאה לא ידועה"
+      "toolNameError": "אירעה שגיאה בכלי: {{name}}."
     },
     "reviewList": {
       "configureProvider": "הגדרת ספק",
@@ -948,10 +931,8 @@
     },
     "scopeList": {
       "personalStillAvailable": "מאגרים אישיים עדיין זמינים למטה.",
-      "personalSubtitle": "המאגרים שלך",
       "viewOnly": "לקריאה בלבד"
     },
-    "selectRepositories": "בחירת מאגרים",
     "selectRepository": "בחר לפחות מאגר אחד כדי להפעיל סקירות אוטומטיות.",
     "webhookSetup": "הגדרת ההתראות האוטומטיות לא הושלמה.",
     "webhookSetupDescription": "ייתכן שחלק מהמאגרים לא יקבלו סקירות אוטומטיות.",
@@ -965,10 +946,8 @@
       "allAreas": "כל התחומים",
       "customInstructions": "הוראות מותאמות אישית",
       "focusAreas": "תחומי מיקוד",
-      "mergeGate": "תנאי סף למיזוג",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
-      "reviewMemory": "זיכרון סקירה",
       "reviewStyle": "סגנון סקירה",
       "set": "הוגדר"
     },
@@ -1029,12 +1008,7 @@
       "title": "סינון ממצאים",
       "fixed": "תוקן",
       "outcome": "תוצאה",
-      "outcomeAnalyzing": "בניתוח",
-      "outcomeDismissed": "סומן להתעלמות",
-      "outcomeFailed": "הניתוח נכשל",
-      "outcomeNotAnalyzed": "לא נותח",
       "outcomeNotExploitable": "לא ניתן לניצול",
-      "outcomeSafeToDismiss": "אפשר להתעלם בבטחה",
       "outcomeTriageComplete": "המיון הראשוני הושלם",
       "overdueOnly": "באיחור בלבד",
       "reset": "איפוס",
@@ -1047,7 +1021,6 @@
       "sortSeverityAsc": "חומרה: מהנמוכה לגבוהה",
       "sortSeverityDesc": "חומרה: מהגבוהה לנמוכה",
       "sortSlaDue": "מועד אחרון לפי SLA",
-      "status": "סטטוס",
       "statusIgnored": "ממצאים שהוחרגו",
       "statusOpen": "פתוח"
     },
@@ -1214,12 +1187,10 @@
       "reasonNoBandwidth": "אין משאבים פנויים",
       "reasonNotUsed": "הקוד הפגיע אינו בשימוש",
       "reasonTolerableRisk": "הסיכון נסבל",
-      "submit": "התעלמות מהממצא",
       "title": "התעלמות מהממצא"
     },
     "findingDetail": {
       "couldNotLoad": "לא הצלחנו לטעון את הממצא הזה.",
-      "dismissA11y": "התעלמות מהממצא",
       "notFound": "הממצא לא נמצא",
       "notFoundDescription": "ייתכן שממצא זה הוסר, או שאין לך עוד גישה אליו.",
       "tabAnalysis": "ניתוח",
@@ -1229,7 +1200,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "זוהה",
-      "dismissed": "סומן להתעלמות",
       "dismissedBecause": "סיבת הדחייה: {{reason}}.",
       "ghsa": "GHSA",
       "manifest": "קובץ מניפסט",
@@ -1243,7 +1213,6 @@
       "sourceRecord": "רשומת מקור",
       "supersededBy": "הוחלף על ידי ממצא עדכני",
       "supersededByDescription": "הקש לפתיחת הרשומה העדכנית ולצפייה במצב, בניתוח ובתיקון.",
-      "updated": "עודכן",
       "viewAdvisory": "צפייה בהודעת האבטחה ב-GitHub",
       "vulnerableVersions": "גרסאות פגיעות",
       "statusSuperseded": "הוחלף",
@@ -1324,13 +1293,11 @@
     },
     "repositories": {
       "couldNotLoad": "לא ניתן לטעון את הגדרות המאגרים.",
-      "couldNotOpenGithubSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
       "githubAppSettings": "הגדרות אפליקציית GitHub",
       "manageAccess": "ניהול הרשאות הגישה של אפליקציית GitHub",
       "noRepositories": "אין מאגרים",
       "noRepositoriesDescription": "יש לתת לאפליקציית Kilo ב-GitHub גישה למאגרים.",
-      "selectAtLeastOne": "יש לבחור לפחות מאגר אחד.",
-      "selectedRepositories": "מאגרים שנבחרו"
+      "selectAtLeastOne": "יש לבחור לפחות מאגר אחד."
     },
     "scopeEntry": {
       "connectDescription": "התקן את אפליקציית Kilo ב-GitHub כדי לסנכרן אוטומטית התראות Dependabot ולנהל ממצאי אבטחה בכל המאגרים שלך.",
@@ -1342,9 +1309,6 @@
       "reauthorizeFailed": "לא ניתן להתחיל את חידוש ההרשאה. נסה שוב.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
-    },
-    "scopeList": {
-      "personalSubtitle": "המאגרים שלך"
     },
     "settingsOverview": {
       "analysisModeSubtitle": "ניתוח {{mode}}",
@@ -1362,7 +1326,6 @@
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_one": "{{displayCount}} מאגר נבחר",
-      "selectRepositories": "בחירת מאגרים",
       "selectRepositoriesSubtitle": "בחירת המאגרים שסוכן האבטחה יעקוב אחריהם",
       "slaPolicy": "מדיניות SLA",
       "title": "הגדרות",
@@ -1417,10 +1380,8 @@
       "queuedTitle": "הניתוח ממתין בתור",
       "queuedDescription": "הניתוח ממתין עד שיתפנה מקום להרצה.",
       "analyzing": "בניתוח",
-      "analyzingTitle": "בניתוח",
       "analyzingDescription": "הסוכן בודק אם קוד האפליקציה יכול להגיע לתכונה הפגיעה.",
       "failed": "הניתוח נכשל",
-      "failedTitle": "הניתוח נכשל",
       "failedDescription": "סוכן האבטחה לא הצליח להשלים את הניתוח.",
       "extractionFailedDescription": "לא ניתן להמיר את הדוח הטכני לתוצאה מובנית.",
       "exploitableDescription": "קוד האפליקציה יכול להגיע לתכונה הפגיעה.",
@@ -1430,18 +1391,14 @@
       "unknown": "נדרשת בדיקה",
       "unknownDescription": "הניתוח לא הצליח לקבוע אם ניתן להגיע לתכונה הפגיעה.",
       "safeToDismiss": "אפשר להתעלם בבטחה",
-      "safeToDismissTitle": "אפשר להתעלם בבטחה",
       "safeToDismissDescription": "במיון הראשוני נקבע שאפשר לדחות את הממצא בבטחה ללא ניתוח בסיס הקוד.",
       "manualReviewTitle": "נדרשת בדיקה ידנית",
       "manualReviewDescription": "במיון הראשוני סומן הממצא הזה לבדיקה ידנית.",
       "analysisRequired": "נדרש ניתוח",
       "analysisRequiredTitle": "נדרש ניתוח של בסיס הקוד",
       "analysisRequiredDescription": "בעקבות המיון הראשוני מומלץ לנתח את המאגר לפני שמחליטים איך לטפל בממצא.",
-      "completed": "נותח",
-      "completedTitle": "נותח",
       "completedDescription": "הניתוח הושלם, אך לא תועדה תוצאה מסוימת.",
       "notAnalyzed": "לא נותח",
-      "notAnalyzedTitle": "לא נותח",
       "notAnalyzedDescription": "עדיין לא בוצע ניתוח של בסיס הקוד עבור הממצא הזה."
     },
     "deadline": {
@@ -1580,7 +1537,6 @@
       "didNotCompleteTitle": "ההתקנה לא הושלמה",
       "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."
     },
-    "sessionExited": "הסשן הסתיים",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להתחיל את השיחה — בדוק את המחשב או עדכן את ה-CLI.",
     "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר.",
@@ -1621,7 +1577,6 @@
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור סשן מרוחק.",
-      "exited": "הסשן הסתיים",
       "failedToExit": "לא ניתן היה לצאת מהסשן.",
       "exitTitle": "לצאת מהסשן?",
       "exitMessage": "הפעולה תעצור את הסשן הפעיל, אבל ההיסטוריה שלו תישמר.",
@@ -1655,7 +1610,6 @@
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
       "promptPlaceholder": "על מה תרצה לעבוד?",
-      "addAttachment": "צירוף קובץ",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",
       "prefillRepoUnavailable": "{{repo}} אינו זמין עוד. בחר מאגר למטה.",
@@ -1690,15 +1644,10 @@
       "updatedFileCount_other": "עודכנו {{displayCount}} קבצים.",
       "updatedFileCount_two": "עודכנו {{displayCount}} קבצים."
     },
-    "toolPatch": {
-      "operationUpdated": "עודכן"
-    },
     "toolCard": {
       "accessibility": "הכלי {{label}}, {{status}}",
       "accessibilityLabel": "הכלי {{name}}, {{status}}",
-      "fileEmpty": "הקובץ הזה ריק.",
       "noTasks": "אין משימות.",
-      "truncated": "קוצר",
       "toolRead": "קריאה",
       "toolEdit": "עריכה",
       "toolWrite": "כתיבה",
@@ -1771,7 +1720,6 @@
       "noMatches": "אין התאמות",
       "noRepositories": "אין מאגרים זמינים",
       "noRepositoriesDescription": "אין מאגרים שמחוברים לחשבון שלך.",
-      "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",
       "loading": "טוען...",
       "accessibility": "מאגר: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -1784,7 +1732,6 @@
       "reportAiResponse": "דיווח על תשובת AI",
       "reportAiResponseConfirm": "לדווח על התשובה הזו כדי שתיבדק?",
       "report": "דיווח",
-      "role": "תפקיד",
       "roleUser": "משתמש",
       "roleAssistant": "עוזר",
       "sent": "מועד השליחה",
@@ -1970,7 +1917,6 @@
     },
     "modelPicker": {
       "title": "בחירת מודל",
-      "searchPlaceholder": "חיפוש מודלים...",
       "noModelsDescription": "אין מודלים זמינים לבחירה.",
       "favorites": "מועדפים"
     },
@@ -1998,7 +1944,6 @@
       "uploading": "מעלה…",
       "uploaded": "הועלה",
       "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
-      "uploadFailedTerminal": "לא ניתן להעלות את הקובץ הזה.",
       "moveLeft": "הזזת {{filename}} שמאלה",
       "moveRight": "הזזת {{filename}} ימינה"
     },
@@ -2010,7 +1955,6 @@
       "camera": "מצלמה",
       "photoLibrary": "ספריית תמונות",
       "files": "קבצים",
-      "cameraAccessMessage": "כדי לצלם תמונה, צריך לאפשר גישה למצלמה בהגדרות.",
       "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את חלון בחירת התמונות. הפעל מחדש את Kilo ונסה שוב.",
       "maxFilesAllowed": "אפשר לצרף עד {{displayCount}} קבצים.",
       "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})"
@@ -2023,7 +1967,6 @@
       "waitForUploads": "המתן לסיום העלאת הקבצים המצורפים.",
       "pasteFromClipboard": "הדבקה מהלוח",
       "stopGenerating": "עצירת יצירת התשובה",
-      "sendMessage": "שליחת הודעה",
       "selectModelBeforeSending": "בחר מודל לפני השליחה.",
       "preparingPlaceholder": "מכין את הסביבה...",
       "finalizingPlaceholder": "מסיים...",
@@ -2077,7 +2020,6 @@
     "contextUsage": {
       "windowUnavailable": "גודל חלון ההקשר אינו זמין",
       "tapToViewDetails": "הקש כדי לצפות בפרטי ההקשר.",
-      "costPrefix": "עלות {{cost}}",
       "costSuffix": ", עלות {{cost}}",
       "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין",
       "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש",
@@ -2191,7 +2133,6 @@
     "title": "הדף לא נמצא"
   },
   "monoScrollBlock": {
-    "truncated": "קוצר",
     "wrap": "גלישת שורות",
     "scroll": "גלילה"
   },
@@ -2386,7 +2327,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "צילומי מסך בעת שגיאה והקלטות של מדגם קטן של סשני שימוש, לאחר הסתרת התוכן.",
     "errorScreenshotsWhy": "כדי לראות מה האפליקציה הציגה כשהתרחשה תקלה.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "מקור התקנה ומזהי קמפיין.",
     "installAttributionWhy": "כדי להבין אילו ערוצים מביאים משתמשים חדשים.",
     "installAttributionWho": "AppsFlyer.",
@@ -2555,7 +2495,6 @@
       "urlAccessibility": "כתובת URL של בקשת משיכה ב-GitHub"
     },
     "eventChips": {
-      "approve": "אישור",
       "comment": "תגובה",
       "label": "סוג הסקירה",
       "requestChanges": "בקשת שינויים"
@@ -2873,7 +2812,6 @@
       "emailError": "הזן כתובת דוא״ל תקינה.",
       "emailPlaceholder": "israel@company.com",
       "permissionDenied": "אין לך הרשאה להזמין חברים.",
-      "roleLabel": "תפקיד",
       "roleMember": "התפקיד הוא חבר בארגון.",
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון"
@@ -2981,7 +2919,6 @@
     "sendFeedback": "שליחת משוב"
   },
   "authErrors": {
-    "emailAlreadyUsed": "כבר קיים חשבון עם כתובת האימייל הזו שמשתמש בשיטת התחברות אחרת. נסה שיטה אחרת או בחר ב-'$t(login.moreSignInOptions)'.",
     "differentOauth": "כבר קיים חשבון עם כתובת האימייל הזו שמשתמש בשיטת התחברות אחרת. נסה שיטה אחרת או בחר ב-'$t(login.moreSignInOptions)'.",
     "ssoError": "הארגון שלך דורש התחברות באמצעות SSO. בחר ב-'$t(login.moreSignInOptions)'.",
     "blocked": "החשבון הזה נחסם. פנה לתמיכה.",
@@ -2999,7 +2936,6 @@
     "startSignInFailed": "לא ניתן היה להתחיל את ההתחברות. נסה שוב.",
     "couldNotOpenBrowser": "לא ניתן היה לפתוח את הדפדפן. נסה שוב.",
     "signInTimedOut": "תם הזמן שהוקצב להתחברות. נסה שוב.",
-    "signInFailed": "ההתחברות נכשלה. אפשר לנסות שוב.",
     "networkError": "שגיאת רשת. נסה שוב.",
     "accessDeniedByUser": "המשתמש דחה את בקשת הגישה.",
     "codeExpired": "תוקף הקוד פג.",
@@ -3032,7 +2968,6 @@
       "title": "התחלת שיחה",
       "description": "שלח הודעה כדי לשוחח עם מודל."
     },
-    "working": "בפעולה",
     "historyRetry": "לא ניתן לטעון את היסטוריית השיחה.",
     "sendError": "לא ניתן לשלוח את ההודעה. נסה שוב."
   },
@@ -3044,7 +2979,6 @@
     "signedOut": "התחברות להצגת הסוכנים",
     "privacy": "פתיחת Kilo להצגת הסוכנים",
     "openAgents": "הצגת הסוכנים",
-    "running": "בפעולה",
     "needsInput": "נדרש קלט",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."

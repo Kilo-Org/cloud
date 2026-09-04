@@ -70,7 +70,7 @@ describe('primary rank and locked copy keys', () => {
 
     const noInput = snapshot({ sessions: [{ status: 'busy' }, { status: 'idle' }] });
     expect(primaryGlanceableCount(noInput)).toEqual({
-      key: 'glanceable.running',
+      key: 'common.working',
       kind: 'running',
       count: 1,
     });
@@ -84,7 +84,7 @@ describe('primary rank and locked copy keys', () => {
 
     const onlyRunning = snapshot({ sessions: [{ status: 'busy' }, { status: 'busy' }] });
     expect(primaryGlanceableCount(onlyRunning)).toEqual({
-      key: 'glanceable.running',
+      key: 'common.working',
       kind: 'running',
       count: 2,
     });
@@ -110,7 +110,7 @@ describe('spoken label shape', () => {
     const happy = snapshot({ sessions: [{ status: 'busy' }, { status: 'question' }] });
     expect(glanceableSpokenLabelKeys(happy)).toEqual([
       'glanceable.needsInput',
-      'glanceable.running',
+      'common.working',
       'glanceable.openAgents',
     ]);
     expect(glanceableSpokenLabelKeys(happy).join(' ')).not.toContain('u1');
@@ -164,7 +164,7 @@ describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
     'glanceable.needsInput': 'Needs input',
     'common.idle': 'Idle',
-    'glanceable.running': 'Working',
+    'common.working': 'Working',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',
     'glanceable.stale': 'Updates delayed',

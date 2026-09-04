@@ -153,9 +153,7 @@ describe('ToolDiffPreview', () => {
     if (!truncatedLabel) {
       throw new Error('truncatedLabel not found');
     }
-    expect((truncatedLabel.props as { children?: string }).children).toBe(
-      'monoScrollBlock.truncated'
-    );
+    expect((truncatedLabel.props as { children?: string }).children).toBe('common.truncated');
   });
 
   it('does not show the Truncated label when the model is not truncated', () => {

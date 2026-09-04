@@ -235,7 +235,7 @@ export function MessageInputView({
               sendDisabled && 'opacity-50'
             )}
             accessibilityRole="button"
-            accessibilityLabel={t('chat.composer.sendMessage')}
+            accessibilityLabel={t('common.sendMessage')}
             accessibilityState={{ disabled: sendDisabled }}
           >
             <Send size={18} color={colors.primaryForeground} />

@@ -120,10 +120,21 @@
     "reply": "回复",
     "reportSubmittedReceipt": "举报已提交。回执编号：{{receiptId}}",
     "retryLoadingMore": "重新加载更多内容",
-    "reviewPr": "审查 PR"
+    "reviewPr": "审查 PR",
+    "role": "角色",
+    "searchModels": "搜索模型",
+    "selectedRepositories": "已选仓库",
+    "selectRepositories": "选择仓库",
+    "sendMessage": "发送消息",
+    "sessionExited": "已退出会话",
+    "starting": "启动中……",
+    "status": "状态",
+    "truncated": "已截断",
+    "updated": "已更新",
+    "working": "处理中",
+    "yourOwnRepositories": "你自己的仓库"
   },
   "language": {
-    "title": "语言",
     "restarting": "正在重启以应用语言设置",
     "couldNotRestart": "无法重新启动",
     "languageSaved": "语言设置已保存。",
@@ -166,7 +177,6 @@
     "sessionEnded": "你的会话已结束。请重新登录。",
     "signInCodeExpired": "你的登录验证码已过期。请重试。",
     "accessDenied": "访问遭拒。",
-    "somethingWentWrong": "出了点问题。请重试。",
     "codeSent": "验证码已发送",
     "signInCodeField": "登录验证码",
     "accountCreated": "账户已创建。欢迎使用 Kilo。",
@@ -254,7 +264,6 @@
     "disabledMessage": "要启用通知，请在设备设置中将其开启。",
     "disableTitle": "禁用通知",
     "disableMessage": "要禁用通知，请在设备设置中将其关闭。",
-    "openSettings": "打开设置",
     "registrationFailed": "推送注册失败。请检查通知权限。",
     "couldNotEnable": "无法启用通知。请重试。",
     "previewAlways": "始终",
@@ -330,15 +339,13 @@
       "cancelReply": "取消回复",
       "openInstance": "打开实例",
       "attachFile": "附加文件",
-      "cancelEdit": "取消编辑",
-      "sendMessage": "发送消息"
+      "cancelEdit": "取消编辑"
     },
     "conversationList": {
       "couldNotLoad": "无法加载对话列表。",
       "emptyTitle": "暂无对话",
       "emptyDescription": "创建对话，即可与你的 KiloClaw 实例聊天。",
       "create": "创建对话",
-      "starting": "启动中……",
       "newConversation": "新对话",
       "openInstanceSettings": "打开实例设置",
       "today": "今天",
@@ -379,8 +386,7 @@
       "moreActions": "更多操作",
       "notDelivered": "未送达",
       "edited": "（已编辑）",
-      "image": "图片",
-      "attachment": "附件"
+      "image": "图片"
     },
     "messageActions": {
       "copied": "已复制",
@@ -440,7 +446,6 @@
       "managedByAdmin": "账单由你所在组织的管理员管理。",
       "couldNotLoad": "无法加载账单信息。",
       "manageOnWeb": "在网页端管理账单",
-      "commitPlan": "提交",
       "earlybird": "早鸟套餐",
       "finalCommitTermEndsOn": "你的 Commit 套餐最后一期将于 {{date}} 到期。可按 {{price}} 续订标准套餐，否则托管服务将终止。",
       "freeTrial": "免费试用",
@@ -457,9 +462,9 @@
       "trialDaysRemaining": "试用剩余 {{remaining}}。",
       "trialEndingSoon": "试用即将结束，剩余 {{remaining}}。",
       "planName": {
-        "commit": "提交",
         "standard": "标准套餐"
-      }
+      },
+      "commit": "提交"
     },
     "changelog": {
       "title": "更新内容",
@@ -509,7 +514,6 @@
       "approveDeviceTitle": "批准设备连接",
       "approveMessage": "允许 {{label}}（配对码：{{code}}）连接到你的实例？",
       "approveTitle": "批准配对请求",
-      "device": "设备",
       "unknownDevice": "未知设备"
     },
     "execPolicy": {
@@ -524,7 +528,6 @@
       "title": "Google 账号",
       "couldNotLoad": "无法加载 Google 账号状态。",
       "disconnected": "Google 账号已断开连接。请重新部署实例以应用更改。",
-      "redeploy": "重新部署",
       "setupCommand": "配置命令",
       "setupCommandHelp": "请在自己的电脑上安装 Docker，然后在终端中运行此命令，连接 Google 账号。",
       "failedToLoadCommand": "无法加载配置命令。",
@@ -537,7 +540,6 @@
       "disconnectTitle": "断开 Google 连接"
     },
     "modelList": {
-      "searchPlaceholder": "搜索模型",
       "noMatches": "没有匹配的模型",
       "noModelsDescription": "模型可用后将显示在此处。",
       "noResultsFor": "没有与“{{query}}”相关的结果。"
@@ -592,22 +594,16 @@
       "iosTitle": "iOS 暂不支持使用 KiloClaw",
       "multipleCurrentConflictBody": "我们发现你的账号有多个有效订阅，已暂停服务，避免重复扣费。",
       "multipleCurrentConflictCta": "前往 kilo.ai 继续",
-      "multipleCurrentConflictTitle": "账号待审查",
       "nonCanonicalEarlybirdBody": "你的抢先体验套餐需要通过人工审核后，才能在手机上使用。",
-      "nonCanonicalEarlybirdCta": "前往 kilo.ai 继续",
       "nonCanonicalEarlybirdTitle": "检测到旧版套餐",
       "quarantinedBody": "你的 KiloClaw 实例已被隔离，目前无法使用，需要我们的团队协助恢复。",
-      "quarantinedCta": "前往 kilo.ai 继续",
       "quarantinedTitle": "实例需要修复",
       "subscriptionCanceledBody": "要使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。",
       "subscriptionCanceledCta": "打开 kilo.ai/claw",
       "subscriptionCanceledTitle": "前往网页版订阅",
       "subscriptionPastDueBody": "你最近一次付款出现了问题。请在浏览器中打开 kilo.ai/claw 更新付款信息。应用内不支持管理账单。",
-      "subscriptionPastDueCta": "打开 kilo.ai/claw",
       "subscriptionPastDueTitle": "在网页端更新付款方式",
-      "trialExpiredBody": "要继续使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。",
-      "trialExpiredCta": "打开 kilo.ai/claw",
-      "trialExpiredTitle": "前往网页版订阅"
+      "trialExpiredBody": "要继续使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。"
     },
     "controls": {
       "redeploying": "正在重新部署…",
@@ -618,7 +614,6 @@
       "start": "启动",
       "startMessage": "确定要启动此实例吗？",
       "startTitle": "启动实例",
-      "starting": "启动中……",
       "stop": "停止",
       "stopMessage": "确定要停止此实例吗？",
       "stopTitle": "停止实例",
@@ -723,7 +718,6 @@
         "backgroundHint": "通常不到一分钟即可完成。你可以关闭此页面，设置会在后台继续。",
         "connectingToAgent": "正在连接智能体",
         "continueInBackground": "在后台继续",
-        "finishingSetup": "正在完成设置",
         "queryErrorBody": "查看 {{name}} 的设置进度时连接中断。设置可能仍在进行，请重试或稍后查看。",
         "queryErrorTitle": "无法查看设置进度",
         "settingUp": "正在设置 {{name}}",
@@ -763,16 +757,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram、Discord、Slack",
-      "channelsLabel": "消息渠道",
       "devicePairingDescription": "批准设备配对请求",
-      "devicePairingLabel": "设备配对",
       "execPolicyDescription": "安全设置",
-      "execPolicyLabel": "执行策略",
       "googleDescription": "Gmail、Calendar、Docs",
-      "googleLabel": "Google 账号",
       "modelDescription": "AI 模型选择",
       "secretsDescription": "加密凭据",
-      "secretsLabel": "机密信息",
       "versionPinDescription": "固定到特定版本",
       "versionPinLabel": "版本锁定"
     },
@@ -823,14 +812,11 @@
       "finishSetup": "完成设置",
       "manageAccess": "管理访问权限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作区中没有可用的仓库。",
-      "bitbucketSetup": "Bitbucket 设置",
-      "couldNotOpenGithubSettings": "无法打开 GitHub 应用设置。",
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
       "noRepositoriesFound": "未找到仓库",
-      "repositoryAccess": "仓库访问权限",
-      "selectedRepositories": "已选仓库"
+      "repositoryAccess": "仓库访问权限"
     },
     "style": {
       "title": "审查风格",
@@ -886,7 +872,6 @@
       "cancelReview": "取消审查",
       "cancelTitle": "取消审查？",
       "checkRun": "检查任务",
-      "completed": "已完成",
       "couldNotGetLatest": "无法获取最新内容。",
       "couldNotLoad": "无法加载审查详情。",
       "council": "评审团",
@@ -901,7 +886,6 @@
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
       "started": "开始时间",
-      "status": "状态",
       "threshold": "阈值",
       "title": "审查",
       "tokens": "词元",
@@ -920,8 +904,7 @@
       "sessionError": "会话出错：{{error}}。",
       "statusWithValue": "状态：{{status}}",
       "toolName": "工具：{{name}}",
-      "toolNameError": "工具 {{name}} 出错。",
-      "unknownError": "未知错误"
+      "toolNameError": "工具 {{name}} 出错。"
     },
     "reviewList": {
       "configureProvider": "配置代码托管平台",
@@ -946,10 +929,8 @@
     },
     "scopeList": {
       "personalStillAvailable": "仍可使用下方的个人仓库。",
-      "personalSubtitle": "你自己的仓库",
       "viewOnly": "仅查看"
     },
-    "selectRepositories": "选择仓库",
     "selectRepository": "请至少选择一个仓库，以启用自动审查。",
     "webhookSetup": "Webhook 配置尚未完成。",
     "webhookSetupDescription": "部分仓库可能无法进行自动审查。",
@@ -963,10 +944,8 @@
       "allAreas": "所有方面",
       "customInstructions": "自定义指令",
       "focusAreas": "审查重点",
-      "mergeGate": "合并条件",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
-      "reviewMemory": "审查记忆",
       "reviewStyle": "审查风格",
       "set": "已设置"
     },
@@ -1027,12 +1006,7 @@
       "title": "筛选安全问题",
       "fixed": "已修复",
       "outcome": "结果",
-      "outcomeAnalyzing": "分析中",
-      "outcomeDismissed": "已忽略",
-      "outcomeFailed": "分析失败",
-      "outcomeNotAnalyzed": "未分析",
       "outcomeNotExploitable": "不可利用",
-      "outcomeSafeToDismiss": "可安全忽略",
       "outcomeTriageComplete": "初步评估已完成",
       "overdueOnly": "仅显示逾期问题",
       "reset": "重置",
@@ -1045,7 +1019,6 @@
       "sortSeverityAsc": "严重程度：从低到高",
       "sortSeverityDesc": "严重程度：从高到低",
       "sortSlaDue": "SLA 到期日",
-      "status": "状态",
       "statusIgnored": "已忽略",
       "statusOpen": "开启"
     },
@@ -1211,12 +1184,10 @@
       "reasonNoBandwidth": "暂无资源处理",
       "reasonNotUsed": "未使用存在漏洞的代码",
       "reasonTolerableRisk": "风险可以接受",
-      "submit": "忽略问题",
       "title": "忽略问题"
     },
     "findingDetail": {
       "couldNotLoad": "无法加载此问题。",
-      "dismissA11y": "忽略问题",
       "notFound": "未找到该问题",
       "notFoundDescription": "此安全问题可能已被移除，或你已无权访问。",
       "tabAnalysis": "分析",
@@ -1226,7 +1197,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "检测时间",
-      "dismissed": "已忽略",
       "dismissedBecause": "已忽略（{{reason}}）。",
       "ghsa": "GHSA",
       "manifest": "清单文件",
@@ -1240,7 +1210,6 @@
       "sourceRecord": "来源记录",
       "supersededBy": "已由最新的安全问题记录替代",
       "supersededByDescription": "点按可打开最新记录，查看状态、分析结果和修复情况。",
-      "updated": "已更新",
       "viewAdvisory": "在 GitHub 上查看安全公告",
       "vulnerableVersions": "存在漏洞的版本",
       "statusSuperseded": "已取代",
@@ -1321,13 +1290,11 @@
     },
     "repositories": {
       "couldNotLoad": "无法加载仓库设置。",
-      "couldNotOpenGithubSettings": "无法打开 GitHub 应用设置。",
       "githubAppSettings": "GitHub 应用设置",
       "manageAccess": "管理 GitHub 应用访问权限",
       "noRepositories": "暂无仓库",
       "noRepositoriesDescription": "请授予 Kilo GitHub 应用访问仓库的权限。",
-      "selectAtLeastOne": "请至少选择一个仓库。",
-      "selectedRepositories": "已选仓库"
+      "selectAtLeastOne": "请至少选择一个仓库。"
     },
     "scopeEntry": {
       "connectDescription": "安装 Kilo GitHub 应用，即可自动同步 Dependabot 警报，并统一管理各仓库的安全问题。",
@@ -1339,9 +1306,6 @@
       "reauthorizeFailed": "无法开始重新授权。请重试。",
       "reauthorizeTitle": "需要额外权限",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
-    },
-    "scopeList": {
-      "personalSubtitle": "你自己的仓库"
     },
     "settingsOverview": {
       "analysisModeSubtitle": "{{mode}} 分析",
@@ -1359,7 +1323,6 @@
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
       "repositoriesCount_one": "已选择 {{displayCount}} 个仓库",
-      "selectRepositories": "选择仓库",
       "selectRepositoriesSubtitle": "选择安全智能体监控的仓库",
       "slaPolicy": "SLA 策略",
       "title": "设置"
@@ -1413,10 +1376,8 @@
       "queuedTitle": "分析排队中",
       "queuedDescription": "正在等待空出分析名额。",
       "analyzing": "分析中",
-      "analyzingTitle": "分析中",
       "analyzingDescription": "正在检查应用代码是否存在通往受影响功能的执行路径。",
       "failed": "分析失败",
-      "failedTitle": "分析失败",
       "failedDescription": "安全智能体无法完成分析。",
       "extractionFailedDescription": "无法将技术报告转换为结构化结果。",
       "exploitableDescription": "应用代码存在通往受影响功能的执行路径。",
@@ -1426,18 +1387,14 @@
       "unknown": "待审查",
       "unknownDescription": "分析无法确认应用代码是否存在通往漏洞功能的执行路径。",
       "safeToDismiss": "可安全忽略",
-      "safeToDismissTitle": "可安全忽略",
       "safeToDismissDescription": "初步评估判定，此安全问题无需分析代码库即可安全忽略。",
       "manualReviewTitle": "待人工审查",
       "manualReviewDescription": "初步评估已将此安全问题标记为需要人工审查。",
       "analysisRequired": "需要分析",
       "analysisRequiredTitle": "需要分析代码库",
       "analysisRequiredDescription": "初步评估建议先分析仓库，再决定如何处理。",
-      "completed": "已分析",
-      "completedTitle": "已分析",
       "completedDescription": "分析已完成，未记录具体结果。",
       "notAnalyzed": "未分析",
-      "notAnalyzedTitle": "未分析",
       "notAnalyzedDescription": "尚未针对此安全问题执行代码库分析。"
     },
     "deadline": {
@@ -1572,7 +1529,6 @@
       "didNotCompleteTitle": "安装未完成",
       "didNotCompleteMessage": "GitHub 应用安装未完成。请从应用中重试。"
     },
-    "sessionExited": "已退出会话",
     "remoteSpawnRetryable": "无法连接到实例，实例可能已断开连接。",
     "remoteSpawnNonRetryable": "实例未能启动会话。请检查设备或更新 CLI。",
     "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。",
@@ -1612,7 +1568,6 @@
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败。",
-      "exited": "已退出会话",
       "failedToExit": "退出会话失败。",
       "exitTitle": "退出会话？",
       "exitMessage": "这会停止正在运行的会话，但保留其历史记录。",
@@ -1646,7 +1601,6 @@
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
       "promptPlaceholder": "你想完成什么任务？",
-      "addAttachment": "添加附件",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",
       "prefillRepoUnavailable": "{{repo}} 已不可用。请在下方选择仓库。",
@@ -1680,15 +1634,10 @@
       "updatedFileCount": "已更新 {{displayCount}} 个文件。",
       "updatedFileCount_other": "已更新 {{displayCount}} 个文件。"
     },
-    "toolPatch": {
-      "operationUpdated": "已更新"
-    },
     "toolCard": {
       "accessibility": "{{label}} 工具，{{status}}",
       "accessibilityLabel": "{{name}} 工具，{{status}}",
-      "fileEmpty": "此文件为空。",
       "noTasks": "没有任务。",
-      "truncated": "已截断",
       "toolRead": "读取",
       "toolEdit": "编辑",
       "toolWrite": "写入",
@@ -1757,7 +1706,6 @@
       "noMatches": "未找到匹配项",
       "noRepositories": "暂无可用仓库",
       "noRepositoriesDescription": "你的账户尚未连接任何仓库。",
-      "tryDifferentSearch": "请尝试其他搜索词。",
       "loading": "正在加载……",
       "accessibility": "仓库：{{label}}",
       "platformBitbucket": "Bitbucket"
@@ -1770,7 +1718,6 @@
       "reportAiResponse": "举报 AI 回复",
       "reportAiResponseConfirm": "要举报此回复并提交审核吗？",
       "report": "举报",
-      "role": "角色",
       "roleUser": "用户",
       "roleAssistant": "助手",
       "sent": "已发送",
@@ -1957,7 +1904,6 @@
     },
     "modelPicker": {
       "title": "选择模型",
-      "searchPlaceholder": "搜索模型",
       "noModelsDescription": "没有可选择的模型。",
       "favorites": "收藏"
     },
@@ -1985,7 +1931,6 @@
       "uploading": "正在上传……",
       "uploaded": "已上传",
       "uploadFailedRetry": "上传失败。点击重试。",
-      "uploadFailedTerminal": "无法上传此文件。",
       "moveLeft": "将 {{filename}} 向左移动",
       "moveRight": "将 {{filename}} 向右移动"
     },
@@ -1997,7 +1942,6 @@
       "camera": "相机",
       "photoLibrary": "相册",
       "files": "文件",
-      "cameraAccessMessage": "请在设置中开启相机权限，以便拍照。",
       "couldNotOpenPhotoPicker": "无法打开照片选择器。请重启 Kilo 后重试。",
       "maxFilesAllowed": "最多可添加 {{displayCount}} 个文件。",
       "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
@@ -2010,7 +1954,6 @@
       "waitForUploads": "请等待附件上传完成。",
       "pasteFromClipboard": "从剪贴板粘贴",
       "stopGenerating": "停止生成",
-      "sendMessage": "发送消息",
       "selectModelBeforeSending": "请先选择模型再发送消息。",
       "preparingPlaceholder": "正在准备环境……",
       "finalizingPlaceholder": "正在收尾……",
@@ -2064,7 +2007,6 @@
     "contextUsage": {
       "windowUnavailable": "无法获取上下文窗口大小",
       "tapToViewDetails": "点击查看上下文详情。",
-      "costPrefix": "费用 {{cost}}",
       "costSuffix": "，费用 {{cost}}",
       "tokensWindowUnavailable": "上下文已用 {{used}} 个词元，无法获取窗口大小",
       "tokensUsage": "上下文已用 {{used}} 个词元，共可用 {{window}} 个，占 {{percentage}}",
@@ -2177,7 +2119,6 @@
     "title": "找不到页面"
   },
   "monoScrollBlock": {
-    "truncated": "已截断",
     "wrap": "换行",
     "scroll": "滚动"
   },
@@ -2372,7 +2313,6 @@
     "productAnalyticsWho": "PostHog。",
     "errorScreenshotsWhat": "出错时的屏幕截图，以及抽样选取的少量会话录屏，均已进行遮盖处理。",
     "errorScreenshotsWhy": "查看应用出现故障时显示的内容。",
-    "errorScreenshotsWho": "Sentry。",
     "installAttributionWhat": "安装来源和营销活动标识符。",
     "installAttributionWhy": "了解哪些渠道带来新用户。",
     "installAttributionWho": "AppsFlyer。",
@@ -2539,7 +2479,6 @@
       "urlAccessibility": "GitHub 拉取请求 URL"
     },
     "eventChips": {
-      "approve": "批准",
       "comment": "评论",
       "label": "审查类型",
       "requestChanges": "要求更改"
@@ -2852,7 +2791,6 @@
       "emailError": "请输入有效的邮箱地址。",
       "emailPlaceholder": "邮箱地址，如 name@company.com",
       "permissionDenied": "你没有邀请成员的权限。",
-      "roleLabel": "角色",
       "roleMember": "角色为成员。",
       "sendInvite": "发送邀请",
       "title": "邀请成员"
@@ -2959,7 +2897,6 @@
     "sendFeedback": "发送反馈"
   },
   "authErrors": {
-    "emailAlreadyUsed": "此邮箱已通过其他登录方式注册。请尝试其他方式，或选择“$t(login.moreSignInOptions)”。",
     "differentOauth": "此邮箱已通过其他登录方式注册。请尝试其他方式，或选择“$t(login.moreSignInOptions)”。",
     "ssoError": "你所在的组织要求使用单点登录（SSO）。请选择“$t(login.moreSignInOptions)”。",
     "blocked": "此账号已被封禁。请联系支持团队。",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
-    "signInFailed": "登录失败。请重试。",
     "networkError": "网络错误。请重试。",
     "accessDeniedByUser": "你已拒绝访问。",
     "codeExpired": "验证码已过期。",
@@ -3010,7 +2946,6 @@
       "title": "开始聊天",
       "description": "发送一条消息，即可与模型对话。"
     },
-    "working": "处理中",
     "historyRetry": "无法加载历史聊天记录。",
     "sendError": "无法发送消息。请重试。"
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "登录后查看智能体",
     "privacy": "打开 Kilo 查看智能体",
     "openAgents": "打开智能体",
-    "running": "处理中",
     "needsInput": "等待输入",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"

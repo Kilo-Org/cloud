@@ -201,7 +201,7 @@ function ScopedQuickChatScreen() {
           <View className="flex-row items-center gap-2 px-4 py-2">
             <ActivityIndicator />
             <Text variant="muted" className="text-xs">
-              {t('quickChat.working')}
+              {t('common.working')}
             </Text>
           </View>
         ) : null}

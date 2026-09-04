@@ -222,7 +222,7 @@ export function ChatComposer({
   onStop,
   disabled = false,
   isStreaming = false,
-  placeholder = i18n.t('agentChat.composer.sendMessage'),
+  placeholder = i18n.t('common.sendMessage'),
   mode,
   onModeChange,
   model,

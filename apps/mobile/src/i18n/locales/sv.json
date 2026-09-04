@@ -120,10 +120,21 @@
     "reply": "Svara",
     "reportSubmittedReceipt": "Anmälan skickad. Kvitto: {{receiptId}}",
     "retryLoadingMore": "Försök läsa in fler igen",
-    "reviewPr": "Granska PR"
+    "reviewPr": "Granska PR",
+    "role": "Roll",
+    "searchModels": "Sök efter modeller…",
+    "selectedRepositories": "Valda kodarkiv",
+    "selectRepositories": "Välj kodarkiv",
+    "sendMessage": "Skicka meddelande",
+    "sessionExited": "Sessionen har avslutats.",
+    "starting": "Startar…",
+    "status": "Läge",
+    "truncated": "Avkortat",
+    "updated": "Uppdaterad",
+    "working": "Arbetar",
+    "yourOwnRepositories": "Dina egna kodarkiv"
   },
   "language": {
-    "title": "Språk",
     "restarting": "Startar om för att byta språk",
     "couldNotRestart": "Kunde inte starta om",
     "languageSaved": "Ditt språkval har sparats.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Din session avslutades. Logga in igen.",
     "signInCodeExpired": "Din inloggningskod har upphört att gälla. Försök igen.",
     "accessDenied": "Åtkomst nekades.",
-    "somethingWentWrong": "Något gick fel. Försök igen.",
     "codeSent": "Kod skickad",
     "accountCreated": "Konto skapat. Välkommen till Kilo.",
     "pleaseEnterEmail": "Ange din e-postadress.",
@@ -584,7 +594,6 @@
     "eventChips": {
       "comment": "Kommentera",
       "requestChanges": "Begär ändringar",
-      "approve": "Godkänn",
       "label": "Typ av granskning"
     },
     "overview": {
@@ -680,7 +689,6 @@
     "disabledMessage": "Aktivera aviseringar genom att slå på dem i enhetens inställningar.",
     "disableTitle": "Inaktivera aviseringar",
     "disableMessage": "Inaktivera aviseringar genom att slå av dem i enhetens inställningar.",
-    "openSettings": "Öppna inställningar",
     "registrationFailed": "Registreringen misslyckades. Kontrollera dina aviseringsbehörigheter.",
     "couldNotEnable": "Kunde inte aktivera aviseringar. Försök igen.",
     "previewAlways": "Alltid",
@@ -756,15 +764,13 @@
       "cancelReply": "Avbryt svar",
       "openInstance": "Öppna instansen",
       "attachFile": "Bifoga fil",
-      "cancelEdit": "Avbryt redigering",
-      "sendMessage": "Skicka meddelande"
+      "cancelEdit": "Avbryt redigering"
     },
     "conversationList": {
       "couldNotLoad": "Kunde inte läsa in konversationerna.",
       "emptyTitle": "Inga konversationer ännu",
       "emptyDescription": "Skapa en konversation för att börja chatta med din KiloClaw-instans.",
       "create": "Skapa konversation",
-      "starting": "Startar…",
       "newConversation": "Ny konversation",
       "openInstanceSettings": "Öppna instansens inställningar",
       "today": "I dag",
@@ -805,8 +811,7 @@
       "moreActions": "Fler åtgärder",
       "notDelivered": "Inte levererat",
       "edited": "(redigerat)",
-      "image": "Bild",
-      "attachment": "Bifogad fil"
+      "image": "Bild"
     },
     "messageActions": {
       "copied": "Kopierat",
@@ -866,7 +871,6 @@
       "managedByAdmin": "Administratören för din organisation hanterar faktureringen.",
       "couldNotLoad": "Kunde inte läsa in faktureringsuppgifterna.",
       "manageOnWeb": "Hantera faktureringen på webben",
-      "commitPlan": "Incheckning",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Din sista Commit-period upphör den {{date}}. Fortsätt med Standard för {{price}}, annars upphör driften.",
       "freeTrial": "Gratis provperiod",
@@ -883,9 +887,9 @@
       "trialDaysRemaining": "Det återstår {{remaining}} av provperioden.",
       "trialEndingSoon": "Provperioden upphör snart: {{remaining}} kvar.",
       "planName": {
-        "commit": "Incheckning",
         "standard": "Standard"
-      }
+      },
+      "commit": "Incheckning"
     },
     "changelog": {
       "title": "Nyheter",
@@ -935,7 +939,6 @@
       "approveDeviceTitle": "Godkänn enhet",
       "approveMessage": "Vill du tillåta att {{label}} (kod: {{code}}) ansluter till din instans?",
       "approveTitle": "Godkänn parkopplingsförfrågan",
-      "device": "Enhet",
       "unknownDevice": "Okänd enhet"
     },
     "execPolicy": {
@@ -950,7 +953,6 @@
       "title": "Google-konto",
       "couldNotLoad": "Kunde inte läsa in statusen för Google-kontot.",
       "disconnected": "Google-kontot har kopplats från. Driftsätt din instans på nytt för att ändringen ska börja gälla.",
-      "redeploy": "Driftsätt igen",
       "setupCommand": "Konfigurationskommando",
       "setupCommandHelp": "Kör kommandot i en terminal på din egen dator för att ansluta ditt Google-konto. Docker måste vara installerat på datorn.",
       "failedToLoadCommand": "Kunde inte läsa in konfigurationskommandot.",
@@ -963,7 +965,6 @@
       "disconnectTitle": "Koppla från Google"
     },
     "modelList": {
-      "searchPlaceholder": "Sök efter modeller…",
       "noMatches": "Inga modeller matchar din sökning",
       "noModelsDescription": "Modeller visas här när de blir tillgängliga.",
       "noResultsFor": "Sökningen efter ”{{query}}” gav inga resultat."
@@ -1021,7 +1022,6 @@
       "start": "Starta",
       "startMessage": "Vill du starta den här instansen?",
       "startTitle": "Starta instans",
-      "starting": "Startar…",
       "stop": "Stoppa",
       "stopMessage": "Vill du stoppa den här instansen?",
       "stopTitle": "Stoppa instans",
@@ -1117,7 +1117,6 @@
         "timeoutBody": "Installationen av {{name}} tar längre tid än vanligt (över {{displayMinutes}} minuter).",
         "continueInBackground": "Fortsätt i bakgrunden",
         "settingUp": "Konfigurerar {{name}}",
-        "finishingSetup": "Konfigurationen slutförs",
         "connectingToAgent": "Ansluter till agenten",
         "startingSandbox": "Startar sandlådan",
         "backgroundHint": "Det brukar ta mindre än en minut. Du kan stänga den här vyn. Vi fortsätter i bakgrunden."
@@ -1157,24 +1156,18 @@
       "browseAllModelsA11y": "Bläddra bland alla modeller, över 500 stycken"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Prenumerera på webben",
       "trialExpiredBody": "Gå till kilo.ai/claw i din webbläsare för att fortsätta använda KiloClaw. Du kan inte teckna ett abonnemang i appen.",
-      "trialExpiredCta": "Öppna kilo.ai/claw",
       "subscriptionCanceledTitle": "Prenumerera på webben",
       "subscriptionCanceledBody": "Gå till kilo.ai/claw i din webbläsare för att använda KiloClaw. Du kan inte teckna ett abonnemang i appen.",
       "subscriptionCanceledCta": "Öppna kilo.ai/claw",
       "subscriptionPastDueTitle": "Uppdatera betalningsuppgifterna på webben",
       "subscriptionPastDueBody": "Vi hade problem med din senaste betalning. Gå till kilo.ai/claw i din webbläsare för att uppdatera betalningsuppgifterna. Du kan inte hantera faktureringen i appen.",
-      "subscriptionPastDueCta": "Öppna kilo.ai/claw",
       "quarantinedTitle": "Instansen kräver åtgärd",
       "quarantinedBody": "Din KiloClaw-instans är i karantän och kan inte användas just nu. Vårt team måste hjälpa till att återställa den.",
-      "quarantinedCta": "Fortsätt på kilo.ai",
-      "multipleCurrentConflictTitle": "Kontot behöver granskas",
       "multipleCurrentConflictBody": "Vi hittade fler än ett aktivt abonnemang på ditt konto. Därför har vi pausat tjänsten för att inte debitera dig dubbelt.",
       "multipleCurrentConflictCta": "Fortsätt på kilo.ai",
       "nonCanonicalEarlybirdTitle": "Äldre abonnemang upptäckt",
       "nonCanonicalEarlybirdBody": "Ditt abonnemang för tidig åtkomst behöver granskas manuellt innan det kan användas i mobilen.",
-      "nonCanonicalEarlybirdCta": "Fortsätt på kilo.ai",
       "iosTitle": "KiloClaw är inte tillgängligt på iOS",
       "iosBody": "För det här kontot hanteras åtkomsten till KiloClaw utanför iOS-appen.",
       "iosContact": "Frågor? Kontakta hi@kilo.ai."
@@ -1189,16 +1182,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanaler",
       "devicePairingDescription": "Godkänn enhetsförfrågningar",
-      "devicePairingLabel": "Parkoppling",
       "execPolicyDescription": "Säkerhetsinställningar",
-      "execPolicyLabel": "Körningsregler",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google-konto",
       "modelDescription": "Val av AI-modell",
       "secretsDescription": "Krypterade autentiseringsuppgifter",
-      "secretsLabel": "Hemligheter",
       "versionPinDescription": "Lås till en viss version",
       "versionPinLabel": "Versionslåsning"
     },
@@ -1249,14 +1237,11 @@
       "finishSetup": "Slutför konfigurationen",
       "manageAccess": "Hantera åtkomst",
       "bitbucketNoRepositoriesDescription": "Inga kodarkiv är tillgängliga i den här Bitbucket-arbetsytan.",
-      "bitbucketSetup": "Konfiguration av Bitbucket",
-      "couldNotOpenGithubSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
       "installGithubApp": "Installera GitHub-appen för kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
       "noRepositoriesFound": "Inga kodarkiv hittades",
-      "repositoryAccess": "åtkomst till kodarkiv",
-      "selectedRepositories": "Valda kodarkiv"
+      "repositoryAccess": "åtkomst till kodarkiv"
     },
     "style": {
       "title": "Granskningsstil",
@@ -1280,7 +1265,6 @@
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
-      "completed": "Slutförd",
       "tokens": "token",
       "tokensInOut": "{{input}} in / {{output}} ut",
       "council": "Granskningsråd",
@@ -1289,7 +1273,6 @@
       "gateNone": "Ingen",
       "gateHidden": "Dold",
       "checkRun": "Kontrollkörning",
-      "status": "Läge",
       "threshold": "Tröskel",
       "transcriptWaiting": "Granskningsloggen är inte tillgänglig ännu.",
       "transcriptEmpty": "Det finns ingen logg för den här granskningen.",
@@ -1305,8 +1288,7 @@
       "sessionError": "Ett sessionsfel uppstod: {{error}}",
       "statusWithValue": "Aktuell status: {{status}}",
       "toolName": "Verktyg: {{name}}",
-      "toolNameError": "Ett fel uppstod i verktyget {{name}}.",
-      "unknownError": "Okänt fel"
+      "toolNameError": "Ett fel uppstod i verktyget {{name}}."
     },
     "reviewMemory": {
       "title": "Granskningsminne",
@@ -1339,7 +1321,6 @@
     "webhookSetupDescription": "Vissa kodarkiv kanske inte granskas automatiskt.",
     "autoReviews": "Automatiska granskningar",
     "selectRepository": "Välj minst ett kodarkiv för att aktivera automatiska granskningar.",
-    "selectRepositories": "Välj kodarkiv",
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
@@ -1354,7 +1335,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "Personliga kodarkiv är fortfarande tillgängliga nedan.",
-      "personalSubtitle": "Dina egna kodarkiv",
       "viewOnly": "Endast visning"
     },
     "reviewList": {
@@ -1385,9 +1365,7 @@
       "allAreas": "Alla områden",
       "customInstructions": "Anpassade instruktioner",
       "set": "Angivet",
-      "mergeGate": "Villkor för sammanfogning",
       "nSelected": "{{displayCount}} valda",
-      "reviewMemory": "Granskningsminne",
       "proposedReviewMdGuidance": "Föreslagna riktlinjer för REVIEW.md"
     },
     "decision": {
@@ -1452,7 +1430,6 @@
       "noFiltersDescription": "Gå tillbaka och öppna filtren igen från listan med fynd.",
       "title": "Filtrera fynd",
       "reset": "Återställ",
-      "status": "Läge",
       "severity": "Allvarlighetsgrad",
       "outcome": "Utfall",
       "slaStatus": "SLA-status",
@@ -1463,13 +1440,8 @@
       "severityHigh": "Hög",
       "severityMedium": "Medel",
       "severityLow": "Låg",
-      "outcomeNotAnalyzed": "Inte analyserad",
-      "outcomeAnalyzing": "Analyseras",
-      "outcomeFailed": "Analysen misslyckades",
       "outcomeNotExploitable": "Inte utnyttjbar",
-      "outcomeSafeToDismiss": "Kan avskrivas utan risk",
       "outcomeTriageComplete": "Inledande bedömning klar",
-      "outcomeDismissed": "Avskriven",
       "sortSeverityDesc": "Allvarlighetsgrad: hög till låg",
       "sortSeverityAsc": "Allvarlighetsgrad: låg till hög",
       "sortSlaDue": "SLA-tidsfrist",
@@ -1594,7 +1566,6 @@
     },
     "dismiss": {
       "title": "Avskriv anmärkning",
-      "submit": "Avskriv anmärkning",
       "reason": "Orsak",
       "reasonFixStarted": "en åtgärd har redan påbörjats",
       "reasonNoBandwidth": "det finns inga resurser",
@@ -1615,7 +1586,6 @@
     "findingDetails": {
       "supersededBy": "Ersatt av ett aktuellt fynd",
       "supersededByDescription": "Tryck för att öppna den aktuella posten med status, analys och åtgärd.",
-      "dismissed": "Avskriven",
       "dismissedBecause": "Fyndet har avskrivits. Orsak: {{reason}}.",
       "severityLabel": "Allvarlighetsgrad: {{severity}}",
       "package": "Paket",
@@ -1626,7 +1596,6 @@
       "ghsa": "GHSA",
       "manifest": "Manifestfil",
       "detected": "Upptäckt den",
-      "updated": "Uppdaterad",
       "slaDeadline": "SLA-tidsfrist",
       "sourceRecord": "Källpost",
       "source": "Källa",
@@ -1650,7 +1619,6 @@
       "repositoriesCount_one": "{{displayCount}} kodarkiv valt",
       "repositoriesCount": "{{displayCount}} kodarkiv valda",
       "repositoriesCount_other": "{{displayCount}} kodarkiv valda",
-      "selectRepositories": "Välj kodarkiv",
       "selectRepositoriesSubtitle": "Välj vilka kodarkiv säkerhetsagenten övervakar",
       "modelsAndAnalysis": "Modeller och analys",
       "analysisModeSubtitle": "Analysläge: {{mode}}",
@@ -1726,8 +1694,7 @@
       "tabRemediation": "Åtgärd",
       "notFound": "Anmärkningen hittades inte",
       "notFoundDescription": "Fyndet kan ha tagits bort, eller så har du inte längre åtkomst till det.",
-      "couldNotLoad": "Det gick inte att läsa in den här anmärkningen.",
-      "dismissA11y": "Avskriv anmärkning"
+      "couldNotLoad": "Det gick inte att läsa in den här anmärkningen."
     },
     "findingList": {
       "couldNotLoad": "Kunde inte läsa in fynden.",
@@ -1736,9 +1703,6 @@
       "noMatchesDescription": "Försök att justera eller rensa de valda filtren.",
       "emptyTitle": "Inga öppna fynd",
       "emptyDescription": "Inga öppna fynd behöver hanteras just nu."
-    },
-    "scopeList": {
-      "personalSubtitle": "Dina egna kodarkiv"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Åtgärds-PR öppen",
@@ -1798,13 +1762,11 @@
     },
     "repositories": {
       "couldNotLoad": "Kunde inte läsa in inställningarna för kodarkiv.",
-      "couldNotOpenGithubSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
       "githubAppSettings": "inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
       "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
-      "selectAtLeastOne": "Välj minst ett kodarkiv.",
-      "selectedRepositories": "Valda kodarkiv"
+      "selectAtLeastOne": "Välj minst ett kodarkiv."
     },
     "scopeEntry": {
       "connectDescription": "Installera Kilos GitHub-app för att automatiskt synkronisera Dependabot-varningar och hantera säkerhetsfynd i dina kodarkiv.",
@@ -1839,10 +1801,8 @@
       "queuedTitle": "Analys i kö",
       "queuedDescription": "Analysen väntar på ledig kapacitet.",
       "analyzing": "Analyseras",
-      "analyzingTitle": "Analyseras",
       "analyzingDescription": "Analysen kontrollerar om programkoden kan nå den berörda funktionen.",
       "failed": "Analysen misslyckades",
-      "failedTitle": "Analysen misslyckades",
       "failedDescription": "Säkerhetsagenten kunde inte slutföra analysen.",
       "extractionFailedDescription": "Den tekniska rapporten kunde inte omvandlas till ett strukturerat resultat.",
       "exploitableDescription": "Programkoden kan nå den berörda funktionen.",
@@ -1852,18 +1812,14 @@
       "unknown": "Kräver granskning",
       "unknownDescription": "Analysen kunde inte bekräfta om den sårbara funktionen är nåbar.",
       "safeToDismiss": "Kan avskrivas utan risk",
-      "safeToDismissTitle": "Kan avskrivas utan risk",
       "safeToDismissDescription": "Den inledande bedömningen visar att fyndet kan avskrivas utan risk och utan analys av kodbasen.",
       "manualReviewTitle": "Kräver manuell granskning",
       "manualReviewDescription": "Den inledande bedömningen markerade fyndet för manuell granskning.",
       "analysisRequired": "Analys krävs",
       "analysisRequiredTitle": "Kodbasanalys krävs",
       "analysisRequiredDescription": "Den inledande bedömningen rekommenderar att kodarkivet analyseras innan du bestämmer hur fyndet ska hanteras.",
-      "completed": "Analyserad",
-      "completedTitle": "Analyserad",
       "completedDescription": "Analysen slutfördes utan att något specifikt resultat registrerades.",
       "notAnalyzed": "Inte analyserad",
-      "notAnalyzedTitle": "Inte analyserad",
       "notAnalyzedDescription": "Kodbasen har ännu inte analyserats för det här fyndet."
     },
     "deadline": {
@@ -1998,7 +1954,6 @@
       "didNotCompleteTitle": "Installationen slutfördes inte",
       "didNotCompleteMessage": "Installationen av GitHub-appen slutfördes inte. Försök igen från appen."
     },
-    "sessionExited": "Sessionen har avslutats.",
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen. Kontrollera datorn eller uppdatera CLI-verktyget.",
     "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans.",
@@ -2038,7 +1993,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsessionen.",
-      "exited": "Sessionen har avslutats.",
       "failedToExit": "Det gick inte att avsluta sessionen.",
       "exitTitle": "Avsluta sessionen?",
       "exitMessage": "Den pågående sessionen stoppas, men historiken sparas.",
@@ -2072,7 +2026,6 @@
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
       "promptPlaceholder": "Vad vill du arbeta med?",
-      "addAttachment": "Bifoga fil",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",
       "prefillRepoUnavailable": "{{repo}} är inte längre tillgängligt. Välj ett kodarkiv nedan.",
@@ -2106,15 +2059,10 @@
       "updatedFileCount": "{{displayCount}} filer har uppdaterats.",
       "updatedFileCount_other": "{{displayCount}} filer har uppdaterats."
     },
-    "toolPatch": {
-      "operationUpdated": "Uppdaterad"
-    },
     "toolCard": {
       "accessibility": "Verktyget {{label}}, {{status}}",
       "accessibilityLabel": "Verktyget {{name}}, {{status}}",
-      "fileEmpty": "Den här filen är tom.",
       "noTasks": "Det finns inga uppgifter.",
-      "truncated": "Avkortat",
       "toolRead": "läs",
       "toolEdit": "Redigera",
       "toolWrite": "skriv",
@@ -2183,7 +2131,6 @@
       "noMatches": "Inga träffar",
       "noRepositories": "Inga kodarkiv tillgängliga",
       "noRepositoriesDescription": "Inga kodarkiv är anslutna till ditt konto.",
-      "tryDifferentSearch": "Prova en annan sökterm.",
       "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2196,7 +2143,6 @@
       "reportAiResponse": "Rapportera AI-svar",
       "reportAiResponseConfirm": "Rapportera det här svaret för granskning?",
       "report": "Rapportera",
-      "role": "Roll",
       "roleUser": "Användare",
       "roleAssistant": "Assistent",
       "sent": "Skickat",
@@ -2383,7 +2329,6 @@
     },
     "modelPicker": {
       "title": "Välj modell",
-      "searchPlaceholder": "Sök efter modeller…",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
       "favorites": "Favoriter"
     },
@@ -2411,7 +2356,6 @@
       "uploading": "Laddar upp…",
       "uploaded": "Uppladdad",
       "uploadFailedRetry": "Uppladdningen misslyckades. Tryck för att försöka igen.",
-      "uploadFailedTerminal": "Den här filen kan inte laddas upp.",
       "moveLeft": "Flytta {{filename}} åt vänster",
       "moveRight": "Flytta {{filename}} åt höger"
     },
@@ -2423,7 +2367,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessMessage": "Tillåt åtkomst till kameran i Inställningar för att ta en bild.",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna bildväljaren. Starta om Kilo och försök igen.",
       "maxFilesAllowed": "Du kan lägga till högst {{displayCount}} filer.",
       "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
@@ -2436,7 +2379,6 @@
       "waitForUploads": "Vänta tills bilagorna har laddats upp.",
       "pasteFromClipboard": "Klistra in från urklipp",
       "stopGenerating": "Stoppa genereringen",
-      "sendMessage": "Skicka meddelande",
       "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet.",
       "preparingPlaceholder": "Förbereder miljön…",
       "finalizingPlaceholder": "Avslutar…",
@@ -2490,7 +2432,6 @@
     "contextUsage": {
       "windowUnavailable": "Kontextfönstrets storlek är inte tillgänglig",
       "tapToViewDetails": "Tryck för att visa kontextdetaljer.",
-      "costPrefix": "kostnad {{cost}}",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontext: {{used}} token, fönstrets storlek är inte tillgänglig",
       "tokensUsage": "Kontext: {{used}} av {{window}} token, {{percentage}} använt",
@@ -2603,7 +2544,6 @@
     "title": "Sidan hittades inte"
   },
   "monoScrollBlock": {
-    "truncated": "Avkortat",
     "wrap": "Radbrytning",
     "scroll": "Rullning"
   },
@@ -2798,7 +2738,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Maskerade skärmbilder när ett fel inträffar och maskerade inspelningar av ett litet urval av sessioner.",
     "errorScreenshotsWhy": "För att se vad appen visade när något gick fel.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Installationskälla och kampanjidentifierare.",
     "installAttributionWhy": "För att förstå vilka kanaler som ger nya användare.",
     "installAttributionWho": "AppsFlyer.",
@@ -2853,7 +2792,6 @@
       "emailError": "Ange en giltig e-postadress.",
       "emailPlaceholder": "namn@foretag.se",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
-      "roleLabel": "Roll",
       "roleMember": "Du bjuder in personen som medlem.",
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem"
@@ -2959,7 +2897,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Det finns redan ett konto med den här e-postadressen som använder en annan inloggningsmetod. Prova en annan metod eller välj ”$t(login.moreSignInOptions)”.",
     "differentOauth": "Det finns redan ett konto med den här e-postadressen som använder en annan inloggningsmetod. Prova en annan metod eller välj ”$t(login.moreSignInOptions)”.",
     "ssoError": "Din organisation kräver SSO. Välj ”$t(login.moreSignInOptions)”.",
     "blocked": "Det här kontot har blockerats. Kontakta supporten.",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "Kunde inte starta inloggningen. Försök igen.",
     "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
     "signInTimedOut": "Inloggningen tog för lång tid. Försök igen.",
-    "signInFailed": "Inloggningen misslyckades. Försök igen.",
     "networkError": "Nätverksfel. Försök igen.",
     "accessDeniedByUser": "Användaren nekade åtkomst.",
     "codeExpired": "Koden har gått ut.",
@@ -3010,7 +2946,6 @@
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
     },
-    "working": "Arbetar",
     "historyRetry": "Kunde inte läsa in chatthistoriken.",
     "sendError": "Kunde inte skicka meddelandet. Försök igen."
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "Logga in för att se agenter",
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
-    "running": "Arbetar",
     "needsInput": "Väntar på svar",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."

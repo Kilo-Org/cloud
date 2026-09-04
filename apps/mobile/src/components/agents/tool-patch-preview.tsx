@@ -29,7 +29,7 @@ export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewPro
   const operationLabel = {
     add: t('common.added'),
     delete: t('common.deleted'),
-    update: t('agentChat.toolPatch.operationUpdated'),
+    update: t('common.updated'),
   } satisfies Record<ToolPatchFile['operation'], string>;
 
   return (
@@ -55,7 +55,7 @@ export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewPro
           accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
-          {t('monoScrollBlock.truncated')}
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

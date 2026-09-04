@@ -186,7 +186,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.findingDetail.dismissA11y')}
+              accessibilityLabel={t('securityAgent.dismiss.title')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />

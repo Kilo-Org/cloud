@@ -292,7 +292,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           {dismissFinding.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">{t('securityAgent.dismiss.submit')}</Text>
+          <Text className="text-primary-foreground">{t('securityAgent.dismiss.title')}</Text>
         </Button>
       </ScrollView>
     </View>

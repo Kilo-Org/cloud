@@ -120,10 +120,21 @@
     "reply": "Svar",
     "reportSubmittedReceipt": "Indberetning sendt. Kvittering: {{receiptId}}",
     "retryLoadingMore": "Prøv igen at indlæse flere",
-    "reviewPr": "Gennemgå PR"
+    "reviewPr": "Gennemgå PR",
+    "role": "Rolle",
+    "searchModels": "Søg efter modeller…",
+    "selectedRepositories": "Valgte kodelagre",
+    "selectRepositories": "Vælg kodelagre",
+    "sendMessage": "Send besked",
+    "sessionExited": "Session afsluttet",
+    "starting": "Starter…",
+    "status": "Tilstand",
+    "truncated": "Afkortet",
+    "updated": "Opdateret",
+    "working": "I gang",
+    "yourOwnRepositories": "Dine egne kodelagre"
   },
   "language": {
-    "title": "Sprog",
     "restarting": "Genstarter for at skifte sprog",
     "couldNotRestart": "Kunne ikke genstarte",
     "languageSaved": "Dit sprogvalg er gemt.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Din session er afsluttet. Log ind igen.",
     "signInCodeExpired": "Din loginkode er udløbet. Prøv igen.",
     "accessDenied": "Adgangen blev afvist.",
-    "somethingWentWrong": "Noget gik galt. Prøv igen.",
     "codeSent": "Kode sendt",
     "accountCreated": "Konto oprettet. Velkommen til Kilo.",
     "pleaseEnterEmail": "Indtast din e-mailadresse.",
@@ -584,7 +594,6 @@
     "eventChips": {
       "comment": "Kommentar",
       "requestChanges": "Anmod om ændringer",
-      "approve": "Godkend",
       "label": "Resultat af gennemgangen"
     },
     "overview": {
@@ -680,7 +689,6 @@
     "disabledMessage": "Slå notifikationer til i enhedens indstillinger for at aktivere dem.",
     "disableTitle": "Deaktivér notifikationer",
     "disableMessage": "Slå notifikationer fra i enhedens indstillinger for at deaktivere dem.",
-    "openSettings": "Åbn indstillinger",
     "registrationFailed": "Registreringen mislykkedes. Kontrollér, at notifikationer er tilladt.",
     "couldNotEnable": "Kunne ikke aktivere notifikationer. Prøv igen.",
     "previewAlways": "Altid",
@@ -756,15 +764,13 @@
       "cancelReply": "Annullér svar",
       "openInstance": "Åbn instans",
       "attachFile": "Vedhæft fil",
-      "cancelEdit": "Annullér redigering",
-      "sendMessage": "Send besked"
+      "cancelEdit": "Annullér redigering"
     },
     "conversationList": {
       "couldNotLoad": "Samtalerne kunne ikke indlæses.",
       "emptyTitle": "Ingen samtaler endnu",
       "emptyDescription": "Opret en samtale for at begynde at chatte med din KiloClaw-instans.",
       "create": "Opret samtale",
-      "starting": "Starter…",
       "newConversation": "Ny samtale",
       "openInstanceSettings": "Åbn indstillinger for instansen",
       "today": "I dag",
@@ -805,8 +811,7 @@
       "moreActions": "Flere handlinger",
       "notDelivered": "Ikke leveret",
       "edited": "(redigeret)",
-      "image": "Billede",
-      "attachment": "Vedhæftet fil"
+      "image": "Billede"
     },
     "messageActions": {
       "copied": "Kopieret",
@@ -866,7 +871,6 @@
       "managedByAdmin": "Din organisations administrator administrerer faktureringen.",
       "couldNotLoad": "Faktureringsoplysningerne kunne ikke indlæses.",
       "manageOnWeb": "Administrer fakturering i browseren",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Din sidste bindingsperiode med Commit slutter den {{date}}. Fortsæt med Standard til {{price}}, ellers ophører hostingen.",
       "freeTrial": "Gratis prøveperiode",
@@ -883,9 +887,9 @@
       "trialDaysRemaining": "Der er {{remaining}} tilbage af prøveperioden.",
       "trialEndingSoon": "Prøveperioden udløber snart. Der er {{remaining}} tilbage.",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Nyheder",
@@ -935,7 +939,6 @@
       "approveDeviceTitle": "Godkend enhed",
       "approveMessage": "Vil du give {{label}} (kode: {{code}}) adgang til at oprette forbindelse til din instans?",
       "approveTitle": "Godkend parringsanmodning",
-      "device": "Enhed",
       "unknownDevice": "Ukendt enhed"
     },
     "execPolicy": {
@@ -950,7 +953,6 @@
       "title": "Google-konto",
       "couldNotLoad": "Status for Google-kontoen kunne ikke indlæses.",
       "disconnected": "Forbindelsen til Google-kontoen er afbrudt. Genudrul din instans, så ændringen træder i kraft.",
-      "redeploy": "Udrul igen",
       "setupCommand": "Opsætningskommando",
       "setupCommandHelp": "Kør denne kommando i en terminal på din egen computer for at tilslutte din Google-konto. Docker skal være installeret på computeren.",
       "failedToLoadCommand": "Opsætningskommandoen kunne ikke indlæses.",
@@ -963,7 +965,6 @@
       "disconnectTitle": "Afbryd forbindelsen til Google"
     },
     "modelList": {
-      "searchPlaceholder": "Søg efter modeller…",
       "noMatches": "Ingen modeller matcher din søgning",
       "noModelsDescription": "Modeller vises her, når de er tilgængelige.",
       "noResultsFor": "Der er ingen resultater for \"{{query}}\"."
@@ -1021,7 +1022,6 @@
       "start": "Start instans",
       "startMessage": "Er du sikker på, at du vil starte denne instans?",
       "startTitle": "Start instans",
-      "starting": "Starter…",
       "stop": "Stop instans",
       "stopMessage": "Er du sikker på, at du vil stoppe denne instans?",
       "stopTitle": "Stop instans",
@@ -1117,7 +1117,6 @@
         "timeoutBody": "Opsætningen af {{name}} tager længere tid end normalt (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsæt i baggrunden",
         "settingUp": "Opsætning af {{name}}",
-        "finishingSetup": "Afslutter opsætningen",
         "connectingToAgent": "Opretter forbindelse til agenten",
         "startingSandbox": "Starter det isolerede miljø",
         "backgroundHint": "Det tager normalt under et minut. Du kan lukke denne skærm. Vi fortsætter i baggrunden."
@@ -1157,24 +1156,18 @@
       "browseAllModelsA11y": "Gennemse alle 500+ modeller"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Tegn abonnement på hjemmesiden",
       "trialExpiredBody": "Åbn kilo.ai/claw i din browser for fortsat at bruge KiloClaw. Du kan ikke tegne et abonnement i appen.",
-      "trialExpiredCta": "Åbn kilo.ai/claw",
       "subscriptionCanceledTitle": "Tegn abonnement på hjemmesiden",
       "subscriptionCanceledBody": "Åbn kilo.ai/claw i din browser for at bruge KiloClaw. Du kan ikke tegne et abonnement i appen.",
       "subscriptionCanceledCta": "Åbn kilo.ai/claw",
       "subscriptionPastDueTitle": "Opdater betalingsoplysninger i browseren",
       "subscriptionPastDueBody": "Der var et problem med din seneste betaling. Åbn kilo.ai/claw i din browser for at opdatere dine betalingsoplysninger. Du kan ikke administrere fakturering i appen.",
-      "subscriptionPastDueCta": "Åbn kilo.ai/claw",
       "quarantinedTitle": "Instansen skal gendannes",
       "quarantinedBody": "Din KiloClaw-instans er i karantæne og kan ikke bruges lige nu. Vores team skal hjælpe med at gendanne den.",
-      "quarantinedCta": "Fortsæt på kilo.ai",
-      "multipleCurrentConflictTitle": "Kontoen skal gennemgås",
       "multipleCurrentConflictBody": "Vi fandt flere aktive abonnementer på din konto. Vi har derfor sat adgangen på pause for at undgå at opkræve dig dobbelt.",
       "multipleCurrentConflictCta": "Fortsæt på kilo.ai",
       "nonCanonicalEarlybirdTitle": "Ældre abonnement fundet",
       "nonCanonicalEarlybirdBody": "Dit abonnement med tidlig adgang kræver en manuel gennemgang, før det kan bruges på mobilen.",
-      "nonCanonicalEarlybirdCta": "Fortsæt på kilo.ai",
       "iosTitle": "KiloClaw er ikke tilgængelig på iOS",
       "iosBody": "Adgangen til KiloClaw for denne konto administreres uden for iOS-appen.",
       "iosContact": "Spørgsmål? Kontakt hi@kilo.ai."
@@ -1189,16 +1182,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanaler",
       "devicePairingDescription": "Godkend enhedsanmodninger",
-      "devicePairingLabel": "Enhedsparring",
       "execPolicyDescription": "Sikkerhedsindstillinger",
-      "execPolicyLabel": "Regler for kørsel",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google-konto",
       "modelDescription": "Valg af AI-model",
       "secretsDescription": "Krypterede adgangsoplysninger",
-      "secretsLabel": "Hemmeligheder",
       "versionPinDescription": "Fastlås til en bestemt version",
       "versionPinLabel": "Versionslåsning"
     },
@@ -1249,14 +1237,11 @@
       "finishSetup": "Afslut opsætning",
       "manageAccess": "Administrér adgang",
       "bitbucketNoRepositoriesDescription": "Der er ingen tilgængelige kodelagre i dette Bitbucket-arbejdsområde.",
-      "bitbucketSetup": "Bitbucket-opsætning",
-      "couldNotOpenGithubSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
       "noRepositoriesFound": "Ingen kodelagre fundet",
-      "repositoryAccess": "adgang til kodelagre",
-      "selectedRepositories": "Valgte kodelagre"
+      "repositoryAccess": "adgang til kodelagre"
     },
     "style": {
       "title": "Gennemgangsstil",
@@ -1280,7 +1265,6 @@
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
-      "completed": "Afsluttet",
       "tokens": "teksttokens",
       "tokensInOut": "{{input}} ind / {{output}} ud",
       "council": "Bedømmelsespanel",
@@ -1289,7 +1273,6 @@
       "gateNone": "Ingen",
       "gateHidden": "Skjult",
       "checkRun": "Kontrolkørsel",
-      "status": "Tilstand",
       "threshold": "Tærskel",
       "transcriptWaiting": "Loggen for gennemgangen er endnu ikke klar.",
       "transcriptEmpty": "Der er ingen log for denne gennemgang.",
@@ -1305,8 +1288,7 @@
       "sessionError": "Sessionsfejl: {{error}}",
       "statusWithValue": "Aktuel status: {{status}}",
       "toolName": "Værktøj: {{name}}",
-      "toolNameError": "Der opstod en fejl i værktøjet {{name}}.",
-      "unknownError": "Ukendt fejl"
+      "toolNameError": "Der opstod en fejl i værktøjet {{name}}."
     },
     "reviewMemory": {
       "title": "Hukommelse for gennemgange",
@@ -1339,7 +1321,6 @@
     "webhookSetupDescription": "Nogle kodelagre får muligvis ikke automatiske gennemgange.",
     "autoReviews": "Automatiske gennemgange",
     "selectRepository": "Vælg mindst ét kodelager for at aktivere automatiske gennemgange.",
-    "selectRepositories": "Vælg kodelagre",
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
@@ -1354,7 +1335,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "Dine personlige kodelagre er stadig tilgængelige nedenfor.",
-      "personalSubtitle": "Dine egne kodelagre",
       "viewOnly": "Kun visning"
     },
     "reviewList": {
@@ -1385,9 +1365,7 @@
       "allAreas": "Alle områder",
       "customInstructions": "Brugerdefinerede instruktioner",
       "set": "Angivet",
-      "mergeGate": "Krav til fletning",
       "nSelected": "{{displayCount}} valgt",
-      "reviewMemory": "Hukommelse for gennemgange",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },
     "decision": {
@@ -1452,7 +1430,6 @@
       "noFiltersDescription": "Gå tilbage, og åbn filtrene igen fra listen over fund.",
       "title": "Filtrering af fund",
       "reset": "Nulstil",
-      "status": "Tilstand",
       "severity": "Alvorlighed",
       "outcome": "Resultat",
       "slaStatus": "SLA-status",
@@ -1463,13 +1440,8 @@
       "severityHigh": "Høj",
       "severityMedium": "Middel",
       "severityLow": "Lav",
-      "outcomeNotAnalyzed": "Ikke analyseret",
-      "outcomeAnalyzing": "Analyserer",
-      "outcomeFailed": "Analysen mislykkedes",
       "outcomeNotExploitable": "Kan ikke udnyttes",
-      "outcomeSafeToDismiss": "Kan trygt afvises",
       "outcomeTriageComplete": "Indledende vurdering afsluttet",
-      "outcomeDismissed": "Afvist",
       "sortSeverityDesc": "Alvorlighed: høj til lav",
       "sortSeverityAsc": "Alvorlighed: lav til høj",
       "sortSlaDue": "SLA-frist",
@@ -1594,7 +1566,6 @@
     },
     "dismiss": {
       "title": "Afvis fund",
-      "submit": "Afvis fund",
       "reason": "Begrundelse",
       "reasonFixStarted": "rettelsen er allerede i gang",
       "reasonNoBandwidth": "der er ingen ledig kapacitet",
@@ -1615,7 +1586,6 @@
     "findingDetails": {
       "supersededBy": "Erstattet af et aktuelt fund",
       "supersededByDescription": "Tryk for at se det aktuelle funds status, analyse og udbedring.",
-      "dismissed": "Afvist",
       "dismissedBecause": "Fundet er afvist {{reason}}.",
       "severityLabel": "Alvorlighed: {{severity}}",
       "package": "Pakke",
@@ -1626,7 +1596,6 @@
       "ghsa": "GHSA",
       "manifest": "Manifestfil",
       "detected": "Registreret",
-      "updated": "Opdateret",
       "slaDeadline": "SLA-frist",
       "sourceRecord": "Kilderegistrering",
       "source": "Kilde",
@@ -1650,7 +1619,6 @@
       "repositoriesCount_one": "{{displayCount}} kodelager valgt",
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
-      "selectRepositories": "Vælg kodelagre",
       "selectRepositoriesSubtitle": "Vælg, hvilke kodelagre Security Agent overvåger",
       "modelsAndAnalysis": "Modeller og analyse",
       "analysisModeSubtitle": "{{mode}} analyse",
@@ -1726,8 +1694,7 @@
       "tabRemediation": "Udbedring",
       "notFound": "Fundet findes ikke",
       "notFoundDescription": "Dette fund kan være blevet fjernet, eller du har ikke længere adgang til det.",
-      "couldNotLoad": "Fundet kunne ikke indlæses.",
-      "dismissA11y": "Afvis fund"
+      "couldNotLoad": "Fundet kunne ikke indlæses."
     },
     "findingList": {
       "couldNotLoad": "Fundene kunne ikke indlæses.",
@@ -1736,9 +1703,6 @@
       "noMatchesDescription": "Prøv at justere eller fjerne de valgte filtre.",
       "emptyTitle": "Ingen åbne fund",
       "emptyDescription": "Ingen åbne fund kræver opmærksomhed lige nu."
-    },
-    "scopeList": {
-      "personalSubtitle": "Dine egne kodelagre"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Åben PR med udbedring",
@@ -1798,13 +1762,11 @@
     },
     "repositories": {
       "couldNotLoad": "Indstillingerne for kodelagre kunne ikke indlæses.",
-      "couldNotOpenGithubSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
       "githubAppSettings": "indstillinger for GitHub-appen",
       "manageAccess": "Administrér GitHub-appens adgang",
       "noRepositories": "Ingen kodelagre",
       "noRepositoriesDescription": "Giv Kilos GitHub-app adgang til kodelagre.",
-      "selectAtLeastOne": "Vælg mindst ét kodelager.",
-      "selectedRepositories": "Valgte kodelagre"
+      "selectAtLeastOne": "Vælg mindst ét kodelager."
     },
     "scopeEntry": {
       "connectDescription": "Installér Kilos GitHub-app for automatisk at synkronisere Dependabot-advarsler og administrere sikkerhedsfund på tværs af dine kodelagre.",
@@ -1839,10 +1801,8 @@
       "queuedTitle": "Analyse i kø",
       "queuedDescription": "Analysen venter på ledig kapacitet.",
       "analyzing": "Analyserer",
-      "analyzingTitle": "Analyserer",
       "analyzingDescription": "Analysen undersøger, om programkoden kan nå den berørte funktion.",
       "failed": "Analysen mislykkedes",
-      "failedTitle": "Analysen mislykkedes",
       "failedDescription": "Security Agent kunne ikke fuldføre analysen.",
       "extractionFailedDescription": "Den tekniske rapport kunne ikke omdannes til et struktureret resultat.",
       "exploitableDescription": "Programkoden kan nå den berørte funktion.",
@@ -1852,18 +1812,14 @@
       "unknown": "Kræver gennemgang",
       "unknownDescription": "Analysen kunne ikke bekræfte, om den sårbare funktion kan nås.",
       "safeToDismiss": "Kan trygt afvises",
-      "safeToDismissTitle": "Kan trygt afvises",
       "safeToDismissDescription": "Den indledende vurdering viste, at fundet kan afvises uden risiko og uden at analysere kodebasen.",
       "manualReviewTitle": "Kræver manuel gennemgang",
       "manualReviewDescription": "Den indledende vurdering markerede dette fund til manuel gennemgang.",
       "analysisRequired": "Analyse påkrævet",
       "analysisRequiredTitle": "Analyse af kodebasen påkrævet",
       "analysisRequiredDescription": "Den indledende vurdering anbefaler at analysere kodelageret, før du beslutter, hvordan du vil håndtere fundet.",
-      "completed": "Analyseret",
-      "completedTitle": "Analyseret",
       "completedDescription": "Analysen er fuldført, men der er ikke registreret et konkret resultat.",
       "notAnalyzed": "Ikke analyseret",
-      "notAnalyzedTitle": "Ikke analyseret",
       "notAnalyzedDescription": "Kodebasen er endnu ikke analyseret for dette fund."
     },
     "deadline": {
@@ -1998,7 +1954,6 @@
       "didNotCompleteTitle": "Installationen blev ikke fuldført",
       "didNotCompleteMessage": "Installationen af GitHub-appen blev ikke fuldført. Prøv igen fra appen."
     },
-    "sessionExited": "Session afsluttet",
     "remoteSpawnRetryable": "Der kunne ikke oprettes forbindelse til instansen. Den har muligvis mistet forbindelsen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte sessionen — kontrollér maskinen eller opdater CLI'en.",
     "remoteSpawnInstanceDisconnected": "Den valgte instans har mistet forbindelsen. Start en session på Cloud Agent, eller vælg en anden instans.",
@@ -2038,7 +1993,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette en fjernsession.",
-      "exited": "Session afsluttet",
       "failedToExit": "Kunne ikke afslutte sessionen.",
       "exitTitle": "Afslut sessionen?",
       "exitMessage": "Dette stopper den kørende session, men bevarer dens historik.",
@@ -2072,7 +2026,6 @@
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
-      "addAttachment": "Vedhæft fil",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den oprindelige session er ikke længere tilgængelige. Vælg et andet kodelager og en anden model nedenfor.",
       "prefillRepoUnavailable": "{{repo}} er ikke længere tilgængeligt. Vælg et kodelager nedenfor.",
@@ -2106,15 +2059,10 @@
       "updatedFileCount": "{{displayCount}} filer er opdateret.",
       "updatedFileCount_other": "{{displayCount}} filer er opdateret."
     },
-    "toolPatch": {
-      "operationUpdated": "Opdateret"
-    },
     "toolCard": {
       "accessibility": "Værktøj: {{label}}, {{status}}",
       "accessibilityLabel": "Værktøj: {{name}}, {{status}}",
-      "fileEmpty": "Denne fil er tom.",
       "noTasks": "Ingen opgaver.",
-      "truncated": "Afkortet",
       "toolRead": "læs",
       "toolEdit": "Redigér",
       "toolWrite": "skriv",
@@ -2183,7 +2131,6 @@
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
       "noRepositoriesDescription": "Der er ingen kodelagre tilknyttet din konto.",
-      "tryDifferentSearch": "Prøv et andet søgeord.",
       "loading": "Indlæser...",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2196,7 +2143,6 @@
       "reportAiResponse": "Indberet AI-svar",
       "reportAiResponseConfirm": "Vil du indberette dette svar, så det kan blive gennemgået?",
       "report": "Indberet",
-      "role": "Rolle",
       "roleUser": "Bruger",
       "roleAssistant": "Assistent",
       "sent": "Sendt",
@@ -2383,7 +2329,6 @@
     },
     "modelPicker": {
       "title": "Vælg model",
-      "searchPlaceholder": "Søg efter modeller…",
       "noModelsDescription": "Der er ingen modeller at vælge imellem.",
       "favorites": "Favoritter"
     },
@@ -2411,7 +2356,6 @@
       "uploading": "Uploader…",
       "uploaded": "Uploadet",
       "uploadFailedRetry": "Uploaden mislykkedes. Tryk for at prøve igen.",
-      "uploadFailedTerminal": "Denne fil kan ikke uploades.",
       "moveLeft": "Flyt {{filename}} til venstre",
       "moveRight": "Flyt {{filename}} til højre"
     },
@@ -2423,7 +2367,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessMessage": "Giv adgang til kameraet i indstillingerne for at tage et billede.",
       "couldNotOpenPhotoPicker": "Kunne ikke åbne billedvælgeren. Genstart Kilo og prøv igen.",
       "maxFilesAllowed": "Du kan højst tilføje {{displayCount}} filer.",
       "onlyAddingFiles": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})"
@@ -2436,7 +2379,6 @@
       "waitForUploads": "Vent, til alle vedhæftede filer er uploadet.",
       "pasteFromClipboard": "Indsæt fra udklipsholderen",
       "stopGenerating": "Stop generering",
-      "sendMessage": "Send besked",
       "selectModelBeforeSending": "Vælg en model, før du sender.",
       "preparingPlaceholder": "Forbereder miljøet...",
       "finalizingPlaceholder": "Afslutter...",
@@ -2490,7 +2432,6 @@
     "contextUsage": {
       "windowUnavailable": "Kontekstvinduets størrelse er ukendt",
       "tapToViewDetails": "Tryk for at se oplysninger om konteksten.",
-      "costPrefix": "pris {{cost}}",
       "costSuffix": ", pris {{cost}}",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokens, kontekstvinduets størrelse er ukendt",
       "tokensUsage": "Kontekst: {{used}} af {{window}} tokens, {{percentage}} brugt",
@@ -2603,7 +2544,6 @@
     "title": "Side ikke fundet"
   },
   "monoScrollBlock": {
-    "truncated": "Afkortet",
     "wrap": "Ombryd",
     "scroll": "Rul"
   },
@@ -2798,7 +2738,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Maskerede skærmbilleder ved fejl og maskerede optagelser af et lille udvalg af sessioner.",
     "errorScreenshotsWhy": "For at se, hvad appen viste, da fejlen opstod.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Installationskilde og kampagne-id'er.",
     "installAttributionWhy": "For at forstå, hvilke kanaler der tiltrækker nye brugere.",
     "installAttributionWho": "AppsFlyer.",
@@ -2853,7 +2792,6 @@
       "emailError": "Angiv en gyldig e-mailadresse.",
       "emailPlaceholder": "navn@virksomhed.dk",
       "permissionDenied": "Du har ikke tilladelse til at invitere medlemmer.",
-      "roleLabel": "Rolle",
       "roleMember": "Rolle: medlem",
       "sendInvite": "Send invitation",
       "title": "Invitér medlem"
@@ -2959,7 +2897,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Der findes allerede en konto med denne e-mailadresse, som bruger en anden loginmetode. Prøv en anden metode, eller vælg '$t(login.moreSignInOptions)'.",
     "differentOauth": "Der findes allerede en konto med denne e-mailadresse, som bruger en anden loginmetode. Prøv en anden metode, eller vælg '$t(login.moreSignInOptions)'.",
     "ssoError": "Din organisation kræver SSO. Brug '$t(login.moreSignInOptions)'.",
     "blocked": "Denne konto er blokeret. Kontakt support.",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
     "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
     "signInTimedOut": "Tiden til at logge ind er udløbet. Prøv igen.",
-    "signInFailed": "Det lykkedes ikke at logge ind. Prøv igen.",
     "networkError": "Netværksfejl. Prøv igen.",
     "accessDeniedByUser": "Brugeren afviste adgangen.",
     "codeExpired": "Koden er udløbet.",
@@ -3010,7 +2946,6 @@
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."
     },
-    "working": "I gang",
     "historyRetry": "Chathistorikken kunne ikke indlæses.",
     "sendError": "Kunne ikke sende beskeden. Prøv igen."
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "Log ind for at se agenter",
     "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
-    "running": "I gang",
     "needsInput": "afventer svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."

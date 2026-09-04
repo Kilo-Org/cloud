@@ -160,7 +160,7 @@ export default function GoogleScreen() {
                 {!mutations.restartMachine.isPending && (
                   <RefreshCw size={14} color={colors.foreground} />
                 )}
-                <Text>{t('kiloclaw.google.redeploy')}</Text>
+                <Text>{t('kiloclaw.redeploy')}</Text>
               </Button>
             </View>
           )}

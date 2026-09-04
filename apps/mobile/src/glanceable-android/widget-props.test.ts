@@ -16,7 +16,7 @@ const NOW = 1_750_000_000_000;
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
-  'glanceable.running': 'Working',
+  'common.working': 'Working',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',

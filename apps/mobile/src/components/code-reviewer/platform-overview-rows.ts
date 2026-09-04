@@ -115,7 +115,7 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: i18n.t('codeReviewer.overview.mergeGate'),
+            title: i18n.t('codeReviewer.gate.title'),
             subtitle: i18n.t(gateThresholdLabels[data.gateThreshold]),
           },
         ]
@@ -141,7 +141,7 @@ export function buildOverviewRows({
           {
             field: 'review-memory',
             icon: Brain,
-            title: i18n.t('codeReviewer.overview.reviewMemory'),
+            title: i18n.t('codeReviewer.reviewMemory.title'),
             subtitle: i18n.t('codeReviewer.overview.proposedReviewMdGuidance'),
             onPress: onOpenReviewMemory,
             readOnlyAccessible: true,

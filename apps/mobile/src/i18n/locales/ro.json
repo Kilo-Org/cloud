@@ -120,10 +120,21 @@
     "reply": "Răspunde",
     "reportSubmittedReceipt": "Sesizare trimisă. Număr de înregistrare: {{receiptId}}",
     "retryLoadingMore": "Încearcă din nou să încarci mai multe elemente",
-    "reviewPr": "Revizuiește PR-ul"
+    "reviewPr": "Revizuiește PR-ul",
+    "role": "Rol",
+    "searchModels": "Căutare modele",
+    "selectedRepositories": "Depozite de cod selectate",
+    "selectRepositories": "Selectează depozitele de cod",
+    "sendMessage": "Trimite mesajul",
+    "sessionExited": "Sesiunea s-a încheiat.",
+    "starting": "Se pornește…",
+    "status": "Stare",
+    "truncated": "Trunchiat",
+    "updated": "Actualizat",
+    "working": "În lucru",
+    "yourOwnRepositories": "Depozitele tale de cod"
   },
   "language": {
-    "title": "Limbă",
     "restarting": "Se repornește aplicația pentru a schimba limba",
     "couldNotRestart": "Repornirea a eșuat",
     "languageSaved": "Limba selectată a fost salvată.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Sesiunea ta s-a încheiat. Autentifică-te din nou.",
     "signInCodeExpired": "Codul tău de autentificare a expirat. Încearcă din nou.",
     "accessDenied": "Accesul a fost refuzat.",
-    "somethingWentWrong": "A apărut o eroare. Încearcă din nou.",
     "codeSent": "Cod trimis",
     "accountCreated": "Cont creat. Bine ai venit la Kilo.",
     "pleaseEnterEmail": "Introdu adresa ta de e-mail.",
@@ -589,7 +599,6 @@
     "eventChips": {
       "comment": "Comentariu",
       "requestChanges": "Cere modificări",
-      "approve": "Aprobă",
       "label": "Tipul revizuirii"
     },
     "overview": {
@@ -687,7 +696,6 @@
     "disabledMessage": "Activează notificările din setările dispozitivului.",
     "disableTitle": "Dezactivează notificările",
     "disableMessage": "Dezactivează notificările din setările dispozitivului.",
-    "openSettings": "Deschide setările",
     "registrationFailed": "Înregistrarea a eșuat. Verifică permisiunile pentru notificări.",
     "couldNotEnable": "Nu s-au putut activa notificările. Încearcă din nou.",
     "previewAlways": "Mereu",
@@ -763,15 +771,13 @@
       "cancelReply": "Anulează răspunsul",
       "openInstance": "Deschide instanța",
       "attachFile": "Atașează un fișier",
-      "cancelEdit": "Anulează editarea",
-      "sendMessage": "Trimite mesajul"
+      "cancelEdit": "Anulează editarea"
     },
     "conversationList": {
       "couldNotLoad": "Nu s-au putut încărca conversațiile.",
       "emptyTitle": "Încă nu există conversații",
       "emptyDescription": "Creează o conversație pentru a discuta cu instanța ta KiloClaw.",
       "create": "Creează o conversație",
-      "starting": "Se pornește…",
       "newConversation": "Conversație nouă",
       "openInstanceSettings": "Deschide setările instanței",
       "today": "Astăzi",
@@ -812,8 +818,7 @@
       "moreActions": "Mai multe acțiuni",
       "notDelivered": "Nelivrat",
       "edited": "(editat)",
-      "image": "Imagine",
-      "attachment": "Atașament"
+      "image": "Imagine"
     },
     "messageActions": {
       "copied": "Copiat",
@@ -874,7 +879,6 @@
       "managedByAdmin": "Facturarea este gestionată de administratorul organizației tale.",
       "couldNotLoad": "Nu s-au putut încărca informațiile de facturare.",
       "manageOnWeb": "Gestionează facturarea în browser",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Ultima perioadă a planului Commit se încheie pe {{date}}. Continuă cu planul Standard la {{price}} sau găzduirea se va încheia.",
       "freeTrial": "Perioadă de probă gratuită",
@@ -891,9 +895,9 @@
       "trialDaysRemaining": "Timp rămas din perioada de probă: {{remaining}}.",
       "trialEndingSoon": "Perioada de probă se încheie curând. Timp rămas: {{remaining}}.",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Noutăți",
@@ -943,7 +947,6 @@
       "approveDeviceTitle": "Aprobă dispozitivul",
       "approveMessage": "Permiți conectarea la instanța ta pentru {{label}} (cod: {{code}})?",
       "approveTitle": "Aprobă cererea de asociere",
-      "device": "Dispozitiv",
       "unknownDevice": "Dispozitiv necunoscut"
     },
     "execPolicy": {
@@ -958,7 +961,6 @@
       "title": "Cont Google",
       "couldNotLoad": "Nu s-a putut încărca starea contului Google.",
       "disconnected": "Contul Google a fost deconectat. Reimplementează instanța pentru a aplica modificarea.",
-      "redeploy": "Implementează din nou",
       "setupCommand": "Comandă de configurare",
       "setupCommandHelp": "Pentru a-ți conecta contul Google, rulează această comandă într-un terminal pe computerul tău, pe care trebuie să fie instalat Docker.",
       "failedToLoadCommand": "Nu s-a putut încărca comanda de configurare.",
@@ -971,7 +973,6 @@
       "disconnectTitle": "Deconectare de la Google"
     },
     "modelList": {
-      "searchPlaceholder": "Căutare modele",
       "noMatches": "Niciun model nu corespunde căutării tale",
       "noModelsDescription": "Modelele vor apărea aici când vor fi disponibile.",
       "noResultsFor": "Nu există rezultate pentru „{{query}}”."
@@ -1029,7 +1030,6 @@
       "start": "Pornește",
       "startMessage": "Ești sigur că vrei să pornești această instanță?",
       "startTitle": "Pornirea instanței",
-      "starting": "Se pornește…",
       "stop": "Oprește",
       "stopMessage": "Ești sigur că vrei să oprești această instanță?",
       "stopTitle": "Oprirea instanței",
@@ -1125,7 +1125,6 @@
         "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{displayMinutes}} minute).",
         "continueInBackground": "Continuă în fundal",
         "settingUp": "Se configurează {{name}}",
-        "finishingSetup": "Se finalizează configurarea",
         "connectingToAgent": "Se conectează la agent",
         "startingSandbox": "Se pornește mediul izolat",
         "backgroundHint": "De obicei durează mai puțin de un minut. Poți închide acest ecran — vom continua configurarea în fundal."
@@ -1165,24 +1164,18 @@
       "browseAllModelsA11y": "Explorează toate cele peste 500 de modele"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Abonează-te pe site",
       "trialExpiredBody": "Pentru a continua să folosești KiloClaw, mergi la kilo.ai/claw din browserul tău. Nu te poți abona în aplicație.",
-      "trialExpiredCta": "Deschide kilo.ai/claw",
       "subscriptionCanceledTitle": "Abonează-te pe site",
       "subscriptionCanceledBody": "Pentru a folosi KiloClaw, mergi la kilo.ai/claw din browserul tău. Nu te poți abona în aplicație.",
       "subscriptionCanceledCta": "Deschide kilo.ai/claw",
       "subscriptionPastDueTitle": "Actualizarea datelor de plată în browser",
       "subscriptionPastDueBody": "Am întâmpinat o problemă la ultima ta plată. Deschide kilo.ai/claw în browser pentru a actualiza datele de plată. Nu poți gestiona facturarea în aplicație.",
-      "subscriptionPastDueCta": "Deschide kilo.ai/claw",
       "quarantinedTitle": "Instanța necesită intervenție",
       "quarantinedBody": "Instanța ta KiloClaw este în carantină și nu poate fi folosită momentan. Echipa noastră trebuie să intervină pentru a o readuce în funcțiune.",
-      "quarantinedCta": "Continuă pe kilo.ai",
-      "multipleCurrentConflictTitle": "Contul trebuie verificat",
       "multipleCurrentConflictBody": "Am găsit mai multe abonamente active în contul tău, așa că am suspendat temporar accesul pentru a evita facturarea dublă.",
       "multipleCurrentConflictCta": "Continuă pe kilo.ai",
       "nonCanonicalEarlybirdTitle": "Plan vechi detectat",
       "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
-      "nonCanonicalEarlybirdCta": "Continuă pe kilo.ai",
       "iosTitle": "KiloClaw indisponibil pe iOS",
       "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
       "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai."
@@ -1198,16 +1191,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Canaluri",
       "devicePairingDescription": "Aprobă cererile de asociere pentru dispozitive",
-      "devicePairingLabel": "Asocierea dispozitivelor",
       "execPolicyDescription": "Setări de securitate",
-      "execPolicyLabel": "Politica de execuție",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Cont Google",
       "modelDescription": "Selectarea modelului AI",
       "secretsDescription": "Date de autentificare criptate",
-      "secretsLabel": "Secrete",
       "versionPinDescription": "Fixează o anumită versiune",
       "versionPinLabel": "Fixarea versiunii"
     },
@@ -1258,14 +1246,11 @@
       "finishSetup": "Finalizează configurarea",
       "manageAccess": "Gestionează accesul",
       "bitbucketNoRepositoriesDescription": "Niciun depozit nu este disponibil în acest spațiu de lucru Bitbucket.",
-      "bitbucketSetup": "Configurare Bitbucket",
-      "couldNotOpenGithubSettings": "Nu s-au putut deschide setările aplicației GitHub.",
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
       "noRepositoriesFound": "Niciun depozit găsit",
-      "repositoryAccess": "acces la depozit",
-      "selectedRepositories": "Depozite de cod selectate"
+      "repositoryAccess": "acces la depozit"
     },
     "style": {
       "title": "Stil de revizuire",
@@ -1289,7 +1274,6 @@
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
-      "completed": "Finalizat",
       "tokens": "Tokenuri",
       "tokensInOut": "{{input}} intrare / {{output}} ieșire",
       "council": "Consiliu",
@@ -1298,7 +1282,6 @@
       "gateNone": "Fără",
       "gateHidden": "Ascuns",
       "checkRun": "Rularea verificării",
-      "status": "Stare",
       "threshold": "Prag",
       "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
       "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
@@ -1314,8 +1297,7 @@
       "sessionError": "A apărut o eroare în sesiune: {{error}}.",
       "statusWithValue": "Stare: {{status}}",
       "toolName": "Instrument: {{name}}",
-      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare.",
-      "unknownError": "Eroare necunoscută"
+      "toolNameError": "Instrumentul {{name}} a întâmpinat o eroare."
     },
     "reviewMemory": {
       "title": "Memoria revizuirilor",
@@ -1348,7 +1330,6 @@
     "webhookSetupDescription": "Este posibil ca unele depozite să nu primească revizuiri automate.",
     "autoReviews": "Revizuiri automate",
     "selectRepository": "Selectează cel puțin un depozit pentru a activa revizuirile automate.",
-    "selectRepositories": "Selectează depozitele de cod",
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
@@ -1363,7 +1344,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "Depozitele personale sunt în continuare disponibile mai jos.",
-      "personalSubtitle": "Depozitele tale de cod",
       "viewOnly": "Doar vizualizare"
     },
     "reviewList": {
@@ -1394,9 +1374,7 @@
       "allAreas": "Toate domeniile",
       "customInstructions": "Instrucțiuni personalizate",
       "set": "Configurat",
-      "mergeGate": "Condiții de îmbinare",
       "nSelected": "{{displayCount}} selectate",
-      "reviewMemory": "Memoria revizuirilor",
       "proposedReviewMdGuidance": "Instrucțiuni propuse pentru REVIEW.md"
     },
     "decision": {
@@ -1461,7 +1439,6 @@
       "noFiltersDescription": "Revino și deschide din nou filtrele din lista de constatări.",
       "title": "Filtrarea constatărilor",
       "reset": "Resetează",
-      "status": "Stare",
       "severity": "Gravitate",
       "outcome": "Rezultat",
       "slaStatus": "Stare SLA",
@@ -1472,13 +1449,8 @@
       "severityHigh": "Ridicat",
       "severityMedium": "Mediu",
       "severityLow": "Scăzut",
-      "outcomeNotAnalyzed": "Neanalizată",
-      "outcomeAnalyzing": "Se analizează",
-      "outcomeFailed": "Analiză eșuată",
       "outcomeNotExploitable": "Neexploatabilă",
-      "outcomeSafeToDismiss": "Se poate ignora fără risc",
       "outcomeTriageComplete": "Triaj finalizat",
-      "outcomeDismissed": "Ignorată",
       "sortSeverityDesc": "Gravitate: de la ridicată la scăzută",
       "sortSeverityAsc": "Gravitate: de la scăzută la ridicată",
       "sortSlaDue": "Termen limită SLA",
@@ -1604,7 +1576,6 @@
     },
     "dismiss": {
       "title": "Ignoră problema",
-      "submit": "Ignoră problema",
       "reason": "Motiv",
       "reasonFixStarted": "remedierea a început deja",
       "reasonNoBandwidth": "nu sunt resurse disponibile",
@@ -1625,7 +1596,6 @@
     "findingDetails": {
       "supersededBy": "Înlocuită de o constatare actuală",
       "supersededByDescription": "Atinge pentru a deschide înregistrarea actuală și a vedea starea, analiza și remedierea.",
-      "dismissed": "Ignorată",
       "dismissedBecause": "Constatarea a fost respinsă {{reason}}.",
       "severityLabel": "Gravitate: {{severity}}",
       "package": "Pachet",
@@ -1636,7 +1606,6 @@
       "ghsa": "GHSA",
       "manifest": "Fișier manifest",
       "detected": "Detectată",
-      "updated": "Actualizat",
       "slaDeadline": "Termen limită SLA",
       "sourceRecord": "Înregistrarea sursă",
       "source": "Sursă",
@@ -1660,7 +1629,6 @@
       "repositoriesCount_one": "{{displayCount}} depozit selectat",
       "repositoriesCount": "{{displayCount}} de depozite de cod selectate",
       "repositoriesCount_other": "{{displayCount}} de depozite de cod selectate",
-      "selectRepositories": "Selectează depozitele de cod",
       "selectRepositoriesSubtitle": "Alege depozitele pe care le monitorizează agentul de securitate",
       "modelsAndAnalysis": "Modele și analiză",
       "analysisModeSubtitle": "Mod de analiză: {{mode}}",
@@ -1737,8 +1705,7 @@
       "tabRemediation": "Remediere",
       "notFound": "Problema nu a fost găsită",
       "notFoundDescription": "Este posibil ca această constatare să fi fost eliminată sau să nu mai ai acces la ea.",
-      "couldNotLoad": "Nu s-a putut încărca această problemă.",
-      "dismissA11y": "Ignoră problema"
+      "couldNotLoad": "Nu s-a putut încărca această problemă."
     },
     "findingList": {
       "couldNotLoad": "Nu s-au putut încărca constatările.",
@@ -1747,9 +1714,6 @@
       "noMatchesDescription": "Încearcă să modifici sau să elimini filtrele selectate.",
       "emptyTitle": "Nicio constatare deschisă",
       "emptyDescription": "Nicio constatare deschisă nu necesită atenție în acest moment."
-    },
-    "scopeList": {
-      "personalSubtitle": "Depozitele tale de cod"
     },
     "findingRow": {
       "nextRemediationPrOpen": "PR de remediere deschis",
@@ -1809,13 +1773,11 @@
     },
     "repositories": {
       "couldNotLoad": "Nu s-au putut încărca setările depozitelor.",
-      "couldNotOpenGithubSettings": "Nu s-au putut deschide setările aplicației GitHub.",
       "githubAppSettings": "setările aplicației GitHub",
       "manageAccess": "Gestionează accesul aplicației GitHub",
       "noRepositories": "Niciun depozit",
       "noRepositoriesDescription": "Acordă aplicației Kilo pentru GitHub acces la depozite.",
-      "selectAtLeastOne": "Selectează cel puțin un depozit.",
-      "selectedRepositories": "Depozite de cod selectate"
+      "selectAtLeastOne": "Selectează cel puțin un depozit."
     },
     "scopeEntry": {
       "connectDescription": "Instalează aplicația Kilo pentru GitHub ca să sincronizezi automat alertele Dependabot și să gestionezi constatările de securitate din depozitele tale.",
@@ -1850,10 +1812,8 @@
       "queuedTitle": "Analiză în coadă",
       "queuedDescription": "Analiza așteaptă eliberarea unui loc de procesare.",
       "analyzing": "Se analizează",
-      "analyzingTitle": "Se analizează",
       "analyzingDescription": "Se verifică dacă funcționalitatea afectată poate fi accesată din codul aplicației.",
       "failed": "Analiză eșuată",
-      "failedTitle": "Analiză eșuată",
       "failedDescription": "Agentul de securitate nu a putut finaliza analiza.",
       "extractionFailedDescription": "Raportul tehnic nu a putut fi transformat într-un rezultat structurat.",
       "exploitableDescription": "Funcționalitatea afectată poate fi accesată din codul aplicației.",
@@ -1863,18 +1823,14 @@
       "unknown": "Necesită revizuire",
       "unknownDescription": "Analiza nu a putut confirma dacă funcționalitatea vulnerabilă este accesibilă.",
       "safeToDismiss": "Se poate ignora fără risc",
-      "safeToDismissTitle": "Se poate ignora fără risc",
       "safeToDismissDescription": "Triajul a stabilit că această constatare poate fi respinsă în siguranță, fără analiza bazei de cod.",
       "manualReviewTitle": "Necesită revizuire manuală",
       "manualReviewDescription": "Triajul a marcat această constatare pentru revizuire manuală.",
       "analysisRequired": "Analiză necesară",
       "analysisRequiredTitle": "Este necesară analiza bazei de cod",
       "analysisRequiredDescription": "Triajul recomandă analizarea depozitului înainte de a decide ce măsuri să iei.",
-      "completed": "Analizată",
-      "completedTitle": "Analizată",
       "completedDescription": "Analiza s-a finalizat, dar nu s-a înregistrat un rezultat specific.",
       "notAnalyzed": "Neanalizată",
-      "notAnalyzedTitle": "Neanalizată",
       "notAnalyzedDescription": "Analiza bazei de cod nu a fost încă efectuată pentru această constatare."
     },
     "deadline": {
@@ -2013,7 +1969,6 @@
       "didNotCompleteTitle": "Instalarea nu s-a finalizat",
       "didNotCompleteMessage": "Instalarea aplicației pentru GitHub nu a fost finalizată. Încearcă din nou din aplicație."
     },
-    "sessionExited": "Sesiunea s-a încheiat.",
     "remoteSpawnRetryable": "Nu s-a putut stabili conexiunea cu instanța — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică sistemul sau actualizează CLI-ul.",
     "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
@@ -2054,7 +2009,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Nu s-a putut crea sesiunea de la distanță.",
-      "exited": "Sesiunea s-a încheiat.",
       "failedToExit": "Nu s-a putut închide sesiunea.",
       "exitTitle": "Închizi sesiunea?",
       "exitMessage": "Sesiunea în curs se va opri, dar istoricul ei se va păstra.",
@@ -2088,7 +2042,6 @@
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
       "promptPlaceholder": "La ce vrei să lucrezi?",
-      "addAttachment": "Adaugă un atașament",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",
       "prefillRepoUnavailable": "{{repo}} nu mai este disponibil. Alege un depozit mai jos.",
@@ -2123,15 +2076,10 @@
       "updatedFileCount_other": "Au fost actualizate {{displayCount}} de fișiere.",
       "updatedFileCount_few": "S-au actualizat {{displayCount}} fișiere."
     },
-    "toolPatch": {
-      "operationUpdated": "Actualizat"
-    },
     "toolCard": {
       "accessibility": "Instrumentul {{label}}, {{status}}",
       "accessibilityLabel": "Instrumentul {{name}}, {{status}}",
-      "fileEmpty": "Acest fișier este gol.",
       "noTasks": "Nu există sarcini.",
-      "truncated": "Trunchiat",
       "toolRead": "citire",
       "toolEdit": "Editează",
       "toolWrite": "scriere",
@@ -2200,7 +2148,6 @@
       "noMatches": "Niciun rezultat",
       "noRepositories": "Nu este disponibil niciun depozit",
       "noRepositoriesDescription": "Nu este conectat niciun depozit la contul tău.",
-      "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "loading": "Se încarcă...",
       "accessibility": "Depozit: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2213,7 +2160,6 @@
       "reportAiResponse": "Raportează răspunsul AI",
       "reportAiResponseConfirm": "Raportezi acest răspuns pentru verificare?",
       "report": "Raportează",
-      "role": "Rol",
       "roleUser": "Utilizator",
       "roleAssistant": "Asistent",
       "sent": "Trimis",
@@ -2403,7 +2349,6 @@
     },
     "modelPicker": {
       "title": "Model",
-      "searchPlaceholder": "Căutare modele",
       "favorites": "Favorite",
       "noModelsDescription": "Nu este disponibil niciun model."
     },
@@ -2431,7 +2376,6 @@
       "uploading": "Se încarcă…",
       "uploaded": "Încărcat",
       "uploadFailedRetry": "Încărcarea a eșuat. Atinge pentru a reîncerca.",
-      "uploadFailedTerminal": "Acest fișier nu poate fi încărcat.",
       "moveLeft": "Mută {{filename}} la stânga",
       "moveRight": "Mută {{filename}} la dreapta"
     },
@@ -2443,7 +2387,6 @@
       "camera": "Cameră",
       "photoLibrary": "Galerie foto",
       "files": "Fișiere",
-      "cameraAccessMessage": "Permite accesul la cameră în Setări pentru a face o fotografie.",
       "couldNotOpenPhotoPicker": "Selectorul de fotografii nu a putut fi deschis. Repornește Kilo și încearcă din nou.",
       "maxFilesAllowed": "Poți adăuga cel mult {{displayCount}} fișiere.",
       "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})"
@@ -2456,7 +2399,6 @@
       "waitForUploads": "Așteaptă finalizarea încărcării atașamentelor.",
       "pasteFromClipboard": "Lipește din clipboard",
       "stopGenerating": "Oprește generarea",
-      "sendMessage": "Trimite mesajul",
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
@@ -2510,7 +2452,6 @@
     "contextUsage": {
       "windowUnavailable": "Dimensiunea ferestrei de context nu este disponibilă",
       "tapToViewDetails": "Atinge pentru a vedea detaliile contextului.",
-      "costPrefix": "cost de {{cost}}",
       "costSuffix": ", costul {{cost}}",
       "tokensWindowUnavailable": "Context: {{used}} tokenuri, dimensiunea ferestrei nu este disponibilă",
       "tokensUsage": "Context: {{used}} din {{window}} tokenuri, {{percentage}} utilizat",
@@ -2624,7 +2565,6 @@
     "title": "Pagina nu a fost găsită"
   },
   "monoScrollBlock": {
-    "truncated": "Trunchiat",
     "wrap": "Încadrare",
     "scroll": "Derulare"
   },
@@ -2819,7 +2759,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Capturi de ecran mascate când apare o eroare și înregistrări mascate dintr-un eșantion mic de sesiuni.",
     "errorScreenshotsWhy": "Pentru a vedea ce afișa aplicația când a apărut o problemă.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Sursa instalării și identificatorii campaniilor.",
     "installAttributionWhy": "Pentru a înțelege ce canale aduc utilizatori noi.",
     "installAttributionWho": "AppsFlyer.",
@@ -2874,7 +2813,6 @@
       "emailError": "Introdu o adresă de e-mail validă.",
       "emailPlaceholder": "nume@companie.com",
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
-      "roleLabel": "Rol",
       "roleMember": "Rolul atribuit este cel de membru.",
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru"
@@ -2981,7 +2919,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Există deja un cont cu această adresă de e-mail, dar cu o altă metodă de autentificare. Încearcă altă metodă sau folosește „$t(login.moreSignInOptions)”.",
     "differentOauth": "Există deja un cont cu această adresă de e-mail, dar cu o altă metodă de autentificare. Încearcă altă metodă sau folosește „$t(login.moreSignInOptions)”.",
     "ssoError": "Organizația ta impune autentificarea unică (SSO). Folosește „$t(login.moreSignInOptions)”.",
     "blocked": "Acest cont a fost blocat. Contactează echipa de asistență.",
@@ -2999,7 +2936,6 @@
     "startSignInFailed": "Nu s-a putut începe autentificarea. Încearcă din nou.",
     "couldNotOpenBrowser": "Nu s-a putut deschide browserul. Încearcă din nou.",
     "signInTimedOut": "Timpul alocat autentificării a expirat. Încearcă din nou.",
-    "signInFailed": "Autentificarea a eșuat. Încearcă din nou.",
     "networkError": "Eroare de rețea. Încearcă din nou.",
     "accessDeniedByUser": "Utilizatorul a refuzat accesul.",
     "codeExpired": "Codul a expirat.",
@@ -3032,7 +2968,6 @@
       "title": "Începe o conversație",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
     },
-    "working": "În lucru",
     "historyRetry": "Nu s-a putut încărca istoricul conversației.",
     "sendError": "Nu s-a putut trimite mesajul. Încearcă din nou."
   },
@@ -3044,7 +2979,6 @@
     "signedOut": "Autentifică-te pentru a vedea agenții",
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
-    "running": "În lucru",
     "needsInput": "așteaptă un răspuns",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."

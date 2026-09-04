@@ -36,7 +36,7 @@ export function ToolDiffPreview({ model, partId }: Readonly<ToolDiffPreviewProps
           accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
-          {t('monoScrollBlock.truncated')}
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

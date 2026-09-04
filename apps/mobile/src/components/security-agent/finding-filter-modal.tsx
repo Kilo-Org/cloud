@@ -34,16 +34,16 @@ const SEVERITY_OPTIONS = [
 
 const OUTCOME_OPTIONS = [
   { value: 'all', labelKey: 'common.all' },
-  { value: 'not_analyzed', labelKey: 'securityAgent.filter.outcomeNotAnalyzed' },
-  { value: 'analyzing', labelKey: 'securityAgent.filter.outcomeAnalyzing' },
-  { value: 'failed', labelKey: 'securityAgent.filter.outcomeFailed' },
+  { value: 'not_analyzed', labelKey: 'securityAgent.analysisState.notAnalyzed' },
+  { value: 'analyzing', labelKey: 'securityAgent.analysisState.analyzing' },
+  { value: 'failed', labelKey: 'securityAgent.analysisState.failed' },
   { value: 'exploitable', labelKey: 'securityAgent.analysis.exploitable' },
   { value: 'not_exploitable', labelKey: 'securityAgent.filter.outcomeNotExploitable' },
-  { value: 'safe_to_dismiss', labelKey: 'securityAgent.filter.outcomeSafeToDismiss' },
+  { value: 'safe_to_dismiss', labelKey: 'securityAgent.analysisState.safeToDismiss' },
   { value: 'needs_review', labelKey: 'securityAgent.analysisState.unknown' },
   { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
-  { value: 'dismissed', labelKey: 'securityAgent.filter.outcomeDismissed' },
+  { value: 'dismissed', labelKey: 'securityAgent.deadline.dismissed' },
 ] as const satisfies readonly { value: SecurityOutcomeFilter; labelKey: string }[];
 
 const SORT_OPTIONS = [
@@ -164,7 +164,7 @@ export function FindingFilterModal({
           }}
         />
         <FilterSection
-          title={t('securityAgent.filter.status')}
+          title={t('common.status')}
           options={statusOptions}
           selected={filters.status}
           onSelect={status => {

@@ -138,7 +138,7 @@ export default function ReposRoute() {
             size="sm"
             onPress={() => {
               void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                label: t('codeReviewer.repos.bitbucketSetup'),
+                label: t('codeReviewer.bitbucket.setup'),
               });
             }}
           >
@@ -171,7 +171,7 @@ export default function ReposRoute() {
                         { label: t('codeReviewer.repos.repositoryAccess') }
                       );
                     } catch {
-                      toast.error(t('codeReviewer.repos.couldNotOpenGithubSettings'));
+                      toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
                     }
                   } else if (platform === 'gitlab') {
                     await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
@@ -204,7 +204,7 @@ export default function ReposRoute() {
                   label={
                     option === 'all'
                       ? t('common.allRepositories')
-                      : t('codeReviewer.repos.selectedRepositories')
+                      : t('common.selectedRepositories')
                   }
                   selected={mode === option}
                   disabled={configDisabled}

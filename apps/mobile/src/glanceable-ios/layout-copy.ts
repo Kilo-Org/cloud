@@ -54,7 +54,7 @@ export function glanceableLayoutCopy() {
     signed_out: i18n.t(GLANCEABLE_STATUS_COPY_KEY.signed_out),
     privacy: i18n.t(GLANCEABLE_STATUS_COPY_KEY.privacy),
     needsInput: i18n.t('glanceable.needsInput'),
-    running: i18n.t('glanceable.running'),
+    running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
     locale: i18n.language.replace('-', '_'),

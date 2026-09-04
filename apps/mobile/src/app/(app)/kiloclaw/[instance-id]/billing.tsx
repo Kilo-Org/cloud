@@ -27,7 +27,7 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const SUBSCRIPTION_PLAN_KEYS = {
-  commit: 'kiloclaw.billing.planName.commit',
+  commit: 'kiloclaw.billing.commit',
   standard: 'kiloclaw.billing.planName.standard',
 } satisfies Record<string, string>;
 
@@ -107,7 +107,7 @@ function FinalCommitTermDetails({
 
   return (
     <View>
-      <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commitPlan')} />
+      <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commit')} />
       <View className="h-px bg-border" />
       <DetailRow label={t('kiloclaw.billing.finalTermEnds')} value={finalDate} />
       <View className="h-px bg-border" />

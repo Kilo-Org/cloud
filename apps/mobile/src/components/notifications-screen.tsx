@@ -484,7 +484,7 @@ export function NotificationsScreen() {
     if (currentStatus === 'denied') {
       Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
       ]);
       return;
     }
@@ -541,7 +541,7 @@ export function NotificationsScreen() {
   const handleDisableNotifications = useCallback(() => {
     Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+      { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
   }, [t]);
 

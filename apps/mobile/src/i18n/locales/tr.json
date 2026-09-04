@@ -120,10 +120,21 @@
     "reply": "Yanıtla",
     "reportSubmittedReceipt": "Bildirim gönderildi. Kayıt numarası: {{receiptId}}",
     "retryLoadingMore": "Daha fazlasını yüklemeyi tekrar dene",
-    "reviewPr": "PR'yi incele"
+    "reviewPr": "PR'yi incele",
+    "role": "Rol",
+    "searchModels": "Model adı...",
+    "selectedRepositories": "Seçilen depolar",
+    "selectRepositories": "Depoları seç",
+    "sendMessage": "Mesaj gönder",
+    "sessionExited": "Oturumdan çıkıldı",
+    "starting": "Başlatılıyor…",
+    "status": "Durum",
+    "truncated": "Kısaltıldı",
+    "updated": "Güncellendi",
+    "working": "Çalışıyor",
+    "yourOwnRepositories": "Kendi depoların"
   },
   "language": {
-    "title": "Dil",
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
     "couldNotRestart": "Yeniden başlatılamadı",
     "languageSaved": "Dil tercihin kaydedildi.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Oturumun sona erdi. Lütfen tekrar oturum aç.",
     "signInCodeExpired": "Oturum açma kodunun süresi doldu. Lütfen tekrar dene.",
     "accessDenied": "Erişim reddedildi.",
-    "somethingWentWrong": "Bir sorun oluştu. Lütfen tekrar dene.",
     "codeSent": "Kod gönderildi",
     "signInCodeField": "Oturum açma kodu",
     "accountCreated": "Hesap oluşturuldu. Kilo'ya hoş geldin.",
@@ -254,7 +264,6 @@
     "disabledMessage": "Bildirimleri etkinleştirmek için cihaz ayarlarından bildirimleri aç.",
     "disableTitle": "Bildirimleri devre dışı bırak",
     "disableMessage": "Bildirimleri devre dışı bırakmak için cihaz ayarlarından bildirimleri kapat.",
-    "openSettings": "Ayarları aç",
     "registrationFailed": "Cihaz kaydedilemedi. Bildirim izinlerini kontrol et.",
     "couldNotEnable": "Bildirimler etkinleştirilemedi. Tekrar dene.",
     "previewAlways": "Her zaman",
@@ -330,15 +339,13 @@
       "cancelReply": "Yanıtı iptal et",
       "openInstance": "Sunucuyu aç",
       "attachFile": "Dosya ekle",
-      "cancelEdit": "Düzenlemeyi iptal et",
-      "sendMessage": "Mesaj gönder"
+      "cancelEdit": "Düzenlemeyi iptal et"
     },
     "conversationList": {
       "couldNotLoad": "Sohbetler yüklenemedi.",
       "emptyTitle": "Henüz sohbet yok",
       "emptyDescription": "KiloClaw sunucunla konuşmaya başlamak için bir sohbet oluştur.",
       "create": "Sohbet oluştur",
-      "starting": "Başlatılıyor…",
       "newConversation": "Yeni sohbet",
       "openInstanceSettings": "Sunucu ayarlarını aç",
       "today": "Bugün",
@@ -379,8 +386,7 @@
       "moreActions": "Diğer işlemler",
       "notDelivered": "İletilmedi",
       "edited": "(düzenlendi)",
-      "image": "Görsel",
-      "attachment": "Ek"
+      "image": "Görsel"
     },
     "messageActions": {
       "copied": "Kopyalandı",
@@ -440,7 +446,6 @@
       "managedByAdmin": "Faturalandırmayı kuruluş yöneticin yönetir.",
       "couldNotLoad": "Faturalandırma bilgileri yüklenemedi.",
       "manageOnWeb": "Faturalandırmayı web üzerinden yönet",
-      "commitPlan": "Değişiklik kaydı",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Son Commit dönemin {{date}} tarihinde sona eriyor. {{price}} karşılığında Standard planıyla devam etmezsen barındırma hizmetin sona erecek.",
       "freeTrial": "Ücretsiz deneme",
@@ -457,9 +462,9 @@
       "trialDaysRemaining": "Deneme süresinin bitmesine {{remaining}} kaldı.",
       "trialEndingSoon": "Deneme süresi yakında bitiyor. Kalan süre: {{remaining}}.",
       "planName": {
-        "commit": "Değişiklik kaydı",
         "standard": "Standard"
-      }
+      },
+      "commit": "Değişiklik kaydı"
     },
     "changelog": {
       "title": "Yenilikler",
@@ -509,7 +514,6 @@
       "approveDeviceTitle": "Cihazı onayla",
       "approveMessage": "{{label}} (kod: {{code}}) için örneğine bağlanma izni verilsin mi?",
       "approveTitle": "Eşleştirme isteğini onayla",
-      "device": "Cihaz",
       "unknownDevice": "Bilinmeyen cihaz"
     },
     "execPolicy": {
@@ -524,7 +528,6 @@
       "title": "Google hesabı",
       "couldNotLoad": "Google hesabının durumu yüklenemedi.",
       "disconnected": "Google hesabının bağlantısı kesildi. Değişikliği uygulamak için örneğini yeniden dağıt.",
-      "redeploy": "Yeniden dağıt",
       "setupCommand": "Kurulum komutu",
       "setupCommandHelp": "Google hesabını bağlamak için bu komutu Docker yüklü bilgisayarında bir terminal açarak çalıştır.",
       "failedToLoadCommand": "Kurulum komutu yüklenemedi.",
@@ -537,7 +540,6 @@
       "disconnectTitle": "Google bağlantısını kes"
     },
     "modelList": {
-      "searchPlaceholder": "Model adı...",
       "noMatches": "Aramanla eşleşen model yok",
       "noModelsDescription": "Modeller kullanılabilir olduğunda burada görünecek.",
       "noResultsFor": "\"{{query}}\" için sonuç bulunamadı."
@@ -592,22 +594,16 @@
       "iosTitle": "KiloClaw iOS'ta kullanılamıyor",
       "multipleCurrentConflictBody": "Hesabında birden fazla etkin abonelik bulduk. Senden iki kez ücret almamak için işlemleri duraklattık.",
       "multipleCurrentConflictCta": "kilo.ai sitesinde devam et",
-      "multipleCurrentConflictTitle": "Hesabın incelenmesi gerekiyor",
       "nonCanonicalEarlybirdBody": "Erken erişim planının mobilde kullanılabilmesi için önce elle incelenmesi gerekiyor.",
-      "nonCanonicalEarlybirdCta": "kilo.ai sitesinde devam et",
       "nonCanonicalEarlybirdTitle": "Eski plan tespit edildi",
       "quarantinedBody": "KiloClaw örneğin karantinada ve şu anda kullanılamıyor. Tekrar çalışır hâle gelmesi için ekibimizin müdahalesi gerekiyor.",
-      "quarantinedCta": "kilo.ai sitesinde devam et",
       "quarantinedTitle": "Örnekteki sorunların giderilmesi gerekiyor",
       "subscriptionCanceledBody": "KiloClaw'ı kullanmak için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
       "subscriptionCanceledCta": "kilo.ai/claw'ı aç",
       "subscriptionCanceledTitle": "Web sitesinden abone ol",
       "subscriptionPastDueBody": "Son ödemende sorun yaşadık. Ödeme bilgilerini güncellemek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden faturalandırmayı yönetemezsin.",
-      "subscriptionPastDueCta": "kilo.ai/claw'ı aç",
       "subscriptionPastDueTitle": "Ödeme bilgilerini web üzerinden güncelle",
-      "trialExpiredBody": "KiloClaw'ı kullanmaya devam etmek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
-      "trialExpiredCta": "kilo.ai/claw'ı aç",
-      "trialExpiredTitle": "Web sitesinden abone ol"
+      "trialExpiredBody": "KiloClaw'ı kullanmaya devam etmek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın."
     },
     "controls": {
       "redeploying": "Yeniden dağıtılıyor…",
@@ -618,7 +614,6 @@
       "start": "Başlat",
       "startMessage": "Bu örneği başlatmak istediğinden emin misin?",
       "startTitle": "Örneği başlat",
-      "starting": "Başlatılıyor…",
       "stop": "Durdur",
       "stopMessage": "Bu örneği durdurmak istediğinden emin misin?",
       "stopTitle": "Örneği durdur",
@@ -723,7 +718,6 @@
         "backgroundHint": "Genellikle bir dakikadan kısa sürer. Bu ekranı kapatabilirsin. Arka planda çalışmaya devam edeceğiz.",
         "connectingToAgent": "Ajana bağlanılıyor",
         "continueInBackground": "Arka planda devam et",
-        "finishingSetup": "Kurulum tamamlanıyor",
         "queryErrorBody": "{{name}} için kurulum durumunu kontrol ederken bağlantımız kesildi. Kurulum hâlâ devam ediyor olabilir. Tekrar dene veya biraz sonra kontrol et.",
         "queryErrorTitle": "Kurulum durumu kontrol edilemedi",
         "settingUp": "{{name}} kuruluyor",
@@ -763,16 +757,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanallar",
       "devicePairingDescription": "Cihaz isteklerini onayla",
-      "devicePairingLabel": "Cihaz eşleştirme",
       "execPolicyDescription": "Güvenlik ayarları",
-      "execPolicyLabel": "Yürütme ilkesi",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google hesabı",
       "modelDescription": "Yapay zekâ modeli seçimi",
       "secretsDescription": "Şifrelenmiş kimlik bilgileri",
-      "secretsLabel": "Gizli bilgiler",
       "versionPinDescription": "Belirli bir sürüme sabitle",
       "versionPinLabel": "Sürüm sabitleme"
     },
@@ -823,14 +812,11 @@
       "finishSetup": "Kurulumu tamamla",
       "manageAccess": "Erişimi yönet",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket çalışma alanında kullanılabilir depo yok.",
-      "bitbucketSetup": "Bitbucket kurulumu",
-      "couldNotOpenGithubSettings": "GitHub uygulaması ayarları açılamadı.",
       "gitlabNoRepositoriesDescription": "GitLab'da daha fazla gruba veya projeye erişim izni vermen gerekebilir.",
       "installGithubApp": "GitHub uygulamasını depolara yükle",
       "installGithubAppDescription": "Kilo GitHub uygulamasına, incelenmesini istediğin depolara erişim izni ver.",
       "noRepositoriesFound": "Depo bulunamadı",
-      "repositoryAccess": "depo erişimi",
-      "selectedRepositories": "Seçilen depolar"
+      "repositoryAccess": "depo erişimi"
     },
     "style": {
       "title": "İnceleme stili",
@@ -886,7 +872,6 @@
       "cancelReview": "İncelemeyi iptal et",
       "cancelTitle": "İnceleme iptal edilsin mi?",
       "checkRun": "Kontrol çalıştırması",
-      "completed": "Tamamlandı",
       "couldNotGetLatest": "Güncel bilgiler alınamadı.",
       "couldNotLoad": "İnceleme yüklenemedi.",
       "council": "Konsey",
@@ -901,7 +886,6 @@
       "retryTitle": "İnceleme tekrar denensin mi?",
       "showMore": "Daha fazla göster",
       "started": "Başlangıç zamanı",
-      "status": "Durum",
       "threshold": "Eşik",
       "title": "İnceleme",
       "tokens": "Belirteç",
@@ -920,8 +904,7 @@
       "sessionError": "Oturum hatası: {{error}}.",
       "statusWithValue": "Durum: {{status}}",
       "toolName": "Araç: {{name}}",
-      "toolNameError": "{{name}} aracında hata oluştu.",
-      "unknownError": "Bilinmeyen bir hata oluştu."
+      "toolNameError": "{{name}} aracında hata oluştu."
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
@@ -946,10 +929,8 @@
     },
     "scopeList": {
       "personalStillAvailable": "Kişisel depolar aşağıda hâlâ kullanılabilir.",
-      "personalSubtitle": "Kendi depoların",
       "viewOnly": "Yalnızca görüntüleme"
     },
-    "selectRepositories": "Depoları seç",
     "selectRepository": "Otomatik incelemeleri etkinleştirmek için en az bir depo seç.",
     "webhookSetup": "Webhook kurulumu tamamlanmadı.",
     "webhookSetupDescription": "Bazı depolarda otomatik inceleme yapılamayabilir.",
@@ -963,10 +944,8 @@
       "allAreas": "Tüm alanlar",
       "customInstructions": "Özel talimatlar",
       "focusAreas": "Odak alanları",
-      "mergeGate": "Birleştirme denetimi",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",
-      "reviewMemory": "İnceleme belleği",
       "reviewStyle": "İnceleme stili",
       "set": "Belirlendi"
     },
@@ -1027,12 +1006,7 @@
       "title": "Bulgu filtreleri",
       "fixed": "Düzeltildi",
       "outcome": "Sonuç",
-      "outcomeAnalyzing": "Analiz ediliyor",
-      "outcomeDismissed": "Yok sayıldı",
-      "outcomeFailed": "Analiz başarısız oldu",
-      "outcomeNotAnalyzed": "Analiz edilmedi",
       "outcomeNotExploitable": "İstismar edilemez",
-      "outcomeSafeToDismiss": "Yok sayılabilir",
       "outcomeTriageComplete": "Ön değerlendirme tamamlandı",
       "overdueOnly": "Yalnızca gecikenler",
       "reset": "Sıfırla",
@@ -1045,7 +1019,6 @@
       "sortSeverityAsc": "Önem derecesi: düşükten yükseğe",
       "sortSeverityDesc": "Önem derecesi: yüksekten düşüğe",
       "sortSlaDue": "SLA son tarihi",
-      "status": "Durum",
       "statusIgnored": "Yok sayıldı",
       "statusOpen": "Açık"
     },
@@ -1211,12 +1184,10 @@
       "reasonNoBandwidth": "Yeterli kaynak yok",
       "reasonNotUsed": "Açık içeren kod kullanılmıyor",
       "reasonTolerableRisk": "Risk kabul edilebilir",
-      "submit": "Bulguyu yok say",
       "title": "Bulguyu yok say"
     },
     "findingDetail": {
       "couldNotLoad": "Bu bulgu yüklenemedi.",
-      "dismissA11y": "Bulguyu yok say",
       "notFound": "Bulgu bulunamadı",
       "notFoundDescription": "Bu bulgu kaldırılmış olabilir veya artık bu bulguya erişimin yok.",
       "tabAnalysis": "Analiz",
@@ -1226,7 +1197,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Tespit tarihi",
-      "dismissed": "Yok sayıldı",
       "dismissedBecause": "Şu nedenle yok sayıldı: {{reason}}.",
       "ghsa": "GHSA",
       "manifest": "Bildirim dosyası",
@@ -1240,7 +1210,6 @@
       "sourceRecord": "Kaynak kaydı",
       "supersededBy": "Yerini güncel bir bulgu aldı",
       "supersededByDescription": "Durum, analiz ve düzeltme bilgileri için güncel kayda dokun.",
-      "updated": "Güncellendi",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
       "vulnerableVersions": "Güvenlik açığı içeren sürümler",
       "statusSuperseded": "Yerini yenisi aldı",
@@ -1321,13 +1290,11 @@
     },
     "repositories": {
       "couldNotLoad": "Depo ayarları yüklenemedi.",
-      "couldNotOpenGithubSettings": "GitHub uygulaması ayarları açılamadı.",
       "githubAppSettings": "GitHub uygulaması ayarları",
       "manageAccess": "GitHub uygulamasının erişimini yönet",
       "noRepositories": "Depo yok",
       "noRepositoriesDescription": "Kilo GitHub uygulamasına depolara erişim izni ver.",
-      "selectAtLeastOne": "En az bir depo seç.",
-      "selectedRepositories": "Seçilen depolar"
+      "selectAtLeastOne": "En az bir depo seç."
     },
     "scopeEntry": {
       "connectDescription": "Dependabot uyarılarını otomatik olarak eşitlemek ve depolarındaki güvenlik bulgularını yönetmek için Kilo GitHub uygulamasını yükle.",
@@ -1339,9 +1306,6 @@
       "reauthorizeFailed": "Yeniden yetkilendirme başlatılamadı. Lütfen tekrar dene.",
       "reauthorizeTitle": "Ek izinler gerekiyor",
       "setupFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar dene."
-    },
-    "scopeList": {
-      "personalSubtitle": "Kendi depoların"
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Analiz modu: {{mode}}",
@@ -1359,7 +1323,6 @@
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
       "repositoriesCount_one": "{{displayCount}} depo seçili",
-      "selectRepositories": "Depoları seç",
       "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç",
       "slaPolicy": "SLA ilkesi",
       "title": "Ayarlar"
@@ -1413,10 +1376,8 @@
       "queuedTitle": "Analiz kuyruğa alındı",
       "queuedDescription": "Analiz için kapasite açılması bekleniyor.",
       "analyzing": "Analiz ediliyor",
-      "analyzingTitle": "Analiz ediliyor",
       "analyzingDescription": "Uygulama kodunun etkilenen özelliğe ulaşıp ulaşamadığı kontrol ediliyor.",
       "failed": "Analiz başarısız oldu",
-      "failedTitle": "Analiz başarısız oldu",
       "failedDescription": "Güvenlik ajanı analizi tamamlayamadı.",
       "extractionFailedDescription": "Teknik rapor yapılandırılmış bir sonuca dönüştürülemedi.",
       "exploitableDescription": "Uygulama kodu etkilenen özelliğe ulaşabiliyor.",
@@ -1426,18 +1387,14 @@
       "unknown": "İnceleme gerekiyor",
       "unknownDescription": "Analiz, güvenlik açığı olan özelliğin ulaşılabilir olup olmadığını doğrulayamadı.",
       "safeToDismiss": "Yok sayılabilir",
-      "safeToDismissTitle": "Yok sayılabilir",
       "safeToDismissDescription": "Ön değerlendirmede, bu bulgunun kod tabanı analizi yapılmadan güvenle yok sayılabileceği belirlendi.",
       "manualReviewTitle": "Manuel inceleme gerekiyor",
       "manualReviewDescription": "Ön değerlendirmede bu bulgu, bir kişinin incelemesi için işaretlendi.",
       "analysisRequired": "Analiz gerekli",
       "analysisRequiredTitle": "Kod tabanı analizi gerekli",
       "analysisRequiredDescription": "Ön değerlendirme, yapılacak işleme karar vermeden önce deponun analiz edilmesini öneriyor.",
-      "completed": "Analiz edildi",
-      "completedTitle": "Analiz edildi",
       "completedDescription": "Analiz, belirli bir sonuç kaydedilmeden tamamlandı.",
       "notAnalyzed": "Analiz edilmedi",
-      "notAnalyzedTitle": "Analiz edilmedi",
       "notAnalyzedDescription": "Bu bulgu için kod tabanı analizi henüz çalıştırılmadı."
     },
     "deadline": {
@@ -1572,7 +1529,6 @@
       "didNotCompleteTitle": "Kurulum tamamlanmadı",
       "didNotCompleteMessage": "GitHub uygulamasının kurulumu tamamlanmadı. Uygulamadan tekrar dene."
     },
-    "sessionExited": "Oturumdan çıkıldı",
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı. Makineyi kontrol et veya CLI'yi güncelle.",
     "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç.",
@@ -1612,7 +1568,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı.",
-      "exited": "Oturumdan çıkıldı",
       "failedToExit": "Oturumdan çıkılamadı.",
       "exitTitle": "Oturumdan çıkılsın mı?",
       "exitMessage": "Çalışan oturum durur, ancak oturum geçmişi korunur.",
@@ -1646,7 +1601,6 @@
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
-      "addAttachment": "Ek ekle",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",
       "prefillRepoUnavailable": "{{repo}} artık kullanılamıyor. Aşağıdan bir depo seç.",
@@ -1680,15 +1634,10 @@
       "updatedFileCount": "{{displayCount}} dosya güncellendi.",
       "updatedFileCount_other": "{{displayCount}} dosya güncellendi."
     },
-    "toolPatch": {
-      "operationUpdated": "Güncellendi"
-    },
     "toolCard": {
       "accessibility": "{{label}} aracı, {{status}}",
       "accessibilityLabel": "{{name}} aracı, {{status}}",
-      "fileEmpty": "Bu dosya boş.",
       "noTasks": "Görev yok.",
-      "truncated": "Kısaltıldı",
       "toolRead": "oku",
       "toolEdit": "Düzenle",
       "toolWrite": "yaz",
@@ -1757,7 +1706,6 @@
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
       "noRepositoriesDescription": "Hesabına bağlı depo yok.",
-      "tryDifferentSearch": "Farklı bir arama terimi dene.",
       "loading": "Yükleniyor...",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -1770,7 +1718,6 @@
       "reportAiResponse": "AI yanıtını bildir",
       "reportAiResponseConfirm": "Bu yanıt inceleme için bildirilsin mi?",
       "report": "Bildir",
-      "role": "Rol",
       "roleUser": "Kullanıcı",
       "roleAssistant": "Asistan",
       "sent": "Gönderildi",
@@ -1957,7 +1904,6 @@
     },
     "modelPicker": {
       "title": "Model seçimi",
-      "searchPlaceholder": "Model adı...",
       "noModelsDescription": "Seçilebilecek model yok.",
       "favorites": "Favoriler"
     },
@@ -1985,7 +1931,6 @@
       "uploading": "Yükleniyor…",
       "uploaded": "Yüklendi",
       "uploadFailedRetry": "Yükleme başarısız oldu. Tekrar denemek için dokun.",
-      "uploadFailedTerminal": "Bu dosya yüklenemiyor.",
       "moveLeft": "{{filename}} dosyasını sola taşı",
       "moveRight": "{{filename}} dosyasını sağa taşı"
     },
@@ -1997,7 +1942,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotoğraf arşivi",
       "files": "Dosya",
-      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'dan kamera erişimine izin ver.",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar dene.",
       "maxFilesAllowed": "En fazla {{displayCount}} dosya ekleyebilirsin.",
       "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})"
@@ -2010,7 +1954,6 @@
       "waitForUploads": "Eklerin yüklenmesini bekle.",
       "pasteFromClipboard": "Panodan yapıştır",
       "stopGenerating": "Oluşturmayı durdur",
-      "sendMessage": "Mesaj gönder",
       "selectModelBeforeSending": "Göndermeden önce bir model seç.",
       "preparingPlaceholder": "Ortam hazırlanıyor...",
       "finalizingPlaceholder": "Tamamlanıyor...",
@@ -2064,7 +2007,6 @@
     "contextUsage": {
       "windowUnavailable": "Bağlam penceresinin boyutu bilinmiyor",
       "tapToViewDetails": "Bağlam ayrıntılarını görüntülemek için dokun.",
-      "costPrefix": "maliyet: {{cost}}",
       "costSuffix": ", maliyet {{cost}}",
       "tokensWindowUnavailable": "Bağlamda {{used}} token var, pencere boyutu bilinmiyor",
       "tokensUsage": "Bağlam: {{used}} / {{window}} token, {{percentage}} kullanıldı",
@@ -2177,7 +2119,6 @@
     "title": "Sayfa bulunamadı"
   },
   "monoScrollBlock": {
-    "truncated": "Kısaltıldı",
     "wrap": "Satır kaydır",
     "scroll": "Kaydır"
   },
@@ -2372,7 +2313,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Hata anında alınan maskelenmiş ekran görüntüleri ve az sayıda oturumdan alınan maskelenmiş kayıtlar.",
     "errorScreenshotsWhy": "Bir sorun oluştuğunda uygulamanın ne gösterdiğini görmek için.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Yükleme kaynağı ve kampanya tanımlayıcıları.",
     "installAttributionWhy": "Hangi kanalların yeni kullanıcı getirdiğini anlamak için.",
     "installAttributionWho": "AppsFlyer.",
@@ -2539,7 +2479,6 @@
       "urlAccessibility": "GitHub çekme isteği URL'si"
     },
     "eventChips": {
-      "approve": "Onayla",
       "comment": "Yorum",
       "label": "İnceleme türü",
       "requestChanges": "Değişiklik iste"
@@ -2852,7 +2791,6 @@
       "emailError": "Geçerli bir e-posta adresi gir.",
       "emailPlaceholder": "ad@sirket.com",
       "permissionDenied": "Üye davet etme iznin yok.",
-      "roleLabel": "Rol",
       "roleMember": "Rol: Üye",
       "sendInvite": "Davet gönder",
       "title": "Üye davet et"
@@ -2959,7 +2897,6 @@
     "sendFeedback": "Geri bildirim gönder"
   },
   "authErrors": {
-    "emailAlreadyUsed": "Bu e-posta adresiyle farklı bir yöntemle oturum açılan bir hesap zaten var. Başka bir yöntem dene veya '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "differentOauth": "Bu e-posta adresiyle farklı bir yöntemle oturum açılan bir hesap zaten var. Başka bir yöntem dene veya '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "ssoError": "Kuruluşun SSO gerektiriyor. '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "blocked": "Bu hesap engellendi. Lütfen destek ekibiyle iletişime geç.",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "Oturum açma işlemi başlatılamadı. Lütfen tekrar dene.",
     "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar dene.",
     "signInTimedOut": "Oturum açma işlemi zaman aşımına uğradı. Lütfen tekrar dene.",
-    "signInFailed": "Oturum açılamadı. Lütfen tekrar dene.",
     "networkError": "Ağ hatası oluştu. Lütfen tekrar dene.",
     "accessDeniedByUser": "Kullanıcı erişimi reddetti.",
     "codeExpired": "Kodun süresi doldu.",
@@ -3010,7 +2946,6 @@
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."
     },
-    "working": "Çalışıyor",
     "historyRetry": "Sohbet geçmişi yüklenemedi.",
     "sendError": "Mesaj gönderilemedi. Tekrar dene."
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "Ajanları görmek için oturum aç",
     "privacy": "Ajanları görmek için Kilo'yu aç",
     "openAgents": "Ajanları aç",
-    "running": "Çalışıyor",
     "needsInput": "Yanıt bekliyor",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."

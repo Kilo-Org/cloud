@@ -83,7 +83,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
       if (label.kind === 'image') {
         return i18n.t('chat.messageBubble.image');
       }
-      return i18n.t('chat.messageBubble.attachment');
+      return i18n.t('chat.attachment.defaultName');
     })
     .join(', ');
 }

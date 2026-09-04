@@ -168,7 +168,7 @@ export default function ModelListScreen() {
         <TextInput
           ref={searchInputRef}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
-          placeholder={t('kiloclaw.modelList.searchPlaceholder')}
+          placeholder={t('common.searchModels')}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
           autoCorrect={false}

@@ -120,10 +120,21 @@
     "reply": "Trả lời",
     "reportSubmittedReceipt": "Đã gửi báo cáo. Mã tiếp nhận: {{receiptId}}",
     "retryLoadingMore": "Thử tải thêm lần nữa",
-    "reviewPr": "Rà soát PR"
+    "reviewPr": "Rà soát PR",
+    "role": "Vai trò",
+    "searchModels": "Tìm kiếm mô hình...",
+    "selectedRepositories": "Kho mã nguồn đã chọn",
+    "selectRepositories": "Chọn kho mã nguồn",
+    "sendMessage": "Gửi tin nhắn",
+    "sessionExited": "Đã thoát phiên",
+    "starting": "Đang khởi động…",
+    "status": "Trạng thái",
+    "truncated": "Đã cắt bớt",
+    "updated": "Đã cập nhật",
+    "working": "Đang xử lý",
+    "yourOwnRepositories": "Kho mã nguồn của riêng bạn"
   },
   "language": {
-    "title": "Ngôn ngữ",
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
     "couldNotRestart": "Không thể khởi động lại",
     "languageSaved": "Đã lưu ngôn ngữ bạn chọn.",
@@ -166,7 +177,6 @@
     "sessionEnded": "Phiên của bạn đã kết thúc. Vui lòng đăng nhập lại.",
     "signInCodeExpired": "Mã đăng nhập của bạn đã hết hạn. Vui lòng thử lại.",
     "accessDenied": "Quyền truy cập đã bị từ chối.",
-    "somethingWentWrong": "Đã xảy ra lỗi. Vui lòng thử lại.",
     "codeSent": "Đã gửi mã",
     "signInCodeField": "Mã đăng nhập",
     "accountCreated": "Đã tạo tài khoản. Chào mừng đến với Kilo.",
@@ -254,7 +264,6 @@
     "disabledMessage": "Mở cài đặt thiết bị để bật thông báo cho ứng dụng.",
     "disableTitle": "Tắt thông báo",
     "disableMessage": "Mở cài đặt thiết bị để tắt thông báo cho ứng dụng.",
-    "openSettings": "Mở cài đặt",
     "registrationFailed": "Không thể đăng ký nhận thông báo. Hãy kiểm tra quyền thông báo.",
     "couldNotEnable": "Không thể bật thông báo. Vui lòng thử lại.",
     "previewAlways": "Luôn luôn",
@@ -330,15 +339,13 @@
       "cancelReply": "Hủy trả lời",
       "openInstance": "Mở máy chủ",
       "attachFile": "Đính kèm tệp",
-      "cancelEdit": "Hủy chỉnh sửa",
-      "sendMessage": "Gửi tin nhắn"
+      "cancelEdit": "Hủy chỉnh sửa"
     },
     "conversationList": {
       "couldNotLoad": "Không thể tải danh sách cuộc trò chuyện.",
       "emptyTitle": "Chưa có cuộc trò chuyện nào",
       "emptyDescription": "Tạo cuộc trò chuyện để bắt đầu trò chuyện với máy chủ KiloClaw của bạn.",
       "create": "Tạo cuộc trò chuyện",
-      "starting": "Đang khởi động…",
       "newConversation": "Cuộc trò chuyện mới",
       "openInstanceSettings": "Mở cài đặt máy chủ",
       "today": "Hôm nay",
@@ -379,8 +386,7 @@
       "moreActions": "Thao tác khác",
       "notDelivered": "Chưa chuyển đến người nhận",
       "edited": "(đã chỉnh sửa)",
-      "image": "Hình ảnh",
-      "attachment": "Tệp đính kèm"
+      "image": "Hình ảnh"
     },
     "messageActions": {
       "copied": "Đã sao chép",
@@ -440,7 +446,6 @@
       "managedByAdmin": "Việc thanh toán do quản trị viên tổ chức của bạn quản lý.",
       "couldNotLoad": "Không thể tải thông tin thanh toán.",
       "manageOnWeb": "Quản lý thanh toán trên web",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Kỳ cuối của gói Commit kết thúc vào {{date}}. Chuyển sang gói Standard với giá {{price}} để tiếp tục; nếu không, dịch vụ lưu trữ sẽ kết thúc.",
       "freeTrial": "Dùng thử miễn phí",
@@ -457,9 +462,9 @@
       "trialDaysRemaining": "Thời gian dùng thử còn {{remaining}}.",
       "trialEndingSoon": "Thời gian dùng thử sắp kết thúc, còn {{remaining}}.",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Có gì mới",
@@ -509,7 +514,6 @@
       "approveDeviceTitle": "Phê duyệt thiết bị",
       "approveMessage": "Cho phép {{label}} (mã: {{code}}) kết nối với phiên chạy của bạn?",
       "approveTitle": "Phê duyệt yêu cầu ghép nối",
-      "device": "Thiết bị",
       "unknownDevice": "Thiết bị không xác định"
     },
     "execPolicy": {
@@ -524,7 +528,6 @@
       "title": "Tài khoản Google",
       "couldNotLoad": "Không thể tải trạng thái tài khoản Google.",
       "disconnected": "Đã ngắt kết nối tài khoản Google. Triển khai lại phiên chạy để áp dụng thay đổi.",
-      "redeploy": "Triển khai lại",
       "setupCommand": "Lệnh thiết lập",
       "setupCommandHelp": "Trên máy tính đã cài Docker của bạn, mở cửa sổ dòng lệnh và chạy lệnh này để kết nối tài khoản Google.",
       "failedToLoadCommand": "Không thể tải lệnh thiết lập.",
@@ -537,7 +540,6 @@
       "disconnectTitle": "Ngắt kết nối Google"
     },
     "modelList": {
-      "searchPlaceholder": "Tìm kiếm mô hình...",
       "noMatches": "Không có mô hình phù hợp với nội dung tìm kiếm",
       "noModelsDescription": "Các mô hình sẽ xuất hiện ở đây khi có thể sử dụng.",
       "noResultsFor": "Không tìm thấy kết quả cho \"{{query}}\"."
@@ -592,22 +594,16 @@
       "iosTitle": "KiloClaw không khả dụng trên iOS",
       "multipleCurrentConflictBody": "Tài khoản của bạn có nhiều gói đăng ký còn hiệu lực. Chúng tôi đã tạm dừng dịch vụ để tránh tính phí trùng lặp.",
       "multipleCurrentConflictCta": "Tiếp tục trên kilo.ai",
-      "multipleCurrentConflictTitle": "Tài khoản cần được rà soát",
       "nonCanonicalEarlybirdBody": "Gói truy cập sớm của bạn cần được nhân viên kiểm tra trước khi sử dụng trên thiết bị di động.",
-      "nonCanonicalEarlybirdCta": "Tiếp tục trên kilo.ai",
       "nonCanonicalEarlybirdTitle": "Phát hiện gói cũ",
       "quarantinedBody": "Phiên chạy KiloClaw của bạn đang bị cách ly nên hiện không thể sử dụng. Đội ngũ hỗ trợ cần giúp bạn khôi phục phiên chạy này.",
-      "quarantinedCta": "Tiếp tục trên kilo.ai",
       "quarantinedTitle": "Phiên chạy cần được khắc phục",
       "subscriptionCanceledBody": "Để sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
       "subscriptionCanceledCta": "Mở kilo.ai/claw",
       "subscriptionCanceledTitle": "Đăng ký gói trên trang web",
       "subscriptionPastDueBody": "Đã xảy ra sự cố với khoản thanh toán gần nhất của bạn. Truy cập kilo.ai/claw bằng trình duyệt để cập nhật thông tin thanh toán. Bạn không thể quản lý thanh toán trong ứng dụng.",
-      "subscriptionPastDueCta": "Mở kilo.ai/claw",
       "subscriptionPastDueTitle": "Cập nhật thông tin thanh toán trên web",
-      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
-      "trialExpiredCta": "Mở kilo.ai/claw",
-      "trialExpiredTitle": "Đăng ký gói trên trang web"
+      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng."
     },
     "controls": {
       "redeploying": "Đang triển khai lại…",
@@ -618,7 +614,6 @@
       "start": "Khởi động",
       "startMessage": "Bạn có chắc muốn khởi động phiên chạy này không?",
       "startTitle": "Khởi động phiên chạy",
-      "starting": "Đang khởi động…",
       "stop": "Dừng",
       "stopMessage": "Bạn có chắc muốn dừng phiên chạy này không?",
       "stopTitle": "Dừng phiên chạy",
@@ -723,7 +718,6 @@
         "backgroundHint": "Quá trình này thường mất chưa đến một phút. Bạn có thể đóng màn hình này — quá trình thiết lập vẫn tiếp tục chạy nền.",
         "connectingToAgent": "Đang kết nối với tác nhân",
         "continueInBackground": "Tiếp tục chạy nền",
-        "finishingSetup": "Đang hoàn tất thiết lập",
         "queryErrorBody": "Kết nối bị mất khi kiểm tra tiến độ thiết lập {{name}}. Quá trình thiết lập có thể vẫn đang chạy. Thử lại hoặc quay lại kiểm tra sau một lát.",
         "queryErrorTitle": "Không thể kiểm tra tiến độ thiết lập",
         "settingUp": "Đang thiết lập {{name}}",
@@ -763,16 +757,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kênh",
       "devicePairingDescription": "Phê duyệt yêu cầu ghép nối thiết bị",
-      "devicePairingLabel": "Ghép nối thiết bị",
       "execPolicyDescription": "Cài đặt bảo mật",
-      "execPolicyLabel": "Chính sách thực thi",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Tài khoản Google",
       "modelDescription": "Chọn mô hình AI",
       "secretsDescription": "Thông tin xác thực được mã hóa",
-      "secretsLabel": "Thông tin bí mật",
       "versionPinDescription": "Ghim vào một phiên bản cụ thể",
       "versionPinLabel": "Ghim phiên bản"
     },
@@ -823,14 +812,11 @@
       "finishSetup": "Hoàn tất thiết lập",
       "manageAccess": "Quản lý quyền truy cập",
       "bitbucketNoRepositoriesDescription": "Không có kho lưu trữ nào có thể truy cập trong không gian làm việc Bitbucket này.",
-      "bitbucketSetup": "Thiết lập Bitbucket",
-      "couldNotOpenGithubSettings": "Không thể mở cài đặt ứng dụng GitHub.",
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
       "noRepositoriesFound": "Không tìm thấy kho lưu trữ",
-      "repositoryAccess": "quyền truy cập kho lưu trữ",
-      "selectedRepositories": "Kho mã nguồn đã chọn"
+      "repositoryAccess": "quyền truy cập kho lưu trữ"
     },
     "style": {
       "title": "Cách rà soát",
@@ -886,7 +872,6 @@
       "cancelReview": "Hủy rà soát",
       "cancelTitle": "Hủy rà soát?",
       "checkRun": "Lần chạy kiểm tra",
-      "completed": "Đã hoàn tất",
       "couldNotGetLatest": "Không thể lấy dữ liệu mới nhất.",
       "couldNotLoad": "Không thể tải kết quả rà soát.",
       "council": "Hội đồng",
@@ -901,7 +886,6 @@
       "retryTitle": "Rà soát lại?",
       "showMore": "Xem thêm",
       "started": "Đã bắt đầu",
-      "status": "Trạng thái",
       "threshold": "Ngưỡng",
       "title": "Rà soát",
       "tokens": "Token",
@@ -920,8 +904,7 @@
       "sessionError": "Phiên gặp lỗi: {{error}}.",
       "statusWithValue": "Trạng thái: {{status}}",
       "toolName": "Công cụ: {{name}}",
-      "toolNameError": "Công cụ {{name}} gặp lỗi.",
-      "unknownError": "Lỗi không xác định"
+      "toolNameError": "Công cụ {{name}} gặp lỗi."
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",
@@ -946,10 +929,8 @@
     },
     "scopeList": {
       "personalStillAvailable": "Bạn vẫn có thể truy cập các kho lưu trữ cá nhân bên dưới.",
-      "personalSubtitle": "Kho mã nguồn của riêng bạn",
       "viewOnly": "Chỉ xem"
     },
-    "selectRepositories": "Chọn kho mã nguồn",
     "selectRepository": "Chọn ít nhất một kho lưu trữ để bật rà soát tự động.",
     "webhookSetup": "Chưa hoàn tất thiết lập webhook.",
     "webhookSetupDescription": "Một số kho lưu trữ có thể không được rà soát tự động.",
@@ -963,10 +944,8 @@
       "allAreas": "Tất cả nội dung",
       "customInstructions": "Hướng dẫn tùy chỉnh",
       "focusAreas": "Nội dung trọng tâm",
-      "mergeGate": "Điều kiện hợp nhất",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",
-      "reviewMemory": "Bộ nhớ rà soát",
       "reviewStyle": "Cách rà soát",
       "set": "Đã thiết lập"
     },
@@ -1027,12 +1006,7 @@
       "title": "Lọc vấn đề",
       "fixed": "Đã sửa",
       "outcome": "Kết quả",
-      "outcomeAnalyzing": "Đang phân tích",
-      "outcomeDismissed": "Đã bỏ qua",
-      "outcomeFailed": "Phân tích thất bại",
-      "outcomeNotAnalyzed": "Chưa phân tích",
       "outcomeNotExploitable": "Không thể khai thác",
-      "outcomeSafeToDismiss": "Có thể bỏ qua an toàn",
       "outcomeTriageComplete": "Đã hoàn tất phân loại",
       "overdueOnly": "Chỉ hiện vấn đề quá hạn",
       "reset": "Đặt lại",
@@ -1045,7 +1019,6 @@
       "sortSeverityAsc": "Mức độ nghiêm trọng: từ thấp đến cao",
       "sortSeverityDesc": "Mức độ nghiêm trọng: từ cao đến thấp",
       "sortSlaDue": "Ngày đến hạn SLA",
-      "status": "Trạng thái",
       "statusIgnored": "Đã bỏ qua",
       "statusOpen": "Mở"
     },
@@ -1211,12 +1184,10 @@
       "reasonNoBandwidth": "Không đủ nguồn lực",
       "reasonNotUsed": "Không sử dụng mã có lỗ hổng",
       "reasonTolerableRisk": "Rủi ro có thể chấp nhận được",
-      "submit": "Bỏ qua vấn đề",
       "title": "Bỏ qua vấn đề"
     },
     "findingDetail": {
       "couldNotLoad": "Không thể tải thông tin về vấn đề này.",
-      "dismissA11y": "Bỏ qua vấn đề",
       "notFound": "Không tìm thấy vấn đề",
       "notFoundDescription": "Vấn đề này có thể đã bị xóa hoặc bạn không còn quyền truy cập.",
       "tabAnalysis": "Phân tích",
@@ -1226,7 +1197,6 @@
     "findingDetails": {
       "cve": "CVE",
       "detected": "Đã phát hiện",
-      "dismissed": "Đã bỏ qua",
       "dismissedBecause": "Đã bỏ qua vì {{reason}}.",
       "ghsa": "GHSA",
       "manifest": "Tệp kê khai",
@@ -1240,7 +1210,6 @@
       "sourceRecord": "Bản ghi nguồn",
       "supersededBy": "Đã được thay thế bằng vấn đề hiện hành",
       "supersededByDescription": "Chạm để mở bản ghi hiện hành và xem trạng thái, kết quả phân tích cùng thông tin khắc phục.",
-      "updated": "Đã cập nhật",
       "viewAdvisory": "Xem thông báo bảo mật trên GitHub",
       "vulnerableVersions": "Phiên bản có lỗ hổng",
       "statusSuperseded": "Đã thay thế",
@@ -1321,13 +1290,11 @@
     },
     "repositories": {
       "couldNotLoad": "Không thể tải cài đặt kho lưu trữ.",
-      "couldNotOpenGithubSettings": "Không thể mở cài đặt ứng dụng GitHub.",
       "githubAppSettings": "cài đặt ứng dụng GitHub",
       "manageAccess": "Quản lý quyền truy cập của ứng dụng GitHub",
       "noRepositories": "Không có kho lưu trữ",
       "noRepositoriesDescription": "Cấp quyền truy cập các kho lưu trữ cho ứng dụng Kilo trên GitHub.",
-      "selectAtLeastOne": "Chọn ít nhất một kho lưu trữ.",
-      "selectedRepositories": "Kho mã nguồn đã chọn"
+      "selectAtLeastOne": "Chọn ít nhất một kho lưu trữ."
     },
     "scopeEntry": {
       "connectDescription": "Cài đặt ứng dụng Kilo trên GitHub để tự động đồng bộ cảnh báo Dependabot và quản lý vấn đề bảo mật trong các kho lưu trữ của bạn.",
@@ -1339,9 +1306,6 @@
       "reauthorizeFailed": "Không thể bắt đầu cấp quyền lại. Vui lòng thử lại.",
       "reauthorizeTitle": "Cần thêm quyền",
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
-    },
-    "scopeList": {
-      "personalSubtitle": "Kho mã nguồn của riêng bạn"
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Phân tích {{mode}}",
@@ -1359,7 +1323,6 @@
       "repositoriesCount": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_other": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_one": "Đã chọn {{displayCount}} kho lưu trữ",
-      "selectRepositories": "Chọn kho mã nguồn",
       "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát",
       "slaPolicy": "Chính sách SLA",
       "title": "Cài đặt"
@@ -1413,10 +1376,8 @@
       "queuedTitle": "Đang chờ phân tích",
       "queuedDescription": "Đang chờ có chỗ trống để chạy phân tích.",
       "analyzing": "Đang phân tích",
-      "analyzingTitle": "Đang phân tích",
       "analyzingDescription": "Đang kiểm tra xem mã ứng dụng có thể gọi đến tính năng bị ảnh hưởng hay không.",
       "failed": "Phân tích thất bại",
-      "failedTitle": "Phân tích thất bại",
       "failedDescription": "Trợ lý bảo mật không thể hoàn tất phân tích.",
       "extractionFailedDescription": "Không thể chuyển báo cáo kỹ thuật thành kết quả có cấu trúc.",
       "exploitableDescription": "Mã ứng dụng có thể gọi đến tính năng bị ảnh hưởng.",
@@ -1426,18 +1387,14 @@
       "unknown": "Cần rà soát",
       "unknownDescription": "Kết quả phân tích chưa xác định được liệu mã có thể gọi đến tính năng có lỗ hổng hay không.",
       "safeToDismiss": "Có thể bỏ qua an toàn",
-      "safeToDismissTitle": "Có thể bỏ qua an toàn",
       "safeToDismissDescription": "Kết quả phân loại cho thấy có thể bỏ qua vấn đề này một cách an toàn mà không cần phân tích mã nguồn.",
       "manualReviewTitle": "Cần rà soát thủ công",
       "manualReviewDescription": "Kết quả phân loại cho thấy vấn đề này cần được rà soát thủ công.",
       "analysisRequired": "Cần phân tích",
       "analysisRequiredTitle": "Cần phân tích mã nguồn",
       "analysisRequiredDescription": "Kết quả phân loại đề xuất phân tích kho lưu trữ trước khi quyết định cách xử lý.",
-      "completed": "Đã phân tích",
-      "completedTitle": "Đã phân tích",
       "completedDescription": "Đã hoàn tất phân tích nhưng chưa ghi nhận kết quả cụ thể.",
       "notAnalyzed": "Chưa phân tích",
-      "notAnalyzedTitle": "Chưa phân tích",
       "notAnalyzedDescription": "Chưa chạy phân tích mã nguồn cho vấn đề này."
     },
     "deadline": {
@@ -1572,7 +1529,6 @@
       "didNotCompleteTitle": "Cài đặt chưa hoàn tất",
       "didNotCompleteMessage": "Quá trình cài đặt ứng dụng GitHub chưa hoàn tất. Hãy thử lại từ ứng dụng."
     },
-    "sessionExited": "Đã thoát phiên",
     "remoteSpawnRetryable": "Không thể kết nối với phiên chạy — có thể phiên chạy đã mất kết nối.",
     "remoteSpawnNonRetryable": "Phiên chạy không thể mở phiên làm việc — hãy kiểm tra máy hoặc cập nhật CLI.",
     "remoteSpawnInstanceDisconnected": "Phiên chạy đã chọn bị ngắt kết nối. Bắt đầu phiên trên Cloud Agent hoặc chọn phiên chạy khác.",
@@ -1612,7 +1568,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa.",
-      "exited": "Đã thoát phiên",
       "failedToExit": "Không thể thoát phiên.",
       "exitTitle": "Thoát phiên?",
       "exitMessage": "Thao tác này sẽ dừng phiên đang chạy nhưng vẫn giữ lại lịch sử phiên.",
@@ -1646,7 +1601,6 @@
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
       "promptPlaceholder": "Bạn muốn làm gì?",
-      "addAttachment": "Thêm tệp đính kèm",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",
       "prefillRepoUnavailable": "{{repo}} không còn dùng được. Hãy chọn kho mã khác bên dưới.",
@@ -1680,15 +1634,10 @@
       "updatedFileCount": "Đã cập nhật {{displayCount}} tệp.",
       "updatedFileCount_other": "Đã cập nhật {{displayCount}} tệp."
     },
-    "toolPatch": {
-      "operationUpdated": "Đã cập nhật"
-    },
     "toolCard": {
       "accessibility": "công cụ {{label}}, {{status}}",
       "accessibilityLabel": "công cụ {{name}}, {{status}}",
-      "fileEmpty": "Tệp này trống.",
       "noTasks": "Không có tác vụ nào.",
-      "truncated": "Đã cắt bớt",
       "toolRead": "đọc",
       "toolEdit": "Chỉnh sửa",
       "toolWrite": "ghi",
@@ -1757,7 +1706,6 @@
       "noMatches": "Không có kết quả phù hợp",
       "noRepositories": "Không có kho mã nào để chọn",
       "noRepositoriesDescription": "Tài khoản của bạn chưa kết nối với kho mã nào.",
-      "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
       "loading": "Đang tải...",
       "accessibility": "Kho mã: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -1770,7 +1718,6 @@
       "reportAiResponse": "Báo cáo phản hồi AI",
       "reportAiResponseConfirm": "Bạn có muốn báo cáo phản hồi này để chúng tôi kiểm tra không?",
       "report": "Báo cáo",
-      "role": "Vai trò",
       "roleUser": "Người dùng",
       "roleAssistant": "Trợ lý",
       "sent": "Đã gửi",
@@ -1957,7 +1904,6 @@
     },
     "modelPicker": {
       "title": "Chọn mô hình",
-      "searchPlaceholder": "Tìm kiếm mô hình...",
       "noModelsDescription": "Không có mô hình nào để chọn.",
       "favorites": "Mục yêu thích"
     },
@@ -1985,7 +1931,6 @@
       "uploading": "Đang tải lên…",
       "uploaded": "Đã tải lên",
       "uploadFailedRetry": "Tải lên thất bại. Chạm để thử lại.",
-      "uploadFailedTerminal": "Không thể tải lên tệp này.",
       "moveLeft": "Di chuyển {{filename}} sang trái",
       "moveRight": "Di chuyển {{filename}} sang phải"
     },
@@ -1997,7 +1942,6 @@
       "camera": "Máy ảnh",
       "photoLibrary": "Thư viện ảnh",
       "files": "Tệp",
-      "cameraAccessMessage": "Cho phép truy cập máy ảnh trong phần cài đặt để chụp ảnh.",
       "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
       "maxFilesAllowed": "Chỉ được thêm tối đa {{displayCount}} tệp.",
       "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
@@ -2010,7 +1954,6 @@
       "waitForUploads": "Chờ các tệp đính kèm tải lên xong.",
       "pasteFromClipboard": "Dán từ bảng nhớ tạm",
       "stopGenerating": "Dừng tạo phản hồi",
-      "sendMessage": "Gửi tin nhắn",
       "selectModelBeforeSending": "Hãy chọn mô hình trước khi gửi.",
       "preparingPlaceholder": "Đang thiết lập môi trường...",
       "finalizingPlaceholder": "Đang hoàn tất...",
@@ -2064,7 +2007,6 @@
     "contextUsage": {
       "windowUnavailable": "Không có thông tin về giới hạn ngữ cảnh",
       "tapToViewDetails": "Chạm để xem chi tiết ngữ cảnh.",
-      "costPrefix": "chi phí {{cost}}",
       "costSuffix": ", chi phí {{cost}}",
       "tokensWindowUnavailable": "Ngữ cảnh đã dùng {{used}} token, chưa rõ giới hạn",
       "tokensUsage": "Ngữ cảnh đã dùng {{used}} trong tổng số {{window}} token, chiếm {{percentage}}",
@@ -2177,7 +2119,6 @@
     "title": "Không tìm thấy trang"
   },
   "monoScrollBlock": {
-    "truncated": "Đã cắt bớt",
     "wrap": "Xuống dòng",
     "scroll": "Cuộn"
   },
@@ -2372,7 +2313,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Ảnh chụp màn hình khi xảy ra lỗi và bản ghi của một số ít phiên được chọn làm mẫu, tất cả đều đã được che nội dung.",
     "errorScreenshotsWhy": "Xem những gì ứng dụng hiển thị khi có sự cố.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Nguồn cài đặt và mã nhận diện chiến dịch.",
     "installAttributionWhy": "Hiểu kênh nào mang lại người dùng mới.",
     "installAttributionWho": "AppsFlyer.",
@@ -2539,7 +2479,6 @@
       "urlAccessibility": "URL của PR trên GitHub"
     },
     "eventChips": {
-      "approve": "Phê duyệt",
       "comment": "Bình luận",
       "label": "Hình thức đánh giá",
       "requestChanges": "Yêu cầu thay đổi"
@@ -2852,7 +2791,6 @@
       "emailError": "Hãy nhập địa chỉ email hợp lệ.",
       "emailPlaceholder": "ten@congty.com",
       "permissionDenied": "Bạn không có quyền mời thành viên.",
-      "roleLabel": "Vai trò",
       "roleMember": "Vai trò của người được mời là thành viên.",
       "sendInvite": "Gửi lời mời",
       "title": "Mời thành viên"
@@ -2959,7 +2897,6 @@
     "sendFeedback": "Gửi phản hồi"
   },
   "authErrors": {
-    "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",
     "differentOauth": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",
     "ssoError": "Tổ chức của bạn yêu cầu SSO. Dùng '$t(login.moreSignInOptions)'.",
     "blocked": "Tài khoản này đã bị chặn. Vui lòng liên hệ bộ phận hỗ trợ.",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
     "signInTimedOut": "Đã hết thời gian chờ đăng nhập. Vui lòng thử lại.",
-    "signInFailed": "Đăng nhập thất bại. Vui lòng thử lại.",
     "networkError": "Lỗi mạng. Vui lòng thử lại.",
     "accessDeniedByUser": "Người dùng đã từ chối cấp quyền truy cập.",
     "codeExpired": "Mã đã hết hạn.",
@@ -3010,7 +2946,6 @@
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
     },
-    "working": "Đang xử lý",
     "historyRetry": "Không thể tải lịch sử trò chuyện.",
     "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "Đăng nhập để xem tác nhân",
     "privacy": "Mở Kilo để xem tác nhân",
     "openAgents": "Mở danh sách tác nhân",
-    "running": "Đang xử lý",
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."

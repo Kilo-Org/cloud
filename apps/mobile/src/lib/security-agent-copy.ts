@@ -20,23 +20,23 @@ const LABEL_KEYS = {
   'safe-to-dismiss': 'securityAgent.analysisState.safeToDismiss',
   'manual-review': 'securityAgent.analysisState.unknown',
   'analysis-required': 'securityAgent.analysisState.analysisRequired',
-  completed: 'securityAgent.analysisState.completed',
+  completed: 'securityAgent.analysis.analyzed',
   'not-analyzed': 'securityAgent.analysisState.notAnalyzed',
 } satisfies Record<SecurityFindingAnalysisState, string>;
 
 const TITLE_KEYS = {
   queued: 'securityAgent.analysisState.queuedTitle',
-  analyzing: 'securityAgent.analysisState.analyzingTitle',
-  failed: 'securityAgent.analysisState.failedTitle',
+  analyzing: 'securityAgent.analysisState.analyzing',
+  failed: 'securityAgent.analysisState.failed',
   'extraction-failed': 'securityAgent.analysisState.unknown',
   exploitable: 'securityAgent.analysis.exploitable',
   'not-exploitable': 'securityAgent.analysisState.notExploitableTitle',
   unknown: 'securityAgent.analysisState.unknown',
-  'safe-to-dismiss': 'securityAgent.analysisState.safeToDismissTitle',
+  'safe-to-dismiss': 'securityAgent.analysisState.safeToDismiss',
   'manual-review': 'securityAgent.analysisState.manualReviewTitle',
   'analysis-required': 'securityAgent.analysisState.analysisRequiredTitle',
-  completed: 'securityAgent.analysisState.completedTitle',
-  'not-analyzed': 'securityAgent.analysisState.notAnalyzedTitle',
+  completed: 'securityAgent.analysis.analyzed',
+  'not-analyzed': 'securityAgent.analysisState.notAnalyzed',
 } satisfies Record<SecurityFindingAnalysisState, string>;
 
 const DESCRIPTION_KEYS = {

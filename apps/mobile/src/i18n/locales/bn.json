@@ -120,10 +120,21 @@
     "reply": "উত্তর দিন",
     "reportSubmittedReceipt": "রিপোর্ট জমা হয়েছে। রসিদ: {{receiptId}}",
     "retryLoadingMore": "আরও লোড করার চেষ্টা করুন",
-    "reviewPr": "PR পর্যালোচনা করুন"
+    "reviewPr": "PR পর্যালোচনা করুন",
+    "role": "ভূমিকা",
+    "searchModels": "মডেল অনুসন্ধান",
+    "selectedRepositories": "নির্বাচিত রিপোজিটরি",
+    "selectRepositories": "রিপোজিটরি নির্বাচন করুন",
+    "sendMessage": "বার্তা পাঠান",
+    "sessionExited": "সেশন শেষ হয়েছে",
+    "starting": "শুরু হচ্ছে…",
+    "status": "অবস্থা",
+    "truncated": "আংশিক",
+    "updated": "আপডেট হয়েছে",
+    "working": "কাজ চলছে",
+    "yourOwnRepositories": "আপনার নিজের রিপোজিটরি"
   },
   "language": {
-    "title": "ভাষা",
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
     "couldNotRestart": "পুনরায় চালু করা যায়নি",
     "languageSaved": "আপনার নির্বাচিত ভাষা সংরক্ষণ করা হয়েছে।",
@@ -166,7 +177,6 @@
     "sessionEnded": "আপনার সেশন শেষ হয়েছে। আবার সাইন-ইন করুন।",
     "signInCodeExpired": "আপনার সাইন-ইন কোডের মেয়াদ শেষ হয়েছে। আবার চেষ্টা করুন।",
     "accessDenied": "অ্যাক্সেসের অনুমতি দেওয়া হয়নি।",
-    "somethingWentWrong": "একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।",
     "codeSent": "কোড পাঠানো হয়েছে",
     "accountCreated": "অ্যাকাউন্ট তৈরি হয়েছে। Kilo-তে স্বাগতম।",
     "pleaseEnterEmail": "আপনার ইমেইল ঠিকানা লিখুন।",
@@ -584,7 +594,6 @@
     "eventChips": {
       "comment": "মন্তব্য",
       "requestChanges": "পরিবর্তন চান",
-      "approve": "অনুমোদন করুন",
       "label": "রিভিউয়ের ধরন"
     },
     "overview": {
@@ -680,7 +689,6 @@
     "disabledMessage": "বিজ্ঞপ্তি পেতে আপনার ডিভাইসের সেটিংসে বিজ্ঞপ্তি চালু করুন।",
     "disableTitle": "বিজ্ঞপ্তি বন্ধ করুন",
     "disableMessage": "বিজ্ঞপ্তি বন্ধ করতে আপনার ডিভাইসের সেটিংসে সেগুলো বন্ধ করুন।",
-    "openSettings": "সেটিংস খুলুন",
     "registrationFailed": "নিবন্ধন করা যায়নি। বিজ্ঞপ্তির অনুমতি পরীক্ষা করুন।",
     "couldNotEnable": "বিজ্ঞপ্তি চালু করা যায়নি। আবার চেষ্টা করুন।",
     "previewAlways": "সবসময়",
@@ -756,15 +764,13 @@
       "cancelReply": "উত্তর বাতিল করুন",
       "openInstance": "ইনস্ট্যান্স খুলুন",
       "attachFile": "ফাইল সংযুক্ত করুন",
-      "cancelEdit": "সম্পাদনা বাতিল করুন",
-      "sendMessage": "বার্তা পাঠান"
+      "cancelEdit": "সম্পাদনা বাতিল করুন"
     },
     "conversationList": {
       "couldNotLoad": "কথোপকথনগুলো লোড করা যায়নি।",
       "emptyTitle": "এখনো কোনো কথোপকথন নেই",
       "emptyDescription": "আপনার KiloClaw ইনস্ট্যান্সের সাথে চ্যাট শুরু করতে একটি কথোপকথন তৈরি করুন।",
       "create": "কথোপকথন তৈরি করুন",
-      "starting": "শুরু হচ্ছে…",
       "newConversation": "নতুন কথোপকথন",
       "openInstanceSettings": "ইনস্ট্যান্সের সেটিংস খুলুন",
       "today": "আজ",
@@ -805,8 +811,7 @@
       "moreActions": "আরও বিকল্প",
       "notDelivered": "পৌঁছায়নি",
       "edited": "(সম্পাদিত)",
-      "image": "ছবি",
-      "attachment": "সংযুক্তি"
+      "image": "ছবি"
     },
     "messageActions": {
       "copied": "কপি হয়েছে",
@@ -865,7 +870,6 @@
       "managedByAdmin": "আপনার সংস্থার অ্যাডমিন বিলিং পরিচালনা করেন।",
       "couldNotLoad": "বিলিংয়ের তথ্য লোড করা যায়নি।",
       "manageOnWeb": "ওয়েবে বিলিং পরিচালনা করুন",
-      "commitPlan": "কমিট",
       "earlybird": "আর্লিবার্ড",
       "finalCommitTermEndsOn": "আপনার Commit প্ল্যানের শেষ মেয়াদ {{date}} তারিখে শেষ হবে। {{price}} মূল্যে স্ট্যান্ডার্ড প্ল্যানে চালিয়ে যান, নইলে হোস্টিং বন্ধ হবে।",
       "freeTrial": "ফ্রি ট্রায়াল",
@@ -883,9 +887,9 @@
       "trialEndingSoon": "ট্রায়ালের মেয়াদ শীঘ্রই শেষ হবে। বাকি: {{remaining}}।",
       "lessThanOneDay": "১ দিনেরও কম",
       "planName": {
-        "commit": "কমিট",
         "standard": "স্ট্যান্ডার্ড"
-      }
+      },
+      "commit": "কমিট"
     },
     "changelog": {
       "title": "নতুন কী",
@@ -935,7 +939,6 @@
       "approveDeviceTitle": "ডিভাইস অনুমোদন করবেন?",
       "approveMessage": "আপনার ইনস্ট্যান্সে {{label}}-এর (কোড: {{code}}) সংযোগের অনুরোধ অনুমোদন করবেন?",
       "approveTitle": "পেয়ারিংয়ের অনুরোধ অনুমোদন করবেন?",
-      "device": "ডিভাইস",
       "unknownDevice": "অজানা ডিভাইস"
     },
     "execPolicy": {
@@ -950,7 +953,6 @@
       "title": "Google অ্যাকাউন্ট",
       "couldNotLoad": "Google অ্যাকাউন্টের অবস্থা লোড করা যায়নি।",
       "disconnected": "Google অ্যাকাউন্টের সংযোগ বিচ্ছিন্ন হয়েছে। পরিবর্তন প্রয়োগ করতে আপনার ইনস্ট্যান্স রিডিপ্লয় করুন।",
-      "redeploy": "আবার ডিপ্লয় করুন",
       "setupCommand": "সেটআপ কমান্ড",
       "setupCommandHelp": "আপনার Google অ্যাকাউন্ট সংযুক্ত করতে নিজের কম্পিউটারের টার্মিনালে এই কমান্ডটি চালান। কম্পিউটারে Docker ইনস্টল থাকতে হবে।",
       "failedToLoadCommand": "সেটআপ কমান্ড লোড করা যায়নি।",
@@ -963,7 +965,6 @@
       "disconnectTitle": "Google-এর সংযোগ বিচ্ছিন্ন করবেন?"
     },
     "modelList": {
-      "searchPlaceholder": "মডেল অনুসন্ধান",
       "noMatches": "আপনার খোঁজের সঙ্গে মেলে এমন মডেল নেই",
       "noModelsDescription": "মডেল পাওয়া গেলে এখানে দেখা যাবে।",
       "noResultsFor": "\"{{query}}\"-এর জন্য কোনো ফলাফল নেই।"
@@ -1021,7 +1022,6 @@
       "start": "চালু করুন",
       "startMessage": "আপনি কি নিশ্চিত যে এই ইনস্ট্যান্সটি চালু করতে চান?",
       "startTitle": "ইনস্ট্যান্স চালু করবেন?",
-      "starting": "শুরু হচ্ছে…",
       "stop": "বন্ধ করুন",
       "stopMessage": "আপনি কি নিশ্চিত যে এই ইনস্ট্যান্সটি বন্ধ করতে চান?",
       "stopTitle": "ইনস্ট্যান্স বন্ধ করবেন?",
@@ -1117,7 +1117,6 @@
         "timeoutBody": "{{name}}-এর সেটআপে স্বাভাবিকের চেয়ে বেশি সময় লাগছে ({{displayMinutes}} মিনিটের বেশি)।",
         "continueInBackground": "ব্যাকগ্রাউন্ডে চালিয়ে যান",
         "settingUp": "{{name}}-এর সেটআপ চলছে",
-        "finishingSetup": "সেটআপ শেষ করা হচ্ছে",
         "connectingToAgent": "এজেন্টের সঙ্গে সংযোগ করা হচ্ছে",
         "startingSandbox": "স্যান্ডবক্স চালু হচ্ছে",
         "backgroundHint": "সাধারণত এক মিনিটেরও কম সময় লাগে। আপনি এটি বন্ধ করতে পারেন — ব্যাকগ্রাউন্ডে কাজ চলতে থাকবে।"
@@ -1157,24 +1156,18 @@
       "browseAllModelsA11y": "৫০০টিরও বেশি মডেলের সবগুলো দেখুন"
     },
     "accessRequired": {
-      "trialExpiredTitle": "ওয়েবে সাবস্ক্রাইব করুন",
       "trialExpiredBody": "KiloClaw ব্যবহার চালিয়ে যেতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে সাবস্ক্রাইব করা যায় না।",
-      "trialExpiredCta": "kilo.ai/claw খুলুন",
       "subscriptionCanceledTitle": "ওয়েবে সাবস্ক্রাইব করুন",
       "subscriptionCanceledBody": "KiloClaw ব্যবহার করতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে সাবস্ক্রাইব করা যায় না।",
       "subscriptionCanceledCta": "kilo.ai/claw খুলুন",
       "subscriptionPastDueTitle": "ওয়েবে পেমেন্ট আপডেট",
       "subscriptionPastDueBody": "আপনার সর্বশেষ পেমেন্টে সমস্যা হয়েছে। পেমেন্টের তথ্য আপডেট করতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে বিলিং পরিচালনা করা যায় না।",
-      "subscriptionPastDueCta": "kilo.ai/claw খুলুন",
       "quarantinedTitle": "ইনস্ট্যান্সের সমস্যা সমাধান প্রয়োজন",
       "quarantinedBody": "আপনার KiloClaw ইনস্ট্যান্স কোয়ারেন্টাইনে আছে, তাই এখন ব্যবহার করা যাচ্ছে না। এটি আবার চালু করতে আমাদের দলের সহায়তা প্রয়োজন।",
-      "quarantinedCta": "kilo.ai-এ চালিয়ে যান",
-      "multipleCurrentConflictTitle": "অ্যাকাউন্টের পর্যালোচনা প্রয়োজন",
       "multipleCurrentConflictBody": "আপনার অ্যাকাউন্টে একাধিক সক্রিয় সাবস্ক্রিপশন পাওয়া গেছে। একাধিকবার বিল নেওয়া এড়াতে আমরা আপাতত কার্যক্রম স্থগিত করেছি।",
       "multipleCurrentConflictCta": "kilo.ai-এ চালিয়ে যান",
       "nonCanonicalEarlybirdTitle": "পুরোনো প্ল্যান পাওয়া গেছে",
       "nonCanonicalEarlybirdBody": "মোবাইলে ব্যবহারের আগে আপনার আগাম ব্যবহারের প্ল্যানটি সরাসরি যাচাই করা প্রয়োজন।",
-      "nonCanonicalEarlybirdCta": "kilo.ai-এ চালিয়ে যান",
       "iosTitle": "iOS-এ KiloClaw ব্যবহার করা যাচ্ছে না",
       "iosBody": "এই অ্যাকাউন্টের জন্য KiloClaw অ্যাক্সেস iOS অ্যাপের বাইরে পরিচালিত হয়।",
       "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।"
@@ -1189,16 +1182,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "চ্যানেল",
       "devicePairingDescription": "ডিভাইসের অনুরোধ অনুমোদন করুন",
-      "devicePairingLabel": "ডিভাইস পেয়ার করা",
       "execPolicyDescription": "নিরাপত্তার সেটিংস",
-      "execPolicyLabel": "কমান্ড চালানোর নীতি",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google অ্যাকাউন্ট",
       "modelDescription": "AI মডেল নির্বাচন",
       "secretsDescription": "এনক্রিপ্ট করা ক্রেডেনশিয়াল",
-      "secretsLabel": "গোপন তথ্য",
       "versionPinDescription": "একটি নির্দিষ্ট সংস্করণে পিন করুন",
       "versionPinLabel": "সংস্করণ নির্দিষ্ট রাখা"
     },
@@ -1249,14 +1237,11 @@
       "finishSetup": "সেটআপ শেষ করুন",
       "manageAccess": "অ্যাক্সেস পরিচালনা করুন",
       "bitbucketNoRepositoriesDescription": "এই Bitbucket ওয়ার্কস্পেসে কোনো রিপোজিটরি নেই।",
-      "bitbucketSetup": "Bitbucket সেটআপ",
-      "couldNotOpenGithubSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
       "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
-      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস",
-      "selectedRepositories": "নির্বাচিত রিপোজিটরি"
+      "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
     },
     "style": {
       "title": "পর্যালোচনার ধরন",
@@ -1280,7 +1265,6 @@
       "showMore": "আরও দেখুন",
       "created": "তৈরি হয়েছে",
       "started": "শুরু হয়েছে",
-      "completed": "সম্পন্ন",
       "tokens": "টোকেন",
       "tokensInOut": "{{input}} ইনপুট / {{output}} আউটপুট",
       "council": "পর্যালোচক দল",
@@ -1289,7 +1273,6 @@
       "gateNone": "নেই",
       "gateHidden": "লুকানো",
       "checkRun": "যাচাই প্রক্রিয়া",
-      "status": "অবস্থা",
       "threshold": "সীমা",
       "transcriptWaiting": "পর্যালোচনার ট্রান্সক্রিপ্টের জন্য অপেক্ষা করা হচ্ছে।",
       "transcriptEmpty": "এই পর্যালোচনার জন্য কোনো ট্রান্সক্রিপ্ট নেই।",
@@ -1305,8 +1288,7 @@
       "sessionError": "সেশনে ত্রুটি: {{error}}।",
       "statusWithValue": "অবস্থা: {{status}}",
       "toolName": "টুল: {{name}}",
-      "toolNameError": "টুল {{name}}-এ ত্রুটি হয়েছে।",
-      "unknownError": "অজানা ত্রুটি"
+      "toolNameError": "টুল {{name}}-এ ত্রুটি হয়েছে।"
     },
     "reviewMemory": {
       "title": "পর্যালোচনার মেমরি",
@@ -1339,7 +1321,6 @@
     "webhookSetupDescription": "কিছু রিপোজিটরি স্বয়ংক্রিয় পর্যালোচনা নাও পেতে পারে।",
     "autoReviews": "স্বয়ংক্রিয় পর্যালোচনা",
     "selectRepository": "স্বয়ংক্রিয় পর্যালোচনা চালু করতে অন্তত একটি রিপোজিটরি নির্বাচন করুন।",
-    "selectRepositories": "রিপোজিটরি নির্বাচন করুন",
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
@@ -1354,7 +1335,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "আপনার ব্যক্তিগত রিপোজিটরিগুলো এখনো নিচে পাওয়া যাবে।",
-      "personalSubtitle": "আপনার নিজের রিপোজিটরি",
       "viewOnly": "শুধু দেখা যাবে"
     },
     "reviewList": {
@@ -1385,9 +1365,7 @@
       "allAreas": "সব বিষয়",
       "customInstructions": "নিজস্ব নির্দেশনা",
       "set": "নির্ধারিত",
-      "mergeGate": "মার্জের শর্ত",
       "nSelected": "{{displayCount}}টি নির্বাচিত",
-      "reviewMemory": "পর্যালোচনার মেমরি",
       "proposedReviewMdGuidance": "প্রস্তাবিত REVIEW.md নির্দেশনা"
     },
     "decision": {
@@ -1452,7 +1430,6 @@
       "noFiltersDescription": "ফিরে গিয়ে ত্রুটির তালিকা থেকে আবার ফিল্টার খুলুন।",
       "title": "ত্রুটির ফিল্টার",
       "reset": "রিসেট করুন",
-      "status": "অবস্থা",
       "severity": "তীব্রতা",
       "outcome": "ফলাফল",
       "slaStatus": "SLA অবস্থা",
@@ -1463,13 +1440,8 @@
       "severityHigh": "উচ্চ",
       "severityMedium": "মাঝারি",
       "severityLow": "নিম্ন",
-      "outcomeNotAnalyzed": "বিশ্লেষণ করা হয়নি",
-      "outcomeAnalyzing": "বিশ্লেষণ চলছে",
-      "outcomeFailed": "বিশ্লেষণ ব্যর্থ হয়েছে",
       "outcomeNotExploitable": "আক্রমণে ব্যবহারযোগ্য নয়",
-      "outcomeSafeToDismiss": "খারিজ করা নিরাপদ",
       "outcomeTriageComplete": "প্রাথমিক যাচাই সম্পন্ন",
-      "outcomeDismissed": "খারিজ",
       "sortSeverityDesc": "তীব্রতা: বেশি থেকে কম",
       "sortSeverityAsc": "তীব্রতা: কম থেকে বেশি",
       "sortSlaDue": "SLA শেষ তারিখ",
@@ -1594,7 +1566,6 @@
     },
     "dismiss": {
       "title": "শনাক্ত সমস্যা খারিজ করুন",
-      "submit": "শনাক্ত সমস্যা খারিজ করুন",
       "reason": "কারণ",
       "reasonFixStarted": "সমাধানের কাজ শুরু হয়েছে",
       "reasonNoBandwidth": "সময় বা লোকবল নেই",
@@ -1615,7 +1586,6 @@
     "findingDetails": {
       "supersededBy": "নতুন ত্রুটির রেকর্ড দিয়ে প্রতিস্থাপিত",
       "supersededByDescription": "অবস্থা, বিশ্লেষণ ও সমাধান দেখতে বর্তমান রেকর্ডটি ট্যাপ করে খুলুন।",
-      "dismissed": "খারিজ",
       "dismissedBecause": "খারিজ করা হয়েছে: {{reason}}।",
       "severityLabel": "তীব্রতা: {{severity}}",
       "package": "প্যাকেজ",
@@ -1626,7 +1596,6 @@
       "ghsa": "GHSA",
       "manifest": "ম্যানিফেস্ট",
       "detected": "শনাক্ত হয়েছে",
-      "updated": "আপডেট হয়েছে",
       "slaDeadline": "SLA সময়সীমা",
       "sourceRecord": "উৎসের রেকর্ড",
       "source": "উৎস",
@@ -1650,7 +1619,6 @@
       "repositoriesCount_one": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount_other": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
-      "selectRepositories": "রিপোজিটরি নির্বাচন করুন",
       "selectRepositoriesSubtitle": "সিকিউরিটি এজেন্ট কোন রিপোজিটরিগুলো পর্যবেক্ষণ করবে তা বেছে নিন",
       "modelsAndAnalysis": "মডেল ও বিশ্লেষণ",
       "analysisModeSubtitle": "{{mode}} বিশ্লেষণ",
@@ -1726,8 +1694,7 @@
       "tabRemediation": "সমাধান",
       "notFound": "শনাক্ত সমস্যাটি পাওয়া যায়নি",
       "notFoundDescription": "এই ত্রুটিটি সরিয়ে ফেলা হয়েছে, অথবা এটি দেখার অনুমতি আপনার আর নেই।",
-      "couldNotLoad": "শনাক্ত সমস্যাটি লোড করা যায়নি।",
-      "dismissA11y": "শনাক্ত সমস্যা খারিজ করুন"
+      "couldNotLoad": "শনাক্ত সমস্যাটি লোড করা যায়নি।"
     },
     "findingList": {
       "couldNotLoad": "ত্রুটিগুলো লোড করা যায়নি।",
@@ -1736,9 +1703,6 @@
       "noMatchesDescription": "নির্বাচিত ফিল্টারগুলো বদলে বা সরিয়ে দেখুন।",
       "emptyTitle": "কোনো অমীমাংসিত ত্রুটি নেই",
       "emptyDescription": "এখন নজর দেওয়ার মতো কোনো অমীমাংসিত ত্রুটি নেই।"
-    },
-    "scopeList": {
-      "personalSubtitle": "আপনার নিজের রিপোজিটরি"
     },
     "findingRow": {
       "nextRemediationPrOpen": "সমাধানের PR খোলা আছে",
@@ -1798,13 +1762,11 @@
     },
     "repositories": {
       "couldNotLoad": "রিপোজিটরির সেটিংস লোড করা যায়নি।",
-      "couldNotOpenGithubSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
       "githubAppSettings": "GitHub অ্যাপের সেটিংস",
       "manageAccess": "GitHub অ্যাপের অ্যাক্সেস পরিচালনা করুন",
       "noRepositories": "কোনো রিপোজিটরি নেই",
       "noRepositoriesDescription": "Kilo GitHub অ্যাপকে রিপোজিটরিগুলোতে অ্যাক্সেস দিন।",
-      "selectAtLeastOne": "অন্তত একটি রিপোজিটরি নির্বাচন করুন।",
-      "selectedRepositories": "নির্বাচিত রিপোজিটরি"
+      "selectAtLeastOne": "অন্তত একটি রিপোজিটরি নির্বাচন করুন।"
     },
     "scopeEntry": {
       "connectDescription": "আপনার রিপোজিটরিগুলোর Dependabot সতর্কতা স্বয়ংক্রিয়ভাবে সিঙ্ক করতে এবং নিরাপত্তা ত্রুটি পরিচালনা করতে Kilo GitHub অ্যাপ ইনস্টল করুন।",
@@ -1839,10 +1801,8 @@
       "queuedTitle": "বিশ্লেষণ সারিতে আছে",
       "queuedDescription": "আরও বিশ্লেষণ চালানোর সুযোগের জন্য অপেক্ষা করা হচ্ছে।",
       "analyzing": "বিশ্লেষণ চলছে",
-      "analyzingTitle": "বিশ্লেষণ চলছে",
       "analyzingDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায় কি না, তা পরীক্ষা করা হচ্ছে।",
       "failed": "বিশ্লেষণ ব্যর্থ হয়েছে",
-      "failedTitle": "বিশ্লেষণ ব্যর্থ হয়েছে",
       "failedDescription": "সিকিউরিটি এজেন্ট বিশ্লেষণটি সম্পূর্ণ করতে পারেনি।",
       "extractionFailedDescription": "প্রযুক্তিগত রিপোর্টটিকে কাঠামোগত ফলাফলে রূপান্তর করা যায়নি।",
       "exploitableDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায়।",
@@ -1852,18 +1812,14 @@
       "unknown": "পর্যালোচনা প্রয়োজন",
       "unknownDescription": "নিরাপত্তা দুর্বলতাযুক্ত ফিচারটি কোড থেকে ব্যবহার করা যায় কি না, তা বিশ্লেষণে নিশ্চিত হওয়া যায়নি।",
       "safeToDismiss": "খারিজ করা নিরাপদ",
-      "safeToDismissTitle": "খারিজ করা নিরাপদ",
       "safeToDismissDescription": "প্রাথমিক যাচাইয়ে দেখা গেছে, কোডবেস বিশ্লেষণ ছাড়াই এটি নিরাপদে খারিজ করা যায়।",
       "manualReviewTitle": "মানুষের পর্যালোচনা প্রয়োজন",
       "manualReviewDescription": "প্রাথমিক যাচাইয়ে এই ত্রুটিটি মানুষের পর্যালোচনার জন্য চিহ্নিত করা হয়েছে।",
       "analysisRequired": "বিশ্লেষণ প্রয়োজন",
       "analysisRequiredTitle": "কোডবেসের বিশ্লেষণ প্রয়োজন",
       "analysisRequiredDescription": "কী পদক্ষেপ নেওয়া হবে তা ঠিক করার আগে রিপোজিটরি বিশ্লেষণের পরামর্শ দেওয়া হয়েছে প্রাথমিক যাচাইয়ে।",
-      "completed": "বিশ্লেষিত",
-      "completedTitle": "বিশ্লেষিত",
       "completedDescription": "বিশ্লেষণ সম্পন্ন হয়েছে, তবে কোনো নির্দিষ্ট ফলাফল রেকর্ড করা হয়নি।",
       "notAnalyzed": "বিশ্লেষণ করা হয়নি",
-      "notAnalyzedTitle": "বিশ্লেষণ করা হয়নি",
       "notAnalyzedDescription": "এই ত্রুটির জন্য এখনো কোডবেস বিশ্লেষণ চালানো হয়নি।"
     },
     "deadline": {
@@ -1998,7 +1954,6 @@
       "didNotCompleteTitle": "ইনস্টলেশন সম্পূর্ণ হয়নি",
       "didNotCompleteMessage": "GitHub অ্যাপ ইনস্টলেশনটি সম্পূর্ণ হয়নি। অ্যাপ থেকে আবার চেষ্টা করুন।"
     },
-    "sessionExited": "সেশন শেষ হয়েছে",
     "remoteSpawnRetryable": "ইনস্ট্যান্সের সঙ্গে যোগাযোগ করা যায়নি — এর সংযোগ বিচ্ছিন্ন হয়ে থাকতে পারে।",
     "remoteSpawnNonRetryable": "ইনস্ট্যান্সটি সেশন শুরু করতে ব্যর্থ হয়েছে — মেশিনটি পরীক্ষা করুন বা CLI আপডেট করুন।",
     "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সের সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন অথবা অন্য একটি ইনস্ট্যান্স বেছে নিন।",
@@ -2038,7 +1993,6 @@
     },
     "remoteSession": {
       "failedToCreate": "রিমোট সেশন তৈরি করা যায়নি।",
-      "exited": "সেশন শেষ হয়েছে",
       "failedToExit": "সেশন শেষ করা যায়নি।",
       "exitTitle": "সেশন শেষ করবেন?",
       "exitMessage": "এতে চলমান সেশনটি বন্ধ হবে, তবে এর ইতিহাস থাকবে।",
@@ -2072,7 +2026,6 @@
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
-      "addAttachment": "সংযুক্তি যোগ করুন",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
       "prefillRepoAndModelUnavailable": "মূল সেশনের রিপোজিটরি ও মডেল আর ব্যবহার করা যাচ্ছে না। নিচে অন্য রিপোজিটরি ও মডেল বেছে নিন।",
       "prefillRepoUnavailable": "{{repo}} আর ব্যবহার করা যাচ্ছে না। নিচে একটি রিপোজিটরি বেছে নিন।",
@@ -2106,15 +2059,10 @@
       "updatedFileCount": "{{displayCount}}টি ফাইল আপডেট হয়েছে।",
       "updatedFileCount_other": "{{displayCount}}টি ফাইল আপডেট হয়েছে।"
     },
-    "toolPatch": {
-      "operationUpdated": "আপডেট হয়েছে"
-    },
     "toolCard": {
       "accessibility": "{{label}} টুল, {{status}}",
       "accessibilityLabel": "{{name}} টুল, {{status}}",
-      "fileEmpty": "এই ফাইলটি খালি।",
       "noTasks": "কোনো কাজ নেই।",
-      "truncated": "আংশিক",
       "toolRead": "ফাইল পড়া",
       "toolEdit": "সম্পাদনা করুন",
       "toolWrite": "ফাইল লেখা",
@@ -2183,7 +2131,6 @@
       "noMatches": "কোনো মিল পাওয়া যায়নি",
       "noRepositories": "কোনো রিপোজিটরি নেই",
       "noRepositoriesDescription": "আপনার অ্যাকাউন্টে কোনো রিপোজিটরি সংযুক্ত নেই।",
-      "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
       "loading": "লোড হচ্ছে...",
       "accessibility": "রিপোজিটরি: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2196,7 +2143,6 @@
       "reportAiResponse": "AI-এর উত্তর রিপোর্ট করুন",
       "reportAiResponseConfirm": "পর্যালোচনার জন্য এই উত্তরটি রিপোর্ট করবেন?",
       "report": "রিপোর্ট করুন",
-      "role": "ভূমিকা",
       "roleUser": "ব্যবহারকারী",
       "roleAssistant": "সহকারী",
       "sent": "পাঠানো হয়েছে",
@@ -2383,7 +2329,6 @@
     },
     "modelPicker": {
       "title": "মডেল নির্বাচন",
-      "searchPlaceholder": "মডেল অনুসন্ধান",
       "favorites": "পছন্দের তালিকা",
       "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।"
     },
@@ -2411,7 +2356,6 @@
       "uploading": "আপলোড হচ্ছে…",
       "uploaded": "আপলোড হয়েছে",
       "uploadFailedRetry": "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করতে ট্যাপ করুন।",
-      "uploadFailedTerminal": "এই ফাইলটি আপলোড করা যাবে না।",
       "moveLeft": "{{filename}} বামে সরান",
       "moveRight": "{{filename}} ডানে সরান"
     },
@@ -2423,7 +2367,6 @@
       "camera": "ক্যামেরা",
       "photoLibrary": "ছবির লাইব্রেরি",
       "files": "ফাইল",
-      "cameraAccessMessage": "ছবি তুলতে সেটিংসে ক্যামেরা ব্যবহারের অনুমতি দিন।",
       "couldNotOpenPhotoPicker": "ছবি বেছে নেওয়ার পর্দা খোলা যায়নি। Kilo আবার চালু করে চেষ্টা করুন।",
       "maxFilesAllowed": "সর্বোচ্চ {{displayCount}}টি ফাইল যোগ করা যায়।",
       "onlyAddingFiles": "{{total}}টি ফাইলের মধ্যে শুধু {{accepted}}টি যোগ করা হচ্ছে (সর্বোচ্চ {{max}}টি)"
@@ -2436,7 +2379,6 @@
       "waitForUploads": "সংযুক্তিগুলোর আপলোড শেষ হওয়া পর্যন্ত অপেক্ষা করুন।",
       "pasteFromClipboard": "ক্লিপবোর্ড থেকে পেস্ট করুন",
       "stopGenerating": "উত্তর তৈরি করা বন্ধ করুন",
-      "sendMessage": "বার্তা পাঠান",
       "selectModelBeforeSending": "পাঠানোর আগে একটি মডেল নির্বাচন করুন।",
       "preparingPlaceholder": "পরিবেশ প্রস্তুত হচ্ছে...",
       "finalizingPlaceholder": "কাজ শেষ করা হচ্ছে...",
@@ -2490,7 +2432,6 @@
     "contextUsage": {
       "windowUnavailable": "কনটেক্সট উইন্ডোর আকার জানা যাচ্ছে না",
       "tapToViewDetails": "কনটেক্সটের বিস্তারিত দেখতে ট্যাপ করুন।",
-      "costPrefix": "খরচ {{cost}}",
       "costSuffix": ", খরচ {{cost}}",
       "tokensWindowUnavailable": "কনটেক্সটে {{used}}টি টোকেন, উইন্ডোর আকার জানা যাচ্ছে না",
       "tokensUsage": "কনটেক্সটের {{window}}টি টোকেনের মধ্যে {{used}}টি ব্যবহৃত, ব্যবহারের হার {{percentage}}",
@@ -2603,7 +2544,6 @@
     "title": "পৃষ্ঠা পাওয়া যায়নি"
   },
   "monoScrollBlock": {
-    "truncated": "আংশিক",
     "wrap": "লাইন ভাঙা",
     "scroll": "স্ক্রল"
   },
@@ -2798,7 +2738,6 @@
     "productAnalyticsWho": "PostHog।",
     "errorScreenshotsWhat": "ত্রুটির সময়ের স্ক্রিনশট ও অল্প কিছু সেশনের রেকর্ডিং, যেগুলোতে টেক্সট ও ছবি আড়াল করা থাকে।",
     "errorScreenshotsWhy": "সমস্যা হওয়ার সময় অ্যাপে কী দেখা যাচ্ছিল তা দেখতে।",
-    "errorScreenshotsWho": "Sentry।",
     "installAttributionWhat": "ইনস্টলের উৎস ও প্রচারাভিযানের শনাক্তকারী।",
     "installAttributionWhy": "কোন মাধ্যম থেকে নতুন ব্যবহারকারীরা আসেন তা জানতে।",
     "installAttributionWho": "AppsFlyer।",
@@ -2853,7 +2792,6 @@
       "emailError": "একটি সঠিক ইমেইল ঠিকানা লিখুন।",
       "emailPlaceholder": "ইমেইল ঠিকানা",
       "permissionDenied": "সদস্যদের আমন্ত্রণ জানানোর অনুমতি আপনার নেই।",
-      "roleLabel": "ভূমিকা",
       "roleMember": "ভূমিকা: সদস্য",
       "sendInvite": "আমন্ত্রণ পাঠান",
       "title": "সদস্যকে আমন্ত্রণ জানান"
@@ -2959,7 +2897,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "এই ইমেইল ঠিকানায় অন্য একটি সাইন-ইন পদ্ধতিতে অ্যাকাউন্ট খোলা আছে। অন্য পদ্ধতিতে চেষ্টা করুন অথবা '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "differentOauth": "এই ইমেইল ঠিকানায় অন্য একটি সাইন-ইন পদ্ধতিতে অ্যাকাউন্ট খোলা আছে। অন্য পদ্ধতিতে চেষ্টা করুন অথবা '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "ssoError": "আপনার সংস্থায় SSO দিয়ে সাইন-ইন করা বাধ্যতামূলক। '$t(login.moreSignInOptions)' ব্যবহার করুন।",
     "blocked": "এই অ্যাকাউন্টটি ব্লক করা হয়েছে। সহায়তা দলের সঙ্গে যোগাযোগ করুন।",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "সাইন-ইন শুরু করা যায়নি। আবার চেষ্টা করুন।",
     "couldNotOpenBrowser": "ব্রাউজার খোলা যায়নি। আবার চেষ্টা করুন।",
     "signInTimedOut": "সাইন-ইন করার সময়সীমা পেরিয়ে গেছে। আবার চেষ্টা করুন।",
-    "signInFailed": "সাইন ইন করা যায়নি। আবার চেষ্টা করুন।",
     "networkError": "নেটওয়ার্কে সমস্যা হয়েছে। আবার চেষ্টা করুন।",
     "accessDeniedByUser": "ব্যবহারকারী অনুমতি দেননি।",
     "codeExpired": "কোডের মেয়াদ শেষ হয়েছে।",
@@ -3010,7 +2946,6 @@
       "title": "চ্যাট শুরু করুন",
       "description": "মডেলের সাথে কথা বলতে একটি বার্তা পাঠান।"
     },
-    "working": "কাজ চলছে",
     "historyRetry": "চ্যাটের ইতিহাস লোড করা যায়নি।",
     "sendError": "বার্তাটি পাঠানো যায়নি। আবার চেষ্টা করুন।"
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "এজেন্ট দেখতে সাইন-ইন করুন",
     "privacy": "এজেন্ট দেখতে Kilo খুলুন",
     "openAgents": "এজেন্ট খুলুন",
-    "running": "কাজ চলছে",
     "needsInput": "ইনপুট প্রয়োজন",
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"

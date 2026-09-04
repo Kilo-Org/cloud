@@ -35,7 +35,7 @@ type MockElement = {
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
-  'glanceable.running': 'Working',
+  'common.working': 'Working',
   'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
   'glanceable.stale': 'Updates delayed',

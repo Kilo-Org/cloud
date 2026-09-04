@@ -100,12 +100,9 @@ export function InviteMemberSheet() {
       ) : (
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('organization.inviteMember.roleLabel')}
+            {t('common.role')}
           </Text>
-          <RadioGroup
-            label={t('organization.inviteMember.roleLabel')}
-            className="overflow-hidden rounded-lg bg-secondary"
-          >
+          <RadioGroup label={t('common.role')} className="overflow-hidden rounded-lg bg-secondary">
             {INVITABLE_ROLES.map((value, index) => {
               const selected = role === value;
               return (

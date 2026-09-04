@@ -71,7 +71,7 @@ export function ScopeListScreen() {
         <ConfigureRow
           icon={User}
           title={t('common.personal')}
-          subtitle={t('securityAgent.scopeList.personalSubtitle')}
+          subtitle={t('common.yourOwnRepositories')}
           onPress={() => {
             openScope(PERSONAL_SECURITY_SCOPE);
           }}

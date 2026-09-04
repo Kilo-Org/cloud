@@ -221,7 +221,7 @@ export function BitbucketOverview({
                         pushField('repos');
                       }}
                     >
-                      <Text>{t('codeReviewer.selectRepositories')}</Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}

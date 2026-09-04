@@ -149,9 +149,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             <ChoiceRow
               key={option}
               label={
-                option === 'all'
-                  ? t('common.allRepositories')
-                  : t('securityAgent.repositories.selectedRepositories')
+                option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
               }
               selected={mode === option}
               disabled={!canManage}
@@ -207,7 +205,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                             }
                           );
                         } catch {
-                          toast.error(t('securityAgent.repositories.couldNotOpenGithubSettings'));
+                          toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
                         }
                       })();
                     }}

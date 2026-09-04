@@ -199,7 +199,7 @@ export function getMetricsAccessibilityLabel({
   const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
 
   if (!info) {
-    return spoken ? i18n.t('agentChat.contextUsage.costPrefix', { cost: spoken }) : '';
+    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
   }
 
   const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';

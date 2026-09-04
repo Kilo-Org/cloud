@@ -120,10 +120,21 @@
     "reply": "အကြောင်းပြန်ပါ",
     "reportSubmittedReceipt": "သတင်းပို့ပြီးပါပြီ။ လက်ခံရရှိကြောင်း အမှတ်စဉ် {{receiptId}}",
     "retryLoadingMore": "နောက်ထပ် ရယူရန် ထပ်စမ်းပါ",
-    "reviewPr": "PR ကို စစ်ဆေးပါ"
+    "reviewPr": "PR ကို စစ်ဆေးပါ",
+    "role": "အခန်းကဏ္ဍ",
+    "searchModels": "မော်ဒယ် ရှာရန်...",
+    "selectedRepositories": "ရွေးချယ်ထားသော ကုဒ်သိုလှောင်ရာများ",
+    "selectRepositories": "ကုဒ်သိုလှောင်ရာများကို ရွေးချယ်ပါ",
+    "sendMessage": "မက်ဆေ့ချ်ပို့ပါ",
+    "sessionExited": "ဆက်ရှင်မှ ထွက်ပြီးပါပြီ။",
+    "starting": "စတင်နေသည်…",
+    "status": "အခြေအနေ",
+    "truncated": "ဖြတ်တောက်ထား",
+    "updated": "မွမ်းမံပြီး",
+    "working": "လုပ်ဆောင်နေ",
+    "yourOwnRepositories": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ"
   },
   "language": {
-    "title": "ဘာသာစကား",
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
     "couldNotRestart": "ပြန်စတင်၍ မရပါ",
     "languageSaved": "ရွေးထားသော ဘာသာစကားကို သိမ်းပြီးပါပြီ။",
@@ -166,7 +177,6 @@
     "sessionEnded": "သင့်ဆက်ရှင် ပြီးဆုံးသွားသည်။ အကောင့်ပြန်ဝင်ပါ။",
     "signInCodeExpired": "အကောင့်ဝင်ရန် သင့်ကုဒ် သက်တမ်းကုန်သွားသည်။ ထပ်ကြိုးစားပါ။",
     "accessDenied": "ဝင်ရောက်ခွင့် မရပါ။",
-    "somethingWentWrong": "တစ်ခုခု မှားသွားပါပြီ။ ထပ်စမ်းပါ။",
     "codeSent": "ကုဒ်ပို့ပြီးပါပြီ",
     "accountCreated": "အကောင့်ဖန်တီးပြီးပါပြီ။ Kilo မှ ကြိုဆိုပါသည်။",
     "pleaseEnterEmail": "သင့်အီးမေးလ်လိပ်စာကို ထည့်ပါ။",
@@ -584,7 +594,6 @@
     "eventChips": {
       "comment": "မှတ်ချက်",
       "requestChanges": "ပြင်ဆင်ရန် တောင်းဆို",
-      "approve": "အတည်ပြုပါ",
       "label": "သုံးသပ်မှုအမျိုးအစား"
     },
     "overview": {
@@ -680,7 +689,6 @@
     "disabledMessage": "အကြောင်းကြားချက်များကို အသုံးပြုရန် သင့်စက်၏ ဆက်တင်များတွင် ဖွင့်ပါ။",
     "disableTitle": "အကြောင်းကြားချက်များ ပိတ်ပါ",
     "disableMessage": "အကြောင်းကြားချက်များကို မရယူလိုပါက သင့်စက်၏ ဆက်တင်များတွင် ပိတ်ပါ။",
-    "openSettings": "ဆက်တင်များကို ဖွင့်ပါ",
     "registrationFailed": "စက်ကို မှတ်ပုံတင်၍မရပါ။ အကြောင်းကြားချက်ခွင့်ပြုချက်များကို စစ်ဆေးပါ။",
     "couldNotEnable": "အကြောင်းကြားချက်များကို ဖွင့်၍မရပါ။ ထပ်ကြိုးစားပါ။",
     "previewAlways": "အမြဲ",
@@ -756,15 +764,13 @@
       "cancelReply": "အကြောင်းပြန်မှု ပယ်ဖျက်ပါ",
       "openInstance": "အင်စတန့် ဖွင့်ရန်",
       "attachFile": "ဖိုင်တွဲပါ",
-      "cancelEdit": "တည်းဖြတ်မှု ပယ်ဖျက်ပါ",
-      "sendMessage": "မက်ဆေ့ချ်ပို့ပါ"
+      "cancelEdit": "တည်းဖြတ်မှု ပယ်ဖျက်ပါ"
     },
     "conversationList": {
       "couldNotLoad": "စကားဝိုင်းများကို ရယူ၍ မရပါ။",
       "emptyTitle": "စကားဝိုင်းများ မရှိသေးပါ",
       "emptyDescription": "သင့် KiloClaw အင်စတန့်နှင့် စကားစပြောရန် စကားဝိုင်းတစ်ခု ဖန်တီးပါ။",
       "create": "စကားဝိုင်း ဖန်တီးရန်",
-      "starting": "စတင်နေသည်…",
       "newConversation": "စကားဝိုင်းအသစ်",
       "openInstanceSettings": "အင်စတန့်ဆက်တင်များကို ဖွင့်ပါ",
       "today": "ယနေ့",
@@ -805,8 +811,7 @@
       "moreActions": "နောက်ထပ်လုပ်ဆောင်ချက်များ",
       "notDelivered": "မရောက်ရှိ",
       "edited": "(တည်းဖြတ်ပြီး)",
-      "image": "ပုံ",
-      "attachment": "ပူးတွဲဖိုင်"
+      "image": "ပုံ"
     },
     "messageActions": {
       "copied": "ကူးယူပြီး",
@@ -866,7 +871,6 @@
       "managedByAdmin": "ငွေတောင်းခံမှုကို သင့်အဖွဲ့အစည်း၏ စီမံခန့်ခွဲသူက စီမံပါသည်။",
       "couldNotLoad": "ငွေတောင်းခံမှု အချက်အလက်များကို ရယူ၍မရပါ။",
       "manageOnWeb": "ဝဘ်ပေါ်တွင် ငွေတောင်းခံမှုကို စီမံပါ",
-      "commitPlan": "ကွန်မစ်",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "သင့်နောက်ဆုံး Commit သက်တမ်းသည် {{date}} တွင် ကုန်ဆုံးပါမည်။ {{price}} ဖြင့် Standard အဖြစ် ဆက်သုံးပါ။ မဟုတ်လျှင် ဆာဗာဝန်ဆောင်မှု ရပ်ဆိုင်းပါမည်။",
       "freeTrial": "အခမဲ့စမ်းသုံးခွင့်",
@@ -883,9 +887,9 @@
       "trialDaysRemaining": "စမ်းသုံးခွင့် {{remaining}} ကျန်ပါသည်။",
       "trialEndingSoon": "စမ်းသုံးခွင့် မကြာမီကုန်ဆုံးပါမည်။ {{remaining}} ကျန်ပါသည်။",
       "planName": {
-        "commit": "ကွန်မစ်",
         "standard": "Standard"
-      }
+      },
+      "commit": "ကွန်မစ်"
     },
     "changelog": {
       "title": "အသစ်ပါဝင်လာသည့်အရာများ",
@@ -935,7 +939,6 @@
       "approveDeviceTitle": "စက်ပစ္စည်းကို ခွင့်ပြုခြင်း",
       "approveMessage": "{{label}} (ကုဒ်: {{code}}) ကို သင့်အင်စတန့်နှင့် ချိတ်ဆက်ခွင့်ပြုမလား။",
       "approveTitle": "တွဲချိတ်ရန် တောင်းဆိုချက်ကို ခွင့်ပြုခြင်း",
-      "device": "စက်ပစ္စည်း",
       "unknownDevice": "အမည်မသိ စက်ပစ္စည်း"
     },
     "execPolicy": {
@@ -950,7 +953,6 @@
       "title": "Google အကောင့်",
       "couldNotLoad": "Google အကောင့်အခြေအနေကို ရယူ၍မရပါ။",
       "disconnected": "Google အကောင့်ချိတ်ဆက်မှုကို ဖြုတ်ပြီးပါပြီ။ ပြောင်းလဲမှု သက်ရောက်စေရန် အင်စတန့်ကို ပြန်တင်ပါ။",
-      "redeploy": "ပြန်လည်ဖြန့်ချိပါ",
       "setupCommand": "စတင်ပြင်ဆင်ရန် ကွန်မန်း",
       "setupCommandHelp": "Google အကောင့်ကို ချိတ်ဆက်ရန် Docker ထည့်သွင်းထားသော သင့်ကွန်ပျူတာ၏ တာမီနယ်တွင် ဒီကွန်မန်းကို လုပ်ဆောင်ပါ။",
       "failedToLoadCommand": "စတင်ပြင်ဆင်ရန် ကွန်မန်းကို ရယူ၍မရပါ။",
@@ -963,7 +965,6 @@
       "disconnectTitle": "Google ချိတ်ဆက်မှု ဖြုတ်ခြင်း"
     },
     "modelList": {
-      "searchPlaceholder": "မော်ဒယ် ရှာရန်...",
       "noMatches": "သင့်ရှာဖွေမှုနှင့် ကိုက်ညီသော မော်ဒယ် မရှိပါ",
       "noModelsDescription": "မော်ဒယ်များ ရနိုင်သည့်အခါ ဤနေရာတွင် ပေါ်လာပါမည်။",
       "noResultsFor": "\"{{query}}\" အတွက် ရလဒ်မရှိပါ။"
@@ -1021,7 +1022,6 @@
       "start": "စတင်ပါ",
       "startMessage": "ဒီအင်စတန့်ကို စတင်မလား။",
       "startTitle": "အင်စတန့် စတင်ခြင်း",
-      "starting": "စတင်နေသည်…",
       "stop": "ရပ်တန့်ပါ",
       "stopMessage": "ဒီအင်စတန့်ကို ရပ်တန့်မလား။",
       "stopTitle": "အင်စတန့် ရပ်တန့်ခြင်း",
@@ -1117,7 +1117,6 @@
         "timeoutBody": "{{name}} အတွက် ပြင်ဆင်မှုက ပုံမှန်ထက် ကြာနေသည် ({{displayMinutes}} မိနစ်ကျော်)။",
         "continueInBackground": "နောက်ခံတွင် ဆက်လုပ်ပါ",
         "settingUp": "{{name}} ကို ပြင်ဆင်နေသည်",
-        "finishingSetup": "စတင်ပြင်ဆင်မှုကို အပြီးသတ်နေသည်",
         "connectingToAgent": "အေးဂျင့်နှင့် ချိတ်ဆက်နေသည်",
         "startingSandbox": "သီးခြားလုပ်ဆောင်ရာ ပတ်ဝန်းကျင်ကို စတင်နေသည်",
         "backgroundHint": "များသောအားဖြင့် တစ်မိနစ်အောက်သာ ကြာပါသည်။ ဒီမျက်နှာပြင်ကို ပိတ်နိုင်ပါသည်။ နောက်ခံတွင် ဆက်လုပ်နေပါမည်။"
@@ -1157,24 +1156,18 @@
       "browseAllModelsA11y": "မော်ဒယ် ၅၀၀ ကျော်အားလုံးကို ကြည့်ပါ"
     },
     "accessRequired": {
-      "trialExpiredTitle": "ဝက်ဘ်ဆိုက်တွင် အခပေးအစီအစဉ် ဝယ်ယူပါ",
       "trialExpiredBody": "KiloClaw ကို ဆက်သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
-      "trialExpiredCta": "kilo.ai/claw ကို ဖွင့်ပါ",
       "subscriptionCanceledTitle": "ဝက်ဘ်ဆိုက်တွင် အခပေးအစီအစဉ် ဝယ်ယူပါ",
       "subscriptionCanceledBody": "KiloClaw ကို သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
       "subscriptionCanceledCta": "kilo.ai/claw ကို ဖွင့်ပါ",
       "subscriptionPastDueTitle": "ဝဘ်ပေါ်တွင် ငွေပေးချေမှု မွမ်းမံခြင်း",
       "subscriptionPastDueBody": "သင့်နောက်ဆုံး ငွေပေးချေမှုတွင် ပြဿနာရှိခဲ့ပါသည်။ မွမ်းမံရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် ငွေတောင်းခံမှုကို စီမံ၍မရပါ။",
-      "subscriptionPastDueCta": "kilo.ai/claw ကို ဖွင့်ပါ",
       "quarantinedTitle": "အင်စတန့်ကို ပြန်ပြင်ရန်လိုသည်",
       "quarantinedBody": "သင့် KiloClaw အင်စတန့်ကို သီးခြားခွဲထားသဖြင့် လောလောဆယ် အသုံးပြု၍မရပါ။ ပြန်သုံးနိုင်ရန် ကျွန်ုပ်တို့အဖွဲ့က ကူညီပြင်ဆင်ပေးရပါမည်။",
-      "quarantinedCta": "kilo.ai တွင် ဆက်လုပ်ပါ",
-      "multipleCurrentConflictTitle": "အကောင့်ကို စစ်ဆေးရန် လိုအပ်သည်",
       "multipleCurrentConflictBody": "သင့်အကောင့်တွင် အသုံးပြုဆဲ စာရင်းသွင်းမှု တစ်ခုထက်ပိုနေပါသည်။ ငွေထပ်တောင်းခံမှု မဖြစ်စေရန် ယာယီရပ်ဆိုင်းထားပါသည်။",
       "multipleCurrentConflictCta": "kilo.ai တွင် ဆက်လုပ်ပါ",
       "nonCanonicalEarlybirdTitle": "အစီအစဉ်အဟောင်း တွေ့ရှိသည်",
       "nonCanonicalEarlybirdBody": "သင့်ကြိုတင်အသုံးပြုခွင့် အစီအစဉ်ကို ဖုန်းပေါ်တွင် မသုံးမီ လူကိုယ်တိုင် စစ်ဆေးရန်လိုပါသည်။",
-      "nonCanonicalEarlybirdCta": "kilo.ai တွင် ဆက်လုပ်ပါ",
       "iosTitle": "KiloClaw ကို iOS တွင် မရရှိနိုင်ပါ",
       "iosBody": "ဤအကောင့်အတွက် KiloClaw အသုံးပြုခွင့်ကို iOS အက်ပ်ပြင်ပတွင် စီမံပါသည်။",
       "iosContact": "မေးခွန်းများရှိလား။ hi@kilo.ai သို့ ဆက်သွယ်ပါ။"
@@ -1189,16 +1182,11 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "ချန်နယ်များ",
       "devicePairingDescription": "စက်ပစ္စည်း တောင်းဆိုချက်များကို ခွင့်ပြုပါ",
-      "devicePairingLabel": "စက်ပစ္စည်း တွဲချိတ်မှု",
       "execPolicyDescription": "လုံခြုံရေး ဆက်တင်များ",
-      "execPolicyLabel": "အမိန့်များ လုပ်ဆောင်ခွင့် မူဝါဒ",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google အကောင့်",
       "modelDescription": "AI မော်ဒယ် ရွေးချယ်မှု",
       "secretsDescription": "ကုဒ်ဝှက်ထားသော ဝင်ရောက်ခွင့်အချက်အလက်များ",
-      "secretsLabel": "လျှို့ဝှက်အချက်အလက်များ",
       "versionPinDescription": "ဗားရှင်းတစ်ခုကို ပုံသေသတ်မှတ်ပါ",
       "versionPinLabel": "ဗားရှင်း ပုံသေသတ်မှတ်ခြင်း"
     },
@@ -1249,14 +1237,11 @@
       "finishSetup": "ပြင်ဆင်မှု အပြီးသတ်ရန်",
       "manageAccess": "ဝင်ရောက်ခွင့်ကို စီမံရန်",
       "bitbucketNoRepositoriesDescription": "ဤ Bitbucket လုပ်ငန်းခွင်တွင် အသုံးပြုနိုင်သော ကုဒ်သိုလှောင်ရာ မရှိပါ။",
-      "bitbucketSetup": "Bitbucket စတင်ပြင်ဆင်မှု",
-      "couldNotOpenGithubSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
       "gitlabNoRepositoriesDescription": "GitLab ရှိ နောက်ထပ်အဖွဲ့များ သို့မဟုတ် ပရောဂျက်များသို့ ဝင်ရောက်ခွင့်ပေးရန် လိုအပ်နိုင်သည်။",
       "installGithubApp": "ကုဒ်သိုလှောင်ရာများတွင် GitHub အက်ပ်ကို ထည့်သွင်းပါ",
       "installGithubAppDescription": "စစ်ဆေးစေလိုသော ကုဒ်သိုလှောင်ရာများသို့ Kilo GitHub အက်ပ်ကို ဝင်ရောက်ခွင့်ပေးပါ။",
       "noRepositoriesFound": "ကုဒ်သိုလှောင်ရာ မတွေ့ပါ",
-      "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်",
-      "selectedRepositories": "ရွေးချယ်ထားသော ကုဒ်သိုလှောင်ရာများ"
+      "repositoryAccess": "ကုဒ်သိုလှောင်ရာ ဝင်ရောက်ခွင့်"
     },
     "style": {
       "title": "စစ်ဆေးမှု ပုံစံ",
@@ -1280,7 +1265,6 @@
       "showMore": "နောက်ထပ် ပြရန်",
       "created": "ဖန်တီးချိန်",
       "started": "စတင်ချိန်",
-      "completed": "ပြီးစီးပြီ",
       "tokens": "တိုကင်",
       "tokensInOut": "အဝင် {{input}} / အထွက် {{output}}",
       "council": "စစ်ဆေးရေးအဖွဲ့",
@@ -1289,7 +1273,6 @@
       "gateNone": "မရှိ",
       "gateHidden": "ဝှက်ထား",
       "checkRun": "စစ်ဆေးမှု လုပ်ဆောင်ချက်",
-      "status": "အခြေအနေ",
       "threshold": "သတ်မှတ်အဆင့်",
       "transcriptWaiting": "စစ်ဆေးမှုမှတ်တမ်းကို စောင့်နေသည်။",
       "transcriptEmpty": "ဤစစ်ဆေးမှုအတွက် မှတ်တမ်း မရှိပါ။",
@@ -1305,8 +1288,7 @@
       "sessionError": "ဆက်ရှင်တွင် အမှားဖြစ်ပေါ်သည်: {{error}}။",
       "statusWithValue": "အခြေအနေ: {{status}}",
       "toolName": "ကိရိယာ: {{name}}",
-      "toolNameError": "ကိရိယာ {{name}} တွင် အမှားဖြစ်ပေါ်သည်။",
-      "unknownError": "အကြောင်းရင်းမသိသော အမှား"
+      "toolNameError": "ကိရိယာ {{name}} တွင် အမှားဖြစ်ပေါ်သည်။"
     },
     "reviewMemory": {
       "title": "စစ်ဆေးမှု မှတ်ဉာဏ်",
@@ -1339,7 +1321,6 @@
     "webhookSetupDescription": "ကုဒ်သိုလှောင်ရာအချို့တွင် အလိုအလျောက် စစ်ဆေးမှု မလုပ်နိုင်ခြင်း ဖြစ်နိုင်သည်။",
     "autoReviews": "အလိုအလျောက် စစ်ဆေးမှုများ",
     "selectRepository": "အလိုအလျောက် စစ်ဆေးမှုများကို ဖွင့်ရန် အနည်းဆုံး ကုဒ်သိုလှောင်ရာတစ်ခုကို ရွေးပါ။",
-    "selectRepositories": "ကုဒ်သိုလှောင်ရာများကို ရွေးချယ်ပါ",
     "followReviewMd": "REVIEW.md လိုက်နာရန်",
     "followReviewMdSubtitle": "ကုဒ်သိုလှောင်ရာတစ်ခုချင်းရှိ REVIEW.md ဖိုင်၏ ညွှန်ကြားချက်များကို လိုက်နာရန်",
     "bitbucket": {
@@ -1354,7 +1335,6 @@
     },
     "scopeList": {
       "personalStillAvailable": "ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများကို အောက်တွင် ဆက်လက်အသုံးပြုနိုင်သည်။",
-      "personalSubtitle": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ",
       "viewOnly": "ကြည့်ရှုရန်သာ"
     },
     "reviewList": {
@@ -1385,9 +1365,7 @@
       "allAreas": "နယ်ပယ်အားလုံး",
       "customInstructions": "စိတ်ကြိုက် ညွှန်ကြားချက်များ",
       "set": "သတ်မှတ်ထား",
-      "mergeGate": "ပေါင်းစည်းခွင့် စစ်ဆေးမှု",
       "nSelected": "{{displayCount}} ခု ရွေးထား",
-      "reviewMemory": "စစ်ဆေးမှု မှတ်ဉာဏ်",
       "proposedReviewMdGuidance": "အဆိုပြုထားသော REVIEW.md လမ်းညွှန်ချက်များ"
     },
     "decision": {
@@ -1452,7 +1430,6 @@
       "noFiltersDescription": "ပြန်သွားပြီး တွေ့ရှိချက်စာရင်းမှ စစ်ထုတ်မှုများ ပြန်ဖွင့်ပါ။",
       "title": "တွေ့ရှိချက် စစ်ထုတ်မှု",
       "reset": "မူလအတိုင်း ပြန်ထားရန်",
-      "status": "အခြေအနေ",
       "severity": "ပြင်းထန်မှု",
       "outcome": "ရလဒ်",
       "slaStatus": "SLA အခြေအနေ",
@@ -1463,13 +1440,8 @@
       "severityHigh": "မြင့်",
       "severityMedium": "အလယ်အလတ်",
       "severityLow": "နိမ့်",
-      "outcomeNotAnalyzed": "ခွဲခြမ်းစိတ်ဖြာမထားသေး",
-      "outcomeAnalyzing": "ခွဲခြမ်းစိတ်ဖြာနေ",
-      "outcomeFailed": "ခွဲခြမ်းစိတ်ဖြာမှု မအောင်မြင်",
       "outcomeNotExploitable": "တိုက်ခိုက်ရန် အသုံးမချနိုင်",
-      "outcomeSafeToDismiss": "စိတ်ချစွာ ပယ်ချနိုင်",
       "outcomeTriageComplete": "ကနဦးစိစစ်မှု ပြီးစီး",
-      "outcomeDismissed": "ပယ်ချပြီး",
       "sortSeverityDesc": "ပြင်းထန်မှု: မြင့်မှ နိမ့်သို့",
       "sortSeverityAsc": "ပြင်းထန်မှု: နိမ့်မှ မြင့်သို့",
       "sortSlaDue": "SLA သတ်မှတ်ရက်",
@@ -1594,7 +1566,6 @@
     },
     "dismiss": {
       "title": "တွေ့ရှိချက်ကို ပယ်ချပါ",
-      "submit": "တွေ့ရှိချက်ကို ပယ်ချပါ",
       "reason": "အကြောင်းရင်း",
       "reasonFixStarted": "ပြင်ဆင်မှု စတင်ပြီး",
       "reasonNoBandwidth": "အချိန်နှင့် လူအင်အား မရှိ",
@@ -1615,7 +1586,6 @@
     "findingDetails": {
       "supersededBy": "လက်ရှိတွေ့ရှိချက်ဖြင့် အစားထိုးထား",
       "supersededByDescription": "အခြေအနေ၊ ခွဲခြမ်းစိတ်ဖြာမှုနှင့် ပြုပြင်မှုတို့ကို ကြည့်ရန် လက်ရှိမှတ်တမ်းကို နှိပ်ဖွင့်ပါ။",
-      "dismissed": "ပယ်ချပြီး",
       "dismissedBecause": "{{reason}} ကြောင့် ပယ်ထားသည်။",
       "severityLabel": "ပြင်းထန်မှု {{severity}} အဆင့်",
       "package": "ပက်ကေ့ဂျ်",
@@ -1626,7 +1596,6 @@
       "ghsa": "GHSA",
       "manifest": "ပက်ကေ့ဂျ် အချက်အလက်ဖိုင်",
       "detected": "တွေ့ရှိချိန်",
-      "updated": "မွမ်းမံပြီး",
       "slaDeadline": "SLA သတ်မှတ်ရက်",
       "sourceRecord": "အရင်းအမြစ် မှတ်တမ်း",
       "source": "အရင်းအမြစ်",
@@ -1650,7 +1619,6 @@
       "repositoriesCount_one": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးထား",
       "repositoriesCount": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
       "repositoriesCount_other": "ကုဒ်သိုလှောင်ရာ {{displayCount}} ခု ရွေးချယ်ထား",
-      "selectRepositories": "ကုဒ်သိုလှောင်ရာများကို ရွေးချယ်ပါ",
       "selectRepositoriesSubtitle": "လုံခြုံရေးအေးဂျင့် စောင့်ကြည့်မည့် ကုဒ်သိုလှောင်ရာများကို ရွေးပါ",
       "modelsAndAnalysis": "မော်ဒယ်များနှင့် ခွဲခြမ်းစိတ်ဖြာမှု",
       "analysisModeSubtitle": "{{mode}} ခွဲခြမ်းစိတ်ဖြာမှု",
@@ -1726,8 +1694,7 @@
       "tabRemediation": "ပြုပြင်မှု",
       "notFound": "တွေ့ရှိချက် မတွေ့ရပါ",
       "notFoundDescription": "ဤတွေ့ရှိချက်ကို ဖယ်ရှားထားနိုင်သည်၊ သို့မဟုတ် ၎င်းကို ဝင်ရောက်ခွင့် မရှိတော့ပါ။",
-      "couldNotLoad": "ဒီတွေ့ရှိချက်ကို မရယူနိုင်ပါ။",
-      "dismissA11y": "တွေ့ရှိချက်ကို ပယ်ချပါ"
+      "couldNotLoad": "ဒီတွေ့ရှိချက်ကို မရယူနိုင်ပါ။"
     },
     "findingList": {
       "couldNotLoad": "တွေ့ရှိချက်များကို ရယူ၍ မရပါ။",
@@ -1736,9 +1703,6 @@
       "noMatchesDescription": "ရွေးထားသော စစ်ထုတ်မှုများကို ပြောင်းကြည့်ပါ သို့မဟုတ် ရှင်းလင်းကြည့်ပါ။",
       "emptyTitle": "မဖြေရှင်းရသေးသော တွေ့ရှိချက် မရှိပါ",
       "emptyDescription": "ယခုအချိန်တွင် ကိုင်တွယ်ရန် လိုအပ်သော မဖြေရှင်းရသေးသည့် တွေ့ရှိချက် မရှိပါ။"
-    },
-    "scopeList": {
-      "personalSubtitle": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ"
     },
     "findingRow": {
       "nextRemediationPrOpen": "ပြုပြင်မှု PR ဖွင့်ထား",
@@ -1798,13 +1762,11 @@
     },
     "repositories": {
       "couldNotLoad": "ကုဒ်သိုလှောင်ရာဆက်တင်များကို ရယူ၍ မရပါ။",
-      "couldNotOpenGithubSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
       "githubAppSettings": "GitHub အက်ပ်ဆက်တင်များ",
       "manageAccess": "GitHub အက်ပ်၏ ဝင်ရောက်ခွင့်ကို စီမံရန်",
       "noRepositories": "ကုဒ်သိုလှောင်ရာ မရှိပါ",
       "noRepositoriesDescription": "Kilo GitHub အက်ပ်ကို ကုဒ်သိုလှောင်ရာများသို့ ဝင်ရောက်ခွင့်ပေးပါ။",
-      "selectAtLeastOne": "အနည်းဆုံး ကုဒ်သိုလှောင်ရာတစ်ခုကို ရွေးပါ။",
-      "selectedRepositories": "ရွေးချယ်ထားသော ကုဒ်သိုလှောင်ရာများ"
+      "selectAtLeastOne": "အနည်းဆုံး ကုဒ်သိုလှောင်ရာတစ်ခုကို ရွေးပါ။"
     },
     "scopeEntry": {
       "connectDescription": "Dependabot သတိပေးချက်များကို အလိုအလျောက် ထပ်တူပြုရန်နှင့် ကုဒ်သိုလှောင်ရာအားလုံးရှိ လုံခြုံရေးတွေ့ရှိချက်များကို စီမံရန် Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ။",
@@ -1839,10 +1801,8 @@
       "queuedTitle": "ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထား",
       "queuedDescription": "နောက်ထပ် ခွဲခြမ်းစိတ်ဖြာမှုတစ်ခု လုပ်ဆောင်နိုင်သည်အထိ စောင့်နေသည်။",
       "analyzing": "ခွဲခြမ်းစိတ်ဖြာနေ",
-      "analyzingTitle": "ခွဲခြမ်းစိတ်ဖြာနေ",
       "analyzingDescription": "အက်ပ်၏ကုဒ်မှ အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်ခြင်း ရှိမရှိ စစ်ဆေးနေသည်။",
       "failed": "ခွဲခြမ်းစိတ်ဖြာမှု မအောင်မြင်",
-      "failedTitle": "ခွဲခြမ်းစိတ်ဖြာမှု မအောင်မြင်",
       "failedDescription": "လုံခြုံရေးအေးဂျင့်သည် ခွဲခြမ်းစိတ်ဖြာမှုကို အပြီးသတ်၍ မရပါ။",
       "extractionFailedDescription": "နည်းပညာအစီရင်ခံစာကို စနစ်တကျ ဖွဲ့စည်းထားသော ရလဒ်အဖြစ် ပြောင်း၍ မရပါ။",
       "exploitableDescription": "အက်ပ်၏ကုဒ်မှ အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်သည်။",
@@ -1852,18 +1812,14 @@
       "unknown": "စစ်ဆေးရန် လိုအပ်",
       "unknownDescription": "အားနည်းချက်ရှိသော လုပ်ဆောင်ချက်ကို ခေါ်သုံးနိုင်ခြင်း ရှိမရှိ ခွဲခြမ်းစိတ်ဖြာမှုက အတည်မပြုနိုင်ပါ။",
       "safeToDismiss": "စိတ်ချစွာ ပယ်ချနိုင်",
-      "safeToDismissTitle": "စိတ်ချစွာ ပယ်ချနိုင်",
       "safeToDismissDescription": "ကုဒ်စုကို ခွဲခြမ်းစိတ်ဖြာရန် မလိုဘဲ ဤတွေ့ရှိချက်ကို ဘေးကင်းစွာ ပယ်ထားနိုင်ကြောင်း ကနဦးစိစစ်မှုက ဆုံးဖြတ်ထားသည်။",
       "manualReviewTitle": "လူကိုယ်တိုင် စစ်ဆေးရန် လိုအပ်",
       "manualReviewDescription": "ဤတွေ့ရှိချက်ကို လူကိုယ်တိုင် ပြန်လည်သုံးသပ်ရန် လိုအပ်ကြောင်း ကနဦးစိစစ်မှုက သတ်မှတ်ထားသည်။",
       "analysisRequired": "ခွဲခြမ်းစိတ်ဖြာမှု လိုအပ်",
       "analysisRequiredTitle": "ကုဒ်စုကို ခွဲခြမ်းစိတ်ဖြာရန် လိုအပ်",
       "analysisRequiredDescription": "မည်သို့ တုံ့ပြန်မည်ကို မဆုံးဖြတ်မီ ကုဒ်သိုလှောင်ရာကို ခွဲခြမ်းစိတ်ဖြာရန် ကနဦးစိစစ်မှုက အကြံပြုထားသည်။",
-      "completed": "ခွဲခြမ်းစိတ်ဖြာပြီး",
-      "completedTitle": "ခွဲခြမ်းစိတ်ဖြာပြီး",
       "completedDescription": "ခွဲခြမ်းစိတ်ဖြာမှု ပြီးစီးခဲ့သော်လည်း တိကျသောရလဒ် မှတ်တမ်းတင်မထားပါ။",
       "notAnalyzed": "ခွဲခြမ်းစိတ်ဖြာမထားသေး",
-      "notAnalyzedTitle": "ခွဲခြမ်းစိတ်ဖြာမထားသေး",
       "notAnalyzedDescription": "ဤတွေ့ရှိချက်အတွက် ကုဒ်စုကို ခွဲခြမ်းစိတ်ဖြာမှု မလုပ်ရသေးပါ။"
     },
     "deadline": {
@@ -1998,7 +1954,6 @@
       "didNotCompleteTitle": "ထည့်သွင်းမှု မပြီးစီးပါ",
       "didNotCompleteMessage": "GitHub အက်ပ် ထည့်သွင်းမှု မပြီးစီးခဲ့ပါ။ အက်ပ်မှ ထပ်စမ်းကြည့်ပါ။"
     },
-    "sessionExited": "ဆက်ရှင်မှ ထွက်ပြီးပါပြီ။",
     "remoteSpawnRetryable": "အင်စတန့်ကို ဆက်သွယ်၍မရပါ။ ချိတ်ဆက်မှု ပြတ်သွားခြင်း ဖြစ်နိုင်ပါသည်။",
     "remoteSpawnNonRetryable": "အင်စတန့်က စက်ရှင်ကို စတင်၍မရပါ။ စက်ကို စစ်ဆေးပါ သို့မဟုတ် CLI ကို မွမ်းမံပါ။",
     "remoteSpawnInstanceDisconnected": "ရွေးထားသော အင်စတန့်၏ ချိတ်ဆက်မှု ပြတ်သွားပါသည်။ Cloud Agent တွင် စက်ရှင်တစ်ခု စတင်ပါ သို့မဟုတ် အခြားအင်စတန့်တစ်ခုကို ရွေးပါ။",
@@ -2038,7 +1993,6 @@
     },
     "remoteSession": {
       "failedToCreate": "အဝေးထိန်းစက်ရှင်ကို ဖန်တီး၍မရပါ။",
-      "exited": "ဆက်ရှင်မှ ထွက်ပြီးပါပြီ။",
       "failedToExit": "စက်ရှင်မှ ထွက်၍မရပါ။",
       "exitTitle": "စက်ရှင်မှ ထွက်မလား။",
       "exitMessage": "လုပ်ဆောင်နေသော စက်ရှင်ကို ရပ်တန့်မည်ဖြစ်သော်လည်း မှတ်တမ်းကို ဆက်သိမ်းထားပါမည်။",
@@ -2072,7 +2026,6 @@
       "commitAndPush": "မှတ်တမ်းတင်ပြီး တင်ပို့",
       "startSession": "စက်ရှင် စတင်ပါ",
       "promptPlaceholder": "ဘာလုပ်ချင်ပါသလဲ။",
-      "addAttachment": "ပူးတွဲဖိုင် ထည့်ပါ",
       "couldNotLoadModels": "မော်ဒယ်များကို ရယူ၍မရပါ။",
       "prefillRepoAndModelUnavailable": "မူရင်းစက်ရှင်၏ ကုဒ်သိုလှောင်ခန်းနှင့် မော်ဒယ်ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် အသစ်ရွေးပါ။",
       "prefillRepoUnavailable": "{{repo}} ကို အသုံးပြု၍မရတော့ပါ။ အောက်တွင် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးပါ။",
@@ -2106,15 +2059,10 @@
       "updatedFileCount": "ဖိုင် {{displayCount}} ခုကို မွမ်းမံပြီးပါပြီ။",
       "updatedFileCount_other": "ဖိုင် {{displayCount}} ခုကို မွမ်းမံပြီးပါပြီ။"
     },
-    "toolPatch": {
-      "operationUpdated": "မွမ်းမံပြီး"
-    },
     "toolCard": {
       "accessibility": "{{label}} ကိရိယာ၊ {{status}}",
       "accessibilityLabel": "{{name}} ကိရိယာ၊ {{status}}",
-      "fileEmpty": "ဒီဖိုင်တွင် အကြောင်းအရာ မရှိပါ။",
       "noTasks": "လုပ်ငန်းများ မရှိပါ။",
-      "truncated": "ဖြတ်တောက်ထား",
       "toolRead": "ဖတ်ခြင်း",
       "toolEdit": "တည်းဖြတ်ပါ",
       "toolWrite": "ရေးခြင်း",
@@ -2183,7 +2131,6 @@
       "noMatches": "ကိုက်ညီမှု မရှိပါ",
       "noRepositories": "အသုံးပြုနိုင်သော ကုဒ်သိုလှောင်ခန်း မရှိပါ",
       "noRepositoriesDescription": "သင့်အကောင့်နှင့် ချိတ်ဆက်ထားသော ကုဒ်သိုလှောင်ခန်း မရှိပါ။",
-      "tryDifferentSearch": "အခြားစကားလုံးဖြင့် ရှာကြည့်ပါ။",
       "loading": "ဖွင့်နေသည်...",
       "accessibility": "ကုဒ်သိုလှောင်ခန်း: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -2196,7 +2143,6 @@
       "reportAiResponse": "AI တုံ့ပြန်ချက်ကို တိုင်ကြားခြင်း",
       "reportAiResponseConfirm": "ဤတုံ့ပြန်ချက်ကို စစ်ဆေးပေးရန် တိုင်ကြားမလား။",
       "report": "တိုင်ကြားပါ",
-      "role": "အခန်းကဏ္ဍ",
       "roleUser": "အသုံးပြုသူ",
       "roleAssistant": "လက်ထောက်",
       "sent": "ပို့သည့်အချိန်",
@@ -2383,7 +2329,6 @@
     },
     "modelPicker": {
       "title": "မော်ဒယ်ရွေးချယ်ခြင်း",
-      "searchPlaceholder": "မော်ဒယ် ရှာရန်...",
       "noModelsDescription": "ရွေးချယ်ရန် မော်ဒယ်များ မရှိပါ။",
       "favorites": "စိတ်ကြိုက်များ"
     },
@@ -2411,7 +2356,6 @@
       "uploading": "တင်နေသည်…",
       "uploaded": "တင်ပြီးပါပြီ",
       "uploadFailedRetry": "ဖိုင်တင်၍မရပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
-      "uploadFailedTerminal": "ဒီဖိုင်ကို တင်၍မရပါ။",
       "moveLeft": "{{filename}} ကို ဘယ်ဘက်သို့ ရွှေ့ပါ",
       "moveRight": "{{filename}} ကို ညာဘက်သို့ ရွှေ့ပါ"
     },
@@ -2423,7 +2367,6 @@
       "camera": "ကင်မရာ",
       "photoLibrary": "ဓာတ်ပုံစုစည်းမှု",
       "files": "ဖိုင်",
-      "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များတွင် ကင်မရာ အသုံးပြုခွင့် ပေးပါ။",
       "couldNotOpenPhotoPicker": "ဓာတ်ပုံရွေးသည့်အကွက်ကို ဖွင့်၍မရပါ။ Kilo ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။",
       "maxFilesAllowed": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
       "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
@@ -2436,7 +2379,6 @@
       "waitForUploads": "ပူးတွဲဖိုင်များ တင်ပြီးသည်အထိ စောင့်ပါ။",
       "pasteFromClipboard": "ကူးယူထားသည့်အရာကို ကူးထည့်ပါ",
       "stopGenerating": "တုံ့ပြန်ချက်ရေးခြင်းကို ရပ်ပါ",
-      "sendMessage": "မက်ဆေ့ချ်ပို့ပါ",
       "selectModelBeforeSending": "မပို့မီ မော်ဒယ်တစ်ခု ရွေးပါ။",
       "preparingPlaceholder": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ပြင်ဆင်နေသည်...",
       "finalizingPlaceholder": "အပြီးသတ်နေသည်...",
@@ -2490,7 +2432,6 @@
     "contextUsage": {
       "windowUnavailable": "နောက်ခံအချက်အလက် လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ",
       "tapToViewDetails": "နောက်ခံအချက်အလက်အသေးစိတ်ကို ကြည့်ရန် နှိပ်ပါ။",
-      "costPrefix": "ကုန်ကျစရိတ် {{cost}}",
       "costSuffix": "၊ ကုန်ကျစရိတ် {{cost}}",
       "tokensWindowUnavailable": "နောက်ခံအချက်အလက် တိုကင် {{used}} ခု၊ လက်ခံနိုင်သည့်ပမာဏ မရရှိနိုင်ပါ",
       "tokensUsage": "နောက်ခံအချက်အလက် တိုကင် {{window}} ခုအနက် {{used}} ခု၊ {{percentage}} အသုံးပြုထားသည်",
@@ -2603,7 +2544,6 @@
     "title": "စာမျက်နှာ မတွေ့ပါ"
   },
   "monoScrollBlock": {
-    "truncated": "ဖြတ်တောက်ထား",
     "wrap": "စာကြောင်းခွဲ",
     "scroll": "ရွှေ့ကြည့်"
   },
@@ -2798,7 +2738,6 @@
     "productAnalyticsWho": "PostHog။",
     "errorScreenshotsWhat": "အမှားဖြစ်ချိန်တွင် အကြောင်းအရာကို ဖုံးကွယ်ထားသော မျက်နှာပြင်ဓာတ်ပုံများနှင့် နမူနာစက်ရှင်အနည်းငယ်၏ အကြောင်းအရာဖုံးကွယ်ထားသော မျက်နှာပြင်မှတ်တမ်းများ။",
     "errorScreenshotsWhy": "ပြဿနာဖြစ်ချိန်တွင် အက်ပ်က ပြသခဲ့သည့်အရာကို ကြည့်ရန်။",
-    "errorScreenshotsWho": "Sentry။",
     "installAttributionWhat": "အက်ပ်ထည့်သွင်းရာ ရင်းမြစ်နှင့် ကြော်ငြာအစီအစဉ် ခွဲခြားသတ်မှတ်ချက်များ။",
     "installAttributionWhy": "အသုံးပြုသူအသစ်များ မည်သည့်လမ်းကြောင်းမှ ရောက်လာကြောင်း နားလည်ရန်။",
     "installAttributionWho": "AppsFlyer။",
@@ -2853,7 +2792,6 @@
       "emailError": "မှန်ကန်သော အီးမေးလ်လိပ်စာကို ထည့်ပါ။",
       "emailPlaceholder": "အမည်@ကုမ္ပဏီ.com",
       "permissionDenied": "အဖွဲ့ဝင်များ ဖိတ်ကြားရန် ခွင့်ပြုချက် မရှိပါ။",
-      "roleLabel": "အခန်းကဏ္ဍ",
       "roleMember": "အခန်းကဏ္ဍမှာ အဖွဲ့ဝင်ဖြစ်ပါသည်။",
       "sendInvite": "ဖိတ်ကြားချက် ပို့ပါ",
       "title": "အဖွဲ့ဝင်ကို ဖိတ်ကြားပါ"
@@ -2959,7 +2897,6 @@
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "ဒီအီးမေးလ်ဖြင့် အခြားအကောင့်ဝင်နည်းကို သုံးထားသော အကောင့်တစ်ခု ရှိပြီးသားဖြစ်ပါသည်။ အခြားနည်းလမ်းကို စမ်းပါ သို့မဟုတ် '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "differentOauth": "ဒီအီးမေးလ်ဖြင့် အခြားအကောင့်ဝင်နည်းကို သုံးထားသော အကောင့်တစ်ခု ရှိပြီးသားဖြစ်ပါသည်။ အခြားနည်းလမ်းကို စမ်းပါ သို့မဟုတ် '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "ssoError": "သင့်အဖွဲ့အစည်းတွင် SSO ဖြင့် အကောင့်ဝင်ရပါမည်။ '$t(login.moreSignInOptions)' ကို သုံးပါ။",
     "blocked": "ဒီအကောင့်ကို ပိတ်ပင်ထားပါသည်။ အကူအညီပေးရေးအဖွဲ့ကို ဆက်သွယ်ပါ။",
@@ -2977,7 +2914,6 @@
     "startSignInFailed": "အကောင့်ဝင်ခြင်းကို စတင်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
     "couldNotOpenBrowser": "ဘရောက်ဆာကို ဖွင့်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
     "signInTimedOut": "အကောင့်ဝင်ရန် သတ်မှတ်ချိန် ကျော်သွားပါသည်။ ထပ်စမ်းကြည့်ပါ။",
-    "signInFailed": "အကောင့်ဝင်၍ မရပါ။ ထပ်စမ်းပါ။",
     "networkError": "ကွန်ရက်ချိတ်ဆက်မှုတွင် အမှားဖြစ်ပါသည်။ ထပ်စမ်းကြည့်ပါ။",
     "accessDeniedByUser": "အသုံးပြုသူက ဝင်ရောက်ခွင့်ကို ငြင်းပယ်ခဲ့ပါသည်။",
     "codeExpired": "ကုဒ်သက်တမ်း ကုန်သွားပါပြီ။",
@@ -3010,7 +2946,6 @@
       "title": "စကားဝိုင်းစတင်ပါ",
       "description": "မော်ဒယ်တစ်ခုနှင့် စကားပြောရန် မက်ဆေ့ချ်ပို့ပါ။"
     },
-    "working": "လုပ်ဆောင်နေ",
     "historyRetry": "စကားဝိုင်းမှတ်တမ်းကို ရယူ၍ မရပါ။",
     "sendError": "မက်ဆေ့ချ်ကို ပို့၍ မရပါ။ ထပ်ကြိုးစားပါ။"
   },
@@ -3022,7 +2957,6 @@
     "signedOut": "အေးဂျင့်များကို ကြည့်ရန် အကောင့်ဝင်ပါ",
     "privacy": "အေးဂျင့်များကို ကြည့်ရန် Kilo ကို ဖွင့်ပါ",
     "openAgents": "အေးဂျင့်များကို ဖွင့်ပါ",
-    "running": "လုပ်ဆောင်နေ",
     "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။"

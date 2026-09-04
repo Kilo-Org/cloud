@@ -41,7 +41,7 @@ const SEVERITY_KEYS = {
 const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.findingDetails.statusSuperseded',
   fixed: 'securityAgent.filter.fixed',
-  dismissed: 'securityAgent.findingDetails.dismissed',
+  dismissed: 'securityAgent.deadline.dismissed',
   open: 'securityAgent.findingDetails.statusOpen',
 } satisfies Record<string, string>;
 
@@ -109,7 +109,7 @@ function DismissalOrSupersessionNote({
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.findingDetails.dismissed')}</Text>
+      <Text className="text-sm font-medium">{t('securityAgent.deadline.dismissed')}</Text>
       <Text variant="muted" className="text-xs" selectable>
         {t('securityAgent.findingDetails.dismissedBecause', {
           reason: getDismissalReasonLabel(finding.ignored_reason),
@@ -226,7 +226,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           value={timeAgo(parseTimestamp(finding.first_detected_at))}
         />
         <KvRow
-          label={t('securityAgent.findingDetails.updated')}
+          label={t('common.updated')}
           value={timeAgo(parseTimestamp(finding.updated_at))}
           last={!finding.fixed_at && !finding.sla_due_at}
         />

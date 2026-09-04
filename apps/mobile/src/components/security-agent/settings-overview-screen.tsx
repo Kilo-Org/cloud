@@ -259,7 +259,7 @@ export function SettingsOverviewScreen({
               {showRepoCta ? (
                 <ConfigureRow
                   icon={FolderGit2}
-                  title={t('securityAgent.settingsOverview.selectRepositories')}
+                  title={t('common.selectRepositories')}
                   subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
                   onPress={() => {
                     router.push(getSecurityAgentPath(scope, 'settings/repositories'));

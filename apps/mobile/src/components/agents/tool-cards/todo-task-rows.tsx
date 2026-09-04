@@ -70,7 +70,7 @@ export function TodoTaskRows({ tasks, truncated = false }: Readonly<TodoTaskRows
           accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
-          {t('agentChat.toolCard.truncated')}
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

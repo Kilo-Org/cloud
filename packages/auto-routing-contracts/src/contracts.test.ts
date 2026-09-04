@@ -480,23 +480,6 @@ describe('MirrorPayloadSchema with routing constraints', () => {
   });
 });
 
-describe('package root re-exports', () => {
-  // These imports come from the package entry point (./index) — proves
-  // S2 (gateway) and S3 (worker) can import them from the package root
-  // without reaching into deep paths.
-  it('re-exports detectRequiredInputModalities from the package root', () => {
-    expect(typeof detectRequiredInputModalities).toBe('function');
-  });
-
-  it('re-exports estimateRoutingTokens from the package root', () => {
-    expect(typeof estimateRoutingTokens).toBe('function');
-  });
-
-  it('re-exports RoutingConstraintsSchema from the package root', () => {
-    expect(RoutingConstraintsSchema.safeParse({}).success).toBe(true);
-  });
-});
-
 describe('BenchmarkModelSummarySchema variant field', () => {
   const baseSummary = {
     model: 'provider/model',

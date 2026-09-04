@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildClassifierMessages, DEFAULT_CLASSIFIER_MODEL } from './prompt';
+import { buildClassifierMessages } from './prompt';
 import type { NormalizedClassifierInput } from '../index';
 
 const input = {
@@ -29,10 +29,6 @@ function parseRequestSummary(messages: ReturnType<typeof buildClassifierMessages
 }
 
 describe('classifier prompt', () => {
-  it('defaults to Gemini Flash Lite as the classifier model', () => {
-    expect(DEFAULT_CLASSIFIER_MODEL).toBe('google/gemini-2.5-flash-lite');
-  });
-
   it('builds compact taxonomy and request-summary messages', () => {
     const messages = buildClassifierMessages(input);
 

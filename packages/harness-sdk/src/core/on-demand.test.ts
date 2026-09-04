@@ -30,7 +30,16 @@ const options = {
 
 const tool = (run: Tool['run']): Layer.Layer<ToolRegistry> =>
   Layer.succeed(ToolRegistry, {
-    tools: [{ definition: { name: 'slow', description: 'slow', parameters: { type: 'object', properties: {} } }, run }],
+    tools: [
+      {
+        definition: {
+          name: 'slow',
+          description: 'slow',
+          parameters: { type: 'object', properties: {} },
+        },
+        run,
+      },
+    ],
   });
 
 const resultsIn = (events: readonly { readonly kind: string }[]) =>
@@ -85,10 +94,7 @@ it('says no when there was nothing left to send away', async () => {
   const { value } = await runWith({
     options,
     tools: tool(() => Effect.succeed('exit 0')),
-    replies: [
-      { deltas: [], calls: [call], stop: 'tools' },
-      { deltas: ['the build passed'] },
-    ],
+    replies: [{ deltas: [], calls: [call], stop: 'tools' }, { deltas: ['the build passed'] }],
     use: session =>
       Effect.gen(function* () {
         /* Nothing is running yet. */
@@ -107,10 +113,7 @@ it('sends a call away once, however many times it is asked to', async () => {
   const { value, calls } = await runWith({
     options,
     tools: tool(() => Effect.zipRight(Deferred.succeed(started, true), Effect.never)),
-    replies: [
-      { deltas: [], calls: [call], stop: 'tools' },
-      { deltas: ['I will carry on'] },
-    ],
+    replies: [{ deltas: [], calls: [call], stop: 'tools' }, { deltas: ['I will carry on'] }],
     use: session =>
       Effect.gen(function* () {
         const asking = yield* Effect.fork(Stream.runDrain(session.ask('start the build')));

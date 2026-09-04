@@ -400,25 +400,25 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 4 minutes 32 seconds:
+The whole sweep, 2026-09-04, 5 minutes 16 seconds:
 
 ```
 PASS  live         7s  the second call read the prefix from the cache
 PASS  shapes      13s  every shape carried the conversation
-PASS  stop        12s  a finished answer, told from one the ceiling cut off
-PASS  tools       23s  every shape ran a tool, and a late answer drove a round
-PASS  image       12s  every shape carried the picture and replayed it
+PASS  stop        11s  a finished answer, told from one the ceiling cut off
+PASS  tools       66s  every shape ran a tool, and a late answer drove a round
+PASS  image       11s  every shape carried the picture and replayed it
 PASS  cancel      10s  the call stopped when the caller did
-PASS  queue        8s  two handed over while busy, one taken back, order kept
-PASS  together    24s  a late answer and a typed message shared one line
-PASS  subagent    ??s  a task went down, one answer came up, a call was sent away
-PASS  session     24s  the prefix held across 10 calls, a busy session refused
-PASS  resume      11s  the stored count is the provider's own
+PASS  queue        7s  two handed over while busy, one taken back, order kept
+PASS  together    23s  a late answer and a typed message shared one line
+PASS  subagent    10s  a task went down, one answer came up, a call was sent away
+PASS  session     21s  the prefix held across 10 calls, a busy session refused
+PASS  resume       8s  the stored count is the provider's own
 PASS  clone       10s  the clone read 11848 tokens of prefix and wrote 0
-PASS  reasoning   29s  every shape took its own thinking back
+PASS  reasoning   24s  every shape took its own thinking back
 PASS  replay      25s  every shape took back thinking that had been stored
-PASS  compact     12s  the session compacted itself and kept what it was told
-PASS  models      50s  10 of 10 models answered every turn
+PASS  compact     11s  the session compacted itself and kept what it was told
+PASS  models      57s  10 of 10 models answered every turn
 ```
 
 `models` fails about one run in five on a single third-party model that answers

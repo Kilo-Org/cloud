@@ -37,7 +37,11 @@ const options = {
 const look = Layer.succeed(ToolRegistry, {
   tools: [
     {
-      definition: { name: 'look', description: 'Counts the files.', parameters: { type: 'object', properties: {} } },
+      definition: {
+        name: 'look',
+        description: 'Counts the files.',
+        parameters: { type: 'object', properties: {} },
+      },
       run: () => Effect.succeed('nine files'),
     },
   ],
@@ -87,10 +91,7 @@ const twoRounds = () => {
       tools: ['look'],
       onFinished: report => Effect.sync(() => void reports.push(report)),
     }),
-    replies: [
-      { deltas: [], calls: [call], stop: 'tools' },
-      { deltas: ['nine, it says'] },
-    ],
+    replies: [{ deltas: [], calls: [call], stop: 'tools' }, { deltas: ['nine, it says'] }],
     use: session =>
       Effect.gen(function* () {
         const events = [...(yield* Stream.runCollect(session.ask('how many files?')))];
@@ -154,15 +155,14 @@ it('counts the subagent’s tokens against the subagent, and hands them over', a
 });
 
 it('hands the model a failed result when the subagent fails', async () => {
-  const sub = under([{ deltas: [], fail: new ModelError({ reason: 'transport', cause: 'no route' }) }]);
+  const sub = under([
+    { deltas: [], fail: new ModelError({ reason: 'transport', cause: 'no route' }) },
+  ]);
 
   const { value } = await runWith({
     options,
     tools: offering(sub.layers),
-    replies: [
-      { deltas: [], calls: [call], stop: 'tools' },
-      { deltas: ['I will do it myself'] },
-    ],
+    replies: [{ deltas: [], calls: [call], stop: 'tools' }, { deltas: ['I will do it myself'] }],
     use: session => Stream.runCollect(session.ask('how many files?')),
   });
 

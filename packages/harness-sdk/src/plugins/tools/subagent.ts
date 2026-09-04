@@ -73,6 +73,12 @@ interface SubagentOptions {
    */
   readonly inlineFor?: Duration.DurationInput;
   /**
+   * Whether the model waits for the subagent, as it is told by default. False,
+   * because handing a task over is how a model carries on. A harness whose
+   * subagents are quick, or whose parent has nothing else to do, says true.
+   */
+  readonly wait?: boolean;
+  /**
    * Told what one subagent cost and where its transcript is, once it has
    * answered. This is the only thing that crosses back: a caller adding up what
    * a conversation spent needs the subagent's counts, and the parent session
@@ -171,6 +177,10 @@ const subagentTool = <E>(
     description: options.description ?? description,
     parameters,
   },
+  /* Handing a task over is how the model carries on, so it does not wait for
+     one by default. A model that has nothing to do until the task is done says
+     so on the call. */
+  wait: options.wait ?? false,
   ...(options.inlineFor === undefined ? {} : { inlineFor: options.inlineFor }),
   run: (call: ToolCall) =>
     Effect.flatMap(asked(call), ({ task }) =>

@@ -202,7 +202,9 @@ Say `concurrent: false` for a tool that holds one thing — a terminal, a file, 
 person — and the session gives it a permit. Say `inlineFor` for one that usually
 outlives a request.
 
-`inlineFor` is your default, not a rule: the session adds a `wait` field to
+Say `wait` for whether the model waits at all — the session shows it to the
+model as that field's default, and reads it from `inlineFor` when you say
+nothing. Both are defaults and not rules: the session adds a `wait` field to
 every tool it offers, and a model that answers it decides for itself. The field
 is taken back off before `run` is called, so do not name a parameter `wait` and
 do not expect one.

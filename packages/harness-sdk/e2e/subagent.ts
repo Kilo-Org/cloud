@@ -50,6 +50,12 @@ const reports: SubagentReport[] = [];
 
 const layers = kilo();
 
+/**
+ * `wait` is what this harness tells the model by default, and both runs below
+ * ask for the waiting one: a task the model is then held on is what makes the
+ * hand-off and the sending away visible where the question was asked. The
+ * package's own default is the opposite, and `subagent.test.ts` covers it.
+ */
 const subagent = (inlineFor: Duration.DurationInput) =>
   subagentTool(
     {
@@ -57,6 +63,7 @@ const subagent = (inlineFor: Duration.DurationInput) =>
       model,
       maxTokens: 128,
       inlineFor,
+      wait: true,
       onFinished: report => Effect.sync(() => void reports.push(report)),
     },
     layers

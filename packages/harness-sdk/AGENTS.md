@@ -985,10 +985,23 @@ is busy, for up to five minutes, and a session busy longer than that surfaces on
 
 ### Four parties decide how long the model waits
 
-`waiting.ts` holds all of it, and the most specific answer wins. The tool author
-names a default with `inlineFor`. The session names a fallback. The model answers
-`wait` on the call. And whoever is watching a running call can end the waiting
-now.
+`waiting.ts` holds all of it, and the most specific answer wins. The tool says
+whether the model waits at all with `Tool.wait`, and how long the waiting lasts
+with `inlineFor`. The session names a fallback deadline. The model answers `wait`
+on the call. And whoever is watching a running call can end the waiting now.
+
+`Tool.wait` and `inlineFor` are two questions, not one. The first is whether
+there is any waiting; the second is how long it lasts once there is. A tool that
+says neither has its default read from the deadline, because a tool nobody waits
+any time for is a tool nobody waits for — that is `waitsFor` in `tool.ts`, and
+it is what reaches the model as the schema's `default`.
+
+The two shipped tools answer opposite ways on purpose. `question` says true: a
+model asks in order to find something out, and the answer is what it is waiting
+for. `subagent` says false: handing a task over is how a model carries on, and a
+parent that sat on it would have paid for a subagent and got a subroutine. Both
+are `options.wait ?? …`, so a harness that knows its own people or its own
+subagents can say otherwise.
 
 The model's answer is honoured in both directions, which was a decision. The
 argument against honouring `wait: true` over a tool's `inlineFor: 0` is that it

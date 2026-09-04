@@ -1,4 +1,4 @@
-import { Context, Data, type Duration, Effect, Option } from 'effect';
+import { Context, Data, Duration, Effect, Option } from 'effect';
 
 /**
  * A tool is something the model may ask for, and the code that answers.
@@ -92,10 +92,24 @@ interface Tool {
    * on a person wants: no model should sit on an open request while somebody
    * reads a question.
    *
-   * It is a default and not a rule. The model answers `wait` on the call when
-   * it knows better, in either direction, and its answer wins.
+   * It bounds the waiting; it does not decide whether there is any. `wait`
+   * decides that, and the model's own answer beats both.
    */
   readonly inlineFor?: Duration.DurationInput;
+  /**
+   * Whether the model waits for this tool, as the model is told by default.
+   *
+   * The tool knows something the harness cannot. A question the model asked
+   * because it cannot go on without the answer is worth waiting for, so
+   * `question` says true. A subagent the model handed a task to is not: the
+   * whole point of handing it over is to carry on, so `subagent` says false.
+   *
+   * It reaches the model as the schema's `default`, so a model that says
+   * nothing gets what the tool expects and a model that knows better overrides
+   * it. Without it the default is read from `inlineFor`: a tool that waits no
+   * time at all advertises false, and everything else advertises true.
+   */
+  readonly wait?: boolean;
   /**
    * Whether two calls to this tool may overlap. True by default, because the
    * model asks for several at once and running them one after another wastes
@@ -133,21 +147,41 @@ const toolNamed = (tools: readonly Tool[], name: string): Option.Option<Tool> =>
  */
 const waitField = 'wait';
 
+/**
+ * How long the model waits for a tool that names no deadline of its own, and
+ * whose session names none either. Half a minute is long enough for anything
+ * that reads a file or asks a server, and short enough that a request is not
+ * left open on something slower.
+ */
+const defaultInlineFor = Duration.seconds(30);
+
 const waitProperty = {
   type: 'boolean',
   description:
     'Whether to wait for this call. False hands you a note saying it is ' +
     'still running, so you can carry on with what does not depend on it, and ' +
-    'the result reaches you in a later message. True waits for it. Leave it ' +
-    'out to let the harness decide, which is right unless you know better.',
+    'the result reaches you in a later message. True waits for it. The default ' +
+    'is what this tool expects — leave it out unless this call is different.',
 };
 
+/**
+ * Whether the model waits for this tool when it says nothing.
+ *
+ * The tool's own answer if it gave one. Otherwise it is read from the deadline:
+ * a tool that waits no time at all is a tool nobody waits for.
+ */
+const waitsFor = (tool: Tool, session?: Duration.DurationInput): boolean =>
+  tool.wait ?? !Duration.isZero(Duration.decode(tool.inlineFor ?? session ?? defaultInlineFor));
+
 /** One tool as the model is told it, with the field the harness adds to all of them. */
-const asOffered = (definition: ToolDefinition): ToolDefinition => ({
-  ...definition,
+const asOffered = (tool: Tool, session?: Duration.DurationInput): ToolDefinition => ({
+  ...tool.definition,
   parameters: {
-    ...definition.parameters,
-    properties: { ...definition.parameters.properties, [waitField]: waitProperty },
+    ...tool.definition.parameters,
+    properties: {
+      ...tool.definition.parameters.properties,
+      [waitField]: { ...waitProperty, default: waitsFor(tool, session) },
+    },
   },
 });
 
@@ -156,11 +190,13 @@ const asOffered = (definition: ToolDefinition): ToolDefinition => ({
  *
  * Every one of them gains `wait`, because whether the model waits for a call is
  * the model's decision to make and not the tool author's. What the tool author
- * decided is the default: `Tool.inlineFor` is what happens when the model says
- * nothing.
+ * decided reaches the model as that field's default, so a model that says
+ * nothing gets it.
  */
-const definitionsOf = (tools: readonly Tool[]): readonly ToolDefinition[] =>
-  tools.map(tool => asOffered(tool.definition));
+const definitionsOf = (
+  tools: readonly Tool[],
+  session?: Duration.DurationInput
+): readonly ToolDefinition[] => tools.map(tool => asOffered(tool, session));
 
 /**
  * Resolves the names a session was opened with, in that order, against the
@@ -205,12 +241,14 @@ const locksFor = (tools: readonly Tool[]): Effect.Effect<ReadonlyMap<string, Eff
 export type { JsonSchema, Tool, ToolCall, ToolDefinition, ToolRegistryService, ToolResult };
 export {
   asOffered,
+  defaultInlineFor,
   definitionsOf,
   locksFor,
   resolveTools,
   ToolFailure,
   ToolMissingError,
   waitField,
+  waitsFor,
   ToolRegistry,
   toolNamed,
 };

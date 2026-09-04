@@ -121,8 +121,9 @@ const description =
   'Asks the person one or more questions and returns their answers. Ask ' +
   'everything you need in one call rather than one question at a time. A ' +
   'question with choices is answered by picking from them; a question without ' +
-  "is answered in the person's own words. The answer may take a while, and " +
-  'you will be told when it arrives.';
+  "is answered in the person's own words. Waiting is the default, because you " +
+  'asked to find something out; set wait to false and carry on if there is ' +
+  'useful work the answer does not block.';
 
 /** What the model sent, or a failed result saying what was wrong with it. */
 const asked = (call: ToolCall): Effect.Effect<Asked, ToolFailure> =>
@@ -166,6 +167,12 @@ interface QuestionOptions {
    * person is asked either way, and only the waiting is cut short.
    */
   readonly inlineFor?: Duration.DurationInput;
+  /**
+   * Whether the model waits for an answer, as it is told by default. True,
+   * because a model asks in order to find something out. A harness whose
+   * people answer slowly, or whose model always has other work, says false.
+   */
+  readonly wait?: boolean;
   /** The name the model calls it by, for a harness that already has one. */
   readonly name?: string;
 }
@@ -181,6 +188,10 @@ interface QuestionOptions {
 const questionTool = (ask: Asker, options?: QuestionOptions): Tool => ({
   definition: { name: options?.name ?? 'question', description, parameters },
   concurrent: false,
+  /* The model asked because it cannot go on without the answer, so waiting is
+     what it wants. It is still only the default: a model with work the answer
+     does not block says so on the call, and the deadline still moves it on. */
+  wait: options?.wait ?? true,
   ...(options?.inlineFor === undefined ? {} : { inlineFor: options.inlineFor }),
   run: (call: ToolCall) =>
     Effect.flatMap(asked(call), ({ questions }) =>

@@ -24,7 +24,20 @@ import {
  * not a failed session.
  */
 
-const call = { id: 'tc_1', name: 'subagent', arguments: '{"task":"count the files"}' };
+/**
+ * The model asks to wait, which the tool does not do by default.
+ *
+ * Handing a task over is how a model carries on, so `subagentTool` says
+ * `wait: false` and every call to it is backgrounded at once. What crosses
+ * between parent and subagent is the same either way, and reading it where the
+ * call was made is what keeps each test below about its own subject. The
+ * default has a test of its own at the end.
+ */
+const call = {
+  id: 'tc_1',
+  name: 'subagent',
+  arguments: '{"task":"count the files","wait":true}',
+};
 
 const options = {
   system: 'sys',
@@ -180,7 +193,7 @@ it('refuses a task it cannot read, without opening a session', async () => {
     options,
     tools: offering(sub.layers),
     replies: [
-      { deltas: [], calls: [{ ...call, arguments: '{"job":"count"}' }], stop: 'tools' },
+      { deltas: [], calls: [{ ...call, arguments: '{"job":"count","wait":true}' }], stop: 'tools' },
       { deltas: ['I will do it myself'] },
     ],
     use: session => Stream.runCollect(session.ask('how many files?')),
@@ -189,4 +202,25 @@ it('refuses a task it cannot read, without opening a session', async () => {
   expect(answered([...value])).toMatchObject([{ result: { failed: true } }]);
   /* Nothing was asked of the subagent's model, so nothing was spent on it. */
   expect(sub.model.calls).toHaveLength(0);
+});
+
+it('hands the task over and carries on, when the model says nothing', async () => {
+  const sub = under([{ deltas: ['there are nine files'] }]);
+
+  const { value } = await runWith({
+    options,
+    tools: offering(sub.layers),
+    replies: [
+      { deltas: [], calls: [{ ...call, arguments: '{"task":"count the files"}' }], stop: 'tools' },
+      { deltas: ['I have asked, and I will say when it answers'] },
+    ],
+    use: session => Stream.runCollect(session.ask('how many files?')),
+  });
+
+  /* The whole point of handing a task over is to carry on. The answer still
+     comes back, in a round of its own, like any backgrounded call. */
+  const [result] = answered([...value]);
+  expect(String(Reflect.get(Reflect.get(result ?? {}, 'result') ?? {}, 'body'))).toContain(
+    'still running'
+  );
 });

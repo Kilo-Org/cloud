@@ -1,5 +1,5 @@
 import { Clock, Deferred, Duration, Effect, type Exit, Fiber, Option, Ref } from 'effect';
-import { type Tool, type ToolCall, type ToolResult, waitField } from './tool.js';
+import { defaultInlineFor, type Tool, type ToolCall, type ToolResult, waitField } from './tool.js';
 import type { Running, Wiring } from './wiring.js';
 
 /**
@@ -16,13 +16,6 @@ import type { Running, Wiring } from './wiring.js';
  * discussion is only whether the model sits and waits for it, or is handed a
  * note and told the answer later.
  */
-
-/**
- * How long the model waits before a call goes to the background. Half a minute
- * is long enough for anything that reads a file or asks a server, and short
- * enough that a request is not left open on something slower.
- */
-const defaultInlineFor = Duration.seconds(30);
 
 /**
  * What the model asked for about waiting, and the call without it.
@@ -61,21 +54,22 @@ const tried = (parse: () => unknown): unknown => {
 /**
  * How long the model waits for one call.
  *
- * The model's own answer wins where it gave one, in both directions: it may
- * give up on a call the tool expected it to wait for, and it may wait for one
- * the tool expected it to abandon. Neither costs anything at the provider —
- * tools run between requests, not during one — so what waiting spends is the
- * caller's own stream, and the caller can cut that short at any time with
- * `session.background`.
+ * Three answers, and the most specific one wins. The model's own `wait` beats
+ * everything, in both directions: it may give up on a call the tool expected it
+ * to wait for, and it may wait for one the tool expected it to abandon — and
+ * when it waits it waits under the session's limit, never the tool's zero. The
+ * tool's own `wait` decides when the model said nothing. And when neither said
+ * anything the deadline decides, as it always did.
  *
- * A model that waits still waits under a limit: the session's, or the
- * package's, never the tool's zero and never forever.
+ * Waiting costs nothing at the provider: tools run between requests, not during
+ * one. What it spends is the caller's own stream, and the caller can cut that
+ * short at any time with `session.background`.
  */
-const waitFor = (wiring: Wiring, tool: Tool, wait?: boolean): Duration.DurationInput => {
-  if (wait === false) {
+const waitFor = (wiring: Wiring, tool: Tool, asked?: boolean): Duration.DurationInput => {
+  if ((asked ?? tool.wait) === false) {
     return Duration.zero;
   }
-  return wait === true
+  return asked === true
     ? (wiring.inlineFor ?? defaultInlineFor)
     : (tool.inlineFor ?? wiring.inlineFor ?? defaultInlineFor);
 };
@@ -165,4 +159,4 @@ const waited = (
       );
 
 export type { RunningCall };
-export { backgroundNow, defaultInlineFor, runningIn, waited, waitFor, wanted, whileWaiting };
+export { backgroundNow, runningIn, waited, waitFor, wanted, whileWaiting };

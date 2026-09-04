@@ -85,7 +85,7 @@ const requestFor = (round: Round, offer: boolean): Effect.Effect<ModelRequest> =
        that is every turn, and the call costs one scan of a list already held. */
     const asked = sinceSummary(turns);
     const maxTokens = yield* ceilingOf(wiring, round.options);
-    const tools = offer ? definitionsOf(wiring.tools) : [];
+    const tools = offer ? definitionsOf(wiring.tools, wiring.inlineFor) : [];
     return {
       prompt: wiring.assembler.assemble({ system: wiring.system, turns: asked }),
       model: wiring.model,

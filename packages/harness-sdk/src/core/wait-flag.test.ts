@@ -1,6 +1,6 @@
 import { Duration, Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
-import type { ModelEvent } from './model.js';
+import type { ModelEvent, ModelRequest } from './model.js';
 import { runWith } from './session-fixture.js';
 import { type Tool, ToolRegistry } from './tool.js';
 
@@ -34,8 +34,14 @@ const asking = (wait?: boolean) => ({
   arguments: JSON.stringify(wait === undefined ? { path: 'x' } : { path: 'x', wait }),
 });
 
+/** What the tool says about waiting, in the two ways a tool can say it. */
+interface Says {
+  readonly inlineFor?: Duration.DurationInput;
+  readonly wait?: boolean;
+}
+
 /** A tool that answers at once, so anything unanswered is a decision, not a race. */
-const tool = (inlineFor?: Duration.DurationInput, seen?: string[]): Layer.Layer<ToolRegistry> =>
+const tool = (says: Says = {}, seen?: string[]): Layer.Layer<ToolRegistry> =>
   Layer.succeed(ToolRegistry, {
     tools: [
       {
@@ -44,7 +50,7 @@ const tool = (inlineFor?: Duration.DurationInput, seen?: string[]): Layer.Layer<
           description: 'look',
           parameters: { type: 'object', properties: { path: { type: 'string' } } },
         },
-        ...(inlineFor === undefined ? {} : { inlineFor }),
+        ...says,
         run: (call): Effect.Effect<string> =>
           Effect.sync(() => {
             seen?.push(call.arguments);
@@ -59,6 +65,10 @@ const bodyOf = (events: Iterable<ModelEvent>): string => {
   const found = [...events].find(event => event.kind === 'toolResult');
   return found === undefined ? '' : found.result.body;
 };
+
+/** What the model was told about waiting for this tool, as the schema says it. */
+const shown = (held: { readonly calls: readonly ModelRequest[] }): unknown =>
+  held.calls[0]?.tools?.[0]?.parameters.properties?.['wait'];
 
 const answered = (tools: Layer.Layer<ToolRegistry>, wait?: boolean) =>
   runWith({
@@ -76,20 +86,20 @@ it('gives up on a call the tool expected it to wait for', async () => {
 });
 
 it('waits for a call the tool expected it to abandon', async () => {
-  const { value } = await answered(tool(Duration.zero), true);
+  const { value } = await answered(tool({ inlineFor: Duration.zero }), true);
 
   expect(bodyOf(value)).toBe('nine');
 });
 
 it('leaves the tool to decide when the model does not answer', async () => {
-  const { value } = await answered(tool(Duration.zero));
+  const { value } = await answered(tool({ inlineFor: Duration.zero }));
 
   expect(bodyOf(value)).toContain('still running');
 });
 
 it('offers the field to the model and keeps it away from the tool', async () => {
   const seen: string[] = [];
-  const { calls } = await answered(tool(Duration.zero, seen), true);
+  const { calls } = await answered(tool({ inlineFor: Duration.zero }, seen), true);
 
   expect(calls[0]?.tools?.[0]?.parameters.properties).toMatchObject({
     path: { type: 'string' },
@@ -104,7 +114,7 @@ it('leaves arguments that are not an object for the tool to complain about', asy
   const seen: string[] = [];
   const { value } = await runWith({
     options,
-    tools: tool(Duration.zero, seen),
+    tools: tool({ inlineFor: Duration.zero }, seen),
     replies: [
       { deltas: [], calls: [{ id: 'tc_1', name: 'look', arguments: 'not json' }], stop: 'tools' },
       { deltas: ['nine files'] },
@@ -122,7 +132,7 @@ it('survives arguments that parse to nothing at all', async () => {
   const seen: string[] = [];
   const { value } = await runWith({
     options,
-    tools: tool(Duration.zero, seen),
+    tools: tool({ inlineFor: Duration.zero }, seen),
     replies: [
       { deltas: [], calls: [{ id: 'tc_1', name: 'look', arguments: 'null' }], stop: 'tools' },
       { deltas: ['nine files'] },
@@ -134,4 +144,33 @@ it('survives arguments that parse to nothing at all', async () => {
      defect on a call the model was entitled to make. */
   expect(seen).toEqual(['null']);
   expect(bodyOf(value)).toContain('still running');
+});
+
+it('takes the tool at its word when the model says nothing', async () => {
+  const { value } = await answered(tool({ wait: false }));
+
+  /* The tool named no deadline, so the session's five minutes would hold the
+     model here. `wait: false` is the tool saying nobody waits for this one. */
+  expect(bodyOf(value)).toContain('still running');
+});
+
+it('lets the model wait for a tool that says nobody does', async () => {
+  const { value } = await answered(tool({ wait: false }), true);
+
+  expect(bodyOf(value)).toBe('nine');
+});
+
+it('tells the model what each tool expects, in the schema', async () => {
+  const waits = await answered(tool({ wait: true }));
+  const goes = await answered(tool({ wait: false }));
+  const zero = await answered(tool({ inlineFor: Duration.zero }));
+  const plain = await answered(tool());
+
+  /* A tool that said so, either way. And one that said nothing: the deadline
+     answers for it, because a tool nobody waits any time for is a tool nobody
+     waits for. */
+  expect(shown(waits)).toMatchObject({ default: true });
+  expect(shown(goes)).toMatchObject({ default: false });
+  expect(shown(zero)).toMatchObject({ default: false });
+  expect(shown(plain)).toMatchObject({ default: true });
 });

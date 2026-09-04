@@ -266,22 +266,35 @@ The answer goes back as a turn the conversation says, never as a second tool
 result: the call it belongs to was already answered, and every shape refuses a
 second result for one call.
 
-### The model decides too
+### Who decides whether the model waits
 
-The deadline is the harness's guess. The model knows something the harness
-cannot: whether this call is the one it is stuck on. So every tool it is offered
-carries one extra field, `wait`, and its answer wins in both directions — it can
-give up on a call the tool expected it to wait for, and wait for one the tool
-expected it to abandon.
+Every tool the model is offered carries one extra field, `wait`, and the
+schema's `default` is what the tool says about itself:
 
-Waiting costs nothing at the provider. Tools run between requests, never during
-one, so what a waiting model spends is the caller's own stream — and the caller
-can cut that short at any moment, which is the next section.
+```ts
+const weather: Tool = {
+  definition: { name: 'weather', description: 'The weather in one city.', parameters },
+  /* What the model is told to do by default. Leave it out and the deadline
+     answers: a tool nobody waits any time for advertises false. */
+  wait: true,
+  run,
+};
+```
 
-A model that says nothing gets the tool's default, which is right unless it
-knows better. A model that waits still waits under the session's limit, never
-forever. The field never reaches the tool: a tool author writes the arguments
-their tool takes, and nothing else arrives.
+The two tools this package ships say opposite things, and both are right.
+`question` says true, because a model asks in order to find something out.
+`subagent` says false, because handing a task over is how a model carries on.
+Either can be changed by the harness that wires it.
+
+The model's own answer beats both, in either direction: it can give up on a call
+the tool expected it to wait for, and wait for one the tool expected it to
+abandon. Waiting costs nothing at the provider — tools run between requests,
+never during one — so what a waiting model spends is the caller's own stream,
+and the caller can cut that short at any moment, which is the next section. A
+model that waits still waits under the session's limit, never forever.
+
+The field never reaches the tool: a tool author writes the arguments their tool
+takes, and nothing else arrives.
 
 ### Sending a running call away
 

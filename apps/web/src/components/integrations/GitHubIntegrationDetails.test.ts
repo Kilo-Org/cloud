@@ -1,4 +1,56 @@
-import { buildAppReturnOutcomeView } from './GitHubIntegrationDetails';
+import {
+  buildAppReturnOutcomeView,
+  getGitHubUserConnectionErrorMessage,
+} from './GitHubIntegrationDetails';
+
+jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret' }));
+
+describe('GitHub user-connect recovery copy', () => {
+  test.each([
+    'invalid_state',
+    'connection_failed',
+    'account_mismatch',
+    'authorization_cancelled',
+    'missing_code',
+  ])('provides an actionable recovery for user-connect error %s only', error => {
+    expect(getGitHubUserConnectionErrorMessage(error, 'user-connect')).toMatch(/new connection/);
+    expect(getGitHubUserConnectionErrorMessage(error, null)).toBeNull();
+    expect(getGitHubUserConnectionErrorMessage(error, 'installation')).toBeNull();
+  });
+
+  test('acknowledges cancellation and provides a fresh-start path', () => {
+    expect(getGitHubUserConnectionErrorMessage('authorization_cancelled', 'user-connect')).toBe(
+      'GitHub account authorization was cancelled. Start a new connection when you are ready.'
+    );
+  });
+
+  test('explains an incomplete provider response without exposing an internal status code', () => {
+    expect(getGitHubUserConnectionErrorMessage('missing_code', 'user-connect')).toBe(
+      'GitHub did not return a valid authorization code. Start a new connection.'
+    );
+  });
+
+  test('does not claim missing verifier state necessarily expired', () => {
+    expect(getGitHubUserConnectionErrorMessage('invalid_state', 'user-connect')).not.toMatch(
+      /expired/i
+    );
+  });
+
+  test('explains the account binding without naming an account', () => {
+    expect(getGitHubUserConnectionErrorMessage('account_mismatch', 'user-connect')).toBe(
+      'Sign in to the Kilo account that started this GitHub connection, then start a new connection.'
+    );
+  });
+
+  test.each([
+    undefined,
+    'installation_failed',
+    'install_state_user_mismatch',
+    'not_installation_admin',
+  ])('leaves unrelated error presentation unchanged: %s', error => {
+    expect(getGitHubUserConnectionErrorMessage(error, 'user-connect')).toBeNull();
+  });
+});
 
 describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
   it('success: Continue back to /cloud/sessions with github_install=success', () => {

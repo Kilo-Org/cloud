@@ -56,6 +56,31 @@ it('reads the turns back in the order they were appended', async () => {
   expect(loaded.map(textOf)).toEqual(['message 0', 'message 1', 'message 2']);
 });
 
+it('reads the parts of a turn back in the order they were written', async () => {
+  /* The provider refuses a turn whose thinking blocks come back rearranged, so
+     a store that reordered them would undo the ordering the session keeps. The
+     read sorts on the part identifier, which is a ULID and so rises with the
+     order the parts were made in. */
+  const written = [
+    { id: 'prt_0', kind: 'reasoning', body: 'before', signature: 'sig_one' },
+    { id: 'prt_1', kind: 'redacted', body: 'ENCRYPTED' },
+    { id: 'prt_2', kind: 'reasoning', body: 'after', signature: 'sig_two' },
+    { id: 'prt_3', kind: 'text', body: 'said' },
+  ] as const;
+  const db = database();
+  const loaded = await use(db, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.append([
+        { id: 'trn_0', sessionId: session.id, role: 'assistant', parts: written },
+      ]);
+      return yield* store.load(session.id);
+    })
+  );
+
+  expect(loaded[0]?.parts).toEqual(written);
+});
+
 it('gives back the options a session was opened with, absent ones included', async () => {
   const db = database();
   const read = await use(db, store =>

@@ -95,6 +95,9 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+- Case follows the English copy, and only in a language that has case. Georgian
+  Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
+  it only in full capitals.
 - Name a key for what the string is, not for the one screen that shows it first.
 - If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
   `tools/i18n/check-catalogs.mjs` and record both senses there.

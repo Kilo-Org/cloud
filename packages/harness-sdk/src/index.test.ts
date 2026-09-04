@@ -30,7 +30,14 @@ const layers = [
 ] as const;
 
 /** What a caller opens, continues, or reads a session with. */
-const functions = ['openSession', 'continueSession', 'cloneSession', 'hitRatio', 'textOf'] as const;
+const functions = [
+  'openSession',
+  'continueSession',
+  'cloneSession',
+  'hitRatio',
+  'textOf',
+  'questionTool',
+] as const;
 
 const tags = [
   'ModelClient',
@@ -40,6 +47,7 @@ const tags = [
   'TokenSource',
   'RetryPolicy',
   'EntropySource',
+  'ToolRegistry',
 ] as const;
 
 it('exports every layer a consumer wires', () => {
@@ -68,15 +76,19 @@ it('keeps the machinery of a session out of the root', () => {
   const machinery = [
     'appendTurn',
     'compactIfFull',
+    'definitionsOf',
     'draftOf',
     'handleOf',
+    'locksFor',
     'makeId',
     'makePart',
     'makeSession',
     'makeTurn',
     'onStore',
     'promptedOf',
+    'resolveTools',
     'sinceSummary',
+    'toolNamed',
     'wiringFor',
   ];
   const leaked = machinery.filter(name => name in sdk);

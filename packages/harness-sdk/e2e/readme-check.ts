@@ -6,6 +6,8 @@ import { openSession } from '../src/core/run.js';
 import { layerKilo } from '../src/plugins/kilo.js';
 import { continueSession, cloneSession } from '../src/core/resume.js';
 import { TokenError, type TokenSourceService } from '../src/core/token.js';
+import { type Tool, ToolRegistry } from '../src/core/tool.js';
+import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
 import { hitRatio } from '../src/core/usage.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
@@ -110,3 +112,48 @@ export const stopped = Effect.gen(function* () {
   const reading = yield* Effect.fork(Stream.runDrain(session.ask('Count to 300.')));
   yield* Fiber.interrupt(reading);
 });
+
+/* The README's tools: the registry, the names a session may use, the rounds it
+   runs on its own, and the question tool with an asker of the caller's own. */
+const weather: Tool = {
+  definition: {
+    name: 'weather',
+    description: 'The weather in one city.',
+    parameters: {
+      type: 'object',
+      properties: { city: { type: 'string', description: 'The city to report on.' } },
+      required: ['city'],
+    },
+  },
+  run: call => Effect.succeed(`It is raining in ${String(JSON.parse(call.arguments).city)}.`),
+};
+
+export const withTools = Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [weather] }));
+
+export const asking = Effect.gen(function* () {
+  const session = yield* openSession({
+    system: 'You are terse.',
+    model: 'anthropic/claude-haiku-4.5',
+    tools: ['weather'],
+    inlineFor: '5 seconds',
+  });
+  yield* Effect.fork(
+    Stream.runForEach(session.continued, event =>
+      Effect.sync(() => {
+        if (event.kind === 'delta') {
+          process.stdout.write(event.text);
+        }
+      })
+    )
+  );
+  yield* Stream.runDrain(session.ask('What is the weather in Oslo?'));
+});
+
+declare const promptTheUser: (question: Question) => Effect.Effect<string>;
+
+const ask: Asker = questions =>
+  Effect.forEach(questions, question =>
+    Effect.map(promptTheUser(question), text => ({ id: question.id, text }))
+  );
+
+export const tools = [questionTool(ask)];

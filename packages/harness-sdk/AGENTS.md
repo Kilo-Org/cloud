@@ -397,19 +397,27 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 3 minutes 46 seconds:
+The whole sweep, 2026-09-04, 4 minutes 27 seconds:
 
 ```
-PASS  live         7s   the second call read the prefix from the cache
-PASS  shapes      11s   every shape carried the conversation
-PASS  stop        11s   a finished answer, told from one the ceiling cut off
-PASS  image       12s   every shape carried the picture and replayed it
-PASS  cancel       9s   the call stopped when the caller did
-PASS  session     25s   the prefix held across 10 calls, a busy session refused
-PASS  reasoning   25s   every shape took its own thinking back
+PASS  live         9s   the second call read the prefix from the cache
+PASS  shapes      20s   every shape carried the conversation
+PASS  stop        22s   a finished answer, told from one the ceiling cut off
+PASS  tools       26s   every shape ran a tool, and a late answer drove a round
+PASS  image       15s   every shape carried the picture and replayed it
+PASS  cancel      15s   the call stopped when the caller did
+PASS  session     27s   the prefix held across 10 calls, a busy session refused
+PASS  resume      11s   the stored count is the provider's own
+PASS  clone       11s   the clone read the prefix from the cache and wrote none
+PASS  reasoning   26s   every shape took its own thinking back
+PASS  replay      24s   every shape took back thinking that had been stored
 PASS  compact     11s   the session compacted itself and kept what it was told
-PASS  models     115s   10 of 10 models answered every turn
+PASS  models      60s   10 of 10 models answered every turn
 ```
+
+`models` fails about one run in five on a single third-party model that answers
+one turn with nothing. It is the model, not the package: the same model passes
+on the next run, and the failure is an empty answer rather than a refused call.
 
 
 `pnpm test:e2e` asks two questions in one session against the real gateway and
@@ -463,6 +471,35 @@ Cache read grows by exactly one exchange per call and cache write stays at
 exactly that exchange. A prefix that moved would show as a large write on a
 late call, which is what the run asserts. It also asks a second question while
 the first is still streaming, and requires `SessionBusyError`.
+
+### Tools, on every shape
+
+`pnpm test:e2e:tools` is the only proof that the provider reads what this
+package writes for a tool call. The three shapes disagree about how one is
+written — `messages` writes blocks, `responses` writes items beside the message,
+`chat_completions` writes a field on the assistant message and a role of its own
+for the result — and a shape that refuses a round refuses the whole session,
+because a call whose result it will not read can never be answered.
+
+The run holds three claims. Each shape carries a round: the model calls the
+tool, reads what it said, and answers with a word it could not have invented.
+The calls of one turn overlap, measured on the clock rather than assumed. And a
+question answered slower than the model waits drives a round of its own, which
+is the whole of backgrounding end to end, against a real model deciding for
+itself whether to carry on.
+
+Measured 2026-09-04, `anthropic/claude-haiku-4.5`:
+
+```
+shape             calls     answered
+messages          1         "The weather in Oslo is kestrel."
+responses         1         "The weather in Oslo is kestrel."
+chat_completions  1         "The weather in Oslo is kestrel."
+
+two calls in one turn overlapped by 600ms
+asked, not waited: "I'm waiting for your answer about your favourite colour."
+told later:        "You said your favourite colour is ultramarine."
+```
 
 ### A picture, and a caller who walks away
 
@@ -695,6 +732,85 @@ acquire shapes were tried and every one that waits deadlocks.
 An answer turn is added only when the stream reaches `done`. A half written turn
 would sit in the prefix of every later request.
 
+### A session names its tools; the registry defines them
+
+The `ToolRegistry` plugin holds every tool the harness has. A session names the
+ones it may use, as strings, and `openSession` resolves them at open. A name
+nothing holds fails with `ToolMissingError` rather than opening a session that
+would send the model a tool it cannot run — and the model would call it.
+
+The names are frozen for the life of the session, like the system prompt and the
+model, and for the same reason: the definitions are rendered into the prefix.
+Adding a tool mid-session throws the cache away.
+
+One question is one loop. The model answers by asking for tools, the tools
+answer, the model is asked again, and only when it stops asking does any of it
+reach the store. That last part is the rule: every shape refuses a call whose
+result is missing, so a store holding half a round holds a session nobody can
+continue. `exchange.ts` collects the turns as they are made; `commit` writes the
+question and all of them in one append.
+
+The loop ends three ways — the model stops asking, the round ceiling is reached
+(`maxRounds`, 24 by default), or the last request filled enough of the window
+that the next would be refused. The last two end with one more request offering
+no tools at all, so the model has to answer in words. An exchange that stopped
+on a tool result would leave the transcript ending on something the model never
+replied to, and no shape takes that back.
+
+Nothing a tool does fails the question. A tool that throws, a name the session
+does not offer, arguments that are not JSON: each is a failed result handed
+back, because the model is the only party that can decide what to do about it.
+The words are the failure's own cause and never `Cause.pretty` — a stack trace
+in a tool result is paid for on every request of the session from then on.
+
+The calls of one turn run at once, because the model asks for several when they
+are independent. A tool that holds one thing says `concurrent: false` and gets
+an `Effect.Semaphore` of one permit, so two calls to it queue while everything
+else overlaps.
+
+### Every call can outlive the request
+
+Every call is forked and run under a deadline — `inlineFor` on the tool, else on
+the session, else 30 seconds. When the deadline passes, the model is told the
+call is still running and carries on; the work keeps going in the session's own
+scope; and what it eventually says goes on a queue that `background.ts` drains.
+
+That is why any tool at all can be backgrounded: the harness decides when to
+stop waiting, not the tool. A tool that always outlives a request says
+`inlineFor: 0`, which is read rather than timed — a zero-length deadline raced
+against the work is a race the work usually wins.
+
+When the answer lands, the session asks the model about it without anybody
+having asked a question, and a caller watches through `session.continued`. It is
+not "wait for the next question": a build that finishes, or a person who answers
+ten minutes later, is work to do at that moment and not at whatever moment
+somebody next types. The rounds happen whether or not anybody reads the stream.
+
+The answer goes back as a turn the conversation says, never as a second tool
+result: the call it belongs to was already answered, and every shape refuses a
+second result for one call.
+
+A result that lands while a question is still streaming waits for it, because
+one session still does one thing at a time. `roundFor` retries while the session
+is busy, for up to five minutes, and a session busy longer than that surfaces on
+`session.continued` rather than spinning forever.
+
+### The one tool the package ships
+
+`questionTool` is in `plugins/`, not `core/`, and it is the only tool here.
+Everything about the question is the model's — how many, what each says, what
+may be picked, one answer or several, whether it may be skipped. Everything
+about the asking is the caller's, in one function. The package holds the middle:
+the shape of a question, the shape of an answer, and the words the model reads.
+
+It is `concurrent: false`, so two rounds of questions queue rather than arriving
+on one person at once. A caller writing an asker that owns the terminal, or one
+dialog, therefore needs no lock of its own.
+
+It renders the answers by walking the questions, not the answers: a caller who
+answers two of three is reported as answering two of three, and an answer to a
+question nobody asked is dropped rather than shown as one the model wrote.
+
 ### The session does not write to the store
 
 `appendTurn` is a pure function. It does not touch the `SessionStore` plugin.
@@ -841,6 +957,17 @@ Measured with `pnpm test:e2e:probe responses anthropic/claude-sonnet-4.5` on
 carrying the reasoning. So the merge loses nothing today, and the probe is how
 to check that again.
 
+A thinking block is closed by its seal, not by the next event. A model produces
+two signed blocks in a row between tool calls, and merging them would hand the
+provider one block under the other's seal.
+
+The gateway then ends a block with a reasoning event carrying no words and no
+signature, after the signature has already arrived. That event opens no block:
+one opened on it would sit unsigned behind the signed one, the wire drops what
+it cannot sign, and the thinking would go back with a hole in it. Only the live
+run says so, which is why `pnpm test:e2e:reasoning` asserts that every stored
+block carries a seal rather than that there is exactly one.
+
 ### A provider may fail after the answer has started
 
 All three shapes may report a failure in the middle of a stream that they would
@@ -870,7 +997,7 @@ probe prints any frame that carries one, so that check takes one command.
 ### Why the model stopped is part of the answer
 
 `done` carries a `StopReason` beside the counts: `end`, `maxTokens`, `refusal`,
-or `unknown`. Without it a caller cannot tell a finished answer from one the
+`tools`, or `unknown`. Without it a caller cannot tell a finished answer from one the
 ceiling cut off mid-sentence, and would store half a thought and build every
 later request on it.
 
@@ -878,8 +1005,14 @@ The truncated turn is still kept. It is what was paid for, and dropping it would
 shorten the prompt that follows.
 
 `unknown` is the honest answer for a name this package has not seen, and it is
-never a guess. `tool_use` and `tool_calls` map to `unknown` on purpose: this
-package has no tools, so naming them would claim a meaning nothing has tested.
+never a guess. `tool_use` and `tool_calls` map to `tools`, which is what tells
+`loop.ts` to run the calls and ask again.
+
+One shape names no reason for a call at all: `chat_completions` can end a
+streamed answer with `finish_reason: "stop"` while the assistant message
+carries `tool_calls`. So the gateway plugin keeps a flag for whether the model
+asked for anything, and upgrades `end` to `tools` when it did — only `end`, so a
+ceiling or a refusal still reports itself.
 
 It is also what a caller gets when the stream ended and no frame said why. All
 three shapes served here always send one, on every live run recorded in this
@@ -898,8 +1031,8 @@ the provider's own guidance for the second is to treat it as truncated. Both
 leave half a sentence, which is the whole of what the reason has to tell a
 caller. The full list, read on 2026-09-04: `end_turn`, `max_tokens`,
 `stop_sequence`, `tool_use`, `pause_turn`, `refusal`, and
-`model_context_window_exceeded`. `tool_use` and `pause_turn` both wait on
-tools.
+`model_context_window_exceeded`. `pause_turn` maps to `unknown`: it waits on a
+server-side tool this package does not run, and no live run has produced one.
 
 ### A dropped stream stops the call
 
@@ -919,8 +1052,10 @@ the type its own runtime has. `e2e/node-fetch.ts` shows the one line.
 ### An exchange is written whole, or not at all
 
 The question is added to the session in memory when it is asked, because the
-prompt needs it. The **store** hears about the question and the answer together,
-in one call, when the stream reaches `done`.
+prompt needs it. The **store** hears about the question and everything it
+produced together, in one call, when the loop ends — the answer, and every tool
+call and result of every round on the way to it. A call stored without its
+result is a session nobody can continue.
 
 If no answer arrives — the caller walked away, the transport failed, the store
 refused the write — the question is taken back out again. A transcript that ends
@@ -1091,6 +1226,11 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/wiring.ts` | What every session shares: the options, the handle, the bridge |
 | `src/core/ask.ts` | One question and one answer: the guard, the ceiling, the stream |
 | `src/core/exchange.ts` | What an exchange is, and the rule that it is written whole |
+| `src/core/handle.ts` | `SessionHandle`: what a caller holds, and the driver behind it |
+| `src/core/loop.ts` | The rounds one question makes, and the three ways they end |
+| `src/core/tool.ts` | The `ToolRegistry` plugin point, and what a tool is |
+| `src/core/tools.ts` | Running the calls of one turn, under a deadline they can outlive |
+| `src/core/background.ts` | The rounds the session runs when a late result lands |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
 | `src/core/turn.ts` | One turn and its parts: text, reasoning, or an image |
@@ -1112,6 +1252,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/web-crypto.ts` | The default source: the global `crypto` |
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
+| `src/plugins/tools/question.ts` | The question tool, and the asker a caller writes |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
 | `src/plugins/store/driver.ts` | The one-function seam an adapter fills, and `transact` |
@@ -1151,9 +1292,9 @@ replacing it by hand means rebuilding the shared catalog — the trap this
 function closes. One line here against twelve a caller would have copied. Every
 other plugin is still replaced by composing the layers instead.
 
-There are six entry points: `@kilocode/harness-sdk`, `/core`,
-`/plugins/gateway`, `/plugins/prompt`, `/plugins/store/node` and
-`/plugins/store/expo`. The two stores have subpaths of their own because each
+There are seven entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/gateway`, `/plugins/prompt`, `/plugins/tools`, `/plugins/store/node`
+and `/plugins/store/expo`. The two stores have subpaths of their own because each
 names a platform: exporting them from the root would pull `node:sqlite` or
 `expo-sqlite` into every bundle. The catalog, token and retry plugins have
 none — a consumer reaches them through the root barrel, which also pulls the
@@ -1162,8 +1303,9 @@ gateway. Add a subpath when one of them is wanted on its own.
 The root is narrower than `/core` on purpose. It re-exports whole only the
 modules a caller uses whole, and names what it takes from the seven that hold
 the machinery a session runs on: `wiringFor`, `makeId`, `sinceSummary`,
-`onStore` and the rest are reached through `/core` instead. That is 33 names at
-the root rather than 50, and every one of them is in the README.
+`onStore` and the rest are reached through `/core` instead. The tool contracts
+are at the root — a caller writes tools — while `resolveTools`, `toolNamed`,
+`definitionsOf` and `locksFor` are machinery and are not.
 
 `src/index.test.ts` asserts both halves, because a module left out of a barrel
 is invisible from outside the package and every test here imports by path. It

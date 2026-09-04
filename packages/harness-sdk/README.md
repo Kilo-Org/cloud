@@ -100,10 +100,12 @@ because its `fetch` does not stream a response body without a polyfill.
 | `delta` | A piece of the answer's text |
 | `reasoning` | A piece of the model's thinking, and the signature that closes it |
 | `redacted` | Thinking the provider encrypted. There is nothing here to show a reader |
+| `toolCall` | A tool the model asked for, whole: its id, its name, its arguments |
+| `toolResult` | What that tool said, and whether it failed |
 | `done` | This call's token counts, and why the model stopped |
 
 `done` is always last, and it is the only event that reports usage. `stop` is
-one of `end`, `maxTokens`, `refusal`, or `unknown`: an answer cut off at the
+one of `end`, `maxTokens`, `refusal`, `tools`, or `unknown`: an answer cut off at the
 ceiling is not a finished answer, and a caller that retries needs to tell them
 apart. `maxTokens` covers both walls — the ceiling you set and the model's own
 context window — because both leave half a sentence. `unknown` means no frame
@@ -132,6 +134,110 @@ counts of every call so far — pass it to `hitRatio`), and `compact`.
 One session does one thing at a time. A second question, or a `compact`,
 started while the first answer is still streaming fails with
 `SessionBusyError` rather than queueing.
+
+## Tools
+
+A tool is a definition and a function that answers a call. Put every tool the
+harness has in the registry; name on each session the ones it may use.
+
+```ts
+import { Effect, Layer } from 'effect';
+import { openSession, ToolRegistry, type Tool } from '@kilocode/harness-sdk';
+
+const weather: Tool = {
+  definition: {
+    name: 'weather',
+    description: 'The weather in one city.',
+    parameters: {
+      type: 'object',
+      properties: { city: { type: 'string', description: 'The city to report on.' } },
+      required: ['city'],
+    },
+  },
+  run: call => Effect.succeed(`It is raining in ${String(JSON.parse(call.arguments).city)}.`),
+};
+
+const withTools = Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [weather] }));
+
+const session = yield* openSession({
+  system: 'You are terse.',
+  model: 'anthropic/claude-haiku-4.5',
+  tools: ['weather'],
+});
+```
+
+The session resolves those names when it opens, and fails with
+`ToolMissingError` if the registry does not hold one. A session that started
+anyway would send the model a tool it cannot run, and the model would call it.
+
+One question is then one loop: the model answers by asking for tools, the tools
+answer, the model is asked again, and only when it stops asking does any of it
+reach the store. Nothing a tool does fails the question — a tool that throws, a
+name the session does not offer, arguments that are not JSON — because the model
+is the only party that can decide what to do about it. Each of those comes back
+as a failed result.
+
+The calls of one turn run at once. A tool that holds one thing — a terminal, a
+file, a person — says `concurrent: false` and gets a permit, so two calls to it
+queue while everything else overlaps.
+
+### A call that outlives the request
+
+Every call is run under a deadline, and every call can outlive it. When the
+deadline passes, the model is told the call is still running and carries on with
+what does not depend on it; the work keeps going; and when it finally answers,
+the session asks the model about it without anybody having asked a question.
+
+```ts
+const session = yield* openSession({
+  system: 'You are terse.',
+  model: 'anthropic/claude-haiku-4.5',
+  tools: ['question'],
+  /* How long the model waits for any tool of this session. 30 seconds by
+     default, and a single tool may name its own with `inlineFor`. */
+  inlineFor: '5 seconds',
+});
+
+/* The rounds the session ran without being asked. Reading it is optional: the
+   rounds happen either way, and the transcript holds all of them. */
+yield* Effect.fork(
+  Stream.runForEach(session.continued, event =>
+    Effect.sync(() => {
+      if (event.kind === 'delta') {
+        process.stdout.write(event.text);
+      }
+    })
+  )
+);
+```
+
+The answer goes back as a turn the conversation says, never as a second tool
+result: the call it belongs to was already answered, and every shape refuses a
+second result for one call.
+
+### The question tool
+
+The package ships one tool, because no harness can do without it and none can
+write it for itself. Everything about the question is the model's — how many,
+what each says, what may be picked, one answer or several, whether it may be
+skipped. Everything about the asking is yours, in one function.
+
+```ts
+import { questionTool, type Asker } from '@kilocode/harness-sdk/plugins/tools';
+
+const ask: Asker = questions =>
+  Effect.forEach(questions, question =>
+    Effect.map(promptTheUser(question), text => ({ id: question.id, text }))
+  );
+
+const tools = [questionTool(ask)];
+```
+
+It refuses to overlap with itself, so two rounds of questions queue rather than
+arriving on one person at once. Take as long as you like: a question is the
+thing that outlives a request most often, and the round the answer starts is the
+one that tells the model what was said. Fail with a `ToolFailure` to choose the
+words the model reads when nobody answers.
 
 ## Stopping a question
 
@@ -300,6 +406,7 @@ Each of these is a `Context.Tag`, and each ships a default the package owns.
 | Point | What it decides | This package ships |
 |---|---|---|
 | `ModelClient` | How a request leaves and a reply comes back | `layerKiloGateway` |
+| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool` |
 | `PromptAssembler` | What the prompt looks like, and where the breakpoints go | `layerAssembler` |
 | `ModelCatalog` | Which shapes a model speaks, its output limit, its window | `layerTableCatalog` |
 | `SessionStore` | Where the conversation is kept | `layerNodeStore`, `layerExpoStore` |
@@ -320,5 +427,6 @@ model the moment one of them is a fetching plugin. `layerKilo` shares it.
 | `@kilocode/harness-sdk/core` | The contracts and the pure domain, no plugin. Wider than the root: it also holds the machinery a session runs on, which a plugin author sometimes needs |
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
+| `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |

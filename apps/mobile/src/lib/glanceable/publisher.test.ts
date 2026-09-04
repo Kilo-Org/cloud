@@ -90,16 +90,7 @@ describe('GlanceablePublisher', () => {
     expect(snapshot.status).toBe('happy');
   });
 
-  it('starts the activity immediately on the first eligible emit', () => {
-    vi.useFakeTimers();
-    const { sink, calls } = makeSink();
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
-    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
-    expect(count(calls, 'startOrUpdate')).toBe(1);
-    publisher.dispose();
-  });
-
-  it('coalesces later happy updates and emits only the latest', () => {
+  it('coalesces later happy updates but publishes needs-input changes immediately', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
@@ -110,6 +101,10 @@ describe('GlanceablePublisher', () => {
     vi.advanceTimersByTime(1000);
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(3);
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(1);
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(0);
     publisher.dispose();
   });
 

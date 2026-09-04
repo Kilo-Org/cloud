@@ -80,13 +80,14 @@ for await (const chunk of response.stream()) {
       continue;
     }
     const event: unknown = JSON.parse(data);
-    const named = event as { type?: string; error?: unknown };
+    const named = event as { type?: string; error?: unknown; response?: { error?: unknown } };
     const name = named.type ?? 'unnamed';
     seen.set(name, (seen.get(name) ?? 0) + 1);
-    /* The gateway fails a stream on a frame carrying a top-level `error`
-       object. Printing them here is how to tell a real failure from a shape
-       that puts the field on a frame that succeeded. */
-    if (named.error !== undefined && named.error !== null) {
+    /* The gateway fails a stream on a frame carrying an `error` object, at the
+       top or inside `response`. Printing them here is how to tell a real
+       failure from a shape that puts the field on a frame that succeeded. */
+    const failed = named.error ?? named.response?.error;
+    if (failed !== undefined && failed !== null) {
       console.log('ERROR FRAME', JSON.stringify(event).slice(0, 300));
     }
     if (name.includes('reasoning') || name.includes('item') || name === 'unnamed') {

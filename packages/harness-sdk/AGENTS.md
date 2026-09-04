@@ -762,9 +762,11 @@ to check that again.
 All three shapes may report a failure in the middle of a stream that they would
 have reported as a status had the call not been streamed. Anthropic's streaming
 reference names the case: an `overloaded_error` frame, which is a 529 on a call
-that is not streamed. All three mark it the same way, with an `error` object on
-the frame, so `isFailure` in `wire/wire.ts` reads it once rather than three
-times.
+that is not streamed. Two of the three mark it with an `error` object on the
+frame. The responses shape marks it one level down, as `response.error` on a
+`response.failed` frame, which OpenAI's reference gives a `code` and a
+`message`. `isFailure` in `wire/wire.ts` reads both places, once, rather than
+three times.
 
 The stream fails with `ModelError` and `reason: 'stream'`. It is a reason of
 its own because the caller already holds part of an answer and has to throw it
@@ -776,8 +778,10 @@ matched no reader, was dropped as an unknown event, and the stream ended on
 Reading a field this way risks calling a good frame a failure, so it was
 checked against real traffic: the whole live sweep, the ten model matrix, and
 `pnpm test:e2e:probe` on each of the three shapes, all on 2026-09-04. Not one
-frame of a call that succeeded carried a top-level `error` object. The probe
-prints any that does, so that check takes one command.
+frame of a call that succeeded carried an `error` object in either place. The
+responses shape does send the key on every reply that worked, as
+`response.error: null`, and null is not an object, so it does not match. The
+probe prints any frame that carries one, so that check takes one command.
 
 ### Why the model stopped is part of the answer
 

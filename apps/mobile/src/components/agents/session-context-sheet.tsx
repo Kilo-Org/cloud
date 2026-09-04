@@ -153,7 +153,7 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          <Row label={t('agentChat.messageDetails.model')}>
+          <Row label={t('common.model')}>
             <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
           </Row>
 

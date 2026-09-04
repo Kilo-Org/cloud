@@ -27,7 +27,49 @@
     "somethingWentWrong": "เกิดข้อผิดพลาด",
     "couldNotOpen": "ไม่สามารถเปิด {{label}} ได้",
     "link": "ลิงก์",
-    "takingLonger": "ใช้เวลานานกว่าที่คาดไว้ คุณสามารถปิดหน้านี้แล้วตรวจสอบอีกครั้งได้"
+    "takingLonger": "ใช้เวลานานกว่าที่คาดไว้ คุณสามารถปิดหน้านี้แล้วตรวจสอบอีกครั้งได้",
+    "model": "โมเดล",
+    "accessDenied": "ไม่มีสิทธิ์เข้าถึง",
+    "allRepositories": "คลังโค้ดทั้งหมด",
+    "personal": "ส่วนตัว",
+    "connectGithub": "เชื่อมต่อ GitHub",
+    "cost": "ค่าใช้จ่าย",
+    "discard": "ทิ้ง",
+    "findings": "ข้อค้นพบ",
+    "notConnected": "ยังไม่เชื่อมต่อ",
+    "notifications": "การแจ้งเตือน",
+    "pullRequest": "พูลรีเควสต์",
+    "repositories": "คลังโค้ด",
+    "securityAgent": "เอเจนต์ความปลอดภัย",
+    "unknown": "ไม่ทราบ",
+    "added": "เพิ่มแล้ว",
+    "cancelled": "ยกเลิกแล้ว",
+    "close": "ปิด",
+    "codeReviewer": "ตัวตรวจสอบโค้ด",
+    "connected": "เชื่อมต่อแล้ว",
+    "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
+    "couldNotLoadRepositories": "ไม่สามารถโหลดคลังโค้ดได้",
+    "critical": "วิกฤต",
+    "delete": "ลบ",
+    "deleted": "ลบแล้ว",
+    "details": "รายละเอียด",
+    "draft": "ฉบับร่าง",
+    "enabled": "เปิดใช้งานแล้ว",
+    "github": "GitHub",
+    "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
+    "loading": "กำลังโหลด…",
+    "loadMore": "โหลดเพิ่ม",
+    "message": "ข้อความ",
+    "off": "ปิด",
+    "organization": "องค์กร",
+    "platform": "แพลตฟอร์ม",
+    "prReview": "การตรวจสอบ PR",
+    "queued": "อยู่ในคิว",
+    "remove": "ลบออก",
+    "repository": "คลังโค้ด",
+    "signOut": "ออกจากระบบ",
+    "agents": "เอเจนต์",
+    "all": "ทั้งหมด"
   },
   "language": {
     "title": "ภาษา",
@@ -62,12 +104,10 @@
     "emailAddress": "ที่อยู่อีเมล",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ดำเนินการต่อด้วยอีเมล",
-    "continue": "ดำเนินการต่อ",
     "enterCodeSentTo": "ป้อนรหัสที่ส่งไปที่ {{email}}",
     "codeArrivalHint": "หากอีเมลนี้มีสิทธิ์ใช้งาน คุณจะได้รับรหัสภายในหนึ่งนาที",
     "verifyCode": "ยืนยันรหัส",
     "resendCode": "ส่งรหัสอีกครั้ง",
-    "back": "ย้อนกลับ",
     "termsPrefix": "การดำเนินการต่อแสดงว่าคุณยอมรับ",
     "terms": "ข้อกำหนด",
     "termsConnector": " และ ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "โปรไฟล์",
-    "agents": "เอเจนต์",
-    "codeReviewer": "ตัวตรวจสอบโค้ด",
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
-    "securityAgent": "เอเจนต์ความปลอดภัย",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
     "reviews": "การตรวจสอบโค้ด",
-    "prReview": "การตรวจสอบ PR",
     "prReviewSubtitle": "ตรวจสอบ PR บนมือถือ",
-    "organization": "องค์กร",
     "couldNotLoadOrganization": "ไม่สามารถโหลดองค์กรได้",
     "couldNotLoadOrganizationDescription": "การตั้งค่าองค์กรและเอเจนต์ไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
     "linkedAccounts": "บัญชีที่เชื่อมโยง",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "คุณไม่มีเครดิตเหลืออยู่ บัญชีนี้ต้องจัดการเครดิตนอกแอป iOS",
     "signOutTitle": "ออกจากระบบหรือไม่?",
     "signOutMessage": "คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้พื้นที่ทำงาน",
-    "signOutConfirm": "ออกจากระบบ",
     "deleteAccountTitle": "ลบบัญชีหรือไม่?",
     "deleteAccountMessage": "การดำเนินการนี้จะลบบัญชีของคุณอย่างถาวรและให้คุณออกจากระบบ เราจะส่งรหัสยืนยันทางอีเมล",
     "deleteAccountConfirm": "ลบบัญชี",
     "accountDeleted": "ลบบัญชีของคุณแล้ว",
     "viewOrganization": "ดูองค์กร",
     "manageOrganization": "จัดการองค์กร",
-    "personal": "ส่วนตัว",
     "selectAccount": "เลือกบัญชี",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "อีเมล",
     "providerTestAccount": "บัญชีทดสอบ",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
     "keepScreenOnSubtitle": "เปิดหน้าจอค้างไว้ขณะที่เซสชันกำลังทำงาน",
     "appearance": "รูปแบบการแสดงผล",
-    "notifications": "การแจ้งเตือน",
     "notificationsSubtitle": "การตั้งค่าการแจ้งเตือนแบบพุช",
     "appearanceSystem": "ตามระบบ",
     "appearanceLight": "สว่าง",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
     "pullRequestUnavailableDescription": "เปิด PR นี้ไม่ได้ อาจเป็นเพราะ PR ถูกลบ รีโพซิทอรีเป็นแบบส่วนตัว หรือยังไม่ได้ติดตั้ง Kilo GitHub App ในรีโพซิทอรีนี้",
-    "accessDenied": "ไม่มีสิทธิ์เข้าถึง",
     "accessDeniedDescription": "คุณไม่มีสิทธิ์ดู PR นี้",
     "noFilesChanged": "ไม่มีการเปลี่ยนแปลงไฟล์",
     "noFilesChangedDescription": "PR นี้ไม่มีการเปลี่ยนแปลงไฟล์",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "ไม่สามารถโหลดไฟล์ได้",
-      "checkConnection": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
       "retryLoadingFiles": "ลองโหลดไฟล์อีกครั้ง",
       "filterPlaceholder": "กรองตามพาธไฟล์",
       "viewedCount": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "ไม่สามารถโหลดความคิดเห็นเพิ่มได้",
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
       "loadMoreComments": "โหลดความคิดเห็นเพิ่ม",
-      "loadMore": "โหลดเพิ่ม",
       "closeReactions": "ปิดการแสดงความรู้สึก",
       "reactionsTitle": "การแสดงความรู้สึก",
       "addReaction": "แสดงความรู้สึก",
@@ -352,7 +380,6 @@
       "reportUser": "รายงานผู้ใช้",
       "mute": "ปิดเสียง",
       "block": "บล็อก",
-      "somethingWentWrong": "เกิดข้อผิดพลาด",
       "reportSubmitted": "ส่งรายงานแล้ว หมายเลขรับเรื่อง {{receiptId}}",
       "blockedUser": "บล็อก {{login}} แล้ว",
       "mutedUser": "ปิดเสียง {{login}} แล้ว",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "รีวิว PR",
     "headLine": "{{counts}} · คอมมิตล่าสุด {{sha}}",
     "entry": {
-      "title": "การตรวจสอบ PR",
       "eyebrow": "เปิด PR ด้วย URL",
       "pastePrLink": "วางลิงก์ PR",
       "noRecentPrs": "ยังไม่มี PR ที่เปิดล่าสุด",
       "noRecentPrsDescription": "วางลิงก์ PR ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไป PR นี้จะแสดงที่นี่",
       "couldNotLoad": "ไม่สามารถโหลดได้",
-      "remove": "ลบออก",
       "removeFromRecentsTitle": "ลบออกจากรายการล่าสุดหรือไม่?",
       "removeFromRecentsMessage": "PR นี้จะถูกลบออกจากรายการล่าสุดของคุณ",
       "removeRecentAccessibility": "ลบ {{repo}} ออกจากรายการล่าสุด",
@@ -460,13 +485,11 @@
       "pending": "รอดำเนินการ {{displayCount}} รายการ",
       "skipped": "ข้าม {{displayCount}} รายการ",
       "checksCount": "การตรวจสอบ {{displayCount}} รายการ",
-      "checkDetails": "รายละเอียดการตรวจสอบ",
-      "pullRequest": "พูลรีเควสต์"
+      "checkDetails": "รายละเอียดการตรวจสอบ"
     },
     "inbox": {
       "title": "กล่องขาเข้า",
       "recent": "ล่าสุด",
-      "draft": "ฉบับร่าง",
       "loading": "กำลังโหลดกล่องขาเข้า",
       "noReviewRequests": "ไม่มีคำขอรีวิว",
       "noReviewRequestsDescription": "PR ที่รอคุณรีวิวจะแสดงที่นี่ คุณยังวางลิงก์ PR ใดก็ได้ด้านบน",
@@ -488,7 +511,6 @@
       "discardTitle": "ทิ้งความคิดเห็นนี้หรือไม่?",
       "discardMessage": "ฉบับร่างของคุณจะหายไป",
       "keepEditing": "แก้ไขต่อ",
-      "discard": "ทิ้ง",
       "comment": "แสดงความคิดเห็น",
       "insertSuggestionA11y": "แทรกข้อเสนอแก้ไขโค้ด",
       "insertSuggestion": "แทรกข้อเสนอแก้ไข",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "เสนอแก้ไขได้เฉพาะบรรทัดที่เพิ่มเข้ามาเท่านั้น",
       "tapDiffLineToSuggest": "แตะบรรทัดในส่วนต่างเพื่อเสนอแก้ไขโค้ด"
     },
-    "screenTitle": "การตรวจสอบ PR",
     "connect": {
       "checkFailedTitle": "ไม่สามารถตรวจสอบการเชื่อมต่อ GitHub ได้",
       "checkFailedMessage": "ยังตรวจสอบสถานะการเข้าสู่ระบบไม่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
-      "title": "เชื่อมต่อ GitHub",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน เชื่อมต่อใหม่เพื่อรีวิว PR บนมือถือต่อ",
       "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ"
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "ไม่สามารถโหลดหน้าส่งรีวิวได้",
       "deletePendingTitle": "ลบความคิดเห็นที่รอส่งหรือไม่?",
       "deletePendingMessage": "ความคิดเห็นนี้จะถูกลบออกจากรายการที่รอส่งรีวิว",
-      "delete": "ลบ",
       "summaryOptional": "สรุปรีวิว (ไม่บังคับ)",
       "pendingComment_one": "ความคิดเห็นที่รอส่ง",
       "pendingComment": "ความคิดเห็นที่รอส่ง",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "ผสานแล้ว",
       "stateClosed": "ปิดแล้ว",
-      "stateDraft": "ฉบับร่าง",
       "stateOpenApproved": "เปิด · อนุมัติแล้ว",
       "stateOpenChangesRequested": "เปิด · ขอให้แก้ไขแล้ว",
       "stateOpenReviewRequired": "เปิด · รอรีวิว",
@@ -572,8 +590,6 @@
       "discussion": "การสนทนา"
     },
     "fileStatus": {
-      "added": "เพิ่มแล้ว",
-      "deleted": "ลบแล้ว",
       "modified": "แก้ไขแล้ว",
       "renamed": "เปลี่ยนชื่อแล้ว",
       "copied": "คัดลอกแล้ว",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "เลือก {{label}} แล้ว แตะเพื่อเปลี่ยนการเลือก",
       "tapToComment": "{{label}} แตะเพื่อแสดงความคิดเห็น",
       "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub",
-      "statusAdded": "เพิ่มแล้ว",
       "statusContext": "บรรทัดแวดล้อม",
-      "statusDeleted": "ลบแล้ว",
       "lineLabel": "บรรทัด {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "สถานะ {{status}}: {{text}}",
       "emptyLine": "(ว่าง)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "การแจ้งเตือน",
     "liveActivities": "กิจกรรมสด",
     "liveActivitySubtitle": "แสดงเอเจนต์ที่ทำงานอยู่บนหน้าจอล็อก",
     "liveUpdates": "การอัปเดตสด",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "หน้าหลัก",
-    "agents": "เอเจนต์",
     "profile": "โปรไฟล์",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "ยังไม่มีอินสแตนซ์ KiloClaw",
       "noInstancesDescription": "ตั้งค่าอินสแตนซ์เพื่อเริ่มแชท",
       "setUpKiloclaw": "ตั้งค่า KiloClaw",
-      "currentInstance": "{{title}} อินสแตนซ์ปัจจุบัน",
-      "personal": "ส่วนตัว"
+      "currentInstance": "{{title}} อินสแตนซ์ปัจจุบัน"
     },
     "conversation": {
       "failedToLoad": "โหลดการสนทนาไม่สำเร็จ",
@@ -722,7 +733,6 @@
       "cancelReply": "ยกเลิกการตอบกลับ",
       "openInstance": "เปิดอินสแตนซ์",
       "attachFile": "แนบไฟล์",
-      "messagePlaceholder": "ข้อความ",
       "cancelEdit": "ยกเลิกการแก้ไข",
       "sendMessage": "ส่งข้อความ"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "เปิด {{filename}}",
-      "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
       "openFailed": "ไม่สามารถเปิดไฟล์แนบได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "attachFailed": "แนบไฟล์ไม่สำเร็จ",
       "limit": "คุณสามารถแนบได้สูงสุด {{displayCount}} ไฟล์",
@@ -771,7 +780,6 @@
       "yourMessage": "ข้อความของคุณ",
       "messageFrom": "ข้อความจาก {{author}}",
       "moreActions": "การดำเนินการเพิ่มเติม",
-      "message": "ข้อความ",
       "notDelivered": "ส่งไม่สำเร็จ",
       "edited": "(แก้ไขแล้ว)",
       "image": "รูปภาพ",
@@ -783,7 +791,6 @@
       "title": "การดำเนินการกับข้อความ",
       "deleteTitle": "ลบข้อความหรือไม่?",
       "deleteMessage": "การดำเนินการนี้จะลบข้อความออกจากการสนทนา",
-      "delete": "ลบ",
       "deleteFailed": "ลบข้อความไม่สำเร็จ",
       "removeReactionFailed": "ลบปฏิกิริยาไม่สำเร็จ",
       "addReactionFailed": "เพิ่มปฏิกิริยาไม่สำเร็จ",
@@ -813,7 +820,6 @@
       "online": "ออนไลน์",
       "idle": "รอทำงาน",
       "offline": "ออฟไลน์",
-      "unknown": "ไม่ทราบ",
       "loadingUser": "กำลังโหลดข้อมูลผู้ใช้...",
       "waitingForStatus": "กำลังรอสถานะบอท...",
       "offlineMessage": "บอทออฟไลน์ ระบบจะกลับมารับส่งข้อความเมื่อบอทเชื่อมต่ออีกครั้ง"
@@ -885,7 +891,6 @@
       "destroyMessage": "การดำเนินการนี้จะลบอินสแตนซ์ KiloClaw ของคุณและข้อมูลทั้งหมดอย่างถาวร โดยไม่สามารถกู้คืนได้",
       "destroyTitle": "ลบอินสแตนซ์ถาวร",
       "instance": "อินสแตนซ์",
-      "renameFailed": "เกิดข้อผิดพลาด",
       "couldNotCheckStatus": "ตรวจสอบสถานะบริการไม่สำเร็จ",
       "dangerZone": "การดำเนินการที่มีความเสี่ยง",
       "destroying": "กำลังลบถาวร…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "โหลดคำสั่งตั้งค่าไม่สำเร็จ",
       "gmailNotifications": "การแจ้งเตือน Gmail",
       "disconnect": "ตัดการเชื่อมต่อบัญชี Google",
-      "connected": "เชื่อมต่อแล้ว",
       "copied": "คัดลอกแล้ว",
       "copyCommand": "คัดลอกคำสั่ง",
       "disabled": "ปิดใช้งานแล้ว",
       "disconnectConfirm": "ตัดการเชื่อมต่อ",
       "disconnectMessage": "นำบัญชี Google ออกจากอินสแตนซ์นี้หรือไม่? การแจ้งเตือน Gmail จะถูกปิด หลังตัดการเชื่อมต่อ ให้ดีพลอยอินสแตนซ์ใหม่เพื่อให้การเปลี่ยนแปลงมีผล",
-      "disconnectTitle": "ตัดการเชื่อมต่อ Google",
-      "enabled": "เปิดใช้งานแล้ว",
-      "notConnected": "ยังไม่เชื่อมต่อ"
+      "disconnectTitle": "ตัดการเชื่อมต่อ Google"
     },
     "modelList": {
       "title": "โมเดลทั้งหมด",
       "searchPlaceholder": "ค้นหาโมเดล...",
-      "couldNotLoad": "ไม่สามารถโหลดโมเดลได้",
       "clearSearch": "ล้างคำค้นหา",
       "noMatches": "ไม่มีโมเดลตรงกับการค้นหาของคุณ",
       "noModels": "ไม่มีโมเดลที่ใช้งานได้",
       "noModelsDescription": "โมเดลจะปรากฏที่นี่เมื่อพร้อมใช้งาน",
       "noResultsFor": "ไม่มีผลลัพธ์สำหรับ \"{{query}}\"",
       "recommended": "แนะนำ"
-    },
-    "model": {
-      "title": "โมเดล"
     },
     "secrets": {
       "title": "ข้อมูลลับ",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "คู่มือตั้งค่า {{label}}",
       "setupGuide": "คู่มือการตั้งค่า",
       "saving": "กำลังบันทึก…",
-      "remove": "ลบออก",
       "removing": "กำลังนำออก…",
-      "connected": "เชื่อมต่อแล้ว",
-      "notConnected": "ยังไม่เชื่อมต่อ",
       "updateToken": "อัปเดตโทเค็น",
       "connect": "เชื่อมต่อ"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "สร้างอินสแตนซ์",
       "organizations": "องค์กร",
-      "personal": "ส่วนตัว",
       "accessIssue": {
         "trialExpired": "ระยะทดลองใช้สิ้นสุดแล้ว สมัครสมาชิกเพื่อใช้อินสแตนซ์นี้ต่อ",
         "subscriptionCanceled": "ไม่มีการสมัครสมาชิกที่ใช้งานอยู่ สมัครใหม่เพื่อใช้อินสแตนซ์นี้ต่อ",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "เปิด kilo.ai",
         "provisioning": "กำลังจัดเตรียม",
         "review": "การตรวจสอบ",
-        "somethingWentWrong": "เกิดข้อผิดพลาด",
         "identityTitle": "ตั้งค่าตัวตนให้กับบอทของคุณ",
-        "close": "ปิด",
         "couldNotLoad": "โหลดสถานะการตั้งค่าเริ่มต้นไม่สำเร็จ",
         "finishingSetup": "กำลังตั้งค่าขั้นสุดท้าย รอสักครู่ระหว่างที่ระบบเตรียมบัญชีของคุณให้พร้อมใช้งาน",
         "ready": "พร้อมแล้ว",
@@ -1080,7 +1072,6 @@
         "location": "ตำแหน่ง",
         "locationPlaceholder": "เมืองหรือภูมิภาค (ไม่บังคับ)",
         "useCurrentLocation": "ใช้ตำแหน่งปัจจุบัน",
-        "continue": "ดำเนินการต่อ",
         "locationDeniedTitle": "ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง",
         "locationDeniedMessage": "อนุญาตให้เข้าถึงตำแหน่งในการตั้งค่าเพื่อใช้ตำแหน่งปัจจุบันของคุณ",
         "locationValidationFailed": "ไม่สามารถตรวจสอบตำแหน่งได้",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "โปรเซสเกตเวย์",
       "lastExit": "การจบการทำงานล่าสุด",
       "memory": "หน่วยความจำ",
-      "model": "โมเดล",
       "region": "ภูมิภาค",
       "resources": "ทรัพยากร",
       "restarts": "จำนวนครั้งที่รีสตาร์ท",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "ประสิทธิภาพสูงสุด เลือกใช้โมเดลล้ำหน้าที่มีความสามารถด้านการให้เหตุผล",
       "balancedLabel": "สมดุล",
       "balancedDescription": "สมดุลทั้งความเร็วและความสามารถ ในราคาที่ถูกลง",
-      "cost": "ค่าใช้จ่าย",
       "performance": "ประสิทธิภาพ",
       "autoModelA11y": "เลือกโมเดลอัตโนมัติแบบ {{label}}",
       "currentModel": "โมเดลปัจจุบัน",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "บัญชี Google",
       "modelDescription": "การเลือกโมเดล AI",
-      "modelLabel": "โมเดล",
       "secretsDescription": "ข้อมูลยืนยันตัวตนที่เข้ารหัส",
       "secretsLabel": "ข้อมูลลับ",
       "versionPinDescription": "ตรึงไว้ที่เวอร์ชันที่ระบุ",
@@ -1251,12 +1239,9 @@
       "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…"
     },
     "repos": {
-      "title": "คลังโค้ด",
-      "couldNotLoad": "ไม่สามารถโหลดคลังโค้ดได้",
       "unavailable": "คลังโค้ดยังไม่พร้อมใช้งาน ตั้งค่า Bitbucket ให้เสร็จบน kilo.ai",
       "finishSetup": "ตั้งค่าให้เสร็จ",
       "manageAccess": "จัดการสิทธิ์เข้าถึง",
-      "allRepositories": "คลังโค้ดทั้งหมด",
       "bitbucketNoRepositoriesDescription": "ไม่มีคลังโค้ดที่ใช้งานได้ในพื้นที่ทำงาน Bitbucket นี้",
       "bitbucketSetup": "การตั้งค่า Bitbucket",
       "couldNotOpenGithubSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
@@ -1274,7 +1259,6 @@
       "roast": "วิจารณ์ตรงและแรงแบบขำ ๆ",
       "strict": "รายงานทุกข้อค้นพบตามมาตรฐานที่เข้มงวด"
     },
-    "title": "ตัวตรวจสอบโค้ด",
     "reviewDetail": {
       "title": "การตรวจสอบ",
       "cancelTitle": "ยกเลิกการตรวจสอบหรือไม่?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "โหลดผลการตรวจสอบไม่สำเร็จ",
       "couldNotGetLatest": "ไม่สามารถดึงข้อมูลล่าสุดได้",
       "byline": "{{repo}} #{{number}} โดย {{author}}",
-      "findings": "ข้อค้นพบ",
       "noFindings": "ไม่มีข้อค้นพบ",
       "showMore": "แสดงเพิ่มเติม",
-      "details": "รายละเอียด",
       "branch": "บรานช์",
-      "platform": "แพลตฟอร์ม",
-      "model": "โมเดล",
       "created": "สร้างเมื่อ",
       "started": "เริ่มเมื่อ",
       "completed": "เสร็จสิ้น",
-      "cost": "ค่าใช้จ่าย",
       "tokens": "โทเค็น",
       "tokensInOut": "ขาเข้า {{input}} / ขาออก {{output}}",
       "openPullRequest": "เปิดพูลรีเควสต์",
@@ -1309,7 +1288,6 @@
       "checkRun": "งานตรวจสอบ",
       "status": "สถานะ",
       "threshold": "เกณฑ์",
-      "pullRequest": "พูลรีเควสต์",
       "transcriptWaiting": "กำลังรอบันทึกการตรวจสอบ",
       "transcriptEmpty": "ไม่มีบันทึกสำหรับการตรวจสอบนี้",
       "transcriptRetry": "ไม่สามารถโหลดบันทึกการตรวจสอบได้",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "ไม่สามารถโหลดข้อมูลผู้ให้บริการที่คุณเชื่อมต่อไว้ได้ กรุณาลองอีกครั้ง",
       "connectProvider": "เชื่อมต่อผู้ให้บริการ",
       "connectProviderDescription": "เชื่อมต่อ GitHub เพื่อเริ่มตรวจสอบ PR ด้วยตนเอง",
-      "connectGitHub": "เชื่อมต่อ GitHub",
-      "platform": "แพลตฟอร์ม",
-      "notConnected": "ยังไม่เชื่อมต่อ",
       "pullRequestUrl": "URL ของ PR",
       "instructions": "คำแนะนำ (ไม่บังคับ)",
       "instructionsPlaceholder": "เรื่องที่ต้องการให้ผู้ตรวจสอบเน้นเป็นพิเศษ…",
-      "model": "โมเดล",
       "starting": "กำลังเริ่มการตรวจสอบ...",
       "start": "เริ่มการตรวจสอบ"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "เลือกคลังโค้ด",
     "followReviewMd": "ปฏิบัติตาม REVIEW.md",
     "followReviewMdSubtitle": "ทำตามคำแนะนำในไฟล์ REVIEW.md ของแต่ละคลังโค้ด",
-    "readOnlyDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket ยังไม่เชื่อมต่อ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "setupIncomplete": "ยังตั้งค่าไม่เสร็จ ตั้งค่าต่อให้เสร็จบน kilo.ai",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "ไม่สามารถโหลดรายชื่อองค์กรได้",
       "personalStillAvailable": "ยังเข้าถึงคลังโค้ดส่วนตัวได้ด้านล่าง",
-      "personal": "ส่วนตัว",
       "personalSubtitle": "คลังโค้ดของคุณเอง",
       "viewOnly": "ดูอย่างเดียว"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "กำลังตรวจสอบ...",
       "statusUnavailable": "ไม่สามารถดูสถานะได้",
-      "connected": "เชื่อมต่อแล้ว",
-      "notConnected": "ยังไม่เชื่อมต่อ",
-      "organization": "องค์กร",
       "platforms": "แพลตฟอร์ม",
       "activity": "กิจกรรม"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "เชื่อมต่อ GitHub",
       "githubError": "ไม่สามารถเปิดหน้าตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง",
       "gitlabAccount": "บัญชี GitLab",
       "connectGitLab": "เชื่อมต่อ GitLab",
@@ -1421,10 +1389,7 @@
       "allAreas": "ทุกด้าน",
       "customInstructions": "คำสั่งที่กำหนดเอง",
       "set": "ตั้งค่าแล้ว",
-      "model": "โมเดล",
       "mergeGate": "เงื่อนไขการผสาน",
-      "repositories": "คลังโค้ด",
-      "allRepositories": "คลังโค้ดทั้งหมด",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
       "reviewMemory": "ความจำในการตรวจสอบ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
@@ -1435,16 +1400,13 @@
       "noDecision": "ยังไม่มีข้อสรุป",
       "noResult": "ไม่มีผลลัพธ์"
     },
-    "eyebrow": "ตัวตรวจสอบโค้ด",
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
       "pending": "รอดำเนินการ",
-      "queued": "อยู่ในคิว",
       "running": "กำลังทำงาน",
       "completed": "เสร็จสิ้น",
       "failed": "ล้มเหลว",
-      "cancelled": "ยกเลิกแล้ว",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "เอกสารประกอบ"
     },
     "gateThreshold": {
-      "off": "ปิด",
-      "all": "ทั้งหมด",
-      "warning": "คำเตือน",
-      "critical": "วิกฤต"
+      "warning": "คำเตือน"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
         "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจาก Kilo ไม่สามารถเข้าถึงคลังโค้ดนี้ผ่าน GitHub App ที่ติดตั้งและใช้งานอยู่ได้ อัปเดตการติดตั้ง GitHub App แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
         "recoveryLabel": "อัปเดต GitHub App"
       },
       "githubIpAllowList": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
-        "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจากองค์กร GitHub นี้ใช้รายการ IP ที่อนุญาตซึ่งไม่รวม Kilo ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
-        "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
+        "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจากองค์กร GitHub นี้ใช้รายการ IP ที่อนุญาตซึ่งไม่รวม Kilo ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง"
       },
       "gitlabProjectAccessRequired": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
         "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจาก Kilo ไม่สามารถสร้างโทเค็นการเข้าถึงโปรเจกต์บน GitLab สำหรับโปรเจกต์นี้ได้ ให้สิทธิ์ระดับผู้ดูแลหรือเปิดใช้โทเค็นการเข้าถึงโปรเจกต์ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
         "recoveryLabel": "อัปเดตการเชื่อมต่อ GitLab"
       },
       "byokInvalidKey": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
         "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจากคีย์ API แบบ BYOK ที่เลือกไม่ถูกต้อง ถูกเพิกถอน หรือไม่มีสิทธิ์ที่จำเป็น อัปเดตคีย์หรือเลือกโมเดลอื่น แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
         "recoveryLabel": "อัปเดตการตั้งค่า BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
         "description": "ตัวตรวจสอบโค้ดถูกปิด เนื่องจากโมเดลที่เลือกใช้กับเซสชันของเอเจนต์บนคลาวด์ไม่ได้ เลือกโมเดลที่ใช้งานได้ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
         "recoveryLabel": "อัปเดตการตั้งค่าตัวตรวจสอบโค้ด"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
-        "description": "ตัวตรวจสอบโค้ดถูกปิด หลังจากการโคลนคลังโค้ดหมดเวลาสามครั้งในวันนี้ ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง",
-        "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
-      }
+        "description": "ตัวตรวจสอบโค้ดถูกปิด หลังจากการโคลนคลังโค้ดหมดเวลาสามครั้งในวันนี้ ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดตัวตรวจสอบโค้ดอีกครั้ง"
+      },
+      "title": "ตัวตรวจสอบโค้ดมีปัญหาที่ต้องแก้ไข",
+      "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
     },
     "unknownError": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "ย้อนกลับแล้วเปิดตัวกรองอีกครั้งจากรายการข้อค้นพบ",
       "title": "กรองข้อค้นพบ",
       "reset": "รีเซ็ต",
-      "repository": "คลังโค้ด",
       "status": "สถานะ",
       "severity": "ความรุนแรง",
       "outcome": "ผลลัพธ์",
       "slaStatus": "สถานะ SLA",
       "sortBy": "เรียงตาม",
-      "allRepositories": "คลังโค้ดทั้งหมด",
-      "all": "ทั้งหมด",
       "statusOpen": "เปิด",
       "fixed": "แก้ไขแล้ว",
       "statusIgnored": "เพิกเฉยแล้ว",
       "statusClosed": "ปิดแล้ว",
-      "severityCritical": "วิกฤต",
       "severityHigh": "สูง",
       "severityMedium": "ปานกลาง",
       "severityLow": "ต่ำ",
       "outcomeNotAnalyzed": "ยังไม่ได้วิเคราะห์",
       "outcomeAnalyzing": "กำลังวิเคราะห์",
       "outcomeFailed": "การวิเคราะห์ล้มเหลว",
-      "outcomeExploitable": "ใช้โจมตีได้",
       "outcomeNotExploitable": "ใช้โจมตีไม่ได้",
       "outcomeSafeToDismiss": "ละเว้นได้อย่างปลอดภัย",
-      "outcomeNeedsReview": "ต้องตรวจสอบ",
       "outcomeTriageComplete": "คัดกรองเสร็จสิ้น",
       "outcomeDismissed": "ละเว้นแล้ว",
       "sortSeverityDesc": "ความรุนแรง: สูงไปต่ำ",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "เปิดการละเว้นอัตโนมัติ",
       "enableAutoDismissSubtitle": "ละเว้นข้อค้นพบโดยอัตโนมัติเมื่อ AI ระบุว่าผู้โจมตีไม่สามารถนำไปใช้ได้",
       "confidenceThreshold": "เกณฑ์ความมั่นใจ",
-      "permissionNote": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
       "enableAutoRemediationConfirmTitle": "เปิดการแก้ไขอัตโนมัติหรือไม่?",
       "enableAutoRemediationConfirmMessage": "Security Agent จะเปิด PR เพื่อแก้ไขโดยอัตโนมัติสำหรับข้อค้นพบที่ผู้โจมตีนำไปใช้ได้และตรงตามเงื่อนไข",
       "enable": "เปิด",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "การดำเนินการที่แนะนำ",
       "triageReasoning": "เหตุผลในการคัดกรอง",
       "exploitable": "ใช้โจมตีได้",
-      "model": "โมเดล",
       "notRecorded": "ไม่ได้บันทึกไว้",
       "analyzed": "วิเคราะห์แล้ว",
       "exploitabilityReasoning": "เหตุผลในการประเมินโอกาสถูกโจมตี",
       "suggestedFix": "วิธีแก้ไขที่แนะนำ",
       "whereFound": "ตำแหน่งที่พบ ({{displayCount}})",
       "fullReport": "รายงานฉบับเต็มที่สร้างขึ้น",
-      "unknown": "ไม่ทราบ",
       "yes": "ใช่",
       "no": "ไม่"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "เปิดอยู่ {{open}} · วิกฤต {{critical}} · สูง {{high}}",
       "couldNotLoad": "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้",
       "filterByRepository": "กรองตามคลังโค้ด",
-      "findings": "ข้อค้นพบ",
       "lastSynced": "ซิงค์ล่าสุด {{time}}",
       "manageRepositories": "จัดการคลังโค้ด",
       "notYetSynced": "ยังไม่ซิงค์",
@@ -1686,23 +1629,19 @@
       "severityLabel": "ความรุนแรงระดับ{{severity}}",
       "package": "แพ็กเกจ",
       "vulnerableVersions": "เวอร์ชันที่มีช่องโหว่",
-      "unknown": "ไม่ทราบ",
       "patchedVersion": "เวอร์ชันที่แก้ไขแล้ว",
       "noPatchAvailable": "ยังไม่มีแพตช์แก้ไข",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "คลังโค้ด",
       "manifest": "ไฟล์รายการแพ็กเกจ",
       "detected": "ตรวจพบ",
       "updated": "อัปเดตแล้ว",
-      "fixed": "แก้ไขแล้ว",
       "slaDeadline": "กำหนดเวลา SLA",
       "sourceRecord": "บันทึกต้นทาง",
       "source": "แหล่งที่มา",
       "sourceId": "ID แหล่งที่มา",
       "viewAdvisory": "ดูประกาศด้านความปลอดภัยบน GitHub",
       "statusSuperseded": "ถูกแทนที่แล้ว",
-      "statusFixed": "แก้ไขแล้ว",
       "statusOpen": "เปิด",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "เริ่มแก้ไขแล้ว",
@@ -1716,25 +1655,18 @@
       "title": "การตั้งค่า",
       "couldNotLoadSettings": "ไม่สามารถโหลดการตั้งค่า Security Agent ได้",
       "couldNotLoadPermissions": "ไม่สามารถโหลดสิทธิ์ได้",
-      "couldNotLoadRepositories": "ไม่สามารถโหลดคลังโค้ดได้",
-      "securityAgent": "เอเจนต์ความปลอดภัย",
-      "enabled": "เปิดใช้งานแล้ว",
       "disabled": "ปิดใช้งานแล้ว",
       "on": "เปิด",
-      "off": "ปิด",
-      "allRepositories": "คลังโค้ดทั้งหมด",
       "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง",
       "repositoriesCount": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "repositoriesCount_other": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "selectRepositories": "เลือกคลังโค้ด",
       "selectRepositoriesSubtitle": "เลือกคลังโค้ดที่ต้องการให้ Security Agent ตรวจสอบ",
-      "repositories": "คลังโค้ด",
       "modelsAndAnalysis": "โมเดลและการวิเคราะห์",
       "analysisModeSubtitle": "การวิเคราะห์แบบ {{mode}}",
       "automation": "ระบบอัตโนมัติ",
       "automationAllOff": "ปิดทั้งหมด",
       "automationCount": "เปิดอยู่ {{displayCount}} จาก 3 รายการ",
-      "notifications": "การแจ้งเตือน",
       "notificationsCount": "เปิดอยู่ {{displayCount}} จาก 2 รายการ",
       "slaPolicy": "นโยบาย SLA",
       "disabledNoManage": "Security Agent ปิดอยู่ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
       "cancelled": "ยกเลิกการแก้ไขแล้ว",
-      "pullRequest": "พูลรีเควสต์",
       "couldNotLoad": "ไม่สามารถโหลดสถานะการแก้ไขได้",
       "noAnalysisTitle": "ยังไม่มีการวิเคราะห์",
       "noAnalysisDescription": "เริ่มการวิเคราะห์จากแท็บรายละเอียด",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "ประวัติการแก้ไข ({{displayCount}})",
       "attemptNumber": "การแก้ไขครั้งที่ {{number}}",
       "startedBy": "เริ่มโดย",
-      "model": "โมเดล",
       "branch": "บรานช์",
       "queued": "จัดคิวการแก้ไขแล้ว",
       "retryQueued": "จัดคิวการแก้ไขอีกครั้งแล้ว",
@@ -1769,20 +1699,17 @@
         "prOpened": "เปิด PR แล้ว",
         "failed": "การแก้ไขล้มเหลว",
         "blocked": "การแก้ไขถูกบล็อก",
-        "noChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง",
-        "cancelled": "ยกเลิกแล้ว"
+        "noChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง"
       },
       "unavailable": "ไม่สามารถใช้การแก้ไขกับข้อค้นพบนี้ได้"
     },
     "analysisSettings": {
       "title": "โมเดลและการวิเคราะห์",
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าการวิเคราะห์ได้",
-      "permissionNote": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
       "depth": "ระดับความละเอียดในการวิเคราะห์",
       "modeAuto": "อัตโนมัติ",
       "modeShallow": "เบื้องต้น",
       "modeDeep": "เชิงลึก",
-      "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "triageModel": "โมเดลการคัดกรอง",
       "analysisModel": "โมเดลการวิเคราะห์",
       "remediationModel": "โมเดลการแก้ไข"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "นโยบาย SLA",
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่า SLA ได้",
-      "critical": "วิกฤต",
       "high": "สูง",
       "medium": "ปานกลาง",
       "low": "ต่ำ",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "ข้อค้นพบ",
-      "tabDetails": "รายละเอียด",
       "tabAnalysis": "การวิเคราะห์",
       "tabRemediation": "การแก้ไข",
       "notFound": "ไม่พบข้อค้นพบ",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "ละเว้นข้อค้นพบ"
     },
     "findingList": {
-      "title": "ข้อค้นพบ",
       "couldNotLoad": "ไม่สามารถโหลดข้อค้นพบได้",
       "couldNotLoadMore": "ไม่สามารถโหลดข้อค้นพบเพิ่มเติมได้",
       "noMatchesTitle": "ไม่มีข้อค้นพบที่ตรงกับตัวกรอง",
@@ -1827,13 +1751,8 @@
       "clearFilters": "ล้างตัวกรอง"
     },
     "scopeList": {
-      "title": "เอเจนต์ความปลอดภัย",
       "couldNotLoad": "ไม่สามารถโหลดรายชื่อองค์กรได้",
-      "personal": "ส่วนตัว",
       "personalSubtitle": "คลังโค้ดของคุณเอง"
-    },
-    "commandRetry": {
-      "discard": "ทิ้ง"
     },
     "findingRow": {
       "nextRemediationPrOpen": "มี PR สำหรับแก้ไขเปิดอยู่",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "ไม่สามารถเปิด GitHub ได้ กรุณาลองอีกครั้ง"
     },
     "settingsSave": {
-      "discard": "ทิ้ง",
       "keepEditing": "แก้ไขต่อ",
       "saveChanges": "บันทึกการเปลี่ยนแปลง",
       "unsavedTitle": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "ไม่สามารถโหลดรายงานการตรวจสอบได้",
       "events": "เหตุการณ์",
-      "findings": "ข้อค้นพบ",
       "generated": "สร้างเมื่อ {{generatedAt}}",
       "noActivity": "ยังไม่มีกิจกรรมที่บันทึกไว้",
       "noActivityDescription": "Kilo ไม่มีกิจกรรมเกี่ยวกับข้อค้นพบด้านความปลอดภัยที่รายงานได้ในช่วง {{start}} ถึง {{end}}",
@@ -1875,8 +1792,7 @@
       "title": "รายงานการตรวจสอบ",
       "unavailable": "ไม่มีรายงานการตรวจสอบ",
       "unavailableDescription": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถดูรายงานการตรวจสอบได้ ติดต่อเจ้าขององค์กรหรือผู้จัดการการเรียกเก็บเงินเพื่อขอสิทธิ์เข้าถึง",
-      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง",
-      "checkConnection": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง"
+      "queryFailed": "ดึงข้อมูลรายงานไม่สำเร็จ ลองอีกครั้ง"
     },
     "notifications": {
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าการแจ้งเตือนได้",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "การแจ้งเตือนข้อค้นพบใหม่",
       "newFindingSeverityLabel": "ความรุนแรงขั้นต่ำของข้อค้นพบใหม่ที่จะแจ้งเตือน",
       "newFindingSubtitle": "ส่งทุกครั้งที่มีการซิงค์ข้อค้นพบใหม่ รวมถึงการซิงค์ครั้งแรก",
-      "readOnly": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
       "slaLeadTimeAccessibility": "ระยะเวลาแจ้งเตือน SLA ล่วงหน้า หน่วยเป็นวัน",
       "slaLeadTimeError": "ระบุจำนวนวันเป็นจำนวนเต็มตั้งแต่ 1 ถึง 365",
       "slaLeadTimeHint": "ป้อนจำนวนเต็มตั้งแต่ 1 ถึง 365",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "ส่งอีเมลแจ้งเตือน SLA ให้ฉัน",
       "slaSection": "การแจ้งเตือน SLA",
       "slaSeverityLabel": "ระดับความรุนแรงขั้นต่ำของการแจ้งเตือน SLA",
-      "slaSubtitle": "ส่งล่วงหน้าและเมื่อข้อค้นพบใกล้ถึงหรือเกินกำหนดเวลา SLA",
-      "title": "การแจ้งเตือน"
+      "slaSubtitle": "ส่งล่วงหน้าและเมื่อข้อค้นพบใกล้ถึงหรือเกินกำหนดเวลา SLA"
     },
     "repositories": {
-      "allRepositories": "คลังโค้ดทั้งหมด",
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าคลังโค้ดได้",
-      "couldNotLoadRepositories": "ไม่สามารถโหลดคลังโค้ดได้",
       "couldNotOpenGithubSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
       "githubAppSettings": "การตั้งค่า GitHub App",
       "manageAccess": "จัดการสิทธิ์การเข้าถึง GitHub App",
       "noRepositories": "ไม่มีคลังโค้ด",
       "noRepositoriesDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ด",
-      "readOnly": "เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปลี่ยนการตั้งค่าเหล่านี้ได้",
       "selectAtLeastOne": "เลือกคลังโค้ดอย่างน้อยหนึ่งแห่ง",
-      "selectedRepositories": "คลังโค้ดที่เลือก",
-      "title": "คลังโค้ด"
+      "selectedRepositories": "คลังโค้ดที่เลือก"
     },
     "scopeEntry": {
       "connectDescription": "ติดตั้ง Kilo GitHub App เพื่อซิงค์การแจ้งเตือน Dependabot โดยอัตโนมัติและจัดการข้อค้นพบด้านความปลอดภัยในคลังโค้ดของคุณ",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "ไม่สามารถติดตามการดำเนินการที่จัดคิวได้อีกต่อไป รีเฟรชเพื่อดูสถานะล่าสุด",
     "initialSyncAdmissionFailed": "เปิดใช้งาน Security Agent แล้ว แต่ไม่สามารถจัดคิวการซิงค์ครั้งแรกได้ ซิงค์อีกครั้ง",
-    "title": "เอเจนต์ความปลอดภัย",
     "commands": {
       "findingAlreadyDismissed": "ละเว้นข้อค้นพบนี้ไปแล้ว",
       "findingDismissed": "ละเว้นข้อค้นพบแล้ว",
@@ -1949,22 +1858,16 @@
       "failed": "การวิเคราะห์ล้มเหลว",
       "failedTitle": "การวิเคราะห์ล้มเหลว",
       "failedDescription": "Security Agent ไม่สามารถทำการวิเคราะห์ให้เสร็จสมบูรณ์ได้",
-      "extractionFailed": "ต้องตรวจสอบ",
-      "extractionFailedTitle": "ต้องตรวจสอบ",
       "extractionFailedDescription": "ไม่สามารถแปลงรายงานทางเทคนิคเป็นผลลัพธ์แบบมีโครงสร้างได้",
-      "exploitable": "ใช้โจมตีได้",
-      "exploitableTitle": "ใช้โจมตีได้",
       "exploitableDescription": "โค้ดของแอปเรียกใช้ฟีเจอร์ที่ได้รับผลกระทบได้",
       "notExploitable": "เข้าถึงไม่ได้",
       "notExploitableTitle": "เข้าถึงไม่ได้",
       "notExploitableDescription": "ไม่พบเส้นทางในคลังโค้ดนี้ที่เรียกใช้ฟีเจอร์ที่มีช่องโหว่ได้",
       "unknown": "ต้องตรวจสอบ",
-      "unknownTitle": "ต้องตรวจสอบ",
       "unknownDescription": "ผลวิเคราะห์ยังยืนยันไม่ได้ว่าโค้ดเรียกใช้ฟีเจอร์ที่มีช่องโหว่ได้หรือไม่",
       "safeToDismiss": "ละเว้นได้อย่างปลอดภัย",
       "safeToDismissTitle": "ละเว้นได้อย่างปลอดภัย",
       "safeToDismissDescription": "ผลการคัดกรองระบุว่าสามารถละเว้นข้อค้นพบนี้ได้อย่างปลอดภัยโดยไม่ต้องวิเคราะห์ฐานโค้ด",
-      "manualReview": "ต้องตรวจสอบ",
       "manualReviewTitle": "ต้องตรวจสอบด้วยตนเอง",
       "manualReviewDescription": "ผลการคัดกรองระบุว่าต้องมีผู้ตรวจสอบข้อค้นพบนี้ด้วยตนเอง",
       "analysisRequired": "ต้องวิเคราะห์",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "แก้ไขแล้วก่อนครบกำหนด",
-      "fixed": "แก้ไขแล้ว",
       "fixedOn": "แก้ไขเมื่อ {{date}}",
       "resolutionRecorded": "บันทึกการแก้ไขแล้ว",
       "superseded": "ถูกแทนที่แล้ว",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
       "notStarted": "ยังไม่เริ่ม",
-      "queued": "อยู่ในคิว",
       "starting": "กำลังเริ่ม",
       "inProgress": "กำลังดำเนินการ",
       "draftPrOpened": "เปิด PR ฉบับร่างแล้ว",
@@ -2009,7 +1910,6 @@
       "blocked": "ถูกบล็อก",
       "failed": "ล้มเหลว",
       "noChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง",
-      "cancelled": "ยกเลิกแล้ว",
       "originAutomaticPolicy": "นโยบายอัตโนมัติ",
       "originIncludeExistingPolicy": "นโยบายรวมข้อค้นพบที่มีอยู่",
       "originManual": "ด้วยตนเอง",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "ลบเซสชันนี้หรือไม่?",
       "deleteMessage": "การดำเนินการนี้ไม่สามารถย้อนกลับได้",
-      "delete": "ลบ",
       "deleteSession": "ลบเซสชัน",
       "rename": "เปลี่ยนชื่อ",
       "renameMessage": "ระบุชื่อใหม่สำหรับเซสชันนี้",
@@ -2130,7 +2029,6 @@
       "title": "เซสชัน",
       "copyErrorDetails": "คัดลอกรายละเอียดข้อผิดพลาด",
       "backToSessions": "กลับไปที่เซสชัน",
-      "accessDenied": "ไม่มีสิทธิ์เข้าถึง",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
       "cloningSession": "กำลังคัดลอกเซสชัน",
-      "continue": "ดำเนินการต่อ",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
       "cloneFailedRetry": "ไม่สามารถคัดลอกเซสชันนี้ได้ ลองอีกครั้ง",
       "notEnoughCredits": "เครดิตไม่เพียงพอที่จะใช้ Cloud Agent เติมเครดิตแล้วลองอีกครั้ง",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "เซสชันใหม่",
-      "repository": "คลังโค้ด",
-      "connectGithub": "เชื่อมต่อ GitHub",
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "openGithub": "เปิด GitHub",
       "refreshRepositories": "รีเฟรชรายการคลังโค้ด",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",
       "keepEditing": "แก้ไขต่อ",
-      "discard": "ทิ้ง",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
       "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ หรือ `/remote` ในเซสชัน CLI ที่กำลังทำงาน เพื่อควบคุมโปรเซส kilo บนเครื่องนั้น",
       "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์"
     },
     "toolPatch": {
-      "operationAdded": "เพิ่มแล้ว",
-      "operationDeleted": "ลบแล้ว",
       "operationUpdated": "อัปเดตแล้ว"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "รันบน",
       "runOnAccessibility": "รันบน: {{label}}",
       "couldNotLoad": "ไม่สามารถโหลดอินสแตนซ์ได้",
-      "couldNotLoadDescription": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
       "cloudAgent": "Cloud Agent",
-      "loading": "กำลังโหลด…",
       "cloudAgentDescription": "รันในแซนด์บ็อกซ์บนคลาวด์ของ Kilo",
       "noCliInstances": "ยังไม่มีอินสแตนซ์ CLI เชื่อมต่ออยู่",
       "noCliInstancesDescription": "รัน `kilo remote` ในโปรเจกต์บนคอมพิวเตอร์ หรืออัปเดต Kilo CLI หากมีอินสแตนซ์ที่กำลังทำงานอยู่แล้ว",
@@ -2323,7 +2213,6 @@
       "loading": "กำลังโหลด...",
       "accessibility": "คลังโค้ด: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "ผู้ใช้",
       "roleAssistant": "ผู้ช่วย",
       "sent": "เวลาที่ส่ง",
-      "model": "โมเดล",
       "costAndTokens": "ค่าใช้จ่ายและโทเคน",
-      "cost": "ค่าใช้จ่าย",
       "input": "ขาเข้า",
       "output": "ขาออก",
       "reasoning": "การใช้เหตุผล",
@@ -2360,7 +2247,6 @@
       "textDisplay": "การแสดงข้อความ",
       "thinking": "กำลังคิด",
       "thought": "ความคิด",
-      "title": "รายละเอียด",
       "showDetails": "แสดงรายละเอียด",
       "pending": "รอดำเนินการ…",
       "running": "กำลังทำงาน…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",
       "imageUnavailableRetry": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่",
-      "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
       "imageUnavailableWithAlt": "ไม่สามารถแสดงรูปภาพ {{alt}} ได้",
       "imagePreviewUnavailableInSession": "ไม่สามารถแสดงตัวอย่างรูปภาพในเซสชันนี้ได้",
       "viewImage": "ดูรูปภาพ",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}",
       "failureRetryAvailable": "{{title}} ลองอีกครั้งได้",
       "copyToComposer": "คัดลอกไปยังช่องป้อนข้อความ",
-      "queued": "อยู่ในคิว",
       "queuedAccessibility": "ข้อความอยู่ในคิว",
       "userMessage": "ข้อความจากผู้ใช้",
       "assistantMessage": "ข้อความจากผู้ช่วย",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "กรองเซสชัน",
-      "platform": "แพลตฟอร์ม",
       "platformCloud": "คลาวด์",
       "platformExtension": "ส่วนขยาย",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "อื่น ๆ",
       "project": "โปรเจกต์"
@@ -2539,7 +2421,6 @@
       "allModels": "โมเดลทั้งหมด"
     },
     "modelSelector": {
-      "model": "โมเดล",
       "provider": "ผู้ให้บริการ {{id}}",
       "modelId": "โมเดล {{id}}",
       "unavailable": "ไม่พร้อมใช้งาน",
@@ -2677,8 +2558,7 @@
       "merged": "PR ที่รวมโค้ดแล้ว",
       "draft": "พูลรีเควสต์ฉบับร่าง",
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
-      "label": "{{label}} หมายเลข {{number}}",
-      "externalLinkLabel": "พูลรีเควสต์"
+      "label": "{{label}} หมายเลข {{number}}"
     },
     "markdownImage": {
       "load": "โหลด",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "โหลดข้อมูลบัญชีของคุณไม่สำเร็จ",
-    "couldNotLoadAccountDescription": "ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     "couldNotLoadPrivacy": "โหลดตัวเลือกความเป็นส่วนตัวไม่สำเร็จ",
     "couldNotLoadPrivacyDescription": "ตรวจสอบการตั้งค่าความปลอดภัยของอุปกรณ์แล้วลองอีกครั้ง",
     "contentReady": "เนื้อหาพร้อมแล้ว",
-    "signOut": "ออกจากระบบ",
     "retryLoadingAccount": "ลองโหลดบัญชีอีกครั้ง",
     "retryLoadingPrivacy": "ลองโหลดตัวเลือกความเป็นส่วนตัวอีกครั้ง"
   },
@@ -2736,7 +2614,6 @@
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",
     "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นี้ยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
-    "signOutConfirm": "ออกจากระบบ",
     "signOutMessage": "คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "webBrowser": "เว็บเบราว์เซอร์"
   },
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "ปิด {{filename}}",
-    "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
     "share": "แชร์ {{filename}}"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "กลับมาเชื่อมต่ออินเทอร์เน็ตได้แล้ว"
   },
   "queryError": {
-    "neutralTitle": "เกิดข้อผิดพลาด",
     "neutralDescription": "กรุณาลองอีกครั้ง",
     "offlineTitle": "โหลดไม่สำเร็จ",
-    "offlineDescription": "เกิดข้อผิดพลาด",
-    "permissionTitle": "ไม่มีสิทธิ์เข้าถึง",
     "permissionDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
     "notFoundTitle": "ไม่พบข้อมูล",
     "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "เปิดเมนู",
     "openMenuFor": "เปิดเมนูสำหรับ {{title}}",
-    "close": "ปิด",
     "goBack": "ย้อนกลับ"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
-    "close": "ปิด",
     "reviewPr": "ตรวจสอบ PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} · PR #{{number}}",
     "newSession": "เซสชันใหม่",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "ข้อมูลของคุณได้รับการจัดการตาม",
     "privacyPolicy": "นโยบายความเป็นส่วนตัวของ Kilo",
     "onDevice": "บนอุปกรณ์",
-    "loading": "กำลังโหลด…",
     "couldNotLoadTranscription": "โหลดการตั้งค่าการถอดเสียงไม่สำเร็จ",
     "signInToManageTranscription": "เข้าสู่ระบบเพื่อจัดการการถอดเสียงออนไลน์",
     "onlineTranscription": "การถอดเสียงออนไลน์",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "การถอดเสียงพูด",
     "retentionPrefix": "ดูรายละเอียดระยะเวลาเก็บข้อมูล สิทธิ์ของคุณ และข้อมูลติดต่อได้ใน",
     "backToConsent": "กลับไปที่หน้าความยินยอม",
-    "back": "ย้อนกลับ",
     "revokeConsent": "เพิกถอนความยินยอม",
     "revokeConsentTitle": "เพิกถอนความยินยอมในการแชร์ข้อมูลหรือไม่?",
     "acceptAndContinue": "ยอมรับและดำเนินการต่อ",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "ประมวลผลบนอุปกรณ์เท่านั้น หรือส่งให้ Apple หรือ Google หากอุปกรณ์นี้ถอดเสียงแบบออฟไลน์ไม่ได้",
     "installAttributionPromptTitle": "อนุญาตการระบุแหล่งที่มาของการติดตั้งหรือไม่?",
     "installAttributionPromptMessage": "Kilo ใช้สิทธิ์การติดตามของ Apple เพื่อทราบว่าคุณมาจากช่องทางใดเท่านั้น เราจะไม่นำพรอมต์และการสนทนาของคุณมาใช้เพื่อการนี้",
-    "continue": "ดำเนินการต่อ",
     "what": "ข้อมูลที่แชร์",
     "why": "เหตุผลที่แชร์",
     "who": "ผู้รับข้อมูล"
@@ -3007,7 +2875,6 @@
       "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
       "selectOrganization": "เลือกองค์กร",
       "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานแล้ว เลือกองค์กรอื่นจากโปรไฟล์เพื่อดำเนินการต่อ",
-      "accessDeniedTitle": "ไม่มีสิทธิ์เข้าถึง",
       "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "การปรับปรุงบัญชี",
         "credits_expired": "เครดิตหมดอายุ"
       },
-      "loadMore": "โหลดเพิ่ม",
       "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
       "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู"
     },
@@ -3052,18 +2918,14 @@
         "paid": "ชำระแล้ว",
         "open": "เปิด",
         "void": "เป็นโมฆะ",
-        "draft": "ฉบับร่าง",
-        "uncollectible": "เรียกเก็บไม่ได้",
-        "unknown": "ไม่ทราบ"
+        "uncollectible": "เรียกเก็บไม่ได้"
       },
-      "loadMore": "โหลดเพิ่ม",
       "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
       "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ชื่อ@บริษัท.com",
       "enableA11y": "เปิดใช้การแจ้งเตือนยอดคงเหลือต่ำ",
-      "enabled": "เปิดใช้งานแล้ว",
       "notifyEmailsLabel": "อีเมลสำหรับการแจ้งเตือน",
       "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการเรียกเก็บเงิน",
       "separateEmailsHint": "หากมีหลายอีเมล ให้คั่นด้วยเครื่องหมายจุลภาค",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}}/วัน",
       "manageA11y": "จัดการ {{name}}",
       "manageInvitationA11y": "จัดการคำเชิญสำหรับ {{email}}",
-      "removeConfirm": "ลบออก",
       "removeMember": "นำสมาชิกออก",
       "removeMemberMessage": "นำ {{name}} ออกจากองค์กรนี้หรือไม่?",
       "revokeConfirm": "เพิกถอน",
@@ -3113,25 +2974,18 @@
       "resendInvite": "ส่งคำเชิญอีกครั้ง",
       "shareInviteLink": "แชร์ลิงก์คำเชิญ"
     },
-    "permissionDenied": {
-      "back": "ย้อนกลับ",
-      "title": "ไม่มีสิทธิ์เข้าถึง"
-    },
     "usageStats": {
-      "cost": "ค่าใช้จ่าย",
       "inputTokens": "โทเคนขาเข้า",
       "last30Days": "30 วันที่ผ่านมา",
       "outputTokens": "โทเคนขาออก",
       "requests": "คำขอ"
     },
     "hub": {
-      "title": "องค์กร",
       "renameTitle": "เปลี่ยนชื่อองค์กร",
       "renamePlaceholder": "ชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "organizationSeats": "สิทธิ์ใช้งานขององค์กร",
-      "lowBalanceBelow": "ต่ำกว่า {{amount}}",
-      "lowBalanceOff": "ปิด"
+      "lowBalanceBelow": "ต่ำกว่า {{amount}}"
     },
     "kiloPass": {
       "activating": "กำลังเปิดใช้งาน",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "การประมวลผลเครดิตล่าช้า · กำลังลองใหม่โดยอัตโนมัติ",
       "ended": "สิ้นสุดแล้ว",
       "endsOn": "สิ้นสุดวันที่ {{date}}",
-      "loading": "กำลังโหลด…",
       "manageHint": "เปิดหน้าจัดการ Kilo Pass บนเว็บ",
       "notSubscribed": "ยังไม่ได้สมัครสมาชิก",
       "overallocated": "จำนวนผู้ได้รับ Pass เกินจำนวนสิทธิ์ใช้งานที่ชำระเงินแล้ว",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "แชท",
-    "composer": {
-      "placeholder": "ข้อความ"
-    },
     "empty": {
       "title": "เริ่มแชท",
       "description": "ส่งข้อความเพื่อพูดคุยกับโมเดล"
     },
     "working": "กำลังทำงาน",
     "historyRetry": "ไม่สามารถโหลดประวัติแชทได้",
-    "catalogRetry": "ไม่สามารถโหลดโมเดลได้",
     "sendError": "ไม่สามารถส่งข้อความได้ ลองอีกครั้ง"
   },
   "glanceable": {

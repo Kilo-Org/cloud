@@ -115,7 +115,7 @@ export function DeviceSessionsScreen() {
       Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('deviceSessions.signOutMessage'), [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('deviceSessions.signOutConfirm'),
+          text: t('common.signOut'),
           style: 'destructive',
           onPress: () => {
             void signOut();
@@ -132,7 +132,7 @@ export function DeviceSessionsScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('deviceSessions.signOutConfirm'),
+          text: t('common.signOut'),
           style: 'destructive',
           onPress: () => {
             revokeSession.mutate({ sessionId: session.id });

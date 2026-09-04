@@ -27,7 +27,49 @@
     "somethingWentWrong": "حدث خطأ ما.",
     "couldNotOpen": "تعذّر فتح {{label}}.",
     "link": "رابط",
-    "takingLonger": "يستغرق هذا وقتًا أطول من المتوقع. يمكنك إغلاق هذه النافذة والتحقق مرة أخرى."
+    "takingLonger": "يستغرق هذا وقتًا أطول من المتوقع. يمكنك إغلاق هذه النافذة والتحقق مرة أخرى.",
+    "model": "النموذج",
+    "accessDenied": "لا تملك صلاحية الوصول.",
+    "allRepositories": "جميع المستودعات",
+    "personal": "شخصي",
+    "connectGithub": "ربط GitHub",
+    "cost": "التكلفة",
+    "discard": "تجاهل",
+    "findings": "الملاحظات",
+    "notConnected": "غير مرتبط",
+    "notifications": "الإشعارات",
+    "pullRequest": "طلب سحب",
+    "repositories": "المستودعات",
+    "securityAgent": "وكيل الأمان",
+    "unknown": "غير معروف",
+    "added": "مضاف",
+    "cancelled": "تم الإلغاء",
+    "close": "إغلاق",
+    "codeReviewer": "مراجع الشيفرة",
+    "connected": "مرتبط",
+    "couldNotLoadModels": "تعذّر تحميل النماذج.",
+    "couldNotLoadRepositories": "تعذّر تحميل المستودعات.",
+    "critical": "حرج",
+    "delete": "حذف",
+    "deleted": "محذوف",
+    "details": "التفاصيل",
+    "draft": "مسودة",
+    "enabled": "مفعّل",
+    "github": "GitHub",
+    "imageUnavailable": "الصورة غير متاحة.",
+    "loading": "جارٍ التحميل…",
+    "loadMore": "تحميل المزيد",
+    "message": "رسالة",
+    "off": "معطّل",
+    "organization": "المؤسسة",
+    "platform": "المنصة",
+    "prReview": "مراجعة PR",
+    "queued": "في قائمة الانتظار",
+    "remove": "إزالة",
+    "repository": "المستودع",
+    "signOut": "تسجيل الخروج",
+    "agents": "الوكلاء",
+    "all": "الكل"
   },
   "language": {
     "title": "اللغة",
@@ -62,12 +104,10 @@
     "emailAddress": "عنوان البريد الإلكتروني",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "المتابعة عبر البريد الإلكتروني",
-    "continue": "متابعة",
     "enterCodeSentTo": "أدخل الرمز المرسل إلى {{email}}.",
     "codeArrivalHint": "إذا كان هذا العنوان مؤهلًا لتسجيل الدخول، فسيصل الرمز خلال دقيقة.",
     "verifyCode": "التحقق من الرمز",
     "resendCode": "إعادة إرسال الرمز",
-    "back": "رجوع",
     "termsPrefix": "بالمتابعة، توافق على",
     "terms": "الشروط",
     "termsConnector": " و ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "الملف الشخصي",
-    "agents": "الوكلاء",
-    "codeReviewer": "مراجع الشيفرة",
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
-    "securityAgent": "وكيل الأمان",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
     "reviews": "المراجعات",
-    "prReview": "مراجعة PR",
     "prReviewSubtitle": "مراجعة طلبات السحب على الجوال",
-    "organization": "المؤسسة",
     "couldNotLoadOrganization": "تعذّر تحميل المؤسسة.",
     "couldNotLoadOrganizationDescription": "إعدادات المؤسسة والوكيل غير متاحة حتى يكتمل تحميل بيانات المؤسسة.",
     "linkedAccounts": "الحسابات المرتبطة",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "نفد رصيدك. تُدار عمليات الرصيد لهذا الحساب خارج تطبيق iOS.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
-    "signOutConfirm": "تسجيل الخروج",
     "deleteAccountTitle": "حذف الحساب؟",
     "deleteAccountMessage": "سيؤدي هذا إلى حذف حسابك نهائيًا وتسجيل خروجك. سنرسل رمز تأكيد عبر البريد الإلكتروني.",
     "deleteAccountConfirm": "حذف الحساب",
     "accountDeleted": "تم حذف حسابك.",
     "viewOrganization": "عرض المؤسسة",
     "manageOrganization": "إدارة المؤسسة",
-    "personal": "شخصي",
     "selectAccount": "اختيار الحساب",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "البريد الإلكتروني",
     "providerTestAccount": "حساب تجريبي",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
     "keepScreenOnSubtitle": "إبقاء الشاشة مضاءة أثناء تشغيل الجلسة.",
     "appearance": "المظهر",
-    "notifications": "الإشعارات",
     "notificationsSubtitle": "تفضيلات الإشعارات الفورية",
     "appearanceSystem": "النظام",
     "appearanceLight": "فاتح",
@@ -159,7 +190,6 @@
     "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق."
   },
   "notifications": {
-    "title": "الإشعارات",
     "liveActivities": "الأنشطة المباشرة",
     "liveActivitySubtitle": "عرض الوكلاء النشطين على شاشة القفل",
     "liveUpdates": "التحديثات المباشرة",
@@ -215,7 +245,6 @@
   },
   "tabs": {
     "home": "الرئيسية",
-    "agents": "الوكلاء",
     "profile": "الملف الشخصي",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -229,8 +258,7 @@
       "noInstances": "لا توجد مثيلات KiloClaw",
       "noInstancesDescription": "أعِدّ مثيلًا لبدء الدردشة.",
       "setUpKiloclaw": "إعداد KiloClaw",
-      "currentInstance": "{{title}}، المثيل الحالي",
-      "personal": "شخصي"
+      "currentInstance": "{{title}}، المثيل الحالي"
     },
     "conversation": {
       "failedToLoad": "تعذّر تحميل المحادثة.",
@@ -268,7 +296,6 @@
       "cancelReply": "إلغاء الرد",
       "openInstance": "فتح المثيل",
       "attachFile": "إرفاق ملف",
-      "messagePlaceholder": "رسالة",
       "cancelEdit": "إلغاء التعديل",
       "sendMessage": "إرسال الرسالة"
     },
@@ -287,7 +314,6 @@
     },
     "attachment": {
       "open": "فتح {{filename}}",
-      "imageUnavailable": "الصورة غير متاحة.",
       "openFailed": "تعذر فتح المرفق. تحقق من اتصالك وحاول مرة أخرى.",
       "attachFailed": "تعذّر إرفاق الملف.",
       "limit": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
@@ -317,7 +343,6 @@
       "yourMessage": "رسالتك",
       "messageFrom": "رسالة من {{author}}",
       "moreActions": "مزيد من الإجراءات",
-      "message": "رسالة",
       "notDelivered": "لم يتم التسليم",
       "edited": "(تم التعديل)",
       "image": "صورة",
@@ -329,7 +354,6 @@
       "title": "إجراءات الرسالة",
       "deleteTitle": "حذف الرسالة؟",
       "deleteMessage": "سيؤدي هذا إلى إزالة الرسالة من المحادثة.",
-      "delete": "حذف",
       "deleteFailed": "تعذّر حذف الرسالة.",
       "removeReactionFailed": "تعذّرت إزالة التفاعل.",
       "addReactionFailed": "تعذّرت إضافة التفاعل.",
@@ -363,7 +387,6 @@
       "online": "متصل",
       "idle": "خامل",
       "offline": "غير متصل",
-      "unknown": "غير معروف",
       "loadingUser": "جارٍ تحميل بيانات المستخدم...",
       "waitingForStatus": "في انتظار حالة الروبوت...",
       "offlineMessage": "الروبوت غير متصل. سيُستأنف تبادل الرسائل عند اتصاله مجددًا."
@@ -435,7 +458,6 @@
       "destroyMessage": "سيُحذف مثيل KiloClaw وجميع بياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
       "destroyTitle": "حذف المثيل نهائيًا",
       "instance": "المثيل",
-      "renameFailed": "حدث خطأ ما.",
       "couldNotCheckStatus": "تعذّر التحقق من حالة الخدمة.",
       "dangerZone": "إجراءات خطرة",
       "destroying": "جارٍ الحذف النهائي…",
@@ -484,29 +506,22 @@
       "failedToLoadCommand": "تعذّر تحميل أمر الإعداد.",
       "gmailNotifications": "إشعارات Gmail",
       "disconnect": "إلغاء ربط حساب Google",
-      "connected": "مرتبط",
       "copied": "تم النسخ",
       "copyCommand": "نسخ الأمر",
       "disabled": "معطّل",
       "disconnectConfirm": "إلغاء الربط",
       "disconnectMessage": "إزالة حسابك على Google من هذا المثيل؟ سيؤدي ذلك إلى تعطيل إشعارات Gmail. أعد النشر بعد إلغاء الربط لتطبيق التغييرات.",
-      "disconnectTitle": "إلغاء ربط Google",
-      "enabled": "مفعّل",
-      "notConnected": "غير مرتبط"
+      "disconnectTitle": "إلغاء ربط Google"
     },
     "modelList": {
       "title": "جميع النماذج",
       "searchPlaceholder": "البحث عن النماذج...",
-      "couldNotLoad": "تعذّر تحميل النماذج.",
       "clearSearch": "مسح البحث",
       "noMatches": "لا توجد نماذج تطابق بحثك",
       "noModels": "لا توجد نماذج متاحة",
       "noModelsDescription": "ستظهر النماذج هنا عندما تصبح متاحة.",
       "noResultsFor": "لا توجد نتائج تطابق «{{query}}».",
       "recommended": "النماذج الموصى بها"
-    },
-    "model": {
-      "title": "النموذج"
     },
     "secrets": {
       "title": "البيانات السرية",
@@ -518,10 +533,7 @@
       "saved": "تم حفظ {{label}}",
       "allFieldsRequired": "يجب ملء جميع الحقول لربط {{label}}.",
       "connect": "ربط",
-      "connected": "مرتبط",
       "hide": "إخفاء {{label}}",
-      "notConnected": "غير مرتبط",
-      "remove": "إزالة",
       "removing": "جارٍ الإزالة…",
       "saving": "جارٍ الحفظ…",
       "setupGuide": "دليل الإعداد",
@@ -623,7 +635,6 @@
     "list": {
       "createInstance": "إنشاء مثيل",
       "organizations": "المؤسسات",
-      "personal": "شخصي",
       "accessIssue": {
         "trialExpired": "انتهت الفترة التجريبية، اشترك لمواصلة استخدام هذا المثيل",
         "subscriptionCanceled": "الاشتراك غير نشط، أعد الاشتراك لمواصلة استخدام هذا المثيل",
@@ -639,7 +650,6 @@
       "balancedLabel": "متوازن",
       "browseAllModels": "أو اختر من بين أكثر من 500 نموذج",
       "browseAllModelsA11y": "استعراض جميع النماذج التي يزيد عددها عن 500",
-      "cost": "التكلفة",
       "currentModel": "النموذج الحالي",
       "frontierDescription": "أعلى أداء. يوجّه الطلبات إلى أحدث النماذج المتقدمة التي تدعم الاستدلال.",
       "frontierLabel": "متقدم",
@@ -654,7 +664,6 @@
         "warmedUp": "كل شيء جاهز. ألقِ التحية متى شئت."
       },
       "flow": {
-        "close": "إغلاق",
         "couldNotLoad": "تعذّر تحميل حالة الإعداد.",
         "finishingSetup": "جارٍ إكمال الإعداد. انتظر قليلًا ريثما نكمل إعداد حسابك.",
         "genericErrorBody": "لم نتمكن من إنهاء إعداد مثيلك الآن.",
@@ -665,13 +674,11 @@
         "provisioning": "التجهيز",
         "ready": "جاهز",
         "review": "مراجعة",
-        "settingUp": "جارٍ الإعداد…",
-        "somethingWentWrong": "حدث خطأ ما."
+        "settingUp": "جارٍ الإعداد…"
       },
       "identity": {
         "changePersonality": "تغيير الشخصية",
         "chooseAvatar": "اختيار الصورة الرمزية",
-        "continue": "متابعة",
         "location": "الموقع",
         "locationDeniedMessage": "فعّل الوصول إلى الموقع في الإعدادات لاستخدام موقعك الحالي.",
         "locationDeniedTitle": "تم رفض الوصول إلى الموقع",
@@ -728,7 +735,6 @@
       "gatewayProcess": "عملية البوابة",
       "lastExit": "آخر خروج",
       "memory": "الذاكرة",
-      "model": "النموذج",
       "region": "المنطقة",
       "resources": "الموارد",
       "restarts": "مرات إعادة التشغيل",
@@ -756,7 +762,6 @@
       "googleDescription": "Gmail وCalendar وDocs",
       "googleLabel": "حساب Google",
       "modelDescription": "اختيار نموذج الذكاء الاصطناعي",
-      "modelLabel": "النموذج",
       "secretsDescription": "بيانات اعتماد مشفّرة",
       "secretsLabel": "البيانات السرية",
       "versionPinDescription": "تثبيت النسخة المستخدمة على إصدار محدد",
@@ -805,12 +810,9 @@
       "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…"
     },
     "repos": {
-      "title": "المستودعات",
-      "couldNotLoad": "تعذّر تحميل المستودعات.",
       "unavailable": "المستودعات غير متاحة — أكمل إعداد Bitbucket على kilo.ai.",
       "finishSetup": "إكمال الإعداد",
       "manageAccess": "إدارة صلاحيات الوصول",
-      "allRepositories": "جميع المستودعات",
       "bitbucketNoRepositoriesDescription": "لا توجد مستودعات متاحة في مساحة عمل Bitbucket هذه.",
       "bitbucketSetup": "إعداد Bitbucket",
       "couldNotOpenGithubSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
@@ -845,7 +847,6 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
-      "connectGitHub": "ربط GitHub",
       "connectProvider": "اربط مزوّدًا",
       "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
@@ -853,9 +854,6 @@
       "instructions": "تعليمات (اختيارية)",
       "instructionsPlaceholder": "جوانب محددة للتركيز عليها أثناء المراجعة…",
       "invalidUrl": "أدخل عنوان URL صالحًا لطلب سحب.",
-      "model": "النموذج",
-      "notConnected": "غير مرتبط",
-      "platform": "المنصة",
       "pullRequestUrl": "عنوان URL لطلب السحب",
       "start": "بدء المراجعة",
       "starting": "جارٍ بدء المراجعة…",
@@ -865,14 +863,10 @@
     "platformList": {
       "activity": "النشاط",
       "checking": "جارٍ التحقق…",
-      "connected": "مرتبط",
-      "notConnected": "غير مرتبط",
-      "organization": "المؤسسة",
       "platforms": "المنصات",
       "statusUnavailable": "الحالة غير متاحة"
     },
     "providerConnect": {
-      "connectGitHub": "ربط GitHub",
       "connectGitLab": "ربط GitLab",
       "description": "اربط {{label}} الخاص بـ Kilo لمراجعة طلبات السحب تلقائيًا.",
       "githubApp": "تطبيق GitHub",
@@ -881,7 +875,6 @@
       "gitlabError": "تعذّر فتح صفحة إعداد GitLab. حاول مرة أخرى.",
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
-    "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
     "reviewDetail": {
       "branch": "الفرع",
       "byline": "{{repo}} #{{number}} بواسطة {{author}}",
@@ -890,22 +883,17 @@
       "cancelTitle": "إلغاء المراجعة؟",
       "checkRun": "تشغيل الفحص",
       "completed": "تم الاكتمال",
-      "cost": "التكلفة",
       "couldNotGetLatest": "تعذّر تحميل آخر التحديثات.",
       "couldNotLoad": "تعذّر تحميل المراجعة.",
       "council": "المجلس",
       "created": "تاريخ الإنشاء",
       "decision": "القرار",
-      "details": "التفاصيل",
-      "findings": "الملاحظات",
       "gate": "معيار اجتياز الفحص",
       "gateHidden": "مخفي",
       "gateNone": "لا شيء",
       "keepRunning": "متابعة التشغيل",
-      "model": "النموذج",
       "noFindings": "لا توجد نتائج.",
       "openPullRequest": "فتح طلب السحب",
-      "platform": "المنصة",
       "retryMessage": "سيؤدي هذا إلى إعادة مراجعة الشفرة.",
       "retryReview": "إعادة المراجعة",
       "retryTitle": "إعادة المراجعة؟",
@@ -916,7 +904,6 @@
       "title": "مراجعة",
       "tokens": "رموز",
       "tokensInOut": "{{input}} إدخال / {{output}} إخراج",
-      "pullRequest": "طلب سحب",
       "transcriptWaiting": "لم يتوفر سجل المراجعة بعد.",
       "transcriptEmpty": "لا يوجد سجل لهذه المراجعة.",
       "transcriptRetry": "تعذّر تحميل سجل المراجعة.",
@@ -959,14 +946,12 @@
     },
     "scopeList": {
       "couldNotLoad": "تعذّر تحميل المؤسسات.",
-      "personal": "شخصي",
       "personalStillAvailable": "لا تزال المستودعات الشخصية متاحة أدناه.",
       "personalSubtitle": "مستودعاتك الخاصة",
       "viewOnly": "للعرض فقط"
     },
     "selectRepositories": "تحديد المستودعات",
     "selectRepository": "اختر مستودعًا واحدًا على الأقل لتفعيل المراجعات التلقائية.",
-    "title": "مراجع الشيفرة",
     "webhookSetup": "إعداد خطاف الويب غير مكتمل.",
     "webhookSetupDescription": "قد لا تتلقى بعض المستودعات مراجعات تلقائية.",
     "decision": {
@@ -975,17 +960,13 @@
       "noResult": "بدون نتيجة",
       "pass": "نجاح"
     },
-    "eyebrow": "مراجع الشيفرة",
     "overview": {
       "allAreas": "جميع المجالات",
-      "allRepositories": "جميع المستودعات",
       "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "mergeGate": "شروط الدمج",
-      "model": "النموذج",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
-      "repositories": "المستودعات",
       "reviewMemory": "ذاكرة المراجعة",
       "reviewStyle": "أسلوب المراجعة",
       "set": "محدّد"
@@ -994,11 +975,9 @@
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
       "pending": "قيد الانتظار",
-      "queued": "في قائمة الانتظار",
       "running": "قيد التشغيل",
       "completed": "تم الاكتمال",
       "failed": "فشل",
-      "cancelled": "تم الإلغاء",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {
@@ -1016,42 +995,33 @@
       "documentation": "التوثيق"
     },
     "gateThreshold": {
-      "off": "معطّل",
-      "all": "الكل",
-      "warning": "تحذير",
-      "critical": "حرج"
+      "warning": "تحذير"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
         "description": "تم تعطيل مراجع الشفرة لأن Kilo لا يستطيع الوصول إلى هذا المستودع عبر تثبيت نشط لتطبيق GitHub. حدّث تثبيت تطبيق GitHub، ثم أعد تفعيل مراجع الشفرة.",
         "recoveryLabel": "تحديث تطبيق GitHub"
       },
       "githubIpAllowList": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
-        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة.",
-        "recoveryLabel": "التواصل مع الدعم"
+        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
       },
       "gitlabProjectAccessRequired": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
         "description": "تم تعطيل مراجع الشفرة لأن Kilo لا يستطيع إنشاء رمز وصول لهذا المشروع في GitLab. امنح صلاحيات المشرف أو فعّل رموز وصول المشاريع، ثم أعد تفعيل مراجع الشفرة.",
         "recoveryLabel": "تحديث تكامل GitLab"
       },
       "byokInvalidKey": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
         "description": "تم تعطيل مراجع الشفرة لأن مفتاح API المحدد ضمن BYOK غير صالح، أو أُلغِي، أو لا يملك الصلاحية المطلوبة. حدّث المفتاح أو اختر نموذجًا آخر، ثم أعد تفعيل مراجع الشفرة.",
         "recoveryLabel": "تحديث إعدادات BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
         "description": "تم تعطيل مراجع الشفرة لأن النموذج المحدد غير متاح لجلسات وكيل السحابة. اختر نموذجًا متاحًا، ثم أعد تفعيل مراجع الشفرة.",
         "recoveryLabel": "تحديث إعدادات مراجع الشفرة"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "يتطلب مراجع الشيفرة تدخلك.",
-        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة.",
-        "recoveryLabel": "التواصل مع الدعم"
-      }
+        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
+      },
+      "title": "يتطلب مراجع الشيفرة تدخلك.",
+      "recoveryLabel": "التواصل مع الدعم"
     },
     "unknownError": "حدث خطأ غير معروف."
   },
@@ -1060,24 +1030,18 @@
       "noFilters": "لا توجد عوامل تصفية متاحة",
       "noFiltersDescription": "ارجع وأعد فتح عوامل التصفية من قائمة النتائج.",
       "title": "تصفية النتائج",
-      "all": "الكل",
-      "allRepositories": "جميع المستودعات",
       "fixed": "تم الإصلاح",
       "outcome": "النتيجة",
       "outcomeAnalyzing": "جارٍ التحليل",
       "outcomeDismissed": "مستبعدة",
-      "outcomeExploitable": "قابلة للاستغلال",
       "outcomeFailed": "فشل التحليل",
-      "outcomeNeedsReview": "بحاجة إلى مراجعة",
       "outcomeNotAnalyzed": "لم تُحلّل بعد",
       "outcomeNotExploitable": "غير قابلة للاستغلال",
       "outcomeSafeToDismiss": "يمكن استبعادها بأمان",
       "outcomeTriageComplete": "اكتمل الفرز الأولي",
       "overdueOnly": "النتائج المتأخرة فقط",
-      "repository": "المستودع",
       "reset": "إعادة تعيين",
       "severity": "الخطورة",
-      "severityCritical": "حرج",
       "severityHigh": "عالٍ",
       "severityLow": "منخفض",
       "severityMedium": "متوسط",
@@ -1101,7 +1065,6 @@
       "exploitable": "قابلة للاستغلال",
       "fullReport": "التقرير المُنشأ كاملًا",
       "keepWaiting": "مواصلة الانتظار",
-      "model": "النموذج",
       "no": "لا",
       "noAnalysisYet": "لا يوجد تحليل بعد",
       "noAnalysisYetDescription": "ابدأ التحليل من علامة التبويب التفاصيل.",
@@ -1114,7 +1077,6 @@
       "suggestedFix": "الإصلاح المقترح",
       "triageConfidence": "درجة الثقة في الفرز الأولي",
       "triageReasoning": "مبررات الفرز الأولي",
-      "unknown": "غير معروف",
       "watchInCloudAgent": "المتابعة في وكيل السحابة",
       "whereFound": "مواضع الاكتشاف ({{displayCount}})",
       "yes": "نعم"
@@ -1122,21 +1084,17 @@
     "analysisSettings": {
       "analysisModel": "نموذج التحليل",
       "couldNotLoad": "تعذّر تحميل إعدادات التحليل.",
-      "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "depth": "عمق التحليل",
       "modeAuto": "تلقائي",
       "modeDeep": "عميق",
       "modeShallow": "سطحي",
-      "permissionNote": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
       "remediationModel": "نموذج المعالجة",
       "title": "النماذج والتحليل",
       "triageModel": "نموذج الفرز الأولي"
     },
     "auditReport": {
-      "checkConnection": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
       "couldNotLoad": "تعذّر تحميل تقرير التدقيق.",
       "events": "الأحداث",
-      "findings": "الملاحظات",
       "generated": "أُنشئ التقرير في {{generatedAt}}.",
       "noActivity": "لا يوجد نشاط مسجّل",
       "noActivityDescription": "لم يسجّل Kilo نشاطًا للنتائج الأمنية يمكن تضمينه في التقرير من {{start}} إلى {{end}}.",
@@ -1173,7 +1131,6 @@
       "includeExistingFindingsAnalysisSubtitle": "تحليل النتائج التي تمت مزامنتها سابقًا أيضًا. قد يستهلك ذلك رصيدًا إضافيًا.",
       "includeExistingFindingsRemediationSubtitle": "إضافة النتائج التي سبق تحليلها وتستوفي الشروط إلى قائمة الانتظار أيضًا، مع الاستمرار في منع طلبات PR المكررة.",
       "minimumSeverity": "الحد الأدنى للخطورة",
-      "permissionNote": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
       "queued": "أُضيفت الملاحظات الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
       "queued_other": "أُضيفت الملاحظات الحالية إلى قائمة انتظار التحليل. عددها: {{displayCount}}.",
       "queued_one": "أُضيفت نتيجة حالية واحدة ({{displayCount}}) إلى قائمة انتظار التحليل.",
@@ -1189,9 +1146,6 @@
       "queued_few": "أُضيفت {{displayCount}} نتائج حالية إلى قائمة انتظار التحليل.",
       "queued_many": "أُضيفت {{displayCount}} نتيجةً حالية إلى قائمة انتظار التحليل."
     },
-    "commandRetry": {
-      "discard": "تجاهل"
-    },
     "dashboard": {
       "actFirst": "الأولويات",
       "actionPosture": "حالة الإجراءات",
@@ -1203,7 +1157,6 @@
       "daysOverdue": "أيام التأخير: {{displayCount}}",
       "deadlineToday": "حلّ الموعد النهائي اليوم",
       "filterByRepository": "التصفية حسب المستودع",
-      "findings": "الملاحظات",
       "findingsCount": "النتائج: {{displayCount}}",
       "highOverdue": "عالية الخطورة ومتأخرة",
       "lastSynced": "آخر مزامنة: {{time}}",
@@ -1277,7 +1230,6 @@
       "notFound": "الملاحظة غير موجودة",
       "notFoundDescription": "ربما أُزيلت هذه النتيجة، أو لم تعد لديك صلاحية الوصول إليها.",
       "tabAnalysis": "التحليل",
-      "tabDetails": "التفاصيل",
       "tabRemediation": "المعالجة",
       "title": "النتيجة"
     },
@@ -1286,13 +1238,11 @@
       "detected": "تاريخ الاكتشاف",
       "dismissed": "مستبعدة",
       "dismissedBecause": "تم استبعاد النتيجة. السبب: {{reason}}.",
-      "fixed": "تم الإصلاح",
       "ghsa": "GHSA",
       "manifest": "ملف تعريف الحزمة",
       "noPatchAvailable": "لا يوجد تصحيح متاح",
       "package": "الحزمة",
       "patchedVersion": "الإصدار المُصحَّح",
-      "repository": "المستودع",
       "severityLabel": "الخطورة: {{severity}}",
       "slaDeadline": "الموعد النهائي حسب SLA",
       "source": "المصدر",
@@ -1300,12 +1250,10 @@
       "sourceRecord": "سجل المصدر",
       "supersededBy": "تم استبدالها بنتيجة حالية",
       "supersededByDescription": "اضغط لفتح السجل الحالي والاطلاع على الحالة والتحليل والمعالجة.",
-      "unknown": "غير معروف",
       "updated": "تم التحديث",
       "viewAdvisory": "عرض النشرة الأمنية على GitHub",
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
       "statusSuperseded": "مستبدلة",
-      "statusFixed": "تم الإصلاح",
       "statusOpen": "فتح",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "بدأ الإصلاح بالفعل",
@@ -1322,8 +1270,7 @@
       "emptyDescription": "لا توجد نتائج مفتوحة تستدعي الاهتمام حاليًا.",
       "emptyTitle": "لا توجد نتائج مفتوحة",
       "noMatchesDescription": "جرّب تعديل عوامل التصفية المحددة أو إزالتها.",
-      "noMatchesTitle": "لا توجد نتائج تطابق عوامل التصفية",
-      "title": "الملاحظات"
+      "noMatchesTitle": "لا توجد نتائج تطابق عوامل التصفية"
     },
     "findingRow": {
       "a11y": "نتيجة بدرجة خطورة {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1346,7 +1293,6 @@
       "newFindingSection": "إشعارات النتائج الجديدة",
       "newFindingSeverityLabel": "الحد الأدنى للخطورة لإشعارات النتائج الجديدة",
       "newFindingSubtitle": "يُرسل عند مزامنة نتيجة جديدة، بما في ذلك عند أول مزامنة.",
-      "readOnly": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
       "slaLeadTimeAccessibility": "عدد الأيام قبل الموعد النهائي لإرسال تحذير SLA",
       "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
       "slaLeadTimeHint": "أدخل عددًا صحيحًا بين 1 و365",
@@ -1354,8 +1300,7 @@
       "slaPersonalTitle": "إشعاري بتحذيرات SLA عبر البريد الإلكتروني",
       "slaSection": "إشعار تحذير SLA",
       "slaSeverityLabel": "الحد الأدنى للخطورة لإشعارات SLA",
-      "slaSubtitle": "يُرسل مسبقًا، وعند اقتراب الموعد النهائي المحدد للنتائج حسب SLA أو تجاوزه.",
-      "title": "الإشعارات"
+      "slaSubtitle": "يُرسل مسبقًا، وعند اقتراب الموعد النهائي المحدد للنتائج حسب SLA أو تجاوزه."
     },
     "remediation": {
       "attemptHistory": "سجل المحاولات ({{displayCount}})",
@@ -1368,19 +1313,16 @@
       "cancelled": "تم إلغاء المعالجة",
       "couldNotLoad": "تعذّر تحميل حالة المعالجة.",
       "keepRunning": "متابعة التشغيل",
-      "model": "النموذج",
       "noAnalysisDescription": "ابدأ التحليل من علامة التبويب التفاصيل.",
       "noAnalysisTitle": "لا يوجد تحليل بعد",
       "openDraftPullRequest": "فتح مسودة طلب السحب{{number}}",
       "openPullRequest": "فتح طلب السحب{{number}}",
       "progress": "التقدم",
-      "pullRequest": "طلب سحب",
       "retry": "إعادة محاولة المعالجة",
       "start": "بدء المعالجة",
       "startedBy": "بدأها",
       "timeline": {
         "blocked": "المعالجة متوقفة بسبب عائق",
-        "cancelled": "تم الإلغاء",
         "failed": "فشلت المعالجة",
         "noChangesNeeded": "لا حاجة إلى تغييرات",
         "prOpened": "تم فتح PR",
@@ -1391,18 +1333,14 @@
       "unavailable": "لا تتوفر معالجة لهذه الملاحظة."
     },
     "repositories": {
-      "allRepositories": "جميع المستودعات",
       "couldNotLoad": "تعذّر تحميل إعدادات المستودعات.",
-      "couldNotLoadRepositories": "تعذّر تحميل المستودعات.",
       "couldNotOpenGithubSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
       "githubAppSettings": "إعدادات تطبيق GitHub",
       "manageAccess": "إدارة صلاحيات وصول تطبيق GitHub",
       "noRepositories": "لا توجد مستودعات",
       "noRepositoriesDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات.",
-      "readOnly": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
       "selectAtLeastOne": "اختر مستودعًا واحدًا على الأقل.",
-      "selectedRepositories": "المستودعات المحددة",
-      "title": "المستودعات"
+      "selectedRepositories": "المستودعات المحددة"
     },
     "scopeEntry": {
       "connectDescription": "ثبّت تطبيق Kilo على GitHub لمزامنة تنبيهات Dependabot تلقائيًا وإدارة النتائج الأمنية في مستودعاتك.",
@@ -1417,34 +1355,25 @@
     },
     "scopeList": {
       "couldNotLoad": "تعذّر تحميل المؤسسات.",
-      "personal": "شخصي",
-      "personalSubtitle": "مستودعاتك الخاصة",
-      "title": "وكيل الأمان"
+      "personalSubtitle": "مستودعاتك الخاصة"
     },
     "settingsOverview": {
-      "allRepositories": "جميع المستودعات",
       "analysisModeSubtitle": "نوع التحليل: {{mode}}",
       "automation": "الأتمتة",
       "automationAllOff": "الكل معطّل",
       "automationCount": "تم تفعيل {{displayCount}} من 3",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات.",
-      "couldNotLoadRepositories": "تعذّر تحميل المستودعات.",
       "couldNotLoadSettings": "تعذّر تحميل إعدادات وكيل الأمان.",
       "disabled": "معطّل",
       "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيله.",
       "disabledNoRepo": "اختر مستودعًا واحدًا على الأقل قبل تفعيل وكيل الأمان.",
       "disabledPrompt": "فعّل وكيل الأمان لمزامنة تنبيهات Dependabot واختيار المستودعات وضبط إعدادات الأتمتة.",
-      "enabled": "مفعّل",
       "modelsAndAnalysis": "النماذج والتحليل",
-      "notifications": "الإشعارات",
       "notificationsCount": "تم تفعيل {{displayCount}} من 2",
-      "off": "معطّل",
       "on": "مفعّل",
-      "repositories": "المستودعات",
       "repositoriesCount": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_other": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_one": "مستودع واحد محدد ({{displayCount}})",
-      "securityAgent": "وكيل الأمان",
       "selectRepositories": "تحديد المستودعات",
       "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
       "slaPolicy": "سياسة SLA",
@@ -1455,7 +1384,6 @@
       "repositoriesCount_many": "تم تحديد {{displayCount}} مستودعًا"
     },
     "settingsSave": {
-      "discard": "تجاهل",
       "keepEditing": "متابعة التعديل",
       "saveChanges": "حفظ التغييرات",
       "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
@@ -1466,7 +1394,6 @@
     },
     "sla": {
       "couldNotLoad": "تعذّر تحميل إعدادات SLA.",
-      "critical": "حرج",
       "criticalDescription": "استغلال عن بُعد بدون مصادقة.",
       "deadlinesHeading": "مهل المعالجة (بالأيام)",
       "enableTracking": "تفعيل تتبع SLA",
@@ -1483,7 +1410,6 @@
       "remediationDeadlineA11y": "مهلة المعالجة بالأيام لمستوى الخطورة {{label}}",
       "title": "سياسة SLA"
     },
-    "title": "وكيل الأمان",
     "initialSyncAdmissionFailed": "تم تفعيل وكيل الأمان، لكن تعذّرت إضافة المزامنة الأولية إلى قائمة الانتظار. أعد المزامنة.",
     "queuedActionUntracked": "لم يعد من الممكن تتبع إجراء في قائمة الانتظار. حدّث البيانات للاطلاع على الحالة الحالية.",
     "commands": {
@@ -1511,22 +1437,16 @@
       "failed": "فشل التحليل",
       "failedTitle": "فشل التحليل",
       "failedDescription": "لم يتمكن وكيل الأمان من إكمال التحليل.",
-      "extractionFailed": "بحاجة إلى مراجعة",
-      "extractionFailedTitle": "بحاجة إلى مراجعة",
       "extractionFailedDescription": "تعذّر تحويل التقرير الفني إلى نتيجة منظمة.",
-      "exploitable": "قابلة للاستغلال",
-      "exploitableTitle": "قابلة للاستغلال",
       "exploitableDescription": "يمكن لشفرة التطبيق الوصول إلى الوظيفة المتأثرة.",
       "notExploitable": "لا يمكن الوصول إليها",
       "notExploitableTitle": "لا يمكن الوصول إليها",
       "notExploitableDescription": "لم يُعثر في هذا المستودع على مسار يصل إلى الوظيفة المتأثرة.",
       "unknown": "بحاجة إلى مراجعة",
-      "unknownTitle": "بحاجة إلى مراجعة",
       "unknownDescription": "لم يحسم التحليل ما إذا كان بالإمكان الوصول إلى الوظيفة المتأثرة بالثغرة.",
       "safeToDismiss": "يمكن استبعادها بأمان",
       "safeToDismissTitle": "يمكن استبعادها بأمان",
       "safeToDismissDescription": "أظهر الفرز الأولي أن استبعاد هذه النتيجة آمن ولا يتطلب تحليل الشفرة البرمجية.",
-      "manualReview": "بحاجة إلى مراجعة",
       "manualReviewTitle": "بحاجة إلى مراجعة يدوية",
       "manualReviewDescription": "أظهر الفرز الأولي أن هذه النتيجة تحتاج إلى مراجعة يدوية.",
       "analysisRequired": "التحليل مطلوب",
@@ -1541,7 +1461,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "تم الإصلاح قبل الموعد النهائي",
-      "fixed": "تم الإصلاح",
       "fixedOn": "تم الإصلاح في {{date}}",
       "resolutionRecorded": "تم تسجيل الحل",
       "superseded": "مستبدلة",
@@ -1571,7 +1490,6 @@
     "remediationStatus": {
       "cancellationRequested": "تم طلب الإلغاء",
       "notStarted": "لم تبدأ",
-      "queued": "في قائمة الانتظار",
       "starting": "جارٍ البدء",
       "inProgress": "قيد التنفيذ",
       "draftPrOpened": "تم فتح مسودة PR",
@@ -1579,7 +1497,6 @@
       "blocked": "متوقفة بسبب عائق",
       "failed": "فشل",
       "noChangesNeeded": "لا حاجة إلى تغييرات",
-      "cancelled": "تم الإلغاء",
       "originAutomaticPolicy": "سياسة تلقائية",
       "originIncludeExistingPolicy": "سياسة تضمين النتائج الحالية",
       "originManual": "يدوي",
@@ -1652,7 +1569,6 @@
     "sessionRow": {
       "deleteTitle": "حذف الجلسة؟",
       "deleteMessage": "لا يمكن التراجع عن هذا الإجراء.",
-      "delete": "حذف",
       "deleteSession": "حذف الجلسة",
       "rename": "تغيير الاسم",
       "renameMessage": "أدخل اسمًا جديدًا لهذه الجلسة.",
@@ -1712,7 +1628,6 @@
       "title": "الجلسة",
       "copyErrorDetails": "نسخ تفاصيل الخطأ",
       "backToSessions": "العودة إلى الجلسات",
-      "accessDenied": "لا تملك صلاحية الوصول.",
       "accessDeniedDescription": "لا تملك صلاحية عرض هذا المحتوى.",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
@@ -1728,7 +1643,6 @@
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
-      "continue": "متابعة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
       "notEnoughCredits": "رصيدك غير كافٍ لتشغيل Cloud Agent. اشحن رصيدك وحاول مرة أخرى.",
@@ -1762,8 +1676,6 @@
     },
     "newSession": {
       "title": "جلسة جديدة",
-      "repository": "المستودع",
-      "connectGithub": "ربط GitHub",
       "connectGithubDescription": "اربط حسابك على GitHub من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",
       "refreshRepositories": "تحديث المستودعات",
@@ -1788,7 +1700,6 @@
       "couldNotReadPendingSessions": "تعذّرت قراءة الجلسات المعلقة. حاول مرة أخرى.",
       "failedToCreate": "تعذّر إنشاء الجلسة.",
       "couldNotRefreshRepositories": "تعذّر تحديث المستودعات. حاول مرة أخرى.",
-      "discard": "تجاهل",
       "discardDraftMessage": "ستفقد التعليمات التي كتبتها.",
       "discardDraftTitle": "حذف المسودة؟",
       "discardFailed": "تعذّر حذف المسودة. حاول مرة أخرى.",
@@ -1824,8 +1735,6 @@
       "updatedFileCount_many": "تم تحديث {{displayCount}} ملفًا."
     },
     "toolPatch": {
-      "operationAdded": "مضاف",
-      "operationDeleted": "محذوف",
       "operationUpdated": "تم التحديث"
     },
     "toolCard": {
@@ -1866,9 +1775,7 @@
       "runOn": "التشغيل على",
       "runOnAccessibility": "التشغيل على: {{label}}",
       "couldNotLoad": "تعذّر تحميل المثيلات",
-      "couldNotLoadDescription": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
       "cloudAgent": "Cloud Agent",
-      "loading": "جارٍ التحميل…",
       "cloudAgentDescription": "التشغيل في بيئة Kilo السحابية المعزولة",
       "noCliInstances": "لا توجد مثيلات CLI متصلة",
       "noCliInstancesDescription": "شغّل `kilo remote` داخل مشروع على حاسوبك، أو حدّث Kilo CLI إذا كان يعمل بالفعل.",
@@ -1909,7 +1816,6 @@
       "loading": "جارٍ التحميل…",
       "accessibility": "المستودع: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -1924,9 +1830,7 @@
       "roleUser": "المستخدم",
       "roleAssistant": "المساعد",
       "sent": "وقت الإرسال",
-      "model": "النموذج",
       "costAndTokens": "التكلفة والرموز",
-      "cost": "التكلفة",
       "input": "الإدخال",
       "output": "الإخراج",
       "reasoning": "الاستدلال",
@@ -1946,7 +1850,6 @@
       "textDisplay": "عرض النص",
       "thinking": "جارٍ التفكير",
       "thought": "التفكير",
-      "title": "التفاصيل",
       "showDetails": "عرض التفاصيل",
       "pending": "قيد الانتظار…",
       "running": "جارٍ التنفيذ…"
@@ -1969,7 +1872,6 @@
     "filePart": {
       "loadingImage": "جارٍ تحميل الصورة",
       "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
-      "imageUnavailable": "الصورة غير متاحة.",
       "imageUnavailableWithAlt": "الصورة غير متاحة: {{alt}}.",
       "imagePreviewUnavailableInSession": "معاينة الصورة غير متاحة في هذه الجلسة.",
       "viewImage": "عرض الصورة",
@@ -2062,7 +1964,6 @@
       "failure": "خطأ: {{title}}.",
       "failureRetryAvailable": "{{title}}. يمكنك إعادة المحاولة.",
       "copyToComposer": "نسخ إلى حقل الرسالة",
-      "queued": "في قائمة الانتظار",
       "queuedAccessibility": "الرسالة في قائمة الانتظار",
       "userMessage": "رسالة المستخدم",
       "assistantMessage": "رسالة المساعد",
@@ -2110,12 +2011,10 @@
     },
     "sessionFilter": {
       "title": "تصفية الجلسات",
-      "platform": "المنصة",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "أخرى",
       "project": "المشروع"
@@ -2137,7 +2036,6 @@
       "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
     },
     "modelSelector": {
-      "model": "النموذج",
       "provider": "المزود {{id}}",
       "modelId": "النموذج {{id}}",
       "unavailable": "غير متاح",
@@ -2279,8 +2177,7 @@
       "merged": "طلب سحب مدموج",
       "draft": "مسودة طلب سحب",
       "updating": "جارٍ التحديث، {{label}} #{{number}}",
-      "label": "{{label}} رقم {{number}}",
-      "externalLinkLabel": "طلب سحب"
+      "label": "{{label}} رقم {{number}}"
     },
     "markdownImage": {
       "load": "تحميل",
@@ -2308,11 +2205,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "تعذّر تحميل حسابك.",
-    "couldNotLoadAccountDescription": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
     "couldNotLoadPrivacy": "تعذّر تحميل خيارات الخصوصية.",
     "couldNotLoadPrivacyDescription": "تحقق من إعدادات أمان جهازك وحاول مرة أخرى.",
     "contentReady": "المحتوى جاهز",
-    "signOut": "تسجيل الخروج",
     "retryLoadingAccount": "إعادة محاولة تحميل الحساب",
     "retryLoadingPrivacy": "إعادة محاولة تحميل خيارات الخصوصية"
   },
@@ -2339,7 +2234,6 @@
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
     "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة.",
-    "signOutConfirm": "تسجيل الخروج",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك."
   },
   "forceUpdate": {
@@ -2360,7 +2254,6 @@
   },
   "imageViewer": {
     "close": "إغلاق {{filename}}",
-    "imageUnavailable": "الصورة غير متاحة.",
     "share": "مشاركة {{filename}}"
   },
   "invalidRoute": {
@@ -2379,11 +2272,8 @@
     "internetRestored": "تمت استعادة الاتصال بالإنترنت"
   },
   "queryError": {
-    "neutralTitle": "حدث خطأ ما.",
     "neutralDescription": "حاول مرة أخرى.",
     "offlineTitle": "تعذّر التحميل.",
-    "offlineDescription": "حدث خطأ ما.",
-    "permissionTitle": "لا تملك صلاحية الوصول.",
     "permissionDescription": "لا تملك صلاحية عرض هذا المحتوى.",
     "notFoundTitle": "لم نعثر على العنصر المطلوب.",
     "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
@@ -2393,7 +2283,6 @@
   "screenHeader": {
     "openMenu": "فتح القائمة",
     "openMenuFor": "فتح قائمة {{title}}",
-    "close": "إغلاق",
     "goBack": "رجوع"
   },
   "picker": {
@@ -2425,7 +2314,6 @@
   },
   "share": {
     "title": "المشاركة مع Kilo",
-    "close": "إغلاق",
     "reviewPr": "مراجعة PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "جلسة جديدة",
@@ -2527,7 +2415,6 @@
     "privacyPolicyPrefix": "نعالج بياناتك وفق",
     "privacyPolicy": "سياسة خصوصية Kilo",
     "onDevice": "على الجهاز",
-    "loading": "جارٍ التحميل…",
     "couldNotLoadTranscription": "تعذّر تحميل إعداد التفريغ الصوتي.",
     "signInToManageTranscription": "سجّل الدخول لإدارة التفريغ الصوتي عبر الإنترنت.",
     "onlineTranscription": "التفريغ الصوتي عبر الإنترنت",
@@ -2544,7 +2431,6 @@
     "voiceTranscriptionTitle": "التفريغ الصوتي",
     "retentionPrefix": "تجد تفاصيل مدد الاحتفاظ بالبيانات وحقوقك ومعلومات الاتصال في",
     "backToConsent": "العودة إلى الموافقة",
-    "back": "رجوع",
     "revokeConsent": "إلغاء الموافقة",
     "revokeConsentTitle": "إلغاء الموافقة على مشاركة البيانات؟",
     "acceptAndContinue": "القبول والمتابعة",
@@ -2588,12 +2474,10 @@
     "what": "البيانات المشتركة",
     "why": "الغرض",
     "who": "الجهة المستلمة",
-    "continue": "متابعة",
     "installAttributionPromptMessage": "يستخدم Kilo إذن التتبع من Apple فقط لمعرفة القناة التي أتيت منها. ولا يستخدم تعليماتك أو محادثاتك لهذا الغرض أبدًا.",
     "installAttributionPromptTitle": "السماح بتحديد مصدر التثبيت؟"
   },
   "prReview": {
-    "accessDenied": "لا تملك صلاحية الوصول.",
     "accessDeniedDescription": "ليست لديك صلاحية لعرض طلب السحب هذا.",
     "checkConnection": "التحقق من الاتصال",
     "checks": {
@@ -2610,8 +2494,7 @@
       "skipped": "تم تخطيها: {{displayCount}}",
       "title": "الفحوصات",
       "viewOnGitHub": "عرض PR على GitHub",
-      "checkDetails": "تفاصيل الفحص",
-      "pullRequest": "طلب سحب"
+      "checkDetails": "تفاصيل الفحص"
     },
     "composer": {
       "addTitle": "إضافة تعليق",
@@ -2620,7 +2503,6 @@
       "commentBody": "نص التعليق",
       "commentBodyPlaceholder": "نص التعليق",
       "commentNow": "نشر التعليق الآن",
-      "discard": "تجاهل",
       "discardMessage": "ستفقد مسودتك.",
       "discardTitle": "إلغاء التعليق؟",
       "editTitle": "تعديل التعليق",
@@ -2640,8 +2522,7 @@
       "checkFailedTitle": "تعذّر التحقق من ربط حساب GitHub.",
       "description": "اربط حسابك على GitHub لمراجعة طلبات السحب على الجوال.",
       "reconnectDescription": "أُلغي ربط حسابك على GitHub. أعد ربطه لمواصلة مراجعة طلبات السحب على الجوال.",
-      "reconnectTitle": "إعادة ربط GitHub",
-      "title": "ربط GitHub"
+      "reconnectTitle": "إعادة ربط GitHub"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
     "connectionExpiredDescription": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
@@ -2664,7 +2545,6 @@
       "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
       "couldNotReply": "تعذّر الرد.",
       "file": "ملف",
-      "loadMore": "تحميل المزيد",
       "loadMoreComments": "تحميل المزيد من التعليقات",
       "loading": "جارٍ تحميل المناقشة",
       "moderation": {
@@ -2710,7 +2590,6 @@
       "resolved": "تم الحل",
       "retryLoadingMore": "إعادة محاولة تحميل المزيد من التعليقات",
       "reviewFiles": "مراجعة الملفات",
-      "somethingWentWrong": "حدث خطأ ما.",
       "startedRelative": " · بدأت {{relative}}",
       "submitReply": "إرسال الرد",
       "termsAcceptRetry": "تعذّر قبول الشروط. تحقق من اتصالك وحاول مرة أخرى.",
@@ -2761,11 +2640,9 @@
       "openPullRequest": "فتح طلب السحب",
       "pasteLink": "لصق رابط طلب السحب",
       "pastePrLink": "لصق رابط PR",
-      "remove": "إزالة",
       "removeFromRecentsMessage": "سيُزال طلب السحب هذا من قائمة الطلبات الأخيرة.",
       "removeFromRecentsTitle": "إزالة الطلب من القائمة الأخيرة؟",
       "removeRecentAccessibility": "إزالة {{repo}} من قائمة الطلبات الأخيرة",
-      "title": "مراجعة PR",
       "urlAccessibility": "عنوان URL لطلب السحب على GitHub"
     },
     "eventChips": {
@@ -2785,7 +2662,6 @@
       "unified": "موحّد"
     },
     "fileNavigator": {
-      "checkConnection": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
       "couldNotLoadFiles": "تعذّر تحميل الملفات.",
       "couldNotLoadMoreFiles": "تعذّر تحميل المزيد من الملفات.",
       "diffTooLarge": "حجم الفروق كبير جدًا",
@@ -2863,7 +2739,6 @@
     "inbox": {
       "couldNotLoad": "تعذّر تحميل صندوق الوارد.",
       "couldNotLoadMore": "تعذّر تحميل المزيد.",
-      "draft": "مسودة",
       "loading": "جارٍ تحميل صندوق الوارد",
       "noReviewRequests": "لا توجد طلبات مراجعة",
       "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
@@ -2956,7 +2831,6 @@
       "file_other": "ملف",
       "file_one": "ملف",
       "stateClosed": "مغلق",
-      "stateDraft": "مسودة",
       "stateMerged": "تم الدمج",
       "stateOpen": "فتح",
       "stateOpenApproved": "مفتوح · تمت الموافقة",
@@ -2999,7 +2873,6 @@
       "shareA11y": "مشاركة طلب السحب",
       "title": "#{{number}}"
     },
-    "screenTitle": "مراجعة PR",
     "sideBySide": {
       "emptyDiffColumn": "عمود فارغ في عرض الفروق",
       "emptyDiffRow": "صف فارغ في عرض الفروق",
@@ -3009,7 +2882,6 @@
       "oldOnly": "القديم فقط: {{text}}"
     },
     "submit": {
-      "delete": "حذف",
       "deletePendingMessage": "ستتم إزالة هذا التعليق من قائمة انتظار المراجعة.",
       "deletePendingTitle": "حذف التعليق المعلّق؟",
       "loadFailedTitle": "تعذّر تحميل شاشة إرسال المراجعة.",
@@ -3029,10 +2901,8 @@
       "blockedComment": "أضف ملخصًا أو تعليقًا واحدًا على الأقل لنشر مراجعة من نوع تعليق."
     },
     "fileStatus": {
-      "added": "مضاف",
       "changed": "متغيّر",
       "copied": "تم النسخ",
-      "deleted": "محذوف",
       "modified": "معدّل",
       "renamed": "أُعيدت تسميته"
     },
@@ -3045,9 +2915,7 @@
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
       "truncationBanner": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
       "tapToComment": "{{label}}، اضغط للتعليق",
-      "statusAdded": "مضاف",
       "statusContext": "السياق",
-      "statusDeleted": "محذوف",
       "lineLabel": "السطر {{line}}، {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(فارغ)"
@@ -3083,7 +2951,6 @@
       "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
       "selectOrganization": "اختيار مؤسسة",
       "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
-      "accessDeniedTitle": "لا تملك صلاحية الوصول.",
       "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
     },
     "creditActivity": {
@@ -3102,18 +2969,15 @@
         "accounting_adjustment": "تعديل محاسبي",
         "credits_expired": "انتهاء صلاحية الرصيد"
       },
-      "loadMore": "تحميل المزيد",
       "loadMoreFailed": "تعذّر تحميل المزيد.",
       "truncated": "تتوفر عمليات أقدم في سجل الرصيد."
     },
     "hub": {
       "balance": "الرصيد",
       "lowBalanceBelow": "أقل من {{amount}}",
-      "lowBalanceOff": "معطّل",
       "organizationSeats": "مقاعد المؤسسة",
       "renamePlaceholder": "اسم المؤسسة",
-      "renameTitle": "إعادة تسمية المؤسسة",
-      "title": "المؤسسة"
+      "renameTitle": "إعادة تسمية المؤسسة"
     },
     "inviteMember": {
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
@@ -3137,18 +3001,14 @@
         "paid": "مدفوعة",
         "open": "فتح",
         "void": "ملغاة",
-        "draft": "مسودة",
-        "uncollectible": "غير قابلة للتحصيل",
-        "unknown": "غير معروف"
+        "uncollectible": "غير قابلة للتحصيل"
       },
-      "loadMore": "تحميل المزيد",
       "loadMoreFailed": "تعذّر تحميل المزيد.",
       "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "user@example.com",
       "enableA11y": "تفعيل تنبيه انخفاض الرصيد",
-      "enabled": "مفعّل",
       "notifyEmailsLabel": "عناوين البريد الإلكتروني للتنبيهات",
       "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الفوترة.",
       "separateEmailsHint": "افصل بين عناوين البريد الإلكتروني بفواصل.",
@@ -3177,7 +3037,6 @@
       "limitPerDay": "{{amount}}/يوم",
       "manageA11y": "إدارة {{name}}",
       "manageInvitationA11y": "إدارة دعوة {{email}}",
-      "removeConfirm": "إزالة",
       "removeMember": "إزالة العضو",
       "removeMemberMessage": "إزالة {{name}} من هذه المؤسسة؟",
       "revokeConfirm": "إلغاء",
@@ -3198,12 +3057,7 @@
       "resendInvite": "إعادة إرسال الدعوة",
       "shareInviteLink": "مشاركة رابط الدعوة"
     },
-    "permissionDenied": {
-      "back": "رجوع",
-      "title": "لا تملك صلاحية الوصول."
-    },
     "usageStats": {
-      "cost": "التكلفة",
       "inputTokens": "رموز الإدخال",
       "last30Days": "آخر 30 يومًا",
       "outputTokens": "رموز الإخراج",
@@ -3216,7 +3070,6 @@
       "creditProcessingDelayed": "تأخرت معالجة الرصيد · جارٍ إعادة المحاولة تلقائيًا",
       "ended": "انتهى",
       "endsOn": "ينتهي في {{date}}",
-      "loading": "جارٍ التحميل…",
       "manageHint": "يفتح صفحة إدارة Kilo Pass على الموقع.",
       "notSubscribed": "غير مشترك",
       "overallocated": "عدد اشتراكات Kilo Pass المعيّنة يتجاوز عدد المقاعد المدفوعة",
@@ -3293,16 +3146,12 @@
   },
   "quickChat": {
     "title": "الدردشة",
-    "composer": {
-      "placeholder": "رسالة"
-    },
     "empty": {
       "title": "ابدأ محادثة",
       "description": "أرسل رسالة للتحدث مع نموذج."
     },
     "working": "جارٍ العمل",
     "historyRetry": "تعذّر تحميل سجل المحادثة.",
-    "catalogRetry": "تعذّر تحميل النماذج.",
     "sendError": "تعذّر إرسال الرسالة. حاول مرة أخرى."
   },
   "glanceable": {

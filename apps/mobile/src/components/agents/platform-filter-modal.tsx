@@ -50,7 +50,7 @@ function platformFilterLabel(p: string): string {
       return i18n.t('agentChat.sessionFilter.platformSlack');
     }
     case 'github': {
-      return i18n.t('agentChat.sessionFilter.platformGithub');
+      return i18n.t('common.github');
     }
     case 'linear': {
       return i18n.t('agentChat.sessionFilter.platformLinear');
@@ -151,7 +151,7 @@ export function SessionFilterModal({
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  {t('agentChat.sessionFilter.platform')}
+                  {t('common.platform')}
                 </Text>
                 {platforms.map(platform => (
                   <FilterCheckboxRow

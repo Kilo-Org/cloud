@@ -51,7 +51,7 @@ const PROVIDER_LABEL_KEYS = {
   discord: 'profile.providerDiscord',
   email: 'profile.providerEmail',
   'fake-login': 'profile.providerTestAccount',
-  github: 'profile.providerGithub',
+  github: 'common.github',
   gitlab: 'profile.providerGitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
@@ -131,7 +131,7 @@ export function ProfileScreen() {
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('profile.signOutConfirm'),
+        text: t('common.signOut'),
         style: 'destructive',
         onPress: () => {
           void signOut();
@@ -158,11 +158,11 @@ export function ProfileScreen() {
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.agents')}
+            {t('common.agents')}
           </Text>
           <ConfigureRow
             icon={GitPullRequest}
-            title={t('profile.codeReviewer')}
+            title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -174,7 +174,7 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={ShieldCheck}
-            title={t('profile.securityAgent')}
+            title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -195,7 +195,7 @@ export function ProfileScreen() {
             </Text>
             <ConfigureRow
               icon={GitMerge}
-              title={t('profile.prReview')}
+              title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last
@@ -210,7 +210,7 @@ export function ProfileScreen() {
         {organizationId != null && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.organization')}
+              {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError

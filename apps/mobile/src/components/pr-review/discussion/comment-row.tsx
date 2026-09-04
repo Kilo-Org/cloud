@@ -85,7 +85,7 @@ function showModerationFailure(action: ModerationAction, error: unknown, retry: 
     announcingToast.error(failure.message);
     return;
   }
-  Alert.alert(i18n.t('prReview.discussion.somethingWentWrong'), failure.message, [
+  Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
     { text: i18n.t('common.cancel'), style: 'cancel' },
     { text: i18n.t('common.retry'), onPress: retry },
   ]);

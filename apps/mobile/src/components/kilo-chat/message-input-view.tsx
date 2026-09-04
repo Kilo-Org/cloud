@@ -191,7 +191,7 @@ export function MessageInputView({
                 inputDisabled && 'opacity-50'
               )}
               style={[messageInputTextStyle, { height: inputHeight }]}
-              placeholder={t('chat.composer.messagePlaceholder')}
+              placeholder={t('common.message')}
               placeholderTextColor={colors.mutedForeground}
               defaultValue={initialText}
               multiline

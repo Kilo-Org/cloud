@@ -44,7 +44,7 @@ function InstanceRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1}>
-            {instance.organizationName ?? t('chat.instancePicker.personal')}
+            {instance.organizationName ?? t('common.personal')}
           </Text>
           <StatusBadge status={instance.status} />
         </View>

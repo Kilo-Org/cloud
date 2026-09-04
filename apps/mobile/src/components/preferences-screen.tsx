@@ -234,11 +234,11 @@ export function PreferencesScreen() {
         {/* Notifications */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('preferences.notifications')}
+            {t('common.notifications')}
           </Text>
           <ConfigureRow
             icon={Bell}
-            title={t('preferences.notifications')}
+            title={t('common.notifications')}
             subtitle={t('preferences.notificationsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

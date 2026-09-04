@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 type FindingTab = 'details' | 'analysis' | 'remediation';
 
 const TABS = [
-  { key: 'details', labelKey: 'securityAgent.findingDetail.tabDetails' },
+  { key: 'details', labelKey: 'common.details' },
   { key: 'analysis', labelKey: 'securityAgent.findingDetail.tabAnalysis' },
   { key: 'remediation', labelKey: 'securityAgent.findingDetail.tabRemediation' },
 ] as const satisfies readonly { key: FindingTab; labelKey: string }[];

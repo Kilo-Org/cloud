@@ -63,7 +63,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -84,7 +84,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && config.isError && config.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
           onRetry={() => {
             void config.refetch();
@@ -98,7 +98,7 @@ export function BitbucketOverview({
   if (!isLoading && !connected) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState className="px-6">
           {canEdit ? (
             <BitbucketConnectForm scope={scope} />
@@ -147,7 +147,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
+      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 pt-4"
@@ -242,7 +242,7 @@ export function BitbucketOverview({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.readOnlyDescription')}
+                  {t('securityAgent.sla.permissionNote')}
                 </Text>
               )}
             </Animated.View>

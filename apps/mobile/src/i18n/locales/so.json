@@ -27,7 +27,49 @@
     "somethingWentWrong": "Waxbaa khaldamay.",
     "couldNotOpen": "{{label}} lama furi karin.",
     "link": "xiriiriye",
-    "takingLonger": "Tani waxay qaadanaysaa waqti ka badan intii la filayay. Waad xiri kartaa tan oo mar kale hubin kartaa."
+    "takingLonger": "Tani waxay qaadanaysaa waqti ka badan intii la filayay. Waad xiri kartaa tan oo mar kale hubin kartaa.",
+    "model": "Moodeel",
+    "accessDenied": "Gelitaanka waa la diiday.",
+    "allRepositories": "Dhammaan kaydadka",
+    "personal": "Shakhsiyeed",
+    "connectGithub": "Ku xir GitHub",
+    "cost": "Kharashka",
+    "discard": "Tuur",
+    "findings": "Natiijooyin",
+    "notConnected": "Kuma xirna",
+    "notifications": "Ogeysiisyada",
+    "pullRequest": "codsi isku-darid",
+    "repositories": "Kaydadka",
+    "securityAgent": "Wakiilka amniga",
+    "unknown": "Lama garanayo",
+    "added": "La daray",
+    "cancelled": "La joojiyay",
+    "close": "Xir",
+    "codeReviewer": "Dib-u-eegaha koodhka",
+    "connected": "Ku xiran",
+    "couldNotLoadModels": "Moodeellada lama soo rari karin.",
+    "couldNotLoadRepositories": "Kaydadka lama soo rari karin.",
+    "critical": "Halis daran",
+    "delete": "Tirtir",
+    "deleted": "La tirtiray",
+    "details": "Faahfaahin",
+    "draft": "Qabyo",
+    "enabled": "La shiday",
+    "github": "GitHub",
+    "imageUnavailable": "Sawirka lama heli karo.",
+    "loading": "Soo raraya…",
+    "loadMore": "Soo rar kuwo kale",
+    "message": "Fariin",
+    "off": "Daman",
+    "organization": "Urur",
+    "platform": "Madal",
+    "prReview": "Dib-u-eegista PR",
+    "queued": "Safan",
+    "remove": "Ka saar",
+    "repository": "Kaydka",
+    "signOut": "Ka bax",
+    "agents": "Wakiillada",
+    "all": "Dhammaan"
   },
   "language": {
     "title": "Luuqad",
@@ -62,12 +104,10 @@
     "emailAddress": "Cinwaanka iimaylka",
     "emailPlaceholder": "adiga@example.com",
     "continueWithEmail": "Ku sii wad iimaylka",
-    "continue": "Sii wad",
     "enterCodeSentTo": "Geli koodhka loo diray {{email}}.",
     "codeArrivalHint": "Haddii cinwaankani u qalmo, koodhku wuxuu ku imanayaa daqiiqad gudaheed.",
     "verifyCode": "Xaqiiji koodhka",
     "resendCode": "Dib u dir koodhka",
-    "back": "Dib u noqo",
     "termsPrefix": "Markaad sii waddo, waxaad oggolaanaysaa",
     "terms": "Shuruudaha",
     "termsConnector": " iyo ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Bogga shakhsiga",
-    "agents": "Wakiillada",
-    "codeReviewer": "Dib-u-eegaha koodhka",
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",
-    "securityAgent": "Wakiilka amniga",
     "securityAgentSubtitle": "Raadi oo sax nuglaanta amniga",
     "reviews": "Dib-u-eegisyo",
-    "prReview": "Dib-u-eegista PR",
     "prReviewSubtitle": "Taleefanka ku eeg codsiyada isku-daridda",
-    "organization": "Urur",
     "couldNotLoadOrganization": "Ururka lama soo shubi karin.",
     "couldNotLoadOrganizationDescription": "Dejinta ururka iyo wakiilka lama heli karo ilaa xogtan la soo shubo.",
     "linkedAccounts": "Akoonnada ku xiran",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Lacagtii isticmaalka way kaa dhammaatay. Lacagta akoonkan waxaa laga maamulaa meel ka baxsan barnaamijka iOS.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
-    "signOutConfirm": "Ka bax",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
     "deleteAccountMessage": "Tani waxay si joogto ah u tirtiraysaa akoonkaaga oo kaa saaraysaa. Waxaan koodhka xaqiijinta kuugu soo diri doonaa iimayl.",
     "deleteAccountConfirm": "Tirtir akoonka",
     "accountDeleted": "Akoonkaaga waa la tirtiray.",
     "viewOrganization": "Eeg ururka",
     "manageOrganization": "Maamul ururka",
-    "personal": "Shakhsiyeed",
     "selectAccount": "Dooro akoonka",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "Iimayl",
     "providerTestAccount": "Akoon tijaabo ah",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Shaashadda shid inta bogga kalfadhigu furan yahay",
     "keepScreenOnSubtitle": "Shaashadda shid inta kalfadhigu shaqaynayo.",
     "appearance": "Muuqaal",
-    "notifications": "Ogeysiisyada",
     "notificationsSubtitle": "Doorashooyinka ogeysiisyada la soo diro",
     "appearanceSystem": "Nidaamka",
     "appearanceLight": "Iftiin",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",
     "pullRequestUnavailableDescription": "PR-kan lama furi karo. Waxaa laga yaabaa in la tirtiray, in kaydku gaar yahay ama in barnaamijka Kilo ee GitHub aanu ku rakibnayn kaydka.",
-    "accessDenied": "Gelitaanka waa la diiday.",
     "accessDeniedDescription": "Ma haysatid oggolaansho aad ku aragto codsigan isku-darka.",
     "noFilesChanged": "Ma jiraan faylal la beddelay",
     "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Faylasha lama soo rari karin.",
-      "checkConnection": "Hubi xiriirkaaga internetka oo mar kale isku day.",
       "retryLoadingFiles": "Mar kale isku day soo rarista faylasha",
       "filterPlaceholder": "Shaandhaynta faylasha ee waddada",
       "viewedCount": "{{viewed}} ka mid ah {{total}} la arkay",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "Faallooyin dheeraad ah lama soo rari karin.",
       "retryLoadingMore": "Mar kale isku day soo rarista faallooyin dheeraad ah",
       "loadMoreComments": "Soo rar faallooyin dheeraad ah",
-      "loadMore": "Soo rar kuwo kale",
       "closeReactions": "Xir falcelinnada",
       "reactionsTitle": "Falcelinno",
       "addReaction": "Ku dar falcelin",
@@ -352,7 +380,6 @@
       "reportUser": "Soo sheeg isticmaalaha",
       "mute": "Aamusi",
       "block": "Xannib",
-      "somethingWentWrong": "Waxbaa khaldamay.",
       "reportSubmitted": "Warbixinta waa la gudbiyay. Lambarka rasiidka: {{receiptId}}",
       "blockedUser": "{{login}} waa la xannibay",
       "mutedUser": "{{login}} waa la aamusiyay",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "Dib u eeg codsiga isku-darka",
     "headLine": "{{counts}} · diiwaanka isbeddelka ugu dambeeya {{sha}}",
     "entry": {
-      "title": "Dib-u-eegista PR",
       "eyebrow": "Ku fur codsi isku-dar ah URL-kiisa.",
       "pastePrLink": "Ku dheji xiriiriye PR ah",
       "noRecentPrs": "Ma jiraan PR-yo dhowaan la isticmaalay",
       "noRecentPrsDescription": "Kor ku dheji xiriiriye PR ah si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",
       "couldNotLoad": "Lama soo rari karin.",
-      "remove": "Ka saar",
       "removeFromRecentsTitle": "Ma laga saaraa kuwii dhowaan la isticmaalay?",
       "removeFromRecentsMessage": "Codsigan isku-darka waxaa laga saari doonaa liiska kuwii aad dhowaan isticmaashay.",
       "removeRecentAccessibility": "Ka saar {{repo}} liiska kuwii dhowaan la isticmaalay",
@@ -460,13 +485,11 @@
       "pending": "{{displayCount}} ayaa la sugayaa",
       "skipped": "{{displayCount}} waa la dhaafay",
       "checksCount": "{{displayCount}} hubin",
-      "checkDetails": "faahfaahinta hubinta",
-      "pullRequest": "codsi isku-darid"
+      "checkDetails": "faahfaahinta hubinta"
     },
     "inbox": {
       "title": "Sanduuqa farriimaha",
       "recent": "Dhowaan",
-      "draft": "Qabyo",
       "loading": "Sanduuqa farriimaha waa la soo rarayaa",
       "noReviewRequests": "Ma jiraan codsiyo dib-u-eegis",
       "noReviewRequestsDescription": "Codsiyada isku-darka ee sugaya dib-u-eegistaada ayaa halkan ka soo muuqda. Weli waxaad kor ku dhejin kartaa xiriiriye PR kasta.",
@@ -488,7 +511,6 @@
       "discardTitle": "Ma la tuuraa faallada?",
       "discardMessage": "Qoraalkaaga qabyada ah wuu lumi doonaa.",
       "keepEditing": "Sii wad wax ka beddelka",
-      "discard": "Tuur",
       "comment": "Faallo",
       "insertSuggestionA11y": "Geli soo-jeedin koodh ah",
       "insertSuggestion": "Geli soo-jeedinta",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "Soo-jeedinnadu waxay khuseeyaan oo keliya sadarrada lagu daray.",
       "tapDiffLineToSuggest": "Taabo sadar ku jira kala duwanaanshaha si aad u daarto soo-jeedinnada."
     },
-    "screenTitle": "Dib-u-eegista PR",
     "connect": {
       "checkFailedTitle": "Xiriirka GitHub lama hubin karin.",
       "checkFailedMessage": "Xaaladda soo gelitaanka lama heli karo ilaa tan la soo raro.",
       "reconnectTitle": "Dib u xir GitHub",
-      "title": "Ku xir GitHub",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday. Dib u xir si aad taleefanka uga sii waddo dib-u-eegista codsiyada isku-darka.",
       "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka."
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "Goobta gudbinta dib-u-eegista lama soo rari karin.",
       "deletePendingTitle": "Ma la tirtiraa faallada sugaysa dirista?",
       "deletePendingMessage": "Faalladan waxaa laga saari doonaa safka dib-u-eegista.",
-      "delete": "Tirtir",
       "summaryOptional": "Soo koobid (ikhtiyaari)",
       "pendingComment_one": "faallo sugaysa dirista",
       "pendingComment": "faallooyin aan weli la gudbin",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "La isku daray",
       "stateClosed": "Xiran",
-      "stateDraft": "Qabyo",
       "stateOpenApproved": "Furan · La ansixiyay",
       "stateOpenChangesRequested": "Furan · Isbeddello la codsaday",
       "stateOpenReviewRequired": "Furan · Dib-u-eegis loo baahan yahay",
@@ -572,8 +590,6 @@
       "discussion": "Dood"
     },
     "fileStatus": {
-      "added": "La daray",
-      "deleted": "La tirtiray",
       "modified": "Waa la beddelay",
       "renamed": "Magaca ayaa la beddelay",
       "copied": "Waa la nuqulay",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "{{label}} ayaa la doortay, taabo si aad u beddesho xulashada",
       "tapToComment": "{{label}}, taabo si aad faallo uga bixiso",
       "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub.",
-      "statusAdded": "La daray",
       "statusContext": "Ku xeeran",
-      "statusDeleted": "La tirtiray",
       "lineLabel": "{{status}}, sadarka {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(madhan)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "Ogeysiisyada",
     "liveActivities": "Hawlaha tooska ah",
     "liveActivitySubtitle": "Ku muuji wakiillada firfircoon shaashadda qufulka",
     "liveUpdates": "Cusboonaysiinta tooska ah",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "Hoyga",
-    "agents": "Wakiillada",
     "profile": "Bogga shakhsiga",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "Ma jiraan nuqullo KiloClaw ah",
       "noInstancesDescription": "Deji nuqul si aad u bilowdo sheekaysiga.",
       "setUpKiloclaw": "Deji KiloClaw",
-      "currentInstance": "{{title}}, kan hadda la isticmaalayo",
-      "personal": "Shakhsiyeed"
+      "currentInstance": "{{title}}, kan hadda la isticmaalayo"
     },
     "conversation": {
       "failedToLoad": "Wada hadalka lama soo dejin karin.",
@@ -722,7 +733,6 @@
       "cancelReply": "Jooji jawaabta",
       "openInstance": "Fur nuqulka",
       "attachFile": "Ku lifaaq fayl",
-      "messagePlaceholder": "Fariin",
       "cancelEdit": "Jooji wax ka beddelka",
       "sendMessage": "Dir fariin"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "Fur {{filename}}",
-      "imageUnavailable": "Sawirka lama heli karo.",
       "openFailed": "Lifaaqa lama furi karin. Hubi xiriirkaaga oo mar kale isku day.",
       "attachFailed": "Faylka lama lifaaqi karin.",
       "limit": "Waxaad ku lifaaqi kartaa ilaa {{displayCount}} fayl.",
@@ -771,7 +780,6 @@
       "yourMessage": "Fariintaada",
       "messageFrom": "Fariin ka timid {{author}}",
       "moreActions": "Tallaabooyin kale",
-      "message": "Fariin",
       "notDelivered": "Lama gudbin",
       "edited": "(waa la beddelay)",
       "image": "Sawir",
@@ -783,7 +791,6 @@
       "title": "Tallaabooyinka fariinta",
       "deleteTitle": "Ma tirtiraysaa fariinta?",
       "deleteMessage": "Tani waxay ka saari doontaa fariinta wada hadalka.",
-      "delete": "Tirtir",
       "deleteFailed": "Fariinta lama tirtiri karin.",
       "removeReactionFailed": "Falcelinta lama saari karin.",
       "addReactionFailed": "Falcelinta laguma dari karin.",
@@ -813,7 +820,6 @@
       "online": "Khadka ku jira",
       "idle": "Hawl la'aan",
       "offline": "Khadka ka maqan",
-      "unknown": "Lama garanayo",
       "loadingUser": "Xogta isticmaalaha ayaa la soo dejinayaa...",
       "waitingForStatus": "Waxaa la sugayaa xaaladda bot-ka...",
       "offlineMessage": "Bot-ku khadka ayuu ka maqan yahay. Fariimuhu way sii socon doonaan marka uu mar kale ku xidhmo."
@@ -885,7 +891,6 @@
       "destroyMessage": "Tani waxay si joogto ah u burburin doontaa nuqulkaaga KiloClaw iyo dhammaan xogtiisa. Falkan dib loogama noqon karo.",
       "destroyTitle": "Burburi nuqulka",
       "instance": "Nuqul",
-      "renameFailed": "Waxbaa khaldamay.",
       "couldNotCheckStatus": "Xaaladda adeegga lama hubin karin.",
       "dangerZone": "AAGGA KHATARTA AH",
       "destroying": "Waa la burburinayaa…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "Amarka diyaarinta lama soo rari karin.",
       "gmailNotifications": "Ogeysiisyada Gmail",
       "disconnect": "Goy xiriirka akoonka Google",
-      "connected": "Ku xiran",
       "copied": "Waa la nuqulay",
       "copyCommand": "Nuqul ka samee amarka",
       "disabled": "La damiyay",
       "disconnectConfirm": "Goy xiriirka",
       "disconnectMessage": "Ma laga saaraa akoonkaaga Google nuqulkan? Tani waxay damin doontaa ogeysiisyada Gmail. Ka dib markaad goyso xiriirka, dib u hawlgeli nuqulka si aad u dhaqan geliso isbeddellada.",
-      "disconnectTitle": "Goy xiriirka Google",
-      "enabled": "La shiday",
-      "notConnected": "Kuma xirna"
+      "disconnectTitle": "Goy xiriirka Google"
     },
     "modelList": {
       "title": "Dhammaan moodeellada",
       "searchPlaceholder": "Raadinta moodeellada…",
-      "couldNotLoad": "Moodeellada lama soo rari karin.",
       "clearSearch": "Tirtir raadinta",
       "noMatches": "Ma jiraan moodeelo u dhigma raadintaada",
       "noModels": "Ma jiraan moodeello la heli karo",
       "noModelsDescription": "Moodeelada ayaa halkan ku soo bixi doona markii la heli karo.",
       "noResultsFor": "Ma jiraan natiijooyin u dhigma \"{{query}}\".",
       "recommended": "Kuwa lagu taliyay"
-    },
-    "model": {
-      "title": "Moodeel"
     },
     "secrets": {
       "title": "Siraha",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "hagaha diyaarinta {{label}}",
       "setupGuide": "Hagaha diyaarinta",
       "saving": "Waa la kaydinayaa…",
-      "remove": "Ka saar",
       "removing": "Waa la saarayaa…",
-      "connected": "Ku xiran",
-      "notConnected": "Kuma xirna",
       "updateToken": "Cusboonaysii furaha aqoonsiga",
       "connect": "Ku xir"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "Abuur nuqul",
       "organizations": "Ururro",
-      "personal": "Shakhsiyeed",
       "accessIssue": {
         "trialExpired": "Tijaabadu way dhammaatay, rukumo si aad u sii isticmaasho nuqulkan",
         "subscriptionCanceled": "Rukumashadu ma firfircoona, mar kale rukumo si aad u sii isticmaasho nuqulkan",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "Fur kilo.ai",
         "provisioning": "Diyaarinta nuqulka",
         "review": "Dib-u-eegis",
-        "somethingWentWrong": "Waxbaa khaldamay.",
         "identityTitle": "Aqoonsiga robotkaaga",
-        "close": "Xir",
         "couldNotLoad": "Xaaladda diyaarinta bilowga ah lama soo rari karin.",
         "finishingSetup": "Diyaarinta ayaa la dhammaystirayaa — wax yar sug inta aan dhammaystirayno akoonkaaga.",
         "ready": "Diyaar",
@@ -1080,7 +1072,6 @@
         "location": "Goobta",
         "locationPlaceholder": "Magaalo ama gobol (ikhtiyaari)",
         "useCurrentLocation": "Isticmaal goobta aad hadda joogto",
-        "continue": "Sii wad",
         "locationDeniedTitle": "Helista goobta waa la diiday",
         "locationDeniedMessage": "Ka daar oggolaanshaha goobta dejinta si aad u isticmaasho goobta aad hadda joogto.",
         "locationValidationFailed": "Goobta lama xaqiijin karin.",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "GEEDDI-SOCODKA ALBAABKA",
       "lastExit": "Bixitaankii ugu dambeeyay",
       "memory": "Xusuus",
-      "model": "Moodeel",
       "region": "Gobol",
       "resources": "KHAYRAADKA",
       "restarts": "Dib-u-bilawyo",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "Waxqabadka ugu sarreeya. Wuxuu codsiyada u gudbiyaa moodeellada ugu horumarsan ee leh awoodda sababaynta.",
       "balancedLabel": "Dheellitiran",
       "balancedDescription": "Waxay si habboon isugu dheellitiraysaa xawaaraha iyo awoodda iyadoo kharashku hooseeyo.",
-      "cost": "Kharashka",
       "performance": "Waxqabadka",
       "autoModelA11y": "moodeelka iskiis loo doorto ee {{label}}",
       "currentModel": "Moodeelka hadda",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Akoonka Google",
       "modelDescription": "Doorashada moodeelka AI",
-      "modelLabel": "Moodeel",
       "secretsDescription": "Xogta aqoonsiga oo la sireeyay",
       "secretsLabel": "Siraha",
       "versionPinDescription": "Ku xaddid nooc gaar ah",
@@ -1251,12 +1239,9 @@
       "placeholder": "Tusaale: Raac habraacayaga maaraynta khaladaadka…"
     },
     "repos": {
-      "title": "Kaydadka",
-      "couldNotLoad": "Kaydadka lama soo rari karin.",
       "unavailable": "Kaydadka lama heli karo. Ku dhammaystir dejinta Bitbucket bogga kilo.ai.",
       "finishSetup": "Dhammaystir dejinta",
       "manageAccess": "Maamul oggolaanshaha gelitaanka",
-      "allRepositories": "Dhammaan kaydadka",
       "bitbucketNoRepositoriesDescription": "Ma jiraan kaydad laga heli karo goobtan shaqada ee Bitbucket.",
       "bitbucketSetup": "Diyaarinta Bitbucket",
       "couldNotOpenGithubSettings": "Dejinta abka GitHub lama furi karin.",
@@ -1274,7 +1259,6 @@
       "roast": "Run aan la qarin oo kaftan leh",
       "strict": "Wax walba calaamadee oo dalbo tayo sare"
     },
-    "title": "Dib-u-eegaha koodhka",
     "reviewDetail": {
       "title": "Dib-u-eegis",
       "cancelTitle": "Ma joojinaysaa dib-u-eegista?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "Dib-u-eegista lama soo dejin karin.",
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
       "byline": "{{repo}} #{{number}} oo uu qoray {{author}}",
-      "findings": "Natiijooyin",
       "noFindings": "Ma jiraan natiijooyin.",
       "showMore": "Muuji wax badan",
-      "details": "Faahfaahin",
       "branch": "Laan",
-      "platform": "Madal",
-      "model": "Moodeel",
       "created": "Waa la abuuray",
       "started": "Waa la bilaabay",
       "completed": "La dhammeeyay",
-      "cost": "Kharashka",
       "tokens": "Tokenno",
       "tokensInOut": "{{input}} soo galay / {{output}} baxay",
       "openPullRequest": "Codsi isku-darid oo furan",
@@ -1309,7 +1288,6 @@
       "checkRun": "Fulinta hubinta",
       "status": "Xaaladda",
       "threshold": "Xadka",
-      "pullRequest": "codsi isku-darid",
       "transcriptWaiting": "Waxaa la sugayaa qoraalka dib-u-eegista.",
       "transcriptEmpty": "Qoraal kama jiro dib-u-eegistan.",
       "transcriptRetry": "Qoraalka dib-u-eegista lama soo dejin karin.",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "Bixiyeyaashaaga ku xiran lama soo dejin karin. Fadlan mar kale isku day.",
       "connectProvider": "Ku xidh bixiye",
       "connectProviderDescription": "Ku xidh GitHub si aad adigu u bilowdo dib-u-eegista codsi isku dar ah.",
-      "connectGitHub": "Ku xir GitHub",
-      "platform": "Madal",
-      "notConnected": "Kuma xirna",
       "pullRequestUrl": "URL-ka codsiga isku darka",
       "instructions": "Tilmaamo (ikhtiyaari)",
       "instructionsPlaceholder": "Wax gaar ah oo dib-u-eeguhu xoogga saaro…",
-      "model": "Moodeel",
       "starting": "Waa la bilaabayaa dib-u-eegista...",
       "start": "Bilow dib-u-eegista"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "Dooro kaydadka",
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
-    "readOnlyDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "setupIncomplete": "Dejintu ma dhammaystirna. Ku dhammaystir bogga kilo.ai.",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "Ururrada lama soo rari karin.",
       "personalStillAvailable": "Kaydadkaaga shakhsiga ah weli hoos ayaa laga heli karaa.",
-      "personal": "Shakhsiyeed",
       "personalSubtitle": "Kaydadkaaga shakhsiga ah",
       "viewOnly": "Daawasho keliya"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "Waa la hubinayaa...",
       "statusUnavailable": "Xaaladda lama heli karo",
-      "connected": "Ku xiran",
-      "notConnected": "Kuma xirna",
-      "organization": "Urur",
       "platforms": "Madalaha",
       "activity": "Hawlaha"
     },
     "providerConnect": {
       "githubApp": "abka GitHub",
-      "connectGitHub": "Ku xir GitHub",
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
       "gitlabAccount": "akoonka GitLab",
       "connectGitLab": "Ku xir GitLab",
@@ -1421,10 +1389,7 @@
       "allAreas": "Dhammaan meelaha",
       "customInstructions": "Tilmaamo gaar ah",
       "set": "La dejiyay",
-      "model": "Moodeel",
       "mergeGate": "Shuruudaha isku-daridda",
-      "repositories": "Kaydadka",
-      "allRepositories": "Dhammaan kaydadka",
       "nSelected": "{{displayCount}} ayaa la doortay",
       "reviewMemory": "Xusuusta dib-u-eegista",
       "proposedReviewMdGuidance": "Hagaha REVIEW.md ee la soo jeediyay"
@@ -1435,16 +1400,13 @@
       "noDecision": "Ma jiro go'aan",
       "noResult": "Ma jirto natiijo"
     },
-    "eyebrow": "Dib-u-eegaha koodhka",
     "updateFailed": "Dib-u-eegaha lama cusboonaysiin karin.",
     "configSaveFailed": "Dejinta dib-u-eegista lama kaydin karin.",
     "status": {
       "pending": "Sugaya",
-      "queued": "Safan",
       "running": "Socda",
       "completed": "La dhammeeyay",
       "failed": "Fashilmay",
-      "cancelled": "La joojiyay",
       "interrupted": "Waa la hakiyay"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "Dukumentiyada"
     },
     "gateThreshold": {
-      "off": "Daman",
-      "all": "Dhammaan",
-      "warning": "Digniin",
-      "critical": "Halis daran"
+      "warning": "Digniin"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah Kilo ma geli karo kaydkan isagoo adeegsanaya rakibaad shaqaynaysa oo abka GitHub ah. Cusboonaysii rakibaadda abka GitHub, ka dibna mar kale shid Dib-u-eegaha koodhka.",
         "recoveryLabel": "Cusboonaysii abka GitHub"
       },
       "githubIpAllowList": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
-        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka.",
-        "recoveryLabel": "La xiriir taageerada"
+        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah Kilo ma abuuri karo summadda gelitaanka mashruucan ee GitLab. Sii oggolaanshaha daryeelaha mashruuca ama shid summadaha gelitaanka mashruuca, ka dibna mar kale shid Dib-u-eegaha koodhka.",
         "recoveryLabel": "Cusboonaysii isku xidhka GitLab"
       },
       "byokInvalidKey": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah furaha API ee BYOK ee la doortay ma ansaxsana, waa la laalay, ama ma laha oggolaansho. Cusboonaysii furaha ama dooro moodeel kale, ka dibna mar kale shid Dib-u-eegaha koodhka.",
         "recoveryLabel": "Cusboonaysii dejinta BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah moodeelka la doortay looma heli karo kalfadhiyada wakiilka daruurta. Dooro moodeel la heli karo, ka dibna mar kale shid Dib-u-eegaha koodhka.",
         "recoveryLabel": "Cusboonaysii dejinta Dib-u-eegaha koodhka"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
-        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka.",
-        "recoveryLabel": "La xiriir taageerada"
-      }
+        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
+      },
+      "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
+      "recoveryLabel": "La xiriir taageerada"
     },
     "unknownError": "Khalad aan la aqoon"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "Dib u noqo oo shaandhooyinka mar kale ka fur liiska natiijooyinka.",
       "title": "Shaandhaynta natiijooyinka",
       "reset": "Dib u deji",
-      "repository": "Kaydka",
       "status": "Xaaladda",
       "severity": "Heerka halista",
       "outcome": "Natiijada",
       "slaStatus": "Xaaladda SLA",
       "sortBy": "Ku kala saar",
-      "allRepositories": "Dhammaan kaydadka",
-      "all": "Dhammaan",
       "statusOpen": "Furan",
       "fixed": "La hagaajiyay",
       "statusIgnored": "Waa la iska dhaafay",
       "statusClosed": "Xiran",
-      "severityCritical": "Halis daran",
       "severityHigh": "Sare",
       "severityMedium": "Dhexdhexaad",
       "severityLow": "Hoose",
       "outcomeNotAnalyzed": "Lama falanqayn",
       "outcomeAnalyzing": "La falanqaynayo",
       "outcomeFailed": "Falanqayntu way fashilantay",
-      "outcomeExploitable": "Laga faa'iidaysan karo",
       "outcomeNotExploitable": "Lagama faa'iidaysan karo",
       "outcomeSafeToDismiss": "Waa ammaan in la iska dhaafo",
-      "outcomeNeedsReview": "U baahan dib-u-eegis",
       "outcomeTriageComplete": "Kala saaristu way dhammaatay",
       "outcomeDismissed": "La iska dhaafay",
       "sortSeverityDesc": "Heerka halista: sare ilaa hoose",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "Shid iska dhaafidda otomaatigga ah",
       "enableAutoDismissSubtitle": "Si otomaatig ah isaga dhaaf natiijooyinka ay AI go'aamiso inaan weerar lagu adeegsan karin.",
       "confidenceThreshold": "Heerka kalsoonida ugu hooseeya",
-      "permissionNote": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "enableAutoRemediationConfirmTitle": "Ma shidaysaa hagaajinta otomaatigga ah?",
       "enableAutoRemediationConfirmMessage": "Wakiilka amnigu wuxuu si otomaatig ah PR hagaajin ah ugu furi doonaa natiijooyinka u qalma ee weerar lagu adeegsan karo.",
       "enable": "Shid",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "Tallaabo la soo jeediyay",
       "triageReasoning": "Sababaha kala saarista",
       "exploitable": "Laga faa'iidaysan karo",
-      "model": "Moodeel",
       "notRecorded": "Lama diiwaangelin",
       "analyzed": "La falanqeeyay",
       "exploitabilityReasoning": "Sababaha qiimaynta suurtagalnimada weerarka",
       "suggestedFix": "Hagaajin la soo jeediyay",
       "whereFound": "Meelaha laga helay ({{displayCount}})",
       "fullReport": "Warbixin dhammaystiran oo la soo saaray",
-      "unknown": "Lama garanayo",
       "yes": "Haa",
       "no": "Maya"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "{{open}} furan · {{critical}} halis daran · {{high}} halis sare",
       "couldNotLoad": "Xogta bogga guud lama soo dejin karin.",
       "filterByRepository": "Ku shaandhee kaydka",
-      "findings": "Natiijooyin",
       "lastSynced": "Markii ugu dambaysay ee la isku waafajiyay: {{time}}",
       "manageRepositories": "Maamul kaydadka",
       "notYetSynced": "Weli lama isku waafajin",
@@ -1686,23 +1629,19 @@
       "severityLabel": "Heerka halista: {{severity}}",
       "package": "Xirmo",
       "vulnerableVersions": "Noocyo nugul",
-      "unknown": "Lama garanayo",
       "patchedVersion": "Nooca la hagaajiyay",
       "noPatchAvailable": "Ma jirto hagaajin la heli karo",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Kaydka",
       "manifest": "Faylka qeexidda xirmada",
       "detected": "La ogaaday",
       "updated": "La cusboonaysiiyay",
-      "fixed": "La hagaajiyay",
       "slaDeadline": "Waqtiga kama-dambaysta ah ee SLA",
       "sourceRecord": "Diiwaanka asalka ah",
       "source": "Asalka",
       "sourceId": "Aqoonsiga isha",
       "viewAdvisory": "GitHub ka eeg ogeysiiska amniga",
       "statusSuperseded": "La beddelay",
-      "statusFixed": "La hagaajiyay",
       "statusOpen": "Furan",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Hagaajin ayaa mar hore bilaabatay",
@@ -1716,25 +1655,18 @@
       "title": "Dejinta",
       "couldNotLoadSettings": "Dejinta Wakiilka amniga lama soo dejin karin.",
       "couldNotLoadPermissions": "Oggolaanshaha lama soo dejin karin.",
-      "couldNotLoadRepositories": "Kaydadka lama soo rari karin.",
-      "securityAgent": "Wakiilka amniga",
-      "enabled": "La shiday",
       "disabled": "La damiyay",
       "on": "Shidan",
-      "off": "Daman",
-      "allRepositories": "Dhammaan kaydadka",
       "repositoriesCount_one": "{{displayCount}} kayd oo la doortay",
       "repositoriesCount": "{{displayCount}} kayd oo la doortay",
       "repositoriesCount_other": "{{displayCount}} kayd oo la doortay",
       "selectRepositories": "Dooro kaydadka",
       "selectRepositoriesSubtitle": "Dooro kaydadka uu Wakiilka amnigu la soconayo",
-      "repositories": "Kaydadka",
       "modelsAndAnalysis": "Moodeellada iyo falanqaynta",
       "analysisModeSubtitle": "Falanqaynta {{mode}}",
       "automation": "Otomaatigayn",
       "automationAllOff": "Dhammaan way dansan yihiin",
       "automationCount": "{{displayCount}} oo ka mid ah 3 ayaa shidan",
-      "notifications": "Ogeysiisyada",
       "notificationsCount": "{{displayCount}} oo ka mid ah 2 ayaa shidan",
       "slaPolicy": "Siyaasadda SLA",
       "disabledNoManage": "Wakiilka amniga waa la damiyay. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa shidi kara.",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "Joojinta ayaa la codsaday",
       "cancelled": "Hagaajinta waa la joojiyay",
-      "pullRequest": "codsi isku-darid",
       "couldNotLoad": "Xaaladda hagaajinta lama soo dejin karin.",
       "noAnalysisTitle": "Weli falanqayn lama samayn",
       "noAnalysisDescription": "Falanqayn ka bilow tabka Faahfaahin.",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "Taariikhda isku dayada ({{displayCount}})",
       "attemptNumber": "Isku dayga #{{number}}",
       "startedBy": "Waxaa bilaabay",
-      "model": "Moodeel",
       "branch": "Laan",
       "queued": "Hagaajinta ayaa safka la geliyay",
       "retryQueued": "Isku dayga kale ee hagaajinta ayaa safka la geliyay",
@@ -1769,20 +1699,17 @@
         "prOpened": "PR waa la furay",
         "failed": "Hagaajintu way fashilantay",
         "blocked": "Hagaajinta waa la xannibay",
-        "noChangesNeeded": "Wax isbeddel ah looma baahna",
-        "cancelled": "La joojiyay"
+        "noChangesNeeded": "Wax isbeddel ah looma baahna"
       },
       "unavailable": "Hagaajin looma heli karo natiijadan."
     },
     "analysisSettings": {
       "title": "Moodeellada iyo falanqaynta",
       "couldNotLoad": "Dejinta falanqaynta lama soo dejin karin.",
-      "permissionNote": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "depth": "Qotada falanqaynta",
       "modeAuto": "Otomaatig",
       "modeShallow": "Dusha sare",
       "modeDeep": "Qoto dheer",
-      "couldNotLoadModels": "Moodeellada lama soo rari karin.",
       "triageModel": "Moodeelka kala saarista",
       "analysisModel": "Moodeelka falanqaynta",
       "remediationModel": "Moodeelka hagaajinta"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "Siyaasadda SLA",
       "couldNotLoad": "Dejinta SLA lama soo dejin karin.",
-      "critical": "Halis daran",
       "high": "Sare",
       "medium": "Dhexdhexaad",
       "low": "Hoose",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "Natiijo",
-      "tabDetails": "Faahfaahin",
       "tabAnalysis": "Falanqayn",
       "tabRemediation": "Hagaajin",
       "notFound": "Natiijada lama helin",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "Iska dhaaf natiijada"
     },
     "findingList": {
-      "title": "Natiijooyin",
       "couldNotLoad": "Natiijooyinka lama soo dejin karin.",
       "couldNotLoadMore": "Natiijooyin dheeraad ah lama soo dejin karin.",
       "noMatchesTitle": "Ma jiraan natiijooyin u dhigma shaandhooyinka",
@@ -1827,13 +1751,8 @@
       "clearFilters": "Ka saar shaandhooyinka"
     },
     "scopeList": {
-      "title": "Wakiilka amniga",
       "couldNotLoad": "Ururrada lama soo rari karin.",
-      "personal": "Shakhsiyeed",
       "personalSubtitle": "Kaydadkaaga shakhsiga ah"
-    },
-    "commandRetry": {
-      "discard": "Tuur"
     },
     "findingRow": {
       "nextRemediationPrOpen": "PR-ga hagaajinta wuu furan yahay",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "Lama furi karin GitHub. Fadlan mar kale isku day."
     },
     "settingsSave": {
-      "discard": "Tuur",
       "keepEditing": "Sii wad wax ka beddelka",
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "Warbixinta hanti-dhawrka lama soo dejin karin.",
       "events": "Dhacdooyin",
-      "findings": "Natiijooyin",
       "generated": "Waxaa la soo saaray {{generatedAt}}.",
       "noActivity": "Ma jiro dhaqdhaqaaq la diiwaangeliyay",
       "noActivityDescription": "Kilo ma hayo wax hawlo ah oo la xiriira natiijooyinka amniga oo laga warbixin karo laga bilaabo {{start}} ilaa {{end}}.",
@@ -1875,8 +1792,7 @@
       "title": "Warbixinta hanti-dhawrka",
       "unavailable": "Warbixinta hanti-dhawrka lama heli karo",
       "unavailableDescription": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa arki kara warbixinnada hanti-dhawrka. Ka codso milkiile ama maamule biilasha inuu kuu oggolaado inaad aragto.",
-      "queryFailed": "Weydiinta warbixintu ma dhammaan. Mar kale isku day.",
-      "checkConnection": "Hubi xiriirkaaga internetka oo mar kale isku day."
+      "queryFailed": "Weydiinta warbixintu ma dhammaan. Mar kale isku day."
     },
     "notifications": {
       "couldNotLoad": "Dejinta ogeysiisyada lama soo dejin karin.",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "Ogeysiinta natiijada cusub",
       "newFindingSeverityLabel": "Heerka halista ugu hooseeya ee natiijooyinka cusub",
       "newFindingSubtitle": "Waxaa la diraa mar kasta oo natiijo cusub la isku waafajiyo, oo ay ku jirto isku waafajinta koowaad.",
-      "readOnly": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "slaLeadTimeAccessibility": "Tirada maalmaha digniinta SLA la sii hormarinayo",
       "slaLeadTimeError": "Geli tirada maalmaha oo u dhaxaysa 1 iyo 365, adigoo isticmaalaya tiro dhan.",
       "slaLeadTimeHint": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "Iimayl iiga soo dir digniinaha SLA",
       "slaSection": "Ogeysiinta digniinta SLA",
       "slaSeverityLabel": "Heerka halista ugu hooseeya ee ogeysiiska SLA",
-      "slaSubtitle": "Waxaa la sii diraa ka hor waqtiga kama dambaysta ah ee SLA, iyo marka natiijooyinku ku soo dhowaadaan ama dhaafaan waqtigaas.",
-      "title": "Ogeysiisyada"
+      "slaSubtitle": "Waxaa la sii diraa ka hor waqtiga kama dambaysta ah ee SLA, iyo marka natiijooyinku ku soo dhowaadaan ama dhaafaan waqtigaas."
     },
     "repositories": {
-      "allRepositories": "Dhammaan kaydadka",
       "couldNotLoad": "Dejinta kaydadka lama soo dejin karin.",
-      "couldNotLoadRepositories": "Kaydadka lama soo rari karin.",
       "couldNotOpenGithubSettings": "Dejinta abka GitHub lama furi karin.",
       "githubAppSettings": "dejinta abka GitHub",
       "manageAccess": "Maamul oggolaanshaha abka GitHub",
       "noRepositories": "Ma jiraan kaydad",
       "noRepositoriesDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka.",
-      "readOnly": "Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa beddeli kara dejintan.",
       "selectAtLeastOne": "Dooro ugu yaraan hal kayd.",
-      "selectedRepositories": "Kaydadka la doortay",
-      "title": "Kaydadka"
+      "selectedRepositories": "Kaydadka la doortay"
     },
     "scopeEntry": {
       "connectDescription": "Rakib abka Kilo ee GitHub si aad si otomaatig ah u isku waafajiso digniinaha Dependabot una maamusho natiijooyinka amniga ee kaydadkaaga oo dhan.",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "Tallaabo safka ku jirta mar dambe lama raaci karin. Cusboonaysii si aad u aragto xaaladda ugu dambaysa.",
     "initialSyncAdmissionFailed": "Wakiilka amniga waa la shiday, laakiin isku waafajinta koowaad safka lama gelin karin. Mar kale isku waafaji.",
-    "title": "Wakiilka amniga",
     "commands": {
       "findingAlreadyDismissed": "Natiijada hore ayaa loo iska dhaafay",
       "findingDismissed": "Natiijada waa la iska dhaafay",
@@ -1949,22 +1858,16 @@
       "failed": "Falanqayntu way fashilantay",
       "failedTitle": "Falanqayntu way fashilantay",
       "failedDescription": "Wakiilka amnigu wuu dhammayn kari waayay falanqaynta.",
-      "extractionFailed": "U baahan dib-u-eegis",
-      "extractionFailedTitle": "U baahan dib-u-eegis",
       "extractionFailedDescription": "Warbixinta farsamada looma rogi karin natiijo habaysan.",
-      "exploitable": "Laga faa'iidaysan karo",
-      "exploitableTitle": "Laga faa'iidaysan karo",
       "exploitableDescription": "Koodhka abku wuxuu gaari karaa shaqada ay cilladdu saamaysay.",
       "notExploitable": "Lama gaari karo",
       "notExploitableTitle": "Lama gaari karo",
       "notExploitableDescription": "Kaydkan lagama helin waddo lagu gaari karo shaqada nugul.",
       "unknown": "U baahan dib-u-eegis",
-      "unknownTitle": "U baahan dib-u-eegis",
       "unknownDescription": "Falanqayntu ma xaqiijin karin in shaqada nugul la gaari karo.",
       "safeToDismiss": "Waa ammaan in la iska dhaafo",
       "safeToDismissTitle": "Waa ammaan in la iska dhaafo",
       "safeToDismissDescription": "Kala saaristu waxay go'aamisay in natiijadan si ammaan ah loo iska dhaafi karo iyada oo aan koodhka la falanqayn.",
-      "manualReview": "U baahan dib-u-eegis",
       "manualReviewTitle": "U baahan dib-u-eegis qof sameeyo",
       "manualReviewDescription": "Kala saaristu waxay calaamadisay in natiijadan qof dib u eego.",
       "analysisRequired": "Falanqayn ayaa loo baahan yahay",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Waa la hagaajiyay ka hor waqtiga kama-dambaysta ah",
-      "fixed": "La hagaajiyay",
       "fixedOn": "Waa la hagaajiyay {{date}}",
       "resolutionRecorded": "Xallintu waa la diiwaangeliyay",
       "superseded": "La beddelay",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "Joojinta ayaa la codsaday",
       "notStarted": "Ma bilaaban",
-      "queued": "Safan",
       "starting": "Bilaabanaya",
       "inProgress": "Way socotaa",
       "draftPrOpened": "PR-ga qabyada ah waa la furay",
@@ -2009,7 +1910,6 @@
       "blocked": "Waa la xannibay",
       "failed": "Fashilmay",
       "noChangesNeeded": "Wax isbeddel ah looma baahna",
-      "cancelled": "La joojiyay",
       "originAutomaticPolicy": "Siyaasad otomaatig ah",
       "originIncludeExistingPolicy": "Siyaasadda ku darista natiijooyinka jira",
       "originManual": "Gacmeed",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "Ma la tirtiraa kalfadhiga?",
       "deleteMessage": "Falkan dib loogama noqon karo.",
-      "delete": "Tirtir",
       "deleteSession": "Tirtir kalfadhiga",
       "rename": "Beddel magaca",
       "renameMessage": "Geli magac cusub oo kalfadhigan ah.",
@@ -2130,7 +2029,6 @@
       "title": "Kalfadhi",
       "copyErrorDetails": "Nuqul ka samee faahfaahinta ciladda",
       "backToSessions": "Ku noqo kalfadhiyada",
-      "accessDenied": "Gelitaanka waa la diiday.",
       "accessDeniedDescription": "Ma haysatid oggolaansho aad tan ku aragto.",
       "couldNotLoad": "Kalfadhiga lama soo shubi karin.",
       "failedToLoadDetails": "Faahfaahinta kalfadhiga lama soo shubi karin.",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
-      "continue": "Sii wad",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
       "notEnoughCredits": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent. Lacag ku dar oo mar kale isku day.",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "Kalfadhi cusub",
-      "repository": "Kaydka",
-      "connectGithub": "Ku xir GitHub",
       "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
       "openGithub": "Fur GitHub",
       "refreshRepositories": "Cusboonaysii kaydadka",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",
       "keepEditing": "Sii wad wax ka beddelka",
-      "discard": "Tuur",
       "discardFailed": "Qabyada lama tirtiri karin. Fadlan mar kale isku day.",
       "remoteHint": "Ku socodsii `kilo remote` kombiyuutarkaaga, ama `/remote` kalfadhi CLI oo socda, si aad u maamusho hawl kilo oo kombiyuutarkaaga ka socota.",
       "bitbucketConnected": "Bitbucket waa ku xiran",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "{{displayCount}} fayl ayaa la cusboonaysiiyay."
     },
     "toolPatch": {
-      "operationAdded": "La daray",
-      "operationDeleted": "La tirtiray",
       "operationUpdated": "La cusboonaysiiyay"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "Ku socodsii",
       "runOnAccessibility": "Ku socodsii: {{label}}",
       "couldNotLoad": "Nuqullada lama soo shubi karin",
-      "couldNotLoadDescription": "Hubi xiriirkaaga internetka oo mar kale isku day.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Soo raraya…",
       "cloudAgentDescription": "Ku socodsii deegaanka go'doonsan ee daruurta Kilo",
       "noCliInstances": "Ma jiraan nuqullo CLI oo ku xiran",
       "noCliInstancesDescription": "Ku socodsii `kilo remote` mashruuc ku yaal kombiyuutarkaaga, ama cusboonaysii Kilo CLI haddii mid mar hore shaqaynayo.",
@@ -2323,7 +2213,6 @@
       "loading": "Waa la soo shubayaa...",
       "accessibility": "Kaydka: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "Isticmaale",
       "roleAssistant": "Kaaliye",
       "sent": "Waa la diray",
-      "model": "Moodeel",
       "costAndTokens": "Kharashka iyo halbeegyada qoraalka",
-      "cost": "Kharashka",
       "input": "Gelinta",
       "output": "Soo saarka",
       "reasoning": "Fikirka",
@@ -2360,7 +2247,6 @@
       "textDisplay": "Muuqaalka qoraalka",
       "thinking": "Wuu fikirayaa",
       "thought": "Fikrad",
-      "title": "Faahfaahin",
       "showDetails": "Muuji faahfaahinta",
       "pending": "Waa la sugayaa…",
       "running": "Way socotaa…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
-      "imageUnavailable": "Sawirka lama heli karo.",
       "imageUnavailableWithAlt": "Sawirka {{alt}} lama heli karo.",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Mar kale waad isku dayi kartaa.",
       "copyToComposer": "Nuqul ku geli goobta farriinta lagu qoro",
-      "queued": "Safan",
       "queuedAccessibility": "Farriinta saf ayaa la geliyay",
       "userMessage": "Farriinta isticmaalaha",
       "assistantMessage": "Farriinta kaaliyaha",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "Shaandhee kalfadhiyada",
-      "platform": "Madal",
       "platformCloud": "Daruurta",
       "platformExtension": "Kordhin",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Kale",
       "project": "Mashruuc"
@@ -2539,7 +2421,6 @@
       "allModels": "Dhammaan moodeellada"
     },
     "modelSelector": {
-      "model": "Moodeel",
       "provider": "Bixiyaha {{id}}",
       "modelId": "Moodeelka {{id}}",
       "unavailable": "Lama heli karo",
@@ -2677,8 +2558,7 @@
       "merged": "codsi isku-darid oo la mideeyay",
       "draft": "Codsi isku-darid oo qabyo ah",
       "updating": "Waa la cusboonaysiinayaa, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "codsi isku-darid"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Soo shub",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Akoonkaaga lama soo rari karin.",
-    "couldNotLoadAccountDescription": "Hubi xiriirkaaga internetka oo mar kale isku day.",
     "couldNotLoadPrivacy": "Doorashooyinka asturnaanta lama soo rari karin.",
     "couldNotLoadPrivacyDescription": "Hubi dejinta amniga ee qalabkaaga oo mar kale isku day.",
     "contentReady": "Waxyaabuhu diyaar bay yihiin",
-    "signOut": "Ka bax",
     "retryLoadingAccount": "Mar kale isku day soo rarista akoonka",
     "retryLoadingPrivacy": "Mar kale isku day soo rarista doorashooyinka asturnaanta"
   },
@@ -2736,7 +2614,6 @@
     "signOutThisDeviceTitle": "Ma ka saaraysaa aaladdan akoonka?",
     "signOutThisSessionTitle": "Ma ka baxaysaa kalfadhigan?",
     "signOutThisSessionMessage": "{{device}} waa laga saarayaa akoonka. Gelitaanka API wuxuu sii shaqayn karaa ilaa saacad.",
-    "signOutConfirm": "Ka bax",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "webBrowser": "Biraawsarka internetka"
   },
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "Xir {{filename}}",
-    "imageUnavailable": "Sawirka lama heli karo.",
     "share": "La wadaag {{filename}}"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "Xiriirka internet-ka waa la soo celiyay"
   },
   "queryError": {
-    "neutralTitle": "Waxbaa khaldamay.",
     "neutralDescription": "Fadlan mar kale isku day.",
     "offlineTitle": "Soo dejintu way fashilantay.",
-    "offlineDescription": "Waxbaa khaldamay.",
-    "permissionTitle": "Gelitaanka waa la diiday.",
     "permissionDescription": "Ma haysatid oggolaansho aad tan ku aragto.",
     "notFoundTitle": "Lama helin.",
     "notFoundDescription": "Waxaa dhici karta in shaygan la saaray ama aan mar dambe la heli karin.",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "Fur liiska",
     "openMenuFor": "Fur liiska {{title}}",
-    "close": "Xir",
     "goBack": "Dib u noqo"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "U wadaag Kilo",
-    "close": "Xir",
     "reviewPr": "Dib u eeg PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Kalfadhi cusub",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "Xogtaada waxaa lagu maamulaa sida ku xusan",
     "privacyPolicy": "siyaasadda asturnaanta ee Kilo",
     "onDevice": "Aaladda gudaheeda",
-    "loading": "Soo raraya…",
     "couldNotLoadTranscription": "Dejintaada codka qoraalka loogu beddelo lama soo shubi karin.",
     "signInToManageTranscription": "Soo gal si aad u maamusho qoraal u beddelidda codka ee internetka.",
     "onlineTranscription": "Qoraal u beddelidda codka ee internetka",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "Qoraal u beddelidda codka",
     "retentionPrefix": "Muddada xogta la hayo, xuquuqdaada iyo macluumaadka xiriirka oo faahfaahsan waxay ku qoran yihiin",
     "backToConsent": "Ku noqo oggolaanshaha",
-    "back": "Dib u noqo",
     "revokeConsent": "Ka noqo oggolaanshaha",
     "revokeConsentTitle": "Ma ka noqonaysaa oggolaanshaha wadaagista xogta?",
     "acceptAndContinue": "Aqbal oo sii soco",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "Aaladda gudaheeda oo keliya, ama Apple ama Google marka aaladdan aysan codka qoraal u beddeli karin internet la'aan.",
     "installAttributionPromptTitle": "Ma oggolaanaysaa in la ogaado halka rakibaaddu ka timid?",
     "installAttributionPromptMessage": "Kilo wuxuu oggolaanshaha raadraaca Apple u isticmaalaa oo keliya inuu ogaado kanaalka ku keenay halkan. Tilmaamahaaga iyo wadahadalladaada marnaba lama isticmaalo.",
-    "continue": "Sii wad",
     "what": "Maxaa",
     "why": "Sababta",
     "who": "Yaa"
@@ -3007,7 +2875,6 @@
       "selectDescription": "Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
       "selectOrganization": "Dooro urur",
       "unavailableDescription": "Ururkan mar dambe lama heli karo. Boggaaga shakhsiga ka dooro urur si aad u sii socoto.",
-      "accessDeniedTitle": "Gelitaanka waa la diiday.",
       "accessDeniedDescription": "Ma lihid oggolaansho aad ku gasho ururkan."
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "Hagaajinta xisaabta",
         "credits_expired": "Lacagta isticmaalka ee dhacday"
       },
-      "loadMore": "Soo rar kuwo kale",
       "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa."
     },
@@ -3052,18 +2918,14 @@
         "paid": "La bixiyay",
         "open": "Furan",
         "void": "La buriyay",
-        "draft": "Qabyo",
-        "uncollectible": "Lama soo xareyn karo",
-        "unknown": "Lama garanayo"
+        "uncollectible": "Lama soo xareyn karo"
       },
-      "loadMore": "Soo rar kuwo kale",
       "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "magac@company.com",
       "enableA11y": "Daar digniinta hadhaaga yar",
-      "enabled": "La shiday",
       "notifyEmailsLabel": "Iimayllada ogeysiiska loo dirayo",
       "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha biilasha.",
       "separateEmailsHint": "Cinwaannada iimaylka ku kala saar hakadyo.",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}}/maalin",
       "manageA11y": "Maamul {{name}}",
       "manageInvitationA11y": "Maamul casuumaadda {{email}}",
-      "removeConfirm": "Ka saar",
       "removeMember": "Ka saar xubinta",
       "removeMemberMessage": "Ma ka saaraysaa {{name}} ururkan?",
       "revokeConfirm": "Ka noqo",
@@ -3113,25 +2974,18 @@
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda"
     },
-    "permissionDenied": {
-      "back": "Dib u noqo",
-      "title": "Gelitaanka waa la diiday."
-    },
     "usageStats": {
-      "cost": "Kharashka",
       "inputTokens": "Halbeegyada qoraalka la geliyay",
       "last30Days": "30-kii maalmood ee la soo dhaafay",
       "outputTokens": "Halbeegyada qoraalka la soo saaray",
       "requests": "Codsiyada"
     },
     "hub": {
-      "title": "Urur",
       "renameTitle": "Beddel magaca ururka",
       "renamePlaceholder": "Magaca ururka",
       "balance": "Hadhaaga",
       "organizationSeats": "Boosaska ururka",
-      "lowBalanceBelow": "Ka yar {{amount}}",
-      "lowBalanceOff": "Daman"
+      "lowBalanceBelow": "Ka yar {{amount}}"
     },
     "kiloPass": {
       "activating": "Waa la hawlgelinayaa",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "Habaynta lacagta isticmaalka way daahday · si toos ah ayaa mar kale la isku dayayaa",
       "ended": "Wuu dhammaaday",
       "endsOn": "Wuxuu dhammaanayaa {{date}}",
-      "loading": "Soo raraya…",
       "manageHint": "Wuxuu bogga internetka ka furaa maareynta Kilo Pass.",
       "notSubscribed": "Rukumasho ma jirto",
       "overallocated": "Qoondaynta Pass waxay ka badan tahay boosaska la bixiyay",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "Sheekaysi",
-    "composer": {
-      "placeholder": "Fariin"
-    },
     "empty": {
       "title": "Bilow wada sheekaysi",
       "description": "Dir fariin si aad ula hadasho moodeel."
     },
     "working": "Shaqaynaya",
     "historyRetry": "Taariikhda wada sheekaysiga lama soo dejin karin.",
-    "catalogRetry": "Moodeellada lama soo rari karin.",
     "sendError": "Fariinta lama diri karin. Mar kale isku day."
   },
   "glanceable": {

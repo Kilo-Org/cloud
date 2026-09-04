@@ -24,7 +24,7 @@ import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-
 import { cn } from '@/lib/utils';
 
 const SEVERITY_KEYS = {
-  critical: 'securityAgent.sla.critical',
+  critical: 'common.critical',
   high: 'securityAgent.sla.high',
   medium: 'securityAgent.sla.medium',
   low: 'securityAgent.sla.low',

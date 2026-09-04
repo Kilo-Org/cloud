@@ -393,7 +393,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <Button
           size="icon"
           variant="ghost"
-          accessibilityLabel={t('share.close')}
+          accessibilityLabel={t('common.close')}
           onPress={dismiss}
           className="absolute right-2"
         >

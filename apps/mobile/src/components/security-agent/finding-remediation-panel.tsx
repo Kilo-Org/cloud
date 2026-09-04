@@ -48,7 +48,7 @@ const REMEDIATION_TIMELINE_LABELS = {
   'security.remediation.failed': 'securityAgent.remediation.timeline.failed',
   'security.remediation.blocked': 'securityAgent.remediation.timeline.blocked',
   'security.remediation.no_changes_needed': 'securityAgent.remediation.timeline.noChangesNeeded',
-  'security.remediation.cancelled': 'securityAgent.remediation.timeline.cancelled',
+  'security.remediation.cancelled': 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -63,7 +63,7 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 const REMEDIATION_STATUS_KEYS = {
   cancellationRequested: 'securityAgent.remediationStatus.cancellationRequested',
   notStarted: 'securityAgent.remediationStatus.notStarted',
-  queued: 'securityAgent.remediationStatus.queued',
+  queued: 'common.queued',
   starting: 'securityAgent.remediationStatus.starting',
   inProgress: 'securityAgent.remediationStatus.inProgress',
   draftPrOpened: 'securityAgent.remediationStatus.draftPrOpened',
@@ -71,7 +71,7 @@ const REMEDIATION_STATUS_KEYS = {
   blocked: 'securityAgent.remediationStatus.blocked',
   failed: 'securityAgent.remediationStatus.failed',
   noChangesNeeded: 'securityAgent.remediationStatus.noChangesNeeded',
-  cancelled: 'securityAgent.remediationStatus.cancelled',
+  cancelled: 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 function getRemediationStatusKey(
@@ -223,7 +223,7 @@ export function FindingRemediationPanel({
       router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
       return;
     }
-    void openExternalUrl(url, { label: t('securityAgent.remediation.pullRequest') });
+    void openExternalUrl(url, { label: t('common.pullRequest') });
   };
 
   if (isLoading && !analysis) {
@@ -470,7 +470,7 @@ export function FindingRemediationPanel({
                     value={originKey ? t(originKey) : attempt.origin.replaceAll('_', ' ')}
                   />
                   <KvRow
-                    label={t('securityAgent.remediation.model')}
+                    label={t('common.model')}
                     value={attempt.remediationModelSlug}
                     selectable
                   />

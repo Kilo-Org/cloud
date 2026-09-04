@@ -156,7 +156,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            {t('securityAgent.analysisSettings.permissionNote')}
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <View className="gap-2">
@@ -209,7 +209,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           <QueryError
             variant="server"
             placement="top"
-            title={t('securityAgent.analysisSettings.couldNotLoadModels')}
+            title={t('common.couldNotLoadModels')}
             onRetry={() => void refetchModels()}
             isRetrying={modelsLoading}
           />

@@ -571,7 +571,7 @@ export function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.title')} />
+      <ScreenHeader title={t('common.notifications')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"

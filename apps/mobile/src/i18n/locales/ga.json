@@ -27,7 +27,49 @@
     "somethingWentWrong": "Tharla earráid.",
     "couldNotOpen": "Níorbh fhéidir {{label}} a oscailt.",
     "link": "nasc",
-    "takingLonger": "Tá sé seo ag tógáil níos faide ná mar a bhíothas ag súil leis. Is féidir leat é seo a dhúnadh agus seiceáil arís."
+    "takingLonger": "Tá sé seo ag tógáil níos faide ná mar a bhíothas ag súil leis. Is féidir leat é seo a dhúnadh agus seiceáil arís.",
+    "model": "Samhail",
+    "accessDenied": "Diúltaíodh don rochtain.",
+    "allRepositories": "Gach stór",
+    "personal": "Pearsanta",
+    "connectGithub": "Ceangail le GitHub",
+    "cost": "Costas",
+    "discard": "Caith uait",
+    "findings": "Torthaí",
+    "notConnected": "Gan nasc",
+    "notifications": "Fógraí",
+    "pullRequest": "iarratas tarraingthe",
+    "repositories": "Stóir",
+    "securityAgent": "Gníomhaire slándála",
+    "unknown": "Anaithnid",
+    "added": "Curtha leis",
+    "cancelled": "Cealaithe",
+    "close": "Dún",
+    "codeReviewer": "Athbhreithneoir cóid",
+    "connected": "Nasctha",
+    "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
+    "couldNotLoadRepositories": "Níorbh fhéidir na stóir a lódáil.",
+    "critical": "Criticiúil",
+    "delete": "Scrios",
+    "deleted": "Scriosta",
+    "details": "Sonraí",
+    "draft": "Dréacht",
+    "enabled": "Cumasaithe",
+    "github": "GitHub",
+    "imageUnavailable": "Níl an íomhá ar fáil.",
+    "loading": "Ag lódáil…",
+    "loadMore": "Lódáil tuilleadh",
+    "message": "Teachtaireacht",
+    "off": "As",
+    "organization": "Eagraíocht",
+    "platform": "Ardán",
+    "prReview": "Athbhreithniú PR",
+    "queued": "Sa scuaine",
+    "remove": "Bain",
+    "repository": "Stór",
+    "signOut": "Sínigh amach",
+    "agents": "Gníomhairí",
+    "all": "Gach ceann"
   },
   "language": {
     "title": "Teanga",
@@ -62,12 +104,10 @@
     "emailAddress": "Seoladh ríomhphoist",
     "emailPlaceholder": "tusa@sampla.com",
     "continueWithEmail": "Lean ar aghaidh le ríomhphost",
-    "continue": "Lean ar aghaidh",
     "enterCodeSentTo": "Cuir isteach an cód a seoladh chuig {{email}}.",
     "codeArrivalHint": "Má tá an seoladh seo incháilithe, tiocfaidh an cód laistigh de nóiméad.",
     "verifyCode": "Fíoraigh an cód",
     "resendCode": "Seol an cód arís",
-    "back": "Ar ais",
     "termsPrefix": "Trí leanúint ar aghaidh, aontaíonn tú lenár",
     "terms": "Téarmaí",
     "termsConnector": " agus ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Próifíl",
-    "agents": "Gníomhairí",
-    "codeReviewer": "Athbhreithneoir cóid",
     "codeReviewerSubtitle": "Athbhreithnithe PR uathoibríocha",
-    "securityAgent": "Gníomhaire slándála",
     "securityAgentSubtitle": "Aimsigh agus réitigh leochaileachtaí",
     "reviews": "Athbhreithnithe",
-    "prReview": "Athbhreithniú PR",
     "prReviewSubtitle": "Athbhreithnigh iarratais tarraingthe ar fhón",
-    "organization": "Eagraíocht",
     "couldNotLoadOrganization": "Níorbh fhéidir an eagraíocht a lódáil.",
     "couldNotLoadOrganizationDescription": "Níl na socruithe eagraíochta agus gníomhairí ar fáil go dtí go lódáiltear é seo.",
     "linkedAccounts": "Cuntais nasctha",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Níl aon chreidmheas fágtha agat. Déantar creidmheasanna an chuntais seo a bhainistiú lasmuigh den aip iOS.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
-    "signOutConfirm": "Sínigh amach",
     "deleteAccountTitle": "An scriosfar an cuntas?",
     "deleteAccountMessage": "Scriosfar do chuntas go buan agus síneofar amach thú. Seolfaimid cód deimhnithe chugat ar ríomhphost.",
     "deleteAccountConfirm": "Scrios an cuntas",
     "accountDeleted": "Tá do chuntas scriosta.",
     "viewOrganization": "Féach ar an eagraíocht",
     "manageOrganization": "Bainistigh an eagraíocht",
-    "personal": "Pearsanta",
     "selectAccount": "Roghnaigh cuntas",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "Ríomhphost",
     "providerTestAccount": "Cuntas tástála",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Coinnigh an scáileán ar siúl ar leathanach an tseisiúin",
     "keepScreenOnSubtitle": "Coinnigh an scáileán ar siúl fad a bhíonn an seisiún ag obair.",
     "appearance": "Dealramh",
-    "notifications": "Fógraí",
     "notificationsSubtitle": "Roghanna brúfhógraí",
     "appearanceSystem": "Córas",
     "appearanceLight": "Geal",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",
     "pullRequestUnavailableDescription": "Ní féidir an PR seo a oscailt. Seans gur scriosadh é, go bhfuil an stór príobháideach, nó nach bhfuil aip GitHub Kilo suiteáilte air.",
-    "accessDenied": "Diúltaíodh don rochtain.",
     "accessDeniedDescription": "Níl cead agat an t-iarratas tarraingthe seo a fheiceáil.",
     "noFilesChanged": "Gan aon chomhad athraithe",
     "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas tarraingthe seo.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Níorbh fhéidir na comhaid a lódáil.",
-      "checkConnection": "Seiceáil do nasc agus bain triail eile as.",
       "retryLoadingFiles": "Bain triail as comhaid a lódáil arís",
       "filterPlaceholder": "Scagadh de réir conaire",
       "viewedCount": "{{viewed}} de {{total}} feicthe",
@@ -345,7 +374,6 @@
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh tráchtanna a lódáil.",
       "retryLoadingMore": "Bain triail as tuilleadh tráchtanna a lódáil arís",
       "loadMoreComments": "Lódáil tuilleadh tráchtanna",
-      "loadMore": "Lódáil tuilleadh",
       "closeReactions": "Dún na frithghníomhartha",
       "reactionsTitle": "Frithghníomhartha",
       "addReaction": "Cuir freagairt leis",
@@ -358,7 +386,6 @@
       "reportUser": "Tuairiscigh úsáideoir",
       "mute": "Cuir ina thost",
       "block": "Blocáil",
-      "somethingWentWrong": "Tharla earráid.",
       "reportSubmitted": "Seoladh an tuairisc. Uimhir admhála: {{receiptId}}",
       "blockedUser": "Cuireadh bac ar {{login}}",
       "mutedUser": "Cuireadh tost ar {{login}}",
@@ -442,13 +469,11 @@
     "reviewPullRequest": "Athbhreithnigh an t-iarratas tarraingthe",
     "headLine": "{{counts}} · taifead athruithe reatha {{sha}}",
     "entry": {
-      "title": "Athbhreithniú PR",
       "eyebrow": "Oscail iarratas tarraingthe trí URL.",
       "pastePrLink": "Greamaigh nasc PR",
       "noRecentPrs": "Gan aon PR le déanaí",
       "noRecentPrsDescription": "Greamaigh nasc PR thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",
       "couldNotLoad": "Níorbh fhéidir an t-ábhar a lódáil.",
-      "remove": "Bain",
       "removeFromRecentsTitle": "An mbainfear den liosta le déanaí é?",
       "removeFromRecentsMessage": "Bainfear an t-iarratas tarraingthe seo den liosta le déanaí.",
       "removeRecentAccessibility": "Bain {{repo}} den liosta le déanaí",
@@ -472,13 +497,11 @@
       "pending": "{{displayCount}} ar feitheamh",
       "skipped": "{{displayCount}} scipeáilte",
       "checksCount": "seiceálacha: {{displayCount}}",
-      "checkDetails": "sonraí seiceála",
-      "pullRequest": "iarratas tarraingthe"
+      "checkDetails": "sonraí seiceála"
     },
     "inbox": {
       "title": "Bosca ionphoist",
       "recent": "Le déanaí",
-      "draft": "Dréacht",
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
       "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
@@ -500,7 +523,6 @@
       "discardTitle": "An gcaithfear an trácht uait?",
       "discardMessage": "Caillfear do dhréacht.",
       "keepEditing": "Lean den eagarthóireacht",
-      "discard": "Caith uait",
       "comment": "Trácht",
       "insertSuggestionA11y": "Cuir moladh cóid isteach",
       "insertSuggestion": "Cuir moladh isteach",
@@ -508,12 +530,10 @@
       "suggestionsOnlyAddedLines": "Ní bhaineann moltaí ach le línte a cuireadh leis.",
       "tapDiffLineToSuggest": "Tapáil líne sa chomparáid athruithe chun moltaí a chumasú."
     },
-    "screenTitle": "Athbhreithniú PR",
     "connect": {
       "checkFailedTitle": "Níorbh fhéidir an nasc GitHub a sheiceáil.",
       "checkFailedMessage": "Níl stádas an tsínithe isteach ar fáil go dtí go lódáiltear é seo.",
       "reconnectTitle": "Athnasc GitHub",
-      "title": "Ceangail le GitHub",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub. Athnasc chun leanúint d'athbhreithniú a dhéanamh ar iarratais tarraingthe ar do ghuthán.",
       "description": "Nasc do chuntas GitHub chun iarratais tarraingthe a athbhreithniú ar do ghuthán."
     },
@@ -526,7 +546,6 @@
       "loadFailedTitle": "Níorbh fhéidir an fhoirm chun athbhreithniú a sheoladh a lódáil.",
       "deletePendingTitle": "An scriosfar an trácht ar feitheamh?",
       "deletePendingMessage": "Bainfear an trácht seo ón scuaine athbhreithnithe.",
-      "delete": "Scrios",
       "summaryOptional": "Achoimre (roghnach)",
       "pendingComment_one": "trácht ar feitheamh",
       "pendingComment": "trácht ar feitheamh",
@@ -554,7 +573,6 @@
     "overview": {
       "stateMerged": "Cumascaithe",
       "stateClosed": "Dúnta",
-      "stateDraft": "Dréacht",
       "stateOpenApproved": "Oscailte · Formheasta",
       "stateOpenChangesRequested": "Oscailte · Athruithe iarrtha",
       "stateOpenReviewRequired": "Oscailte · Athbhreithniú riachtanach",
@@ -593,8 +611,6 @@
       "discussion": "Plé"
     },
     "fileStatus": {
-      "added": "Curtha leis",
-      "deleted": "Scriosta",
       "modified": "Modhnaithe",
       "renamed": "Athainmnithe",
       "copied": "Cóipeáilte",
@@ -604,9 +620,7 @@
       "selectedTapToChange": "{{label}} roghnaithe, tapáil chun an roghnú a athrú",
       "tapToComment": "{{label}}, tapáil chun trácht a dhéanamh",
       "truncationBanner": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub.",
-      "statusAdded": "Curtha leis",
       "statusContext": "Comhthéacs",
-      "statusDeleted": "Scriosta",
       "lineLabel": "Líne {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(folamh)"
@@ -634,7 +648,6 @@
     }
   },
   "notifications": {
-    "title": "Fógraí",
     "liveActivities": "Gníomhaíochtaí beo",
     "liveActivitySubtitle": "Taispeáin gníomhairí gníomhacha ar an scáileán glasála",
     "liveUpdates": "Nuashonruithe beo",
@@ -690,7 +703,6 @@
   },
   "tabs": {
     "home": "Baile",
-    "agents": "Gníomhairí",
     "profile": "Próifíl",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -704,8 +716,7 @@
       "noInstances": "Níl aon ásc KiloClaw ann",
       "noInstancesDescription": "Cuir ásc ar bun chun tosú ag comhrá.",
       "setUpKiloclaw": "Cuir KiloClaw ar bun",
-      "currentInstance": "{{title}}, reatha",
-      "personal": "Pearsanta"
+      "currentInstance": "{{title}}, reatha"
     },
     "conversation": {
       "failedToLoad": "Níorbh fhéidir an comhrá a lódáil.",
@@ -743,7 +754,6 @@
       "cancelReply": "Cealaigh freagra",
       "openInstance": "Oscail an t-ásc",
       "attachFile": "Ceangail comhad",
-      "messagePlaceholder": "Teachtaireacht",
       "cancelEdit": "Cealaigh an eagarthóireacht",
       "sendMessage": "Seol teachtaireacht"
     },
@@ -762,7 +772,6 @@
     },
     "attachment": {
       "open": "Oscail {{filename}}",
-      "imageUnavailable": "Níl an íomhá ar fáil.",
       "openFailed": "Níorbh fhéidir an ceangaltán a oscailt. Seiceáil do nasc agus bain triail as arís.",
       "attachFailed": "Níorbh fhéidir an comhad a cheangal.",
       "limit": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
@@ -792,7 +801,6 @@
       "yourMessage": "Do theachtaireacht",
       "messageFrom": "Teachtaireacht ó {{author}}",
       "moreActions": "Tuilleadh gníomhartha",
-      "message": "Teachtaireacht",
       "notDelivered": "Gan seachadadh",
       "edited": "(curtha in eagar)",
       "image": "Íomhá",
@@ -804,7 +812,6 @@
       "title": "Gníomhartha teachtaireachta",
       "deleteTitle": "An scriosfar an teachtaireacht?",
       "deleteMessage": "Bainfidh sé seo an teachtaireacht ón gcomhrá.",
-      "delete": "Scrios",
       "deleteFailed": "Níorbh fhéidir an teachtaireacht a scriosadh.",
       "removeReactionFailed": "Níorbh fhéidir an t-imoibriú a bhaint.",
       "addReactionFailed": "Níorbh fhéidir an t-imoibriú a chur leis.",
@@ -837,7 +844,6 @@
       "online": "Ar líne",
       "idle": "Díomhaoin",
       "offline": "As líne",
-      "unknown": "Anaithnid",
       "loadingUser": "Ag lódáil úsáideora...",
       "waitingForStatus": "Ag fanacht le stádas an róbait...",
       "offlineMessage": "Tá an róbat as líne. Atosóidh seoladh na dteachtaireachtaí nuair a athcheanglóidh sé."
@@ -909,7 +915,6 @@
       "destroyMessage": "Scriosfar d'ásc KiloClaw agus a chuid sonraí go léir go buan. Ní féidir an gníomh seo a chur ar ceal.",
       "destroyTitle": "Scrios an t-ásc",
       "instance": "Ásc",
-      "renameFailed": "Tharla earráid.",
       "couldNotCheckStatus": "Níorbh fhéidir stádas na seirbhíse a sheiceáil.",
       "dangerZone": "CRIOS CONTÚIRTE",
       "destroying": "Ag scriosadh…",
@@ -958,29 +963,22 @@
       "failedToLoadCommand": "Níorbh fhéidir an t-ordú socraithe a lódáil.",
       "gmailNotifications": "Fógraí Gmail",
       "disconnect": "Dícheangail an cuntas Google",
-      "connected": "Nasctha",
       "copied": "Cóipeáilte",
       "copyCommand": "Cóipeáil an t-ordú",
       "disabled": "Díchumasaithe",
       "disconnectConfirm": "Dícheangail",
       "disconnectMessage": "An mbainfear do chuntas Google den ásc seo? Díchumasófar fógraí Gmail. Athimscar an t-ásc tar éis an dícheangail chun na hathruithe a chur i bhfeidhm.",
-      "disconnectTitle": "Dícheangail Google",
-      "enabled": "Cumasaithe",
-      "notConnected": "Gan nasc"
+      "disconnectTitle": "Dícheangail Google"
     },
     "modelList": {
       "title": "Gach samhail",
       "searchPlaceholder": "Cuardach samhlacha",
-      "couldNotLoad": "Níorbh fhéidir na samhlacha a lódáil.",
       "clearSearch": "Glan an cuardach",
       "noMatches": "Níl aon samhail ag teacht le do chuardach",
       "noModels": "Níl aon samhail ar fáil",
       "noModelsDescription": "Beidh samhlacha le feiceáil anseo nuair a bheidh siad ar fáil.",
       "noResultsFor": "Níor aimsíodh aon toradh ar \"{{query}}\".",
       "recommended": "Molta"
-    },
-    "model": {
-      "title": "Samhail"
     },
     "secrets": {
       "title": "Rúin",
@@ -997,10 +995,7 @@
       "setupGuideA11y": "treoir socraithe {{label}}",
       "setupGuide": "treoir socraithe",
       "saving": "Ag sábháil…",
-      "remove": "Bain",
       "removing": "Ag baint…",
-      "connected": "Nasctha",
-      "notConnected": "Gan nasc",
       "updateToken": "Nuashonraigh an comhartha",
       "connect": "Ceangail"
     },
@@ -1061,7 +1056,6 @@
     "list": {
       "createInstance": "Cruthaigh ásc",
       "organizations": "Eagraíochtaí",
-      "personal": "Pearsanta",
       "accessIssue": {
         "trialExpired": "Tá deireadh leis an triail — glac síntiús chun leanúint den ásc seo a úsáid",
         "subscriptionCanceled": "Síntiús neamhghníomhach — glac síntiús arís chun leanúint den ásc seo a úsáid",
@@ -1085,9 +1079,7 @@
         "openKiloAi": "Oscail kilo.ai",
         "provisioning": "Soláthar",
         "review": "Athbhreithniú",
-        "somethingWentWrong": "Tharla earráid.",
         "identityTitle": "Céannacht do róbait",
-        "close": "Dún",
         "couldNotLoad": "Níorbh fhéidir stádas an tsocraithe a lódáil.",
         "finishingSetup": "Tá an socrú á chríochnú — fan nóiméad agus muid ag cur bailchríoch ar do chuntas.",
         "ready": "Réidh",
@@ -1104,7 +1096,6 @@
         "location": "Suíomh",
         "locationPlaceholder": "Cathair nó réigiún (roghnach)",
         "useCurrentLocation": "Úsáid an suíomh reatha",
-        "continue": "Lean ar aghaidh",
         "locationDeniedTitle": "Rochtain ar an suíomh diúltaithe",
         "locationDeniedMessage": "Cumasaigh rochtain ar an suíomh sna socruithe chun do shuíomh reatha a úsáid.",
         "locationValidationFailed": "Níorbh fhéidir an suíomh a bhailíochtú.",
@@ -1153,7 +1144,6 @@
       "gatewayProcess": "PRÓISEAS GEATA",
       "lastExit": "Scor deireanach",
       "memory": "Cuimhne",
-      "model": "Samhail",
       "region": "Réigiún",
       "resources": "ACMHAINNÍ",
       "restarts": "Atosuithe",
@@ -1177,7 +1167,6 @@
       "frontierDescription": "An fheidhmíocht is airde. Seoltar iarratais chuig na samhlacha is forbartha a úsáideann réasúnaíocht.",
       "balancedLabel": "Cothrom",
       "balancedDescription": "Cothromaíocht chliste idir luas agus cumas ar chostas níos ísle.",
-      "cost": "Costas",
       "performance": "Feidhmíocht",
       "autoModelA11y": "samhail uathoibríoch {{label}}",
       "currentModel": "Samhail reatha",
@@ -1229,7 +1218,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Cuntas Google",
       "modelDescription": "Roghnú samhla AI",
-      "modelLabel": "Samhail",
       "secretsDescription": "Dintiúir chripteáilte",
       "secretsLabel": "Rúin",
       "versionPinDescription": "Glasáil ar leagan ar leith",
@@ -1278,12 +1266,9 @@
       "placeholder": "m.sh. Ár ngnáis maidir le láimhseáil earráidí a chur i bhfeidhm…"
     },
     "repos": {
-      "title": "Stóir",
-      "couldNotLoad": "Níorbh fhéidir na stóir a lódáil.",
       "unavailable": "Níl na stórtha ar fáil. Críochnaigh socrú Bitbucket ar kilo.ai.",
       "finishSetup": "Críochnaigh an socrú",
       "manageAccess": "Bainistigh rochtain",
-      "allRepositories": "Gach stór",
       "bitbucketNoRepositoriesDescription": "Níl aon stór ar fáil sa spás oibre Bitbucket seo.",
       "bitbucketSetup": "Socrú Bitbucket",
       "couldNotOpenGithubSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
@@ -1301,7 +1286,6 @@
       "roast": "Macánta gan trócaire, ar bhealach siamsúil",
       "strict": "Marcáil gach rud agus éiligh ardchaighdeán"
     },
-    "title": "Athbhreithneoir cóid",
     "reviewDetail": {
       "title": "Athbhreithniú",
       "cancelTitle": "An gcealófar an t-athbhreithniú?",
@@ -1314,17 +1298,12 @@
       "couldNotLoad": "Níorbh fhéidir an t-athbhreithniú a lódáil.",
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
       "byline": "{{repo}} #{{number}} le {{author}}",
-      "findings": "Torthaí",
       "noFindings": "Níor aimsíodh aon toradh.",
       "showMore": "Taispeáin níos mó",
-      "details": "Sonraí",
       "branch": "Brainse",
-      "platform": "Ardán",
-      "model": "Samhail",
       "created": "Cruthaithe",
       "started": "Tosaithe",
       "completed": "Críochnaithe",
-      "cost": "Costas",
       "tokens": "Comharthaí",
       "tokensInOut": "{{input}} isteach / {{output}} amach",
       "openPullRequest": "Oscail an t-iarratas tarraingthe",
@@ -1336,7 +1315,6 @@
       "checkRun": "Rith seiceála",
       "status": "Stádas",
       "threshold": "Tairseach",
-      "pullRequest": "iarratas tarraingthe",
       "transcriptWaiting": "Táthar ag fanacht le tras-scríbhinn an athbhreithnithe.",
       "transcriptEmpty": "Níl aon tras-scríbhinn ar fáil don athbhreithniú seo.",
       "transcriptRetry": "Níorbh fhéidir tras-scríbhinn an athbhreithnithe a lódáil.",
@@ -1376,13 +1354,9 @@
       "couldNotLoadProviders": "Níorbh fhéidir linn do sholáthraithe nasctha a lódáil. Bain triail as arís le do thoil.",
       "connectProvider": "Ceangail soláthraí",
       "connectProviderDescription": "Ceangail GitHub chun athbhreithniú de láimh a thosú ar iarratas tarraingthe.",
-      "connectGitHub": "Ceangail le GitHub",
-      "platform": "Ardán",
-      "notConnected": "Gan nasc",
       "pullRequestUrl": "URL an iarratais tarraingthe",
       "instructions": "Treoracha (roghnach)",
       "instructionsPlaceholder": "Aon rud ar leith ar cheart don athbhreithneoir díriú air…",
-      "model": "Samhail",
       "starting": "Ag tosú an athbhreithnithe…",
       "start": "Tosaigh athbhreithniú"
     },
@@ -1394,7 +1368,6 @@
     "selectRepositories": "Roghnaigh stóir",
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
-    "readOnlyDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
     "bitbucket": {
       "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a cheangal.",
       "setupIncomplete": "Níl an socrú críochnaithe. Críochnaigh an chumraíocht ar kilo.ai.",
@@ -1411,7 +1384,6 @@
     "scopeList": {
       "couldNotLoad": "Níorbh fhéidir na heagraíochtaí a lódáil.",
       "personalStillAvailable": "Tá stórtha pearsanta ar fáil fós thíos.",
-      "personal": "Pearsanta",
       "personalSubtitle": "Do stóir féin",
       "viewOnly": "Le féachaint amháin"
     },
@@ -1426,15 +1398,11 @@
     "platformList": {
       "checking": "Ag seiceáil…",
       "statusUnavailable": "Níl an stádas ar fáil",
-      "connected": "Nasctha",
-      "notConnected": "Gan nasc",
-      "organization": "Eagraíocht",
       "platforms": "Ardáin",
       "activity": "Gníomhaíocht"
     },
     "providerConnect": {
       "githubApp": "aip GitHub",
-      "connectGitHub": "Ceangail le GitHub",
       "githubError": "Níorbh fhéidir socrú GitHub a oscailt. Bain triail as arís le do thoil.",
       "gitlabAccount": "cuntas GitLab",
       "connectGitLab": "Ceangail le GitLab",
@@ -1448,10 +1416,7 @@
       "allAreas": "Gach réimse",
       "customInstructions": "Treoracha saincheaptha",
       "set": "Socraithe",
-      "model": "Samhail",
       "mergeGate": "Coinníoll cumaisc",
-      "repositories": "Stóir",
-      "allRepositories": "Gach stór",
       "nSelected": "{{displayCount}} roghnaithe",
       "reviewMemory": "Cuimhne athbhreithnithe",
       "proposedReviewMdGuidance": "Treoir REVIEW.md molta"
@@ -1462,16 +1427,13 @@
       "noDecision": "Níl aon chinneadh",
       "noResult": "Níl aon toradh"
     },
-    "eyebrow": "Athbhreithneoir cóid",
     "updateFailed": "Níorbh fhéidir an t-athbhreithneoir a nuashonrú.",
     "configSaveFailed": "Níorbh fhéidir cumraíocht an athbhreithnithe a shábháil.",
     "status": {
       "pending": "Ar feitheamh",
-      "queued": "Sa scuaine",
       "running": "Ag rith",
       "completed": "Críochnaithe",
       "failed": "Teipthe",
-      "cancelled": "Cealaithe",
       "interrupted": "Idirbhriste"
     },
     "reviewStyle": {
@@ -1489,42 +1451,33 @@
       "documentation": "Doiciméadú"
     },
     "gateThreshold": {
-      "off": "As",
-      "all": "Gach ceann",
-      "warning": "Rabhadh",
-      "critical": "Criticiúil"
+      "warning": "Rabhadh"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc nach féidir le Kilo rochtain a fháil ar an stór seo trí shuiteáil ghníomhach den aip GitHub. Nuashonraigh suiteáil na haipe GitHub, ansin cumasaigh an tAthbhreithneoir cóid arís.",
         "recoveryLabel": "Nuashonraigh an aip GitHub"
       },
       "githubIpAllowList": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís.",
-        "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc nach féidir le Kilo comhartha rochtana tionscadail GitLab a chruthú don tionscadal seo. Tabhair rochtain cothaitheora nó cumasaigh comharthaí rochtana tionscadail, ansin cumasaigh an tAthbhreithneoir cóid arís.",
         "recoveryLabel": "Nuashonraigh comhtháthú GitLab"
       },
       "byokInvalidKey": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go bhfuil an eochair API BYOK roghnaithe neamhbhailí, cúlghairthe nó gan na ceadanna riachtanacha. Nuashonraigh an eochair nó roghnaigh samhail eile, ansin cumasaigh an tAthbhreithneoir cóid arís.",
         "recoveryLabel": "Nuashonraigh socruithe BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc nach bhfuil an tsamhail roghnaithe ar fáil do sheisiúin gníomhaire néil. Roghnaigh samhail atá ar fáil, ansin cumasaigh an tAthbhreithneoir cóid arís.",
         "recoveryLabel": "Nuashonraigh socruithe an Athbhreithneora cóid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís.",
-        "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"
-      }
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
+      },
+      "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
+      "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"
     },
     "unknownError": "Earráid anaithnid."
   },
@@ -1534,29 +1487,23 @@
       "noFiltersDescription": "Téigh ar ais agus oscail na scagairí arís ó liosta na dtorthaí.",
       "title": "Scagadh torthaí",
       "reset": "Athshocraigh",
-      "repository": "Stór",
       "status": "Stádas",
       "severity": "Déine",
       "outcome": "Toradh",
       "slaStatus": "Stádas SLA",
       "sortBy": "Sórtáil de réir",
-      "allRepositories": "Gach stór",
-      "all": "Gach ceann",
       "statusOpen": "Oscailte",
       "fixed": "Deisithe",
       "statusIgnored": "Neamhaird déanta",
       "statusClosed": "Dúnta",
-      "severityCritical": "Criticiúil",
       "severityHigh": "Ard",
       "severityMedium": "Meánach",
       "severityLow": "Íseal",
       "outcomeNotAnalyzed": "Gan anailísiú",
       "outcomeAnalyzing": "Ag anailísiú",
       "outcomeFailed": "Theip ar an anailís",
-      "outcomeExploitable": "Inshaothraithe",
       "outcomeNotExploitable": "Neamh-inshaothraithe",
       "outcomeSafeToDismiss": "Sábháilte le cur as an áireamh",
-      "outcomeNeedsReview": "Athbhreithniú de dhíth",
       "outcomeTriageComplete": "Triáis críochnaithe",
       "outcomeDismissed": "Curtha as an áireamh",
       "sortSeverityDesc": "Déine: ón leibhéal is airde go dtí an leibhéal is ísle",
@@ -1583,7 +1530,6 @@
       "enableAutoDismiss": "Cumasaigh díbhe uathoibríoch",
       "enableAutoDismissSubtitle": "Díbir torthaí go huathoibríoch má chinneann an intleacht shaorga nach bhfuil siad inshaothraithe.",
       "confidenceThreshold": "Tairseach muiníne",
-      "permissionNote": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
       "enableAutoRemediationConfirmTitle": "An gcumasófar leasú uathoibríoch?",
       "enableAutoRemediationConfirmMessage": "Osclóidh an Gníomhaire slándála PRanna leasaithe go huathoibríoch do thorthaí inshaothraithe a chomhlíonann na coinníollacha.",
       "enable": "Cumasaigh",
@@ -1618,14 +1564,12 @@
       "suggestedAction": "Gníomh molta",
       "triageReasoning": "Réasúnaíocht na triáise",
       "exploitable": "Inshaothraithe",
-      "model": "Samhail",
       "notRecorded": "Gan taifeadadh",
       "analyzed": "Anailísithe",
       "exploitabilityReasoning": "Réasúnaíocht maidir le hinshaothraitheacht",
       "suggestedFix": "Deisiúchán molta",
       "whereFound": "Cá bhfuarthas é seo ({{displayCount}})",
       "fullReport": "An tuarascáil iomlán a gineadh",
-      "unknown": "Anaithnid",
       "yes": "Tá",
       "no": "Níl"
     },
@@ -1656,7 +1600,6 @@
       "repoSummary": "{{open}} oscailte · {{critical}} criticiúil · {{high}} ard",
       "couldNotLoad": "Níorbh fhéidir sonraí na deaise a lódáil.",
       "filterByRepository": "Scag de réir stóir",
-      "findings": "Torthaí",
       "lastSynced": "An sioncronú deireanach: {{time}}",
       "manageRepositories": "Bainistigh stórtha",
       "notYetSynced": "Níl sé sioncronaithe fós",
@@ -1716,23 +1659,19 @@
       "severityLabel": "Déine: {{severity}}",
       "package": "Pacáiste",
       "vulnerableVersions": "Leaganacha leochaileacha",
-      "unknown": "Anaithnid",
       "patchedVersion": "Leagan paisteáilte",
       "noPatchAvailable": "Níl aon paiste ar fáil",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Stór",
       "manifest": "Comhad forléirithe",
       "detected": "Braite",
       "updated": "Nuashonraithe",
-      "fixed": "Deisithe",
       "slaDeadline": "Spriocdháta SLA",
       "sourceRecord": "Taifead foinse",
       "source": "Foinse",
       "sourceId": "Aitheantóir foinse",
       "viewAdvisory": "Féach ar an bhfógra slándála ar GitHub",
       "statusSuperseded": "Ceann nua ina áit",
-      "statusFixed": "Deisithe",
       "statusOpen": "Oscailte",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Tá an ceartú ar bun cheana",
@@ -1746,25 +1685,18 @@
       "title": "Socruithe",
       "couldNotLoadSettings": "Níorbh fhéidir socruithe an Ghníomhaire slándála a lódáil.",
       "couldNotLoadPermissions": "Níorbh fhéidir na ceadanna a lódáil.",
-      "couldNotLoadRepositories": "Níorbh fhéidir na stóir a lódáil.",
-      "securityAgent": "Gníomhaire slándála",
-      "enabled": "Cumasaithe",
       "disabled": "Díchumasaithe",
       "on": "Ar siúl",
-      "off": "As",
-      "allRepositories": "Gach stór",
       "repositoriesCount_one": "{{displayCount}} stór roghnaithe",
       "repositoriesCount": "{{displayCount}} stór roghnaithe",
       "repositoriesCount_other": "{{displayCount}} stór roghnaithe",
       "selectRepositories": "Roghnaigh stóir",
       "selectRepositoriesSubtitle": "Roghnaigh na stórtha a ndéanann an Gníomhaire slándála monatóireacht orthu",
-      "repositories": "Stóir",
       "modelsAndAnalysis": "Samhlacha agus anailís",
       "analysisModeSubtitle": "Anailís: {{mode}}",
       "automation": "Uathoibriú",
       "automationAllOff": "Gach ceann múchta",
       "automationCount": "{{displayCount}} as 3 cumasaithe",
-      "notifications": "Fógraí",
       "notificationsCount": "{{displayCount}} as 2 cumasaithe",
       "slaPolicy": "Beartas SLA",
       "disabledNoManage": "Tá an Gníomhaire slándála díchumasaithe. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a chumasú.",
@@ -1777,7 +1709,6 @@
     "remediation": {
       "cancellationRequested": "Iarradh cealú",
       "cancelled": "Cealaíodh an leasú",
-      "pullRequest": "iarratas tarraingthe",
       "couldNotLoad": "Níorbh fhéidir stádas an leasaithe a lódáil.",
       "noAnalysisTitle": "Gan anailís fós",
       "noAnalysisDescription": "Rith anailís ón táb Sonraí.",
@@ -1793,7 +1724,6 @@
       "attemptHistory": "Stair iarrachtaí ({{displayCount}})",
       "attemptNumber": "Iarracht #{{number}}",
       "startedBy": "Tionscnaithe ag",
-      "model": "Samhail",
       "branch": "Brainse",
       "queued": "Leasú curtha sa scuaine",
       "retryQueued": "Atriail leasaithe curtha sa scuaine",
@@ -1802,20 +1732,17 @@
         "prOpened": "Osclaíodh PR",
         "failed": "Theip ar an leasú",
         "blocked": "Bac ar an leasú",
-        "noChangesNeeded": "Ní gá aon athruithe",
-        "cancelled": "Cealaithe"
+        "noChangesNeeded": "Ní gá aon athruithe"
       },
       "unavailable": "Níl ceartú ar fáil don toradh seo."
     },
     "analysisSettings": {
       "title": "Samhlacha agus anailís",
       "couldNotLoad": "Níorbh fhéidir na socruithe anailíse a lódáil.",
-      "permissionNote": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
       "depth": "Doimhneacht anailíse",
       "modeAuto": "Uathoibríoch",
       "modeShallow": "Bunúsach",
       "modeDeep": "Mionsonraithe",
-      "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
       "triageModel": "Samhail triáise",
       "analysisModel": "Samhail anailíse",
       "remediationModel": "Samhail leasaithe"
@@ -1823,7 +1750,6 @@
     "sla": {
       "title": "Beartas SLA",
       "couldNotLoad": "Níorbh fhéidir na socruithe SLA a lódáil.",
-      "critical": "Criticiúil",
       "high": "Ard",
       "medium": "Meánach",
       "low": "Íseal",
@@ -1841,7 +1767,6 @@
     },
     "findingDetail": {
       "title": "Toradh",
-      "tabDetails": "Sonraí",
       "tabAnalysis": "Anailís",
       "tabRemediation": "Leasú",
       "notFound": "Níor aimsíodh an toradh",
@@ -1850,7 +1775,6 @@
       "dismissA11y": "Cuir an toradh as an áireamh"
     },
     "findingList": {
-      "title": "Torthaí",
       "couldNotLoad": "Níorbh fhéidir na torthaí a lódáil.",
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh torthaí a lódáil.",
       "noMatchesTitle": "Níl aon toradh ag teacht leis na scagairí",
@@ -1860,13 +1784,8 @@
       "clearFilters": "Glan na scagairí"
     },
     "scopeList": {
-      "title": "Gníomhaire slándála",
       "couldNotLoad": "Níorbh fhéidir na heagraíochtaí a lódáil.",
-      "personal": "Pearsanta",
       "personalSubtitle": "Do stóir féin"
-    },
-    "commandRetry": {
-      "discard": "Caith uait"
     },
     "findingRow": {
       "nextRemediationPrOpen": "PR leasaithe oscailte",
@@ -1886,7 +1805,6 @@
       "couldNotOpenGithub": "Níorbh fhéidir GitHub a oscailt. Bain triail as arís le do thoil."
     },
     "settingsSave": {
-      "discard": "Caith uait",
       "keepEditing": "Lean den eagarthóireacht",
       "saveChanges": "Sábháil athruithe",
       "unsavedTitle": "Athruithe gan sábháil",
@@ -1898,7 +1816,6 @@
     "auditReport": {
       "couldNotLoad": "Níorbh fhéidir an tuarascáil iniúchta a lódáil.",
       "events": "Imeachtaí",
-      "findings": "Torthaí",
       "generated": "Gineadh an tuarascáil: {{generatedAt}}.",
       "noActivity": "Níl aon ghníomhaíocht taifeadta",
       "noActivityDescription": "Níl aon ghníomhaíocht maidir le torthaí slándála le tuairisciú ag Kilo ó {{start}} go dtí {{end}}.",
@@ -1908,8 +1825,7 @@
       "title": "Tuarascáil iniúchta",
       "unavailable": "Níl an tuarascáil iniúchta ar fáil",
       "unavailableDescription": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála tuarascálacha iniúchta a fheiceáil. Iarr ar úinéir nó ar bhainisteoir billeála rochtain a thabhairt duit.",
-      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís.",
-      "checkConnection": "Seiceáil do nasc agus bain triail eile as."
+      "queryFailed": "Níor críochnaíodh iarratas na tuarascála. Bain triail as arís."
     },
     "notifications": {
       "couldNotLoad": "Níorbh fhéidir na socruithe fógraí a lódáil.",
@@ -1918,7 +1834,6 @@
       "newFindingSection": "Fógra faoi thorthaí nua",
       "newFindingSeverityLabel": "Déine íosta do thorthaí nua",
       "newFindingSubtitle": "Seoltar fógra gach uair a shioncronaítear toradh nua, ar an gcéad sioncronú san áireamh.",
-      "readOnly": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
       "slaLeadTimeAccessibility": "Líon na laethanta roimh ré le haghaidh rabhadh SLA",
       "slaLeadTimeError": "Cuir isteach líon laethanta idir 1 agus 365, mar uimhir shlán.",
       "slaLeadTimeHint": "Cuir isteach slánuimhir idir 1 agus 365",
@@ -1926,22 +1841,17 @@
       "slaPersonalTitle": "Seol ríomhphost chugam faoi rabhaidh SLA",
       "slaSection": "Fógra rabhaidh SLA",
       "slaSeverityLabel": "Déine íosta d'fhógraí SLA",
-      "slaSubtitle": "Seoltar fógraí roimh ré, agus nuair a bhíonn spriocdháta SLA na dtorthaí ag druidim nó caite.",
-      "title": "Fógraí"
+      "slaSubtitle": "Seoltar fógraí roimh ré, agus nuair a bhíonn spriocdháta SLA na dtorthaí ag druidim nó caite."
     },
     "repositories": {
-      "allRepositories": "Gach stór",
       "couldNotLoad": "Níorbh fhéidir socruithe na stórtha a lódáil.",
-      "couldNotLoadRepositories": "Níorbh fhéidir na stóir a lódáil.",
       "couldNotOpenGithubSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
       "githubAppSettings": "socruithe na haipe GitHub",
       "manageAccess": "Bainistigh rochtain na haipe GitHub",
       "noRepositories": "Níl aon stór ann",
       "noRepositoriesDescription": "Tabhair rochtain ar na stórtha d'aip GitHub Kilo.",
-      "readOnly": "Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála na socruithe seo a athrú.",
       "selectAtLeastOne": "Roghnaigh stór amháin ar a laghad.",
-      "selectedRepositories": "Stóir roghnaithe",
-      "title": "Stóir"
+      "selectedRepositories": "Stóir roghnaithe"
     },
     "scopeEntry": {
       "connectDescription": "Suiteáil aip GitHub Kilo chun foláirimh Dependabot a shioncronú go huathoibríoch agus torthaí slándála a bhainistiú ar fud do stórtha.",
@@ -1956,7 +1866,6 @@
     },
     "queuedActionUntracked": "Níorbh fhéidir gníomh i scuaine a rianú a thuilleadh. Athnuaigh chun an staid is déanaí a fheiceáil.",
     "initialSyncAdmissionFailed": "Cumasaíodh an Gníomhaire slándála, ach níorbh fhéidir an chéad sioncronú a chur sa scuaine. Sioncronaigh arís.",
-    "title": "Gníomhaire slándála",
     "commands": {
       "findingAlreadyDismissed": "Toradh díbeartha cheana",
       "findingDismissed": "Toradh díbeartha",
@@ -1982,22 +1891,16 @@
       "failed": "Theip ar an anailís",
       "failedTitle": "Theip ar an anailís",
       "failedDescription": "Níorbh fhéidir leis an nGníomhaire slándála an anailís a chríochnú.",
-      "extractionFailed": "Athbhreithniú de dhíth",
-      "extractionFailedTitle": "Athbhreithniú de dhíth",
       "extractionFailedDescription": "Níorbh fhéidir an tuarascáil theicniúil a iompú ina toradh struchtúrtha.",
-      "exploitable": "Inshaothraithe",
-      "exploitableTitle": "Inshaothraithe",
       "exploitableDescription": "Is féidir le cód na haipe an ghné lena mbaineann a bhaint amach.",
       "notExploitable": "Doshroichte",
       "notExploitableTitle": "Doshroichte",
       "notExploitableDescription": "Níor aimsíodh aon chosán insroichte sa stór seo.",
       "unknown": "Athbhreithniú de dhíth",
-      "unknownTitle": "Athbhreithniú de dhíth",
       "unknownDescription": "Níorbh fhéidir leis an anailís a dheimhniú an bhfuil an ghné leochaileach insroichte.",
       "safeToDismiss": "Sábháilte le cur as an áireamh",
       "safeToDismissTitle": "Sábháilte le cur as an áireamh",
       "safeToDismissDescription": "Chinn an triáis gur féidir é seo a dhíbhe go sábháilte gan anailís ar an mbunachar cóid.",
-      "manualReview": "Athbhreithniú de dhíth",
       "manualReviewTitle": "Athbhreithniú láimhe de dhíth",
       "manualReviewDescription": "Mharcáil an triáis an toradh seo le haghaidh athbhreithnithe de láimh.",
       "analysisRequired": "Anailís ag teastáil",
@@ -2012,7 +1915,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Deisithe roimh an spriocdháta",
-      "fixed": "Deisithe",
       "fixedOn": "Deisithe: {{date}}",
       "resolutionRecorded": "Taifeadadh an réiteach",
       "superseded": "Ceann nua ina áit",
@@ -2040,7 +1942,6 @@
     "remediationStatus": {
       "cancellationRequested": "Iarradh cealú",
       "notStarted": "Gan tosú",
-      "queued": "Sa scuaine",
       "starting": "Ag tosú",
       "inProgress": "Ar siúl",
       "draftPrOpened": "Dréacht-PR oscailte",
@@ -2048,7 +1949,6 @@
       "blocked": "Faoi bhac",
       "failed": "Teipthe",
       "noChangesNeeded": "Ní gá aon athruithe",
-      "cancelled": "Cealaithe",
       "originAutomaticPolicy": "Polasaí uathoibríoch",
       "originIncludeExistingPolicy": "Polasaí chun torthaí atá ann cheana a chur san áireamh",
       "originManual": "De láimh",
@@ -2121,7 +2021,6 @@
     "sessionRow": {
       "deleteTitle": "An scriosfar an seisiún?",
       "deleteMessage": "Ní féidir é seo a chur ar ceal.",
-      "delete": "Scrios",
       "deleteSession": "Scrios seisiún",
       "rename": "Athainmnigh",
       "renameMessage": "Cuir ainm nua isteach don seisiún seo.",
@@ -2178,7 +2077,6 @@
       "title": "Seisiún",
       "copyErrorDetails": "Cóipeáil sonraí na hearráide",
       "backToSessions": "Ar ais chuig na seisiúin",
-      "accessDenied": "Diúltaíodh don rochtain.",
       "accessDeniedDescription": "Níl cead agat é seo a fheiceáil.",
       "couldNotLoad": "Níorbh fhéidir an seisiún a lódáil.",
       "failedToLoadDetails": "Níorbh fhéidir sonraí an tseisiúin a lódáil.",
@@ -2194,7 +2092,6 @@
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
-      "continue": "Lean ar aghaidh",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
@@ -2228,8 +2125,6 @@
     },
     "newSession": {
       "title": "Seisiún nua",
-      "repository": "Stór",
-      "connectGithub": "Ceangail le GitHub",
       "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
       "openGithub": "Oscail GitHub",
       "refreshRepositories": "Athnuaigh stórtha",
@@ -2257,7 +2152,6 @@
       "discardDraftTitle": "An gcaithfear an dréacht ar lár?",
       "discardDraftMessage": "Caillfear do leid.",
       "keepEditing": "Lean den eagarthóireacht",
-      "discard": "Caith uait",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
       "remoteHint": "Rith `kilo remote` ar do ríomhaire, nó `/remote` i seisiún CLI atá ar siúl, chun próiseas áitiúil kilo a rialú.",
       "bitbucketConnected": "Bitbucket nasctha",
@@ -2289,8 +2183,6 @@
       "updatedFileCount_many": "Nuashonraíodh {{displayCount}} gcomhad."
     },
     "toolPatch": {
-      "operationAdded": "Curtha leis",
-      "operationDeleted": "Scriosta",
       "operationUpdated": "Nuashonraithe"
     },
     "toolCard": {
@@ -2331,9 +2223,7 @@
       "runOn": "Rith ar",
       "runOnAccessibility": "Rith ar: {{label}}",
       "couldNotLoad": "Níorbh fhéidir na háisc a lódáil",
-      "couldNotLoadDescription": "Seiceáil do nasc agus bain triail eile as.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Ag lódáil…",
       "cloudAgentDescription": "Rith i mbosca gainimh Kilo sa scamall",
       "noCliInstances": "Níl aon ásc CLI nasctha",
       "noCliInstancesDescription": "Rith `kilo remote` i dtionscadal ar do ríomhaire, nó nuashonraigh Kilo CLI má tá ceann ar siúl cheana.",
@@ -2378,7 +2268,6 @@
       "loading": "Ag lódáil...",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2393,9 +2282,7 @@
       "roleUser": "Úsáideoir",
       "roleAssistant": "Cúntóir",
       "sent": "Seolta",
-      "model": "Samhail",
       "costAndTokens": "Costas agus comharthaí",
-      "cost": "Costas",
       "input": "Ionchur",
       "output": "Aschur",
       "reasoning": "Réasúnaíocht",
@@ -2411,7 +2298,6 @@
       "textDisplay": "Taispeáint téacs",
       "thinking": "Ag machnamh",
       "thought": "Machnamh",
-      "title": "Sonraí",
       "showDetails": "Taispeáin sonraí",
       "pending": "Ar feitheamh…",
       "running": "Ar siúl…"
@@ -2434,7 +2320,6 @@
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",
       "imageUnavailableRetry": "Níl an íomhá ar fáil, bain triail eile as í a lódáil",
-      "imageUnavailable": "Níl an íomhá ar fáil.",
       "imageUnavailableWithAlt": "Níl an íomhá ar fáil: {{alt}}.",
       "imagePreviewUnavailableInSession": "Níl réamhamharc na híomhá ar fáil sa seisiún seo.",
       "viewImage": "Féach ar an íomhá",
@@ -2527,7 +2412,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Is féidir triail eile a bhaint as.",
       "copyToComposer": "Cóipeáil chuig an mbosca teachtaireachta",
-      "queued": "Sa scuaine",
       "queuedAccessibility": "Teachtaireacht curtha sa scuaine",
       "userMessage": "Teachtaireacht úsáideora",
       "assistantMessage": "Teachtaireacht chúntóra",
@@ -2572,12 +2456,10 @@
     },
     "sessionFilter": {
       "title": "Scag seisiúin",
-      "platform": "Ardán",
       "platformCloud": "Scamall",
       "platformExtension": "Eisínteacht",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Eile",
       "project": "Tionscadal"
@@ -2599,7 +2481,6 @@
       "allModels": "Gach samhail"
     },
     "modelSelector": {
-      "model": "Samhail",
       "provider": "Soláthraí {{id}}",
       "modelId": "Samhail {{id}}",
       "unavailable": "Níl ar fáil",
@@ -2740,8 +2621,7 @@
       "merged": "iarratas tarraingthe cumaiscthe",
       "draft": "Dréacht d'iarratas tarraingthe",
       "updating": "Ag nuashonrú, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "iarratas tarraingthe"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Lódáil",
@@ -2769,11 +2649,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Níorbh fhéidir do chuntas a lódáil.",
-    "couldNotLoadAccountDescription": "Seiceáil do nasc agus bain triail eile as.",
     "couldNotLoadPrivacy": "Níorbh fhéidir na roghanna príobháideachta a lódáil.",
     "couldNotLoadPrivacyDescription": "Seiceáil socruithe slándála do ghléis agus bain triail as arís.",
     "contentReady": "Ábhar réidh",
-    "signOut": "Sínigh amach",
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
@@ -2799,7 +2677,6 @@
     "signOutThisDeviceTitle": "An bhfuil tú ag iarraidh síniú amach ón ngléas seo?",
     "signOutThisSessionTitle": "An bhfuil tú ag iarraidh síniú amach ón seisiún seo?",
     "signOutThisSessionMessage": "Síneofar {{device}} amach. Is féidir leis rochtain API a choinneáil ar feadh uair an chloig ar a mhéad.",
-    "signOutConfirm": "Sínigh amach",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "webBrowser": "Brabhsálaí gréasáin"
   },
@@ -2821,7 +2698,6 @@
   },
   "imageViewer": {
     "close": "Dún {{filename}}",
-    "imageUnavailable": "Níl an íomhá ar fáil.",
     "share": "Comhroinn {{filename}}"
   },
   "invalidRoute": {
@@ -2840,11 +2716,8 @@
     "internetRestored": "Nasc idirlín athbhunaithe"
   },
   "queryError": {
-    "neutralTitle": "Tharla earráid.",
     "neutralDescription": "Bain triail as arís.",
     "offlineTitle": "Theip ar an lódáil.",
-    "offlineDescription": "Tharla earráid.",
-    "permissionTitle": "Diúltaíodh don rochtain.",
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundTitle": "Níor aimsíodh é.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
@@ -2854,7 +2727,6 @@
   "screenHeader": {
     "openMenu": "Oscail roghchlár",
     "openMenuFor": "Oscail roghchlár do {{title}}",
-    "close": "Dún",
     "goBack": "Téigh ar ais"
   },
   "picker": {
@@ -2886,7 +2758,6 @@
   },
   "share": {
     "title": "Comhroinnt le Kilo",
-    "close": "Dún",
     "reviewPr": "Athbhreithnigh PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Seisiún nua",
@@ -2988,7 +2859,6 @@
     "privacyPolicyPrefix": "Láimhseáiltear do shonraí de réir an pholasaí seo:",
     "privacyPolicy": "polasaí príobháideachta Kilo",
     "onDevice": "Ar an ngléas",
-    "loading": "Ag lódáil…",
     "couldNotLoadTranscription": "Níorbh fhéidir do shocrú tras-scríofa a lódáil.",
     "signInToManageTranscription": "Sínigh isteach le tras-scríobh ar líne a bhainistiú.",
     "onlineTranscription": "Tras-scríobh ar líne",
@@ -3005,7 +2875,6 @@
     "voiceTranscriptionTitle": "Tras-scríobh gutha",
     "retentionPrefix": "Tá eolas faoi na tréimhsí coinneála, do chearta agus sonraí teagmhála anseo:",
     "backToConsent": "Ar ais go dtí an toiliú",
-    "back": "Ar ais",
     "revokeConsent": "Cúlghair an toiliú",
     "revokeConsentTitle": "An bhfuil tú ag iarraidh do thoiliú le sonraí a roinnt a chúlghairm?",
     "acceptAndContinue": "Glac agus lean ar aghaidh",
@@ -3048,7 +2917,6 @@
     "voiceTranscriptionWho": "Ar an ngléas amháin, nó Apple nó Google nuair nach féidir leis an ngléas seo tras-scríobh a dhéanamh as líne.",
     "installAttributionPromptTitle": "An gceadaíonn tú foinse na suiteála a aithint?",
     "installAttributionPromptMessage": "Ní úsáideann Kilo cead rianaithe Apple ach le foghlaim cén bealach a thug anseo thú. Ní úsáidtear do leideanna ná do chomhráite riamh.",
-    "continue": "Lean ar aghaidh",
     "what": "Cad é",
     "why": "Cén fáth",
     "who": "Cé"
@@ -3070,7 +2938,6 @@
       "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
       "selectOrganization": "Roghnaigh eagraíocht",
       "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
-      "accessDeniedTitle": "Diúltaíodh don rochtain.",
       "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
     },
     "creditActivity": {
@@ -3089,7 +2956,6 @@
         "accounting_adjustment": "Coigeartú cuntasaíochta",
         "credits_expired": "Creidmheasanna imithe in éag"
       },
-      "loadMore": "Lódáil tuilleadh",
       "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
       "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
@@ -3115,18 +2981,14 @@
         "paid": "Íoctha",
         "open": "Oscailte",
         "void": "Ar neamhní",
-        "draft": "Dréacht",
-        "uncollectible": "Dobhailithe",
-        "unknown": "Anaithnid"
+        "uncollectible": "Dobhailithe"
       },
-      "loadMore": "Lódáil tuilleadh",
       "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
       "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ainm@cuideachta.com",
       "enableA11y": "Cumasaigh foláireamh faoi iarmhéid íseal",
-      "enabled": "Cumasaithe",
       "notifyEmailsLabel": "Seoltaí ríomhphoist le haghaidh foláireamh",
       "permissionDenied": "Níl cead agat foláirimh billeála a bhainistiú.",
       "separateEmailsHint": "Scar na seoltaí ríomhphoist le camóga.",
@@ -3155,7 +3017,6 @@
       "limitPerDay": "{{amount}}/lá",
       "manageA11y": "Bainistigh {{name}}",
       "manageInvitationA11y": "Bainistigh cuireadh do {{email}}",
-      "removeConfirm": "Bain",
       "removeMember": "Bain ball",
       "removeMemberMessage": "An bhfuil tú ag iarraidh {{name}} a bhaint ón eagraíocht seo?",
       "revokeConfirm": "Cúlghair",
@@ -3176,25 +3037,18 @@
       "resendInvite": "Seol an cuireadh arís",
       "shareInviteLink": "Roinn nasc an chuiridh"
     },
-    "permissionDenied": {
-      "back": "Ar ais",
-      "title": "Diúltaíodh don rochtain."
-    },
     "usageStats": {
-      "cost": "Costas",
       "inputTokens": "Comharthaí ionchuir",
       "last30Days": "Na 30 lá deireanacha",
       "outputTokens": "Comharthaí aschuir",
       "requests": "Iarratais"
     },
     "hub": {
-      "title": "Eagraíocht",
       "renameTitle": "Athainmnigh an eagraíocht",
       "renamePlaceholder": "Ainm na heagraíochta",
       "balance": "Iarmhéid",
       "organizationSeats": "Suíocháin eagraíochta",
-      "lowBalanceBelow": "Faoi {{amount}}",
-      "lowBalanceOff": "As"
+      "lowBalanceBelow": "Faoi {{amount}}"
     },
     "kiloPass": {
       "activating": "Ag gníomhachtú",
@@ -3203,7 +3057,6 @@
       "creditProcessingDelayed": "Moill ar phróiseáil creidmheasa · ag triail arís go huathoibríoch",
       "ended": "Críochnaithe",
       "endsOn": "Dáta deiridh: {{date}}",
-      "loading": "Ag lódáil…",
       "manageHint": "Osclaítear leathanach bainistíochta Kilo Pass ar an ngréasán.",
       "notSubscribed": "Gan síntiús",
       "overallocated": "Tá níos mó pasanna sannta ná suíocháin íoctha",
@@ -3271,16 +3124,12 @@
   },
   "quickChat": {
     "title": "Comhrá",
-    "composer": {
-      "placeholder": "Teachtaireacht"
-    },
     "empty": {
       "title": "Tosaigh comhrá",
       "description": "Seol teachtaireacht chun labhairt le samhail."
     },
     "working": "Ag obair",
     "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
-    "catalogRetry": "Níorbh fhéidir na samhlacha a lódáil.",
     "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
   },
   "glanceable": {

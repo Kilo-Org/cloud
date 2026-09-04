@@ -172,7 +172,7 @@ export function InstanceListScreen({
           ) : null}
 
           <InstanceSection
-            title={t('kiloclaw.list.personal')}
+            title={t('common.personal')}
             instances={personal}
             onSelect={handleSelect}
             onSettingsPress={handleSettingsPress}

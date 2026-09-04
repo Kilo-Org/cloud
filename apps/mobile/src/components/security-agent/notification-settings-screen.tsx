@@ -38,7 +38,7 @@ type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeveri
 // is a distinct 4-value enum from the auto-analysis/remediation severity
 // (no 'all' tier; 'low' is the catch-all instead).
 const NOTIFICATION_SEVERITY_OPTIONS = [
-  { value: 'critical', labelKey: 'securityAgent.filter.severityCritical' },
+  { value: 'critical', labelKey: 'common.critical' },
   { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
   { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
   { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
@@ -48,7 +48,7 @@ function NotificationSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.notifications.title')} />
+      <ScreenHeader title={t('common.notifications')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -153,7 +153,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title={t('securityAgent.notifications.title')}
+        title={t('common.notifications')}
         variant="offline"
         message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
@@ -170,7 +170,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.notifications.title')}
+        title={t('common.notifications')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -191,7 +191,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            {t('securityAgent.notifications.readOnly')}
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <View className="gap-3">

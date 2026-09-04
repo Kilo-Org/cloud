@@ -67,7 +67,7 @@ function variantForClass(cls: TerminalErrorClass): QueryErrorVariant {
 
 function titleForClass(cls: TerminalErrorClass): string {
   if (cls === 'permission') {
-    return i18n.t('agentChat.session.accessDenied');
+    return i18n.t('common.accessDenied');
   }
   if (cls === 'gone') {
     return i18n.t('agentChat.session.notFound');

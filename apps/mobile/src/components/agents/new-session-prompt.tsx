@@ -452,7 +452,7 @@ export function NewSessionPrompt({
           placement="top"
           variant="server"
           title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('agentChat.instancePicker.couldNotLoadDescription')}
+          message={t('organization.boundary.loadErrorMessage')}
           onRetry={() => {
             onRefetchModels();
           }}

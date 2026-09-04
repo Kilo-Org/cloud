@@ -65,7 +65,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
     return i18n.t('chat.messageBubble.deleted');
   }
   if ('previewText' in replyToMessage) {
-    return replyToMessage.previewText ?? i18n.t('chat.messageBubble.message');
+    return replyToMessage.previewText ?? i18n.t('common.message');
   }
   const text = contentBlocksToText(replyToMessage.content).trim();
   if (text) {
@@ -73,7 +73,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   }
   const labels = contentBlocksAttachmentPreviewLabels(replyToMessage.content);
   if (labels.length === 0) {
-    return i18n.t('chat.messageBubble.message');
+    return i18n.t('common.message');
   }
   return labels
     .map(label => {

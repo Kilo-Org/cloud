@@ -103,7 +103,7 @@ export function resolveCloneImportFailureKey(message: string): string {
     message === CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL ||
     message === CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL
   ) {
-    return 'agentChat.session.accessDenied';
+    return 'common.accessDenied';
   }
   return 'agentChat.newSession.importFailed';
 }

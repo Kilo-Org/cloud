@@ -32,7 +32,7 @@ type FindingDetailsPanelProps = {
 // stable code (severity, status, dismissal reason, source) to a key and
 // renders `t(key)` instead of app-shared's English labels.
 const SEVERITY_KEYS = {
-  critical: 'securityAgent.sla.critical',
+  critical: 'common.critical',
   high: 'securityAgent.sla.high',
   medium: 'securityAgent.sla.medium',
   low: 'securityAgent.sla.low',
@@ -40,7 +40,7 @@ const SEVERITY_KEYS = {
 
 const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.findingDetails.statusSuperseded',
-  fixed: 'securityAgent.findingDetails.statusFixed',
+  fixed: 'securityAgent.filter.fixed',
   dismissed: 'securityAgent.findingDetails.dismissed',
   open: 'securityAgent.findingDetails.statusOpen',
 } satisfies Record<string, string>;
@@ -183,10 +183,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         />
         <KvRow
           label={t('securityAgent.findingDetails.vulnerableVersions')}
-          value={firstNonEmpty(
-            finding.vulnerable_version_range,
-            t('securityAgent.findingDetails.unknown')
-          )}
+          value={firstNonEmpty(finding.vulnerable_version_range, t('common.unknown'))}
           selectable
         />
         <KvRow
@@ -208,7 +205,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           />
         ) : null}
         <KvRow
-          label={t('securityAgent.findingDetails.repository')}
+          label={t('common.repository')}
           value={finding.repo_full_name}
           last={!finding.manifest_path}
           selectable
@@ -235,7 +232,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         />
         {finding.fixed_at ? (
           <KvRow
-            label={t('securityAgent.findingDetails.fixed')}
+            label={t('securityAgent.filter.fixed')}
             value={timeAgo(parseTimestamp(finding.fixed_at))}
             last={!finding.sla_due_at}
           />

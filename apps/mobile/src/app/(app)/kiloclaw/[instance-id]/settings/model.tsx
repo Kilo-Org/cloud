@@ -15,12 +15,12 @@ export default function ModelSettingsScreen() {
   const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('kiloclaw.model.title')} context={instanceContext} />;
+    return <InstanceContextBoundary title={t('common.model')} context={instanceContext} />;
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloclaw.model.title')} />
+      <ScreenHeader title={t('common.model')} />
       <ScrollView className="flex-1 pt-4" contentContainerStyle={{ paddingBottom }}>
         <View className="px-4">
           <ModelPicker />

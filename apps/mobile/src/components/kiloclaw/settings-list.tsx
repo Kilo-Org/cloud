@@ -24,7 +24,7 @@ type SettingsItem = {
 const SETTINGS_ITEMS = [
   {
     icon: Sparkles,
-    labelKey: 'kiloclaw.settings.modelLabel',
+    labelKey: 'common.model',
     descriptionKey: 'kiloclaw.settings.modelDescription',
     path: 'settings/model',
   },

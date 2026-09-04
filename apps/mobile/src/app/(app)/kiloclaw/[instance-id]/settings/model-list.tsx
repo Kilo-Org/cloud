@@ -187,7 +187,7 @@ export default function ModelListScreen() {
       )}
       {isError && (
         <QueryError
-          message={t('kiloclaw.modelList.couldNotLoad')}
+          message={t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetch();
             void configQuery.refetch();

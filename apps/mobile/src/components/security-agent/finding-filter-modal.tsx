@@ -21,26 +21,26 @@ const STATUS_OPTIONS = [
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
   { value: 'ignored', labelKey: 'securityAgent.filter.statusIgnored' },
   { value: 'closed', labelKey: 'securityAgent.filter.statusClosed' },
-  { value: 'all', labelKey: 'securityAgent.filter.all' },
+  { value: 'all', labelKey: 'common.all' },
 ] as const satisfies readonly { value: SecurityFindingStatusFilter; labelKey: string }[];
 
 const SEVERITY_OPTIONS = [
-  { value: 'all', labelKey: 'securityAgent.filter.all' },
-  { value: 'critical', labelKey: 'securityAgent.filter.severityCritical' },
+  { value: 'all', labelKey: 'common.all' },
+  { value: 'critical', labelKey: 'common.critical' },
   { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
   { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
   { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
 ] as const satisfies readonly { value: SecuritySeverityFilter; labelKey: string }[];
 
 const OUTCOME_OPTIONS = [
-  { value: 'all', labelKey: 'securityAgent.filter.all' },
+  { value: 'all', labelKey: 'common.all' },
   { value: 'not_analyzed', labelKey: 'securityAgent.filter.outcomeNotAnalyzed' },
   { value: 'analyzing', labelKey: 'securityAgent.filter.outcomeAnalyzing' },
   { value: 'failed', labelKey: 'securityAgent.filter.outcomeFailed' },
-  { value: 'exploitable', labelKey: 'securityAgent.filter.outcomeExploitable' },
+  { value: 'exploitable', labelKey: 'securityAgent.analysis.exploitable' },
   { value: 'not_exploitable', labelKey: 'securityAgent.filter.outcomeNotExploitable' },
   { value: 'safe_to_dismiss', labelKey: 'securityAgent.filter.outcomeSafeToDismiss' },
-  { value: 'needs_review', labelKey: 'securityAgent.filter.outcomeNeedsReview' },
+  { value: 'needs_review', labelKey: 'securityAgent.analysisState.unknown' },
   { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
   { value: 'dismissed', labelKey: 'securityAgent.filter.outcomeDismissed' },
@@ -53,7 +53,7 @@ const SORT_OPTIONS = [
 ] as const satisfies readonly { value: SecurityFindingSortBy; labelKey: string }[];
 
 const SLA_STATUS_OPTIONS = [
-  { value: false, labelKey: 'securityAgent.filter.all' },
+  { value: false, labelKey: 'common.all' },
   { value: true, labelKey: 'securityAgent.filter.overdueOnly' },
 ] as const satisfies readonly { value: boolean; labelKey: string }[];
 
@@ -139,7 +139,7 @@ export function FindingFilterModal({
     label: t(labelKey),
   }));
   const repoOptions: { value: string | null; label: string }[] = [
-    { value: null, label: t('securityAgent.filter.allRepositories') },
+    { value: null, label: t('common.allRepositories') },
     ...repositories.map(repo => ({ value: repo.fullName, label: repo.fullName })),
   ];
 
@@ -156,7 +156,7 @@ export function FindingFilterModal({
       </Button>
       <View className="gap-4">
         <FilterSection
-          title={t('securityAgent.filter.repository')}
+          title={t('common.repository')}
           options={repoOptions}
           selected={filters.repoFullName}
           onSelect={repoFullName => {

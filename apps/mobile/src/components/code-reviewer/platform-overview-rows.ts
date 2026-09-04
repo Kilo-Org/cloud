@@ -31,10 +31,10 @@ const focusAreaLabels = {
 } as const;
 
 const gateThresholdLabels = {
-  off: 'codeReviewer.gateThreshold.off',
-  all: 'codeReviewer.gateThreshold.all',
+  off: 'common.off',
+  all: 'common.all',
   warning: 'codeReviewer.gateThreshold.warning',
-  critical: 'codeReviewer.gateThreshold.critical',
+  critical: 'common.critical',
 } as const;
 
 type OverviewRow = {
@@ -106,7 +106,7 @@ export function buildOverviewRows({
     {
       field: 'model',
       icon: FileSliders,
-      title: i18n.t('codeReviewer.overview.model'),
+      title: i18n.t('common.model'),
       subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
@@ -123,10 +123,10 @@ export function buildOverviewRows({
     {
       field: 'repos',
       icon: FolderGit2,
-      title: i18n.t('codeReviewer.overview.repositories'),
+      title: i18n.t('common.repositories'),
       subtitle:
         capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-          ? i18n.t('codeReviewer.overview.allRepositories')
+          ? i18n.t('common.allRepositories')
           : i18n.t('codeReviewer.overview.nSelected', {
               count: data.selectedRepositoryIds.length,
               displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),

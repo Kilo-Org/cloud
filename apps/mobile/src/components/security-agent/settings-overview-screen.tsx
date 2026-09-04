@@ -111,7 +111,7 @@ export function SettingsOverviewScreen({
   } else if (capabilityUnavailable || permissionError || capability.isError) {
     recoveryError = t('securityAgent.settingsOverview.couldNotLoadPermissions');
   } else if (repositoriesError) {
-    recoveryError = t('securityAgent.settingsOverview.couldNotLoadRepositories');
+    recoveryError = t('common.couldNotLoadRepositories');
   }
   if (configUnavailable || capabilityUnavailable) {
     return (
@@ -151,7 +151,7 @@ export function SettingsOverviewScreen({
     displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
-    repoCountLabel = t('securityAgent.settingsOverview.allRepositories');
+    repoCountLabel = t('common.allRepositories');
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,
@@ -234,16 +234,14 @@ export function SettingsOverviewScreen({
         <View className="gap-6 px-6 py-4">
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
             <View className="flex-1 pr-3">
-              <Text className="text-sm font-medium">
-                {t('securityAgent.settingsOverview.securityAgent')}
-              </Text>
+              <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
               <Text variant="muted" className="text-xs">
                 {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
               </Text>
             </View>
             {capability.canManage ? (
               <Switch
-                accessibilityLabel={t('securityAgent.settingsOverview.securityAgent')}
+                accessibilityLabel={t('common.securityAgent')}
                 value={data.isEnabled}
                 disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
                 onValueChange={handleToggle}
@@ -251,7 +249,7 @@ export function SettingsOverviewScreen({
             ) : (
               <Text variant="muted" className="text-xs">
                 {data.isEnabled
-                  ? t('securityAgent.settingsOverview.enabled')
+                  ? t('common.enabled')
                   : t('securityAgent.settingsOverview.disabled')}
               </Text>
             )}
@@ -277,7 +275,7 @@ export function SettingsOverviewScreen({
             <View>
               <ConfigureRow
                 icon={FolderGit2}
-                title={t('securityAgent.settingsOverview.repositories')}
+                title={t('common.repositories')}
                 subtitle={repoCountLabel}
                 onPress={() => {
                   router.push(getSecurityAgentPath(scope, 'settings/repositories'));
@@ -310,10 +308,10 @@ export function SettingsOverviewScreen({
               />
               <ConfigureRow
                 icon={Bell}
-                title={t('securityAgent.settingsOverview.notifications')}
+                title={t('common.notifications')}
                 subtitle={
                   notificationsEnabledCount === 0
-                    ? t('securityAgent.settingsOverview.off')
+                    ? t('common.off')
                     : t('securityAgent.settingsOverview.notificationsCount', {
                         count: notificationsEnabledCount,
                         displayCount: formatNumber(notificationsEnabledCount, i18n.language),
@@ -327,9 +325,7 @@ export function SettingsOverviewScreen({
                 icon={Clock}
                 title={t('securityAgent.settingsOverview.slaPolicy')}
                 subtitle={
-                  data.slaEnabled
-                    ? t('securityAgent.settingsOverview.on')
-                    : t('securityAgent.settingsOverview.off')
+                  data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')
                 }
                 last
                 onPress={() => {

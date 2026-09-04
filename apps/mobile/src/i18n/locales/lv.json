@@ -27,7 +27,49 @@
     "somethingWentWrong": "Radās kļūda.",
     "couldNotOpen": "Neizdevās atvērt {{label}}.",
     "link": "saite",
-    "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz."
+    "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz.",
+    "model": "Modelis",
+    "accessDenied": "Piekļuve liegta",
+    "allRepositories": "Visi repozitoriji",
+    "personal": "Personīgais",
+    "connectGithub": "Pievienot GitHub",
+    "cost": "Izmaksas",
+    "discard": "Atmest",
+    "findings": "Konstatējumi",
+    "notConnected": "Nav pievienots",
+    "notifications": "Paziņojumi",
+    "pullRequest": "izmaiņu pieprasījums",
+    "repositories": "Repozitoriji",
+    "securityAgent": "Drošības aģents",
+    "unknown": "Nezināms",
+    "added": "Pievienots",
+    "cancelled": "Atcelts",
+    "close": "Aizvērt",
+    "codeReviewer": "Koda pārskatītājs",
+    "connected": "Pievienots",
+    "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
+    "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus.",
+    "critical": "Kritisks",
+    "delete": "Dzēst",
+    "deleted": "Dzēsts",
+    "details": "Informācija",
+    "draft": "Melnraksts",
+    "enabled": "Iespējots",
+    "github": "GitHub",
+    "imageUnavailable": "Attēls nav pieejams.",
+    "loading": "Ielādē…",
+    "loadMore": "Ielādēt vairāk",
+    "message": "Ziņojums",
+    "off": "Izslēgts",
+    "organization": "Organizācija",
+    "platform": "Platforma",
+    "prReview": "PR pārskatīšana",
+    "queued": "Rindā",
+    "remove": "Noņemt",
+    "repository": "Repozitorijs",
+    "signOut": "Izrakstīties",
+    "agents": "Aģenti",
+    "all": "Visi"
   },
   "language": {
     "title": "Valoda",
@@ -62,12 +104,10 @@
     "emailAddress": "E-pasta adrese",
     "emailPlaceholder": "tu@example.com",
     "continueWithEmail": "Turpināt ar e-pastu",
-    "continue": "Turpināt",
     "enterCodeSentTo": "Ievadi kodu, kas nosūtīts uz {{email}}.",
     "codeArrivalHint": "Ja šī adrese atbilst nosacījumiem, kodu saņemsi minūtes laikā.",
     "verifyCode": "Pārbaudīt kodu",
     "resendCode": "Nosūtīt kodu vēlreiz",
-    "back": "Atpakaļ",
     "termsPrefix": "Turpinot, tu piekrīti mūsu",
     "terms": "noteikumiem",
     "termsConnector": " un ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Profils",
-    "agents": "Aģenti",
-    "codeReviewer": "Koda pārskatītājs",
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",
-    "securityAgent": "Drošības aģents",
     "securityAgentSubtitle": "Atrast un novērst ievainojamības",
     "reviews": "Koda pārbaudes",
-    "prReview": "PR pārskatīšana",
     "prReviewSubtitle": "Pārbaudīt izmaiņu pieprasījumus mobilajā ierīcē",
-    "organization": "Organizācija",
     "couldNotLoadOrganization": "Neizdevās ielādēt organizāciju.",
     "couldNotLoadOrganizationDescription": "Organizācijas un aģentu iestatījumi būs pieejami pēc organizācijas datu ielādes.",
     "linkedAccounts": "Saistītie konti",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Tavi kredīti ir iztērēti. Šim kontam kredītus var pārvaldīt ārpus iOS lietotnes.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
-    "signOutConfirm": "Izrakstīties",
     "deleteAccountTitle": "Dzēst kontu?",
     "deleteAccountMessage": "Tavs konts tiks neatgriezeniski dzēsts, un tiks veikta izrakstīšanās. Apstiprināšanas kodu nosūtīsim e-pastā.",
     "deleteAccountConfirm": "Dzēst kontu",
     "accountDeleted": "Tavs konts ir dzēsts.",
     "viewOrganization": "Skatīt organizāciju",
     "manageOrganization": "Pārvaldīt organizāciju",
-    "personal": "Personīgais",
     "selectAccount": "Izvēlēties kontu",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "E-pasts",
     "providerTestAccount": "Testa konts",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Neizslēgt ekrānu sesijas skatā",
     "keepScreenOnSubtitle": "Neizslēgt ekrānu, kamēr sesija darbojas.",
     "appearance": "Izskats",
-    "notifications": "Paziņojumi",
     "notificationsSubtitle": "Pašpiegādes paziņojumu iestatījumi",
     "appearanceSystem": "Sistēma",
     "appearanceLight": "Gaišs",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
     "pullRequestUnavailableDescription": "Šo PR nevar atvērt. Iespējams, tas ir dzēsts, repozitorijs ir privāts vai tajā nav instalēta Kilo GitHub lietotne.",
-    "accessDenied": "Piekļuve liegta",
     "accessDeniedDescription": "Tev nav atļaujas skatīt šo izmaiņu pieprasījumu.",
     "noFilesChanged": "Nav mainītu failu",
     "noFilesChangedDescription": "Šajā izmaiņu pieprasījumā nav failu izmaiņu.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Neizdevās ielādēt failus.",
-      "checkConnection": "Pārbaudi savienojumu un mēģini vēlreiz.",
       "retryLoadingFiles": "Mēģināt ielādēt failus vēlreiz",
       "filterPlaceholder": "Faila ceļš",
       "viewedCount": "apskatīti {{viewed}} no {{total}}",
@@ -341,7 +370,6 @@
       "couldNotLoadMore": "Neizdevās ielādēt vairāk komentāru.",
       "retryLoadingMore": "Mēģināt ielādēt vairāk komentāru vēlreiz",
       "loadMoreComments": "Ielādēt vairāk komentāru",
-      "loadMore": "Ielādēt vairāk",
       "closeReactions": "Aizvērt reakcijas",
       "reactionsTitle": "Reakcijas",
       "addReaction": "Pievienot reakciju",
@@ -354,7 +382,6 @@
       "reportUser": "Ziņot par lietotāju",
       "mute": "Apklusināt",
       "block": "Bloķēt",
-      "somethingWentWrong": "Radās kļūda.",
       "reportSubmitted": "Ziņojums iesniegts. Apstiprinājuma numurs: {{receiptId}}",
       "blockedUser": "Bloķēts {{login}}",
       "mutedUser": "Apklusināts {{login}}",
@@ -434,13 +461,11 @@
     "reviewPullRequest": "Pārskatīt izmaiņu pieprasījumu",
     "headLine": "{{counts}} · jaunākais komits {{sha}}",
     "entry": {
-      "title": "PR pārskatīšana",
       "eyebrow": "Atver izmaiņu pieprasījumu, izmantojot URL.",
       "pastePrLink": "Ielīmēt PR saiti",
       "noRecentPrs": "Nav nesen atvērtu PR",
       "noRecentPrsDescription": "Ielīmē PR saiti augstāk, lai sāktu pārskatīšanu — nākamreiz šis PR būs redzams šeit.",
       "couldNotLoad": "Neizdevās ielādēt.",
-      "remove": "Noņemt",
       "removeFromRecentsTitle": "Noņemt no nesen atvērtajiem?",
       "removeFromRecentsMessage": "Šis izmaiņu pieprasījums tiks noņemts no tavu nesen atvērto pieprasījumu saraksta.",
       "removeRecentAccessibility": "Noņemt {{repo}} no nesen atvērtajiem",
@@ -464,13 +489,11 @@
       "pending": "gaida: {{displayCount}}",
       "skipped": "izlaistas: {{displayCount}}",
       "checksCount": "pārbaudes: {{displayCount}}",
-      "checkDetails": "informācija par pārbaudi",
-      "pullRequest": "izmaiņu pieprasījums"
+      "checkDetails": "informācija par pārbaudi"
     },
     "inbox": {
       "title": "Iesūtne",
       "recent": "Jaunākie",
-      "draft": "Melnraksts",
       "loading": "Tiek ielādēta iesūtne",
       "noReviewRequests": "Nav pārskatīšanas pieprasījumu",
       "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu. Arī augstāk vari ielīmēt jebkuru PR saiti.",
@@ -492,7 +515,6 @@
       "discardTitle": "Atmest komentāru?",
       "discardMessage": "Tavs melnraksts netiks saglabāts.",
       "keepEditing": "Turpināt rediģēt",
-      "discard": "Atmest",
       "comment": "Komentēt",
       "insertSuggestionA11y": "Ievietot koda ieteikumu",
       "insertSuggestion": "Ievietot ieteikumu",
@@ -500,12 +522,10 @@
       "suggestionsOnlyAddedLines": "Ieteikumi attiecas tikai uz pievienotajām rindām.",
       "tapDiffLineToSuggest": "Pieskaries izmaiņu salīdzinājuma rindai, lai iespējotu ieteikumus."
     },
-    "screenTitle": "PR pārskatīšana",
     "connect": {
       "checkFailedTitle": "Neizdevās pārbaudīt GitHub savienojumu.",
       "checkFailedMessage": "Pierakstīšanās statuss būs pieejams pēc ielādes.",
       "reconnectTitle": "Atkārtoti savienot GitHub",
-      "title": "Pievienot GitHub",
       "reconnectDescription": "Tavam GitHub savienojumam ir atsaukta piekļuve. Izveido savienojumu no jauna, lai turpinātu pārskatīt izmaiņu pieprasījumus mobilajā ierīcē.",
       "description": "Pievieno savu GitHub kontu, lai pārskatītu izmaiņu pieprasījumus mobilajā ierīcē."
     },
@@ -518,7 +538,6 @@
       "loadFailedTitle": "Neizdevās ielādēt vērtējuma iesniegšanas formu.",
       "deletePendingTitle": "Dzēst nepublicēto komentāru?",
       "deletePendingMessage": "Šis komentārs tiks noņemts no vērtējuma rindas.",
-      "delete": "Dzēst",
       "summaryOptional": "Kopsavilkums (neobligāts)",
       "pendingComment_one": "nepublicēts komentārs",
       "pendingComment": "neiesniegti komentāri",
@@ -544,7 +563,6 @@
     "overview": {
       "stateMerged": "Apvienots",
       "stateClosed": "Slēgts",
-      "stateDraft": "Melnraksts",
       "stateOpenApproved": "Atvērts · apstiprināts",
       "stateOpenChangesRequested": "Atvērts · pieprasītas izmaiņas",
       "stateOpenReviewRequired": "Atvērts · jāizskata",
@@ -579,8 +597,6 @@
       "discussion": "Diskusija"
     },
     "fileStatus": {
-      "added": "Pievienots",
-      "deleted": "Dzēsts",
       "modified": "Mainīts",
       "renamed": "Pārdēvēts",
       "copied": "Kopēts",
@@ -590,9 +606,7 @@
       "selectedTapToChange": "Atlasīts: {{label}}. Pieskaries, lai mainītu atlasi",
       "tapToComment": "{{label}}, pieskaries, lai komentētu",
       "truncationBanner": "GitHub API ierobežojuma dēļ tiek rādīti tikai pirmie {{limit}} no {{total}} mainītajiem failiem.",
-      "statusAdded": "Pievienots",
       "statusContext": "Konteksts",
-      "statusDeleted": "Dzēsts",
       "lineLabel": "{{status}}, rinda {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}, teksts: {{text}}",
       "emptyLine": "(tukšs)"
@@ -620,7 +634,6 @@
     }
   },
   "notifications": {
-    "title": "Paziņojumi",
     "liveActivities": "Aktivitātes reāllaikā",
     "liveActivitySubtitle": "Rādīt aktīvos aģentus bloķēšanas ekrānā",
     "liveUpdates": "Atjauninājumi reāllaikā",
@@ -676,7 +689,6 @@
   },
   "tabs": {
     "home": "Sākums",
-    "agents": "Aģenti",
     "profile": "Profils",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -690,8 +702,7 @@
       "noInstances": "Nav KiloClaw instanču",
       "noInstancesDescription": "Iestati instanci, lai sāktu tērzēt.",
       "setUpKiloclaw": "Iestatīt KiloClaw",
-      "currentInstance": "{{title}}, pašreizējā",
-      "personal": "Personīgais"
+      "currentInstance": "{{title}}, pašreizējā"
     },
     "conversation": {
       "failedToLoad": "Neizdevās ielādēt sarunu.",
@@ -729,7 +740,6 @@
       "cancelReply": "Atcelt atbildi",
       "openInstance": "Atvērt instanci",
       "attachFile": "Pievienot failu",
-      "messagePlaceholder": "Ziņojums",
       "cancelEdit": "Atcelt rediģēšanu",
       "sendMessage": "Nosūtīt ziņojumu"
     },
@@ -748,7 +758,6 @@
     },
     "attachment": {
       "open": "Atvērt {{filename}}",
-      "imageUnavailable": "Attēls nav pieejams.",
       "openFailed": "Neizdevās atvērt pielikumu. Pārbaudi savienojumu un mēģini vēlreiz.",
       "attachFailed": "Neizdevās pievienot failu.",
       "limit": "Vari pievienot līdz {{displayCount}} failiem.",
@@ -778,7 +787,6 @@
       "yourMessage": "Tavs ziņojums",
       "messageFrom": "Ziņojums no {{author}}",
       "moreActions": "Citas darbības",
-      "message": "Ziņojums",
       "notDelivered": "Nav piegādāts",
       "edited": "(rediģēts)",
       "image": "Attēls",
@@ -790,7 +798,6 @@
       "title": "Darbības ar ziņojumu",
       "deleteTitle": "Dzēst ziņojumu?",
       "deleteMessage": "Ziņojums tiks noņemts no sarunas.",
-      "delete": "Dzēst",
       "deleteFailed": "Neizdevās dzēst ziņojumu.",
       "removeReactionFailed": "Neizdevās noņemt reakciju.",
       "addReactionFailed": "Neizdevās pievienot reakciju.",
@@ -821,7 +828,6 @@
       "online": "Tiešsaistē",
       "idle": "Dīkstāvē",
       "offline": "Bezsaistē",
-      "unknown": "Nezināms",
       "loadingUser": "Ielādē lietotāju…",
       "waitingForStatus": "Gaida bota statusu…",
       "offlineMessage": "Bots ir bezsaistē. Ziņojumu apmaiņa atsāksies, kad tas atkal izveidos savienojumu."
@@ -893,7 +899,6 @@
       "destroyMessage": "Tava KiloClaw vide un visi tās dati tiks neatgriezeniski dzēsti. Šo darbību nevar atsaukt.",
       "destroyTitle": "Dzēst vidi",
       "instance": "Vide",
-      "renameFailed": "Radās kļūda.",
       "couldNotCheckStatus": "Neizdevās pārbaudīt pakalpojuma statusu.",
       "dangerZone": "BĪSTAMĀ ZONA",
       "destroying": "Notiek dzēšana…",
@@ -942,29 +947,22 @@
       "failedToLoadCommand": "Neizdevās ielādēt iestatīšanas komandu.",
       "gmailNotifications": "Gmail paziņojumi",
       "disconnect": "Atvienot Google kontu",
-      "connected": "Pievienots",
       "copied": "Kopēts",
       "copyCommand": "Kopēt komandu",
       "disabled": "Atspējots",
       "disconnectConfirm": "Atvienot",
       "disconnectMessage": "Noņemt tavu Google kontu no šīs vides? Gmail paziņojumi tiks atspējoti. Pēc atvienošanas atkārtoti izvieto vidi, lai izmaiņas stātos spēkā.",
-      "disconnectTitle": "Atvienot Google",
-      "enabled": "Iespējots",
-      "notConnected": "Nav pievienots"
+      "disconnectTitle": "Atvienot Google"
     },
     "modelList": {
       "title": "Visi modeļi",
       "searchPlaceholder": "Meklēt modeļus…",
-      "couldNotLoad": "Neizdevās ielādēt modeļus.",
       "clearSearch": "Notīrīt meklēšanas lauku",
       "noMatches": "Nav meklējumam atbilstošu modeļu",
       "noModels": "Nav pieejamu modeļu",
       "noModelsDescription": "Modeļi parādīsies šeit, kad būs pieejami.",
       "noResultsFor": "Meklējumam “{{query}}” nav rezultātu.",
       "recommended": "Ieteicamie"
-    },
-    "model": {
-      "title": "Modelis"
     },
     "secrets": {
       "title": "Slepenie dati",
@@ -981,10 +979,7 @@
       "setupGuideA11y": "{{label}} iestatīšanas ceļvedis",
       "setupGuide": "Iestatīšanas ceļvedis",
       "saving": "Notiek saglabāšana…",
-      "remove": "Noņemt",
       "removing": "Notiek noņemšana…",
-      "connected": "Pievienots",
-      "notConnected": "Nav pievienots",
       "updateToken": "Atjaunināt pilnvaru",
       "connect": "Pievienot"
     },
@@ -1045,7 +1040,6 @@
     "list": {
       "createInstance": "Izveidot vidi",
       "organizations": "Organizācijas",
-      "personal": "Personīgais",
       "accessIssue": {
         "trialExpired": "Izmēģinājums ir beidzies — abonē, lai turpinātu izmantot šo vidi",
         "subscriptionCanceled": "Abonements nav aktīvs — abonē vēlreiz, lai turpinātu izmantot šo vidi",
@@ -1069,9 +1063,7 @@
         "openKiloAi": "Atvērt kilo.ai",
         "provisioning": "Vides sagatavošana",
         "review": "Pārskatīšana",
-        "somethingWentWrong": "Radās kļūda.",
         "identityTitle": "Bota identitāte",
-        "close": "Aizvērt",
         "couldNotLoad": "Neizdevās ielādēt sākotnējās iestatīšanas stāvokli.",
         "finishingSetup": "Iestatīšana tuvojas beigām — uzgaidi, kamēr pabeidzam tava konta izveidi.",
         "ready": "Gatavs",
@@ -1088,7 +1080,6 @@
         "location": "Atrašanās vieta",
         "locationPlaceholder": "Pilsēta vai reģions (nav obligāti)",
         "useCurrentLocation": "Izmantot pašreizējo atrašanās vietu",
-        "continue": "Turpināt",
         "locationDeniedTitle": "Piekļuve atrašanās vietai ir liegta",
         "locationDeniedMessage": "Iestatījumos atļauj piekļuvi atrašanās vietai, lai izmantotu savu pašreizējo atrašanās vietu.",
         "locationValidationFailed": "Neizdevās pārbaudīt atrašanās vietu.",
@@ -1137,7 +1128,6 @@
       "gatewayProcess": "VĀRTEJAS PROCESS",
       "lastExit": "Pēdējā darbības beigšana",
       "memory": "Atmiņa",
-      "model": "Modelis",
       "region": "Reģions",
       "resources": "RESURSI",
       "restarts": "Restartēšanas reižu skaits",
@@ -1161,7 +1151,6 @@
       "frontierDescription": "Augstākā veiktspēja. Izmanto jaudīgākos modeļus ar spriešanas spējām.",
       "balancedLabel": "Līdzsvarots",
       "balancedDescription": "Saprātīgs ātruma un spēju līdzsvars par zemāku cenu.",
-      "cost": "Izmaksas",
       "performance": "Veiktspēja",
       "autoModelA11y": "{{label}} automātiskais modelis",
       "currentModel": "Pašreizējais modelis",
@@ -1211,7 +1200,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google konts",
       "modelDescription": "Mākslīgā intelekta modeļa izvēle",
-      "modelLabel": "Modelis",
       "secretsDescription": "Šifrēti akreditācijas dati",
       "secretsLabel": "Slepenie dati",
       "versionPinDescription": "Fiksēt konkrētu versiju",
@@ -1260,12 +1248,9 @@
       "placeholder": "Piemēram, ievērot mūsu kļūdu apstrādes noteikumus…"
     },
     "repos": {
-      "title": "Repozitoriji",
-      "couldNotLoad": "Neizdevās ielādēt repozitorijus.",
       "unavailable": "Repozitoriji nav pieejami. Pabeidz Bitbucket iestatīšanu vietnē kilo.ai.",
       "finishSetup": "Pabeigt iestatīšanu",
       "manageAccess": "Pārvaldīt piekļuvi",
-      "allRepositories": "Visi repozitoriji",
       "bitbucketNoRepositoriesDescription": "Šajā Bitbucket darbvietā nav pieejamu repozitoriju.",
       "bitbucketSetup": "Bitbucket iestatīšana",
       "couldNotOpenGithubSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
@@ -1283,7 +1268,6 @@
       "roast": "Nesaudzīgi atklāts, bet ar humoru",
       "strict": "Atzīmēt visas problēmas un ievērot augstas prasības"
     },
-    "title": "Koda pārskatītājs",
     "reviewDetail": {
       "title": "Pārskatīšana",
       "cancelTitle": "Atcelt koda pārskatīšanu?",
@@ -1296,17 +1280,12 @@
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanu.",
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "{{repo}} #{{number}} autors: {{author}}",
-      "findings": "Konstatējumi",
       "noFindings": "Nav konstatējumu.",
       "showMore": "Rādīt vairāk",
-      "details": "Informācija",
       "branch": "Atzars",
-      "platform": "Platforma",
-      "model": "Modelis",
       "created": "Izveidota",
       "started": "Sākta",
       "completed": "Pabeigts",
-      "cost": "Izmaksas",
       "tokens": "Tokeni",
       "tokensInOut": "Ievade: {{input}} / izvade: {{output}}",
       "openPullRequest": "Atvērt izmaiņu pieprasījumu",
@@ -1318,7 +1297,6 @@
       "checkRun": "Pārbaudes izpilde",
       "status": "Statuss",
       "threshold": "Slieksnis",
-      "pullRequest": "izmaiņu pieprasījums",
       "transcriptWaiting": "Tiek gaidīts koda pārskatīšanas sarunas ieraksts.",
       "transcriptEmpty": "Šai koda pārskatīšanai nav sarunas ieraksta.",
       "transcriptRetry": "Neizdevās ielādēt koda pārskatīšanas sarunas ierakstu.",
@@ -1358,13 +1336,9 @@
       "couldNotLoadProviders": "Neizdevās ielādēt tavus pievienotos pakalpojumu sniedzējus. Lūdzu, mēģini vēlreiz.",
       "connectProvider": "Pievieno pakalpojuma sniedzēju",
       "connectProviderDescription": "Pievieno GitHub, lai manuāli sāktu izmaiņu pieprasījuma koda pārskatīšanu.",
-      "connectGitHub": "Pievienot GitHub",
-      "platform": "Platforma",
-      "notConnected": "Nav pievienots",
       "pullRequestUrl": "Izmaiņu pieprasījuma URL",
       "instructions": "Norādījumi (neobligāti)",
       "instructionsPlaceholder": "Kam īpaši pievērst uzmanību…",
-      "model": "Modelis",
       "starting": "Tiek sākta koda pārskatīšana…",
       "start": "Sākt koda pārskatīšanu"
     },
@@ -1376,7 +1350,6 @@
     "selectRepositories": "Atlasīt repozitorijus",
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
-    "readOnlyDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
       "setupIncomplete": "Iestatīšana nav pabeigta. Pabeidz konfigurēšanu vietnē kilo.ai.",
@@ -1393,7 +1366,6 @@
     "scopeList": {
       "couldNotLoad": "Neizdevās ielādēt organizācijas.",
       "personalStillAvailable": "Personīgie repozitoriji joprojām ir pieejami zemāk.",
-      "personal": "Personīgais",
       "personalSubtitle": "Tavi repozitoriji",
       "viewOnly": "Tikai skatīšanai"
     },
@@ -1408,15 +1380,11 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
-      "connected": "Pievienots",
-      "notConnected": "Nav pievienots",
-      "organization": "Organizācija",
       "platforms": "Platformas",
       "activity": "Darbības"
     },
     "providerConnect": {
       "githubApp": "GitHub lietotne",
-      "connectGitHub": "Pievienot GitHub",
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "connectGitLab": "Pievienot GitLab",
@@ -1430,10 +1398,7 @@
       "allAreas": "Visas jomas",
       "customInstructions": "Pielāgoti norādījumi",
       "set": "Iestatīts",
-      "model": "Modelis",
       "mergeGate": "Apvienošanas nosacījumi",
-      "repositories": "Repozitoriji",
-      "allRepositories": "Visi repozitoriji",
       "nSelected": "Atlasīts: {{displayCount}}",
       "reviewMemory": "Pārskatīšanas atmiņa",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
@@ -1444,16 +1409,13 @@
       "noDecision": "Nav lēmuma",
       "noResult": "Nav rezultāta"
     },
-    "eyebrow": "Koda pārskatītājs",
     "updateFailed": "Neizdevās atjaunināt koda pārskatītāju.",
     "configSaveFailed": "Neizdevās saglabāt koda pārskatīšanas iestatījumus.",
     "status": {
       "pending": "Gaida",
-      "queued": "Rindā",
       "running": "Darbojas",
       "completed": "Pabeigts",
       "failed": "Neizdevās",
-      "cancelled": "Atcelts",
       "interrupted": "Pārtraukta"
     },
     "reviewStyle": {
@@ -1471,42 +1433,33 @@
       "documentation": "Dokumentācija"
     },
     "gateThreshold": {
-      "off": "Izslēgts",
-      "all": "Visi",
-      "warning": "Brīdinājums",
-      "critical": "Kritisks"
+      "warning": "Brīdinājums"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar piekļūt šim repozitorijam ar aktīvu GitHub lietotnes instalāciju. Atjaunini GitHub lietotnes instalāciju un vēlreiz iespējo koda pārskatītāju.",
         "recoveryLabel": "Atjaunināt GitHub lietotni"
       },
       "githubIpAllowList": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
-        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju.",
-        "recoveryLabel": "Sazināties ar atbalsta dienestu"
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķir uzturētāja piekļuves tiesības vai iespējo projekta piekļuves pilnvaras un vēlreiz iespējo koda pārskatītāju.",
         "recoveryLabel": "Atjaunināt GitLab integrāciju"
       },
       "byokInvalidKey": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
         "description": "Koda pārskatītājs tika atspējots, jo izvēlētā BYOK API atslēga ir nederīga, atsaukta vai tai trūkst atļauju. Atjaunini atslēgu vai izvēlies citu modeli un vēlreiz iespējo koda pārskatītāju.",
         "recoveryLabel": "Atjaunināt BYOK iestatījumus"
       },
       "selectedModelUnavailable": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
         "description": "Koda pārskatītājs tika atspējots, jo izvēlētais modelis nav pieejams mākoņa aģenta sesijām. Izvēlies pieejamu modeli un vēlreiz iespējo koda pārskatītāju.",
         "recoveryLabel": "Atjaunināt koda pārskatītāja iestatījumus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
-        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju.",
-        "recoveryLabel": "Sazināties ar atbalsta dienestu"
-      }
+        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+      },
+      "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
+      "recoveryLabel": "Sazināties ar atbalsta dienestu"
     },
     "unknownError": "Nezināma kļūda"
   },
@@ -1516,29 +1469,23 @@
       "noFiltersDescription": "Atgriezies konstatējumu sarakstā un vēlreiz atver filtrus.",
       "title": "Filtrēt konstatējumus",
       "reset": "Atiestatīt",
-      "repository": "Repozitorijs",
       "status": "Statuss",
       "severity": "Smaguma pakāpe",
       "outcome": "Rezultāts",
       "slaStatus": "SLA statuss",
       "sortBy": "Kārtot pēc",
-      "allRepositories": "Visi repozitoriji",
-      "all": "Visi",
       "statusOpen": "Atvērt",
       "fixed": "Novērsts",
       "statusIgnored": "Ignorēts",
       "statusClosed": "Slēgts",
-      "severityCritical": "Kritisks",
       "severityHigh": "Augsts",
       "severityMedium": "Vidējs",
       "severityLow": "Zems",
       "outcomeNotAnalyzed": "Nav analizēts",
       "outcomeAnalyzing": "Notiek analīze",
       "outcomeFailed": "Analīze neizdevās",
-      "outcomeExploitable": "Izmantojams uzbrukumam",
       "outcomeNotExploitable": "Nav izmantojams uzbrukumam",
       "outcomeSafeToDismiss": "Var droši noraidīt",
-      "outcomeNeedsReview": "Jāpārskata",
       "outcomeTriageComplete": "Sākotnējā izvērtēšana pabeigta",
       "outcomeDismissed": "Noraidīts",
       "sortSeverityDesc": "Smaguma pakāpe: no augstākās līdz zemākajai",
@@ -1565,7 +1512,6 @@
       "enableAutoDismiss": "Iespējot automātisko noraidīšanu",
       "enableAutoDismissSubtitle": "Automātiski noraida konstatējumus, kurus mākslīgais intelekts atzīst par neizmantojamiem uzbrukumā.",
       "confidenceThreshold": "Uzticamības slieksnis",
-      "permissionNote": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "enableAutoRemediationConfirmTitle": "Iespējot automātisko labošanu?",
       "enableAutoRemediationConfirmMessage": "Drošības aģents automātiski izveidos labošanas PR konstatējumiem, kas atbilst labošanas nosacījumiem un ir izmantojami uzbrukumā.",
       "enable": "Iespējot",
@@ -1598,14 +1544,12 @@
       "suggestedAction": "Ieteiktā darbība",
       "triageReasoning": "Sākotnējā izvērtējuma pamatojums",
       "exploitable": "Izmantojams uzbrukumam",
-      "model": "Modelis",
       "notRecorded": "Nav reģistrēts",
       "analyzed": "Analizēts",
       "exploitabilityReasoning": "Izmantojamības uzbrukumā pamatojums",
       "suggestedFix": "Ieteiktais labojums",
       "whereFound": "Konstatējuma atrašanās vietas ({{displayCount}})",
       "fullReport": "Pilns sagatavotais ziņojums",
-      "unknown": "Nezināms",
       "yes": "Jā",
       "no": "Nē"
     },
@@ -1636,7 +1580,6 @@
       "repoSummary": "Atvērti: {{open}} · kritiska pakāpe: {{critical}} · augsta pakāpe: {{high}}",
       "couldNotLoad": "Neizdevās ielādēt informācijas paneļa datus.",
       "filterByRepository": "Filtrēt pēc repozitorija",
-      "findings": "Konstatējumi",
       "lastSynced": "Pēdējo reizi sinhronizēts {{time}}",
       "manageRepositories": "Pārvaldīt repozitorijus",
       "notYetSynced": "Vēl nav sinhronizēts",
@@ -1696,23 +1639,19 @@
       "severityLabel": "Smaguma pakāpe: {{severity}}",
       "package": "Pakete",
       "vulnerableVersions": "Ievainojamās versijas",
-      "unknown": "Nezināms",
       "patchedVersion": "Labotā versija",
       "noPatchAvailable": "Nav pieejams ielāps",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Repozitorijs",
       "manifest": "Manifests",
       "detected": "Atklāts",
       "updated": "Atjaunināts",
-      "fixed": "Novērsts",
       "slaDeadline": "SLA termiņš",
       "sourceRecord": "Avota ieraksts",
       "source": "Avots",
       "sourceId": "Avota ID",
       "viewAdvisory": "Skatīt drošības paziņojumu vietnē GitHub",
       "statusSuperseded": "Aizstāts",
-      "statusFixed": "Novērsts",
       "statusOpen": "Atvērt",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Labošana jau ir sākta",
@@ -1726,25 +1665,18 @@
       "title": "Iestatījumi",
       "couldNotLoadSettings": "Neizdevās ielādēt drošības aģenta iestatījumus.",
       "couldNotLoadPermissions": "Neizdevās ielādēt atļaujas.",
-      "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus.",
-      "securityAgent": "Drošības aģents",
-      "enabled": "Iespējots",
       "disabled": "Atspējots",
       "on": "Ieslēgts",
-      "off": "Izslēgts",
-      "allRepositories": "Visi repozitoriji",
       "repositoriesCount_one": "Izvēlēts {{displayCount}} repozitorijs",
       "repositoriesCount": "Atlasīti {{displayCount}} repozitoriji",
       "repositoriesCount_other": "Atlasīti {{displayCount}} repozitoriji",
       "selectRepositories": "Atlasīt repozitorijus",
       "selectRepositoriesSubtitle": "Izvēlies, kurus repozitorijus uzraudzīs drošības aģents",
-      "repositories": "Repozitoriji",
       "modelsAndAnalysis": "Modeļi un analīze",
       "analysisModeSubtitle": "Analīzes režīms: {{mode}}",
       "automation": "Automatizācija",
       "automationAllOff": "Viss izslēgts",
       "automationCount": "Iespējoti {{displayCount}} no 3",
-      "notifications": "Paziņojumi",
       "notificationsCount": "Iespējoti {{displayCount}} no 2",
       "slaPolicy": "SLA politika",
       "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
@@ -1755,7 +1687,6 @@
     "remediation": {
       "cancellationRequested": "Atcelšana pieprasīta",
       "cancelled": "Labošana atcelta",
-      "pullRequest": "izmaiņu pieprasījums",
       "couldNotLoad": "Neizdevās ielādēt labošanas statusu.",
       "noAnalysisTitle": "Analīzes vēl nav",
       "noAnalysisDescription": "Sāc analīzi cilnē Informācija.",
@@ -1771,7 +1702,6 @@
       "attemptHistory": "Mēģinājumu vēsture ({{displayCount}})",
       "attemptNumber": "Mēģinājums Nr. {{number}}",
       "startedBy": "Sāka",
-      "model": "Modelis",
       "branch": "Atzars",
       "queued": "Labošana pievienota rindai",
       "retryQueued": "Atkārtota labošana pievienota rindai",
@@ -1780,20 +1710,17 @@
         "prOpened": "PR atvērts",
         "failed": "Labošana neizdevās",
         "blocked": "Labošana bloķēta",
-        "noChangesNeeded": "Izmaiņas nav vajadzīgas",
-        "cancelled": "Atcelts"
+        "noChangesNeeded": "Izmaiņas nav vajadzīgas"
       },
       "unavailable": "Šim konstatējumam labošanas funkcija nav pieejama."
     },
     "analysisSettings": {
       "title": "Modeļi un analīze",
       "couldNotLoad": "Neizdevās ielādēt analīzes iestatījumus.",
-      "permissionNote": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "depth": "Analīzes dziļums",
       "modeAuto": "Automātiska",
       "modeShallow": "Virspusēja",
       "modeDeep": "Padziļināta",
-      "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "triageModel": "Sākotnējās izvērtēšanas modelis",
       "analysisModel": "Analīzes modelis",
       "remediationModel": "Labošanas modelis"
@@ -1801,7 +1728,6 @@
     "sla": {
       "title": "SLA politika",
       "couldNotLoad": "Neizdevās ielādēt SLA iestatījumus.",
-      "critical": "Kritisks",
       "high": "Augsts",
       "medium": "Vidējs",
       "low": "Zems",
@@ -1819,7 +1745,6 @@
     },
     "findingDetail": {
       "title": "Konstatējums",
-      "tabDetails": "Informācija",
       "tabAnalysis": "Analīze",
       "tabRemediation": "Labošana",
       "notFound": "Konstatējums nav atrasts",
@@ -1828,7 +1753,6 @@
       "dismissA11y": "Noraidīt konstatējumu"
     },
     "findingList": {
-      "title": "Konstatējumi",
       "couldNotLoad": "Neizdevās ielādēt konstatējumus.",
       "couldNotLoadMore": "Neizdevās ielādēt papildu konstatējumus.",
       "noMatchesTitle": "Neviens konstatējums neatbilst filtriem",
@@ -1838,13 +1762,8 @@
       "clearFilters": "Notīrīt filtrus"
     },
     "scopeList": {
-      "title": "Drošības aģents",
       "couldNotLoad": "Neizdevās ielādēt organizācijas.",
-      "personal": "Personīgais",
       "personalSubtitle": "Tavi repozitoriji"
-    },
-    "commandRetry": {
-      "discard": "Atmest"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Labošanas PR atvērts",
@@ -1864,7 +1783,6 @@
       "couldNotOpenGithub": "Neizdevās atvērt GitHub. Lūdzu, mēģini vēlreiz."
     },
     "settingsSave": {
-      "discard": "Atmest",
       "keepEditing": "Turpināt rediģēt",
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
@@ -1876,7 +1794,6 @@
     "auditReport": {
       "couldNotLoad": "Neizdevās ielādēt audita ziņojumu.",
       "events": "Notikumi",
-      "findings": "Konstatējumi",
       "generated": "Ziņojums sagatavots {{generatedAt}}.",
       "noActivity": "Nav reģistrētu darbību",
       "noActivityDescription": "Laikposmā no {{start}} līdz {{end}} Kilo nav reģistrētas ar drošības konstatējumiem saistītas darbības, ko iekļaut ziņojumā.",
@@ -1886,8 +1803,7 @@
       "title": "Audita ziņojums",
       "unavailable": "Audita ziņojums nav pieejams",
       "unavailableDescription": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var skatīt audita ziņojumus. Lūdz īpašnieku vai norēķinu pārvaldnieku piešķirt tev piekļuvi.",
-      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz.",
-      "checkConnection": "Pārbaudi savienojumu un mēģini vēlreiz."
+      "queryFailed": "Neizdevās pabeigt ziņojuma vaicājumu. Mēģini vēlreiz."
     },
     "notifications": {
       "couldNotLoad": "Neizdevās ielādēt paziņojumu iestatījumus.",
@@ -1896,7 +1812,6 @@
       "newFindingSection": "Paziņojumi par jauniem konstatējumiem",
       "newFindingSeverityLabel": "Jaunu konstatējumu minimālā smaguma pakāpe",
       "newFindingSubtitle": "Paziņojums tiek sūtīts ikreiz, kad tiek sinhronizēts jauns konstatējums, arī pirmajā sinhronizācijā.",
-      "readOnly": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "slaLeadTimeAccessibility": "Dienu skaits pirms SLA termiņa, kad sūtīt brīdinājumu",
       "slaLeadTimeError": "Ievadi dienu skaitu no 1 līdz 365, izmantojot veselu skaitli.",
       "slaLeadTimeHint": "Ievadi veselu skaitli no 1 līdz 365",
@@ -1904,22 +1819,17 @@
       "slaPersonalTitle": "Sūtīt man e-pastus ar SLA brīdinājumiem",
       "slaSection": "SLA brīdinājumu paziņojumi",
       "slaSeverityLabel": "SLA paziņojumu minimālā smaguma pakāpe",
-      "slaSubtitle": "Paziņojums tiek sūtīts, kad tuvojas konstatējuma SLA termiņš vai tas ir nokavēts.",
-      "title": "Paziņojumi"
+      "slaSubtitle": "Paziņojums tiek sūtīts, kad tuvojas konstatējuma SLA termiņš vai tas ir nokavēts."
     },
     "repositories": {
-      "allRepositories": "Visi repozitoriji",
       "couldNotLoad": "Neizdevās ielādēt repozitoriju iestatījumus.",
-      "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus.",
       "couldNotOpenGithubSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
       "githubAppSettings": "GitHub lietotnes iestatījumi",
       "manageAccess": "Pārvaldīt GitHub lietotnes piekļuvi",
       "noRepositories": "Nav repozitoriju",
       "noRepositoriesDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem.",
-      "readOnly": "Tikai organizācijas īpašnieki un norēķinu pārvaldnieki var mainīt šos iestatījumus.",
       "selectAtLeastOne": "Izvēlies vismaz vienu repozitoriju.",
-      "selectedRepositories": "Atlasītie repozitoriji",
-      "title": "Repozitoriji"
+      "selectedRepositories": "Atlasītie repozitoriji"
     },
     "scopeEntry": {
       "connectDescription": "Instalē Kilo GitHub lietotni, lai automātiski sinhronizētu Dependabot brīdinājumus un pārvaldītu drošības konstatējumus savos repozitorijos.",
@@ -1934,7 +1844,6 @@
     },
     "queuedActionUntracked": "Rindai pievienoto darbību vairs nevar izsekot. Atsvaidzini datus, lai redzētu aktuālo stāvokli.",
     "initialSyncAdmissionFailed": "Drošības aģents tika iespējots, bet sākotnējo sinhronizāciju neizdevās pievienot rindai. Sinhronizē vēlreiz.",
-    "title": "Drošības aģents",
     "commands": {
       "findingAlreadyDismissed": "Konstatējums jau ir noraidīts",
       "findingDismissed": "Konstatējums noraidīts",
@@ -1960,22 +1869,16 @@
       "failed": "Analīze neizdevās",
       "failedTitle": "Analīze neizdevās",
       "failedDescription": "Drošības aģents nevarēja pabeigt analīzi.",
-      "extractionFailed": "Jāpārskata",
-      "extractionFailedTitle": "Jāpārskata",
       "extractionFailedDescription": "Tehnisko ziņojumu nevarēja pārvērst strukturētā rezultātā.",
-      "exploitable": "Izmantojams uzbrukumam",
-      "exploitableTitle": "Izmantojams uzbrukumam",
       "exploitableDescription": "No lietotnes koda var sasniegt skarto funkciju.",
       "notExploitable": "Nesasniedzams",
       "notExploitableTitle": "Nesasniedzams",
       "notExploitableDescription": "Šajā repozitorijā netika atrasts izpildes ceļš līdz skartajai funkcijai.",
       "unknown": "Jāpārskata",
-      "unknownTitle": "Jāpārskata",
       "unknownDescription": "Analīzē neizdevās apstiprināt, vai ievainojamā funkcija ir sasniedzama.",
       "safeToDismiss": "Var droši noraidīt",
       "safeToDismissTitle": "Var droši noraidīt",
       "safeToDismissDescription": "Sākotnējā izvērtēšanā secināts, ka šo konstatējumu var droši noraidīt bez koda bāzes analīzes.",
-      "manualReview": "Jāpārskata",
       "manualReviewTitle": "Jāpārskata manuāli",
       "manualReviewDescription": "Sākotnējā izvērtēšanā šis konstatējums atzīmēts manuālai pārskatīšanai.",
       "analysisRequired": "Nepieciešama analīze",
@@ -1990,7 +1893,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Izlabots pirms termiņa",
-      "fixed": "Novērsts",
       "fixedOn": "Izlabots {{date}}",
       "resolutionRecorded": "Atrisināšana reģistrēta",
       "superseded": "Aizstāts",
@@ -2014,7 +1916,6 @@
     "remediationStatus": {
       "cancellationRequested": "Atcelšana pieprasīta",
       "notStarted": "Nav sākta",
-      "queued": "Rindā",
       "starting": "Tiek palaists",
       "inProgress": "Notiek",
       "draftPrOpened": "Atvērts PR melnraksts",
@@ -2022,7 +1923,6 @@
       "blocked": "Bloķēta",
       "failed": "Neizdevās",
       "noChangesNeeded": "Izmaiņas nav vajadzīgas",
-      "cancelled": "Atcelts",
       "originAutomaticPolicy": "Automātiskā politika",
       "originIncludeExistingPolicy": "Esošo konstatējumu iekļaušanas politika",
       "originManual": "Manuāli",
@@ -2095,7 +1995,6 @@
     "sessionRow": {
       "deleteTitle": "Dzēst sesiju?",
       "deleteMessage": "To nevar atsaukt.",
-      "delete": "Dzēst",
       "deleteSession": "Dzēst sesiju",
       "rename": "Pārdēvēt",
       "renameMessage": "Ievadi šai sesijai jaunu nosaukumu.",
@@ -2146,7 +2045,6 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopēt informāciju par kļūdu",
       "backToSessions": "Atpakaļ uz sesijām",
-      "accessDenied": "Piekļuve liegta",
       "accessDeniedDescription": "Tev nav atļaujas to skatīt.",
       "couldNotLoad": "Neizdevās ielādēt sesiju.",
       "failedToLoadDetails": "Neizdevās ielādēt sesijas informāciju.",
@@ -2162,7 +2060,6 @@
       "emptyTitle": "Ziņojumu vēl nav",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
       "cloningSession": "Klonē sesiju…",
-      "continue": "Turpināt",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
       "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Papildini kredītus un mēģini vēlreiz.",
@@ -2196,8 +2093,6 @@
     },
     "newSession": {
       "title": "Jauna sesija",
-      "repository": "Repozitorijs",
-      "connectGithub": "Pievienot GitHub",
       "connectGithubDescription": "Pievieno GitHub kontu pārlūkā, pēc tam atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
@@ -2225,7 +2120,6 @@
       "discardDraftTitle": "Atmest melnrakstu?",
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
       "keepEditing": "Turpināt rediģēt",
-      "discard": "Atmest",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
       "remoteHint": "Palaid `kilo remote` savā datorā vai `/remote` aktīvā CLI sesijā, lai vadītu lokālu kilo procesu.",
       "bitbucketConnected": "Bitbucket pievienots",
@@ -2255,8 +2149,6 @@
       "updatedFileCount_zero": "Atjaunināts {{displayCount}} failu."
     },
     "toolPatch": {
-      "operationAdded": "Pievienots",
-      "operationDeleted": "Dzēsts",
       "operationUpdated": "Atjaunināts"
     },
     "toolCard": {
@@ -2297,9 +2189,7 @@
       "runOn": "Izpildes vide",
       "runOnAccessibility": "Palaist vidē: {{label}}",
       "couldNotLoad": "Neizdevās ielādēt instances",
-      "couldNotLoadDescription": "Pārbaudi savienojumu un mēģini vēlreiz.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Ielādē…",
       "cloudAgentDescription": "Palaist Kilo mākoņa smilškastē",
       "noCliInstances": "Nav savienotu CLI instanču",
       "noCliInstancesDescription": "Palaid `kilo remote` projektā savā datorā. Ja Kilo CLI jau darbojas, atjaunini to.",
@@ -2340,7 +2230,6 @@
       "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2355,9 +2244,7 @@
       "roleUser": "Lietotājs",
       "roleAssistant": "Asistents",
       "sent": "Nosūtīts",
-      "model": "Modelis",
       "costAndTokens": "Izmaksas un tokeni",
-      "cost": "Izmaksas",
       "input": "Ievade",
       "output": "Izvade",
       "reasoning": "Domāšana",
@@ -2377,7 +2264,6 @@
       "textDisplay": "Teksta attēlojums",
       "thinking": "Domā",
       "thought": "Domas",
-      "title": "Informācija",
       "showDetails": "Rādīt detalizētu informāciju",
       "pending": "Gaida…",
       "running": "Darbojas…"
@@ -2400,7 +2286,6 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
-      "imageUnavailable": "Attēls nav pieejams.",
       "imageUnavailableWithAlt": "Attēls „{{alt}}” nav pieejams.",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
@@ -2493,7 +2378,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Vari mēģināt vēlreiz.",
       "copyToComposer": "Kopēt ziņojuma ievades laukā",
-      "queued": "Rindā",
       "queuedAccessibility": "Ziņojums rindā",
       "userMessage": "Lietotāja ziņojums",
       "assistantMessage": "Asistenta ziņojums",
@@ -2532,12 +2416,10 @@
     },
     "sessionFilter": {
       "title": "Sesiju filtrs",
-      "platform": "Platforma",
       "platformCloud": "Mākonis",
       "platformExtension": "Paplašinājums",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Cits",
       "project": "Projekts"
@@ -2559,7 +2441,6 @@
       "allModels": "Visi modeļi"
     },
     "modelSelector": {
-      "model": "Modelis",
       "provider": "Pakalpojumu sniedzējs {{id}}",
       "modelId": "Modelis {{id}}",
       "unavailable": "Nav pieejams",
@@ -2698,8 +2579,7 @@
       "merged": "sapludināts izmaiņu pieprasījums",
       "draft": "Izmaiņu pieprasījuma melnraksts",
       "updating": "Atjaunina, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "izmaiņu pieprasījums"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Ielādēt",
@@ -2727,11 +2607,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Neizdevās ielādēt tavu kontu.",
-    "couldNotLoadAccountDescription": "Pārbaudi savienojumu un mēģini vēlreiz.",
     "couldNotLoadPrivacy": "Neizdevās ielādēt privātuma iestatījumus.",
     "couldNotLoadPrivacyDescription": "Pārbaudi ierīces drošības iestatījumus un mēģini vēlreiz.",
     "contentReady": "Saturs ir gatavs",
-    "signOut": "Izrakstīties",
     "retryLoadingAccount": "Mēģināt ielādēt kontu vēlreiz",
     "retryLoadingPrivacy": "Mēģināt ielādēt privātuma iestatījumus vēlreiz"
   },
@@ -2758,7 +2636,6 @@
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
     "signOutThisSessionMessage": "Ierīcē „{{device}}” tiks veikta izrakstīšanās. Tai vēl līdz stundai var saglabāties piekļuve API.",
-    "signOutConfirm": "Izrakstīties",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz."
   },
   "forceUpdate": {
@@ -2779,7 +2656,6 @@
   },
   "imageViewer": {
     "close": "Aizvērt {{filename}}",
-    "imageUnavailable": "Attēls nav pieejams.",
     "share": "Kopīgot {{filename}}"
   },
   "invalidRoute": {
@@ -2798,11 +2674,8 @@
     "internetRestored": "Interneta savienojums atjaunots"
   },
   "queryError": {
-    "neutralTitle": "Radās kļūda.",
     "neutralDescription": "Lūdzu, mēģini vēlreiz.",
     "offlineTitle": "Neizdevās ielādēt.",
-    "offlineDescription": "Radās kļūda.",
-    "permissionTitle": "Piekļuve liegta",
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundTitle": "Neizdevās atrast meklēto.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
@@ -2812,7 +2685,6 @@
   "screenHeader": {
     "openMenu": "Atvērt izvēlni",
     "openMenuFor": "Atvērt {{title}} izvēlni",
-    "close": "Aizvērt",
     "goBack": "Atpakaļ"
   },
   "picker": {
@@ -2844,7 +2716,6 @@
   },
   "share": {
     "title": "Kopīgošana lietotnē Kilo",
-    "close": "Aizvērt",
     "reviewPr": "Pārskatīt PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Jauna sesija",
@@ -2946,7 +2817,6 @@
     "privacyPolicyPrefix": "Tavi dati tiek apstrādāti saskaņā ar",
     "privacyPolicy": "Kilo privātuma politiku",
     "onDevice": "Ierīcē",
-    "loading": "Ielādē…",
     "couldNotLoadTranscription": "Neizdevās ielādēt tavu transkripcijas iestatījumu.",
     "signInToManageTranscription": "Pieraksties, lai pārvaldītu tiešsaistes transkripciju.",
     "onlineTranscription": "Tiešsaistes transkripcija",
@@ -2963,7 +2833,6 @@
     "voiceTranscriptionTitle": "Balss transkripcija",
     "retentionPrefix": "Informāciju par visiem datu glabāšanas termiņiem, tavām tiesībām un saziņas iespējām atradīsi, atverot",
     "backToConsent": "Atpakaļ uz piekrišanas iestatījumiem",
-    "back": "Atpakaļ",
     "revokeConsent": "Atsaukt piekrišanu",
     "revokeConsentTitle": "Atsaukt piekrišanu datu kopīgošanai?",
     "acceptAndContinue": "Pieņemt un turpināt",
@@ -3006,7 +2875,6 @@
     "voiceTranscriptionWho": "Apstrāde notiek tikai ierīcē vai pie Apple vai Google, ja ierīce nevar transkribēt bezsaistē.",
     "installAttributionPromptTitle": "Atļaut noteikt instalēšanas avotu?",
     "installAttributionPromptMessage": "Kilo izmanto Apple izsekošanas atļauju tikai tam, lai noteiktu, kurā kanālā uzzināji par lietotni. Tavas uzvednes un sarunas šim nolūkam nekad netiek izmantotas.",
-    "continue": "Turpināt",
     "what": "Kādi dati",
     "why": "Kāpēc",
     "who": "Kas saņem datus"
@@ -3028,7 +2896,6 @@
       "selectDescription": "Lai turpinātu, izvēlies organizāciju savā profilā.",
       "selectOrganization": "Organizācijas izvēle",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Lai turpinātu, izvēlies citu organizāciju savā profilā.",
-      "accessDeniedTitle": "Piekļuve liegta",
       "accessDeniedDescription": "Tev nav piekļuves šai organizācijai."
     },
     "creditActivity": {
@@ -3047,7 +2914,6 @@
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredītu derīguma termiņš beidzies"
       },
-      "loadMore": "Ielādēt vairāk",
       "loadMoreFailed": "Neizdevās ielādēt vairāk.",
       "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
     },
@@ -3073,18 +2939,14 @@
         "paid": "Apmaksāts",
         "open": "Atvērt",
         "void": "Anulēts",
-        "draft": "Melnraksts",
-        "uncollectible": "Nepiedzenams",
-        "unknown": "Nezināms"
+        "uncollectible": "Nepiedzenams"
       },
-      "loadMore": "Ielādēt vairāk",
       "loadMoreFailed": "Neizdevās ielādēt vairāk.",
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "vards@uznemums.com",
       "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
-      "enabled": "Iespējots",
       "notifyEmailsLabel": "Paziņojumu saņēmēju e-pasta adreses",
       "permissionDenied": "Tev nav atļaujas pārvaldīt norēķinu brīdinājumus.",
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
@@ -3113,7 +2975,6 @@
       "limitPerDay": "{{amount}}/dienā",
       "manageA11y": "Pārvaldīt {{name}}",
       "manageInvitationA11y": "Pārvaldīt uzaicinājumu uz {{email}}",
-      "removeConfirm": "Noņemt",
       "removeMember": "Izņemt dalībnieku",
       "removeMemberMessage": "Izņemt {{name}} no šīs organizācijas?",
       "revokeConfirm": "Atsaukt",
@@ -3134,25 +2995,18 @@
       "resendInvite": "Nosūtīt uzaicinājumu vēlreiz",
       "shareInviteLink": "Kopīgot uzaicinājuma saiti"
     },
-    "permissionDenied": {
-      "back": "Atpakaļ",
-      "title": "Piekļuve liegta"
-    },
     "usageStats": {
-      "cost": "Izmaksas",
       "inputTokens": "Ievades tokeni",
       "last30Days": "Pēdējās 30 dienas",
       "outputTokens": "Izvades tokeni",
       "requests": "Pieprasījumi"
     },
     "hub": {
-      "title": "Organizācija",
       "renameTitle": "Pārdēvēt organizāciju",
       "renamePlaceholder": "Organizācijas nosaukums",
       "balance": "Atlikums",
       "organizationSeats": "Organizācijas vietas",
-      "lowBalanceBelow": "Zem {{amount}}",
-      "lowBalanceOff": "Izslēgts"
+      "lowBalanceBelow": "Zem {{amount}}"
     },
     "kiloPass": {
       "activating": "Aktivizē",
@@ -3161,7 +3015,6 @@
       "creditProcessingDelayed": "Kredītu apstrāde kavējas · automātiski mēģina vēlreiz",
       "ended": "Beidzies",
       "endsOn": "Beidzas {{date}}",
-      "loading": "Ielādē…",
       "manageHint": "Atver Kilo Pass pārvaldību tīmeklī.",
       "notSubscribed": "Nav abonēts",
       "overallocated": "Piešķirto Kilo Pass abonementu skaits pārsniedz apmaksāto vietu skaitu",
@@ -3227,16 +3080,12 @@
   },
   "quickChat": {
     "title": "Tērzēšana",
-    "composer": {
-      "placeholder": "Ziņojums"
-    },
     "empty": {
       "title": "Sāc tērzēt",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
     },
     "working": "Strādā",
     "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
-    "catalogRetry": "Neizdevās ielādēt modeļus.",
     "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
   },
   "glanceable": {

@@ -195,16 +195,16 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(2_agents)"
           options={{
-            title: t('tabs.agents'),
+            title: t('common.agents'),
             tabBarBadge: needsInputBadge,
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               needsInputBadge
-                ? `${t('tabs.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
-                : t('tabs.agents'),
+                ? `${t('common.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
+                : t('common.agents'),
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={t('common.agents')} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),

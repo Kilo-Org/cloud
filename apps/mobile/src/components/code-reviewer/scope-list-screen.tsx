@@ -30,7 +30,7 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.title')} />
+      <ScreenHeader title={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {isError && (
           <QueryError
@@ -45,7 +45,7 @@ export function ScopeListScreen() {
         )}
         <ConfigureRow
           icon={User}
-          title={t('codeReviewer.scopeList.personal')}
+          title={t('common.personal')}
           subtitle={t('codeReviewer.scopeList.personalSubtitle')}
           onPress={() => {
             openScope(PERSONAL_SCOPE);

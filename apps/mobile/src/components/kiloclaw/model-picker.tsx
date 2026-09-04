@@ -53,7 +53,7 @@ function CostIndicator({ level }: { level: number }) {
   const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-xs text-muted-foreground">{t('kiloclaw.modelPicker.cost')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('common.cost')}</Text>
       <View className="flex-row gap-0.5">
         {[0, 1, 2].map(i => (
           <Text

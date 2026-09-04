@@ -271,7 +271,7 @@ export function PrReviewFileList({
     if (firstPageErrorState?.kind === 'permission') {
       return (
         <TabStateMessage
-          title={t('prReview.accessDenied')}
+          title={t('common.accessDenied')}
           message={t('prReview.accessDeniedDescription')}
         />
       );

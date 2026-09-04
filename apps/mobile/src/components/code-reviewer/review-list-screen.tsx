@@ -33,11 +33,11 @@ const STATUS_CLASSNAME = {
 
 const STATUS_KEY = {
   pending: 'codeReviewer.status.pending',
-  queued: 'codeReviewer.status.queued',
+  queued: 'common.queued',
   running: 'codeReviewer.status.running',
   completed: 'codeReviewer.status.completed',
   failed: 'codeReviewer.status.failed',
-  cancelled: 'codeReviewer.status.cancelled',
+  cancelled: 'common.cancelled',
   interrupted: 'codeReviewer.status.interrupted',
 } satisfies Record<CodeReviewStatus, string>;
 
@@ -169,7 +169,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('codeReviewer.title')} />
+      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('common.codeReviewer')} />
       {body}
     </View>
   );

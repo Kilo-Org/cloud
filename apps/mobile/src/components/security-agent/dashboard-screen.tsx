@@ -226,11 +226,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
       repo => repo.fullName
     );
-    const options = [
-      t('securityAgent.repositories.allRepositories'),
-      ...repoNames,
-      t('common.cancel'),
-    ];
+    const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
     showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, index => {
       if (index === undefined || index === options.length - 1) {
         return;
@@ -242,7 +238,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.title')}
+        title={t('common.securityAgent')}
         headerRight={
           <View className="flex-row items-center">
             <Pressable
@@ -250,7 +246,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.findings')}
+              accessibilityLabel={t('common.findings')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
@@ -285,7 +281,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             accessibilityState={{ disabled: repoFilterUnavailable }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
-              {repoFullName ?? t('securityAgent.repositories.allRepositories')}
+              {repoFullName ?? t('common.allRepositories')}
             </Text>
             <Text variant="muted" className="text-xs">
               {lastSyncLabel}

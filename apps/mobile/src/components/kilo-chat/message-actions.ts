@@ -54,7 +54,7 @@ export function buildMessageActionSheetOptions({
     actions.push({ kind: 'edit', label: i18n.t('chat.messageActions.edit') });
   }
   if (canUseApiBackedActions && canDelete) {
-    actions.push({ kind: 'delete', label: i18n.t('chat.messageActions.delete') });
+    actions.push({ kind: 'delete', label: i18n.t('common.delete') });
   }
   actions.push({ kind: 'cancel', label: i18n.t('common.cancel') });
 

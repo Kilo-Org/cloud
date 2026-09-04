@@ -285,7 +285,7 @@ export function IdleAuth({
         accessibilityLabel={t('login.continueWithEmail')}
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>{t('login.continue')}</Text>
+        <Text>{t('common.continue')}</Text>
       </Button>
       <Text className="text-xs text-muted-foreground">
         {t('login.termsPrefix')}{' '}

@@ -27,7 +27,49 @@
     "somethingWentWrong": "Une erreur s'est produite.",
     "couldNotOpen": "Impossible d'ouvrir {{label}}.",
     "link": "lien",
-    "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard."
+    "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
+    "model": "Modèle",
+    "accessDenied": "Accès refusé",
+    "allRepositories": "Tous les dépôts",
+    "personal": "Personnel",
+    "connectGithub": "Connecter GitHub",
+    "cost": "Coût",
+    "discard": "Abandonner",
+    "findings": "Problèmes détectés",
+    "notConnected": "Non connecté",
+    "notifications": "Alertes et notifications",
+    "pullRequest": "PR",
+    "repositories": "Dépôts",
+    "securityAgent": "Agent de sécurité",
+    "unknown": "Inconnu",
+    "added": "Ajouté",
+    "cancelled": "Annulation",
+    "close": "Fermer",
+    "codeReviewer": "Agent de revue de code",
+    "connected": "Connecté",
+    "couldNotLoadModels": "Impossible de charger les modèles.",
+    "couldNotLoadRepositories": "Impossible de charger les dépôts.",
+    "critical": "Critique",
+    "delete": "Supprimer",
+    "deleted": "Supprimé",
+    "details": "Détails",
+    "draft": "Brouillon",
+    "enabled": "Activé",
+    "github": "GitHub",
+    "imageUnavailable": "Cette image est indisponible.",
+    "loading": "Chargement…",
+    "loadMore": "Afficher la suite",
+    "message": "Votre message",
+    "off": "Désactivé",
+    "organization": "Organisation",
+    "platform": "Plateforme",
+    "prReview": "Revue de PR",
+    "queued": "En file d'attente",
+    "remove": "Supprimer",
+    "repository": "Dépôt",
+    "signOut": "Se déconnecter",
+    "agents": "Agents IA",
+    "all": "Tout"
   },
   "language": {
     "title": "Langue",
@@ -62,12 +104,10 @@
     "emailAddress": "Adresse e-mail",
     "emailPlaceholder": "vous@exemple.com",
     "continueWithEmail": "Continuer par e-mail",
-    "continue": "Continuer",
     "enterCodeSentTo": "Saisissez le code envoyé à {{email}}.",
     "codeArrivalHint": "Si cette adresse remplit les conditions requises, vous recevrez le code sous une minute.",
     "verifyCode": "Vérifier le code",
     "resendCode": "Renvoyer le code",
-    "back": "Retour",
     "termsPrefix": "En continuant, vous acceptez nos",
     "terms": "conditions d'utilisation",
     "termsConnector": " et ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Profil",
-    "agents": "Agents IA",
-    "codeReviewer": "Agent de revue de code",
     "codeReviewerSubtitle": "Revues automatiques de PR",
-    "securityAgent": "Agent de sécurité",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
     "reviews": "Revues",
-    "prReview": "Revue de PR",
     "prReviewSubtitle": "Examiner les PR sur mobile",
-    "organization": "Organisation",
     "couldNotLoadOrganization": "Impossible de charger l'organisation.",
     "couldNotLoadOrganizationDescription": "Les réglages de l'organisation et des agents restent indisponibles tant que le chargement de l'organisation n'a pas abouti.",
     "linkedAccounts": "Comptes liés",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Vous n'avez plus de crédits. Pour ce compte, les crédits se gèrent en dehors de l'application iOS.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
-    "signOutConfirm": "Se déconnecter",
     "deleteAccountTitle": "Supprimer le compte ?",
     "deleteAccountMessage": "Cela supprime définitivement votre compte et vous déconnecte. Nous enverrons un code de confirmation par e-mail.",
     "deleteAccountConfirm": "Supprimer le compte",
     "accountDeleted": "Votre compte a été supprimé.",
     "viewOrganization": "Voir l'organisation",
     "manageOrganization": "Gérer l'organisation",
-    "personal": "Personnel",
     "selectAccount": "Sélectionner un compte",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "E-mail",
     "providerTestAccount": "Compte de test",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -162,7 +194,6 @@
       "securityFindingsTitle": "Problèmes de sécurité",
       "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA"
     },
-    "title": "Alertes et notifications",
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
     "liveUpdates": "Mises à jour en direct",
@@ -195,7 +226,6 @@
   },
   "tabs": {
     "home": "Accueil",
-    "agents": "Agents IA",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -209,8 +239,7 @@
       "noInstances": "Aucune instance KiloClaw",
       "noInstancesDescription": "Configurez une instance pour commencer à discuter.",
       "setUpKiloclaw": "Configurer KiloClaw",
-      "currentInstance": "{{title}}, instance actuelle",
-      "personal": "Personnel"
+      "currentInstance": "{{title}}, instance actuelle"
     },
     "conversation": {
       "failedToLoad": "Impossible de charger la conversation.",
@@ -248,7 +277,6 @@
       "cancelReply": "Annuler la réponse",
       "openInstance": "Ouvrir l'instance",
       "attachFile": "Joindre un fichier",
-      "messagePlaceholder": "Votre message",
       "cancelEdit": "Annuler la modification",
       "sendMessage": "Envoyer le message"
     },
@@ -267,7 +295,6 @@
     },
     "attachment": {
       "open": "Ouvrir {{filename}}",
-      "imageUnavailable": "Cette image est indisponible.",
       "openFailed": "Impossible d'ouvrir la pièce jointe. Vérifiez votre connexion et réessayez.",
       "attachFailed": "Impossible de joindre le fichier.",
       "limit": "Vous pouvez joindre jusqu'à {{displayCount}} fichiers.",
@@ -297,7 +324,6 @@
       "yourMessage": "Votre message",
       "messageFrom": "Message de {{author}}",
       "moreActions": "Plus d'actions",
-      "message": "Votre message",
       "notDelivered": "Non distribué",
       "edited": "(modifié)",
       "image": "Fichier image",
@@ -309,7 +335,6 @@
       "title": "Actions sur le message",
       "deleteTitle": "Supprimer le message ?",
       "deleteMessage": "Cela supprimera le message de la conversation.",
-      "delete": "Supprimer",
       "deleteFailed": "Impossible de supprimer le message.",
       "removeReactionFailed": "Impossible de supprimer la réaction.",
       "addReactionFailed": "Impossible d'ajouter la réaction.",
@@ -340,7 +365,6 @@
       "online": "En ligne",
       "idle": "En veille",
       "offline": "Hors ligne",
-      "unknown": "Inconnu",
       "loadingUser": "Chargement de l'utilisateur…",
       "waitingForStatus": "En attente de l'état du bot…",
       "offlineMessage": "Le bot est hors ligne. L'échange de messages reprendra à sa reconnexion."
@@ -412,7 +436,6 @@
       "destroyMessage": "Cela détruira définitivement votre instance KiloClaw et toutes ses données. Cette action est irréversible.",
       "destroyTitle": "Détruire l'instance",
       "instance": "Instance KiloClaw",
-      "renameFailed": "Une erreur s'est produite.",
       "couldNotCheckStatus": "Impossible de vérifier l'état du service.",
       "dangerZone": "Actions irréversibles",
       "destroying": "Destruction…",
@@ -461,29 +484,22 @@
       "failedToLoadCommand": "Impossible de charger la commande de configuration.",
       "gmailNotifications": "Notifications Gmail",
       "disconnect": "Déconnecter le compte Google",
-      "connected": "Connecté",
       "copied": "Copié",
       "copyCommand": "Copier la commande",
       "disabled": "Désactivé",
       "disconnectConfirm": "Déconnecter",
       "disconnectMessage": "Retirer votre compte Google de cette instance ? Les notifications Gmail seront désactivées. Redéployez l'instance après la déconnexion pour appliquer les modifications.",
-      "disconnectTitle": "Déconnecter Google",
-      "enabled": "Activé",
-      "notConnected": "Non connecté"
+      "disconnectTitle": "Déconnecter Google"
     },
     "modelList": {
       "title": "Tous les modèles",
       "searchPlaceholder": "Rechercher des modèles…",
-      "couldNotLoad": "Impossible de charger les modèles.",
       "clearSearch": "Effacer la recherche",
       "noMatches": "Aucun modèle ne correspond à votre recherche",
       "noModels": "Aucun modèle disponible",
       "noModelsDescription": "Les modèles apparaîtront ici dès qu'ils seront disponibles.",
       "noResultsFor": "Aucun résultat ne correspond à « {{query}} ».",
       "recommended": "Recommandés"
-    },
-    "model": {
-      "title": "Modèle"
     },
     "secrets": {
       "title": "Données secrètes",
@@ -495,10 +511,7 @@
       "saved": "{{label}} enregistré",
       "allFieldsRequired": "Remplissez tous les champs pour connecter {{label}}.",
       "connect": "Connecter",
-      "connected": "Connecté",
       "hide": "Masquer {{label}}",
-      "notConnected": "Non connecté",
-      "remove": "Supprimer",
       "removing": "Suppression…",
       "saving": "Enregistrement…",
       "setupGuide": "guide de configuration",
@@ -597,7 +610,6 @@
     "list": {
       "createInstance": "Créer une instance",
       "organizations": "Organisations",
-      "personal": "Personnel",
       "accessIssue": {
         "trialExpired": "Essai terminé — s'abonner pour continuer à utiliser cette instance",
         "subscriptionCanceled": "Abonnement inactif — se réabonner pour continuer à utiliser cette instance",
@@ -613,7 +625,6 @@
       "balancedLabel": "Équilibré",
       "browseAllModels": "ou choisissez parmi plus de 500 modèles",
       "browseAllModelsA11y": "Parcourir le catalogue de plus de 500 modèles",
-      "cost": "Coût",
       "currentModel": "Modèle actuel",
       "frontierDescription": "Performances maximales. Utilise des modèles de pointe dotés de capacités de raisonnement.",
       "frontierLabel": "De pointe",
@@ -628,7 +639,6 @@
         "warmedUp": "Tout est prêt. Dites bonjour quand vous voulez."
       },
       "flow": {
-        "close": "Fermer",
         "couldNotLoad": "Impossible de charger l'état de la configuration.",
         "finishingSetup": "La configuration touche à sa fin. Patientez pendant que nous terminons de préparer votre compte.",
         "genericErrorBody": "Nous n'avons pas pu terminer la configuration de votre instance pour le moment.",
@@ -639,13 +649,11 @@
         "provisioning": "Création de l'instance",
         "ready": "Prêt",
         "review": "Revue",
-        "settingUp": "Configuration…",
-        "somethingWentWrong": "Une erreur s'est produite."
+        "settingUp": "Configuration…"
       },
       "identity": {
         "changePersonality": "Changer la personnalité",
         "chooseAvatar": "Choisir un avatar",
-        "continue": "Continuer",
         "location": "Localisation",
         "locationDeniedMessage": "Activez l'accès à la localisation dans les paramètres pour utiliser votre position actuelle.",
         "locationDeniedTitle": "Accès à la localisation refusé",
@@ -702,7 +710,6 @@
       "gatewayProcess": "Processus de la passerelle",
       "lastExit": "Dernier arrêt",
       "memory": "Mémoire",
-      "model": "Modèle",
       "region": "Région",
       "resources": "Ressources",
       "restarts": "Redémarrages",
@@ -730,7 +737,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Compte Google",
       "modelDescription": "Sélection du modèle d'IA",
-      "modelLabel": "Modèle",
       "secretsDescription": "Identifiants chiffrés",
       "secretsLabel": "Données secrètes",
       "versionPinDescription": "Utiliser une version fixe",
@@ -779,12 +785,9 @@
       "placeholder": "Ex. : respecter nos conventions de gestion des erreurs…"
     },
     "repos": {
-      "title": "Dépôts",
-      "couldNotLoad": "Impossible de charger les dépôts.",
       "unavailable": "Les dépôts sont indisponibles. Terminez la configuration de Bitbucket sur kilo.ai.",
       "finishSetup": "Terminer la configuration",
       "manageAccess": "Gérer l'accès",
-      "allRepositories": "Tous les dépôts",
       "bitbucketNoRepositoriesDescription": "Aucun dépôt n'est disponible dans cet espace de travail Bitbucket.",
       "bitbucketSetup": "Configuration de Bitbucket",
       "couldNotOpenGithubSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
@@ -819,7 +822,6 @@
     "followReviewMd": "Suivre les consignes de REVIEW.md",
     "followReviewMdSubtitle": "Respecter les fichiers d'instructions REVIEW.md de chaque dépôt",
     "manualReview": {
-      "connectGitHub": "Connecter GitHub",
       "connectProvider": "Connecter un fournisseur",
       "connectProviderDescription": "Connectez GitHub pour lancer une revue manuelle d'une demande de fusion.",
       "couldNotCheckProviderStatus": "Impossible de vérifier l'état du fournisseur.",
@@ -827,9 +829,6 @@
       "instructions": "Instructions (facultatives)",
       "instructionsPlaceholder": "Points à examiner en priorité…",
       "invalidUrl": "Saisissez une URL de demande de fusion valide.",
-      "model": "Modèle",
-      "notConnected": "Non connecté",
-      "platform": "Plateforme",
       "pullRequestUrl": "URL de la demande de fusion",
       "start": "Démarrer la revue",
       "starting": "Démarrage de la revue…",
@@ -839,14 +838,10 @@
     "platformList": {
       "activity": "Activité",
       "checking": "Vérification…",
-      "connected": "Connecté",
-      "notConnected": "Non connecté",
-      "organization": "Organisation",
       "platforms": "Plateformes",
       "statusUnavailable": "État indisponible"
     },
     "providerConnect": {
-      "connectGitHub": "Connecter GitHub",
       "connectGitLab": "Connecter GitLab",
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
       "githubApp": "application GitHub",
@@ -855,7 +850,6 @@
       "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez.",
       "bitbucketError": "Impossible d'ouvrir la configuration de Bitbucket. Réessayez."
     },
-    "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
     "reviewDetail": {
       "branch": "Branche",
       "byline": "{{repo}} #{{number}} par {{author}}",
@@ -864,22 +858,17 @@
       "cancelTitle": "Annuler la revue ?",
       "checkRun": "Exécution du contrôle",
       "completed": "Terminé",
-      "cost": "Coût",
       "couldNotGetLatest": "Impossible de récupérer les dernières données.",
       "couldNotLoad": "Impossible de charger la revue.",
       "council": "Conseil",
       "created": "Date de création",
       "decision": "Décision",
-      "details": "Détails",
-      "findings": "Problèmes détectés",
       "gate": "Contrôle de validation",
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
       "keepRunning": "Laisser continuer",
-      "model": "Modèle",
       "noFindings": "Aucun signalement.",
       "openPullRequest": "Ouverture de la PR",
-      "platform": "Plateforme",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
       "retryTitle": "Relancer la revue ?",
@@ -890,7 +879,6 @@
       "title": "Revue",
       "tokens": "jetons",
       "tokensInOut": "{{input}} en entrée / {{output}} en sortie",
-      "pullRequest": "PR",
       "transcriptWaiting": "La transcription de la revue n'est pas encore disponible.",
       "transcriptEmpty": "Aucune transcription n'est disponible pour cette revue.",
       "transcriptRetry": "Impossible de charger la transcription de la revue.",
@@ -933,14 +921,12 @@
     },
     "scopeList": {
       "couldNotLoad": "Impossible de charger les organisations.",
-      "personal": "Personnel",
       "personalStillAvailable": "Les dépôts personnels restent disponibles ci-dessous.",
       "personalSubtitle": "Vos propres dépôts",
       "viewOnly": "Lecture seule"
     },
     "selectRepositories": "Sélectionner les dépôts",
     "selectRepository": "Sélectionnez au moins un dépôt pour activer les revues automatiques.",
-    "title": "Agent de revue de code",
     "webhookSetup": "La configuration du webhook est incomplète.",
     "webhookSetupDescription": "Certains dépôts risquent de ne pas bénéficier des revues automatiques.",
     "decision": {
@@ -949,17 +935,13 @@
       "noResult": "Aucun résultat",
       "pass": "Réussite"
     },
-    "eyebrow": "Agent de revue de code",
     "overview": {
       "allAreas": "Tous les domaines",
-      "allRepositories": "Tous les dépôts",
       "customInstructions": "Instructions personnalisées",
       "focusAreas": "Points à vérifier",
       "mergeGate": "Contrôle avant fusion",
-      "model": "Modèle",
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
-      "repositories": "Dépôts",
       "reviewMemory": "Mémoire des revues",
       "reviewStyle": "Style de revue",
       "set": "Défini"
@@ -968,11 +950,9 @@
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
       "pending": "En attente",
-      "queued": "En file d'attente",
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Échec",
-      "cancelled": "Annulation",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {
@@ -990,42 +970,33 @@
       "documentation": "Documentation du code"
     },
     "gateThreshold": {
-      "off": "Désactivé",
-      "all": "Tout",
-      "warning": "Avertissement",
-      "critical": "Critique"
+      "warning": "Avertissement"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
         "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas accéder à ce dépôt via une installation active de l'application GitHub. Mettez à jour l'installation de l'application GitHub, puis réactivez l'agent de revue de code.",
         "recoveryLabel": "Mettre à jour l'application GitHub"
       },
       "githubIpAllowList": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
-        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code.",
-        "recoveryLabel": "Contacter l'assistance"
+        "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "gitlabProjectAccessRequired": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
         "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas créer de jeton d'accès au projet GitLab. Accordez le rôle de responsable du projet ou activez les jetons d'accès au projet, puis réactivez l'agent de revue de code.",
         "recoveryLabel": "Mettre à jour l'intégration GitLab"
       },
       "byokInvalidKey": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
         "description": "L'agent de revue de code a été désactivé, car la clé API BYOK sélectionnée est invalide, révoquée ou ne dispose pas des autorisations nécessaires. Mettez à jour la clé ou choisissez un autre modèle, puis réactivez l'agent de revue de code.",
         "recoveryLabel": "Mettre à jour les paramètres BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
         "description": "L'agent de revue de code a été désactivé, car le modèle sélectionné n'est pas disponible pour les sessions d'agent cloud. Choisissez un modèle disponible, puis réactivez l'agent de revue de code.",
         "recoveryLabel": "Modifier les paramètres de l'agent de revue de code"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "L'agent de revue de code nécessite votre intervention.",
-        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code.",
-        "recoveryLabel": "Contacter l'assistance"
-      }
+        "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez l'agent de revue de code."
+      },
+      "title": "L'agent de revue de code nécessite votre intervention.",
+      "recoveryLabel": "Contacter l'assistance"
     },
     "unknownError": "Une erreur inconnue s'est produite."
   },
@@ -1034,24 +1005,18 @@
       "noFilters": "Aucun filtre disponible",
       "noFiltersDescription": "Revenez en arrière et rouvrez les filtres depuis la liste des signalements.",
       "title": "Filtrer les signalements",
-      "all": "Tout",
-      "allRepositories": "Tous les dépôts",
       "fixed": "Corrigé",
       "outcome": "Résultat",
       "outcomeAnalyzing": "Analyse en cours",
       "outcomeDismissed": "Ignoré",
-      "outcomeExploitable": "Exploitation possible",
       "outcomeFailed": "Échec de l'analyse",
-      "outcomeNeedsReview": "À vérifier",
       "outcomeNotAnalyzed": "Non analysé",
       "outcomeNotExploitable": "Non exploitable",
       "outcomeSafeToDismiss": "Peut être ignoré sans risque",
       "outcomeTriageComplete": "Triage terminé",
       "overdueOnly": "En retard uniquement",
-      "repository": "Dépôt",
       "reset": "Réinitialiser",
       "severity": "Gravité",
-      "severityCritical": "Critique",
       "severityHigh": "Élevé",
       "severityLow": "Faible",
       "severityMedium": "Moyen",
@@ -1075,7 +1040,6 @@
       "exploitable": "Exploitation possible",
       "fullReport": "Rapport généré complet",
       "keepWaiting": "Continuer à attendre",
-      "model": "Modèle",
       "no": "Non",
       "noAnalysisYet": "Aucune analyse pour le moment",
       "noAnalysisYetDescription": "Lancez une analyse depuis l'onglet Détails.",
@@ -1088,7 +1052,6 @@
       "suggestedFix": "Correction suggérée",
       "triageConfidence": "Niveau de confiance du triage",
       "triageReasoning": "Justification du triage",
-      "unknown": "Inconnu",
       "watchInCloudAgent": "Suivre dans l'agent cloud",
       "whereFound": "Emplacements détectés ({{displayCount}})",
       "yes": "Oui"
@@ -1096,21 +1059,17 @@
     "analysisSettings": {
       "analysisModel": "Modèle d'analyse",
       "couldNotLoad": "Impossible de charger les paramètres d'analyse.",
-      "couldNotLoadModels": "Impossible de charger les modèles.",
       "depth": "Profondeur d'analyse",
       "modeAuto": "Auto",
       "modeDeep": "Approfondie",
       "modeShallow": "Superficielle",
-      "permissionNote": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
       "remediationModel": "Modèle de correction",
       "title": "Modèles et analyse",
       "triageModel": "Modèle de triage"
     },
     "auditReport": {
-      "checkConnection": "Vérifiez votre connexion et réessayez.",
       "couldNotLoad": "Impossible de charger le rapport d'audit.",
       "events": "Événements",
-      "findings": "Problèmes détectés",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
       "noActivity": "Aucune activité enregistrée",
       "noActivityDescription": "Kilo n'a aucune activité liée aux signalements de sécurité à rapporter du {{start}} au {{end}}.",
@@ -1147,7 +1106,6 @@
       "includeExistingFindingsAnalysisSubtitle": "Analyse aussi les signalements déjà synchronisés. Cela peut consommer des crédits supplémentaires.",
       "includeExistingFindingsRemediationSubtitle": "Ajoute aussi à la file d'attente les signalements admissibles déjà analysés. Les PR en double ne sont pas créées.",
       "minimumSeverity": "Gravité minimale",
-      "permissionNote": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
       "queued": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
       "queued_other": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
       "queued_one": "{{displayCount}} signalement existant ajouté à la file d'attente d'analyse.",
@@ -1160,9 +1118,6 @@
       "title": "Automatisation",
       "queued_many": "{{displayCount}} vulnérabilités existantes mises en attente d'analyse."
     },
-    "commandRetry": {
-      "discard": "Abandonner"
-    },
     "dashboard": {
       "actFirst": "Actions prioritaires",
       "actionPosture": "État des actions",
@@ -1174,7 +1129,6 @@
       "daysOverdue": "{{displayCount}} jours de retard",
       "deadlineToday": "Échéance atteinte aujourd'hui",
       "filterByRepository": "Filtrer par dépôt",
-      "findings": "Problèmes détectés",
       "findingsCount": "{{displayCount}} signalements",
       "highOverdue": "Gravité élevée : en retard",
       "lastSynced": "Dernière synchronisation : {{time}}",
@@ -1248,7 +1202,6 @@
       "notFound": "Problème introuvable",
       "notFoundDescription": "Ce signalement a peut-être été supprimé, ou vous n'y avez plus accès.",
       "tabAnalysis": "Analyse",
-      "tabDetails": "Détails",
       "tabRemediation": "Correction",
       "title": "Signalement"
     },
@@ -1257,13 +1210,11 @@
       "detected": "Détecté",
       "dismissed": "Ignoré",
       "dismissedBecause": "Ce signalement a été exclu : {{reason}}.",
-      "fixed": "Corrigé",
       "ghsa": "GHSA",
       "manifest": "Manifeste",
       "noPatchAvailable": "Aucun correctif disponible",
       "package": "Paquet",
       "patchedVersion": "Version corrigée",
-      "repository": "Dépôt",
       "severityLabel": "Gravité : {{severity}}",
       "slaDeadline": "Échéance du SLA",
       "source": "Origine",
@@ -1271,12 +1222,10 @@
       "sourceRecord": "Fiche source",
       "supersededBy": "Remplacé par un signalement à jour",
       "supersededByDescription": "Touchez pour ouvrir la fiche à jour et consulter son état, son analyse et sa correction.",
-      "unknown": "Inconnu",
       "updated": "Mis à jour",
       "viewAdvisory": "Voir l'avis de sécurité sur GitHub",
       "vulnerableVersions": "Versions vulnérables",
       "statusSuperseded": "Remplacé",
-      "statusFixed": "Corrigé",
       "statusOpen": "Ouverture",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "correction déjà en cours",
@@ -1293,8 +1242,7 @@
       "emptyDescription": "Aucun signalement ouvert ne nécessite d'intervention pour le moment.",
       "emptyTitle": "Aucun signalement ouvert",
       "noMatchesDescription": "Modifiez ou effacez les filtres sélectionnés.",
-      "noMatchesTitle": "Aucun signalement ne correspond aux filtres",
-      "title": "Problèmes détectés"
+      "noMatchesTitle": "Aucun signalement ne correspond aux filtres"
     },
     "findingRow": {
       "a11y": "Signalement de gravité {{severity}} : {{title}}. {{repo}}. {{analysis}}",
@@ -1317,7 +1265,6 @@
       "newFindingSection": "Notification des nouveaux signalements",
       "newFindingSeverityLabel": "Gravité minimale des nouveaux signalements",
       "newFindingSubtitle": "Envoyée à chaque synchronisation d'un nouveau signalement, y compris lors de la première synchronisation.",
-      "readOnly": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
       "slaLeadTimeAccessibility": "Nombre de jours avant l'échéance du SLA pour recevoir un avertissement",
       "slaLeadTimeError": "Saisissez un nombre entier de jours entre 1 et 365.",
       "slaLeadTimeHint": "Saisissez un nombre entier entre 1 et 365",
@@ -1325,8 +1272,7 @@
       "slaPersonalTitle": "M'avertir par e-mail des échéances des SLA",
       "slaSection": "Notification des échéances des SLA",
       "slaSeverityLabel": "Gravité minimale pour les notifications de SLA",
-      "slaSubtitle": "Envoyée avant l'échéance du SLA, à son approche et en cas de dépassement.",
-      "title": "Alertes et notifications"
+      "slaSubtitle": "Envoyée avant l'échéance du SLA, à son approche et en cas de dépassement."
     },
     "remediation": {
       "attemptHistory": "Historique des tentatives ({{displayCount}})",
@@ -1339,19 +1285,16 @@
       "cancelled": "Correction annulée",
       "couldNotLoad": "Impossible de charger l'état de la correction.",
       "keepRunning": "Laisser continuer",
-      "model": "Modèle",
       "noAnalysisDescription": "Lancez une analyse depuis l'onglet Détails.",
       "noAnalysisTitle": "Aucune analyse pour le moment",
       "openDraftPullRequest": "Ouvrir le brouillon de demande de fusion{{number}}",
       "openPullRequest": "Ouvrir la demande de fusion{{number}}",
       "progress": "Progression",
-      "pullRequest": "PR",
       "retry": "Relancer la correction",
       "start": "Lancer la correction",
       "startedBy": "Démarrée par",
       "timeline": {
         "blocked": "Correction bloquée",
-        "cancelled": "Annulation",
         "failed": "Échec de la correction",
         "noChangesNeeded": "Aucune modification nécessaire",
         "prOpened": "PR ouverte",
@@ -1362,18 +1305,14 @@
       "unavailable": "La correction n'est pas disponible pour ce problème."
     },
     "repositories": {
-      "allRepositories": "Tous les dépôts",
       "couldNotLoad": "Impossible de charger les paramètres des dépôts.",
-      "couldNotLoadRepositories": "Impossible de charger les dépôts.",
       "couldNotOpenGithubSettings": "Impossible d'ouvrir les paramètres de l'application GitHub.",
       "githubAppSettings": "paramètres de l'application GitHub",
       "manageAccess": "Gérer l'accès de l'application GitHub",
       "noRepositories": "Aucun dépôt",
       "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts.",
-      "readOnly": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent modifier ces paramètres.",
       "selectAtLeastOne": "Sélectionnez au moins un dépôt.",
-      "selectedRepositories": "Dépôts sélectionnés",
-      "title": "Dépôts"
+      "selectedRepositories": "Dépôts sélectionnés"
     },
     "scopeEntry": {
       "connectDescription": "Installez l'application GitHub de Kilo pour synchroniser automatiquement les alertes Dependabot et gérer les signalements de sécurité dans tous vos dépôts.",
@@ -1388,34 +1327,25 @@
     },
     "scopeList": {
       "couldNotLoad": "Impossible de charger les organisations.",
-      "personal": "Personnel",
-      "personalSubtitle": "Vos propres dépôts",
-      "title": "Agent de sécurité"
+      "personalSubtitle": "Vos propres dépôts"
     },
     "settingsOverview": {
-      "allRepositories": "Tous les dépôts",
       "analysisModeSubtitle": "Analyse {{mode}}",
       "automation": "Automatisation",
       "automationAllOff": "Tout désactivé",
       "automationCount": "{{displayCount}} sur 3 activées",
       "couldNotLoadPermissions": "Impossible de charger les autorisations.",
-      "couldNotLoadRepositories": "Impossible de charger les dépôts.",
       "couldNotLoadSettings": "Impossible de charger les paramètres de l'agent de sécurité.",
       "disabled": "Désactivé",
       "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent l'activer.",
       "disabledNoRepo": "Sélectionnez au moins un dépôt avant d'activer l'agent de sécurité.",
       "disabledPrompt": "Activez l'agent de sécurité pour synchroniser les alertes Dependabot, choisir des dépôts et configurer l'automatisation.",
-      "enabled": "Activé",
       "modelsAndAnalysis": "Modèles et analyse",
-      "notifications": "Alertes et notifications",
       "notificationsCount": "{{displayCount}} sur 2 activées",
-      "off": "Désactivé",
       "on": "Activé",
-      "repositories": "Dépôts",
       "repositoriesCount": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_other": "{{displayCount}} dépôts sélectionnés",
       "repositoriesCount_one": "{{displayCount}} dépôt sélectionné",
-      "securityAgent": "Agent de sécurité",
       "selectRepositories": "Sélectionner les dépôts",
       "selectRepositoriesSubtitle": "Choisir les dépôts surveillés par l'agent de sécurité",
       "slaPolicy": "Politique SLA",
@@ -1423,7 +1353,6 @@
       "repositoriesCount_many": "{{displayCount}} dépôts sélectionnés"
     },
     "settingsSave": {
-      "discard": "Abandonner",
       "keepEditing": "Continuer à modifier",
       "saveChanges": "Enregistrer les modifications",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
@@ -1434,7 +1363,6 @@
     },
     "sla": {
       "couldNotLoad": "Impossible de charger les paramètres des SLA.",
-      "critical": "Critique",
       "criticalDescription": "Exploitation à distance sans authentification.",
       "deadlinesHeading": "Délais de correction (jours)",
       "enableTracking": "Activer le suivi des SLA",
@@ -1451,7 +1379,6 @@
       "remediationDeadlineA11y": "Délai de correction en jours pour la gravité {{label}}",
       "title": "Politique SLA"
     },
-    "title": "Agent de sécurité",
     "initialSyncAdmissionFailed": "L'agent de sécurité a été activé, mais la synchronisation initiale n'a pas pu être ajoutée à la file d'attente. Relancez la synchronisation.",
     "queuedActionUntracked": "Le suivi d'une action en file d'attente a été interrompu. Actualisez pour consulter son état actuel.",
     "commands": {
@@ -1479,22 +1406,16 @@
       "failed": "Échec de l'analyse",
       "failedTitle": "Échec de l'analyse",
       "failedDescription": "L'agent de sécurité n'a pas pu terminer l'analyse.",
-      "extractionFailed": "À vérifier",
-      "extractionFailedTitle": "À vérifier",
       "extractionFailedDescription": "Le rapport technique n'a pas pu être converti en résultat structuré.",
-      "exploitable": "Exploitation possible",
-      "exploitableTitle": "Exploitation possible",
       "exploitableDescription": "Le code de l'application peut accéder à la fonctionnalité concernée.",
       "notExploitable": "Inaccessible",
       "notExploitableTitle": "Inaccessible",
       "notExploitableDescription": "Aucun chemin d'exécution ne permet d'accéder à la fonctionnalité vulnérable dans ce dépôt.",
       "unknown": "À vérifier",
-      "unknownTitle": "À vérifier",
       "unknownDescription": "L'analyse n'a pas pu confirmer si la fonctionnalité vulnérable est accessible.",
       "safeToDismiss": "Peut être ignoré sans risque",
       "safeToDismissTitle": "Peut être ignoré sans risque",
       "safeToDismissDescription": "Le triage a établi que ce signalement peut être exclu sans risque et sans analyser le code.",
-      "manualReview": "À vérifier",
       "manualReviewTitle": "Vérification manuelle requise",
       "manualReviewDescription": "Le triage a identifié ce signalement comme nécessitant un examen manuel.",
       "analysisRequired": "Analyse requise",
@@ -1509,7 +1430,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Corrigé avant l'échéance",
-      "fixed": "Corrigé",
       "fixedOn": "Corrigé le {{date}}",
       "resolutionRecorded": "Résolution enregistrée",
       "superseded": "Remplacé",
@@ -1533,7 +1453,6 @@
     "remediationStatus": {
       "cancellationRequested": "Annulation demandée",
       "notStarted": "Non démarrée",
-      "queued": "En file d'attente",
       "starting": "Démarrage",
       "inProgress": "En cours",
       "draftPrOpened": "Brouillon de PR ouvert",
@@ -1541,7 +1460,6 @@
       "blocked": "Bloquée",
       "failed": "Échec",
       "noChangesNeeded": "Aucune modification nécessaire",
-      "cancelled": "Annulation",
       "originAutomaticPolicy": "Règle automatique",
       "originIncludeExistingPolicy": "Règle d'inclusion des signalements existants",
       "originManual": "Manuelle",
@@ -1595,7 +1513,6 @@
       "title": "Session de travail",
       "copyErrorDetails": "Copier les détails de l'erreur",
       "backToSessions": "Retour aux sessions",
-      "accessDenied": "Accès refusé",
       "accessDeniedDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
@@ -1611,7 +1528,6 @@
       "emptyTitle": "Aucun message pour l'instant",
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
-      "continue": "Continuer",
       "couldNotLoadThisSession": "Impossible de charger cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour exécuter Cloud Agent. Ajoutez des crédits et réessayez.",
@@ -1645,8 +1561,6 @@
     },
     "newSession": {
       "title": "Nouvelle session",
-      "repository": "Dépôt",
-      "connectGithub": "Connecter GitHub",
       "connectGithubDescription": "Connectez votre compte GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
       "openGithub": "Ouvrir GitHub",
       "refreshRepositories": "Actualiser les dépôts",
@@ -1671,7 +1585,6 @@
       "couldNotReadPendingSessions": "Impossible de lire les sessions en attente. Réessayez.",
       "failedToCreate": "Impossible de créer la session.",
       "couldNotRefreshRepositories": "Impossible d'actualiser les dépôts. Réessayez.",
-      "discard": "Abandonner",
       "discardDraftMessage": "Votre consigne sera perdue.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardFailed": "Impossible de supprimer le brouillon. Réessayez.",
@@ -1704,8 +1617,6 @@
       "updatedFileCount_many": "{{displayCount}} fichiers mis à jour."
     },
     "toolPatch": {
-      "operationAdded": "Ajouté",
-      "operationDeleted": "Supprimé",
       "operationUpdated": "Mis à jour"
     },
     "toolCard": {
@@ -1745,9 +1656,7 @@
     "instancePicker": {
       "runOn": "Lieu d'exécution",
       "couldNotLoad": "Impossible de charger les instances",
-      "couldNotLoadDescription": "Vérifiez votre connexion et réessayez.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Chargement…",
       "cloudAgentDescription": "Exécuter dans l'environnement isolé de Kilo en ligne",
       "noCliInstances": "Aucune instance CLI connectée",
       "noCliInstancesDescription": "Exécutez `kilo remote` dans un projet sur votre ordinateur, ou mettez à jour Kilo CLI si une instance est déjà en cours d'exécution.",
@@ -1774,7 +1683,6 @@
       "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "modeSelector": {
@@ -1804,9 +1712,7 @@
       "roleUser": "Utilisateur",
       "roleAssistant": "Assistant IA",
       "sent": "Envoyé",
-      "model": "Modèle",
       "costAndTokens": "Coût et jetons",
-      "cost": "Coût",
       "input": "Entrée",
       "output": "Sortie",
       "reasoning": "Raisonnement",
@@ -1826,7 +1732,6 @@
       "textDisplay": "Affichage du texte",
       "thinking": "Réflexion en cours",
       "thought": "Réflexion",
-      "title": "Détails",
       "showDetails": "Afficher les détails",
       "pending": "En attente…",
       "running": "En cours…"
@@ -1849,7 +1754,6 @@
     "filePart": {
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
-      "imageUnavailable": "Cette image est indisponible.",
       "imageUnavailableWithAlt": "Image indisponible : {{alt}}.",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
@@ -1942,7 +1846,6 @@
       "failure": "Erreur : {{title}}.",
       "failureRetryAvailable": "{{title}}. Vous pouvez réessayer.",
       "copyToComposer": "Copier dans le champ de saisie",
-      "queued": "En file d'attente",
       "queuedAccessibility": "Message en attente",
       "userMessage": "Message de l'utilisateur",
       "assistantMessage": "Message de l'assistant",
@@ -1981,12 +1884,10 @@
     },
     "sessionFilter": {
       "title": "Filtrer les sessions",
-      "platform": "Plateforme",
       "platformCloud": "En ligne",
       "platformExtension": "Extension de l'éditeur",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Autre",
       "project": "Projet"
@@ -2008,7 +1909,6 @@
       "allModels": "Tous les modèles"
     },
     "modelSelector": {
-      "model": "Modèle",
       "provider": "Fournisseur {{id}}",
       "modelId": "Modèle {{id}}",
       "unavailable": "indisponible",
@@ -2147,8 +2047,7 @@
       "merged": "PR fusionnée",
       "draft": "PR en brouillon",
       "updating": "Mise à jour en cours, {{label}} n° {{number}}",
-      "label": "{{label}} n° {{number}}",
-      "externalLinkLabel": "PR"
+      "label": "{{label}} n° {{number}}"
     },
     "markdownImage": {
       "load": "Charger",
@@ -2176,11 +2075,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Impossible de charger votre compte.",
-    "couldNotLoadAccountDescription": "Vérifiez votre connexion et réessayez.",
     "couldNotLoadPrivacy": "Impossible de charger vos préférences de confidentialité.",
     "couldNotLoadPrivacyDescription": "Vérifiez les paramètres de sécurité de votre appareil et réessayez.",
     "contentReady": "Contenu prêt",
-    "signOut": "Se déconnecter",
     "retryLoadingAccount": "Réessayer de charger le compte",
     "retryLoadingPrivacy": "Réessayer de charger les préférences de confidentialité"
   },
@@ -2191,7 +2088,6 @@
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
     "keepScreenOnSubtitle": "Garder l'écran allumé pendant l'exécution de la session.",
     "appearance": "Apparence",
-    "notifications": "Alertes et notifications",
     "notificationsSubtitle": "Préférences de notifications",
     "appearanceSystem": "Système",
     "appearanceLight": "Clair",
@@ -2226,7 +2122,6 @@
     "signOutThisDeviceTitle": "Déconnecter cet appareil ?",
     "signOutThisSessionTitle": "Déconnecter cette session ?",
     "signOutThisSessionMessage": "{{device}} sera déconnecté. L'accès à l'API peut rester actif pendant une heure au maximum.",
-    "signOutConfirm": "Se déconnecter",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "webBrowser": "Navigateur web"
   },
@@ -2248,7 +2143,6 @@
   },
   "imageViewer": {
     "close": "Fermer {{filename}}",
-    "imageUnavailable": "Cette image est indisponible.",
     "share": "Partager {{filename}}"
   },
   "invalidRoute": {
@@ -2261,11 +2155,8 @@
     "internetRestored": "Connexion Internet rétablie"
   },
   "queryError": {
-    "neutralTitle": "Une erreur s'est produite.",
     "neutralDescription": "Réessayez.",
     "offlineTitle": "Le chargement a échoué.",
-    "offlineDescription": "Une erreur s'est produite.",
-    "permissionTitle": "Accès refusé",
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
     "notFoundTitle": "Cet élément est introuvable.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
@@ -2275,7 +2166,6 @@
   "screenHeader": {
     "openMenu": "Ouvrir le menu",
     "openMenuFor": "Ouvrir le menu pour {{title}}",
-    "close": "Fermer",
     "goBack": "Retour"
   },
   "picker": {
@@ -2307,7 +2197,6 @@
   },
   "share": {
     "title": "Partager avec Kilo",
-    "close": "Fermer",
     "reviewPr": "Examiner la PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Nouvelle session",
@@ -2409,7 +2298,6 @@
     "privacyPolicyPrefix": "Vos données sont traitées conformément à la",
     "privacyPolicy": "politique de confidentialité de Kilo",
     "onDevice": "Sur l'appareil",
-    "loading": "Chargement…",
     "couldNotLoadTranscription": "Impossible de charger votre réglage de transcription.",
     "signInToManageTranscription": "Connectez-vous pour gérer la transcription en ligne.",
     "onlineTranscription": "Transcription en ligne",
@@ -2467,10 +2355,8 @@
     "voiceTranscriptionWhat": "Votre enregistrement pendant que vous dictez.",
     "voiceTranscriptionWhy": "Pour transformer la parole en texte.",
     "voiceTranscriptionWho": "Uniquement sur l'appareil, ou par Apple ou Google si l'appareil ne permet pas la transcription hors ligne.",
-    "back": "Retour",
     "revokeConsent": "Retirer le consentement",
     "revokeConsentTitle": "Retirer le consentement au partage des données ?",
-    "continue": "Continuer",
     "installAttributionPromptMessage": "Kilo utilise l'autorisation de suivi d'Apple uniquement pour savoir comment vous avez découvert l'application. Vos consignes et conversations ne sont jamais utilisées.",
     "installAttributionPromptTitle": "Autoriser le suivi de l'origine de l'installation ?"
   },
@@ -2498,7 +2384,6 @@
     "sessionRow": {
       "deleteTitle": "Supprimer la session ?",
       "deleteMessage": "Cette action est irréversible.",
-      "delete": "Supprimer",
       "deleteSession": "Supprimer la session",
       "rename": "Renommer",
       "renameMessage": "Saisissez un nouveau nom pour cette session.",
@@ -2551,7 +2436,6 @@
     "scroll": "Défilement"
   },
   "prReview": {
-    "accessDenied": "Accès refusé",
     "accessDeniedDescription": "Vous n'avez pas l'autorisation de consulter cette demande de fusion.",
     "checkConnection": "Vérifier la connexion",
     "checks": {
@@ -2568,8 +2452,7 @@
       "skipped": "{{displayCount}} ignorées",
       "title": "Vérifications",
       "viewOnGitHub": "Voir la PR sur GitHub",
-      "checkDetails": "détails de la vérification",
-      "pullRequest": "PR"
+      "checkDetails": "détails de la vérification"
     },
     "composer": {
       "addTitle": "Nouveau commentaire",
@@ -2578,7 +2461,6 @@
       "commentBody": "Texte du commentaire",
       "commentBodyPlaceholder": "Votre commentaire",
       "commentNow": "Commenter maintenant",
-      "discard": "Abandonner",
       "discardMessage": "Votre brouillon sera perdu.",
       "discardTitle": "Supprimer le brouillon du commentaire ?",
       "editTitle": "Modification du commentaire",
@@ -2598,8 +2480,7 @@
       "checkFailedTitle": "Impossible de vérifier la connexion GitHub.",
       "description": "Connectez votre compte GitHub pour examiner des demandes de fusion sur mobile.",
       "reconnectDescription": "L'accès à votre compte GitHub a été révoqué. Reconnectez-vous pour continuer à examiner des demandes de fusion sur mobile.",
-      "reconnectTitle": "Reconnecter GitHub",
-      "title": "Connecter GitHub"
+      "reconnectTitle": "Reconnecter GitHub"
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "connectionExpiredDescription": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
@@ -2622,7 +2503,6 @@
       "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
       "couldNotReply": "Impossible de répondre.",
       "file": "fichier",
-      "loadMore": "Afficher la suite",
       "loadMoreComments": "Charger d'autres commentaires",
       "loading": "Chargement des échanges",
       "moderation": {
@@ -2668,7 +2548,6 @@
       "resolved": "Résolu",
       "retryLoadingMore": "Réessayer de charger d'autres commentaires",
       "reviewFiles": "Examiner les fichiers",
-      "somethingWentWrong": "Une erreur s'est produite.",
       "startedRelative": " · ouvert {{relative}}",
       "submitReply": "Envoyer la réponse",
       "termsAcceptRetry": "Impossible d'accepter les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
@@ -2713,11 +2592,9 @@
       "openPullRequest": "Ouverture de la PR",
       "pasteLink": "Coller le lien de la demande de fusion",
       "pastePrLink": "Coller un lien de PR",
-      "remove": "Supprimer",
       "removeFromRecentsMessage": "Cette demande de fusion sera retirée de vos éléments récents.",
       "removeFromRecentsTitle": "Retirer des éléments récents ?",
       "removeRecentAccessibility": "Retirer {{repo}} des éléments récents",
-      "title": "Revue de PR",
       "urlAccessibility": "URL de la demande de fusion GitHub"
     },
     "eventChips": {
@@ -2737,7 +2614,6 @@
       "unified": "Unifié"
     },
     "fileNavigator": {
-      "checkConnection": "Vérifiez votre connexion et réessayez.",
       "couldNotLoadFiles": "Impossible de charger les fichiers.",
       "couldNotLoadMoreFiles": "Impossible de charger d'autres fichiers.",
       "diffTooLarge": "trop de différences",
@@ -2809,7 +2685,6 @@
     "inbox": {
       "couldNotLoad": "Impossible de charger la boîte de réception.",
       "couldNotLoadMore": "Impossible de charger la suite.",
-      "draft": "Brouillon",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
       "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
@@ -2902,7 +2777,6 @@
       "file_other": "fichiers",
       "file_one": "fichier",
       "stateClosed": "Clôture",
-      "stateDraft": "Brouillon",
       "stateMerged": "Fusionnée",
       "stateOpen": "Ouverture",
       "stateOpenApproved": "Ouverte · Approuvée",
@@ -2939,7 +2813,6 @@
       "shareA11y": "Partager la demande de fusion",
       "title": "#{{number}}"
     },
-    "screenTitle": "Revue de PR",
     "sideBySide": {
       "emptyDiffColumn": "colonne de différences vide",
       "emptyDiffRow": "Ligne de différences vide",
@@ -2949,7 +2822,6 @@
       "oldOnly": "Ancienne version uniquement : {{text}}"
     },
     "submit": {
-      "delete": "Supprimer",
       "deletePendingMessage": "Ce commentaire sera retiré des commentaires en attente de la revue.",
       "deletePendingTitle": "Supprimer le commentaire en attente ?",
       "loadFailedTitle": "Impossible de charger le formulaire d'envoi de la revue.",
@@ -2966,10 +2838,8 @@
       "blockedComment": "Ajoutez un résumé ou au moins un commentaire pour publier une revue avec des commentaires."
     },
     "fileStatus": {
-      "added": "Ajouté",
       "changed": "Modifié",
       "copied": "Copié",
-      "deleted": "Supprimé",
       "modified": "Modifié",
       "renamed": "Renommé"
     },
@@ -2982,9 +2852,7 @@
       "selectedTapToChange": "Sélection : {{label}}, touchez pour modifier la sélection",
       "tapToComment": "{{label}}, touchez pour commenter",
       "truncationBanner": "Seuls les {{limit}} premiers fichiers modifiés sur {{total}} sont affichés, en raison d'une limite de l'API GitHub.",
-      "statusAdded": "Ajouté",
       "statusContext": "Contexte",
-      "statusDeleted": "Supprimé",
       "lineLabel": "ligne {{line}}, {{status}} : {{text}}",
       "lineLabelNoNumber": "{{status}} : {{text}}",
       "emptyLine": "(vide)"
@@ -3020,7 +2888,6 @@
       "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
       "selectOrganization": "Choix d'une organisation",
       "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
-      "accessDeniedTitle": "Accès refusé",
       "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
     "creditActivity": {
@@ -3039,18 +2906,15 @@
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
       },
-      "loadMore": "Afficher la suite",
       "loadMoreFailed": "Impossible de charger la suite.",
       "truncated": "Des mouvements de crédits plus anciens sont disponibles."
     },
     "hub": {
       "balance": "Solde",
       "lowBalanceBelow": "Moins de {{amount}}",
-      "lowBalanceOff": "Désactivé",
       "organizationSeats": "Licences de l'organisation",
       "renamePlaceholder": "Nom de l'organisation",
-      "renameTitle": "Renommer l'organisation",
-      "title": "Organisation"
+      "renameTitle": "Renommer l'organisation"
     },
     "inviteMember": {
       "emailError": "Saisissez une adresse e-mail valide.",
@@ -3074,18 +2938,14 @@
         "paid": "Payée",
         "open": "Ouverture",
         "void": "Annulée",
-        "draft": "Brouillon",
-        "uncollectible": "Irrecouvrable",
-        "unknown": "Inconnu"
+        "uncollectible": "Irrecouvrable"
       },
-      "loadMore": "Afficher la suite",
       "loadMoreFailed": "Impossible de charger la suite.",
       "truncated": "Des factures plus anciennes sont disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nom@entreprise.com",
       "enableA11y": "Activer l'alerte de solde faible",
-      "enabled": "Activé",
       "notifyEmailsLabel": "Adresses e-mail à prévenir",
       "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de facturation.",
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
@@ -3114,7 +2974,6 @@
       "limitPerDay": "{{amount}}/jour",
       "manageA11y": "Gérer {{name}}",
       "manageInvitationA11y": "Gérer l'invitation pour {{email}}",
-      "removeConfirm": "Supprimer",
       "removeMember": "Retirer le membre",
       "removeMemberMessage": "Retirer {{name}} de cette organisation ?",
       "revokeConfirm": "Révoquer",
@@ -3135,12 +2994,7 @@
       "resendInvite": "Renvoyer l'invitation",
       "shareInviteLink": "Partager le lien d'invitation"
     },
-    "permissionDenied": {
-      "back": "Retour",
-      "title": "Accès refusé"
-    },
     "usageStats": {
-      "cost": "Coût",
       "inputTokens": "Jetons d'entrée",
       "last30Days": "30 derniers jours",
       "outputTokens": "Jetons de sortie",
@@ -3153,7 +3007,6 @@
       "creditProcessingDelayed": "Traitement des crédits retardé · nouvelle tentative automatique",
       "ended": "Terminé",
       "endsOn": "Se termine le {{date}}",
-      "loading": "Chargement…",
       "manageHint": "Ouvre la gestion de Kilo Pass sur le site web.",
       "notSubscribed": "Aucun abonnement",
       "overallocated": "Le nombre de pass attribués dépasse le nombre de licences payées",
@@ -3227,16 +3080,12 @@
   },
   "quickChat": {
     "title": "Discussion",
-    "composer": {
-      "placeholder": "Votre message"
-    },
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
     },
     "working": "En cours",
     "historyRetry": "Impossible de charger l'historique de la conversation.",
-    "catalogRetry": "Impossible de charger les modèles.",
     "sendError": "Impossible d'envoyer le message. Réessayez."
   },
   "glanceable": {

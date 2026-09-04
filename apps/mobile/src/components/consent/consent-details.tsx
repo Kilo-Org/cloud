@@ -60,7 +60,7 @@ export function VoiceTranscriptionControl() {
   }
 
   if (isLoading) {
-    return <Text className="mt-3 text-sm text-muted-foreground">{t('consent.loading')}</Text>;
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</Text>;
   }
 
   if (isError) {

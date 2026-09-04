@@ -47,7 +47,7 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
           [
             { text: i18n.t('common.notNow'), style: 'cancel' },
             {
-              text: i18n.t('consent.continue'),
+              text: i18n.t('common.continue'),
               onPress: () => {
                 void (async () => {
                   try {

@@ -27,7 +27,49 @@
     "somethingWentWrong": "發生錯誤。",
     "couldNotOpen": "無法開啟 {{label}}。",
     "link": "連結",
-    "takingLonger": "此操作所需時間比預期更長。你可以關閉此畫面，稍後再查看。"
+    "takingLonger": "此操作所需時間比預期更長。你可以關閉此畫面，稍後再查看。",
+    "model": "模型",
+    "accessDenied": "無權存取。",
+    "allRepositories": "所有存放庫",
+    "personal": "個人",
+    "connectGithub": "連結 GitHub",
+    "cost": "費用",
+    "discard": "捨棄",
+    "findings": "問題",
+    "notConnected": "未連結",
+    "notifications": "通知",
+    "pullRequest": "提取要求",
+    "repositories": "存放庫",
+    "securityAgent": "資安代理程式",
+    "unknown": "未知",
+    "added": "已新增",
+    "cancelled": "已取消",
+    "close": "關閉",
+    "codeReviewer": "程式碼審查助手",
+    "connected": "已連結",
+    "couldNotLoadModels": "無法載入模型。",
+    "couldNotLoadRepositories": "無法載入存放庫。",
+    "critical": "嚴重",
+    "delete": "刪除",
+    "deleted": "已刪除",
+    "details": "詳細資料",
+    "draft": "草稿",
+    "enabled": "已啟用",
+    "github": "GitHub",
+    "imageUnavailable": "無法顯示圖片。",
+    "loading": "載入中…",
+    "loadMore": "載入更多",
+    "message": "訊息",
+    "off": "關閉",
+    "organization": "組織",
+    "platform": "平台",
+    "prReview": "PR 審查",
+    "queued": "排隊中",
+    "remove": "移除",
+    "repository": "存放庫",
+    "signOut": "登出",
+    "agents": "代理程式",
+    "all": "全部"
   },
   "language": {
     "title": "語言",
@@ -62,12 +104,10 @@
     "emailAddress": "電子郵件地址",
     "emailPlaceholder": "例如：name@example.com",
     "continueWithEmail": "透過電子郵件繼續登入",
-    "continue": "繼續",
     "enterCodeSentTo": "請輸入傳送至 {{email}} 的驗證碼。",
     "codeArrivalHint": "如果此電子郵件地址符合資格，驗證碼會在一分鐘內送達。",
     "verifyCode": "驗證",
     "resendCode": "重新傳送驗證碼",
-    "back": "返回",
     "termsPrefix": "繼續即表示你同意我們的",
     "terms": "條款",
     "termsConnector": " 和 ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "個人資料",
-    "agents": "代理程式",
-    "codeReviewer": "程式碼審查助手",
     "codeReviewerSubtitle": "自動 PR 審查",
-    "securityAgent": "資安代理程式",
     "securityAgentSubtitle": "尋找並修復漏洞",
     "reviews": "審查",
-    "prReview": "PR 審查",
     "prReviewSubtitle": "在行動裝置上審查 PR",
-    "organization": "組織",
     "couldNotLoadOrganization": "無法載入組織。",
     "couldNotLoadOrganizationDescription": "載入完成前，無法使用組織與智慧代理設定。",
     "linkedAccounts": "已連結的帳戶",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "你的點數餘額已用完。此帳戶的點數須在 iOS 應用程式外管理。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
-    "signOutConfirm": "登出",
     "deleteAccountTitle": "刪除帳戶？",
     "deleteAccountMessage": "這會永久刪除你的帳戶並登出。我們會透過電子郵件寄送確認代碼。",
     "deleteAccountConfirm": "刪除帳戶",
     "accountDeleted": "你的帳戶已刪除。",
     "viewOrganization": "檢視組織",
     "manageOrganization": "管理組織",
-    "personal": "個人",
     "selectAccount": "選取帳戶",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "電子郵件",
     "providerTestAccount": "測試帳戶",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
     "keepScreenOnSubtitle": "工作階段執行期間，保持螢幕亮起。",
     "appearance": "外觀",
-    "notifications": "通知",
     "notificationsSubtitle": "推播偏好設定",
     "appearanceSystem": "系統",
     "appearanceLight": "淺色",
@@ -159,7 +190,6 @@
     "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。"
   },
   "notifications": {
-    "title": "通知",
     "liveActivities": "即時動態",
     "liveActivitySubtitle": "在鎖定畫面上顯示執行中的智慧代理",
     "liveUpdates": "即時更新",
@@ -215,7 +245,6 @@
   },
   "tabs": {
     "home": "首頁",
-    "agents": "代理程式",
     "profile": "個人資料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -229,8 +258,7 @@
       "noInstances": "沒有 KiloClaw 執行個體",
       "noInstancesDescription": "設定執行個體以開始聊天。",
       "setUpKiloclaw": "設定 KiloClaw",
-      "currentInstance": "{{title}}，目前使用的執行個體",
-      "personal": "個人"
+      "currentInstance": "{{title}}，目前使用的執行個體"
     },
     "conversation": {
       "failedToLoad": "無法載入對話。",
@@ -268,7 +296,6 @@
       "cancelReply": "取消回覆",
       "openInstance": "開啟執行個體",
       "attachFile": "附加檔案",
-      "messagePlaceholder": "訊息",
       "cancelEdit": "取消編輯",
       "sendMessage": "傳送訊息"
     },
@@ -287,7 +314,6 @@
     },
     "attachment": {
       "open": "開啟 {{filename}}",
-      "imageUnavailable": "無法顯示圖片。",
       "openFailed": "無法開啟附件。請檢查連線後再試一次。",
       "attachFailed": "無法附加檔案。",
       "limit": "最多可附加 {{displayCount}} 個檔案。",
@@ -317,7 +343,6 @@
       "yourMessage": "你的訊息",
       "messageFrom": "來自 {{author}} 的訊息",
       "moreActions": "更多操作",
-      "message": "訊息",
       "notDelivered": "未送達",
       "edited": "（已編輯）",
       "image": "圖片",
@@ -329,7 +354,6 @@
       "title": "訊息操作",
       "deleteTitle": "要刪除訊息嗎？",
       "deleteMessage": "這會將該訊息從對話中移除。",
-      "delete": "刪除",
       "deleteFailed": "無法刪除訊息。",
       "removeReactionFailed": "無法移除表情回應。",
       "addReactionFailed": "無法新增表情回應。",
@@ -359,7 +383,6 @@
       "online": "在線上",
       "idle": "閒置",
       "offline": "離線",
-      "unknown": "未知",
       "loadingUser": "正在載入使用者…",
       "waitingForStatus": "正在等待機器人狀態…",
       "offlineMessage": "機器人已離線。重新連線後，訊息傳送就會恢復。"
@@ -431,7 +454,6 @@
       "destroyMessage": "這會永久銷毀你的 KiloClaw 執行個體及其所有資料。此操作無法復原。",
       "destroyTitle": "銷毀執行個體",
       "instance": "執行個體",
-      "renameFailed": "發生錯誤。",
       "couldNotCheckStatus": "無法檢查服務狀態。",
       "dangerZone": "危險區域",
       "destroying": "正在銷毀…",
@@ -480,29 +502,22 @@
       "failedToLoadCommand": "無法載入設定指令。",
       "gmailNotifications": "Gmail 通知",
       "disconnect": "中斷 Google 帳戶連線",
-      "connected": "已連結",
       "copied": "已複製",
       "copyCommand": "複製指令",
       "disabled": "已停用",
       "disconnectConfirm": "中斷連線",
       "disconnectMessage": "要從此執行個體移除你的 Google 帳戶嗎？這會停用 Gmail 通知。中斷連線後，請重新部署以套用變更。",
-      "disconnectTitle": "中斷 Google 連線",
-      "enabled": "已啟用",
-      "notConnected": "未連結"
+      "disconnectTitle": "中斷 Google 連線"
     },
     "modelList": {
       "title": "所有模型",
       "searchPlaceholder": "搜尋模型…",
-      "couldNotLoad": "無法載入模型。",
       "clearSearch": "清除搜尋",
       "noMatches": "沒有符合搜尋條件的模型",
       "noModels": "沒有可用的模型",
       "noModelsDescription": "有可用模型時，會顯示在這裡。",
       "noResultsFor": "找不到「{{query}}」的搜尋結果。",
       "recommended": "推薦"
-    },
-    "model": {
-      "title": "模型"
     },
     "secrets": {
       "title": "機密資料",
@@ -514,10 +529,7 @@
       "saved": "{{label}} 已儲存",
       "allFieldsRequired": "必須填妥所有欄位才能連結 {{label}}。",
       "connect": "連結",
-      "connected": "已連結",
       "hide": "隱藏 {{label}}",
-      "notConnected": "未連結",
-      "remove": "移除",
       "removing": "正在移除…",
       "saving": "正在儲存…",
       "setupGuide": "設定指南",
@@ -615,7 +627,6 @@
     "list": {
       "createInstance": "建立執行個體",
       "organizations": "組織",
-      "personal": "個人",
       "accessIssue": {
         "trialExpired": "試用已結束，請訂閱以繼續使用此執行個體",
         "subscriptionCanceled": "訂閱已停用，請重新訂閱以繼續使用此執行個體",
@@ -631,7 +642,6 @@
       "balancedLabel": "均衡",
       "browseAllModels": "或從 500 多個模型中選擇",
       "browseAllModelsA11y": "瀏覽全部 500 多個模型",
-      "cost": "費用",
       "currentModel": "目前模型",
       "frontierDescription": "效能最強，自動選用具備推理能力的頂尖模型。",
       "frontierLabel": "頂尖",
@@ -646,7 +656,6 @@
         "warmedUp": "一切就緒。準備好後隨時打聲招呼。"
       },
       "flow": {
-        "close": "關閉",
         "couldNotLoad": "無法載入初始設定進度。",
         "finishingSetup": "帳戶設定即將完成，請稍候。",
         "genericErrorBody": "剛才無法完成你的執行個體設定。",
@@ -657,13 +666,11 @@
         "provisioning": "正在佈建",
         "ready": "就緒",
         "review": "審查",
-        "settingUp": "正在設定…",
-        "somethingWentWrong": "發生錯誤。"
+        "settingUp": "正在設定…"
       },
       "identity": {
         "changePersonality": "變更個性",
         "chooseAvatar": "選擇頭像",
-        "continue": "繼續",
         "location": "位置",
         "locationDeniedMessage": "請在設定中允許位置存取，即可使用目前位置。",
         "locationDeniedTitle": "未取得位置存取權限",
@@ -720,7 +727,6 @@
       "gatewayProcess": "閘道程序",
       "lastExit": "上次結束",
       "memory": "記憶體",
-      "model": "模型",
       "region": "區域",
       "resources": "資源",
       "restarts": "重新啟動次數",
@@ -748,7 +754,6 @@
       "googleDescription": "Gmail、Calendar、Docs",
       "googleLabel": "Google 帳戶",
       "modelDescription": "選擇 AI 模型",
-      "modelLabel": "模型",
       "secretsDescription": "加密的驗證資訊",
       "secretsLabel": "機密資料",
       "versionPinDescription": "固定至特定版本",
@@ -797,12 +802,9 @@
       "placeholder": "例如：確保程式碼符合我們的錯誤處理規範…"
     },
     "repos": {
-      "title": "存放庫",
-      "couldNotLoad": "無法載入存放庫。",
       "unavailable": "目前無法存取存放庫。請在 kilo.ai 上完成 Bitbucket 設定。",
       "finishSetup": "完成設定",
       "manageAccess": "管理存取權限",
-      "allRepositories": "所有存放庫",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "bitbucketSetup": "Bitbucket 設定",
       "couldNotOpenGithubSettings": "無法開啟 GitHub 應用程式設定。",
@@ -837,7 +839,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectGitHub": "連結 GitHub",
       "connectProvider": "連結平台",
       "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
@@ -845,9 +846,6 @@
       "instructions": "指示（選填）",
       "instructionsPlaceholder": "希望審查員特別留意的事項…",
       "invalidUrl": "請輸入有效的 PR URL。",
-      "model": "模型",
-      "notConnected": "未連結",
-      "platform": "平台",
       "pullRequestUrl": "PR URL",
       "start": "開始審查",
       "starting": "正在啟動審查…",
@@ -857,14 +855,10 @@
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
-      "connected": "已連結",
-      "notConnected": "未連結",
-      "organization": "組織",
       "platforms": "平台",
       "statusUnavailable": "無法取得狀態"
     },
     "providerConnect": {
-      "connectGitHub": "連結 GitHub",
       "connectGitLab": "連結 GitLab",
       "description": "連結 Kilo {{label}}，即可自動審查 PR。",
       "githubApp": "GitHub App",
@@ -873,7 +867,6 @@
       "gitlabError": "無法開啟 GitLab 設定。請再試一次。",
       "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
     },
-    "readOnlyDescription": "只有組織擁有者與帳單管理員可以變更這些設定。",
     "reviewDetail": {
       "branch": "分支",
       "byline": "{{repo}} #{{number}}，作者 {{author}}",
@@ -882,22 +875,17 @@
       "cancelTitle": "要取消審查嗎？",
       "checkRun": "檢查作業",
       "completed": "已完成",
-      "cost": "費用",
       "couldNotGetLatest": "無法取得最新內容。",
       "couldNotLoad": "無法載入審查。",
       "council": "審查小組",
       "created": "建立時間",
       "decision": "判定",
-      "details": "詳細資料",
-      "findings": "問題",
       "gate": "通過條件",
       "gateHidden": "隱藏",
       "gateNone": "無",
       "keepRunning": "繼續執行",
-      "model": "模型",
       "noFindings": "未發現問題。",
       "openPullRequest": "開啟提取要求",
-      "platform": "平台",
       "retryMessage": "這會重新執行程式碼審查。",
       "retryReview": "重新嘗試審查",
       "retryTitle": "要重新嘗試審查嗎？",
@@ -908,7 +896,6 @@
       "title": "審查",
       "tokens": "詞元",
       "tokensInOut": "輸入 {{input}} / 輸出 {{output}}",
-      "pullRequest": "提取要求",
       "transcriptWaiting": "正在等待審查對話記錄。",
       "transcriptEmpty": "這次審查沒有對話記錄。",
       "transcriptRetry": "無法載入審查對話記錄。",
@@ -951,14 +938,12 @@
     },
     "scopeList": {
       "couldNotLoad": "無法載入組織。",
-      "personal": "個人",
       "personalStillAvailable": "你仍可使用下方的個人存放庫。",
       "personalSubtitle": "你自己的存放庫",
       "viewOnly": "僅供檢視"
     },
     "selectRepositories": "選擇存放庫",
     "selectRepository": "請至少選取一個存放庫，以啟用自動審查。",
-    "title": "程式碼審查助手",
     "webhookSetup": "Webhook 設定尚未完成。",
     "webhookSetupDescription": "部分存放庫可能無法自動執行審查。",
     "decision": {
@@ -967,17 +952,13 @@
       "noResult": "無結果",
       "pass": "通過"
     },
-    "eyebrow": "程式碼審查助手",
     "overview": {
       "allAreas": "所有面向",
-      "allRepositories": "所有存放庫",
       "customInstructions": "自訂指示",
       "focusAreas": "審查重點",
       "mergeGate": "合併條件",
-      "model": "模型",
       "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
-      "repositories": "存放庫",
       "reviewMemory": "審查記憶",
       "reviewStyle": "審查風格",
       "set": "已設定"
@@ -986,11 +967,9 @@
     "configSaveFailed": "無法儲存審查設定。",
     "status": {
       "pending": "待處理",
-      "queued": "排隊中",
       "running": "執行中",
       "completed": "已完成",
       "failed": "失敗",
-      "cancelled": "已取消",
       "interrupted": "已中斷"
     },
     "reviewStyle": {
@@ -1008,42 +987,33 @@
       "documentation": "文件"
     },
     "gateThreshold": {
-      "off": "關閉",
-      "all": "全部",
-      "warning": "警告",
-      "critical": "嚴重"
+      "warning": "警告"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "程式碼審查助手有問題需要處理。",
         "description": "程式碼審查員已停用，因為 Kilo 無法透過有效安裝的 GitHub App 存取此存放庫。請更新 GitHub App 的安裝設定，再重新啟用程式碼審查員。",
         "recoveryLabel": "更新 GitHub App"
       },
       "githubIpAllowList": {
-        "title": "程式碼審查助手有問題需要處理。",
-        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilocode.ai 尋求協助，然後重新啟用程式碼審查員。",
-        "recoveryLabel": "聯絡客服"
+        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilocode.ai 尋求協助，然後重新啟用程式碼審查員。"
       },
       "gitlabProjectAccessRequired": {
-        "title": "程式碼審查助手有問題需要處理。",
         "description": "程式碼審查員已停用，因為 Kilo 無法為此專案建立 GitLab 專案存取權杖。請授予維護者權限或啟用專案存取權杖，再重新啟用程式碼審查員。",
         "recoveryLabel": "更新 GitLab 整合"
       },
       "byokInvalidKey": {
-        "title": "程式碼審查助手有問題需要處理。",
         "description": "程式碼審查員已停用，因為所選的 BYOK API 金鑰無效、已撤銷或缺少權限。請更新金鑰或選擇其他模型，然後重新啟用程式碼審查員。",
         "recoveryLabel": "更新 BYOK 設定"
       },
       "selectedModelUnavailable": {
-        "title": "程式碼審查助手有問題需要處理。",
         "description": "程式碼審查員已停用，因為所選模型無法用於雲端代理工作階段。請選擇可用的模型，然後重新啟用程式碼審查員。",
         "recoveryLabel": "更新程式碼審查員設定"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "程式碼審查助手有問題需要處理。",
-        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilocode.ai 尋求協助，再重新啟用程式碼審查員。",
-        "recoveryLabel": "聯絡客服"
-      }
+        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilocode.ai 尋求協助，再重新啟用程式碼審查員。"
+      },
+      "title": "程式碼審查助手有問題需要處理。",
+      "recoveryLabel": "聯絡客服"
     },
     "unknownError": "未知錯誤"
   },
@@ -1052,24 +1022,18 @@
       "noFilters": "沒有可用的篩選條件",
       "noFiltersDescription": "請返回資安問題清單，再重新開啟篩選設定。",
       "title": "篩選資安問題",
-      "all": "全部",
-      "allRepositories": "所有存放庫",
       "fixed": "已修復",
       "outcome": "結果",
       "outcomeAnalyzing": "分析中",
       "outcomeDismissed": "已忽略",
-      "outcomeExploitable": "可被利用",
       "outcomeFailed": "分析失敗",
-      "outcomeNeedsReview": "待審查",
       "outcomeNotAnalyzed": "未分析",
       "outcomeNotExploitable": "無法被利用",
       "outcomeSafeToDismiss": "可放心忽略",
       "outcomeTriageComplete": "初步評估完成",
       "overdueOnly": "僅顯示已逾期項目",
-      "repository": "存放庫",
       "reset": "重設",
       "severity": "嚴重程度",
-      "severityCritical": "嚴重",
       "severityHigh": "高",
       "severityLow": "低",
       "severityMedium": "中",
@@ -1093,7 +1057,6 @@
       "exploitable": "可被利用",
       "fullReport": "產生的完整報告",
       "keepWaiting": "繼續等待",
-      "model": "模型",
       "no": "否",
       "noAnalysisYet": "尚無分析結果",
       "noAnalysisYetDescription": "請在「詳細資料」分頁執行分析。",
@@ -1106,7 +1069,6 @@
       "suggestedFix": "建議修復方式",
       "triageConfidence": "初步評估信心度",
       "triageReasoning": "初步評估依據",
-      "unknown": "未知",
       "watchInCloudAgent": "在雲端代理中檢視",
       "whereFound": "發現位置（{{displayCount}}）",
       "yes": "是"
@@ -1114,21 +1076,17 @@
     "analysisSettings": {
       "analysisModel": "分析模型",
       "couldNotLoad": "無法載入分析設定。",
-      "couldNotLoadModels": "無法載入模型。",
       "depth": "分析深度",
       "modeAuto": "自動",
       "modeDeep": "深度",
       "modeShallow": "初步",
-      "permissionNote": "只有組織擁有者與帳單管理員可以變更這些設定。",
       "remediationModel": "修復模型",
       "title": "模型與分析",
       "triageModel": "初步評估模型"
     },
     "auditReport": {
-      "checkConnection": "請檢查網路連線後再試一次。",
       "couldNotLoad": "無法載入稽核報告。",
       "events": "事件",
-      "findings": "問題",
       "generated": "已於 {{generatedAt}} 產生。",
       "noActivity": "尚無活動記錄",
       "noActivityDescription": "Kilo 在 {{start}} 至 {{end}} 期間沒有可列入報告的資安問題活動。",
@@ -1165,7 +1123,6 @@
       "includeExistingFindingsAnalysisSubtitle": "一併分析先前已同步的資安問題，這可能會消耗額外點數。",
       "includeExistingFindingsRemediationSubtitle": "一併將已分析且符合條件的資安問題排入佇列，但不會重複建立 PR。",
       "minimumSeverity": "最低嚴重程度",
-      "permissionNote": "只有組織擁有者與帳單管理員可以變更這些設定。",
       "queued": "已將 {{displayCount}} 項現有問題加入分析佇列。",
       "queued_other": "已將 {{displayCount}} 項現有問題加入分析佇列。",
       "queued_one": "已將 {{displayCount}} 項現有資安問題排入分析佇列。",
@@ -1176,9 +1133,6 @@
       "severityHighAndAbove": "高以上",
       "severityMediumAndAbove": "中以上",
       "title": "自動化"
-    },
-    "commandRetry": {
-      "discard": "捨棄"
     },
     "dashboard": {
       "actFirst": "優先處理",
@@ -1191,7 +1145,6 @@
       "daysOverdue": "逾期 {{displayCount}} 天",
       "deadlineToday": "今天到期",
       "filterByRepository": "依存放庫篩選",
-      "findings": "問題",
       "findingsCount": "{{displayCount}} 項資安問題",
       "highOverdue": "高風險問題已逾期",
       "lastSynced": "上次同步於 {{time}}",
@@ -1265,7 +1218,6 @@
       "notFound": "找不到問題",
       "notFoundDescription": "這項資安問題可能已移除，或你已無權存取。",
       "tabAnalysis": "分析",
-      "tabDetails": "詳細資料",
       "tabRemediation": "修復",
       "title": "資安問題"
     },
@@ -1274,13 +1226,11 @@
       "detected": "偵測時間",
       "dismissed": "已忽略",
       "dismissedBecause": "已忽略，原因：{{reason}}。",
-      "fixed": "已修復",
       "ghsa": "GHSA",
       "manifest": "套件清單檔",
       "noPatchAvailable": "沒有可用的修補程式",
       "package": "套件",
       "patchedVersion": "已修補版本",
-      "repository": "存放庫",
       "severityLabel": "嚴重程度：{{severity}}",
       "slaDeadline": "SLA 期限",
       "source": "來源",
@@ -1288,12 +1238,10 @@
       "sourceRecord": "來源記錄",
       "supersededBy": "已由最新的資安問題記錄取代",
       "supersededByDescription": "點按以開啟最新記錄，檢視狀態、分析與修復資訊。",
-      "unknown": "未知",
       "updated": "已更新",
       "viewAdvisory": "在 GitHub 上檢視資安公告",
       "vulnerableVersions": "有漏洞的版本",
       "statusSuperseded": "已被取代",
-      "statusFixed": "已修復",
       "statusOpen": "開啟",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "已開始修復",
@@ -1310,8 +1258,7 @@
       "emptyDescription": "目前沒有需要處理的未解決資安問題。",
       "emptyTitle": "沒有未解決的資安問題",
       "noMatchesDescription": "請嘗試調整或清除已選取的篩選條件。",
-      "noMatchesTitle": "沒有符合篩選條件的資安問題",
-      "title": "問題"
+      "noMatchesTitle": "沒有符合篩選條件的資安問題"
     },
     "findingRow": {
       "a11y": "{{severity}}資安問題：{{title}}。{{repo}}。{{analysis}}",
@@ -1334,7 +1281,6 @@
       "newFindingSection": "新資安問題通知",
       "newFindingSeverityLabel": "新資安問題通知的最低嚴重程度",
       "newFindingSubtitle": "每次同步到新的資安問題時都會傳送通知，首次同步也不例外。",
-      "readOnly": "只有組織擁有者與帳單管理員可以變更這些設定。",
       "slaLeadTimeAccessibility": "SLA 到期預警的提前通知天數",
       "slaLeadTimeError": "請輸入 1 到 365 之間的整數天數。",
       "slaLeadTimeHint": "請輸入 1 到 365 之間的整數",
@@ -1342,8 +1288,7 @@
       "slaPersonalTitle": "有 SLA 到期預警時以電子郵件通知我",
       "slaSection": "SLA 到期預警通知",
       "slaSeverityLabel": "SLA 通知的最低嚴重程度",
-      "slaSubtitle": "在資安問題接近或超過 SLA 期限前預先通知，屆時也會傳送通知。",
-      "title": "通知"
+      "slaSubtitle": "在資安問題接近或超過 SLA 期限前預先通知，屆時也會傳送通知。"
     },
     "remediation": {
       "attemptHistory": "修復嘗試記錄（{{displayCount}}）",
@@ -1356,19 +1301,16 @@
       "cancelled": "修復已取消",
       "couldNotLoad": "無法載入修復狀態。",
       "keepRunning": "繼續執行",
-      "model": "模型",
       "noAnalysisDescription": "請在「詳細資料」分頁執行分析。",
       "noAnalysisTitle": "尚無分析結果",
       "openDraftPullRequest": "開啟草稿 PR{{number}}",
       "openPullRequest": "開啟 PR{{number}}",
       "progress": "進度",
-      "pullRequest": "提取要求",
       "retry": "重新嘗試修復",
       "start": "開始修復",
       "startedBy": "發起者",
       "timeline": {
         "blocked": "修復受阻",
-        "cancelled": "已取消",
         "failed": "修復失敗",
         "noChangesNeeded": "無需變更",
         "prOpened": "已建立 PR",
@@ -1379,18 +1321,14 @@
       "unavailable": "這項問題不支援修復功能。"
     },
     "repositories": {
-      "allRepositories": "所有存放庫",
       "couldNotLoad": "無法載入存放庫設定。",
-      "couldNotLoadRepositories": "無法載入存放庫。",
       "couldNotOpenGithubSettings": "無法開啟 GitHub 應用程式設定。",
       "githubAppSettings": "GitHub App 設定",
       "manageAccess": "管理 GitHub App 存取權限",
       "noRepositories": "沒有存放庫",
       "noRepositoriesDescription": "請授權 Kilo GitHub App 存取存放庫。",
-      "readOnly": "只有組織擁有者與帳單管理員可以變更這些設定。",
       "selectAtLeastOne": "請至少選取一個存放庫。",
-      "selectedRepositories": "已選取的存放庫",
-      "title": "存放庫"
+      "selectedRepositories": "已選取的存放庫"
     },
     "scopeEntry": {
       "connectDescription": "安裝 Kilo GitHub App，即可自動同步 Dependabot 警報，並管理各個存放庫的資安問題。",
@@ -1405,41 +1343,31 @@
     },
     "scopeList": {
       "couldNotLoad": "無法載入組織。",
-      "personal": "個人",
-      "personalSubtitle": "你自己的存放庫",
-      "title": "資安代理程式"
+      "personalSubtitle": "你自己的存放庫"
     },
     "settingsOverview": {
-      "allRepositories": "所有存放庫",
       "analysisModeSubtitle": "{{mode}} 分析",
       "automation": "自動化",
       "automationAllOff": "全部關閉",
       "automationCount": "已啟用 {{displayCount}}/3 項",
       "couldNotLoadPermissions": "無法載入權限。",
-      "couldNotLoadRepositories": "無法載入存放庫。",
       "couldNotLoadSettings": "無法載入資安代理設定。",
       "disabled": "已停用",
       "disabledNoManage": "資安代理已停用。只有組織擁有者與帳單管理員可以啟用。",
       "disabledNoRepo": "啟用資安代理前，請至少選取一個存放庫。",
       "disabledPrompt": "啟用資安代理，即可同步 Dependabot 警報、選取存放庫並設定自動化。",
-      "enabled": "已啟用",
       "modelsAndAnalysis": "模型與分析",
-      "notifications": "通知",
       "notificationsCount": "已啟用 {{displayCount}}/2 項",
-      "off": "關閉",
       "on": "開啟",
-      "repositories": "存放庫",
       "repositoriesCount": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_other": "已選擇 {{displayCount}} 個存放庫",
       "repositoriesCount_one": "已選取 {{displayCount}} 個存放庫",
-      "securityAgent": "資安代理程式",
       "selectRepositories": "選擇存放庫",
       "selectRepositoriesSubtitle": "選取要由資安代理監控的存放庫",
       "slaPolicy": "SLA 原則",
       "title": "設定"
     },
     "settingsSave": {
-      "discard": "捨棄",
       "keepEditing": "繼續編輯",
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
@@ -1450,7 +1378,6 @@
     },
     "sla": {
       "couldNotLoad": "無法載入 SLA 設定。",
-      "critical": "嚴重",
       "criticalDescription": "未經身分驗證即可遠端利用漏洞。",
       "deadlinesHeading": "修復期限（天）",
       "enableTracking": "啟用 SLA 追蹤",
@@ -1467,7 +1394,6 @@
       "remediationDeadlineA11y": "{{label}}修復期限，以天為單位",
       "title": "SLA 原則"
     },
-    "title": "資安代理程式",
     "initialSyncAdmissionFailed": "資安代理已啟用，但無法將首次同步排入佇列。請再次同步。",
     "queuedActionUntracked": "無法繼續追蹤已排入佇列的操作。請重新整理以檢視最新狀態。",
     "commands": {
@@ -1495,22 +1421,16 @@
       "failed": "分析失敗",
       "failedTitle": "分析失敗",
       "failedDescription": "資安代理無法完成分析。",
-      "extractionFailed": "待審查",
-      "extractionFailedTitle": "待審查",
       "extractionFailedDescription": "技術報告無法轉換為結構化結果。",
-      "exploitable": "可被利用",
-      "exploitableTitle": "可被利用",
       "exploitableDescription": "應用程式的程式碼有路徑可執行到受影響的功能。",
       "notExploitable": "無法觸及",
       "notExploitableTitle": "無法觸及",
       "notExploitableDescription": "在此存放庫中未找到可執行到受影響功能的路徑。",
       "unknown": "待審查",
-      "unknownTitle": "待審查",
       "unknownDescription": "分析無法確認是否有路徑可執行到有漏洞的功能。",
       "safeToDismiss": "可放心忽略",
       "safeToDismissTitle": "可放心忽略",
       "safeToDismissDescription": "初步評估判定這項資安問題可安全忽略，無需分析程式碼庫。",
-      "manualReview": "待審查",
       "manualReviewTitle": "待人工審查",
       "manualReviewDescription": "初步評估已將這項資安問題標記為需要人工審查。",
       "analysisRequired": "需要分析",
@@ -1525,7 +1445,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "已在期限前修復",
-      "fixed": "已修復",
       "fixedOn": "已於 {{date}} 修復",
       "resolutionRecorded": "已記錄處理結果",
       "superseded": "已被取代",
@@ -1547,7 +1466,6 @@
     "remediationStatus": {
       "cancellationRequested": "已送出取消要求",
       "notStarted": "尚未開始",
-      "queued": "排隊中",
       "starting": "啟動中",
       "inProgress": "進行中",
       "draftPrOpened": "草稿 PR 已開啟",
@@ -1555,7 +1473,6 @@
       "blocked": "受阻",
       "failed": "失敗",
       "noChangesNeeded": "無需變更",
-      "cancelled": "已取消",
       "originAutomaticPolicy": "自動修復規則",
       "originIncludeExistingPolicy": "納入現有問題的規則",
       "originManual": "手動",
@@ -1628,7 +1545,6 @@
     "sessionRow": {
       "deleteTitle": "要刪除工作階段嗎？",
       "deleteMessage": "此操作無法復原。",
-      "delete": "刪除",
       "deleteSession": "刪除工作階段",
       "rename": "重新命名",
       "renameMessage": "請輸入此工作階段的新名稱。",
@@ -1676,7 +1592,6 @@
       "title": "工作階段",
       "copyErrorDetails": "複製錯誤詳細資料",
       "backToSessions": "返回工作階段清單",
-      "accessDenied": "無權存取。",
       "accessDeniedDescription": "你沒有權限查看這個內容。",
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
@@ -1692,7 +1607,6 @@
       "emptyTitle": "尚無訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
-      "continue": "繼續",
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行 Cloud Agent。請加值後再試一次。",
@@ -1726,8 +1640,6 @@
     },
     "newSession": {
       "title": "新增工作階段",
-      "repository": "存放庫",
-      "connectGithub": "連結 GitHub",
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",
       "refreshRepositories": "重新整理儲存庫",
@@ -1752,7 +1664,6 @@
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
-      "discard": "捨棄",
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
       "discardDraftTitle": "捨棄草稿？",
       "discardFailed": "無法捨棄草稿。請再試一次。",
@@ -1784,8 +1695,6 @@
       "updatedFileCount_other": "已更新 {{displayCount}} 個檔案。"
     },
     "toolPatch": {
-      "operationAdded": "已新增",
-      "operationDeleted": "已刪除",
       "operationUpdated": "已更新"
     },
     "toolCard": {
@@ -1826,9 +1735,7 @@
       "runOn": "執行環境",
       "runOnAccessibility": "執行環境：{{label}}",
       "couldNotLoad": "無法載入執行個體",
-      "couldNotLoadDescription": "請檢查網路連線後再試一次。",
       "cloudAgent": "Cloud Agent",
-      "loading": "載入中…",
       "cloudAgentDescription": "在 Kilo 的雲端沙箱中執行",
       "noCliInstances": "尚無已連線的 CLI 執行個體",
       "noCliInstancesDescription": "請在電腦上的專案中執行 `kilo remote`。如果 Kilo CLI 已在執行，請更新 Kilo CLI。",
@@ -1869,7 +1776,6 @@
       "loading": "載入中…",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -1884,9 +1790,7 @@
       "roleUser": "使用者",
       "roleAssistant": "助理",
       "sent": "傳送時間",
-      "model": "模型",
       "costAndTokens": "費用與詞元",
-      "cost": "費用",
       "input": "輸入",
       "output": "輸出",
       "reasoning": "推理",
@@ -1906,7 +1810,6 @@
       "textDisplay": "文字顯示",
       "thinking": "思考中",
       "thought": "思考內容",
-      "title": "詳細資料",
       "showDetails": "顯示詳細資料",
       "pending": "待處理…",
       "running": "執行中…"
@@ -1929,7 +1832,6 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
-      "imageUnavailable": "無法顯示圖片。",
       "imageUnavailableWithAlt": "無法顯示圖片：{{alt}}。",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
@@ -2022,7 +1924,6 @@
       "failure": "{{title}}。",
       "failureRetryAvailable": "{{title}}。可以再試一次。",
       "copyToComposer": "複製到訊息輸入框",
-      "queued": "排隊中",
       "queuedAccessibility": "訊息已排入佇列",
       "userMessage": "使用者訊息",
       "assistantMessage": "助理訊息",
@@ -2058,12 +1959,10 @@
     },
     "sessionFilter": {
       "title": "篩選工作階段",
-      "platform": "平台",
       "platformCloud": "雲端",
       "platformExtension": "擴充功能",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "其他",
       "project": "專案"
@@ -2085,7 +1984,6 @@
       "recommended": "推薦"
     },
     "modelSelector": {
-      "model": "模型",
       "provider": "供應商 {{id}}",
       "modelId": "模型 {{id}}",
       "unavailable": "無法使用",
@@ -2223,8 +2121,7 @@
       "merged": "已合併的 PR",
       "draft": "提取要求草稿",
       "updating": "正在更新，{{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "提取要求"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "載入",
@@ -2252,11 +2149,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "無法載入你的帳戶。",
-    "couldNotLoadAccountDescription": "請檢查網路連線後再試一次。",
     "couldNotLoadPrivacy": "無法載入隱私權選項。",
     "couldNotLoadPrivacyDescription": "請檢查裝置的安全性設定後再試一次。",
     "contentReady": "內容已就緒",
-    "signOut": "登出",
     "retryLoadingAccount": "重新載入帳戶",
     "retryLoadingPrivacy": "重新載入隱私權選項"
   },
@@ -2283,7 +2178,6 @@
     "signOutThisDeviceTitle": "登出此裝置？",
     "signOutThisSessionTitle": "登出此工作階段？",
     "signOutThisSessionMessage": "{{device}} 將登出，但最長仍可存取 API 一小時。",
-    "signOutConfirm": "登出",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。"
   },
   "forceUpdate": {
@@ -2304,7 +2198,6 @@
   },
   "imageViewer": {
     "close": "關閉 {{filename}}",
-    "imageUnavailable": "無法顯示圖片。",
     "share": "分享 {{filename}}"
   },
   "invalidRoute": {
@@ -2323,11 +2216,8 @@
     "internetRestored": "網際網路連線已恢復"
   },
   "queryError": {
-    "neutralTitle": "發生錯誤。",
     "neutralDescription": "請再試一次。",
     "offlineTitle": "載入失敗。",
-    "offlineDescription": "發生錯誤。",
-    "permissionTitle": "無權存取。",
     "permissionDescription": "你沒有權限查看這個內容。",
     "notFoundTitle": "找不到項目。",
     "notFoundDescription": "這個項目可能已移除，或已無法使用。",
@@ -2337,7 +2227,6 @@
   "screenHeader": {
     "openMenu": "開啟選單",
     "openMenuFor": "開啟 {{title}} 的選單",
-    "close": "關閉",
     "goBack": "返回"
   },
   "picker": {
@@ -2369,7 +2258,6 @@
   },
   "share": {
     "title": "分享到 Kilo",
-    "close": "關閉",
     "reviewPr": "審查 PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "新增工作階段",
@@ -2471,7 +2359,6 @@
     "privacyPolicyPrefix": "你的資料處理方式依據",
     "privacyPolicy": "Kilo 隱私權政策",
     "onDevice": "裝置端",
-    "loading": "載入中…",
     "couldNotLoadTranscription": "無法載入你的語音轉文字設定。",
     "signInToManageTranscription": "登入後即可管理線上語音轉文字功能。",
     "onlineTranscription": "線上語音轉文字",
@@ -2488,7 +2375,6 @@
     "voiceTranscriptionTitle": "語音轉文字",
     "retentionPrefix": "完整的資料保留期限、你的權利與聯絡資訊，請參閱",
     "backToConsent": "返回同意頁面",
-    "back": "返回",
     "revokeConsent": "撤銷同意",
     "revokeConsentTitle": "要撤銷分享資料的同意嗎？",
     "acceptAndContinue": "同意並繼續",
@@ -2532,12 +2418,10 @@
     "what": "內容",
     "why": "用途",
     "who": "對象",
-    "continue": "繼續",
     "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限，了解你透過哪個管道安裝應用程式。絕不會使用你的提示詞或對話。",
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {
-    "accessDenied": "無權存取。",
     "accessDeniedDescription": "你沒有權限檢視此提取請求。",
     "checkConnection": "檢查連線",
     "checks": {
@@ -2554,8 +2438,7 @@
       "skipped": "{{displayCount}} 項略過",
       "title": "檢查",
       "viewOnGitHub": "在 GitHub 上檢視 PR",
-      "checkDetails": "檢查詳細資料",
-      "pullRequest": "提取要求"
+      "checkDetails": "檢查詳細資料"
     },
     "composer": {
       "addTitle": "新增留言",
@@ -2564,7 +2447,6 @@
       "commentBody": "留言內容",
       "commentBodyPlaceholder": "留言內容",
       "commentNow": "立即留言",
-      "discard": "捨棄",
       "discardMessage": "你的草稿將不會保留。",
       "discardTitle": "要捨棄留言嗎？",
       "editTitle": "編輯留言",
@@ -2584,8 +2466,7 @@
       "checkFailedTitle": "無法檢查 GitHub 連線。",
       "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。請重新連線，以繼續在行動裝置上審查提取請求。",
-      "reconnectTitle": "重新連線至 GitHub",
-      "title": "連結 GitHub"
+      "reconnectTitle": "重新連線至 GitHub"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "connectionExpiredDescription": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
@@ -2608,7 +2489,6 @@
       "couldNotLoadMore": "無法載入更多留言。",
       "couldNotReply": "無法回覆。",
       "file": "檔案",
-      "loadMore": "載入更多",
       "loadMoreComments": "載入更多留言",
       "loading": "正在載入討論",
       "moderation": {
@@ -2654,7 +2534,6 @@
       "resolved": "已解決",
       "retryLoadingMore": "重新載入更多留言",
       "reviewFiles": "審查檔案",
-      "somethingWentWrong": "發生錯誤。",
       "startedRelative": " · {{relative}}開始",
       "submitReply": "送出回覆",
       "termsAcceptRetry": "同意服務條款時發生錯誤。請檢查連線後再試一次。",
@@ -2697,11 +2576,9 @@
       "openPullRequest": "開啟提取要求",
       "pasteLink": "貼上提取請求連結",
       "pastePrLink": "貼上 PR 連結",
-      "remove": "移除",
       "removeFromRecentsMessage": "此提取請求將從你的最近項目中移除。",
       "removeFromRecentsTitle": "要從最近項目移除嗎？",
       "removeRecentAccessibility": "從最近項目移除 {{repo}}",
-      "title": "PR 審查",
       "urlAccessibility": "GitHub 提取請求 URL"
     },
     "eventChips": {
@@ -2721,7 +2598,6 @@
       "unified": "單欄"
     },
     "fileNavigator": {
-      "checkConnection": "請檢查網路連線後再試一次。",
       "couldNotLoadFiles": "無法載入檔案。",
       "couldNotLoadMoreFiles": "無法載入更多檔案。",
       "diffTooLarge": "差異過大",
@@ -2791,7 +2667,6 @@
     "inbox": {
       "couldNotLoad": "無法載入收件匣。",
       "couldNotLoadMore": "無法載入更多內容。",
-      "draft": "草稿",
       "loading": "正在載入收件匣",
       "noReviewRequests": "尚無審查請求",
       "noReviewRequestsDescription": "等待你審查的提取請求會顯示在這裡。你也可以在上方貼上任何 PR 連結。",
@@ -2884,7 +2759,6 @@
       "file_other": "檔案",
       "file_one": "檔案",
       "stateClosed": "已關閉",
-      "stateDraft": "草稿",
       "stateMerged": "已合併",
       "stateOpen": "開啟",
       "stateOpenApproved": "未結案 · 已核准",
@@ -2919,7 +2793,6 @@
       "shareA11y": "分享提取請求",
       "title": "#{{number}}"
     },
-    "screenTitle": "PR 審查",
     "sideBySide": {
       "emptyDiffColumn": "空白差異欄",
       "emptyDiffRow": "空白差異列",
@@ -2929,7 +2802,6 @@
       "oldOnly": "僅舊版有：{{text}}"
     },
     "submit": {
-      "delete": "刪除",
       "deletePendingMessage": "此留言將從待送出的審查留言中移除。",
       "deletePendingTitle": "要刪除待送出留言嗎？",
       "loadFailedTitle": "無法載入審查送出畫面。",
@@ -2945,10 +2817,8 @@
       "blockedComment": "請先填寫摘要或新增至少一則留言，才能送出留言型審查。"
     },
     "fileStatus": {
-      "added": "已新增",
       "changed": "已變更",
       "copied": "已複製",
-      "deleted": "已刪除",
       "modified": "已修改",
       "renamed": "已重新命名"
     },
@@ -2961,9 +2831,7 @@
       "selectedTapToChange": "已選取 {{label}}，點一下即可變更選取範圍",
       "tapToComment": "{{label}}，點一下即可留言",
       "truncationBanner": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。",
-      "statusAdded": "已新增",
       "statusContext": "前後文",
-      "statusDeleted": "已刪除",
       "lineLabel": "{{status}}，第 {{line}} 行：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
       "emptyLine": "（空白）"
@@ -2999,7 +2867,6 @@
       "selectDescription": "請到個人資料頁面選取組織，即可繼續。",
       "selectOrganization": "選取組織",
       "unavailableDescription": "此組織已無法存取。請到個人資料頁面選取其他組織，即可繼續。",
-      "accessDeniedTitle": "無權存取。",
       "accessDeniedDescription": "你沒有存取此組織的權限。"
     },
     "creditActivity": {
@@ -3018,18 +2885,15 @@
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
       },
-      "loadMore": "載入更多",
       "loadMoreFailed": "無法載入更多內容。",
       "truncated": "還有更早的點數記錄可供查看。"
     },
     "hub": {
       "balance": "餘額",
       "lowBalanceBelow": "低於 {{amount}}",
-      "lowBalanceOff": "關閉",
       "organizationSeats": "組織席次",
       "renamePlaceholder": "組織名稱",
-      "renameTitle": "重新命名組織",
-      "title": "組織"
+      "renameTitle": "重新命名組織"
     },
     "inviteMember": {
       "emailError": "請輸入有效的電子郵件地址。",
@@ -3053,18 +2917,14 @@
         "paid": "已付款",
         "open": "開啟",
         "void": "已作廢",
-        "draft": "草稿",
-        "uncollectible": "無法收款",
-        "unknown": "未知"
+        "uncollectible": "無法收款"
       },
-      "loadMore": "載入更多",
       "loadMoreFailed": "無法載入更多內容。",
       "truncated": "還有更早的發票可供查看。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "例如：name@company.com",
       "enableA11y": "啟用餘額不足提醒",
-      "enabled": "已啟用",
       "notifyEmailsLabel": "通知收件地址",
       "permissionDenied": "你沒有管理帳單提醒的權限。",
       "separateEmailsHint": "請以逗號分隔多個電子郵件地址。",
@@ -3093,7 +2953,6 @@
       "limitPerDay": "{{amount}}/天",
       "manageA11y": "管理 {{name}}",
       "manageInvitationA11y": "管理傳送給 {{email}} 的邀請",
-      "removeConfirm": "移除",
       "removeMember": "移除成員",
       "removeMemberMessage": "將 {{name}} 從此組織移除？",
       "revokeConfirm": "撤銷",
@@ -3114,12 +2973,7 @@
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結"
     },
-    "permissionDenied": {
-      "back": "返回",
-      "title": "無權存取。"
-    },
     "usageStats": {
-      "cost": "費用",
       "inputTokens": "輸入詞元",
       "last30Days": "最近 30 天",
       "outputTokens": "輸出詞元",
@@ -3132,7 +2986,6 @@
       "creditProcessingDelayed": "點數處理延遲 · 自動重試中",
       "ended": "已結束",
       "endsOn": "於 {{date}} 結束",
-      "loading": "載入中…",
       "manageHint": "開啟 Kilo Pass 網頁版管理頁面。",
       "notSubscribed": "未訂閱",
       "overallocated": "Kilo Pass 分配數超過已付費席次",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "聊天",
-    "composer": {
-      "placeholder": "訊息"
-    },
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息，即可與模型對話。"
     },
     "working": "處理中",
     "historyRetry": "無法載入聊天記錄。",
-    "catalogRetry": "無法載入模型。",
     "sendError": "無法傳送訊息。請再試一次。"
   },
   "glanceable": {

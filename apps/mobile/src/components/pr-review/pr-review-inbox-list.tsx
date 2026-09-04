@@ -146,7 +146,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.isDraft ? (
             <View className="rounded-full bg-secondary px-2 py-0.5">
               <Text variant="muted" className="text-[10px] font-medium">
-                {t('prReview.inbox.draft')}
+                {t('common.draft')}
               </Text>
             </View>
           ) : null}

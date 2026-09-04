@@ -27,7 +27,49 @@
     "somethingWentWrong": "משהו השתבש.",
     "couldNotOpen": "לא ניתן היה לפתוח את {{label}}.",
     "link": "קישור",
-    "takingLonger": "זה לוקח יותר זמן מהצפוי. אפשר לסגור את המסך הזה ולבדוק שוב."
+    "takingLonger": "זה לוקח יותר זמן מהצפוי. אפשר לסגור את המסך הזה ולבדוק שוב.",
+    "model": "מודל",
+    "accessDenied": "אין הרשאת גישה.",
+    "allRepositories": "כל המאגרים",
+    "personal": "אישי",
+    "connectGithub": "חיבור ל-GitHub",
+    "cost": "עלות",
+    "discard": "ויתור על השינויים",
+    "findings": "ממצאים",
+    "notConnected": "לא מחובר",
+    "notifications": "התראות",
+    "pullRequest": "PR",
+    "repositories": "מאגרים",
+    "securityAgent": "סוכן אבטחה",
+    "unknown": "לא ידוע",
+    "added": "נוסף",
+    "cancelled": "בוטל",
+    "close": "סגירה",
+    "codeReviewer": "סוקר קוד",
+    "connected": "מחובר",
+    "couldNotLoadModels": "לא הצלחנו לטעון את המודלים.",
+    "couldNotLoadRepositories": "לא הצלחנו לטעון את המאגרים.",
+    "critical": "קריטית",
+    "delete": "מחיקה",
+    "deleted": "נמחק",
+    "details": "פרטים",
+    "draft": "טיוטה",
+    "enabled": "מופעל",
+    "github": "GitHub",
+    "imageUnavailable": "התמונה לא זמינה.",
+    "loading": "בטעינה…",
+    "loadMore": "טעינת פריטים נוספים",
+    "message": "הודעה",
+    "off": "כבוי",
+    "organization": "ארגון",
+    "platform": "פלטפורמה",
+    "prReview": "סקירת PR",
+    "queued": "בתור",
+    "remove": "הסרה",
+    "repository": "מאגר",
+    "signOut": "התנתקות",
+    "agents": "סוכנים",
+    "all": "הכול"
   },
   "language": {
     "title": "שפה",
@@ -62,12 +104,10 @@
     "emailAddress": "כתובת דוא״ל",
     "emailPlaceholder": "כתובת הדוא״ל שלך",
     "continueWithEmail": "המשך באמצעות דוא״ל",
-    "continue": "המשך",
     "enterCodeSentTo": "הזן את הקוד שנשלח אל {{email}}.",
     "codeArrivalHint": "אם כתובת הדוא״ל עומדת בתנאים, הקוד יגיע תוך דקה.",
     "verifyCode": "אימות הקוד",
     "resendCode": "שליחת הקוד שוב",
-    "back": "חזרה",
     "termsPrefix": "המשך השימוש מהווה הסכמה למסמכים הבאים:",
     "terms": "תנאי השימוש",
     "termsConnector": " וכן ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "פרופיל",
-    "agents": "סוכנים",
-    "codeReviewer": "סוקר קוד",
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
-    "securityAgent": "סוכן אבטחה",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
     "reviews": "סקירות",
-    "prReview": "סקירת PR",
     "prReviewSubtitle": "סקירת בקשות משיכה בנייד",
-    "organization": "ארגון",
     "couldNotLoadOrganization": "לא ניתן היה לטעון את הארגון.",
     "couldNotLoadOrganizationDescription": "הגדרות הארגון והסוכנים אינן זמינות עד לסיום טעינת הארגון.",
     "linkedAccounts": "חשבונות מקושרים",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "יתרת הקרדיטים שלך היא אפס. בחשבון הזה, הקרדיטים מנוהלים מחוץ לאפליקציית iOS.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
-    "signOutConfirm": "התנתקות",
     "deleteAccountTitle": "למחוק את החשבון?",
     "deleteAccountMessage": "פעולה זו מוחקת לצמיתות את החשבון שלך ומנתקת אותך. נשלח אליך קוד אישור בדוא״ל.",
     "deleteAccountConfirm": "מחיקת החשבון",
     "accountDeleted": "החשבון שלך נמחק.",
     "viewOrganization": "הצגת הארגון",
     "manageOrganization": "ניהול הארגון",
-    "personal": "אישי",
     "selectAccount": "בחירת חשבון",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "דוא״ל",
     "providerTestAccount": "חשבון בדיקה",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "השארת המסך דלוק במסך הסשן",
     "keepScreenOnSubtitle": "השאר את המסך דלוק כשהסשן פעיל.",
     "appearance": "מראה",
-    "notifications": "התראות",
     "notificationsSubtitle": "העדפות התראות",
     "appearanceSystem": "לפי המערכת",
     "appearanceLight": "בהיר",
@@ -159,7 +190,6 @@
     "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע."
   },
   "notifications": {
-    "title": "התראות",
     "liveActivities": "פעילויות בזמן אמת",
     "liveActivitySubtitle": "הצגת סוכנים פעילים במסך הנעילה",
     "liveUpdates": "עדכונים בזמן אמת",
@@ -215,7 +245,6 @@
   },
   "tabs": {
     "home": "ראשי",
-    "agents": "סוכנים",
     "profile": "פרופיל",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -229,8 +258,7 @@
       "noInstances": "אין מופעי KiloClaw",
       "noInstancesDescription": "הגדר מופע כדי להתחיל לשוחח.",
       "setUpKiloclaw": "הגדרת KiloClaw",
-      "currentInstance": "{{title}}, המופע הנוכחי",
-      "personal": "אישי"
+      "currentInstance": "{{title}}, המופע הנוכחי"
     },
     "conversation": {
       "failedToLoad": "לא ניתן לטעון את השיחה.",
@@ -268,7 +296,6 @@
       "cancelReply": "ביטול התשובה",
       "openInstance": "פתיחת המופע",
       "attachFile": "צירוף קובץ",
-      "messagePlaceholder": "הודעה",
       "cancelEdit": "ביטול העריכה",
       "sendMessage": "שליחת הודעה"
     },
@@ -287,7 +314,6 @@
     },
     "attachment": {
       "open": "פתיחת {{filename}}",
-      "imageUnavailable": "התמונה לא זמינה.",
       "openFailed": "לא ניתן לפתוח את הקובץ המצורף. בדוק את החיבור לאינטרנט ונסה שוב.",
       "attachFailed": "צירוף הקובץ נכשל.",
       "limit": "ניתן לצרף עד {{displayCount}} קבצים.",
@@ -317,7 +343,6 @@
       "yourMessage": "ההודעה שלך",
       "messageFrom": "הודעה מאת {{author}}",
       "moreActions": "פעולות נוספות",
-      "message": "הודעה",
       "notDelivered": "לא נמסרה",
       "edited": "(נערכה)",
       "image": "תמונה",
@@ -329,7 +354,6 @@
       "title": "פעולות בהודעה",
       "deleteTitle": "למחוק את ההודעה?",
       "deleteMessage": "פעולה זו תסיר את ההודעה מהשיחה.",
-      "delete": "מחיקה",
       "deleteFailed": "מחיקת ההודעה נכשלה.",
       "removeReactionFailed": "הסרת התגובה נכשלה.",
       "addReactionFailed": "הוספת התגובה נכשלה.",
@@ -360,7 +384,6 @@
       "online": "מקוון",
       "idle": "בהמתנה",
       "offline": "מנותק",
-      "unknown": "לא ידוע",
       "loadingUser": "פרטי המשתמש בטעינה...",
       "waitingForStatus": "ממתין למצב הבוט...",
       "offlineMessage": "הבוט מנותק. העברת ההודעות תתחדש כשהוא יתחבר מחדש."
@@ -432,7 +455,6 @@
       "destroyMessage": "פעולה זו תמחק לצמיתות את מופע ה-KiloClaw שלך ואת כל הנתונים שלו. לא ניתן לבטל את המחיקה.",
       "destroyTitle": "מחיקת המופע לצמיתות",
       "instance": "מופע",
-      "renameFailed": "משהו השתבש.",
       "couldNotCheckStatus": "לא ניתן היה לבדוק את מצב השירות.",
       "dangerZone": "פעולות מסוכנות",
       "destroying": "מחיקה לצמיתות…",
@@ -481,29 +503,22 @@
       "failedToLoadCommand": "לא ניתן היה לטעון את פקודת ההגדרה.",
       "gmailNotifications": "התראות Gmail",
       "disconnect": "ניתוק חשבון Google",
-      "connected": "מחובר",
       "copied": "הועתק",
       "copyCommand": "העתקת הפקודה",
       "disabled": "מושבת",
       "disconnectConfirm": "ניתוק",
       "disconnectMessage": "להסיר את חשבון Google מהמופע הזה? פעולה זו תשבית את התראות Gmail. פרוס מחדש לאחר הניתוק כדי להחיל שינויים.",
-      "disconnectTitle": "ניתוק Google",
-      "enabled": "מופעל",
-      "notConnected": "לא מחובר"
+      "disconnectTitle": "ניתוק Google"
     },
     "modelList": {
       "title": "כל המודלים",
       "searchPlaceholder": "חיפוש מודלים...",
-      "couldNotLoad": "לא הצלחנו לטעון את המודלים.",
       "clearSearch": "ניקוי החיפוש",
       "noMatches": "אין מודלים התואמים לחיפוש שלך",
       "noModels": "אין מודלים זמינים",
       "noModelsDescription": "מודלים יופיעו כאן כשיהיו זמינים.",
       "noResultsFor": "לא נמצאו תוצאות עבור \"{{query}}\".",
       "recommended": "מומלצים"
-    },
-    "model": {
-      "title": "מודל"
     },
     "secrets": {
       "title": "סודות",
@@ -515,10 +530,7 @@
       "saved": "{{label}} נשמר",
       "allFieldsRequired": "צריך למלא את כל השדות כדי לחבר את {{label}}.",
       "connect": "חיבור",
-      "connected": "מחובר",
       "hide": "הסתרת {{label}}",
-      "notConnected": "לא מחובר",
-      "remove": "הסרה",
       "removing": "הסרה…",
       "saving": "שמירה…",
       "setupGuide": "מדריך להגדרה",
@@ -617,7 +629,6 @@
     "list": {
       "createInstance": "יצירת מופע",
       "organizations": "ארגונים",
-      "personal": "אישי",
       "accessIssue": {
         "trialExpired": "תקופת הניסיון הסתיימה — רכישת מינוי להמשך השימוש במופע",
         "subscriptionCanceled": "המינוי אינו פעיל — חידוש המינוי להמשך השימוש במופע",
@@ -633,7 +644,6 @@
       "balancedLabel": "מאוזן",
       "browseAllModels": "או בחירה מתוך יותר מ-500 מודלים",
       "browseAllModelsA11y": "עיון בכל המודלים — יותר מ-500",
-      "cost": "עלות",
       "currentModel": "המודל הנוכחי",
       "frontierDescription": "הביצועים הגבוהים ביותר. הבקשות מנותבות למודלים המתקדמים ביותר עם יכולת חשיבה.",
       "frontierLabel": "המתקדמים ביותר",
@@ -648,7 +658,6 @@
         "warmedUp": "הכול מוכן. אפשר להגיד שלום מתי שתרצה."
       },
       "flow": {
-        "close": "סגירה",
         "couldNotLoad": "לא ניתן היה לטעון את מצב ההגדרה.",
         "finishingSetup": "אנחנו משלימים את הגדרת החשבון שלך. זה ייקח עוד רגע.",
         "genericErrorBody": "לא הצלחנו להשלים את הגדרת המופע שלך כרגע.",
@@ -659,13 +668,11 @@
         "provisioning": "הקצאת משאבים",
         "ready": "מוכן",
         "review": "סקירה",
-        "settingUp": "ההגדרה מתבצעת…",
-        "somethingWentWrong": "משהו השתבש."
+        "settingUp": "ההגדרה מתבצעת…"
       },
       "identity": {
         "changePersonality": "שינוי האישיות",
         "chooseAvatar": "בחירת תמונת פרופיל",
-        "continue": "המשך",
         "location": "מיקום",
         "locationDeniedMessage": "אפשר גישה למיקום בהגדרות כדי להשתמש במיקום הנוכחי שלך.",
         "locationDeniedTitle": "הגישה למיקום נדחתה",
@@ -722,7 +729,6 @@
       "gatewayProcess": "תהליך שער הגישה",
       "lastExit": "יציאה אחרונה",
       "memory": "זיכרון",
-      "model": "מודל",
       "region": "אזור",
       "resources": "משאבים",
       "restarts": "הפעלות מחדש",
@@ -750,7 +756,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "חשבון Google",
       "modelDescription": "בחירת מודל בינה מלאכותית",
-      "modelLabel": "מודל",
       "secretsDescription": "פרטי הזדהות מוצפנים",
       "secretsLabel": "סודות",
       "versionPinDescription": "הצמדה לגרסה מסוימת",
@@ -799,12 +804,9 @@
       "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…"
     },
     "repos": {
-      "title": "מאגרים",
-      "couldNotLoad": "לא הצלחנו לטעון את המאגרים.",
       "unavailable": "המאגרים אינם זמינים — השלם את הגדרת Bitbucket ב-kilo.ai.",
       "finishSetup": "השלמת ההגדרה",
       "manageAccess": "ניהול גישה",
-      "allRepositories": "כל המאגרים",
       "bitbucketNoRepositoriesDescription": "אין מאגרים זמינים בסביבת העבודה הזו של Bitbucket.",
       "bitbucketSetup": "הגדרת Bitbucket",
       "couldNotOpenGithubSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
@@ -839,7 +841,6 @@
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
     "manualReview": {
-      "connectGitHub": "חיבור ל-GitHub",
       "connectProvider": "חיבור ספק",
       "connectProviderDescription": "חבר את GitHub כדי להתחיל סקירה ידנית של בקשת משיכה.",
       "couldNotCheckProviderStatus": "לא ניתן לבדוק את מצב הספק.",
@@ -847,9 +848,6 @@
       "instructions": "הוראות (לא חובה)",
       "instructionsPlaceholder": "נושאים שחשוב להתמקד בהם בסקירה…",
       "invalidUrl": "יש להזין כתובת URL תקינה של בקשת משיכה.",
-      "model": "מודל",
-      "notConnected": "לא מחובר",
-      "platform": "פלטפורמה",
       "pullRequestUrl": "כתובת URL של בקשת משיכה",
       "start": "התחלת סקירה",
       "starting": "הסקירה מתחילה…",
@@ -859,14 +857,10 @@
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
-      "connected": "מחובר",
-      "notConnected": "לא מחובר",
-      "organization": "ארגון",
       "platforms": "פלטפורמות",
       "statusUnavailable": "המצב אינו זמין"
     },
     "providerConnect": {
-      "connectGitHub": "חיבור ל-GitHub",
       "connectGitLab": "חיבור ל-GitLab",
       "description": "חבר את {{label}} של Kilo כדי לסקור בקשות משיכה אוטומטית.",
       "githubApp": "אפליקציית GitHub",
@@ -875,7 +869,6 @@
       "gitlabError": "לא ניתן לפתוח את הגדרות GitLab. נסה שוב.",
       "bitbucketError": "לא ניתן לפתוח את הגדרות Bitbucket. נסה שוב."
     },
-    "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
     "reviewDetail": {
       "branch": "ענף",
       "byline": "{{repo}} #{{number}} מאת {{author}}",
@@ -884,22 +877,17 @@
       "cancelTitle": "לבטל את הסקירה?",
       "checkRun": "הרצת בדיקה",
       "completed": "הושלם",
-      "cost": "עלות",
       "couldNotGetLatest": "לא ניתן לקבל את הנתונים העדכניים.",
       "couldNotLoad": "לא ניתן לטעון את הסקירה.",
       "council": "צוות הסוקרים",
       "created": "נוצרה",
       "decision": "החלטה",
-      "details": "פרטים",
-      "findings": "ממצאים",
       "gate": "תנאי מעבר",
       "gateHidden": "מוסתר",
       "gateNone": "אין",
       "keepRunning": "המשך הרצה",
-      "model": "מודל",
       "noFindings": "לא נמצאו ממצאים.",
       "openPullRequest": "PR פתוח",
-      "platform": "פלטפורמה",
       "retryMessage": "פעולה זו תריץ מחדש את סקירת הקוד.",
       "retryReview": "הרצת הסקירה שוב",
       "retryTitle": "להריץ את הסקירה שוב?",
@@ -910,7 +898,6 @@
       "title": "סקירה",
       "tokens": "טוקנים",
       "tokensInOut": "{{input}} קלט / {{output}} פלט",
-      "pullRequest": "PR",
       "transcriptWaiting": "תמליל הסקירה עדיין אינו זמין.",
       "transcriptEmpty": "אין תמליל לסקירה זו.",
       "transcriptRetry": "לא ניתן לטעון את תמליל הסקירה.",
@@ -953,14 +940,12 @@
     },
     "scopeList": {
       "couldNotLoad": "לא הצלחנו לטעון את הארגונים.",
-      "personal": "אישי",
       "personalStillAvailable": "מאגרים אישיים עדיין זמינים למטה.",
       "personalSubtitle": "המאגרים שלך",
       "viewOnly": "לקריאה בלבד"
     },
     "selectRepositories": "בחירת מאגרים",
     "selectRepository": "בחר לפחות מאגר אחד כדי להפעיל סקירות אוטומטיות.",
-    "title": "סוקר קוד",
     "webhookSetup": "הגדרת ההתראות האוטומטיות לא הושלמה.",
     "webhookSetupDescription": "ייתכן שחלק מהמאגרים לא יקבלו סקירות אוטומטיות.",
     "decision": {
@@ -969,17 +954,13 @@
       "noResult": "אין תוצאה",
       "pass": "עבר"
     },
-    "eyebrow": "סוקר קוד",
     "overview": {
       "allAreas": "כל התחומים",
-      "allRepositories": "כל המאגרים",
       "customInstructions": "הוראות מותאמות אישית",
       "focusAreas": "תחומי מיקוד",
       "mergeGate": "תנאי סף למיזוג",
-      "model": "מודל",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",
-      "repositories": "מאגרים",
       "reviewMemory": "זיכרון סקירה",
       "reviewStyle": "סגנון סקירה",
       "set": "הוגדר"
@@ -988,11 +969,9 @@
     "configSaveFailed": "שמירת הגדרות הסקירה נכשלה.",
     "status": {
       "pending": "ממתין",
-      "queued": "בתור",
       "running": "בהרצה",
       "completed": "הושלם",
       "failed": "נכשל",
-      "cancelled": "בוטל",
       "interrupted": "הופסקה"
     },
     "reviewStyle": {
@@ -1010,42 +989,33 @@
       "documentation": "תיעוד"
     },
     "gateThreshold": {
-      "off": "כבוי",
-      "all": "הכול",
-      "warning": "אזהרה",
-      "critical": "קריטית"
+      "warning": "אזהרה"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "נדרש טיפול בסוקר הקוד.",
         "description": "סוקר הקוד הושבת כי Kilo לא יכול לגשת למאגר הזה דרך התקנה פעילה של אפליקציית GitHub. עדכן את התקנת האפליקציה והפעל שוב את סוקר הקוד.",
         "recoveryLabel": "עדכון אפליקציית GitHub"
       },
       "githubIpAllowList": {
-        "title": "נדרש טיפול בסוקר הקוד.",
-        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד.",
-        "recoveryLabel": "פנייה לתמיכה"
+        "description": "סוקר הקוד הושבת כי רשימת כתובות ה-IP המורשות בארגון הזה ב-GitHub חוסמת את Kilo. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
       },
       "gitlabProjectAccessRequired": {
-        "title": "נדרש טיפול בסוקר הקוד.",
         "description": "סוקר הקוד הושבת כי Kilo לא יכול ליצור אסימון גישה לפרויקט הזה ב-GitLab. תן הרשאת מתחזק או אפשר יצירת אסימוני גישה לפרויקט, והפעל שוב את סוקר הקוד.",
         "recoveryLabel": "עדכון החיבור ל-GitLab"
       },
       "byokInvalidKey": {
-        "title": "נדרש טיפול בסוקר הקוד.",
         "description": "סוקר הקוד הושבת כי מפתח ה-API שנבחר בהגדרות BYOK אינו תקין, בוטל או חסר הרשאות. עדכן את המפתח או בחר מודל אחר, והפעל שוב את סוקר הקוד.",
         "recoveryLabel": "עדכון הגדרות BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "נדרש טיפול בסוקר הקוד.",
         "description": "סוקר הקוד הושבת כי המודל שנבחר אינו זמין לסשנים של סוכן הענן. בחר מודל זמין והפעל שוב את סוקר הקוד.",
         "recoveryLabel": "עדכון הגדרות סוקר הקוד"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "נדרש טיפול בסוקר הקוד.",
-        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד.",
-        "recoveryLabel": "פנייה לתמיכה"
-      }
+        "description": "סוקר הקוד הושבת לאחר ששלושה ניסיונות לשכפול המאגר חרגו היום מהזמן המוקצב. פנה לעזרה בכתובת hi@kilocode.ai והפעל שוב את סוקר הקוד."
+      },
+      "title": "נדרש טיפול בסוקר הקוד.",
+      "recoveryLabel": "פנייה לתמיכה"
     },
     "unknownError": "שגיאה לא ידועה"
   },
@@ -1054,24 +1024,18 @@
       "noFilters": "אין מסננים זמינים",
       "noFiltersDescription": "חזור ופתח את המסננים מתוך רשימת הממצאים.",
       "title": "סינון ממצאים",
-      "all": "הכול",
-      "allRepositories": "כל המאגרים",
       "fixed": "תוקן",
       "outcome": "תוצאה",
       "outcomeAnalyzing": "בניתוח",
       "outcomeDismissed": "סומן להתעלמות",
-      "outcomeExploitable": "ניתן לניצול",
       "outcomeFailed": "הניתוח נכשל",
-      "outcomeNeedsReview": "נדרשת בדיקה",
       "outcomeNotAnalyzed": "לא נותח",
       "outcomeNotExploitable": "לא ניתן לניצול",
       "outcomeSafeToDismiss": "אפשר להתעלם בבטחה",
       "outcomeTriageComplete": "המיון הראשוני הושלם",
       "overdueOnly": "באיחור בלבד",
-      "repository": "מאגר",
       "reset": "איפוס",
       "severity": "חומרה",
-      "severityCritical": "קריטית",
       "severityHigh": "גבוהה",
       "severityLow": "נמוכה",
       "severityMedium": "בינונית",
@@ -1095,7 +1059,6 @@
       "exploitable": "ניתן לניצול",
       "fullReport": "הדוח המלא שנוצר",
       "keepWaiting": "המשך המתנה",
-      "model": "מודל",
       "no": "לא",
       "noAnalysisYet": "עדיין לא בוצע ניתוח",
       "noAnalysisYetDescription": "אפשר להריץ ניתוח דרך לשונית הפרטים.",
@@ -1108,7 +1071,6 @@
       "suggestedFix": "תיקון מוצע",
       "triageConfidence": "רמת הביטחון במיון הראשוני",
       "triageReasoning": "נימוקי המיון הראשוני",
-      "unknown": "לא ידוע",
       "watchInCloudAgent": "צפייה בסוכן הענן",
       "whereFound": "מיקומי הממצא ({{displayCount}})",
       "yes": "כן"
@@ -1116,21 +1078,17 @@
     "analysisSettings": {
       "analysisModel": "מודל לניתוח",
       "couldNotLoad": "לא ניתן לטעון את הגדרות הניתוח.",
-      "couldNotLoadModels": "לא הצלחנו לטעון את המודלים.",
       "depth": "עומק הניתוח",
       "modeAuto": "אוטומטי",
       "modeDeep": "מעמיק",
       "modeShallow": "שטחי",
-      "permissionNote": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
       "remediationModel": "מודל לתיקון",
       "title": "מודלים וניתוח",
       "triageModel": "מודל למיון ראשוני"
     },
     "auditReport": {
-      "checkConnection": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
       "couldNotLoad": "לא ניתן לטעון את דוח הביקורת.",
       "events": "אירועים",
-      "findings": "ממצאים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",
       "noActivity": "אין פעילות מתועדת",
       "noActivityDescription": "אין ב-Kilo פעילות לדיווח הקשורה לממצאי אבטחה בתקופה שבין {{start}} ל-{{end}}.",
@@ -1167,7 +1125,6 @@
       "includeExistingFindingsAnalysisSubtitle": "גם ממצאים שכבר סונכרנו ינותחו. פעולה זו עשויה לצרוך קרדיטים נוספים.",
       "includeExistingFindingsRemediationSubtitle": "גם ממצאים שכבר נותחו ועומדים בתנאים יתווספו לתור. לא ייפתחו PR כפולים.",
       "minimumSeverity": "חומרה מינימלית",
-      "permissionNote": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
       "queued": "{{displayCount}} ממצאים קיימים נוספו לתור לניתוח.",
       "queued_other": "{{displayCount}} ממצאים קיימים נוספו לתור לניתוח.",
       "queued_one": "{{displayCount}} ממצא קיים נוסף לתור הניתוח.",
@@ -1180,9 +1137,6 @@
       "title": "אוטומציה",
       "queued_two": "{{displayCount}} ממצאים קיימים נוספו לתור לניתוח."
     },
-    "commandRetry": {
-      "discard": "ויתור על השינויים"
-    },
     "dashboard": {
       "actFirst": "לטיפול בעדיפות ראשונה",
       "actionPosture": "מצב הטיפול",
@@ -1194,7 +1148,6 @@
       "daysOverdue": "איחור של {{displayCount}} ימים",
       "deadlineToday": "המועד האחרון חל היום",
       "filterByRepository": "סינון לפי מאגר",
-      "findings": "ממצאים",
       "findingsCount": "{{displayCount}} ממצאים",
       "highOverdue": "חומרה גבוהה — באיחור",
       "lastSynced": "סנכרון אחרון: {{time}}",
@@ -1268,7 +1221,6 @@
       "notFound": "הממצא לא נמצא",
       "notFoundDescription": "ייתכן שממצא זה הוסר, או שאין לך עוד גישה אליו.",
       "tabAnalysis": "ניתוח",
-      "tabDetails": "פרטים",
       "tabRemediation": "תיקון",
       "title": "ממצא"
     },
@@ -1277,13 +1229,11 @@
       "detected": "זוהה",
       "dismissed": "סומן להתעלמות",
       "dismissedBecause": "סיבת הדחייה: {{reason}}.",
-      "fixed": "תוקן",
       "ghsa": "GHSA",
       "manifest": "קובץ מניפסט",
       "noPatchAvailable": "אין תיקון זמין",
       "package": "חבילה",
       "patchedVersion": "גרסה מתוקנת",
-      "repository": "מאגר",
       "severityLabel": "חומרה: {{severity}}",
       "slaDeadline": "מועד אחרון לפי SLA",
       "source": "מקור",
@@ -1291,12 +1241,10 @@
       "sourceRecord": "רשומת מקור",
       "supersededBy": "הוחלף על ידי ממצא עדכני",
       "supersededByDescription": "הקש לפתיחת הרשומה העדכנית ולצפייה במצב, בניתוח ובתיקון.",
-      "unknown": "לא ידוע",
       "updated": "עודכן",
       "viewAdvisory": "צפייה בהודעת האבטחה ב-GitHub",
       "vulnerableVersions": "גרסאות פגיעות",
       "statusSuperseded": "הוחלף",
-      "statusFixed": "תוקן",
       "statusOpen": "פתוח",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "התיקון כבר התחיל",
@@ -1313,8 +1261,7 @@
       "emptyDescription": "אין כרגע ממצאים פתוחים שדורשים טיפול.",
       "emptyTitle": "אין ממצאים פתוחים",
       "noMatchesDescription": "נסה לשנות את המסננים שנבחרו או לאפס אותם.",
-      "noMatchesTitle": "אין ממצאים שתואמים למסננים",
-      "title": "ממצאים"
+      "noMatchesTitle": "אין ממצאים שתואמים למסננים"
     },
     "findingRow": {
       "a11y": "ממצא בחומרה {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1337,7 +1284,6 @@
       "newFindingSection": "התראה על ממצא חדש",
       "newFindingSeverityLabel": "חומרה מינימלית להתראה על ממצא חדש",
       "newFindingSubtitle": "נשלחת בכל פעם שממצא חדש מסונכרן, כולל בסנכרון הראשון.",
-      "readOnly": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
       "slaLeadTimeAccessibility": "מספר הימים להתראה מראש על מועד ה-SLA",
       "slaLeadTimeError": "יש להזין מספר ימים שלם בין 1 ל-365.",
       "slaLeadTimeHint": "יש להזין מספר שלם בין 1 ל-365",
@@ -1345,8 +1291,7 @@
       "slaPersonalTitle": "קבלת דוא״ל על אזהרות SLA",
       "slaSection": "התראת SLA",
       "slaSeverityLabel": "חומרה מינימלית להתראת SLA",
-      "slaSubtitle": "נשלחת מראש, כשמתקרב המועד האחרון לפי ה-SLA וכאשר המועד חולף.",
-      "title": "התראות"
+      "slaSubtitle": "נשלחת מראש, כשמתקרב המועד האחרון לפי ה-SLA וכאשר המועד חולף."
     },
     "remediation": {
       "attemptHistory": "היסטוריית ניסיונות ({{displayCount}})",
@@ -1359,19 +1304,16 @@
       "cancelled": "התיקון בוטל",
       "couldNotLoad": "לא ניתן לטעון את מצב התיקון.",
       "keepRunning": "המשך הרצה",
-      "model": "מודל",
       "noAnalysisDescription": "אפשר להריץ ניתוח דרך לשונית הפרטים.",
       "noAnalysisTitle": "עדיין לא בוצע ניתוח",
       "openDraftPullRequest": "פתיחת טיוטת בקשת משיכה{{number}}",
       "openPullRequest": "פתיחת בקשת משיכה{{number}}",
       "progress": "התקדמות",
-      "pullRequest": "PR",
       "retry": "ניסיון תיקון חוזר",
       "start": "התחלת תיקון",
       "startedBy": "הופעל על ידי",
       "timeline": {
         "blocked": "התיקון נחסם",
-        "cancelled": "בוטל",
         "failed": "התיקון נכשל",
         "noChangesNeeded": "אין צורך בשינויים",
         "prOpened": "נפתח PR",
@@ -1382,18 +1324,14 @@
       "unavailable": "לא ניתן להפעיל תיקון לממצא הזה."
     },
     "repositories": {
-      "allRepositories": "כל המאגרים",
       "couldNotLoad": "לא ניתן לטעון את הגדרות המאגרים.",
-      "couldNotLoadRepositories": "לא הצלחנו לטעון את המאגרים.",
       "couldNotOpenGithubSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
       "githubAppSettings": "הגדרות אפליקציית GitHub",
       "manageAccess": "ניהול הרשאות הגישה של אפליקציית GitHub",
       "noRepositories": "אין מאגרים",
       "noRepositoriesDescription": "יש לתת לאפליקציית Kilo ב-GitHub גישה למאגרים.",
-      "readOnly": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
       "selectAtLeastOne": "יש לבחור לפחות מאגר אחד.",
-      "selectedRepositories": "מאגרים שנבחרו",
-      "title": "מאגרים"
+      "selectedRepositories": "מאגרים שנבחרו"
     },
     "scopeEntry": {
       "connectDescription": "התקן את אפליקציית Kilo ב-GitHub כדי לסנכרן אוטומטית התראות Dependabot ולנהל ממצאי אבטחה בכל המאגרים שלך.",
@@ -1408,34 +1346,25 @@
     },
     "scopeList": {
       "couldNotLoad": "לא הצלחנו לטעון את הארגונים.",
-      "personal": "אישי",
-      "personalSubtitle": "המאגרים שלך",
-      "title": "סוכן אבטחה"
+      "personalSubtitle": "המאגרים שלך"
     },
     "settingsOverview": {
-      "allRepositories": "כל המאגרים",
       "analysisModeSubtitle": "ניתוח {{mode}}",
       "automation": "אוטומציה",
       "automationAllOff": "הכול כבוי",
       "automationCount": "{{displayCount}} מתוך 3 מופעלים",
       "couldNotLoadPermissions": "לא ניתן לטעון את ההרשאות.",
-      "couldNotLoadRepositories": "לא הצלחנו לטעון את המאגרים.",
       "couldNotLoadSettings": "לא ניתן לטעון את הגדרות סוכן האבטחה.",
       "disabled": "מושבת",
       "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון ומנהלי החיוב יכולים להפעיל אותו.",
       "disabledNoRepo": "יש לבחור לפחות מאגר אחד לפני הפעלת סוכן האבטחה.",
       "disabledPrompt": "הפעל את סוכן האבטחה כדי לסנכרן התראות Dependabot, לבחור מאגרים ולהגדיר אוטומציה.",
-      "enabled": "מופעל",
       "modelsAndAnalysis": "מודלים וניתוח",
-      "notifications": "התראות",
       "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
-      "off": "כבוי",
       "on": "מופעל",
-      "repositories": "מאגרים",
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_one": "{{displayCount}} מאגר נבחר",
-      "securityAgent": "סוכן אבטחה",
       "selectRepositories": "בחירת מאגרים",
       "selectRepositoriesSubtitle": "בחירת המאגרים שסוכן האבטחה יעקוב אחריהם",
       "slaPolicy": "מדיניות SLA",
@@ -1443,7 +1372,6 @@
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
-      "discard": "ויתור על השינויים",
       "keepEditing": "המשך עריכה",
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
@@ -1454,7 +1382,6 @@
     },
     "sla": {
       "couldNotLoad": "לא ניתן לטעון את הגדרות ה-SLA.",
-      "critical": "קריטית",
       "criticalDescription": "ניצול מרחוק ללא אימות.",
       "deadlinesHeading": "זמן לתיקון (בימים)",
       "enableTracking": "הפעלת מעקב אחר SLA",
@@ -1471,7 +1398,6 @@
       "remediationDeadlineA11y": "מספר הימים לתיקון ממצאים בחומרה {{label}}",
       "title": "מדיניות SLA"
     },
-    "title": "סוכן אבטחה",
     "initialSyncAdmissionFailed": "סוכן האבטחה הופעל, אך לא ניתן להוסיף את הסנכרון הראשוני לתור. נסה לסנכרן שוב.",
     "queuedActionUntracked": "לא ניתן עוד לעקוב אחר פעולה שנוספה לתור. רענן כדי לראות את המצב העדכני.",
     "commands": {
@@ -1499,22 +1425,16 @@
       "failed": "הניתוח נכשל",
       "failedTitle": "הניתוח נכשל",
       "failedDescription": "סוכן האבטחה לא הצליח להשלים את הניתוח.",
-      "extractionFailed": "נדרשת בדיקה",
-      "extractionFailedTitle": "נדרשת בדיקה",
       "extractionFailedDescription": "לא ניתן להמיר את הדוח הטכני לתוצאה מובנית.",
-      "exploitable": "ניתן לניצול",
-      "exploitableTitle": "ניתן לניצול",
       "exploitableDescription": "קוד האפליקציה יכול להגיע לתכונה הפגיעה.",
       "notExploitable": "לא נגיש",
       "notExploitableTitle": "לא נגיש",
       "notExploitableDescription": "לא נמצא במאגר הזה נתיב קוד שמגיע לתכונה הפגיעה.",
       "unknown": "נדרשת בדיקה",
-      "unknownTitle": "נדרשת בדיקה",
       "unknownDescription": "הניתוח לא הצליח לקבוע אם ניתן להגיע לתכונה הפגיעה.",
       "safeToDismiss": "אפשר להתעלם בבטחה",
       "safeToDismissTitle": "אפשר להתעלם בבטחה",
       "safeToDismissDescription": "במיון הראשוני נקבע שאפשר לדחות את הממצא בבטחה ללא ניתוח בסיס הקוד.",
-      "manualReview": "נדרשת בדיקה",
       "manualReviewTitle": "נדרשת בדיקה ידנית",
       "manualReviewDescription": "במיון הראשוני סומן הממצא הזה לבדיקה ידנית.",
       "analysisRequired": "נדרש ניתוח",
@@ -1529,7 +1449,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "תוקן לפני המועד האחרון",
-      "fixed": "תוקן",
       "fixedOn": "תוקן ב-{{date}}",
       "resolutionRecorded": "תועד פתרון",
       "superseded": "הוחלף",
@@ -1553,7 +1472,6 @@
     "remediationStatus": {
       "cancellationRequested": "נשלחה בקשת ביטול",
       "notStarted": "טרם התחיל",
-      "queued": "בתור",
       "starting": "מתחיל",
       "inProgress": "מתבצע",
       "draftPrOpened": "נפתחה טיוטת PR",
@@ -1561,7 +1479,6 @@
       "blocked": "נחסם",
       "failed": "נכשל",
       "noChangesNeeded": "אין צורך בשינויים",
-      "cancelled": "בוטל",
       "originAutomaticPolicy": "מדיניות אוטומטית",
       "originIncludeExistingPolicy": "מדיניות להכללת ממצאים קיימים",
       "originManual": "ידני",
@@ -1634,7 +1551,6 @@
     "sessionRow": {
       "deleteTitle": "למחוק את השיחה?",
       "deleteMessage": "לא ניתן לבטל פעולה זו.",
-      "delete": "מחיקה",
       "deleteSession": "מחיקת השיחה",
       "rename": "שינוי שם",
       "renameMessage": "הזן שם חדש לשיחה הזו.",
@@ -1685,7 +1601,6 @@
       "title": "סשן",
       "copyErrorDetails": "העתקת פרטי השגיאה",
       "backToSessions": "חזרה לסשנים",
-      "accessDenied": "אין הרשאת גישה.",
       "accessDeniedDescription": "אין לך הרשאה לצפות בזה.",
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
@@ -1701,7 +1616,6 @@
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
-      "continue": "המשך",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
@@ -1735,8 +1649,6 @@
     },
     "newSession": {
       "title": "סשן חדש",
-      "repository": "מאגר",
-      "connectGithub": "חיבור ל-GitHub",
       "connectGithubDescription": "חבר את חשבון GitHub דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתיחת GitHub",
       "refreshRepositories": "רענון המאגרים",
@@ -1761,7 +1673,6 @@
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
-      "discard": "ויתור על השינויים",
       "discardDraftMessage": "ההנחיה שלך תימחק.",
       "discardDraftTitle": "למחוק את הטיוטה?",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
@@ -1794,8 +1705,6 @@
       "updatedFileCount_two": "עודכנו {{displayCount}} קבצים."
     },
     "toolPatch": {
-      "operationAdded": "נוסף",
-      "operationDeleted": "נמחק",
       "operationUpdated": "עודכן"
     },
     "toolCard": {
@@ -1836,9 +1745,7 @@
       "runOn": "יעד ההרצה",
       "runOnAccessibility": "יעד ההרצה: {{label}}",
       "couldNotLoad": "לא ניתן היה לטעון את המופעים",
-      "couldNotLoadDescription": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
       "cloudAgent": "Cloud Agent",
-      "loading": "בטעינה…",
       "cloudAgentDescription": "הרצה בסביבה מבודדת בענן של Kilo",
       "noCliInstances": "אין מופעי CLI מחוברים",
       "noCliInstancesDescription": "הרץ `kilo remote` בתיקיית פרויקט במחשב שלך. אם Kilo CLI כבר פועל, עדכן אותו.",
@@ -1883,7 +1790,6 @@
       "loading": "טוען...",
       "accessibility": "מאגר: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -1898,9 +1804,7 @@
       "roleUser": "משתמש",
       "roleAssistant": "עוזר",
       "sent": "מועד השליחה",
-      "model": "מודל",
       "costAndTokens": "עלות וטוקנים",
-      "cost": "עלות",
       "input": "קלט",
       "output": "פלט",
       "reasoning": "חשיבה",
@@ -1916,7 +1820,6 @@
       "textDisplay": "תצוגת טקסט",
       "thinking": "חושב",
       "thought": "מחשבה",
-      "title": "פרטים",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
       "running": "פועל…"
@@ -1939,7 +1842,6 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
-      "imageUnavailable": "התמונה לא זמינה.",
       "imageUnavailableWithAlt": "התמונה אינה זמינה: {{alt}}.",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
@@ -2032,7 +1934,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. ניתן לנסות שוב.",
       "copyToComposer": "העתקה לשדה ההודעה",
-      "queued": "בתור",
       "queuedAccessibility": "ההודעה בתור",
       "userMessage": "הודעת משתמש",
       "assistantMessage": "הודעת עוזר",
@@ -2071,12 +1972,10 @@
     },
     "sessionFilter": {
       "title": "סינון סשנים",
-      "platform": "פלטפורמה",
       "platformCloud": "ענן",
       "platformExtension": "תוסף",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "אחר",
       "project": "פרויקט"
@@ -2098,7 +1997,6 @@
       "allModels": "כל המודלים"
     },
     "modelSelector": {
-      "model": "מודל",
       "provider": "ספק {{id}}",
       "modelId": "מודל {{id}}",
       "unavailable": "לא זמין",
@@ -2237,8 +2135,7 @@
       "merged": "בקשת משיכה שמוזגה",
       "draft": "טיוטת PR",
       "updating": "מעדכן, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "PR"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "טעינה",
@@ -2266,11 +2163,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "לא ניתן היה לטעון את החשבון שלך.",
-    "couldNotLoadAccountDescription": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
     "couldNotLoadPrivacy": "לא ניתן היה לטעון את העדפות הפרטיות.",
     "couldNotLoadPrivacyDescription": "בדוק את הגדרות האבטחה של המכשיר ונסה שוב.",
     "contentReady": "התוכן מוכן",
-    "signOut": "התנתקות",
     "retryLoadingAccount": "ניסיון נוסף לטעינת החשבון",
     "retryLoadingPrivacy": "ניסיון נוסף לטעינת העדפות הפרטיות"
   },
@@ -2296,7 +2191,6 @@
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
-    "signOutConfirm": "התנתקות",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "webBrowser": "דפדפן"
   },
@@ -2318,7 +2212,6 @@
   },
   "imageViewer": {
     "close": "סגירת {{filename}}",
-    "imageUnavailable": "התמונה לא זמינה.",
     "share": "שיתוף {{filename}}"
   },
   "invalidRoute": {
@@ -2337,11 +2230,8 @@
     "internetRestored": "החיבור לאינטרנט חזר"
   },
   "queryError": {
-    "neutralTitle": "משהו השתבש.",
     "neutralDescription": "נסה שוב.",
     "offlineTitle": "הטעינה נכשלה.",
-    "offlineDescription": "משהו השתבש.",
-    "permissionTitle": "אין הרשאת גישה.",
     "permissionDescription": "אין לך הרשאה לצפות בזה.",
     "notFoundTitle": "לא נמצא.",
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
@@ -2351,7 +2241,6 @@
   "screenHeader": {
     "openMenu": "פתיחת התפריט",
     "openMenuFor": "פתיחת התפריט של {{title}}",
-    "close": "סגירה",
     "goBack": "חזרה"
   },
   "picker": {
@@ -2383,7 +2272,6 @@
   },
   "share": {
     "title": "שיתוף עם Kilo",
-    "close": "סגירה",
     "reviewPr": "סקירת PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "סשן חדש",
@@ -2485,7 +2373,6 @@
     "privacyPolicyPrefix": "הנתונים שלך מטופלים לפי",
     "privacyPolicy": "מדיניות הפרטיות של Kilo",
     "onDevice": "במכשיר",
-    "loading": "בטעינה…",
     "couldNotLoadTranscription": "לא ניתן היה לטעון את הגדרת התמלול שלך.",
     "signInToManageTranscription": "היכנס כדי לנהל תמלול מקוון.",
     "onlineTranscription": "תמלול מקוון",
@@ -2502,7 +2389,6 @@
     "voiceTranscriptionTitle": "תמלול קולי",
     "retentionPrefix": "תקופות שמירת הנתונים, הזכויות שלך ופרטי הקשר מפורטים במסמך",
     "backToConsent": "חזרה למסך ההסכמה",
-    "back": "חזרה",
     "revokeConsent": "ביטול ההסכמה",
     "revokeConsentTitle": "לבטל את ההסכמה לשיתוף נתונים?",
     "acceptAndContinue": "אישור והמשך",
@@ -2546,12 +2432,10 @@
     "what": "אילו נתונים",
     "why": "לאיזו מטרה",
     "who": "למי נשלח",
-    "continue": "המשך",
     "installAttributionPromptMessage": "Kilo משתמש בהרשאת המעקב של Apple רק כדי לדעת מאיזה ערוץ הגעת. לעולם לא נעשה שימוש בהנחיות ובשיחות שלך למטרה הזו.",
     "installAttributionPromptTitle": "לאפשר זיהוי של מקור ההתקנה?"
   },
   "prReview": {
-    "accessDenied": "אין הרשאת גישה.",
     "accessDeniedDescription": "אין לך הרשאה לצפות בבקשת המשיכה הזו.",
     "checkConnection": "בדיקת החיבור",
     "checks": {
@@ -2568,8 +2452,7 @@
       "skipped": "דילוג על {{displayCount}}",
       "title": "בדיקות",
       "viewOnGitHub": "הצגת ה-PR ב-GitHub",
-      "checkDetails": "פרטי בדיקה",
-      "pullRequest": "PR"
+      "checkDetails": "פרטי בדיקה"
     },
     "composer": {
       "addTitle": "הוספת תגובה",
@@ -2578,7 +2461,6 @@
       "commentBody": "תוכן התגובה",
       "commentBodyPlaceholder": "כתיבת תגובה",
       "commentNow": "פרסום תגובה עכשיו",
-      "discard": "ויתור על השינויים",
       "discardMessage": "הטיוטה שלך תימחק.",
       "discardTitle": "למחוק את טיוטת התגובה?",
       "editTitle": "עריכת תגובה",
@@ -2598,8 +2480,7 @@
       "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
       "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
-      "reconnectTitle": "חיבור מחדש ל-GitHub",
-      "title": "חיבור ל-GitHub"
+      "reconnectTitle": "חיבור מחדש ל-GitHub"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "connectionExpiredDescription": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
@@ -2622,7 +2503,6 @@
       "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
       "couldNotReply": "לא הצלחנו לשלוח את התשובה.",
       "file": "קובץ",
-      "loadMore": "טעינת פריטים נוספים",
       "loadMoreComments": "טעינת תגובות נוספות",
       "loading": "הדיון נטען",
       "moderation": {
@@ -2668,7 +2548,6 @@
       "resolved": "טופל",
       "retryLoadingMore": "ניסיון נוסף לטעינת תגובות נוספות",
       "reviewFiles": "סקירת הקבצים",
-      "somethingWentWrong": "משהו השתבש.",
       "startedRelative": " · התחיל {{relative}}",
       "submitReply": "שליחת תשובה",
       "termsAcceptRetry": "לא ניתן היה לאשר את תנאי השירות. בדוק את החיבור ונסה שוב.",
@@ -2713,11 +2592,9 @@
       "openPullRequest": "PR פתוח",
       "pasteLink": "הדבקת קישור לבקשת משיכה",
       "pastePrLink": "הדבקת קישור ל-PR",
-      "remove": "הסרה",
       "removeFromRecentsMessage": "בקשת המשיכה הזו תוסר מרשימת הבקשות האחרונות שלך.",
       "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
       "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
-      "title": "סקירת PR",
       "urlAccessibility": "כתובת URL של בקשת משיכה ב-GitHub"
     },
     "eventChips": {
@@ -2737,7 +2614,6 @@
       "unified": "מאוחדת"
     },
     "fileNavigator": {
-      "checkConnection": "כדאי לבדוק את החיבור לאינטרנט ולנסות שוב.",
       "couldNotLoadFiles": "לא ניתן היה לטעון את הקבצים.",
       "couldNotLoadMoreFiles": "לא ניתן היה לטעון קבצים נוספים.",
       "diffTooLarge": "השוואת השינויים גדולה מדי",
@@ -2809,7 +2685,6 @@
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
       "couldNotLoadMore": "לא הצלחנו לטעון פריטים נוספים.",
-      "draft": "טיוטה",
       "loading": "הבקשות הנכנסות נטענות",
       "noReviewRequests": "אין בקשות לסקירה",
       "noReviewRequestsDescription": "כאן יופיעו בקשות משיכה שממתינות לסקירה שלך. אפשר גם להדביק למעלה קישור לכל PR.",
@@ -2902,7 +2777,6 @@
       "file_other": "קבצים",
       "file_one": "קובץ",
       "stateClosed": "סגור",
-      "stateDraft": "טיוטה",
       "stateMerged": "מוזג",
       "stateOpen": "פתוח",
       "stateOpenApproved": "פתוחה · אושרה",
@@ -2939,7 +2813,6 @@
       "shareA11y": "שיתוף בקשת המשיכה",
       "title": "#{{number}}"
     },
-    "screenTitle": "סקירת PR",
     "sideBySide": {
       "emptyDiffColumn": "עמודה ריקה בהשוואת השינויים",
       "emptyDiffRow": "שורה ריקה בהשוואת השינויים",
@@ -2949,7 +2822,6 @@
       "oldOnly": "רק בגרסה הישנה: {{text}}"
     },
     "submit": {
-      "delete": "מחיקה",
       "deletePendingMessage": "התגובה הזו תוסר מהתגובות שממתינות לשליחה בסקירה.",
       "deletePendingTitle": "למחוק תגובה ממתינה?",
       "loadFailedTitle": "לא ניתן היה לטעון את מסך שליחת הסקירה.",
@@ -2966,10 +2838,8 @@
       "blockedComment": "הוסף סיכום או לפחות תגובה אחת כדי לשלוח סקירה מסוג תגובה."
     },
     "fileStatus": {
-      "added": "נוסף",
       "changed": "השתנה",
       "copied": "הועתק",
-      "deleted": "נמחק",
       "modified": "שונה",
       "renamed": "השם שונה"
     },
@@ -2982,9 +2852,7 @@
       "selectedTapToChange": "נבחר: {{label}}, הקשה לשינוי הבחירה",
       "tapToComment": "{{label}}, הקשה להוספת תגובה",
       "truncationBanner": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub.",
-      "statusAdded": "נוסף",
       "statusContext": "הקשר",
-      "statusDeleted": "נמחק",
       "lineLabel": "שורה {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(ריק)"
@@ -3020,7 +2888,6 @@
       "selectDescription": "בחר ארגון מהפרופיל שלך כדי להמשיך.",
       "selectOrganization": "בחירת ארגון",
       "unavailableDescription": "הארגון הזה כבר אינו זמין. בחר ארגון אחר מהפרופיל שלך כדי להמשיך.",
-      "accessDeniedTitle": "אין הרשאת גישה.",
       "accessDeniedDescription": "אין לך גישה לארגון זה."
     },
     "creditActivity": {
@@ -3039,18 +2906,15 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "loadMore": "טעינת פריטים נוספים",
       "loadMoreFailed": "לא הצלחנו לטעון פריטים נוספים.",
       "truncated": "יש תנועות קודמות בקרדיטים."
     },
     "hub": {
       "balance": "יתרה",
       "lowBalanceBelow": "מתחת ל-{{amount}}",
-      "lowBalanceOff": "כבוי",
       "organizationSeats": "רישיונות הארגון",
       "renamePlaceholder": "שם הארגון",
-      "renameTitle": "שינוי שם הארגון",
-      "title": "ארגון"
+      "renameTitle": "שינוי שם הארגון"
     },
     "inviteMember": {
       "emailError": "הזן כתובת דוא״ל תקינה.",
@@ -3074,18 +2938,14 @@
         "paid": "שולם",
         "open": "פתוח",
         "void": "בוטלה",
-        "draft": "טיוטה",
-        "uncollectible": "לא ניתנת לגבייה",
-        "unknown": "לא ידוע"
+        "uncollectible": "לא ניתנת לגבייה"
       },
-      "loadMore": "טעינת פריטים נוספים",
       "loadMoreFailed": "לא הצלחנו לטעון פריטים נוספים.",
       "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "israel@company.com",
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
-      "enabled": "מופעל",
       "notifyEmailsLabel": "כתובות דוא״ל לקבלת התראות",
       "permissionDenied": "אין לך הרשאה לנהל התראות חיוב.",
       "separateEmailsHint": "אם הזנת כמה כתובות דוא״ל, הפרד ביניהן בפסיקים.",
@@ -3114,7 +2974,6 @@
       "limitPerDay": "{{amount}} ליום",
       "manageA11y": "ניהול {{name}}",
       "manageInvitationA11y": "ניהול ההזמנה עבור {{email}}",
-      "removeConfirm": "הסרה",
       "removeMember": "הסרת חבר",
       "removeMemberMessage": "להסיר את {{name}} מהארגון הזה?",
       "revokeConfirm": "ביטול",
@@ -3135,12 +2994,7 @@
       "resendInvite": "שליחת ההזמנה מחדש",
       "shareInviteLink": "שיתוף הקישור להזמנה"
     },
-    "permissionDenied": {
-      "back": "חזרה",
-      "title": "אין הרשאת גישה."
-    },
     "usageStats": {
-      "cost": "עלות",
       "inputTokens": "טוקני קלט",
       "last30Days": "30 הימים האחרונים",
       "outputTokens": "טוקני פלט",
@@ -3153,7 +3007,6 @@
       "creditProcessingDelayed": "עיבוד הקרדיטים מתעכב · מנסה שוב אוטומטית",
       "ended": "הסתיים",
       "endsOn": "מסתיים ב-{{date}}",
-      "loading": "בטעינה…",
       "manageHint": "פתיחת ניהול Kilo Pass באתר.",
       "notSubscribed": "אין מינוי",
       "overallocated": "מספר ההקצאות של Kilo Pass גדול ממספר הרישיונות בתשלום",
@@ -3227,16 +3080,12 @@
   },
   "quickChat": {
     "title": "צ׳אט",
-    "composer": {
-      "placeholder": "הודעה"
-    },
     "empty": {
       "title": "התחלת שיחה",
       "description": "שלח הודעה כדי לשוחח עם מודל."
     },
     "working": "בפעולה",
     "historyRetry": "לא ניתן לטעון את היסטוריית השיחה.",
-    "catalogRetry": "לא הצלחנו לטעון את המודלים.",
     "sendError": "לא ניתן לשלוח את ההודעה. נסה שוב."
   },
   "glanceable": {

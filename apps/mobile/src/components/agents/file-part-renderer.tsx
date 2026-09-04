@@ -263,9 +263,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
             accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
           >
             <AlertCircle size={14} color={colors.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">
-              {t('imageViewer.imageUnavailable')}
-            </Text>
+            <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
           </Pressable>
         );
       }
@@ -343,14 +341,14 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
           accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
         >
           <AlertCircle size={14} color={colors.mutedForeground} />
-          <Text className="text-xs text-muted-foreground">{t('imageViewer.imageUnavailable')}</Text>
+          <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
         </Pressable>
       );
     }
     return (
       <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <AlertCircle size={14} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">{t('imageViewer.imageUnavailable')}</Text>
+        <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
       </View>
     );
   }

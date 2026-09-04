@@ -27,7 +27,49 @@
     "somethingWentWrong": "Iets het verkeerd geloop.",
     "couldNotOpen": "Kon nie {{label}} oopmaak nie.",
     "link": "skakel",
-    "takingLonger": "Dit neem langer as verwag. Jy kan dit toemaak en weer nagaan."
+    "takingLonger": "Dit neem langer as verwag. Jy kan dit toemaak en weer nagaan.",
+    "model": "KI-model",
+    "accessDenied": "Toegang is geweier.",
+    "allRepositories": "Alle bewaarplekke",
+    "personal": "Persoonlik",
+    "connectGithub": "Koppel GitHub",
+    "cost": "Koste",
+    "discard": "Gooi weg",
+    "findings": "Bevindings",
+    "notConnected": "Nie gekoppel nie",
+    "notifications": "Kennisgewings",
+    "pullRequest": "trekversoek",
+    "repositories": "Bewaarplekke",
+    "securityAgent": "Sekuriteitsagent",
+    "unknown": "Onbekend",
+    "added": "Bygevoeg",
+    "cancelled": "Gekanselleer",
+    "close": "Maak toe",
+    "codeReviewer": "Kodehersiener",
+    "connected": "Gekoppel",
+    "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
+    "couldNotLoadRepositories": "Die bewaarplekke kon nie gelaai word nie.",
+    "critical": "Krities",
+    "delete": "Skrap",
+    "deleted": "Geskrap",
+    "details": "Besonderhede",
+    "draft": "Konsep",
+    "enabled": "Aangeskakel",
+    "github": "GitHub",
+    "imageUnavailable": "Die prent is nie beskikbaar nie.",
+    "loading": "Laai…",
+    "loadMore": "Laai meer",
+    "message": "Boodskap",
+    "off": "Af",
+    "organization": "Organisasie",
+    "platform": "Kodeplatform",
+    "prReview": "PR-hersiening",
+    "queued": "In die tou",
+    "remove": "Verwyder",
+    "repository": "Bewaarplek",
+    "signOut": "Meld af",
+    "agents": "Agente",
+    "all": "Alles"
   },
   "language": {
     "title": "Taal",
@@ -62,12 +104,10 @@
     "emailAddress": "E-posadres",
     "emailPlaceholder": "jou@voorbeeld.com",
     "continueWithEmail": "Gaan voort met e-pos",
-    "continue": "Gaan voort",
     "enterCodeSentTo": "Voer die kode in wat na {{email}} gestuur is.",
     "codeArrivalHint": "As hierdie adres kwalifiseer, kom die kode binne 'n minuut aan.",
     "verifyCode": "Verifieer kode",
     "resendCode": "Stuur kode weer",
-    "back": "Terug",
     "termsPrefix": "Deur voort te gaan, aanvaar jy ons",
     "terms": "Voorwaardes",
     "termsConnector": " en ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Profiel",
-    "agents": "Agente",
-    "codeReviewer": "Kodehersiener",
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
-    "securityAgent": "Sekuriteitsagent",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
     "reviews": "Hersienings",
-    "prReview": "PR-hersiening",
     "prReviewSubtitle": "Hersien trekversoeke op jou selfoon",
-    "organization": "Organisasie",
     "couldNotLoadOrganization": "Die organisasie kon nie gelaai word nie.",
     "couldNotLoadOrganizationDescription": "Organisasie- en agentinstellings is nie beskikbaar voordat die organisasie gelaai is nie.",
     "linkedAccounts": "Gekoppelde rekeninge",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Jou kredietsaldo is nul. Krediete vir hierdie rekening word buite die iOS-toep bestuur.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
-    "signOutConfirm": "Meld af",
     "deleteAccountTitle": "Skrap rekening?",
     "deleteAccountMessage": "Dit skrap jou rekening permanent en teken jou uit. Ons sal 'n bevestigingskode per e-pos aan jou stuur.",
     "deleteAccountConfirm": "Skrap rekening",
     "accountDeleted": "Jou rekening is geskrap.",
     "viewOrganization": "Bekyk organisasie",
     "manageOrganization": "Bestuur organisasie",
-    "personal": "Persoonlik",
     "selectAccount": "Kies rekening",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "E-pos",
     "providerTestAccount": "Toetsrekening",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",
     "keepScreenOnSubtitle": "Hou die skerm aan terwyl die sessie werk.",
     "appearance": "Voorkoms",
-    "notifications": "Kennisgewings",
     "notificationsSubtitle": "Voorkeure vir stootkennisgewings",
     "appearanceSystem": "Stelsel",
     "appearanceLight": "Lig",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
     "pullRequestUnavailableDescription": "Hierdie PR kan nie oopgemaak word nie. Dit is dalk geskrap, die bewaarplek is privaat, of die Kilo GitHub-toep is nie daarop geïnstalleer nie.",
-    "accessDenied": "Toegang is geweier.",
     "accessDeniedDescription": "Jy het nie toestemming om hierdie trekversoek te bekyk nie.",
     "noFilesChanged": "Geen lêers verander nie",
     "noFilesChangedDescription": "Hierdie trekversoek het geen lêerveranderings nie.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Kon nie die lêers laai nie.",
-      "checkConnection": "Kontroleer jou verbinding en probeer weer.",
       "retryLoadingFiles": "Probeer weer om die lêers te laai",
       "filterPlaceholder": "Lêerpad…",
       "viewedCount": "{{viewed}} van {{total}} bekyk",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "Kon nie meer kommentare laai nie.",
       "retryLoadingMore": "Probeer weer om meer kommentare te laai",
       "loadMoreComments": "Laai meer kommentare",
-      "loadMore": "Laai meer",
       "closeReactions": "Maak reaksies toe",
       "reactionsTitle": "Reaksies",
       "addReaction": "Voeg reaksie by",
@@ -352,7 +380,6 @@
       "reportUser": "Rapporteer gebruiker",
       "mute": "Demp",
       "block": "Blokkeer",
-      "somethingWentWrong": "Iets het verkeerd geloop.",
       "reportSubmitted": "Melding ingedien. Verwysing: {{receiptId}}",
       "blockedUser": "{{login}} geblokkeer",
       "mutedUser": "{{login}} gedemp",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "Hersien trekversoek",
     "headLine": "{{counts}} · jongste vaslegging {{sha}}",
     "entry": {
-      "title": "PR-hersiening",
       "eyebrow": "Maak 'n trekversoek met sy URL oop.",
       "pastePrLink": "Plak 'n PR-skakel",
       "noRecentPrs": "Geen onlangse PR's nie",
       "noRecentPrsDescription": "Plak hierbo 'n PR-skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
       "couldNotLoad": "Kon nie laai nie.",
-      "remove": "Verwyder",
       "removeFromRecentsTitle": "Verwyder uit onlangse trekversoeke?",
       "removeFromRecentsMessage": "Hierdie trekversoek sal uit jou lys van onlangse trekversoeke verwyder word.",
       "removeRecentAccessibility": "Verwyder {{repo}} uit onlangse trekversoeke",
@@ -460,13 +485,11 @@
       "pending": "{{displayCount}} uitstaande",
       "skipped": "{{displayCount}} oorgeslaan",
       "checksCount": "{{displayCount}} kontroles",
-      "checkDetails": "kontrolebesonderhede",
-      "pullRequest": "trekversoek"
+      "checkDetails": "kontrolebesonderhede"
     },
     "inbox": {
       "title": "Inkas",
       "recent": "Onlangse items",
-      "draft": "Konsep",
       "loading": "Laai inkas",
       "noReviewRequests": "Geen hersieningsversoeke nie",
       "noReviewRequestsDescription": "Trekversoeke wat op jou hersiening wag, verskyn hier. Jy kan steeds enige PR-skakel hierbo plak.",
@@ -488,7 +511,6 @@
       "discardTitle": "Verwerp kommentaar?",
       "discardMessage": "Jou konsep sal verlore gaan.",
       "keepEditing": "Gaan voort met wysiging",
-      "discard": "Gooi weg",
       "comment": "Kommentaar",
       "insertSuggestionA11y": "Voeg 'n kodevoorstel in",
       "insertSuggestion": "Voeg voorstel in",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "Voorstelle geld net vir bygevoegde reëls.",
       "tapDiffLineToSuggest": "Tik op 'n reël in die verskille om voorstelle te aktiveer."
     },
-    "screenTitle": "PR-hersiening",
     "connect": {
       "checkFailedTitle": "Kon nie die GitHub-verbinding kontroleer nie.",
       "checkFailedMessage": "Die aanmeldstatus is nie beskikbaar voordat hierdie inligting gelaai is nie.",
       "reconnectTitle": "Koppel GitHub weer",
-      "title": "Koppel GitHub",
       "reconnectDescription": "Jou GitHub-verbinding is herroep. Koppel weer om steeds trekversoeke op jou foon te kan hersien.",
       "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien."
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "Kon nie die indieningskerm vir die hersiening laai nie.",
       "deletePendingTitle": "Skrap hangende kommentaar?",
       "deletePendingMessage": "Hierdie kommentaar sal uit die hersieningswaglys verwyder word.",
-      "delete": "Skrap",
       "summaryOptional": "Opsomming (opsioneel)",
       "pendingComment_one": "hangende kommentaar",
       "pendingComment": "hangende kommentare",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "Saamgevoeg",
       "stateClosed": "Gesluit",
-      "stateDraft": "Konsep",
       "stateOpenApproved": "Oop · goedgekeur",
       "stateOpenChangesRequested": "Oop · veranderings versoek",
       "stateOpenReviewRequired": "Oop · hersiening vereis",
@@ -572,8 +590,6 @@
       "discussion": "Bespreking"
     },
     "fileStatus": {
-      "added": "Bygevoeg",
-      "deleted": "Geskrap",
       "modified": "Gewysig",
       "renamed": "Hernoem",
       "copied": "Gekopieer",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "{{label}} gekies, tik om die keuse te verander",
       "truncationBanner": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet.",
       "tapToComment": "{{label}}, tik om kommentaar te lewer",
-      "statusAdded": "Bygevoeg",
       "statusContext": "Konteks",
-      "statusDeleted": "Geskrap",
       "lineLabel": "{{status}} reël {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(leeg)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "Kennisgewings",
     "liveActivities": "Intydse aktiwiteite",
     "liveActivitySubtitle": "Wys aktiewe agente op die sluitskerm",
     "liveUpdates": "Intydse opdaterings",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "Tuis",
-    "agents": "Agente",
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "Geen KiloClaw-instansies nie",
       "noInstancesDescription": "Stel 'n instansie op om te begin klets.",
       "setUpKiloclaw": "Stel KiloClaw op",
-      "currentInstance": "{{title}}, huidige instansie",
-      "personal": "Persoonlik"
+      "currentInstance": "{{title}}, huidige instansie"
     },
     "conversation": {
       "failedToLoad": "Die gesprek kon nie gelaai word nie.",
@@ -722,7 +733,6 @@
       "cancelReply": "Kanselleer antwoord",
       "openInstance": "Maak instansie oop",
       "attachFile": "Heg lêer aan",
-      "messagePlaceholder": "Boodskap",
       "cancelEdit": "Kanselleer wysiging",
       "sendMessage": "Stuur boodskap"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "Maak {{filename}} oop",
-      "imageUnavailable": "Die prent is nie beskikbaar nie.",
       "openFailed": "Die aanhegsel kon nie oopgemaak word nie. Gaan jou verbinding na en probeer weer.",
       "attachFailed": "Die lêer kon nie aangeheg word nie.",
       "limit": "Jy kan tot {{displayCount}} lêers aanheg.",
@@ -771,7 +780,6 @@
       "yourMessage": "Jou boodskap",
       "messageFrom": "Boodskap van {{author}}",
       "moreActions": "Meer aksies",
-      "message": "Boodskap",
       "notDelivered": "Nie afgelewer nie",
       "edited": "(gewysig)",
       "image": "Prent",
@@ -783,7 +791,6 @@
       "title": "Boodskapaksies",
       "deleteTitle": "Skrap boodskap?",
       "deleteMessage": "Dit sal die boodskap uit die gesprek verwyder.",
-      "delete": "Skrap",
       "deleteFailed": "Die boodskap kon nie geskrap word nie.",
       "removeReactionFailed": "Die reaksie kon nie verwyder word nie.",
       "addReactionFailed": "Die reaksie kon nie bygevoeg word nie.",
@@ -813,7 +820,6 @@
       "online": "Aanlyn",
       "idle": "Onaktief",
       "offline": "Vanlyn",
-      "unknown": "Onbekend",
       "loadingUser": "Laai gebruiker...",
       "waitingForStatus": "Wag vir botstatus...",
       "offlineMessage": "Die bot is vanlyn. Boodskappe sal weer deurkom wanneer dit weer verbind is."
@@ -885,7 +891,6 @@
       "destroyMessage": "Dit sal jou KiloClaw-instansie en al sy data permanent vernietig. Hierdie aksie kan nie ongedaan gemaak word nie.",
       "destroyTitle": "Vernietig instansie",
       "instance": "Instansie",
-      "renameFailed": "Iets het verkeerd geloop.",
       "couldNotCheckStatus": "Kon nie die diensstatus kontroleer nie.",
       "dangerZone": "GEVAARSONE",
       "destroying": "Besig om te vernietig…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "Kon nie die opstelopdrag laai nie.",
       "gmailNotifications": "Gmail-kennisgewings",
       "disconnect": "Ontkoppel Google-rekening",
-      "connected": "Gekoppel",
       "copied": "Gekopieer",
       "copyCommand": "Kopieer opdrag",
       "disabled": "Afgeskakel",
       "disconnectConfirm": "Ontkoppel",
       "disconnectMessage": "Verwyder jou Google-rekening van hierdie instansie? Dit sal Gmail-kennisgewings deaktiveer. Herontplooi die instansie ná ontkoppeling om die veranderings toe te pas.",
-      "disconnectTitle": "Ontkoppel Google",
-      "enabled": "Aangeskakel",
-      "notConnected": "Nie gekoppel nie"
+      "disconnectTitle": "Ontkoppel Google"
     },
     "modelList": {
       "title": "Alle modelle",
       "searchPlaceholder": "Soek modelle...",
-      "couldNotLoad": "Die modelle kon nie gelaai word nie.",
       "clearSearch": "Vee soektog uit",
       "noMatches": "Geen modelle pas by jou soektog nie",
       "noModels": "Geen modelle beskikbaar nie",
       "noModelsDescription": "Modelle sal hier verskyn sodra dit beskikbaar is.",
       "noResultsFor": "Daar is geen resultate vir \"{{query}}\" nie.",
       "recommended": "Aanbeveel"
-    },
-    "model": {
-      "title": "KI-model"
     },
     "secrets": {
       "title": "Geheime",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "opstelgids vir {{label}}",
       "setupGuide": "opstelgids",
       "saving": "Besig om te stoor…",
-      "remove": "Verwyder",
       "removing": "Besig om te verwyder…",
-      "connected": "Gekoppel",
-      "notConnected": "Nie gekoppel nie",
       "updateToken": "Werk toegangsteken by",
       "connect": "Koppel"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "Skep instansie",
       "organizations": "Organisasies",
-      "personal": "Persoonlik",
       "accessIssue": {
         "trialExpired": "Proeftydperk verby — teken in om hierdie instansie te bly gebruik",
         "subscriptionCanceled": "Intekening onaktief — teken weer in om hierdie instansie te bly gebruik",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "Maak kilo.ai oop",
         "provisioning": "Voorbereiding",
         "review": "Hersiening",
-        "somethingWentWrong": "Iets het verkeerd geloop.",
         "identityTitle": "Gee jou bot 'n identiteit",
-        "close": "Maak toe",
         "couldNotLoad": "Kon nie die opstelstatus laai nie.",
         "finishingSetup": "Ons voltooi die opstelling. Wag 'n oomblik terwyl ons jou rekening klaar opstel.",
         "ready": "Gereed",
@@ -1080,7 +1072,6 @@
         "location": "Ligging",
         "locationPlaceholder": "Stad of streek (opsioneel)",
         "useCurrentLocation": "Gebruik huidige ligging",
-        "continue": "Gaan voort",
         "locationDeniedTitle": "Liggingstoegang geweier",
         "locationDeniedMessage": "Laat toegang tot jou ligging in die instellings toe om jou huidige ligging te gebruik.",
         "locationValidationFailed": "Jou ligging kon nie bevestig word nie.",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "POORTPROSES",
       "lastExit": "Laaste beëindiging",
       "memory": "Geheue",
-      "model": "KI-model",
       "region": "Streek",
       "resources": "HULPBRONNE",
       "restarts": "Herbeginnings",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "Die beste werkverrigting. Gebruik die mees gevorderde modelle met redeneervermoë.",
       "balancedLabel": "Gebalanseerd",
       "balancedDescription": "Slim balans van spoed en vermoë teen laer koste.",
-      "cost": "Koste",
       "performance": "Werkverrigting",
       "autoModelA11y": "{{label}}, outomatiese modelkeuse",
       "currentModel": "Huidige model",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google-rekening",
       "modelDescription": "KI-modelkeuse",
-      "modelLabel": "KI-model",
       "secretsDescription": "Geënkripteerde aanmeldbesonderhede",
       "secretsLabel": "Geheime",
       "versionPinDescription": "Pen op 'n spesifieke weergawe vas",
@@ -1251,12 +1239,9 @@
       "placeholder": "Bv. Pas ons konvensies vir foutafhandeling toe…"
     },
     "repos": {
-      "title": "Bewaarplekke",
-      "couldNotLoad": "Die bewaarplekke kon nie gelaai word nie.",
       "unavailable": "Die bewaarplekke is nie beskikbaar nie. Voltooi die Bitbucket-opstelling op kilo.ai.",
       "finishSetup": "Voltooi opstelling",
       "manageAccess": "Bestuur toegang",
-      "allRepositories": "Alle bewaarplekke",
       "bitbucketNoRepositoriesDescription": "Geen bewaarplekke is in hierdie Bitbucket-werkruimte beskikbaar nie.",
       "bitbucketSetup": "Bitbucket-opstelling",
       "couldNotOpenGithubSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
@@ -1274,7 +1259,6 @@
       "roast": "Genadeloos eerlik, op 'n vermaaklike manier",
       "strict": "Wys elke probleem uit en stel hoë vereistes"
     },
-    "title": "Kodehersiener",
     "reviewDetail": {
       "title": "Hersiening",
       "cancelTitle": "Kanselleer hersiening?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "Die hersiening kon nie gelaai word nie.",
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",
       "byline": "{{repo}} #{{number}} deur {{author}}",
-      "findings": "Bevindings",
       "noFindings": "Daar is geen bevindings nie.",
       "showMore": "Wys meer",
-      "details": "Besonderhede",
       "branch": "Tak",
-      "platform": "Kodeplatform",
-      "model": "KI-model",
       "created": "Geskep",
       "started": "Begin",
       "completed": "Voltooi",
-      "cost": "Koste",
       "tokens": "Tekseenhede",
       "tokensInOut": "{{input}} in / {{output}} uit",
       "openPullRequest": "Oop trekversoek",
@@ -1309,7 +1288,6 @@
       "checkRun": "Kontrole-uitvoering",
       "status": "Toestand",
       "threshold": "Drempel",
-      "pullRequest": "trekversoek",
       "transcriptWaiting": "Die transkripsie van die hersiening is nog nie beskikbaar nie.",
       "transcriptEmpty": "Daar is geen transkripsie vir hierdie hersiening nie.",
       "transcriptRetry": "Die transkripsie van die hersiening kon nie gelaai word nie.",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "Ons kon nie jou gekoppelde verskaffers laai nie. Probeer asseblief weer.",
       "connectProvider": "Koppel 'n verskaffer",
       "connectProviderDescription": "Koppel GitHub om 'n handmatige hersiening van 'n trekversoek te begin.",
-      "connectGitHub": "Koppel GitHub",
-      "platform": "Kodeplatform",
-      "notConnected": "Nie gekoppel nie",
       "pullRequestUrl": "Trekversoek-URL",
       "instructions": "Instruksies (opsioneel)",
       "instructionsPlaceholder": "Enigiets spesifieks waarop die hersiener moet fokus…",
-      "model": "KI-model",
       "starting": "Hersiening begin…",
       "start": "Begin hersiening"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "Kies bewaarplekke",
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
-    "readOnlyDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars en faktureringsbestuurders kan dit koppel.",
       "setupIncomplete": "Die opstelling is onvolledig. Voltooi dit op kilo.ai.",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "Die organisasies kon nie gelaai word nie.",
       "personalStillAvailable": "Persoonlike bewaarplekke is steeds hieronder beskikbaar.",
-      "personal": "Persoonlik",
       "personalSubtitle": "Jou eie bewaarplekke",
       "viewOnly": "Slegs bekyk"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "Besig om na te gaan…",
       "statusUnavailable": "Status onbeskikbaar",
-      "connected": "Gekoppel",
-      "notConnected": "Nie gekoppel nie",
-      "organization": "Organisasie",
       "platforms": "Kodeplatforms",
       "activity": "Aktiwiteit"
     },
     "providerConnect": {
       "githubApp": "GitHub-app",
-      "connectGitHub": "Koppel GitHub",
       "githubError": "Die GitHub-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
       "gitlabAccount": "GitLab-rekening",
       "connectGitLab": "Koppel GitLab",
@@ -1421,10 +1389,7 @@
       "allAreas": "Alle fokusareas",
       "customInstructions": "Pasgemaakte instruksies",
       "set": "Ingestel",
-      "model": "KI-model",
       "mergeGate": "Samevoegingsvereistes",
-      "repositories": "Bewaarplekke",
-      "allRepositories": "Alle bewaarplekke",
       "nSelected": "{{displayCount}} gekies",
       "reviewMemory": "Hersieningsgeheue",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
@@ -1435,16 +1400,13 @@
       "noDecision": "Geen besluit",
       "noResult": "Geen resultaat"
     },
-    "eyebrow": "Kodehersiener",
     "updateFailed": "Die Kodehersiener kon nie bygewerk word nie.",
     "configSaveFailed": "Die hersieningsinstellings kon nie gestoor word nie.",
     "status": {
       "pending": "Hangend",
-      "queued": "In die tou",
       "running": "Aktief",
       "completed": "Voltooi",
       "failed": "Misluk",
-      "cancelled": "Gekanselleer",
       "interrupted": "Onderbreek"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "Dokumentasie"
     },
     "gateThreshold": {
-      "off": "Af",
-      "all": "Alles",
-      "warning": "Waarskuwing",
-      "critical": "Krities"
+      "warning": "Waarskuwing"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Die kodehersiener het aandag nodig.",
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie met 'n aktiewe GitHub-appinstallasie toegang tot hierdie bewaarplek het nie. Werk die GitHub-appinstallasie by en aktiveer die Kodehersiener weer.",
         "recoveryLabel": "Werk die GitHub-app by"
       },
       "githubIpAllowList": {
-        "title": "Die kodehersiener het aandag nodig.",
-        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer.",
-        "recoveryLabel": "Kontak ondersteuning"
+        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Die kodehersiener het aandag nodig.",
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen instandhouertoegang of aktiveer projektoegangstokens en aktiveer die Kodehersiener daarna weer.",
         "recoveryLabel": "Werk GitLab-integrasie by"
       },
       "byokInvalidKey": {
-        "title": "Die kodehersiener het aandag nodig.",
         "description": "Die Kodehersiener is gedeaktiveer omdat die gekose BYOK-API-sleutel ongeldig of herroep is, of nie die vereiste toestemmings het nie. Werk die sleutel by of kies 'n ander model en aktiveer die Kodehersiener daarna weer.",
         "recoveryLabel": "Werk BYOK-instellings by"
       },
       "selectedModelUnavailable": {
-        "title": "Die kodehersiener het aandag nodig.",
         "description": "Die Kodehersiener is gedeaktiveer omdat die gekose model nie vir wolkagentsessies beskikbaar is nie. Kies 'n beskikbare model en aktiveer die Kodehersiener weer.",
         "recoveryLabel": "Werk die Kodehersiener se instellings by"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Die kodehersiener het aandag nodig.",
-        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer.",
-        "recoveryLabel": "Kontak ondersteuning"
-      }
+        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+      },
+      "title": "Die kodehersiener het aandag nodig.",
+      "recoveryLabel": "Kontak ondersteuning"
     },
     "unknownError": "Onbekende fout"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "Gaan terug en maak die filters weer vanuit die bevindingslys oop.",
       "title": "Filtreer bevindings",
       "reset": "Stel terug",
-      "repository": "Bewaarplek",
       "status": "Toestand",
       "severity": "Ernsgraad",
       "outcome": "Uitkoms",
       "slaStatus": "SLA-status",
       "sortBy": "Sorteer volgens",
-      "allRepositories": "Alle bewaarplekke",
-      "all": "Alles",
       "statusOpen": "Oop",
       "fixed": "Reggestel",
       "statusIgnored": "Geïgnoreer",
       "statusClosed": "Gesluit",
-      "severityCritical": "Krities",
       "severityHigh": "Hoog",
       "severityMedium": "Matig",
       "severityLow": "Laag",
       "outcomeNotAnalyzed": "Nog nie ontleed nie",
       "outcomeAnalyzing": "Word ontleed",
       "outcomeFailed": "Ontleding misluk",
-      "outcomeExploitable": "Uitbuitbaar",
       "outcomeNotExploitable": "Nie uitbuitbaar nie",
       "outcomeSafeToDismiss": "Veilig om te verwerp",
-      "outcomeNeedsReview": "Hersiening nodig",
       "outcomeTriageComplete": "Aanvanklike beoordeling voltooi",
       "outcomeDismissed": "Verwerp",
       "sortSeverityDesc": "Ernsgraad: hoog na laag",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "Aktiveer outomatiese verwerping",
       "enableAutoDismissSubtitle": "Verwerp bevindings outomaties as kunsmatige intelligensie bepaal dat hulle nie uitbuitbaar is nie.",
       "confidenceThreshold": "Sekerheidsdrempel",
-      "permissionNote": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
       "enableAutoRemediationConfirmTitle": "Aktiveer outomatiese regstelling?",
       "enableAutoRemediationConfirmMessage": "Die Sekuriteitsagent sal outomaties regstellings-PR's oopmaak vir uitbuitbare bevindings wat daarvoor kwalifiseer.",
       "enable": "Aktiveer",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "Voorgestelde aksie",
       "triageReasoning": "Redes vir aanvanklike beoordeling",
       "exploitable": "Uitbuitbaar",
-      "model": "KI-model",
       "notRecorded": "Nie aangeteken nie",
       "analyzed": "Ontleed",
       "exploitabilityReasoning": "Redes vir uitbuitbaarheidsoordeel",
       "suggestedFix": "Voorgestelde regstelling",
       "whereFound": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
-      "unknown": "Onbekend",
       "yes": "Ja",
       "no": "Nee"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "{{open}} oop · {{critical}} kritiek · {{high}} hoog",
       "couldNotLoad": "Die paneelborddata kon nie gelaai word nie.",
       "filterByRepository": "Filtreer volgens bewaarplek",
-      "findings": "Bevindings",
       "lastSynced": "Laas gesinkroniseer: {{time}}",
       "manageRepositories": "Bestuur bewaarplekke",
       "notYetSynced": "Nog nie gesinkroniseer nie",
@@ -1686,23 +1629,19 @@
       "severityLabel": "Ernsgraad: {{severity}}",
       "package": "Pakket",
       "vulnerableVersions": "Kwesbare weergawes",
-      "unknown": "Onbekend",
       "patchedVersion": "Weergawe met regstelling",
       "noPatchAvailable": "Geen regstelling beskikbaar nie",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Bewaarplek",
       "manifest": "Manifes",
       "detected": "Opgespoor",
       "updated": "Bygewerk",
-      "fixed": "Reggestel",
       "slaDeadline": "SLA-sperdatum",
       "sourceRecord": "Bronrekord",
       "source": "Bron",
       "sourceId": "Bron-ID",
       "viewAdvisory": "Bekyk sekuriteitskennisgewing op GitHub",
       "statusSuperseded": "Vervang",
-      "statusFixed": "Reggestel",
       "statusOpen": "Oop",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Regstelling reeds begin",
@@ -1716,25 +1655,18 @@
       "title": "Instellings",
       "couldNotLoadSettings": "Die Sekuriteitsagent se instellings kon nie gelaai word nie.",
       "couldNotLoadPermissions": "Die toestemmings kon nie gelaai word nie.",
-      "couldNotLoadRepositories": "Die bewaarplekke kon nie gelaai word nie.",
-      "securityAgent": "Sekuriteitsagent",
-      "enabled": "Aangeskakel",
       "disabled": "Afgeskakel",
       "on": "Aan",
-      "off": "Af",
-      "allRepositories": "Alle bewaarplekke",
       "repositoriesCount_one": "{{displayCount}} bewaarplek gekies",
       "repositoriesCount": "{{displayCount}} bewaarplekke gekies",
       "repositoriesCount_other": "{{displayCount}} bewaarplekke gekies",
       "selectRepositories": "Kies bewaarplekke",
       "selectRepositoriesSubtitle": "Kies watter bewaarplekke die Sekuriteitsagent monitor",
-      "repositories": "Bewaarplekke",
       "modelsAndAnalysis": "Modelle en ontleding",
       "analysisModeSubtitle": "Ontleding: {{mode}}",
       "automation": "Outomatisering",
       "automationAllOff": "Alles af",
       "automationCount": "{{displayCount}} van 3 geaktiveer",
-      "notifications": "Kennisgewings",
       "notificationsCount": "{{displayCount}} van 2 geaktiveer",
       "slaPolicy": "SLA-beleid",
       "disabledNoManage": "Die Sekuriteitsagent is gedeaktiveer. Slegs organisasie-eienaars en faktureringsbestuurders kan dit aktiveer.",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "Kansellasie versoek",
       "cancelled": "Regstelling gekanselleer",
-      "pullRequest": "trekversoek",
       "couldNotLoad": "Die regstellingsstatus kon nie gelaai word nie.",
       "noAnalysisTitle": "Nog geen ontleding nie",
       "noAnalysisDescription": "Begin 'n ontleding op die Besonderhede-oortjie.",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "Vorige pogings ({{displayCount}})",
       "attemptNumber": "Poging #{{number}}",
       "startedBy": "Begin deur",
-      "model": "KI-model",
       "branch": "Tak",
       "queued": "Regstelling in die tou geplaas",
       "retryQueued": "Nuwe regstellingspoging in die tou geplaas",
@@ -1769,20 +1699,17 @@
         "prOpened": "PR geopen",
         "failed": "Regstelling misluk",
         "blocked": "Regstelling geblokkeer",
-        "noChangesNeeded": "Geen veranderinge nodig nie",
-        "cancelled": "Gekanselleer"
+        "noChangesNeeded": "Geen veranderinge nodig nie"
       },
       "unavailable": "Geen regstelling is vir hierdie bevinding beskikbaar nie."
     },
     "analysisSettings": {
       "title": "Modelle en ontleding",
       "couldNotLoad": "Die ontledingsinstellings kon nie gelaai word nie.",
-      "permissionNote": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
       "depth": "Ontledingsdiepte",
       "modeAuto": "Outo",
       "modeShallow": "Vlak",
       "modeDeep": "Diep",
-      "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
       "triageModel": "Model vir aanvanklike beoordeling",
       "analysisModel": "Ontledingsmodel",
       "remediationModel": "Regstellingsmodel"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "SLA-beleid",
       "couldNotLoad": "Die SLA-instellings kon nie gelaai word nie.",
-      "critical": "Krities",
       "high": "Hoog",
       "medium": "Matig",
       "low": "Laag",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "Bevinding",
-      "tabDetails": "Besonderhede",
       "tabAnalysis": "Ontleding",
       "tabRemediation": "Regstelling",
       "notFound": "Bevinding nie gevind nie",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "Verwerp bevinding"
     },
     "findingList": {
-      "title": "Bevindings",
       "couldNotLoad": "Die bevindings kon nie gelaai word nie.",
       "couldNotLoadMore": "Meer bevindings kon nie gelaai word nie.",
       "noMatchesTitle": "Geen bevindings pas by die filters nie",
@@ -1827,13 +1751,8 @@
       "clearFilters": "Vee filters uit"
     },
     "scopeList": {
-      "title": "Sekuriteitsagent",
       "couldNotLoad": "Die organisasies kon nie gelaai word nie.",
-      "personal": "Persoonlik",
       "personalSubtitle": "Jou eie bewaarplekke"
-    },
-    "commandRetry": {
-      "discard": "Gooi weg"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Regstellings-PR oop",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "Kon GitHub nie oopmaak nie. Probeer asseblief weer."
     },
     "settingsSave": {
-      "discard": "Gooi weg",
       "keepEditing": "Gaan voort met wysiging",
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "Die ouditverslag kon nie gelaai word nie.",
       "events": "Gebeure",
-      "findings": "Bevindings",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",
       "noActivity": "Geen aangetekende aktiwiteit nie",
       "noActivityDescription": "Kilo het geen rapporteerbare aktiwiteit oor sekuriteitsbevindings van {{start}} tot {{end}} nie.",
@@ -1875,8 +1792,7 @@
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
       "unavailableDescription": "Slegs organisasie-eienaars en faktureringsbestuurders kan ouditverslae bekyk. Vra 'n eienaar of faktureringsbestuurder om jou toegang te gee.",
-      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer.",
-      "checkConnection": "Kontroleer jou verbinding en probeer weer."
+      "queryFailed": "Die verslagnavraag is nie voltooi nie. Probeer weer."
     },
     "notifications": {
       "couldNotLoad": "Die kennisgewinginstellings kon nie gelaai word nie.",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "Kennisgewing oor nuwe bevindings",
       "newFindingSeverityLabel": "Minimum ernsgraad vir nuwe bevindings",
       "newFindingSubtitle": "Word gestuur wanneer 'n nuwe bevinding gesinkroniseer word, ook tydens die eerste sinkronisasie.",
-      "readOnly": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
       "slaLeadTimeAccessibility": "Aantal dae voor die SLA-sperdatum vir waarskuwings",
       "slaLeadTimeError": "Voer 'n aantal dae tussen 1 en 365 as 'n heelgetal in.",
       "slaLeadTimeHint": "Voer 'n heelgetal tussen 1 en 365 in",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "E-pos my oor SLA-waarskuwings",
       "slaSection": "Kennisgewing oor SLA-waarskuwings",
       "slaSeverityLabel": "Minimum ernsgraad vir SLA-kennisgewings",
-      "slaSubtitle": "Word gestuur voordat bevindings hul SLA-sperdatum nader, en wanneer hulle dit nader of oorskry.",
-      "title": "Kennisgewings"
+      "slaSubtitle": "Word gestuur voordat bevindings hul SLA-sperdatum nader, en wanneer hulle dit nader of oorskry."
     },
     "repositories": {
-      "allRepositories": "Alle bewaarplekke",
       "couldNotLoad": "Die bewaarplekinstellings kon nie gelaai word nie.",
-      "couldNotLoadRepositories": "Die bewaarplekke kon nie gelaai word nie.",
       "couldNotOpenGithubSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
       "githubAppSettings": "GitHub-appinstellings",
       "manageAccess": "Bestuur die GitHub-app se toegang",
       "noRepositories": "Geen bewaarplekke nie",
       "noRepositoriesDescription": "Gee die Kilo GitHub-app toegang tot bewaarplekke.",
-      "readOnly": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
       "selectAtLeastOne": "Kies ten minste een bewaarplek.",
-      "selectedRepositories": "Gekose bewaarplekke",
-      "title": "Bewaarplekke"
+      "selectedRepositories": "Gekose bewaarplekke"
     },
     "scopeEntry": {
       "connectDescription": "Installeer die Kilo GitHub-app om Dependabot-waarskuwings outomaties te sinkroniseer en sekuriteitsbevindings in jou bewaarplekke te bestuur.",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "'n Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",
     "initialSyncAdmissionFailed": "Die Sekuriteitsagent is geaktiveer, maar die eerste sinkronisasie kon nie in die tou geplaas word nie. Sinkroniseer weer.",
-    "title": "Sekuriteitsagent",
     "commands": {
       "findingAlreadyDismissed": "Bevinding is reeds verwerp",
       "findingDismissed": "Bevinding verwerp",
@@ -1949,22 +1858,16 @@
       "failed": "Ontleding misluk",
       "failedTitle": "Ontleding misluk",
       "failedDescription": "Die Sekuriteitsagent kon nie die ontleding voltooi nie.",
-      "extractionFailed": "Hersiening nodig",
-      "extractionFailedTitle": "Hersiening nodig",
       "extractionFailedDescription": "Die tegniese verslag kon nie in 'n gestruktureerde resultaat omskep word nie.",
-      "exploitable": "Uitbuitbaar",
-      "exploitableTitle": "Uitbuitbaar",
       "exploitableDescription": "Die toepassingskode kan die betrokke funksie bereik.",
       "notExploitable": "Onbereikbaar",
       "notExploitableTitle": "Onbereikbaar",
       "notExploitableDescription": "Geen bereikbare pad is in hierdie bewaarplek gevind nie.",
       "unknown": "Hersiening nodig",
-      "unknownTitle": "Hersiening nodig",
       "unknownDescription": "Die ontleding kon nie bevestig of die kwesbare funksie bereikbaar is nie.",
       "safeToDismiss": "Veilig om te verwerp",
       "safeToDismissTitle": "Veilig om te verwerp",
       "safeToDismissDescription": "Die aanvanklike beoordeling het bepaal dat hierdie bevinding veilig verwerp kan word sonder om die kodebasis te ontleed.",
-      "manualReview": "Hersiening nodig",
       "manualReviewTitle": "Handmatige hersiening nodig",
       "manualReviewDescription": "Die aanvanklike beoordeling het hierdie bevinding vir handmatige hersiening gemerk.",
       "analysisRequired": "Ontleding vereis",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Voor sperdatum reggestel",
-      "fixed": "Reggestel",
       "fixedOn": "Reggestel op {{date}}",
       "resolutionRecorded": "Oplossing aangeteken",
       "superseded": "Vervang",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "Kansellasie versoek",
       "notStarted": "Nie begin nie",
-      "queued": "In die tou",
       "starting": "Begin tans",
       "inProgress": "Aan die gang",
       "draftPrOpened": "Konsep-PR geopen",
@@ -2009,7 +1910,6 @@
       "blocked": "Geblokkeer",
       "failed": "Misluk",
       "noChangesNeeded": "Geen veranderinge nodig nie",
-      "cancelled": "Gekanselleer",
       "originAutomaticPolicy": "Outomatiese beleid",
       "originIncludeExistingPolicy": "Beleid vir insluiting van bestaande bevindings",
       "originManual": "Handmatig",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "Skrap sessie?",
       "deleteMessage": "Dit kan nie ongedaan gemaak word nie.",
-      "delete": "Skrap",
       "deleteSession": "Skrap sessie",
       "rename": "Hernoem",
       "renameMessage": "Voer 'n nuwe naam vir hierdie sessie in.",
@@ -2130,7 +2029,6 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
-      "accessDenied": "Toegang is geweier.",
       "accessDeniedDescription": "Jy het nie toestemming om dit te bekyk nie.",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
       "cloningSession": "Sessie word gekloon",
-      "continue": "Gaan voort",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "cloneFailedRetry": "Hierdie sessie kon nie gekloon word nie. Probeer weer.",
       "notEnoughCredits": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie. Voeg krediete by en probeer weer.",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "Nuwe sessie",
-      "repository": "Bewaarplek",
-      "connectGithub": "Koppel GitHub",
       "connectGithubDescription": "Koppel GitHub in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
       "refreshRepositories": "Verfris bewaarplekke",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
       "keepEditing": "Gaan voort met wysiging",
-      "discard": "Gooi weg",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n aktiewe CLI-sessie, om 'n plaaslike kilo-proses te beheer.",
       "bitbucketConnected": "Bitbucket gekoppel",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "{{displayCount}} lêers is bygewerk."
     },
     "toolPatch": {
-      "operationAdded": "Bygevoeg",
-      "operationDeleted": "Geskrap",
       "operationUpdated": "Bygewerk"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "Voer uit op",
       "runOnAccessibility": "Voer uit op: {{label}}",
       "couldNotLoad": "Kon instansies nie laai nie",
-      "couldNotLoadDescription": "Kontroleer jou verbinding en probeer weer.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Laai…",
       "cloudAgentDescription": "Voer uit in Kilo se afgesonderde wolkomgewing",
       "noCliInstances": "Geen CLI-instansies gekoppel nie",
       "noCliInstancesDescription": "Voer `kilo remote` in 'n projek op jou rekenaar uit, of werk Kilo CLI by as dit reeds loop.",
@@ -2323,7 +2213,6 @@
       "loading": "Laai...",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "Gebruiker",
       "roleAssistant": "Assistent",
       "sent": "Gestuur",
-      "model": "KI-model",
       "costAndTokens": "Koste en tekens",
-      "cost": "Koste",
       "input": "Invoer",
       "output": "Uitset",
       "reasoning": "Redenering",
@@ -2360,7 +2247,6 @@
       "textDisplay": "Teksvertoning",
       "thinking": "Dink",
       "thought": "Gedagte",
-      "title": "Besonderhede",
       "showDetails": "Wys besonderhede",
       "pending": "Hangende…",
       "running": "Besig…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "Laai afbeelding",
       "imageUnavailableRetry": "Afbeelding onbeskikbaar, probeer weer om dit te laai",
-      "imageUnavailable": "Die prent is nie beskikbaar nie.",
       "imageUnavailableWithAlt": "Die afbeelding is nie beskikbaar nie: {{alt}}.",
       "imagePreviewUnavailableInSession": "'n Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
       "viewImage": "Bekyk afbeelding",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Jy kan weer probeer.",
       "copyToComposer": "Kopieer na boodskapinvoer",
-      "queued": "In die tou",
       "queuedAccessibility": "Boodskap in die wagry",
       "userMessage": "Gebruikersboodskap",
       "assistantMessage": "Assistentboodskap",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "Filtreer sessies",
-      "platform": "Kodeplatform",
       "platformCloud": "Wolk",
       "platformExtension": "Uitbreiding",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Ander",
       "project": "Projek"
@@ -2539,7 +2421,6 @@
       "noModelsDescription": "Geen modelle is beskikbaar om te kies nie."
     },
     "modelSelector": {
-      "model": "KI-model",
       "provider": "Verskaffer {{id}}",
       "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
@@ -2677,8 +2558,7 @@
       "merged": "saamgevoegde trekversoek",
       "draft": "Konseptrekversoek",
       "updating": "Word bygewerk, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "trekversoek"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Laai",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kon nie jou rekening laai nie.",
-    "couldNotLoadAccountDescription": "Kontroleer jou verbinding en probeer weer.",
     "couldNotLoadPrivacy": "Kon nie die privaatheidskeuses laai nie.",
     "couldNotLoadPrivacyDescription": "Kontroleer jou toestel se sekuriteitsinstellings en probeer weer.",
     "contentReady": "Inhoud gereed",
-    "signOut": "Meld af",
     "retryLoadingAccount": "Probeer weer om die rekening te laai",
     "retryLoadingPrivacy": "Probeer weer om die privaatheidskeuses te laai"
   },
@@ -2737,7 +2615,6 @@
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
     "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Dit kan nog tot 'n uur lank API-toegang behou.",
-    "signOutConfirm": "Meld af",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry."
   },
   "forceUpdate": {
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "Maak {{filename}} toe",
-    "imageUnavailable": "Die prent is nie beskikbaar nie.",
     "share": "Deel {{filename}}"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "Internetverbinding herstel"
   },
   "queryError": {
-    "neutralTitle": "Iets het verkeerd geloop.",
     "neutralDescription": "Probeer asseblief weer.",
     "offlineTitle": "Die inhoud kon nie gelaai word nie.",
-    "offlineDescription": "Iets het verkeerd geloop.",
-    "permissionTitle": "Toegang is geweier.",
     "permissionDescription": "Jy het nie toestemming om dit te bekyk nie.",
     "notFoundTitle": "Die item is nie gevind nie.",
     "notFoundDescription": "Hierdie item is moontlik verwyder of is nie meer beskikbaar nie.",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "Maak spyskaart oop",
     "openMenuFor": "Maak spyskaart vir {{title}} oop",
-    "close": "Maak toe",
     "goBack": "Gaan terug"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "Deel met Kilo",
-    "close": "Maak toe",
     "reviewPr": "Hersien PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Nuwe sessie",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "Jou data word hanteer volgens die",
     "privacyPolicy": "Kilo-privaatheidsbeleid",
     "onDevice": "Op die toestel",
-    "loading": "Laai…",
     "couldNotLoadTranscription": "Jou transkripsie-instelling kon nie gelaai word nie.",
     "signInToManageTranscription": "Teken in om aanlyn transkripsie te bestuur.",
     "onlineTranscription": "Aanlyn transkripsie",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "Stemtranskripsie",
     "retentionPrefix": "Die volledige bewaringstydperke, jou regte en kontakinligting staan in die",
     "backToConsent": "Terug na toestemming",
-    "back": "Terug",
     "revokeConsent": "Herroep toestemming",
     "revokeConsentTitle": "Toestemming vir datadeling herroep?",
     "acceptAndContinue": "Aanvaar en gaan voort",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "Slegs op die toestel, of Apple of Google wanneer hierdie toestel nie vanlyn kan transkribeer nie.",
     "installAttributionPromptTitle": "Installasietoeskrywing toelaat?",
     "installAttributionPromptMessage": "Kilo gebruik Apple se nasporingstoestemming net om vas te stel watter kanaal jou hierheen gebring het. Jou opdragte en gesprekke word nooit gebruik nie.",
-    "continue": "Gaan voort",
     "what": "Wat",
     "why": "Hoekom",
     "who": "Wie"
@@ -3007,7 +2875,6 @@
       "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
       "selectOrganization": "Kies 'n organisasie",
       "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
-      "accessDeniedTitle": "Toegang is geweier.",
       "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "Boekhoudkundige aanpassing",
         "credits_expired": "Krediete het verval"
       },
-      "loadMore": "Laai meer",
       "loadMoreFailed": "Meer items kon nie gelaai word nie.",
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
@@ -3052,18 +2918,14 @@
         "paid": "Betaal",
         "open": "Oop",
         "void": "Nietig",
-        "draft": "Konsep",
-        "uncollectible": "Oninbaar",
-        "unknown": "Onbekend"
+        "uncollectible": "Oninbaar"
       },
-      "loadMore": "Laai meer",
       "loadMoreFailed": "Meer items kon nie gelaai word nie.",
       "truncated": "Ouer fakture is beskikbaar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "naam@maatskappy.com",
       "enableA11y": "Aktiveer waarskuwing vir lae saldo",
-      "enabled": "Aangeskakel",
       "notifyEmailsLabel": "E-posadresse vir kennisgewings",
       "permissionDenied": "Jy het nie toestemming om faktureringswaarskuwings te bestuur nie.",
       "separateEmailsHint": "Skei verskeie e-posadresse met kommas.",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "Bestuur {{name}}",
       "manageInvitationA11y": "Bestuur uitnodiging vir {{email}}",
-      "removeConfirm": "Verwyder",
       "removeMember": "Verwyder lid",
       "removeMemberMessage": "Wil jy {{name}} uit hierdie organisasie verwyder?",
       "revokeConfirm": "Herroep",
@@ -3113,25 +2974,18 @@
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel"
     },
-    "permissionDenied": {
-      "back": "Terug",
-      "title": "Toegang is geweier."
-    },
     "usageStats": {
-      "cost": "Koste",
       "inputTokens": "Invoertekens",
       "last30Days": "Laaste 30 dae",
       "outputTokens": "Uitsettekens",
       "requests": "Versoeke"
     },
     "hub": {
-      "title": "Organisasie",
       "renameTitle": "Hernoem organisasie",
       "renamePlaceholder": "Organisasienaam",
       "balance": "Saldo",
       "organizationSeats": "Gebruikersplekke in die organisasie",
-      "lowBalanceBelow": "Onder {{amount}}",
-      "lowBalanceOff": "Af"
+      "lowBalanceBelow": "Onder {{amount}}"
     },
     "kiloPass": {
       "activating": "Word geaktiveer",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "Kredietverwerking vertraag · probeer outomaties weer",
       "ended": "Geëindig",
       "endsOn": "Eindig op {{date}}",
-      "loading": "Laai…",
       "manageHint": "Maak Kilo Pass-bestuur op die web oop.",
       "notSubscribed": "Nie ingeteken nie",
       "overallocated": "Kilo Pass-toewysings oorskry die aantal betaalde gebruikersplekke",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "Klets",
-    "composer": {
-      "placeholder": "Boodskap"
-    },
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."
     },
     "working": "Besig",
     "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
-    "catalogRetry": "Die modelle kon nie gelaai word nie.",
     "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
   },
   "glanceable": {

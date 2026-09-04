@@ -27,7 +27,49 @@
     "somethingWentWrong": "문제가 발생했습니다.",
     "couldNotOpen": "{{label}}을(를) 열지 못했습니다.",
     "link": "링크",
-    "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다."
+    "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다.",
+    "model": "모델",
+    "accessDenied": "접근 권한이 없습니다.",
+    "allRepositories": "모든 저장소",
+    "personal": "개인",
+    "connectGithub": "GitHub 연결",
+    "cost": "비용",
+    "discard": "버리기",
+    "findings": "진단 결과",
+    "notConnected": "연결 안 됨",
+    "notifications": "알림",
+    "pullRequest": "풀 리퀘스트",
+    "repositories": "저장소",
+    "securityAgent": "보안 에이전트",
+    "unknown": "알 수 없음",
+    "added": "추가됨",
+    "cancelled": "취소됨",
+    "close": "닫기",
+    "codeReviewer": "코드 리뷰어",
+    "connected": "연결됨",
+    "couldNotLoadModels": "모델을 불러오지 못했습니다.",
+    "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
+    "critical": "치명적",
+    "delete": "삭제",
+    "deleted": "삭제됨",
+    "details": "세부 정보",
+    "draft": "초안",
+    "enabled": "활성화됨",
+    "github": "GitHub",
+    "imageUnavailable": "이미지를 표시할 수 없습니다.",
+    "loading": "불러오는 중…",
+    "loadMore": "더 보기",
+    "message": "메시지",
+    "off": "꺼짐",
+    "organization": "조직",
+    "platform": "플랫폼",
+    "prReview": "PR 리뷰",
+    "queued": "대기 중",
+    "remove": "제거",
+    "repository": "저장소",
+    "signOut": "로그아웃",
+    "agents": "에이전트",
+    "all": "전체"
   },
   "language": {
     "title": "언어",
@@ -62,12 +104,10 @@
     "emailAddress": "이메일 주소",
     "emailPlaceholder": "email@example.com",
     "continueWithEmail": "이메일로 계속하기",
-    "continue": "계속하기",
     "enterCodeSentTo": "{{email}}로 보낸 코드를 입력하세요.",
     "codeArrivalHint": "코드를 받을 수 있는 이메일 주소라면 1분 이내에 코드가 도착합니다.",
     "verifyCode": "코드 확인",
     "resendCode": "코드 다시 보내기",
-    "back": "뒤로",
     "termsPrefix": "계속하면 다음",
     "terms": "약관",
     "termsConnector": " 및 ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "프로필",
-    "agents": "에이전트",
-    "codeReviewer": "코드 리뷰어",
     "codeReviewerSubtitle": "자동 PR 리뷰",
-    "securityAgent": "보안 에이전트",
     "securityAgentSubtitle": "취약점 탐지 및 해결",
     "reviews": "리뷰",
-    "prReview": "PR 리뷰",
     "prReviewSubtitle": "모바일에서 풀 리퀘스트 리뷰",
-    "organization": "조직",
     "couldNotLoadOrganization": "조직을 불러올 수 없습니다.",
     "couldNotLoadOrganizationDescription": "조직 정보를 불러올 때까지 조직 및 에이전트 설정을 사용할 수 없습니다.",
     "linkedAccounts": "연결된 계정",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "남은 크레딧이 없습니다. 이 계정의 크레딧은 iOS 앱 외부에서 관리됩니다.",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
-    "signOutConfirm": "로그아웃",
     "deleteAccountTitle": "계정을 삭제할까요?",
     "deleteAccountMessage": "계정이 영구적으로 삭제되며 로그아웃됩니다. 확인 코드를 이메일로 보내드립니다.",
     "deleteAccountConfirm": "계정 삭제",
     "accountDeleted": "계정이 삭제되었습니다.",
     "viewOrganization": "조직 보기",
     "manageOrganization": "조직 관리",
-    "personal": "개인",
     "selectAccount": "계정 선택",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "이메일",
     "providerTestAccount": "테스트 계정",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
     "keepScreenOnSubtitle": "세션이 실행되는 동안 화면이 꺼지지 않도록 합니다.",
     "appearance": "화면 스타일",
-    "notifications": "알림",
     "notificationsSubtitle": "푸시 알림 설정",
     "appearanceSystem": "시스템",
     "appearanceLight": "라이트",
@@ -159,7 +190,6 @@
     "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다."
   },
   "notifications": {
-    "title": "알림",
     "liveActivities": "실시간 활동",
     "liveActivitySubtitle": "잠금 화면에 실행 중인 에이전트 표시",
     "liveUpdates": "실시간 업데이트",
@@ -215,7 +245,6 @@
   },
   "tabs": {
     "home": "홈",
-    "agents": "에이전트",
     "profile": "프로필",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -229,8 +258,7 @@
       "noInstances": "KiloClaw 인스턴스 없음",
       "noInstancesDescription": "채팅을 시작하려면 인스턴스를 설정하세요.",
       "setUpKiloclaw": "KiloClaw 설정",
-      "currentInstance": "{{title}}, 현재 선택된 인스턴스",
-      "personal": "개인"
+      "currentInstance": "{{title}}, 현재 선택된 인스턴스"
     },
     "conversation": {
       "failedToLoad": "대화를 불러오지 못했습니다.",
@@ -268,7 +296,6 @@
       "cancelReply": "답장 취소",
       "openInstance": "인스턴스 열기",
       "attachFile": "파일 첨부",
-      "messagePlaceholder": "메시지",
       "cancelEdit": "편집 취소",
       "sendMessage": "메시지 보내기"
     },
@@ -287,7 +314,6 @@
     },
     "attachment": {
       "open": "{{filename}} 열기",
-      "imageUnavailable": "이미지를 표시할 수 없습니다.",
       "openFailed": "첨부 파일을 열 수 없습니다. 연결을 확인하고 다시 시도하세요.",
       "attachFailed": "파일을 첨부하지 못했습니다.",
       "limit": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
@@ -317,7 +343,6 @@
       "yourMessage": "내 메시지",
       "messageFrom": "{{author}}님의 메시지",
       "moreActions": "추가 작업",
-      "message": "메시지",
       "notDelivered": "전송 안 됨",
       "edited": "(수정됨)",
       "image": "이미지",
@@ -329,7 +354,6 @@
       "title": "메시지 작업",
       "deleteTitle": "메시지를 삭제할까요?",
       "deleteMessage": "대화에서 이 메시지가 삭제됩니다.",
-      "delete": "삭제",
       "deleteFailed": "메시지를 삭제하지 못했습니다.",
       "removeReactionFailed": "반응을 제거하지 못했습니다.",
       "addReactionFailed": "반응을 추가하지 못했습니다.",
@@ -359,7 +383,6 @@
       "online": "온라인",
       "idle": "대기 중",
       "offline": "오프라인",
-      "unknown": "알 수 없음",
       "loadingUser": "사용자 정보 불러오는 중...",
       "waitingForStatus": "봇 상태 확인 대기 중...",
       "offlineMessage": "봇이 오프라인입니다. 다시 연결되면 메시지 송수신이 재개됩니다."
@@ -431,7 +454,6 @@
       "destroyMessage": "KiloClaw 인스턴스와 모든 데이터가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
       "destroyTitle": "인스턴스 영구 삭제",
       "instance": "인스턴스",
-      "renameFailed": "문제가 발생했습니다.",
       "couldNotCheckStatus": "서비스 상태를 확인하지 못했습니다.",
       "dangerZone": "주의가 필요한 작업",
       "destroying": "삭제 중…",
@@ -480,29 +502,22 @@
       "failedToLoadCommand": "설정 명령을 불러오지 못했습니다.",
       "gmailNotifications": "Gmail 알림",
       "disconnect": "Google 계정 연결 해제",
-      "connected": "연결됨",
       "copied": "복사 완료",
       "copyCommand": "명령 복사",
       "disabled": "비활성화됨",
       "disconnectConfirm": "연결 해제",
       "disconnectMessage": "이 인스턴스에서 Google 계정을 제거할까요? Gmail 알림이 꺼집니다. 변경 사항을 적용하려면 연결 해제 후 다시 배포하세요.",
-      "disconnectTitle": "Google 연결 해제",
-      "enabled": "활성화됨",
-      "notConnected": "연결 안 됨"
+      "disconnectTitle": "Google 연결 해제"
     },
     "modelList": {
       "title": "모든 모델",
       "searchPlaceholder": "모델 검색...",
-      "couldNotLoad": "모델을 불러오지 못했습니다.",
       "clearSearch": "검색어 지우기",
       "noMatches": "검색 결과에 해당하는 모델 없음",
       "noModels": "사용 가능한 모델 없음",
       "noModelsDescription": "사용 가능한 모델이 여기에 표시됩니다.",
       "noResultsFor": "\"{{query}}\" 검색 결과가 없습니다.",
       "recommended": "추천"
-    },
-    "model": {
-      "title": "모델"
     },
     "secrets": {
       "title": "시크릿",
@@ -514,10 +529,7 @@
       "saved": "{{label}} 저장됨",
       "allFieldsRequired": "{{label}} 연결에 필요한 모든 항목을 입력하세요.",
       "connect": "연결",
-      "connected": "연결됨",
       "hide": "{{label}} 숨기기",
-      "notConnected": "연결 안 됨",
-      "remove": "제거",
       "removing": "제거 중…",
       "saving": "저장 중…",
       "setupGuide": "설정 가이드",
@@ -615,7 +627,6 @@
     "list": {
       "createInstance": "인스턴스 만들기",
       "organizations": "조직",
-      "personal": "개인",
       "accessIssue": {
         "trialExpired": "무료 체험 종료 · 계속 이용하려면 구독",
         "subscriptionCanceled": "구독 중단 · 계속 이용하려면 다시 구독",
@@ -631,7 +642,6 @@
       "balancedLabel": "균형형",
       "browseAllModels": "또는 500개 이상의 모델 중에서 선택",
       "browseAllModelsA11y": "500개 이상의 모든 모델 둘러보기",
-      "cost": "비용",
       "currentModel": "현재 모델",
       "frontierDescription": "추론 기능을 갖춘 최상위 모델을 선택해 최고의 성능을 제공합니다.",
       "frontierLabel": "프런티어",
@@ -646,7 +656,6 @@
         "warmedUp": "준비가 모두 끝났습니다. 언제든 인사를 건네세요."
       },
       "flow": {
-        "close": "닫기",
         "couldNotLoad": "초기 설정 상태를 불러오지 못했습니다.",
         "finishingSetup": "계정 설정을 마무리하고 있습니다. 잠시만 기다려 주세요.",
         "genericErrorBody": "인스턴스 설정을 완료하지 못했습니다.",
@@ -657,13 +666,11 @@
         "provisioning": "프로비저닝",
         "ready": "준비됨",
         "review": "리뷰",
-        "settingUp": "설정 중…",
-        "somethingWentWrong": "문제가 발생했습니다."
+        "settingUp": "설정 중…"
       },
       "identity": {
         "changePersonality": "성격 변경",
         "chooseAvatar": "아바타 선택",
-        "continue": "계속하기",
         "location": "위치",
         "locationDeniedMessage": "현재 위치를 사용하려면 설정에서 위치 접근을 허용하세요.",
         "locationDeniedTitle": "위치 접근 권한 없음",
@@ -720,7 +727,6 @@
       "gatewayProcess": "게이트웨이 프로세스",
       "lastExit": "마지막 종료",
       "memory": "메모리",
-      "model": "모델",
       "region": "지역",
       "resources": "리소스",
       "restarts": "재시작 횟수",
@@ -748,7 +754,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google 계정",
       "modelDescription": "AI 모델 선택",
-      "modelLabel": "모델",
       "secretsDescription": "암호화된 인증 정보",
       "secretsLabel": "시크릿",
       "versionPinDescription": "특정 버전에 고정",
@@ -797,12 +802,9 @@
       "placeholder": "예: 오류 처리 규칙 적용…"
     },
     "repos": {
-      "title": "저장소",
-      "couldNotLoad": "저장소를 불러오지 못했습니다.",
       "unavailable": "저장소를 사용할 수 없습니다. kilo.ai에서 Bitbucket 설정을 완료하세요.",
       "finishSetup": "설정 완료",
       "manageAccess": "접근 권한 관리",
-      "allRepositories": "모든 저장소",
       "bitbucketNoRepositoriesDescription": "이 Bitbucket 작업 영역에 사용 가능한 저장소가 없습니다.",
       "bitbucketSetup": "Bitbucket 설정",
       "couldNotOpenGithubSettings": "GitHub 앱 설정을 열지 못했습니다.",
@@ -837,7 +839,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectGitHub": "GitHub 연결",
       "connectProvider": "서비스 연결",
       "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
@@ -845,9 +846,6 @@
       "instructions": "지침(선택 사항)",
       "instructionsPlaceholder": "리뷰어가 집중해야 할 사항…",
       "invalidUrl": "올바른 풀 리퀘스트 URL을 입력하세요.",
-      "model": "모델",
-      "notConnected": "연결 안 됨",
-      "platform": "플랫폼",
       "pullRequestUrl": "풀 리퀘스트 URL",
       "start": "리뷰 시작",
       "starting": "리뷰 시작 중…",
@@ -857,14 +855,10 @@
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
-      "connected": "연결됨",
-      "notConnected": "연결 안 됨",
-      "organization": "조직",
       "platforms": "플랫폼",
       "statusUnavailable": "상태 확인 불가"
     },
     "providerConnect": {
-      "connectGitHub": "GitHub 연결",
       "connectGitLab": "GitLab 연결",
       "description": "풀 리퀘스트를 자동으로 리뷰하려면 Kilo {{label}} 연결을 설정하세요.",
       "githubApp": "GitHub 앱",
@@ -873,7 +867,6 @@
       "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요.",
       "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
-    "readOnlyDescription": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
     "reviewDetail": {
       "branch": "브랜치",
       "byline": "{{repo}} #{{number}} · {{author}}",
@@ -882,22 +875,17 @@
       "cancelTitle": "리뷰를 취소할까요?",
       "checkRun": "검사 실행",
       "completed": "완료",
-      "cost": "비용",
       "couldNotGetLatest": "최신 정보를 가져올 수 없습니다.",
       "couldNotLoad": "리뷰를 불러올 수 없습니다.",
       "council": "리뷰 협의체",
       "created": "생성 일시",
       "decision": "결정",
-      "details": "세부 정보",
-      "findings": "진단 결과",
       "gate": "통과 기준",
       "gateHidden": "숨김",
       "gateNone": "없음",
       "keepRunning": "계속 실행",
-      "model": "모델",
       "noFindings": "발견된 문제가 없습니다.",
       "openPullRequest": "풀 리퀘스트 오픈",
-      "platform": "플랫폼",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryTitle": "리뷰를 다시 시도할까요?",
@@ -908,7 +896,6 @@
       "title": "리뷰",
       "tokens": "토큰",
       "tokensInOut": "입력 {{input}} / 출력 {{output}}",
-      "pullRequest": "풀 리퀘스트",
       "transcriptWaiting": "리뷰 대화록을 기다리는 중입니다.",
       "transcriptEmpty": "이 리뷰에 대한 대화록이 없습니다.",
       "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
@@ -951,14 +938,12 @@
     },
     "scopeList": {
       "couldNotLoad": "조직을 불러오지 못했습니다.",
-      "personal": "개인",
       "personalStillAvailable": "개인 저장소는 아래에서 계속 사용할 수 있습니다.",
       "personalSubtitle": "내 저장소",
       "viewOnly": "보기 전용"
     },
     "selectRepositories": "저장소 선택",
     "selectRepository": "자동 리뷰를 사용하려면 저장소를 하나 이상 선택하세요.",
-    "title": "코드 리뷰어",
     "webhookSetup": "웹훅 설정이 완료되지 않았습니다.",
     "webhookSetupDescription": "일부 저장소는 자동 리뷰를 받지 못할 수 있습니다.",
     "decision": {
@@ -967,17 +952,13 @@
       "noResult": "결과 없음",
       "pass": "통과"
     },
-    "eyebrow": "코드 리뷰어",
     "overview": {
       "allAreas": "모든 영역",
-      "allRepositories": "모든 저장소",
       "customInstructions": "사용자 지정 지침",
       "focusAreas": "중점 리뷰 항목",
       "mergeGate": "병합 조건",
-      "model": "모델",
       "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
-      "repositories": "저장소",
       "reviewMemory": "리뷰 메모리",
       "reviewStyle": "리뷰 스타일",
       "set": "설정됨"
@@ -986,11 +967,9 @@
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",
     "status": {
       "pending": "대기 중",
-      "queued": "대기 중",
       "running": "실행 중",
       "completed": "완료",
       "failed": "실패",
-      "cancelled": "취소됨",
       "interrupted": "중단됨"
     },
     "reviewStyle": {
@@ -1008,42 +987,33 @@
       "documentation": "문서화"
     },
     "gateThreshold": {
-      "off": "꺼짐",
-      "all": "전체",
-      "warning": "경고",
-      "critical": "치명적"
+      "warning": "경고"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
         "description": "활성화된 GitHub 앱으로 Kilo가 이 저장소에 접근할 수 없어 코드 리뷰어가 비활성화되었습니다. GitHub 앱 설치 설정을 업데이트한 후 코드 리뷰어를 다시 활성화하세요.",
         "recoveryLabel": "GitHub 앱 업데이트"
       },
       "githubIpAllowList": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
-        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요.",
-        "recoveryLabel": "지원팀에 문의"
+        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "gitlabProjectAccessRequired": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
         "description": "Kilo가 이 프로젝트의 GitLab 프로젝트 액세스 토큰을 생성할 수 없어 코드 리뷰어가 비활성화되었습니다. 유지보수 담당자 권한을 부여하거나 프로젝트 액세스 토큰을 활성화한 후 코드 리뷰어를 다시 활성화하세요.",
         "recoveryLabel": "GitLab 통합 업데이트"
       },
       "byokInvalidKey": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
         "description": "선택한 BYOK API 키가 유효하지 않거나 폐기되었거나 권한이 부족하여 코드 리뷰어가 비활성화되었습니다. 키를 업데이트하거나 다른 모델을 선택한 후 코드 리뷰어를 다시 활성화하세요.",
         "recoveryLabel": "BYOK 설정 업데이트"
       },
       "selectedModelUnavailable": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
         "description": "선택한 모델을 클라우드 에이전트 세션에서 사용할 수 없어 코드 리뷰어가 비활성화되었습니다. 사용 가능한 모델을 선택한 후 코드 리뷰어를 다시 활성화하세요.",
         "recoveryLabel": "코드 리뷰어 설정 업데이트"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "코드 리뷰어에 조치가 필요합니다.",
-        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요.",
-        "recoveryLabel": "지원팀에 문의"
-      }
+        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+      },
+      "title": "코드 리뷰어에 조치가 필요합니다.",
+      "recoveryLabel": "지원팀에 문의"
     },
     "unknownError": "알 수 없는 오류"
   },
@@ -1052,24 +1022,18 @@
       "noFilters": "사용 가능한 필터 없음",
       "noFiltersDescription": "뒤로 돌아가 발견된 문제 목록에서 필터를 다시 여세요.",
       "title": "발견된 문제 필터",
-      "all": "전체",
-      "allRepositories": "모든 저장소",
       "fixed": "수정됨",
       "outcome": "결과",
       "outcomeAnalyzing": "분석 중",
       "outcomeDismissed": "무시됨",
-      "outcomeExploitable": "악용 가능",
       "outcomeFailed": "분석 실패",
-      "outcomeNeedsReview": "검토 필요",
       "outcomeNotAnalyzed": "분석 안 됨",
       "outcomeNotExploitable": "악용 불가",
       "outcomeSafeToDismiss": "무시해도 안전함",
       "outcomeTriageComplete": "분류 완료",
       "overdueOnly": "기한 초과만 표시",
-      "repository": "저장소",
       "reset": "초기화",
       "severity": "심각도",
-      "severityCritical": "치명적",
       "severityHigh": "높음",
       "severityLow": "낮음",
       "severityMedium": "중간",
@@ -1093,7 +1057,6 @@
       "exploitable": "악용 가능",
       "fullReport": "생성된 보고서 전문",
       "keepWaiting": "계속 대기",
-      "model": "모델",
       "no": "아니요",
       "noAnalysisYet": "아직 분석 내역 없음",
       "noAnalysisYetDescription": "세부 정보 탭에서 분석을 실행하세요.",
@@ -1106,7 +1069,6 @@
       "suggestedFix": "권장 수정 방법",
       "triageConfidence": "분류 신뢰도",
       "triageReasoning": "분류 근거",
-      "unknown": "알 수 없음",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
       "yes": "예"
@@ -1114,21 +1076,17 @@
     "analysisSettings": {
       "analysisModel": "분석 모델",
       "couldNotLoad": "분석 설정을 불러올 수 없습니다.",
-      "couldNotLoadModels": "모델을 불러오지 못했습니다.",
       "depth": "분석 깊이",
       "modeAuto": "자동",
       "modeDeep": "심층",
       "modeShallow": "간단",
-      "permissionNote": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "remediationModel": "수정 모델",
       "title": "모델 및 분석",
       "triageModel": "분류 모델"
     },
     "auditReport": {
-      "checkConnection": "인터넷 연결을 확인하고 다시 시도하세요.",
       "couldNotLoad": "감사 보고서를 불러올 수 없습니다.",
       "events": "이벤트",
-      "findings": "진단 결과",
       "generated": "{{generatedAt}}에 생성되었습니다.",
       "noActivity": "기록된 활동 없음",
       "noActivityDescription": "{{start}}부터 {{end}}까지 Kilo에 보고할 보안 문제 관련 활동이 없습니다.",
@@ -1165,7 +1123,6 @@
       "includeExistingFindingsAnalysisSubtitle": "이전에 동기화된 문제도 분석합니다. 추가 크레딧이 사용될 수 있습니다.",
       "includeExistingFindingsRemediationSubtitle": "이미 분석된 문제 중 조건에 맞는 문제도 대기열에 추가합니다. 중복 PR은 생성하지 않습니다.",
       "minimumSeverity": "최소 심각도",
-      "permissionNote": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "queued": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "queued_other": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "queued_one": "기존 문제 {{displayCount}}건을 분석 대기열에 추가했습니다.",
@@ -1176,9 +1133,6 @@
       "severityHighAndAbove": "높음 이상",
       "severityMediumAndAbove": "중간 이상",
       "title": "자동화"
-    },
-    "commandRetry": {
-      "discard": "버리기"
     },
     "dashboard": {
       "actFirst": "우선 조치 항목",
@@ -1191,7 +1145,6 @@
       "daysOverdue": "기한 {{displayCount}}일 초과",
       "deadlineToday": "오늘 마감",
       "filterByRepository": "저장소별 필터링",
-      "findings": "진단 결과",
       "findingsCount": "발견된 문제 {{displayCount}}건",
       "highOverdue": "높음: 기한 초과",
       "lastSynced": "마지막 동기화: {{time}}",
@@ -1265,7 +1218,6 @@
       "notFound": "진단 결과를 찾을 수 없음",
       "notFoundDescription": "이 문제가 삭제되었거나 더 이상 접근 권한이 없을 수 있습니다.",
       "tabAnalysis": "분석",
-      "tabDetails": "세부 정보",
       "tabRemediation": "수정",
       "title": "발견된 문제"
     },
@@ -1274,13 +1226,11 @@
       "detected": "감지됨",
       "dismissed": "무시됨",
       "dismissedBecause": "무시 처리했습니다. 사유: {{reason}}.",
-      "fixed": "수정됨",
       "ghsa": "GHSA",
       "manifest": "매니페스트",
       "noPatchAvailable": "사용 가능한 패치 없음",
       "package": "패키지",
       "patchedVersion": "패치된 버전",
-      "repository": "저장소",
       "severityLabel": "심각도: {{severity}}",
       "slaDeadline": "SLA 마감일",
       "source": "출처",
@@ -1288,12 +1238,10 @@
       "sourceRecord": "원본 기록",
       "supersededBy": "최신 문제로 대체됨",
       "supersededByDescription": "최신 기록을 탭하여 상태, 분석 결과, 수정 내역을 확인하세요.",
-      "unknown": "알 수 없음",
       "updated": "업데이트됨",
       "viewAdvisory": "GitHub에서 보안 권고 보기",
       "vulnerableVersions": "취약점이 있는 버전",
       "statusSuperseded": "대체됨",
-      "statusFixed": "수정됨",
       "statusOpen": "오픈",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "이미 수정 중",
@@ -1310,8 +1258,7 @@
       "emptyDescription": "현재 조치가 필요한 미해결 문제가 없습니다.",
       "emptyTitle": "미해결 문제 없음",
       "noMatchesDescription": "선택한 필터를 변경하거나 초기화해 보세요.",
-      "noMatchesTitle": "필터 조건에 맞는 문제 없음",
-      "title": "진단 결과"
+      "noMatchesTitle": "필터 조건에 맞는 문제 없음"
     },
     "findingRow": {
       "a11y": "심각도 {{severity}}인 문제: {{title}}. {{repo}}. {{analysis}}",
@@ -1334,7 +1281,6 @@
       "newFindingSection": "새 문제 알림",
       "newFindingSeverityLabel": "새 문제 알림의 최소 심각도",
       "newFindingSubtitle": "첫 동기화부터 새로 발견된 문제가 동기화될 때마다 알림을 보냅니다.",
-      "readOnly": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "slaLeadTimeAccessibility": "SLA 마감 며칠 전에 알림을 보낼지 설정",
       "slaLeadTimeError": "일수를 1~365 사이의 정수로 입력하세요.",
       "slaLeadTimeHint": "1에서 365 사이의 정수를 입력하세요",
@@ -1342,8 +1288,7 @@
       "slaPersonalTitle": "SLA 경고를 이메일로 받기",
       "slaSection": "SLA 경고 알림",
       "slaSeverityLabel": "SLA 알림의 최소 심각도",
-      "slaSubtitle": "발견된 문제의 SLA 마감일이 다가오면 미리 알림을 보내고, 마감일에 도달하거나 기한을 넘긴 경우에도 알림을 보냅니다.",
-      "title": "알림"
+      "slaSubtitle": "발견된 문제의 SLA 마감일이 다가오면 미리 알림을 보내고, 마감일에 도달하거나 기한을 넘긴 경우에도 알림을 보냅니다."
     },
     "remediation": {
       "attemptHistory": "시도 기록({{displayCount}})",
@@ -1356,19 +1301,16 @@
       "cancelled": "수정이 취소되었습니다.",
       "couldNotLoad": "수정 상태를 불러올 수 없습니다.",
       "keepRunning": "계속 실행",
-      "model": "모델",
       "noAnalysisDescription": "세부 정보 탭에서 분석을 실행하세요.",
       "noAnalysisTitle": "아직 분석 내역 없음",
       "openDraftPullRequest": "초안 풀 리퀘스트{{number}} 열기",
       "openPullRequest": "풀 리퀘스트{{number}} 열기",
       "progress": "진행 상황",
-      "pullRequest": "풀 리퀘스트",
       "retry": "수정 다시 시도",
       "start": "수정 시작",
       "startedBy": "시작한 사용자",
       "timeline": {
         "blocked": "수정 차단됨",
-        "cancelled": "취소됨",
         "failed": "수정 실패",
         "noChangesNeeded": "변경 필요 없음",
         "prOpened": "PR 생성됨",
@@ -1379,18 +1321,14 @@
       "unavailable": "이 진단 결과에 대한 수정 기능을 사용할 수 없습니다."
     },
     "repositories": {
-      "allRepositories": "모든 저장소",
       "couldNotLoad": "저장소 설정을 불러올 수 없습니다.",
-      "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
       "couldNotOpenGithubSettings": "GitHub 앱 설정을 열지 못했습니다.",
       "githubAppSettings": "GitHub 앱 설정",
       "manageAccess": "GitHub 앱 접근 권한 관리",
       "noRepositories": "저장소 없음",
       "noRepositoriesDescription": "Kilo GitHub 앱에 저장소 접근 권한을 부여하세요.",
-      "readOnly": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
       "selectAtLeastOne": "저장소를 하나 이상 선택하세요.",
-      "selectedRepositories": "선택한 저장소",
-      "title": "저장소"
+      "selectedRepositories": "선택한 저장소"
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub 앱을 설치하여 모든 저장소의 Dependabot 알림을 자동으로 동기화하고 보안 문제를 관리하세요.",
@@ -1405,41 +1343,31 @@
     },
     "scopeList": {
       "couldNotLoad": "조직을 불러오지 못했습니다.",
-      "personal": "개인",
-      "personalSubtitle": "내 저장소",
-      "title": "보안 에이전트"
+      "personalSubtitle": "내 저장소"
     },
     "settingsOverview": {
-      "allRepositories": "모든 저장소",
       "analysisModeSubtitle": "{{mode}} 분석",
       "automation": "자동화",
       "automationAllOff": "모두 꺼짐",
       "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
-      "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
       "disabled": "비활성화됨",
       "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
-      "enabled": "활성화됨",
       "modelsAndAnalysis": "모델 및 분석",
-      "notifications": "알림",
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
-      "off": "꺼짐",
       "on": "켜짐",
-      "repositories": "저장소",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨",
-      "securityAgent": "보안 에이전트",
       "selectRepositories": "저장소 선택",
       "selectRepositoriesSubtitle": "보안 에이전트가 모니터링할 저장소를 선택하세요.",
       "slaPolicy": "SLA 정책",
       "title": "설정"
     },
     "settingsSave": {
-      "discard": "버리기",
       "keepEditing": "계속 편집",
       "saveChanges": "변경 사항 저장",
       "unsavedMessage": "이 화면을 떠나기 전에 변경 사항을 저장할까요?",
@@ -1450,7 +1378,6 @@
     },
     "sla": {
       "couldNotLoad": "SLA 설정을 불러올 수 없습니다.",
-      "critical": "치명적",
       "criticalDescription": "인증 없이 원격으로 악용할 수 있습니다.",
       "deadlinesHeading": "수정 기한(일)",
       "enableTracking": "SLA 추적 활성화",
@@ -1467,7 +1394,6 @@
       "remediationDeadlineA11y": "{{label}} 수정 기한, 일 단위",
       "title": "SLA 정책"
     },
-    "title": "보안 에이전트",
     "initialSyncAdmissionFailed": "보안 에이전트를 활성화했지만 첫 동기화를 대기열에 추가하지 못했습니다. 다시 동기화하세요.",
     "queuedActionUntracked": "대기 중인 작업을 더 이상 추적할 수 없습니다. 최신 상태를 보려면 새로고침하세요.",
     "commands": {
@@ -1495,22 +1421,16 @@
       "failed": "분석 실패",
       "failedTitle": "분석 실패",
       "failedDescription": "보안 에이전트가 분석을 완료하지 못했습니다.",
-      "extractionFailed": "검토 필요",
-      "extractionFailedTitle": "검토 필요",
       "extractionFailedDescription": "기술 보고서를 구조화된 결과로 변환할 수 없습니다.",
-      "exploitable": "악용 가능",
-      "exploitableTitle": "악용 가능",
       "exploitableDescription": "애플리케이션 코드에서 취약점이 있는 기능에 도달할 수 있습니다.",
       "notExploitable": "도달 불가",
       "notExploitableTitle": "도달 불가",
       "notExploitableDescription": "이 저장소에서 도달 가능한 경로를 찾지 못했습니다.",
       "unknown": "검토 필요",
-      "unknownTitle": "검토 필요",
       "unknownDescription": "분석 결과, 취약점이 있는 기능에 도달할 수 있는지 확인하지 못했습니다.",
       "safeToDismiss": "무시해도 안전함",
       "safeToDismissTitle": "무시해도 안전함",
       "safeToDismissDescription": "분류 결과, 코드베이스 분석 없이 안전하게 무시 처리할 수 있는 문제로 판단했습니다.",
-      "manualReview": "검토 필요",
       "manualReviewTitle": "직접 검토 필요",
       "manualReviewDescription": "분류 결과, 이 문제는 담당자의 검토가 필요한 것으로 판단했습니다.",
       "analysisRequired": "분석 필요",
@@ -1525,7 +1445,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "마감일 전에 수정됨",
-      "fixed": "수정됨",
       "fixedOn": "{{date}} 수정됨",
       "resolutionRecorded": "해결 내역 기록됨",
       "superseded": "대체됨",
@@ -1547,7 +1466,6 @@
     "remediationStatus": {
       "cancellationRequested": "취소 요청됨",
       "notStarted": "시작 안 함",
-      "queued": "대기 중",
       "starting": "시작 중",
       "inProgress": "진행 중",
       "draftPrOpened": "초안 PR 열림",
@@ -1555,7 +1473,6 @@
       "blocked": "차단됨",
       "failed": "실패",
       "noChangesNeeded": "변경 필요 없음",
-      "cancelled": "취소됨",
       "originAutomaticPolicy": "자동화 정책",
       "originIncludeExistingPolicy": "기존 문제 포함 정책",
       "originManual": "수동",
@@ -1628,7 +1545,6 @@
     "sessionRow": {
       "deleteTitle": "세션을 삭제할까요?",
       "deleteMessage": "이 작업은 되돌릴 수 없습니다.",
-      "delete": "삭제",
       "deleteSession": "세션 삭제",
       "rename": "이름 변경",
       "renameMessage": "이 세션의 새 이름을 입력하세요.",
@@ -1676,7 +1592,6 @@
       "title": "세션",
       "copyErrorDetails": "오류 세부 정보 복사",
       "backToSessions": "세션으로 돌아가기",
-      "accessDenied": "접근 권한이 없습니다.",
       "accessDeniedDescription": "이 항목을 볼 권한이 없습니다.",
       "couldNotLoad": "세션을 불러올 수 없습니다.",
       "failedToLoadDetails": "세션 세부 정보를 불러오지 못했습니다.",
@@ -1692,7 +1607,6 @@
       "emptyTitle": "아직 메시지가 없습니다",
       "renameAccessibility": "세션 이름 변경: {{title}}",
       "cloningSession": "세션 복제 중",
-      "continue": "계속하기",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
       "notEnoughCredits": "Cloud Agent를 실행할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
@@ -1726,8 +1640,6 @@
     },
     "newSession": {
       "title": "새 세션",
-      "repository": "저장소",
-      "connectGithub": "GitHub 연결",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 후 여기로 돌아와 저장소를 선택하세요.",
       "openGithub": "GitHub 열기",
       "refreshRepositories": "저장소 새로고침",
@@ -1752,7 +1664,6 @@
       "couldNotReadPendingSessions": "대기 중인 세션을 불러올 수 없습니다. 다시 시도하세요.",
       "failedToCreate": "세션을 만들지 못했습니다.",
       "couldNotRefreshRepositories": "저장소를 새로고침하지 못했습니다. 다시 시도하세요.",
-      "discard": "버리기",
       "discardDraftMessage": "프롬프트가 사라집니다.",
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
@@ -1784,8 +1695,6 @@
       "updatedFileCount_other": "파일 {{displayCount}}개를 업데이트했습니다."
     },
     "toolPatch": {
-      "operationAdded": "추가됨",
-      "operationDeleted": "삭제됨",
       "operationUpdated": "업데이트됨"
     },
     "toolCard": {
@@ -1826,9 +1735,7 @@
       "runOn": "실행 위치",
       "runOnAccessibility": "실행 위치: {{label}}",
       "couldNotLoad": "인스턴스를 불러올 수 없습니다",
-      "couldNotLoadDescription": "인터넷 연결을 확인하고 다시 시도하세요.",
       "cloudAgent": "Cloud Agent",
-      "loading": "불러오는 중…",
       "cloudAgentDescription": "Kilo의 클라우드 샌드박스에서 실행",
       "noCliInstances": "연결된 CLI 인스턴스 없음",
       "noCliInstancesDescription": "컴퓨터의 프로젝트에서 `kilo remote`를 실행하거나, 이미 실행 중이라면 Kilo CLI를 업데이트하세요.",
@@ -1869,7 +1776,6 @@
       "loading": "불러오는 중…",
       "accessibility": "저장소: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -1884,9 +1790,7 @@
       "roleUser": "사용자",
       "roleAssistant": "어시스턴트",
       "sent": "보낸 시각",
-      "model": "모델",
       "costAndTokens": "비용 및 토큰",
-      "cost": "비용",
       "input": "입력",
       "output": "출력",
       "reasoning": "추론",
@@ -1906,7 +1810,6 @@
       "textDisplay": "텍스트 표시",
       "thinking": "추론 중",
       "thought": "추론 내용",
-      "title": "세부 정보",
       "showDetails": "세부 정보 표시",
       "pending": "대기 중…",
       "running": "실행 중…"
@@ -1929,7 +1832,6 @@
     "filePart": {
       "loadingImage": "이미지 불러오는 중",
       "imageUnavailableRetry": "이미지를 불러올 수 없습니다. 불러오기 다시 시도",
-      "imageUnavailable": "이미지를 표시할 수 없습니다.",
       "imageUnavailableWithAlt": "이미지를 표시할 수 없습니다: {{alt}}.",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
@@ -2022,7 +1924,6 @@
       "failure": "오류: {{title}}.",
       "failureRetryAvailable": "오류: {{title}}. 다시 시도할 수 있습니다.",
       "copyToComposer": "메시지 입력란에 복사",
-      "queued": "대기 중",
       "queuedAccessibility": "메시지 대기 중",
       "userMessage": "사용자 메시지",
       "assistantMessage": "어시스턴트 메시지",
@@ -2058,12 +1959,10 @@
     },
     "sessionFilter": {
       "title": "세션 필터링",
-      "platform": "플랫폼",
       "platformCloud": "클라우드",
       "platformExtension": "확장 프로그램",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "기타",
       "project": "프로젝트"
@@ -2085,7 +1984,6 @@
       "allModels": "모든 모델"
     },
     "modelSelector": {
-      "model": "모델",
       "provider": "제공업체 {{id}}",
       "modelId": "모델 {{id}}",
       "unavailable": "사용할 수 없음",
@@ -2223,8 +2121,7 @@
       "merged": "병합된 풀 리퀘스트",
       "draft": "초안 풀 리퀘스트",
       "updating": "업데이트 중, {{label}} #{{number}}",
-      "label": "{{label}} {{number}}번",
-      "externalLinkLabel": "풀 리퀘스트"
+      "label": "{{label}} {{number}}번"
     },
     "markdownImage": {
       "load": "불러오기",
@@ -2252,11 +2149,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "계정 정보를 불러오지 못했습니다.",
-    "couldNotLoadAccountDescription": "인터넷 연결을 확인하고 다시 시도하세요.",
     "couldNotLoadPrivacy": "개인정보 보호 설정을 불러오지 못했습니다.",
     "couldNotLoadPrivacyDescription": "기기 보안 설정을 확인하고 다시 시도하세요.",
     "contentReady": "콘텐츠 준비됨",
-    "signOut": "로그아웃",
     "retryLoadingAccount": "계정 정보 불러오기 다시 시도",
     "retryLoadingPrivacy": "개인정보 보호 설정 불러오기 다시 시도"
   },
@@ -2282,7 +2177,6 @@
     "signOutThisDeviceTitle": "이 기기에서 로그아웃할까요?",
     "signOutThisSessionTitle": "이 세션에서 로그아웃할까요?",
     "signOutThisSessionMessage": "{{device}} 기기에서 로그아웃됩니다. 로그아웃 후에도 최대 1시간 동안 API에 접근할 수 있습니다.",
-    "signOutConfirm": "로그아웃",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "webBrowser": "웹 브라우저"
   },
@@ -2304,7 +2198,6 @@
   },
   "imageViewer": {
     "close": "{{filename}} 닫기",
-    "imageUnavailable": "이미지를 표시할 수 없습니다.",
     "share": "{{filename}} 공유"
   },
   "invalidRoute": {
@@ -2323,11 +2216,8 @@
     "internetRestored": "인터넷 연결이 복구되었습니다"
   },
   "queryError": {
-    "neutralTitle": "문제가 발생했습니다.",
     "neutralDescription": "다시 시도하세요.",
     "offlineTitle": "불러오지 못했습니다.",
-    "offlineDescription": "문제가 발생했습니다.",
-    "permissionTitle": "접근 권한이 없습니다.",
     "permissionDescription": "이 항목을 볼 권한이 없습니다.",
     "notFoundTitle": "항목을 찾을 수 없습니다.",
     "notFoundDescription": "이 항목이 삭제되었거나 더 이상 제공되지 않을 수 있습니다.",
@@ -2337,7 +2227,6 @@
   "screenHeader": {
     "openMenu": "메뉴 열기",
     "openMenuFor": "{{title}} 메뉴 열기",
-    "close": "닫기",
     "goBack": "뒤로 가기"
   },
   "picker": {
@@ -2369,7 +2258,6 @@
   },
   "share": {
     "title": "Kilo로 공유",
-    "close": "닫기",
     "reviewPr": "PR 리뷰",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "새 세션",
@@ -2471,7 +2359,6 @@
     "privacyPolicyPrefix": "데이터 처리에 적용되는 방침:",
     "privacyPolicy": "Kilo 개인정보 처리방침",
     "onDevice": "기기 내",
-    "loading": "불러오는 중…",
     "couldNotLoadTranscription": "음성 텍스트 변환 설정을 불러올 수 없습니다.",
     "signInToManageTranscription": "온라인 음성 텍스트 변환 설정을 관리하려면 로그인하세요.",
     "onlineTranscription": "온라인 음성 텍스트 변환",
@@ -2488,7 +2375,6 @@
     "voiceTranscriptionTitle": "음성 텍스트 변환",
     "retentionPrefix": "전체 보관 기간, 사용자 권리 및 연락처 안내:",
     "backToConsent": "동의 화면으로 돌아가기",
-    "back": "뒤로",
     "revokeConsent": "동의 철회",
     "revokeConsentTitle": "데이터 공유 동의를 철회할까요?",
     "acceptAndContinue": "동의하고 계속하기",
@@ -2532,12 +2418,10 @@
     "what": "공유 데이터",
     "why": "공유 목적",
     "who": "공유 대상",
-    "continue": "계속하기",
     "installAttributionPromptMessage": "Kilo는 앱을 설치한 경로를 파악하는 데만 Apple의 추적 권한을 사용합니다. 프롬프트와 대화는 절대 사용하지 않습니다.",
     "installAttributionPromptTitle": "설치 경로 분석을 허용할까요?"
   },
   "prReview": {
-    "accessDenied": "접근 권한이 없습니다.",
     "accessDeniedDescription": "이 풀 리퀘스트를 볼 권한이 없습니다.",
     "checkConnection": "연결 확인",
     "checks": {
@@ -2554,8 +2438,7 @@
       "skipped": "{{displayCount}}개 건너뜀",
       "title": "검사",
       "viewOnGitHub": "GitHub에서 PR 보기",
-      "checkDetails": "검사 세부 정보",
-      "pullRequest": "풀 리퀘스트"
+      "checkDetails": "검사 세부 정보"
     },
     "composer": {
       "addTitle": "댓글 추가",
@@ -2564,7 +2447,6 @@
       "commentBody": "댓글 내용",
       "commentBodyPlaceholder": "댓글 입력",
       "commentNow": "지금 댓글 달기",
-      "discard": "버리기",
       "discardMessage": "작성 중인 내용이 사라집니다.",
       "discardTitle": "작성 중인 댓글을 버릴까요?",
       "editTitle": "댓글 수정",
@@ -2584,8 +2466,7 @@
       "checkFailedTitle": "GitHub 연결을 확인하지 못했습니다.",
       "description": "모바일에서 풀 리퀘스트를 리뷰하려면 GitHub 계정을 연결하세요.",
       "reconnectDescription": "GitHub 연결이 해제되었습니다. 모바일에서 풀 리퀘스트를 계속 리뷰하려면 다시 연결하세요.",
-      "reconnectTitle": "GitHub 다시 연결",
-      "title": "GitHub 연결"
+      "reconnectTitle": "GitHub 다시 연결"
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "connectionExpiredDescription": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요. 필요한 경우 다시 연결하라는 안내가 표시됩니다.",
@@ -2608,7 +2489,6 @@
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "couldNotReply": "답글을 달 수 없습니다.",
       "file": "파일",
-      "loadMore": "더 보기",
       "loadMoreComments": "댓글 더 불러오기",
       "loading": "토론 불러오는 중",
       "moderation": {
@@ -2654,7 +2534,6 @@
       "resolved": "해결됨",
       "retryLoadingMore": "댓글 더 불러오기 다시 시도",
       "reviewFiles": "파일 리뷰",
-      "somethingWentWrong": "문제가 발생했습니다.",
       "startedRelative": " · {{relative}} 시작",
       "submitReply": "답글 제출",
       "termsAcceptRetry": "약관 동의를 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
@@ -2697,11 +2576,9 @@
       "openPullRequest": "풀 리퀘스트 오픈",
       "pasteLink": "풀 리퀘스트 링크 붙여넣기",
       "pastePrLink": "PR 링크 붙여넣기",
-      "remove": "제거",
       "removeFromRecentsMessage": "이 풀 리퀘스트가 최근 항목에서 제거됩니다.",
       "removeFromRecentsTitle": "최근 항목에서 제거할까요?",
       "removeRecentAccessibility": "최근 항목에서 {{repo}} 제거",
-      "title": "PR 리뷰",
       "urlAccessibility": "GitHub 풀 리퀘스트 URL"
     },
     "eventChips": {
@@ -2721,7 +2598,6 @@
       "unified": "통합"
     },
     "fileNavigator": {
-      "checkConnection": "인터넷 연결을 확인하고 다시 시도하세요.",
       "couldNotLoadFiles": "파일을 불러오지 못했습니다.",
       "couldNotLoadMoreFiles": "파일을 더 불러오지 못했습니다.",
       "diffTooLarge": "변경 내용이 너무 큼",
@@ -2791,7 +2667,6 @@
     "inbox": {
       "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
       "couldNotLoadMore": "추가 항목을 불러오지 못했습니다.",
-      "draft": "초안",
       "loading": "받은 편지함 불러오는 중",
       "noReviewRequests": "리뷰 요청 없음",
       "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
@@ -2884,7 +2759,6 @@
       "file_other": "파일",
       "file_one": "파일",
       "stateClosed": "닫힘",
-      "stateDraft": "초안",
       "stateMerged": "병합됨",
       "stateOpen": "오픈",
       "stateOpenApproved": "열림 · 승인됨",
@@ -2919,7 +2793,6 @@
       "shareA11y": "풀 리퀘스트 공유",
       "title": "#{{number}}"
     },
-    "screenTitle": "PR 리뷰",
     "sideBySide": {
       "emptyDiffColumn": "변경 내용의 빈 열",
       "emptyDiffRow": "변경 내용의 빈 행",
@@ -2929,7 +2802,6 @@
       "oldOnly": "변경 전에만 있음: {{text}}"
     },
     "submit": {
-      "delete": "삭제",
       "deletePendingMessage": "이 댓글이 리뷰 대기열에서 제거됩니다.",
       "deletePendingTitle": "제출 대기 중인 댓글을 삭제할까요?",
       "loadFailedTitle": "리뷰 제출 화면을 불러오지 못했습니다.",
@@ -2945,10 +2817,8 @@
       "blockedComment": "댓글 리뷰를 게시하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요."
     },
     "fileStatus": {
-      "added": "추가됨",
       "changed": "변경됨",
       "copied": "복사 완료",
-      "deleted": "삭제됨",
       "modified": "수정됨",
       "renamed": "이름 변경됨"
     },
@@ -2961,9 +2831,7 @@
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
       "tapToComment": "{{label}}, 탭하여 댓글 달기",
       "truncationBanner": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다.",
-      "statusAdded": "추가됨",
       "statusContext": "변경 없음",
-      "statusDeleted": "삭제됨",
       "lineLabel": "{{status}}, {{line}}번 줄: {{text}}",
       "lineLabelNoNumber": "{{status}}, {{text}}",
       "emptyLine": "(비어 있음)"
@@ -2999,7 +2867,6 @@
       "selectDescription": "계속하려면 프로필에서 조직을 선택하세요.",
       "selectOrganization": "조직 선택",
       "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 다른 조직을 선택하세요.",
-      "accessDeniedTitle": "접근 권한이 없습니다.",
       "accessDeniedDescription": "이 조직에 접근할 권한이 없습니다."
     },
     "creditActivity": {
@@ -3018,18 +2885,15 @@
         "accounting_adjustment": "회계 조정",
         "credits_expired": "크레딧 만료"
       },
-      "loadMore": "더 보기",
       "loadMoreFailed": "추가 항목을 불러오지 못했습니다.",
       "truncated": "이전 크레딧 내역을 확인할 수 있습니다."
     },
     "hub": {
       "balance": "잔액",
       "lowBalanceBelow": "{{amount}} 미만",
-      "lowBalanceOff": "꺼짐",
       "organizationSeats": "조직 라이선스",
       "renamePlaceholder": "조직 이름",
-      "renameTitle": "조직 이름 변경",
-      "title": "조직"
+      "renameTitle": "조직 이름 변경"
     },
     "inviteMember": {
       "emailError": "올바른 이메일 주소를 입력하세요.",
@@ -3053,18 +2917,14 @@
         "paid": "결제 완료",
         "open": "오픈",
         "void": "무효",
-        "draft": "초안",
-        "uncollectible": "회수 불가",
-        "unknown": "알 수 없음"
+        "uncollectible": "회수 불가"
       },
-      "loadMore": "더 보기",
       "loadMoreFailed": "추가 항목을 불러오지 못했습니다.",
       "truncated": "이전 청구서를 확인할 수 있습니다."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "이름@회사.com",
       "enableA11y": "잔액 부족 알림 켜기",
-      "enabled": "활성화됨",
       "notifyEmailsLabel": "알림 수신 이메일 주소",
       "permissionDenied": "결제 알림을 관리할 권한이 없습니다.",
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
@@ -3093,7 +2953,6 @@
       "limitPerDay": "일일 {{amount}}",
       "manageA11y": "{{name}} 관리",
       "manageInvitationA11y": "{{email}} 초대 관리",
-      "removeConfirm": "제거",
       "removeMember": "멤버 제거",
       "removeMemberMessage": "이 조직에서 {{name}}님을 제거할까요?",
       "revokeConfirm": "철회",
@@ -3114,12 +2973,7 @@
       "resendInvite": "초대 다시 보내기",
       "shareInviteLink": "초대 링크 공유"
     },
-    "permissionDenied": {
-      "back": "뒤로",
-      "title": "접근 권한이 없습니다."
-    },
     "usageStats": {
-      "cost": "비용",
       "inputTokens": "입력 토큰",
       "last30Days": "최근 30일",
       "outputTokens": "출력 토큰",
@@ -3132,7 +2986,6 @@
       "creditProcessingDelayed": "크레딧 처리 지연됨 · 자동으로 다시 시도 중",
       "ended": "종료됨",
       "endsOn": "{{date}}에 종료",
-      "loading": "불러오는 중…",
       "manageHint": "웹에서 Kilo Pass 관리 페이지를 엽니다.",
       "notSubscribed": "구독하지 않음",
       "overallocated": "Kilo Pass 배정 수가 유료 라이선스 수를 초과함",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "채팅",
-    "composer": {
-      "placeholder": "메시지"
-    },
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
     },
     "working": "작업 중",
     "historyRetry": "채팅 기록을 불러올 수 없습니다.",
-    "catalogRetry": "모델을 불러오지 못했습니다.",
     "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
   },
   "glanceable": {

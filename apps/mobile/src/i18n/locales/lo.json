@@ -27,7 +27,49 @@
     "somethingWentWrong": "ເກີດຂໍ້ຜິດພາດ.",
     "couldNotOpen": "ບໍ່ສາມາດເປີດ {{label}} ໄດ້.",
     "link": "ລິ້ງ",
-    "takingLonger": "ການດຳເນີນການນີ້ໃຊ້ເວລາດົນກວ່າທີ່ຄາດໄວ້. ທ່ານປິດໜ້ານີ້ແລ້ວກັບມາກວດສອບອີກຄັ້ງໄດ້."
+    "takingLonger": "ການດຳເນີນການນີ້ໃຊ້ເວລາດົນກວ່າທີ່ຄາດໄວ້. ທ່ານປິດໜ້ານີ້ແລ້ວກັບມາກວດສອບອີກຄັ້ງໄດ້.",
+    "model": "ໂມເດວ",
+    "accessDenied": "ບໍ່ມີສິດເຂົ້າເຖິງ.",
+    "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
+    "personal": "ສ່ວນຕົວ",
+    "connectGithub": "ເຊື່ອມຕໍ່ GitHub",
+    "cost": "ຄ່າໃຊ້ຈ່າຍ",
+    "discard": "ຖິ້ມ",
+    "findings": "ບັນຫາທີ່ກວດພົບ",
+    "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
+    "notifications": "ການແຈ້ງເຕືອນ",
+    "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
+    "repositories": "ຄັງໂຄ້ດ",
+    "securityAgent": "ເອເຈນດ້ານຄວາມປອດໄພ",
+    "unknown": "ບໍ່ຊາບ",
+    "added": "ເພີ່ມແລ້ວ",
+    "cancelled": "ຍົກເລີກແລ້ວ",
+    "close": "ປິດ",
+    "codeReviewer": "ຜູ້ກວດສອບໂຄ້ດ",
+    "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
+    "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
+    "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
+    "critical": "ຮ້າຍແຮງ",
+    "delete": "ລຶບ",
+    "deleted": "ລຶບແລ້ວ",
+    "details": "ລາຍລະອຽດ",
+    "draft": "ສະບັບຮ່າງ",
+    "enabled": "ເປີດໃຊ້ແລ້ວ",
+    "github": "GitHub",
+    "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
+    "loading": "ກຳລັງໂຫຼດ…",
+    "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+    "message": "ຂໍ້ຄວາມ",
+    "off": "ປິດ",
+    "organization": "ອົງກອນ",
+    "platform": "ແພລດຟອມ",
+    "prReview": "ການກວດສອບ PR",
+    "queued": "ລໍຄິວ",
+    "remove": "ເອົາອອກ",
+    "repository": "ຄັງໂຄ້ດ",
+    "signOut": "ອອກຈາກລະບົບ",
+    "agents": "ເອເຈນ",
+    "all": "ທັງໝົດ"
   },
   "language": {
     "title": "ພາສາ",
@@ -62,12 +104,10 @@
     "emailAddress": "ທີ່ຢູ່ອີເມວ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ສືບຕໍ່ດ້ວຍອີເມວ",
-    "continue": "ສືບຕໍ່",
     "enterCodeSentTo": "ໃສ່ລະຫັດທີ່ສົ່ງໄປຫາ {{email}}.",
     "codeArrivalHint": "ຖ້າອີເມວນີ້ມີສິດໃຊ້ງານ, ລະຫັດຈະມາເຖິງພາຍໃນໜຶ່ງນາທີ.",
     "verifyCode": "ຢືນຢັນລະຫັດ",
     "resendCode": "ສົ່ງລະຫັດອີກຄັ້ງ",
-    "back": "ກັບຄືນ",
     "termsPrefix": "ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບ",
     "terms": "ຂໍ້ກຳນົດ",
     "termsConnector": " ແລະ ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "ໂປຣຟາຍ",
-    "agents": "ເອເຈນ",
-    "codeReviewer": "ຜູ້ກວດສອບໂຄ້ດ",
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
-    "securityAgent": "ເອເຈນດ້ານຄວາມປອດໄພ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
     "reviews": "ການກວດສອບ",
-    "prReview": "ການກວດສອບ PR",
     "prReviewSubtitle": "ກວດສອບ PR ໃນມືຖື",
-    "organization": "ອົງກອນ",
     "couldNotLoadOrganization": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນອົງກອນໄດ້.",
     "couldNotLoadOrganizationDescription": "ທ່ານຍັງໃຊ້ການຕັ້ງຄ່າອົງກອນ ແລະ ຕົວແທນບໍ່ໄດ້ຈົນກວ່າຈະໂຫຼດຂໍ້ມູນສຳເລັດ.",
     "linkedAccounts": "ບັນຊີທີ່ເຊື່ອມໂຍງ",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "ທ່ານບໍ່ມີເຄຣດິດຄົງເຫຼືອ. ການຈັດການເຄຣດິດສຳລັບບັນຊີນີ້ຕ້ອງເຮັດນອກແອັບ iOS.",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
-    "signOutConfirm": "ອອກຈາກລະບົບ",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",
     "deleteAccountMessage": "ການດຳເນີນການນີ້ຈະລຶບບັນຊີຂອງທ່ານຢ່າງຖາວອນ ແລະ ນຳທ່ານອອກຈາກລະບົບ. ເຮົາຈະສົ່ງລະຫັດຢືນຢັນໃຫ້ທ່ານທາງອີເມວ.",
     "deleteAccountConfirm": "ລຶບບັນຊີ",
     "accountDeleted": "ບັນຊີຂອງທ່ານຖືກລຶບແລ້ວ.",
     "viewOrganization": "ເບິ່ງອົງກອນ",
     "manageOrganization": "ຈັດການອົງກອນ",
-    "personal": "ສ່ວນຕົວ",
     "selectAccount": "ເລືອກບັນຊີ",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "ອີເມວ",
     "providerTestAccount": "ບັນຊີທົດສອບ",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "ເປີດໜ້າຈໍໄວ້ໃນຂະນະຢູ່ໜ້າເຊສຊັນ",
     "keepScreenOnSubtitle": "ເປີດໜ້າຈໍໄວ້ຕະຫຼອດຂະນະທີ່ເຊສຊັນກຳລັງເຮັດວຽກ.",
     "appearance": "ຮູບລັກສະນະ",
-    "notifications": "ການແຈ້ງເຕືອນ",
     "notificationsSubtitle": "ການຕັ້ງຄ່າການແຈ້ງເຕືອນແບບພຸຊ",
     "appearanceSystem": "ລະບົບ",
     "appearanceLight": "ສະຫວ່າງ",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",
     "pullRequestUnavailableDescription": "ບໍ່ສາມາດເປີດ PR ນີ້ໄດ້. PR ອາດຖືກລຶບແລ້ວ, ຄັງໂຄດອາດເປັນສ່ວນຕົວ ຫຼື ຍັງບໍ່ໄດ້ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub ໃນຄັງໂຄດນັ້ນ.",
-    "accessDenied": "ບໍ່ມີສິດເຂົ້າເຖິງ.",
     "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເບິ່ງຄຳຂໍລວມໂຄດນີ້.",
     "noFilesChanged": "ບໍ່ມີໄຟລ໌ທີ່ປ່ຽນແປງ",
     "noFilesChangedDescription": "ຄຳຂໍລວມໂຄດນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "ບໍ່ສາມາດໂຫຼດໄຟລ໌ໄດ້.",
-      "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
       "retryLoadingFiles": "ລອງໂຫຼດໄຟລ໌ອີກຄັ້ງ",
       "filterPlaceholder": "ເສັ້ນທາງໄຟລ໌ທີ່ຕ້ອງການກັ່ນຕອງ",
       "viewedCount": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
       "loadMoreComments": "ໂຫຼດຄຳເຫັນເພີ່ມເຕີມ",
-      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
       "closeReactions": "ປິດການສະແດງຄວາມຮູ້ສຶກ",
       "reactionsTitle": "ການສະແດງຄວາມຮູ້ສຶກ",
       "addReaction": "ເພີ່ມການຕອບສະໜອງ",
@@ -352,7 +380,6 @@
       "reportUser": "ລາຍງານຜູ້ໃຊ້",
       "mute": "ປິດສຽງ",
       "block": "ບລັອກ",
-      "somethingWentWrong": "ເກີດຂໍ້ຜິດພາດ.",
       "reportSubmitted": "ສົ່ງລາຍງານແລ້ວ. ເລກທີຮັບລາຍງານ: {{receiptId}}",
       "blockedUser": "ບລັອກ {{login}} ແລ້ວ",
       "mutedUser": "ປິດສຽງ {{login}} ແລ້ວ",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "ກວດທານຄຳຂໍລວມໂຄດ",
     "headLine": "{{counts}} · ຄອມມິດຫຼ້າສຸດ {{sha}}",
     "entry": {
-      "title": "ການກວດສອບ PR",
       "eyebrow": "ເປີດຄຳຂໍລວມໂຄດດ້ວຍ URL.",
       "pastePrLink": "ວາງລິງ PR",
       "noRecentPrs": "ບໍ່ມີ PR ທີ່ເປີດຫຼ້າສຸດ",
       "noRecentPrsDescription": "ວາງລິງ PR ຂ້າງເທິງເພື່ອເລີ່ມກວດທານ — PR ນັ້ນຈະປາກົດຢູ່ທີ່ນີ້ໃນຄັ້ງຕໍ່ໄປ.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດໄດ້.",
-      "remove": "ເອົາອອກ",
       "removeFromRecentsTitle": "ເອົາອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດບໍ?",
       "removeFromRecentsMessage": "ຄຳຂໍລວມໂຄດນີ້ຈະຖືກເອົາອອກຈາກລາຍການທີ່ທ່ານເປີດຫຼ້າສຸດ.",
       "removeRecentAccessibility": "ເອົາ {{repo}} ອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດ",
@@ -460,13 +485,11 @@
       "pending": "ລໍຖ້າ {{displayCount}}",
       "skipped": "ຂ້າມແລ້ວ {{displayCount}}",
       "checksCount": "ການກວດສອບ {{displayCount}} ລາຍການ",
-      "checkDetails": "ລາຍລະອຽດການກວດສອບ",
-      "pullRequest": "ຄຳຂໍລວມໂຄ້ດ"
+      "checkDetails": "ລາຍລະອຽດການກວດສອບ"
     },
     "inbox": {
       "title": "ກ່ອງຂໍ້ຄວາມເຂົ້າ",
       "recent": "ລ່າສຸດ",
-      "draft": "ສະບັບຮ່າງ",
       "loading": "ກຳລັງໂຫຼດກ່ອງຂໍ້ຄວາມເຂົ້າ",
       "noReviewRequests": "ບໍ່ມີຄຳຂໍໃຫ້ກວດທານ",
       "noReviewRequestsDescription": "ຄຳຂໍລວມໂຄດທີ່ລໍຖ້າໃຫ້ທ່ານກວດທານຈະປາກົດຢູ່ທີ່ນີ້. ທ່ານຍັງສາມາດວາງລິງ PR ໃດກໍໄດ້ຂ້າງເທິງ.",
@@ -488,7 +511,6 @@
       "discardTitle": "ຖິ້ມຄຳເຫັນບໍ?",
       "discardMessage": "ຮ່າງຄຳເຫັນຂອງທ່ານຈະຖືກລຶບ.",
       "keepEditing": "ແກ້ໄຂຕໍ່",
-      "discard": "ຖິ້ມ",
       "comment": "ສະແດງຄຳເຫັນ",
       "insertSuggestionA11y": "ແຊກຂໍ້ສະເໜີແນະການແກ້ໄຂໂຄດ",
       "insertSuggestion": "ແຊກຂໍ້ສະເໜີແນະ",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "ຂໍ້ສະເໜີແນະໃຊ້ໄດ້ກັບບັນທັດທີ່ເພີ່ມໃໝ່ເທົ່ານັ້ນ.",
       "tapDiffLineToSuggest": "ແຕະບັນທັດໃນຄວາມແຕກຕ່າງເພື່ອເປີດໃຊ້ຂໍ້ສະເໜີແນະ."
     },
-    "screenTitle": "ການກວດສອບ PR",
     "connect": {
       "checkFailedTitle": "ບໍ່ສາມາດກວດສອບການເຊື່ອມຕໍ່ GitHub ໄດ້.",
       "checkFailedMessage": "ຍັງບໍ່ສາມາດສະແດງສະຖານະການເຂົ້າສູ່ລະບົບໄດ້ຈົນກວ່າຈະໂຫຼດຂໍ້ມູນນີ້ສຳເລັດ.",
       "reconnectTitle": "ເຊື່ອມຕໍ່ GitHub ໃໝ່",
-      "title": "ເຊື່ອມຕໍ່ GitHub",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ. ເຊື່ອມຕໍ່ໃໝ່ເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖືຕໍ່ໄປ.",
       "description": "ເຊື່ອມຕໍ່ບັນຊີ GitHub ຂອງທ່ານເພື່ອກວດທານຄຳຂໍລວມໂຄດໃນມືຖື."
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "ບໍ່ສາມາດໂຫຼດໜ້າສົ່ງຜົນການກວດທານໄດ້.",
       "deletePendingTitle": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງບໍ?",
       "deletePendingMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄິວການກວດທານ.",
-      "delete": "ລຶບ",
       "summaryOptional": "ບົດສະຫຼຸບ (ບໍ່ບັງຄັບ)",
       "pendingComment_one": "ຄຳເຫັນທີ່ລໍສົ່ງ",
       "pendingComment": "ຄຳເຫັນທີ່ຍັງບໍ່ໄດ້ສົ່ງ",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "ລວມໂຄ້ດແລ້ວ",
       "stateClosed": "ປິດແລ້ວ",
-      "stateDraft": "ສະບັບຮ່າງ",
       "stateOpenApproved": "ເປີດ · ອະນຸມັດແລ້ວ",
       "stateOpenChangesRequested": "ເປີດ · ມີຄຳຂໍໃຫ້ແກ້ໄຂ",
       "stateOpenReviewRequired": "ເປີດ · ຕ້ອງກວດທານ",
@@ -572,8 +590,6 @@
       "discussion": "ການສົນທະນາ"
     },
     "fileStatus": {
-      "added": "ເພີ່ມແລ້ວ",
-      "deleted": "ລຶບແລ້ວ",
       "modified": "ແກ້ໄຂແລ້ວ",
       "renamed": "ປ່ຽນຊື່ແລ້ວ",
       "copied": "ຄັດລອກແລ້ວ",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "ເລືອກ {{label}} ແລ້ວ, ແຕະເພື່ອປ່ຽນການເລືອກ",
       "tapToComment": "{{label}}, ແຕະເພື່ອໃສ່ຄຳເຫັນ",
       "truncationBanner": "ສະແດງໄຟລ໌ທີ່ປ່ຽນແປງ {{limit}} ໄຟລ໌ທຳອິດຈາກທັງໝົດ {{total}} ໄຟລ໌ — ຕາມຂີດຈຳກັດຂອງ GitHub API.",
-      "statusAdded": "ເພີ່ມແລ້ວ",
       "statusContext": "ໂຄດອ້ອມຂ້າງ",
-      "statusDeleted": "ລຶບແລ້ວ",
       "lineLabel": "{{status}} ບັນທັດ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(ວ່າງເປົ່າ)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "ການແຈ້ງເຕືອນ",
     "liveActivities": "ກິດຈະກຳແບບທັນທີ",
     "liveActivitySubtitle": "ສະແດງຕົວແທນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ",
     "liveUpdates": "ການອັບເດດແບບທັນທີ",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "ໜ້າຫຼັກ",
-    "agents": "ເອເຈນ",
     "profile": "ໂປຣຟາຍ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "ບໍ່ມີອິນສະແຕນ KiloClaw",
       "noInstancesDescription": "ຕັ້ງຄ່າອິນສະແຕນເພື່ອເລີ່ມສົນທະນາ.",
       "setUpKiloclaw": "ຕັ້ງຄ່າ KiloClaw",
-      "currentInstance": "{{title}}, ກຳລັງໃຊ້ຢູ່",
-      "personal": "ສ່ວນຕົວ"
+      "currentInstance": "{{title}}, ກຳລັງໃຊ້ຢູ່"
     },
     "conversation": {
       "failedToLoad": "ບໍ່ສາມາດໂຫຼດການສົນທະນາໄດ້.",
@@ -722,7 +733,6 @@
       "cancelReply": "ຍົກເລີກການຕອບ",
       "openInstance": "ເປີດອິນສະແຕນ",
       "attachFile": "ແນບໄຟລ໌",
-      "messagePlaceholder": "ຂໍ້ຄວາມ",
       "cancelEdit": "ຍົກເລີກການແກ້ໄຂ",
       "sendMessage": "ສົ່ງຂໍ້ຄວາມ"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "ເປີດ {{filename}}",
-      "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
       "openFailed": "ບໍ່ສາມາດເປີດໄຟລ໌ແນບໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
       "attachFailed": "ບໍ່ສາມາດແນບໄຟລ໌ໄດ້.",
       "limit": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
@@ -771,7 +780,6 @@
       "yourMessage": "ຂໍ້ຄວາມຂອງທ່ານ",
       "messageFrom": "ຂໍ້ຄວາມຈາກ {{author}}",
       "moreActions": "ຕົວເລືອກເພີ່ມເຕີມ",
-      "message": "ຂໍ້ຄວາມ",
       "notDelivered": "ສົ່ງບໍ່ສຳເລັດ",
       "edited": "(ແກ້ໄຂແລ້ວ)",
       "image": "ຮູບພາບ",
@@ -783,7 +791,6 @@
       "title": "ຕົວເລືອກຂໍ້ຄວາມ",
       "deleteTitle": "ລຶບຂໍ້ຄວາມບໍ?",
       "deleteMessage": "ຂໍ້ຄວາມນີ້ຈະຖືກລຶບອອກຈາກການສົນທະນາ.",
-      "delete": "ລຶບ",
       "deleteFailed": "ບໍ່ສາມາດລຶບຂໍ້ຄວາມໄດ້.",
       "removeReactionFailed": "ບໍ່ສາມາດລຶບປະຕິກິລິຍາໄດ້.",
       "addReactionFailed": "ບໍ່ສາມາດເພີ່ມປະຕິກິລິຍາໄດ້.",
@@ -813,7 +820,6 @@
       "online": "ອອນໄລນ໌",
       "idle": "ວ່າງ",
       "offline": "ອອບລາຍ",
-      "unknown": "ບໍ່ຊາບ",
       "loadingUser": "ກຳລັງໂຫຼດຂໍ້ມູນຜູ້ໃຊ້...",
       "waitingForStatus": "ກຳລັງລໍຖ້າສະຖານະຂອງບັອດ...",
       "offlineMessage": "ບັອດອອບລາຍຢູ່. ການຮັບສົ່ງຂໍ້ຄວາມຈະສືບຕໍ່ເມື່ອບັອດເຊື່ອມຕໍ່ອີກຄັ້ງ."
@@ -885,7 +891,6 @@
       "destroyMessage": "ການດຳເນີນການນີ້ຈະລຶບອິນສະແຕນ KiloClaw ຂອງທ່ານ ພ້ອມຂໍ້ມູນທັງໝົດຢ່າງຖາວອນ. ບໍ່ສາມາດກູ້ຄືນໄດ້.",
       "destroyTitle": "ລຶບອິນສະແຕນຖາວອນ",
       "instance": "ອິນສະແຕນ",
-      "renameFailed": "ເກີດຂໍ້ຜິດພາດ.",
       "couldNotCheckStatus": "ບໍ່ສາມາດກວດສອບສະຖານະບໍລິການໄດ້.",
       "dangerZone": "ເຂດອັນຕະລາຍ",
       "destroying": "ກຳລັງລຶບຖາວອນ…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "ບໍ່ສາມາດໂຫຼດຄຳສັ່ງຕັ້ງຄ່າໄດ້.",
       "gmailNotifications": "ການແຈ້ງເຕືອນ Gmail",
       "disconnect": "ຕັດການເຊື່ອມຕໍ່ບັນຊີ Google",
-      "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
       "copied": "ຄັດລອກແລ້ວ",
       "copyCommand": "ຄັດລອກຄຳສັ່ງ",
       "disabled": "ປິດໃຊ້ແລ້ວ",
       "disconnectConfirm": "ຕັດການເຊື່ອມຕໍ່",
       "disconnectMessage": "ຕ້ອງການເອົາບັນຊີ Google ຂອງທ່ານອອກຈາກອິນສະແຕນນີ້ບໍ? ການແຈ້ງເຕືອນ Gmail ຈະຖືກປິດ. ຫຼັງຈາກຕັດການເຊື່ອມຕໍ່, ນຳອິນສະແຕນຂຶ້ນໃຊ້ງານໃໝ່ເພື່ອໃຫ້ການປ່ຽນແປງມີຜົນ.",
-      "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ Google",
-      "enabled": "ເປີດໃຊ້ແລ້ວ",
-      "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່"
+      "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ Google"
     },
     "modelList": {
       "title": "ໂມເດວທັງໝົດ",
       "searchPlaceholder": "ຄົ້ນຫາໂມເດວ...",
-      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
       "clearSearch": "ລຶບຄຳຄົ້ນຫາ",
       "noMatches": "ບໍ່ພົບໂມເດວທີ່ກົງກັບການຄົ້ນຫາ",
       "noModels": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
       "noModelsDescription": "ໂມເດວຈະປາກົດຢູ່ນີ້ເມື່ອພ້ອມໃຊ້ງານ.",
       "noResultsFor": "ບໍ່ພົບຜົນການຄົ້ນຫາສຳລັບ \"{{query}}\".",
       "recommended": "ແນະນຳ"
-    },
-    "model": {
-      "title": "ໂມເດວ"
     },
     "secrets": {
       "title": "ຂໍ້ມູນລັບ",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "ຄູ່ມືການຕັ້ງຄ່າ {{label}}",
       "setupGuide": "ຄູ່ມືການຕັ້ງຄ່າ",
       "saving": "ກຳລັງບັນທຶກ…",
-      "remove": "ເອົາອອກ",
       "removing": "ກຳລັງເອົາອອກ…",
-      "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
-      "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
       "updateToken": "ອັບເດດໂທເຄັນ",
       "connect": "ເຊື່ອມຕໍ່"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "ສ້າງອິນສະແຕນ",
       "organizations": "ອົງກອນ",
-      "personal": "ສ່ວນຕົວ",
       "accessIssue": {
         "trialExpired": "ໝົດໄລຍະທົດລອງແລ້ວ — ສະໝັກໃຊ້ບໍລິການເພື່ອໃຊ້ອິນສະແຕນນີ້ຕໍ່",
         "subscriptionCanceled": "ການສະໝັກໃຊ້ບໍລິການບໍ່ມີຜົນແລ້ວ — ສະໝັກໃໝ່ເພື່ອໃຊ້ອິນສະແຕນນີ້ຕໍ່",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "ເປີດ kilo.ai",
         "provisioning": "ການກຽມອິນສະແຕນ",
         "review": "ການກວດສອບ",
-        "somethingWentWrong": "ເກີດຂໍ້ຜິດພາດ.",
         "identityTitle": "ສ້າງຕົວຕົນໃຫ້ບັອດຂອງທ່ານ",
-        "close": "ປິດ",
         "couldNotLoad": "ບໍ່ສາມາດໂຫຼດສະຖານະການຕັ້ງຄ່າເບື້ອງຕົ້ນໄດ້.",
         "finishingSetup": "ກຳລັງຕັ້ງຄ່າຂັ້ນສຸດທ້າຍ — ກະລຸນາລໍຖ້າຈັກໜ້ອຍຂະນະທີ່ພວກເຮົາກຽມບັນຊີຂອງທ່ານໃຫ້ພ້ອມໃຊ້ງານ.",
         "ready": "ພ້ອມ",
@@ -1080,7 +1072,6 @@
         "location": "ທີ່ຕັ້ງ",
         "locationPlaceholder": "ເມືອງ ຫຼື ພາກພື້ນ (ບໍ່ບັງຄັບ)",
         "useCurrentLocation": "ໃຊ້ທີ່ຕັ້ງປັດຈຸບັນ",
-        "continue": "ສືບຕໍ່",
         "locationDeniedTitle": "ບໍ່ໄດ້ຮັບອະນຸຍາດໃຫ້ເຂົ້າເຖິງທີ່ຕັ້ງ",
         "locationDeniedMessage": "ເປີດສິດເຂົ້າເຖິງທີ່ຕັ້ງໃນການຕັ້ງຄ່າ ເພື່ອໃຊ້ທີ່ຕັ້ງປັດຈຸບັນຂອງທ່ານ.",
         "locationValidationFailed": "ບໍ່ສາມາດຢືນຢັນທີ່ຕັ້ງໄດ້.",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "ກະບວນການເກດເວ",
       "lastExit": "ການສິ້ນສຸດຄັ້ງລ່າສຸດ",
       "memory": "ໜ່ວຍຄວາມຈຳ",
-      "model": "ໂມເດວ",
       "region": "ພາກພື້ນ",
       "resources": "ຊັບພະຍາກອນ",
       "restarts": "ຈຳນວນຄັ້ງທີ່ເລີ່ມໃໝ່",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "ປະສິດທິພາບສູງສຸດ. ສົ່ງຄຳຂໍໄປຍັງໂມເດວລ້ຳໜ້າທີ່ສາມາດຄິດວິເຄາະໄດ້.",
       "balancedLabel": "ສົມດຸນ",
       "balancedDescription": "ສົມດຸນທັງຄວາມໄວ ແລະ ຄວາມສາມາດ ໃນລາຄາທີ່ຕ່ຳກວ່າ.",
-      "cost": "ຄ່າໃຊ້ຈ່າຍ",
       "performance": "ປະສິດທິພາບ",
       "autoModelA11y": "ໂມເດວອັດຕະໂນມັດແບບ {{label}}",
       "currentModel": "ໂມເດວປັດຈຸບັນ",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "ບັນຊີ Google",
       "modelDescription": "ການເລືອກໂມເດວ AI",
-      "modelLabel": "ໂມເດວ",
       "secretsDescription": "ຂໍ້ມູນຢືນຢັນຕົວຕົນທີ່ເຂົ້າລະຫັດໄວ້",
       "secretsLabel": "ຂໍ້ມູນລັບ",
       "versionPinDescription": "ລັອກໃຫ້ໃຊ້ເວີຊັນທີ່ກຳນົດ",
@@ -1251,12 +1239,9 @@
       "placeholder": "ເຊັ່ນ: ໃຫ້ປະຕິບັດຕາມມາດຕະຖານການຈັດການຂໍ້ຜິດພາດຂອງທີມ…"
     },
     "repos": {
-      "title": "ຄັງໂຄ້ດ",
-      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
       "unavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດໄດ້ — ຕັ້ງຄ່າ Bitbucket ໃຫ້ສຳເລັດໃນ kilo.ai.",
       "finishSetup": "ຕັ້ງຄ່າໃຫ້ສຳເລັດ",
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງ",
-      "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
       "bitbucketNoRepositoriesDescription": "ບໍ່ມີຄັງໂຄ້ດທີ່ໃຊ້ໄດ້ໃນພື້ນທີ່ເຮັດວຽກ Bitbucket ນີ້.",
       "bitbucketSetup": "ການຕັ້ງຄ່າ Bitbucket",
       "couldNotOpenGithubSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
@@ -1274,7 +1259,6 @@
       "roast": "ວິຈານກົງໆ ແບບເຈັບໆ ແຕ່ຕະຫຼົກ",
       "strict": "ລາຍງານທຸກບັນຫາ ຮັກສາມາດຕະຖານສູງ"
     },
-    "title": "ຜູ້ກວດສອບໂຄ້ດ",
     "reviewDetail": {
       "title": "ການກວດສອບ",
       "cancelTitle": "ຍົກເລີກການກວດທານບໍ?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດທານໄດ້.",
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
       "byline": "{{repo}} #{{number}} ໂດຍ {{author}}",
-      "findings": "ບັນຫາທີ່ກວດພົບ",
       "noFindings": "ບໍ່ພົບບັນຫາ.",
       "showMore": "ສະແດງເພີ່ມເຕີມ",
-      "details": "ລາຍລະອຽດ",
       "branch": "ສາຂາໂຄ້ດ",
-      "platform": "ແພລດຟອມ",
-      "model": "ໂມເດວ",
       "created": "ສ້າງເມື່ອ",
       "started": "ເລີ່ມເມື່ອ",
       "completed": "ສຳເລັດແລ້ວ",
-      "cost": "ຄ່າໃຊ້ຈ່າຍ",
       "tokens": "ໂທເຄັນ",
       "tokensInOut": "{{input}} ເຂົ້າ / {{output}} ອອກ",
       "openPullRequest": "ເປີດຄຳຂໍລວມໂຄ້ດ",
@@ -1309,7 +1288,6 @@
       "checkRun": "ການກວດແຕ່ລະຄັ້ງ",
       "status": "ສະຖານະ",
       "threshold": "ຄ່າເກນ",
-      "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
       "transcriptWaiting": "ກຳລັງລໍຖ້າບັນທຶກການກວດສອບ.",
       "transcriptEmpty": "ບໍ່ມີບັນທຶກສຳລັບການກວດສອບນີ້.",
       "transcriptRetry": "ບໍ່ສາມາດໂຫຼດບັນທຶກການກວດສອບໄດ້.",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "ບໍ່ສາມາດໂຫຼດລາຍການຜູ້ໃຫ້ບໍລິການທີ່ທ່ານເຊື່ອມຕໍ່ໄວ້ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
       "connectProviderDescription": "ເຊື່ອມຕໍ່ GitHub ເພື່ອເລີ່ມກວດສອບຄຳຂໍລວມໂຄ້ດດ້ວຍຕົນເອງ.",
-      "connectGitHub": "ເຊື່ອມຕໍ່ GitHub",
-      "platform": "ແພລດຟອມ",
-      "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
       "pullRequestUrl": "URL ຂອງຄຳຂໍລວມໂຄ້ດ",
       "instructions": "ຄຳແນະນຳ (ບໍ່ຈຳເປັນຕ້ອງໃສ່)",
       "instructionsPlaceholder": "ຈຸດທີ່ຕ້ອງການໃຫ້ກວດສອບເປັນພິເສດ…",
-      "model": "ໂມເດວ",
       "starting": "ກຳລັງເລີ່ມການກວດສອບ…",
       "start": "ເລີ່ມກວດສອບ"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "ເລືອກຄັງໂຄ້ດ",
     "followReviewMd": "ປະຕິບັດຕາມ REVIEW.md",
     "followReviewMdSubtitle": "ປະຕິບັດຕາມຄຳແນະນຳໃນໄຟລ໌ REVIEW.md ຂອງແຕ່ລະຄັງໂຄ້ດ",
-    "readOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
     "bitbucket": {
       "notConnectedReadOnly": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ Bitbucket. ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
       "setupIncomplete": "ຍັງຕັ້ງຄ່າບໍ່ສຳເລັດ — ໄປຕັ້ງຄ່າໃຫ້ຄົບຢູ່ kilo.ai.",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
       "personalStillAvailable": "ທ່ານຍັງສາມາດໃຊ້ຄັງໂຄ້ດສ່ວນຕົວທີ່ຢູ່ດ້ານລຸ່ມໄດ້.",
-      "personal": "ສ່ວນຕົວ",
       "personalSubtitle": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
       "viewOnly": "ເບິ່ງເທົ່ານັ້ນ"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "ກຳລັງກວດສອບ…",
       "statusUnavailable": "ບໍ່ສາມາດຮູ້ສະຖານະໄດ້",
-      "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
-      "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
-      "organization": "ອົງກອນ",
       "platforms": "ແພລດຟອມ",
       "activity": "ກິດຈະກຳ"
     },
     "providerConnect": {
       "githubApp": "ແອັບ GitHub",
-      "connectGitHub": "ເຊື່ອມຕໍ່ GitHub",
       "githubError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitHub ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "gitlabAccount": "ບັນຊີ GitLab",
       "connectGitLab": "ເຊື່ອມຕໍ່ GitLab",
@@ -1421,10 +1389,7 @@
       "allAreas": "ທຸກດ້ານ",
       "customInstructions": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "set": "ຕັ້ງຄ່າແລ້ວ",
-      "model": "ໂມເດວ",
       "mergeGate": "ເງື່ອນໄຂການລວມໂຄ້ດ",
-      "repositories": "ຄັງໂຄ້ດ",
-      "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",
       "reviewMemory": "ຄວາມຈຳສຳລັບການກວດສອບ",
       "proposedReviewMdGuidance": "ຄຳແນະນຳທີ່ສະເໜີສຳລັບ REVIEW.md"
@@ -1435,16 +1400,13 @@
       "noDecision": "ຍັງບໍ່ມີຜົນການຕັດສິນ",
       "noResult": "ບໍ່ມີຜົນ"
     },
-    "eyebrow": "ຜູ້ກວດສອບໂຄ້ດ",
     "updateFailed": "ບໍ່ສາມາດອັບເດດເຄື່ອງມືກວດສອບໂຄ້ດໄດ້.",
     "configSaveFailed": "ບໍ່ສາມາດບັນທຶກການຕັ້ງຄ່າການກວດສອບໄດ້.",
     "status": {
       "pending": "ລໍຖ້າ",
-      "queued": "ລໍຄິວ",
       "running": "ກຳລັງເຮັດວຽກ",
       "completed": "ສຳເລັດແລ້ວ",
       "failed": "ລົ້ມເຫຼວ",
-      "cancelled": "ຍົກເລີກແລ້ວ",
       "interrupted": "ຢຸດກາງຄັນ"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "ເອກະສານ"
     },
     "gateThreshold": {
-      "off": "ປິດ",
-      "all": "ທັງໝົດ",
-      "warning": "ຄຳເຕືອນ",
-      "critical": "ຮ້າຍແຮງ"
+      "warning": "ຄຳເຕືອນ"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
         "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະແອັບ GitHub ທີ່ຕິດຕັ້ງແລະໃຊ້ງານຢູ່ບໍ່ສາມາດໃຫ້ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດນີ້ໄດ້. ອັບເດດການຕິດຕັ້ງແອັບ GitHub ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
         "recoveryLabel": "ອັບເດດແອັບ GitHub"
       },
       "githubIpAllowList": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
-        "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະອົງກອນ GitHub ນີ້ໃຊ້ລາຍການ IP ທີ່ອະນຸຍາດ ເຊິ່ງປິດກັ້ນ Kilo. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
-        "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+        "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະອົງກອນ GitHub ນີ້ໃຊ້ລາຍການ IP ທີ່ອະນຸຍາດ ເຊິ່ງປິດກັ້ນ Kilo. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ."
       },
       "gitlabProjectAccessRequired": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
         "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະ Kilo ບໍ່ສາມາດສ້າງໂທເຄັນເຂົ້າເຖິງໂຄງການໃນ GitLab ສຳລັບໂຄງການນີ້ໄດ້. ໃຫ້ສິດຜູ້ດູແລ ຫຼື ເປີດໃຊ້ໂທເຄັນເຂົ້າເຖິງໂຄງການ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
         "recoveryLabel": "ອັບເດດການເຊື່ອມຕໍ່ GitLab"
       },
       "byokInvalidKey": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
         "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະຄີ API ແບບ BYOK ທີ່ເລືອກໄວ້ບໍ່ຖືກຕ້ອງ, ຖືກຖອນ ຫຼື ບໍ່ມີສິດພຽງພໍ. ອັບເດດຄີ ຫຼື ເລືອກໂມເດວອື່ນ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
         "recoveryLabel": "ອັບເດດການຕັ້ງຄ່າ BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
         "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ເພາະໂມເດວທີ່ເລືອກໄວ້ບໍ່ສາມາດໃຊ້ກັບເຊສຊັນຂອງເອເຈນເທິງຄລາວໄດ້. ເລືອກໂມເດວທີ່ໃຊ້ໄດ້ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
         "recoveryLabel": "ອັບເດດການຕັ້ງຄ່າເຄື່ອງມືກວດສອບໂຄ້ດ"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
-        "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ຫຼັງຈາກການສຳເນົາຄັງໂຄ້ດໃຊ້ເວລາເກີນກຳນົດ 3 ຄັ້ງໃນມື້ນີ້. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ.",
-        "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
-      }
+        "description": "ເຄື່ອງມືກວດສອບໂຄ້ດຖືກປິດ ຫຼັງຈາກການສຳເນົາຄັງໂຄ້ດໃຊ້ເວລາເກີນກຳນົດ 3 ຄັ້ງໃນມື້ນີ້. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ ແລ້ວເປີດໃຊ້ເຄື່ອງມືກວດສອບໂຄ້ດອີກຄັ້ງ."
+      },
+      "title": "ຜູ້ກວດສອບໂຄ້ດມີບັນຫາທີ່ຕ້ອງແກ້ໄຂ.",
+      "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
     },
     "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຊາບສາເຫດ"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "ກັບໄປທີ່ລາຍການບັນຫາທີ່ກວດພົບ ແລ້ວເປີດຕົວກັ່ນຕອງອີກຄັ້ງ.",
       "title": "ກັ່ນຕອງບັນຫາທີ່ກວດພົບ",
       "reset": "ຄືນຄ່າເດີມ",
-      "repository": "ຄັງໂຄ້ດ",
       "status": "ສະຖານະ",
       "severity": "ລະດັບຄວາມຮ້າຍແຮງ",
       "outcome": "ຜົນລັບ",
       "slaStatus": "ສະຖານະ SLA",
       "sortBy": "ຮຽງຕາມ",
-      "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
-      "all": "ທັງໝົດ",
       "statusOpen": "ເປີດ",
       "fixed": "ແກ້ໄຂແລ້ວ",
       "statusIgnored": "ຂ້າມແລ້ວ",
       "statusClosed": "ປິດແລ້ວ",
-      "severityCritical": "ຮ້າຍແຮງ",
       "severityHigh": "ສູງ",
       "severityMedium": "ປານກາງ",
       "severityLow": "ຕ່ຳ",
       "outcomeNotAnalyzed": "ຍັງບໍ່ໄດ້ວິເຄາະ",
       "outcomeAnalyzing": "ກຳລັງວິເຄາະ",
       "outcomeFailed": "ການວິເຄາະລົ້ມເຫຼວ",
-      "outcomeExploitable": "ໃຊ້ໂຈມຕີໄດ້",
       "outcomeNotExploitable": "ໃຊ້ໂຈມຕີບໍ່ໄດ້",
       "outcomeSafeToDismiss": "ລະເວັ້ນໄດ້ຢ່າງປອດໄພ",
-      "outcomeNeedsReview": "ຕ້ອງກວດສອບ",
       "outcomeTriageComplete": "ຄັດແຍກເບື້ອງຕົ້ນແລ້ວ",
       "outcomeDismissed": "ລະເວັ້ນແລ້ວ",
       "sortSeverityDesc": "ຄວາມຮ້າຍແຮງ: ສູງຫາຕ່ຳ",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "ເປີດການປິດບັນຫາອັດຕະໂນມັດ",
       "enableAutoDismissSubtitle": "ປິດບັນຫາໂດຍອັດຕະໂນມັດເມື່ອ AI ປະເມີນວ່າບໍ່ສາມາດນຳໄປໃຊ້ໂຈມຕີໄດ້.",
       "confidenceThreshold": "ເກນຄວາມໝັ້ນໃຈ",
-      "permissionNote": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
       "enableAutoRemediationConfirmTitle": "ເປີດການແກ້ໄຂອັດຕະໂນມັດບໍ?",
       "enableAutoRemediationConfirmMessage": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຈະເປີດ PR ເພື່ອແກ້ໄຂບັນຫາໂດຍອັດຕະໂນມັດ ສຳລັບບັນຫາທີ່ເຂົ້າເກນ ແລະ ສາມາດຖືກນຳໄປໃຊ້ໂຈມຕີໄດ້.",
       "enable": "ເປີດ",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "ການດຳເນີນການທີ່ແນະນຳ",
       "triageReasoning": "ເຫດຜົນຂອງການຄັດແຍກເບື້ອງຕົ້ນ",
       "exploitable": "ໃຊ້ໂຈມຕີໄດ້",
-      "model": "ໂມເດວ",
       "notRecorded": "ບໍ່ໄດ້ບັນທຶກ",
       "analyzed": "ວິເຄາະແລ້ວ",
       "exploitabilityReasoning": "ເຫດຜົນການປະເມີນວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ຫຼືບໍ່",
       "suggestedFix": "ວິທີແກ້ໄຂທີ່ແນະນຳ",
       "whereFound": "ຈຸດທີ່ກວດພົບ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນສະບັບເຕັມ",
-      "unknown": "ບໍ່ຊາບ",
       "yes": "ແມ່ນ",
       "no": "ບໍ່ແມ່ນ"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "ເປີດຢູ່ {{open}} · ວິກິດ {{critical}} · ສູງ {{high}}",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນພາບລວມໄດ້.",
       "filterByRepository": "ກັ່ນຕອງຕາມຄັງໂຄ້ດ",
-      "findings": "ບັນຫາທີ່ກວດພົບ",
       "lastSynced": "ຊິງຂໍ້ມູນຄັ້ງລ່າສຸດ {{time}}",
       "manageRepositories": "ຈັດການຄັງໂຄ້ດ",
       "notYetSynced": "ຍັງບໍ່ໄດ້ຊິງຂໍ້ມູນ",
@@ -1686,23 +1629,19 @@
       "severityLabel": "ຄວາມຮ້າຍແຮງລະດັບ {{severity}}",
       "package": "ແພັກເກດ",
       "vulnerableVersions": "ລຸ້ນທີ່ມີຊ່ອງໂຫວ່",
-      "unknown": "ບໍ່ຊາບ",
       "patchedVersion": "ລຸ້ນທີ່ແກ້ໄຂແລ້ວ",
       "noPatchAvailable": "ຍັງບໍ່ມີຊຸດແກ້ໄຂ",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "ຄັງໂຄ້ດ",
       "manifest": "ໄຟລ໌ຂໍ້ມູນແພັກເກດ",
       "detected": "ກວດພົບ",
       "updated": "ອັບເດດແລ້ວ",
-      "fixed": "ແກ້ໄຂແລ້ວ",
       "slaDeadline": "ວັນຄົບກຳນົດ SLA",
       "sourceRecord": "ບັນທຶກຈາກແຫຼ່ງຂໍ້ມູນ",
       "source": "ແຫຼ່ງຂໍ້ມູນ",
       "sourceId": "ລະຫັດຈາກແຫຼ່ງຂໍ້ມູນ",
       "viewAdvisory": "ເບິ່ງປະກາດຄວາມປອດໄພໃນ GitHub",
       "statusSuperseded": "ແທນທີ່ແລ້ວ",
-      "statusFixed": "ແກ້ໄຂແລ້ວ",
       "statusOpen": "ເປີດ",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ເລີ່ມແກ້ໄຂແລ້ວ",
@@ -1716,25 +1655,18 @@
       "title": "ການຕັ້ງຄ່າ",
       "couldNotLoadSettings": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າຕົວຊ່ວຍດ້ານຄວາມປອດໄພໄດ້.",
       "couldNotLoadPermissions": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນສິດໄດ້.",
-      "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
-      "securityAgent": "ເອເຈນດ້ານຄວາມປອດໄພ",
-      "enabled": "ເປີດໃຊ້ແລ້ວ",
       "disabled": "ປິດໃຊ້ແລ້ວ",
       "on": "ເປີດ",
-      "off": "ປິດ",
-      "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
       "repositoriesCount_one": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ແຫ່ງ",
       "repositoriesCount": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "repositoriesCount_other": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "selectRepositories": "ເລືອກຄັງໂຄ້ດ",
       "selectRepositoriesSubtitle": "ເລືອກຄັງໂຄ້ດທີ່ຈະໃຫ້ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕິດຕາມ",
-      "repositories": "ຄັງໂຄ້ດ",
       "modelsAndAnalysis": "ໂມເດວ ແລະ ການວິເຄາະ",
       "analysisModeSubtitle": "ການວິເຄາະແບບ {{mode}}",
       "automation": "ການເຮັດວຽກອັດຕະໂນມັດ",
       "automationAllOff": "ປິດທັງໝົດ",
       "automationCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 3 ລາຍການ",
-      "notifications": "ການແຈ້ງເຕືອນ",
       "notificationsCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 2 ລາຍການ",
       "slaPolicy": "ນະໂຍບາຍ SLA",
       "disabledNoManage": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພປິດຢູ່. ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ເປີດໃຊ້ໄດ້.",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "ສົ່ງຄຳຂໍຍົກເລີກແລ້ວ",
       "cancelled": "ຍົກເລີກການແກ້ໄຂແລ້ວ",
-      "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດສະຖານະການແກ້ໄຂໄດ້.",
       "noAnalysisTitle": "ຍັງບໍ່ມີການວິເຄາະ",
       "noAnalysisDescription": "ເລີ່ມການວິເຄາະຈາກແຖບລາຍລະອຽດ.",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "ປະຫວັດການລອງແກ້ໄຂ ({{displayCount}})",
       "attemptNumber": "ການລອງແກ້ໄຂຄັ້ງທີ {{number}}",
       "startedBy": "ເລີ່ມໂດຍ",
-      "model": "ໂມເດວ",
       "branch": "ສາຂາໂຄ້ດ",
       "queued": "ເພີ່ມການແກ້ໄຂໃສ່ຄິວແລ້ວ",
       "retryQueued": "ເພີ່ມການລອງແກ້ໄຂໃໝ່ໃສ່ຄິວແລ້ວ",
@@ -1769,20 +1699,17 @@
         "prOpened": "ເປີດ PR ແລ້ວ",
         "failed": "ການແກ້ໄຂລົ້ມເຫຼວ",
         "blocked": "ການແກ້ໄຂຕິດຂັດ",
-        "noChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ",
-        "cancelled": "ຍົກເລີກແລ້ວ"
+        "noChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ"
       },
       "unavailable": "ບໍ່ມີການແກ້ໄຂໃຫ້ໃຊ້ສຳລັບບັນຫາທີ່ກວດພົບນີ້."
     },
     "analysisSettings": {
       "title": "ໂມເດວ ແລະ ການວິເຄາະ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການວິເຄາະໄດ້.",
-      "permissionNote": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
       "depth": "ລະດັບຄວາມເລິກຂອງການວິເຄາະ",
       "modeAuto": "ອັດຕະໂນມັດ",
       "modeShallow": "ເບື້ອງຕົ້ນ",
       "modeDeep": "ເຊິງເລິກ",
-      "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
       "triageModel": "ໂມເດວຄັດແຍກເບື້ອງຕົ້ນ",
       "analysisModel": "ໂມເດວວິເຄາະ",
       "remediationModel": "ໂມເດວແກ້ໄຂ"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "ນະໂຍບາຍ SLA",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າ SLA ໄດ້.",
-      "critical": "ຮ້າຍແຮງ",
       "high": "ສູງ",
       "medium": "ປານກາງ",
       "low": "ຕ່ຳ",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "ບັນຫາທີ່ກວດພົບ",
-      "tabDetails": "ລາຍລະອຽດ",
       "tabAnalysis": "ການວິເຄາະ",
       "tabRemediation": "ການແກ້ໄຂ",
       "notFound": "ບໍ່ພົບລາຍການບັນຫານີ້",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "ລະເວັ້ນບັນຫາທີ່ກວດພົບ"
     },
     "findingList": {
-      "title": "ບັນຫາທີ່ກວດພົບ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດບັນຫາທີ່ກວດພົບໄດ້.",
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດບັນຫາທີ່ກວດພົບເພີ່ມໄດ້.",
       "noMatchesTitle": "ບໍ່ມີບັນຫາທີ່ກົງກັບຕົວກັ່ນຕອງ",
@@ -1827,13 +1751,8 @@
       "clearFilters": "ລ້າງການກັ່ນຕອງ"
     },
     "scopeList": {
-      "title": "ເອເຈນດ້ານຄວາມປອດໄພ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
-      "personal": "ສ່ວນຕົວ",
       "personalSubtitle": "ຄັງໂຄ້ດຂອງທ່ານເອງ"
-    },
-    "commandRetry": {
-      "discard": "ຖິ້ມ"
     },
     "findingRow": {
       "nextRemediationPrOpen": "PR ແກ້ໄຂບັນຫາເປີດຢູ່",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "ບໍ່ສາມາດເປີດ GitHub. ກະລຸນາລອງໃໝ່."
     },
     "settingsSave": {
-      "discard": "ຖິ້ມ",
       "keepEditing": "ແກ້ໄຂຕໍ່",
       "saveChanges": "ບັນທຶກການປ່ຽນແປງ",
       "unsavedTitle": "ການປ່ຽນແປງທີ່ຍັງບໍ່ທັນບັນທຶກ",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍງານການກວດສອບໄດ້.",
       "events": "ເຫດການ",
-      "findings": "ບັນຫາທີ່ກວດພົບ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",
       "noActivity": "ບໍ່ມີກິດຈະກຳທີ່ບັນທຶກໄວ້",
       "noActivityDescription": "Kilo ບໍ່ມີກິດຈະກຳກ່ຽວກັບບັນຫາຄວາມປອດໄພທີ່ກວດພົບທີ່ສາມາດລາຍງານໄດ້ ຕັ້ງແຕ່ {{start}} ຫາ {{end}}.",
@@ -1875,8 +1792,7 @@
       "title": "ລາຍງານການກວດສອບ",
       "unavailable": "ບໍ່ສາມາດເບິ່ງລາຍງານການກວດສອບໄດ້",
       "unavailableDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ເບິ່ງລາຍງານການກວດສອບໄດ້. ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ ຫຼື ຜູ້ຈັດການການເກັບເງິນໃຫ້ສິດເຂົ້າເບິ່ງແກ່ເຈົ້າ.",
-      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່.",
-      "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່."
+      "queryFailed": "ການດຶງຂໍ້ມູນລາຍງານບໍ່ສຳເລັດ. ລອງໃໝ່."
     },
     "notifications": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການແຈ້ງເຕືອນໄດ້.",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "ການແຈ້ງເຕືອນບັນຫາທີ່ກວດພົບໃໝ່",
       "newFindingSeverityLabel": "ລະດັບຄວາມຮ້າຍແຮງຕ່ຳສຸດຂອງບັນຫາໃໝ່",
       "newFindingSubtitle": "ສົ່ງທຸກຄັ້ງທີ່ຊິງຂໍ້ມູນບັນຫາໃໝ່ ລວມທັງການຊິງຂໍ້ມູນຄັ້ງທຳອິດ.",
-      "readOnly": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
       "slaLeadTimeAccessibility": "ຈຳນວນມື້ທີ່ແຈ້ງເຕືອນ SLA ລ່ວງໜ້າ",
       "slaLeadTimeError": "ໃສ່ຈຳນວນມື້ເປັນຈຳນວນເຕັມຕັ້ງແຕ່ 1 ຫາ 365.",
       "slaLeadTimeHint": "ໃສ່ຈຳນວນເຕັມແຕ່ 1 ຫາ 365",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "ສົ່ງອີເມວແຈ້ງຂ້ອຍເມື່ອມີຄຳເຕືອນ SLA",
       "slaSection": "ການແຈ້ງເຕືອນ SLA",
       "slaSeverityLabel": "ລະດັບຄວາມຮ້າຍແຮງຕ່ຳສຸດສຳລັບການແຈ້ງເຕືອນ SLA",
-      "slaSubtitle": "ສົ່ງລ່ວງໜ້າ ແລະ ເມື່ອບັນຫາທີ່ກວດພົບໃກ້ຄົບກຳນົດ ຫຼື ເກີນກຳນົດ SLA.",
-      "title": "ການແຈ້ງເຕືອນ"
+      "slaSubtitle": "ສົ່ງລ່ວງໜ້າ ແລະ ເມື່ອບັນຫາທີ່ກວດພົບໃກ້ຄົບກຳນົດ ຫຼື ເກີນກຳນົດ SLA."
     },
     "repositories": {
-      "allRepositories": "ຄັງໂຄ້ດທັງໝົດ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າຄັງໂຄ້ດໄດ້.",
-      "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
       "couldNotOpenGithubSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
       "githubAppSettings": "ການຕັ້ງຄ່າແອັບ GitHub",
       "manageAccess": "ຈັດການສິດເຂົ້າເຖິງຂອງແອັບ GitHub",
       "noRepositories": "ບໍ່ມີຄັງໂຄ້ດ",
       "noRepositoriesDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດ.",
-      "readOnly": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
       "selectAtLeastOne": "ເລືອກຄັງໂຄ້ດຢ່າງໜ້ອຍໜຶ່ງແຫ່ງ.",
-      "selectedRepositories": "ຄັງໂຄ້ດທີ່ເລືອກ",
-      "title": "ຄັງໂຄ້ດ"
+      "selectedRepositories": "ຄັງໂຄ້ດທີ່ເລືອກ"
     },
     "scopeEntry": {
       "connectDescription": "ຕິດຕັ້ງແອັບ GitHub ຂອງ Kilo ເພື່ອຊິງຂໍ້ມູນການແຈ້ງເຕືອນ Dependabot ໂດຍອັດຕະໂນມັດ ແລະ ຈັດການບັນຫາຄວາມປອດໄພທີ່ກວດພົບໃນຄັງໂຄ້ດຂອງເຈົ້າ.",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "ບໍ່ສາມາດຕິດຕາມການດຳເນີນການທີ່ຢູ່ໃນຄິວໄດ້ອີກແລ້ວ. ໂຫຼດຂໍ້ມູນໃໝ່ເພື່ອເບິ່ງສະຖານະລ່າສຸດ.",
     "initialSyncAdmissionFailed": "ເປີດຕົວຊ່ວຍດ້ານຄວາມປອດໄພແລ້ວ ແຕ່ບໍ່ສາມາດເພີ່ມການຊິງຂໍ້ມູນຄັ້ງທຳອິດໃສ່ຄິວໄດ້. ຊິງຂໍ້ມູນອີກຄັ້ງ.",
-    "title": "ເອເຈນດ້ານຄວາມປອດໄພ",
     "commands": {
       "findingAlreadyDismissed": "ບັນຫານີ້ປິດໄປແລ້ວ",
       "findingDismissed": "ປິດບັນຫາແລ້ວ",
@@ -1949,22 +1858,16 @@
       "failed": "ການວິເຄາະລົ້ມເຫຼວ",
       "failedTitle": "ການວິເຄາະລົ້ມເຫຼວ",
       "failedDescription": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພບໍ່ສາມາດວິເຄາະໃຫ້ສຳເລັດໄດ້.",
-      "extractionFailed": "ຕ້ອງກວດສອບ",
-      "extractionFailedTitle": "ຕ້ອງກວດສອບ",
       "extractionFailedDescription": "ບໍ່ສາມາດແປງລາຍງານທາງເຕັກນິກເປັນຜົນລັບທີ່ມີໂຄງສ້າງໄດ້.",
-      "exploitable": "ໃຊ້ໂຈມຕີໄດ້",
-      "exploitableTitle": "ໃຊ້ໂຈມຕີໄດ້",
       "exploitableDescription": "ໂຄ້ດຂອງແອັບສາມາດເອີ້ນໃຊ້ຄຸນສົມບັດທີ່ມີບັນຫາໄດ້.",
       "notExploitable": "ເຂົ້າເຖິງບໍ່ໄດ້",
       "notExploitableTitle": "ເຂົ້າເຖິງບໍ່ໄດ້",
       "notExploitableDescription": "ບໍ່ພົບເສັ້ນທາງໃນຄັງໂຄ້ດນີ້ທີ່ເຂົ້າເຖິງສ່ວນທີ່ມີບັນຫາໄດ້.",
       "unknown": "ຕ້ອງກວດສອບ",
-      "unknownTitle": "ຕ້ອງກວດສອບ",
       "unknownDescription": "ການວິເຄາະບໍ່ສາມາດຢືນຢັນໄດ້ວ່າໂຄ້ດສາມາດເອີ້ນໃຊ້ຄຸນສົມບັດທີ່ມີຊ່ອງໂຫວ່ໄດ້ຫຼືບໍ່.",
       "safeToDismiss": "ລະເວັ້ນໄດ້ຢ່າງປອດໄພ",
       "safeToDismissTitle": "ລະເວັ້ນໄດ້ຢ່າງປອດໄພ",
       "safeToDismissDescription": "ການຄັດແຍກເບື້ອງຕົ້ນພົບວ່າສາມາດປິດບັນຫານີ້ໄດ້ຢ່າງປອດໄພ ໂດຍບໍ່ຕ້ອງວິເຄາະຊຸດໂຄ້ດ.",
-      "manualReview": "ຕ້ອງກວດສອບ",
       "manualReviewTitle": "ຕ້ອງໃຫ້ຄົນກວດສອບ",
       "manualReviewDescription": "ການຄັດແຍກເບື້ອງຕົ້ນລະບຸວ່າບັນຫານີ້ຕ້ອງໃຫ້ຄົນກວດທານ.",
       "analysisRequired": "ຕ້ອງວິເຄາະ",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "ແກ້ໄຂແລ້ວກ່ອນຄົບກຳນົດ",
-      "fixed": "ແກ້ໄຂແລ້ວ",
       "fixedOn": "ແກ້ໄຂເມື່ອ {{date}}",
       "resolutionRecorded": "ບັນທຶກການແກ້ໄຂແລ້ວ",
       "superseded": "ແທນທີ່ແລ້ວ",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "ສົ່ງຄຳຂໍຍົກເລີກແລ້ວ",
       "notStarted": "ຍັງບໍ່ໄດ້ເລີ່ມ",
-      "queued": "ລໍຄິວ",
       "starting": "ກຳລັງເລີ່ມ",
       "inProgress": "ກຳລັງດຳເນີນການ",
       "draftPrOpened": "ເປີດ PR ສະບັບຮ່າງແລ້ວ",
@@ -2009,7 +1910,6 @@
       "blocked": "ຕິດຂັດ",
       "failed": "ລົ້ມເຫຼວ",
       "noChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ",
-      "cancelled": "ຍົກເລີກແລ້ວ",
       "originAutomaticPolicy": "ນະໂຍບາຍອັດຕະໂນມັດ",
       "originIncludeExistingPolicy": "ນະໂຍບາຍລວມບັນຫາທີ່ກວດພົບໄວ້ແລ້ວ",
       "originManual": "ດ້ວຍຕົນເອງ",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນບໍ?",
       "deleteMessage": "ເມື່ອລຶບແລ້ວຈະກູ້ຄືນບໍ່ໄດ້.",
-      "delete": "ລຶບ",
       "deleteSession": "ລຶບເຊດຊັນ",
       "rename": "ປ່ຽນຊື່",
       "renameMessage": "ປ້ອນຊື່ໃໝ່ໃຫ້ເຊດຊັນນີ້.",
@@ -2130,7 +2029,6 @@
       "title": "ເຊດຊັນ",
       "copyErrorDetails": "ຄັດລອກລາຍລະອຽດຂໍ້ຜິດພາດ",
       "backToSessions": "ກັບໄປລາຍການເຊດຊັນ",
-      "accessDenied": "ບໍ່ມີສິດເຂົ້າເຖິງ.",
       "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນໄດ້.",
       "failedToLoadDetails": "ບໍ່ສາມາດໂຫຼດລາຍລະອຽດເຊດຊັນໄດ້.",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
-      "continue": "ສືບຕໍ່",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສ້າງສຳເນົາເຊດຊັນນີ້ໄດ້. ລອງໃໝ່.",
       "notEnoughCredits": "ເຄຣດິດບໍ່ພໍສຳລັບໃຊ້ Cloud Agent. ເຕີມເຄຣດິດແລ້ວລອງໃໝ່.",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "ເຊສຊັນໃໝ່",
-      "repository": "ຄັງໂຄ້ດ",
-      "connectGithub": "ເຊື່ອມຕໍ່ GitHub",
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
       "openGithub": "ເປີດ GitHub",
       "refreshRepositories": "ໂຫຼດລາຍການຄັງໂຄດໃໝ່",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "ລຶບຂໍ້ຄວາມຮ່າງບໍ?",
       "discardDraftMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ຈະຖືກລຶບ.",
       "keepEditing": "ແກ້ໄຂຕໍ່",
-      "discard": "ຖິ້ມ",
       "discardFailed": "ບໍ່ສາມາດລຶບຂໍ້ຄວາມຮ່າງໄດ້. ກະລຸນາລອງໃໝ່.",
       "remoteHint": "ໃຊ້ຄຳສັ່ງ `kilo remote` ໃນຄອມພິວເຕີຂອງເຈົ້າ ຫຼື `/remote` ໃນເຊດຊັນ CLI ທີ່ກຳລັງເຮັດວຽກຢູ່ ເພື່ອຄວບຄຸມ kilo ທີ່ເຮັດວຽກຢູ່ໃນເຄື່ອງ.",
       "bitbucketConnected": "ເຊື່ອມຕໍ່ Bitbucket ແລ້ວ",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "ອັບເດດແລ້ວ {{displayCount}} ໄຟລ໌."
     },
     "toolPatch": {
-      "operationAdded": "ເພີ່ມແລ້ວ",
-      "operationDeleted": "ລຶບແລ້ວ",
       "operationUpdated": "ອັບເດດແລ້ວ"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "ເຮັດວຽກເທິງ",
       "runOnAccessibility": "ເຮັດວຽກເທິງ: {{label}}",
       "couldNotLoad": "ໂຫຼດອິນສະແຕນຊ໌ບໍ່ໄດ້",
-      "couldNotLoadDescription": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
       "cloudAgent": "Cloud Agent",
-      "loading": "ກຳລັງໂຫຼດ…",
       "cloudAgentDescription": "ເຮັດວຽກໃນສະພາບແວດລ້ອມແຍກສ່ວນເທິງຄລາວຂອງ Kilo",
       "noCliInstances": "ບໍ່ມີອິນສະແຕນຊ໌ CLI ເຊື່ອມຕໍ່ຢູ່",
       "noCliInstancesDescription": "ໃຊ້ຄຳສັ່ງ `kilo remote` ໃນໂຄງການເທິງຄອມພິວເຕີຂອງເຈົ້າ ຫຼືອັບເດດ Kilo CLI ຖ້າມີອິນສະແຕນຊ໌ເຮັດວຽກຢູ່ແລ້ວ.",
@@ -2323,7 +2213,6 @@
       "loading": "ກຳລັງໂຫຼດ…",
       "accessibility": "ຄັງໂຄດ: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "ຜູ້ໃຊ້",
       "roleAssistant": "ຜູ້ຊ່ວຍ",
       "sent": "ສົ່ງແລ້ວ",
-      "model": "ໂມເດວ",
       "costAndTokens": "ຄ່າໃຊ້ຈ່າຍແລະໂທເຄັນ",
-      "cost": "ຄ່າໃຊ້ຈ່າຍ",
       "input": "ຂໍ້ມູນເຂົ້າ",
       "output": "ຜົນລັບ",
       "reasoning": "ການໃຫ້ເຫດຜົນ",
@@ -2360,7 +2247,6 @@
       "textDisplay": "ການສະແດງຂໍ້ຄວາມ",
       "thinking": "ກຳລັງຄິດ",
       "thought": "ຄວາມຄິດ",
-      "title": "ລາຍລະອຽດ",
       "showDetails": "ສະແດງລາຍລະອຽດ",
       "pending": "ລໍຖ້າ…",
       "running": "ກຳລັງເຮັດວຽກ…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ສະແດງຮູບພາບບໍ່ໄດ້, ລອງໂຫຼດໃໝ່",
-      "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
       "imageUnavailableWithAlt": "ບໍ່ສາມາດສະແດງຮູບພາບ {{alt}} ໄດ້.",
       "imagePreviewUnavailableInSession": "ບໍ່ສາມາດເບິ່ງຕົວຢ່າງຮູບພາບໃນເຊດຊັນນີ້ໄດ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
@@ -2476,7 +2361,6 @@
       "failure": "ຂໍ້ຜິດພາດ: {{title}}.",
       "failureRetryAvailable": "{{title}}. ລອງໃໝ່ໄດ້.",
       "copyToComposer": "ຄັດລອກໃສ່ຊ່ອງປ້ອນຂໍ້ຄວາມ",
-      "queued": "ລໍຄິວ",
       "queuedAccessibility": "ຂໍ້ຄວາມກຳລັງລໍຖ້າສົ່ງ",
       "userMessage": "ຂໍ້ຄວາມຈາກຜູ້ໃຊ້",
       "assistantMessage": "ຂໍ້ຄວາມຈາກຜູ້ຊ່ວຍ",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
-      "platform": "ແພລດຟອມ",
       "platformCloud": "ຄລາວ",
       "platformExtension": "ສ່ວນຂະຫຍາຍ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "ອື່ນໆ",
       "project": "ໂຄງການ"
@@ -2539,7 +2421,6 @@
       "allModels": "ໂມເດວທັງໝົດ"
     },
     "modelSelector": {
-      "model": "ໂມເດວ",
       "provider": "ຜູ້ໃຫ້ບໍລິການ {{id}}",
       "modelId": "ໂມເດວ {{id}}",
       "unavailable": "ໃຊ້ບໍ່ໄດ້",
@@ -2677,8 +2558,7 @@
       "merged": "PR ທີ່ລວມໂຄ້ດແລ້ວ",
       "draft": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",
       "updating": "ກຳລັງອັບເດດ, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "ຄຳຂໍລວມໂຄ້ດ"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "ໂຫຼດ",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "ບໍ່ສາມາດໂຫຼດບັນຊີຂອງທ່ານໄດ້.",
-    "couldNotLoadAccountDescription": "ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່.",
     "couldNotLoadPrivacy": "ບໍ່ສາມາດໂຫຼດຕົວເລືອກຄວາມເປັນສ່ວນຕົວໄດ້.",
     "couldNotLoadPrivacyDescription": "ກວດສອບການຕັ້ງຄ່າຄວາມປອດໄພຂອງອຸປະກອນແລ້ວລອງອີກຄັ້ງ.",
     "contentReady": "ເນື້ອຫາພ້ອມແລ້ວ",
-    "signOut": "ອອກຈາກລະບົບ",
     "retryLoadingAccount": "ລອງໂຫຼດບັນຊີອີກຄັ້ງ",
     "retryLoadingPrivacy": "ລອງໂຫຼດຕົວເລືອກຄວາມເປັນສ່ວນຕົວອີກຄັ້ງ"
   },
@@ -2736,7 +2614,6 @@
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",
     "signOutThisSessionMessage": "ລະບົບຈະອອກຈາກບັນຊີໃນ {{device}}. ອຸປະກອນນີ້ອາດຍັງເຂົ້າເຖິງ API ໄດ້ອີກສູງສຸດໜຶ່ງຊົ່ວໂມງ.",
-    "signOutConfirm": "ອອກຈາກລະບົບ",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "webBrowser": "ຕົວທ່ອງເວັບ"
   },
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "ປິດ {{filename}}",
-    "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
     "share": "ແບ່ງປັນ {{filename}}"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "ການເຊື່ອມຕໍ່ອິນເຕີເນັດກັບຄືນມາແລ້ວ"
   },
   "queryError": {
-    "neutralTitle": "ເກີດຂໍ້ຜິດພາດ.",
     "neutralDescription": "ກະລຸນາລອງອີກຄັ້ງ.",
     "offlineTitle": "ໂຫຼດບໍ່ສຳເລັດ.",
-    "offlineDescription": "ເກີດຂໍ້ຜິດພາດ.",
-    "permissionTitle": "ບໍ່ມີສິດເຂົ້າເຖິງ.",
     "permissionDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
     "notFoundTitle": "ບໍ່ພົບລາຍການນີ້.",
     "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "ເປີດເມນູ",
     "openMenuFor": "ເປີດເມນູສຳລັບ {{title}}",
-    "close": "ປິດ",
     "goBack": "ກັບຄືນ"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "ແບ່ງປັນໄປທີ່ Kilo",
-    "close": "ປິດ",
     "reviewPr": "ກວດສອບ PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "ເຊສຊັນໃໝ່",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "ຂໍ້ມູນຂອງທ່ານຖືກຈັດການຕາມ",
     "privacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວຂອງ Kilo",
     "onDevice": "ຢູ່ໃນອຸປະກອນ",
-    "loading": "ກຳລັງໂຫຼດ…",
     "couldNotLoadTranscription": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການຖອດສຽງເປັນຂໍ້ຄວາມຂອງທ່ານໄດ້.",
     "signInToManageTranscription": "ເຂົ້າສູ່ລະບົບເພື່ອຈັດການການຖອດສຽງເປັນຂໍ້ຄວາມອອນໄລນ໌.",
     "onlineTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມອອນໄລນ໌",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "ການຖອດສຽງເປັນຂໍ້ຄວາມ",
     "retentionPrefix": "ລາຍລະອຽດທັງໝົດກ່ຽວກັບໄລຍະເກັບຮັກສາຂໍ້ມູນ, ສິດຂອງທ່ານ ແລະ ຂໍ້ມູນຕິດຕໍ່ລະບຸໄວ້ໃນ",
     "backToConsent": "ກັບໄປທີ່ໜ້າໃຫ້ຄວາມຍິນຍອມ",
-    "back": "ກັບຄືນ",
     "revokeConsent": "ຖອນຄວາມຍິນຍອມ",
     "revokeConsentTitle": "ຖອນຄວາມຍິນຍອມໃນການແບ່ງປັນຂໍ້ມູນບໍ?",
     "acceptAndContinue": "ຍອມຮັບ ແລະ ສືບຕໍ່",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "ປະມວນຜົນໃນອຸປະກອນເທົ່ານັ້ນ ຫຼື ໃຊ້ Apple ຫຼື Google ເມື່ອອຸປະກອນນີ້ຖອດສຽງເປັນຂໍ້ຄວາມໂດຍບໍ່ໃຊ້ອິນເຕີເນັດບໍ່ໄດ້.",
     "installAttributionPromptTitle": "ອະນຸຍາດໃຫ້ລະບຸແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງບໍ?",
     "installAttributionPromptMessage": "Kilo ໃຊ້ສິດການຕິດຕາມຂອງ Apple ພຽງເພື່ອຮູ້ວ່າທ່ານມາຈາກຊ່ອງທາງໃດ. ເຮົາບໍ່ເຄີຍນຳຂໍ້ຄວາມສັ່ງງານ ຫຼື ການສົນທະນາຂອງທ່ານມາໃຊ້ເພື່ອຈຸດປະສົງນີ້.",
-    "continue": "ສືບຕໍ່",
     "what": "ຂໍ້ມູນທີ່ແບ່ງປັນ",
     "why": "ຈຸດປະສົງ",
     "who": "ຜູ້ຮັບຂໍ້ມູນ"
@@ -3007,7 +2875,6 @@
       "selectDescription": "ເລືອກອົງກອນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "selectOrganization": "ເລືອກອົງກອນ",
       "unavailableDescription": "ບໍ່ສາມາດໃຊ້ງານອົງກອນນີ້ໄດ້ອີກແລ້ວ. ເລືອກອົງກອນອື່ນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
-      "accessDeniedTitle": "ບໍ່ມີສິດເຂົ້າເຖິງ.",
       "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "ການປັບຍອດບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
       },
-      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
       "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
       "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
@@ -3052,18 +2918,14 @@
         "paid": "ຊຳລະແລ້ວ",
         "open": "ເປີດ",
         "void": "ຍົກເລີກແລ້ວ",
-        "draft": "ສະບັບຮ່າງ",
-        "uncollectible": "ເກັບເງິນບໍ່ໄດ້",
-        "unknown": "ບໍ່ຊາບ"
+        "uncollectible": "ເກັບເງິນບໍ່ໄດ້"
       },
-      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
       "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
       "truncated": "ຍັງມີໃບແຈ້ງໜີ້ກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ຕົວຢ່າງ: name@company.com",
       "enableA11y": "ເປີດການແຈ້ງເຕືອນຍອດເງິນຕໍ່າ",
-      "enabled": "ເປີດໃຊ້ແລ້ວ",
       "notifyEmailsLabel": "ອີເມວທີ່ຮັບການແຈ້ງເຕືອນ",
       "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນກ່ຽວກັບການຮຽກເກັບເງິນ.",
       "separateEmailsHint": "ແຍກທີ່ຢູ່ອີເມວແຕ່ລະອັນດ້ວຍເຄື່ອງໝາຍຈຸດ (,).",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}}/ວັນ",
       "manageA11y": "ຈັດການ {{name}}",
       "manageInvitationA11y": "ຈັດການຄຳເຊີນສຳລັບ {{email}}",
-      "removeConfirm": "ເອົາອອກ",
       "removeMember": "ນຳສະມາຊິກອອກ",
       "removeMemberMessage": "ນຳ {{name}} ອອກຈາກອົງກອນນີ້ບໍ?",
       "revokeConfirm": "ຖອນ",
@@ -3113,25 +2974,18 @@
       "resendInvite": "ສົ່ງຄຳເຊີນອີກຄັ້ງ",
       "shareInviteLink": "ແບ່ງປັນລິ້ງເຊີນ"
     },
-    "permissionDenied": {
-      "back": "ກັບຄືນ",
-      "title": "ບໍ່ມີສິດເຂົ້າເຖິງ."
-    },
     "usageStats": {
-      "cost": "ຄ່າໃຊ້ຈ່າຍ",
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",
       "last30Days": "30 ວັນທີ່ຜ່ານມາ",
       "outputTokens": "ໂທເຄັນຂາອອກ",
       "requests": "ຄຳຂໍ"
     },
     "hub": {
-      "title": "ອົງກອນ",
       "renameTitle": "ປ່ຽນຊື່ອົງກອນ",
       "renamePlaceholder": "ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
       "organizationSeats": "ຈຳນວນສິດຜູ້ໃຊ້ໃນອົງກອນ",
-      "lowBalanceBelow": "ຕໍ່າກວ່າ {{amount}}",
-      "lowBalanceOff": "ປິດ"
+      "lowBalanceBelow": "ຕໍ່າກວ່າ {{amount}}"
     },
     "kiloPass": {
       "activating": "ກຳລັງເປີດໃຊ້",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "ການປະມວນຜົນເຄຣດິດລ່າຊ້າ · ກຳລັງລອງອີກຄັ້ງອັດຕະໂນມັດ",
       "ended": "ສິ້ນສຸດແລ້ວ",
       "endsOn": "ສິ້ນສຸດວັນທີ {{date}}",
-      "loading": "ກຳລັງໂຫຼດ…",
       "manageHint": "ເປີດໜ້າຈັດການ Kilo Pass ໃນເວັບ.",
       "notSubscribed": "ຍັງບໍ່ໄດ້ສະໝັກ",
       "overallocated": "ຈຳນວນຜູ້ທີ່ໄດ້ຮັບສິດ Kilo Pass ເກີນຈຳນວນສິດຜູ້ໃຊ້ທີ່ຊຳລະແລ້ວ",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "ສົນທະນາ",
-    "composer": {
-      "placeholder": "ຂໍ້ຄວາມ"
-    },
     "empty": {
       "title": "ເລີ່ມການສົນທະນາ",
       "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
     },
     "working": "ກຳລັງເຮັດວຽກ",
     "historyRetry": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
-    "catalogRetry": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
     "sendError": "ບໍ່ສາມາດສົ່ງຂໍ້ຄວາມໄດ້. ລອງອີກຄັ້ງ."
   },
   "glanceable": {

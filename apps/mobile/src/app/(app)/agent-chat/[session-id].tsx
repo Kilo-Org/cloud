@@ -171,7 +171,7 @@ export default function SessionDetailScreen() {
     );
     let message = t(
       identityFailed
-        ? 'bootstrap.couldNotLoadAccountDescription'
+        ? 'organization.boundary.loadErrorMessage'
         : 'agentChat.session.failedToLoadDetails'
     );
     let variant: 'neutral' | 'not-found' | 'permission' | 'server' = identityFailed
@@ -182,7 +182,7 @@ export default function SessionDetailScreen() {
       message = t('agentChat.session.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {
-      title = t('agentChat.session.accessDenied');
+      title = t('common.accessDenied');
       message = t('agentChat.session.accessDeniedDescription');
       variant = 'permission';
     }

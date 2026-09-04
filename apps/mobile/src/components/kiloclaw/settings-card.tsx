@@ -229,7 +229,7 @@ export function SettingsCard({
     Alert.alert(removeAlertTitle, removeAlertMessage, [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('kiloclaw.secrets.remove'),
+        text: t('common.remove'),
         style: 'destructive',
         onPress: () => {
           setIsRemoving(true);
@@ -283,13 +283,11 @@ export function SettingsCard({
         </View>
         {item.configured ? (
           <View className="rounded-full bg-good-tile-bg px-2 py-0.5">
-            <Text className="text-xs font-medium text-good">{t('kiloclaw.secrets.connected')}</Text>
+            <Text className="text-xs font-medium text-good">{t('common.connected')}</Text>
           </View>
         ) : (
           <View className="rounded-full bg-muted px-2 py-0.5">
-            <Text className="text-xs text-muted-foreground">
-              {t('kiloclaw.secrets.notConnected')}
-            </Text>
+            <Text className="text-xs text-muted-foreground">{t('common.notConnected')}</Text>
           </View>
         )}
       </View>
@@ -311,7 +309,7 @@ export function SettingsCard({
               <Trash2 size={14} color="white" />
             )}
             <Text className="text-xs text-destructive-foreground">
-              {isRemoving ? t('kiloclaw.secrets.removing') : t('kiloclaw.secrets.remove')}
+              {isRemoving ? t('kiloclaw.secrets.removing') : t('common.remove')}
             </Text>
           </Button>
         )}

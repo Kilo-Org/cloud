@@ -158,7 +158,7 @@ function ScopedQuickChatScreen() {
       return (
         <QueryError
           variant="server"
-          title={t('quickChat.catalogRetry')}
+          title={t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetchModels();
           }}
@@ -214,7 +214,7 @@ function ScopedQuickChatScreen() {
               variant="outline"
               size="sm"
               accessibilityLabel={
-                catalogError ? t('quickChat.catalogRetry') : t('quickChat.historyRetry')
+                catalogError ? t('common.couldNotLoadModels') : t('quickChat.historyRetry')
               }
               onPress={() => {
                 void chat.refetch();
@@ -238,7 +238,7 @@ function ScopedQuickChatScreen() {
             onExitSession={noopExitSession}
             onStop={handleStop}
             isStreaming={chat.isStreaming}
-            placeholder={t('quickChat.composer.placeholder')}
+            placeholder={t('common.message')}
             mode="ask"
             onModeChange={() => {
               // Mode is locked to ask; any picker change snaps back on the next render.

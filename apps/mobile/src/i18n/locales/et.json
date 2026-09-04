@@ -27,7 +27,49 @@
     "somethingWentWrong": "Midagi läks valesti.",
     "couldNotOpen": "Avamine ebaõnnestus: {{label}}.",
     "link": "veebilink",
-    "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata."
+    "takingLonger": "See võtab oodatust kauem aega. Sa võid selle sulgeda ja hiljem uuesti vaadata.",
+    "model": "Mudel",
+    "accessDenied": "Juurdepääs keelatud",
+    "allRepositories": "Kõik hoidlad",
+    "personal": "Isiklik",
+    "connectGithub": "Ühenda GitHub",
+    "cost": "Kulu",
+    "discard": "Loobu",
+    "findings": "Leiud",
+    "notConnected": "Pole ühendatud",
+    "notifications": "Teavitused",
+    "pullRequest": "tõmbetaotlus",
+    "repositories": "Hoidlad",
+    "securityAgent": "Turvaagent",
+    "unknown": "Teadmata",
+    "added": "Lisatud",
+    "cancelled": "Tühistatud",
+    "close": "Sulge",
+    "codeReviewer": "Koodiülevaataja",
+    "connected": "Ühendatud",
+    "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
+    "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
+    "critical": "Kriitiline",
+    "delete": "Kustuta",
+    "deleted": "Kustutatud",
+    "details": "Üksikasjad",
+    "draft": "Mustand",
+    "enabled": "Sisse lülitatud",
+    "github": "GitHub",
+    "imageUnavailable": "Pilt pole saadaval.",
+    "loading": "Laadimine…",
+    "loadMore": "Laadi veel",
+    "message": "Sõnum",
+    "off": "Väljas",
+    "organization": "Organisatsioon",
+    "platform": "Platvorm",
+    "prReview": "PR-i ülevaatus",
+    "queued": "Järjekorras",
+    "remove": "Eemalda",
+    "repository": "Hoidla",
+    "signOut": "Logi välja",
+    "agents": "Agendid",
+    "all": "Kõik"
   },
   "language": {
     "title": "Keel",
@@ -62,12 +104,10 @@
     "emailAddress": "E-posti aadress",
     "emailPlaceholder": "sina@example.com",
     "continueWithEmail": "Jätka e-postiga",
-    "continue": "Jätka",
     "enterCodeSentTo": "Sisesta aadressile {{email}} saadetud kood.",
     "codeArrivalHint": "Kui see aadress vastab tingimustele, saabub kood minuti jooksul.",
     "verifyCode": "Kinnita kood",
     "resendCode": "Saada kood uuesti",
-    "back": "Tagasi",
     "termsPrefix": "Jätkates nõustud meie",
     "terms": "kasutustingimustega",
     "termsConnector": " ja ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Profiil",
-    "agents": "Agendid",
-    "codeReviewer": "Koodiülevaataja",
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
-    "securityAgent": "Turvaagent",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
     "reviews": "Ülevaatused",
-    "prReview": "PR-i ülevaatus",
     "prReviewSubtitle": "Vaata liitmistaotlused mobiilis üle",
-    "organization": "Organisatsioon",
     "couldNotLoadOrganization": "Organisatsiooni ei õnnestunud laadida.",
     "couldNotLoadOrganizationDescription": "Organisatsiooni ja agendi seaded on saadaval alles pärast organisatsiooni andmete laadimist.",
     "linkedAccounts": "Seotud kontod",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Sinu krediidisaldo on null. Selle konto krediiti hallatakse väljaspool iOS-i rakendust.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
-    "signOutConfirm": "Logi välja",
     "deleteAccountTitle": "Kas kustutada konto?",
     "deleteAccountMessage": "See kustutab su konto jäädavalt ja logib su välja. Saadame kinnituskoodi e-postiga.",
     "deleteAccountConfirm": "Kustuta konto",
     "accountDeleted": "Sinu konto on kustutatud.",
     "viewOrganization": "Vaata organisatsiooni",
     "manageOrganization": "Halda organisatsiooni",
-    "personal": "Isiklik",
     "selectAccount": "Vali konto",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "E-post",
     "providerTestAccount": "Testikonto",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
     "keepScreenOnSubtitle": "Hoia ekraan sisselülitatuna, kuni seanss töötab.",
     "appearance": "Välimus",
-    "notifications": "Teavitused",
     "notificationsSubtitle": "Tõuketeavituste eelistused",
     "appearanceSystem": "Süsteem",
     "appearanceLight": "Hele",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
     "pullRequestUnavailableDescription": "Seda PR-i ei saa avada. See võib olla kustutatud, hoidla võib olla privaatne või Kilo GitHubi rakendus pole hoidlasse installitud.",
-    "accessDenied": "Juurdepääs keelatud",
     "accessDeniedDescription": "Sul pole õigust seda tõmbetaotlust vaadata.",
     "noFilesChanged": "Faile ei muudetud",
     "noFilesChangedDescription": "See tõmbetaotlus ei sisalda failimuudatusi.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Faile ei õnnestunud laadida.",
-      "checkConnection": "Kontrolli ühendust ja proovi uuesti.",
       "retryLoadingFiles": "Proovi failide laadimist uuesti",
       "filterPlaceholder": "Failide otsing tee järgi",
       "viewedCount": "{{viewed}}/{{total}} vaadatud",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "Lisakommentaare ei õnnestunud laadida.",
       "retryLoadingMore": "Proovi lisakommentaare uuesti laadida",
       "loadMoreComments": "Laadi rohkem kommentaare",
-      "loadMore": "Laadi veel",
       "closeReactions": "Sulge reaktsioonid",
       "reactionsTitle": "Reaktsioonid",
       "addReaction": "Lisa reaktsioon",
@@ -352,7 +380,6 @@
       "reportUser": "Teata kasutajast",
       "mute": "Vaigista",
       "block": "Blokeeri",
-      "somethingWentWrong": "Midagi läks valesti.",
       "reportSubmitted": "Teade saadetud. Kinnituse number: {{receiptId}}",
       "blockedUser": "{{login}} on blokeeritud",
       "mutedUser": "{{login}} on vaigistatud",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "Vaata tõmbetaotlus üle",
     "headLine": "{{counts}} · uusim kommit: {{sha}}",
     "entry": {
-      "title": "PR-i ülevaatus",
       "eyebrow": "Ava tõmbetaotlus URL-i kaudu.",
       "pastePrLink": "Kleebi PR-i link",
       "noRecentPrs": "Hiljutisi PR-e pole",
       "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi PR-i link ülalolevale väljale — järgmisel korral leiad selle siit.",
       "couldNotLoad": "Laadimine ebaõnnestus.",
-      "remove": "Eemalda",
       "removeFromRecentsTitle": "Kas eemaldada hiljutiste hulgast?",
       "removeFromRecentsMessage": "See tõmbetaotlus eemaldatakse sinu hiljutiste loendist.",
       "removeRecentAccessibility": "Eemalda {{repo}} hiljutiste hulgast",
@@ -460,13 +485,11 @@
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
-      "checkDetails": "kontrolli üksikasjad",
-      "pullRequest": "tõmbetaotlus"
+      "checkDetails": "kontrolli üksikasjad"
     },
     "inbox": {
       "title": "Postkast",
       "recent": "Hiljutised",
-      "draft": "Mustand",
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
       "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
@@ -488,7 +511,6 @@
       "discardTitle": "Kas loobuda kommentaarist?",
       "discardMessage": "Sinu mustand kaob.",
       "keepEditing": "Jätka muutmist",
-      "discard": "Loobu",
       "comment": "Kommenteeri",
       "insertSuggestionA11y": "Lisa koodisoovitus",
       "insertSuggestion": "Lisa soovitus",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "Muudatusi saab soovitada ainult lisatud ridadele.",
       "tapDiffLineToSuggest": "Soovituse lisamiseks puuduta rida muudatuste vaates."
     },
-    "screenTitle": "PR-i ülevaatus",
     "connect": {
       "checkFailedTitle": "GitHubi ühendust ei õnnestunud kontrollida.",
       "checkFailedMessage": "Sisselogimisolekut saab näha alles pärast laadimise lõppu.",
       "reconnectTitle": "Ühenda GitHub uuesti",
-      "title": "Ühenda GitHub",
       "reconnectDescription": "Sinu GitHubi ühendus on tühistatud. Taasta ühendus, et jätkata tõmbetaotluste ülevaatamist mobiilis.",
       "description": "Ühenda oma GitHubi konto, et tõmbetaotlusi mobiilis üle vaadata."
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "Ülevaatuse esitamise vormi ei õnnestunud laadida.",
       "deletePendingTitle": "Kas kustutada ootel kommentaar?",
       "deletePendingMessage": "See kommentaar eemaldatakse ülevaatuse järjekorrast.",
-      "delete": "Kustuta",
       "summaryOptional": "Kokkuvõte (valikuline)",
       "pendingComment_one": "ootel kommentaar",
       "pendingComment": "ootel kommentaari",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "Mestitud",
       "stateClosed": "Suletud",
-      "stateDraft": "Mustand",
       "stateOpenApproved": "Avatud · Kinnitatud",
       "stateOpenChangesRequested": "Avatud · Muudatusi nõutud",
       "stateOpenReviewRequired": "Avatud · Ülevaatus nõutud",
@@ -572,8 +590,6 @@
       "discussion": "Arutelu"
     },
     "fileStatus": {
-      "added": "Lisatud",
-      "deleted": "Kustutatud",
       "modified": "Muudetud",
       "renamed": "Ümber nimetatud",
       "copied": "Kopeeritud",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "Valitud {{label}}, puuduta valiku muutmiseks",
       "tapToComment": "{{label}}, puuduta kommenteerimiseks",
       "truncationBanner": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}.",
-      "statusAdded": "Lisatud",
       "statusContext": "Kontekst",
-      "statusDeleted": "Kustutatud",
       "lineLabel": "{{status}} rida {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} rida: {{text}}",
       "emptyLine": "(tühi)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "Teavitused",
     "liveActivities": "Reaalajas tegevused",
     "liveActivitySubtitle": "Näita aktiivseid agente lukustuskuval",
     "liveUpdates": "Reaalajas värskendused",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "Avaleht",
-    "agents": "Agendid",
     "profile": "Profiil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "KiloClaw'i eksemplare pole",
       "noInstancesDescription": "Vestluse alustamiseks seadista eksemplar.",
       "setUpKiloclaw": "Seadista KiloClaw",
-      "currentInstance": "{{title}}, praegune",
-      "personal": "Isiklik"
+      "currentInstance": "{{title}}, praegune"
     },
     "conversation": {
       "failedToLoad": "Vestlust ei õnnestunud laadida.",
@@ -722,7 +733,6 @@
       "cancelReply": "Tühista vastus",
       "openInstance": "Ava eksemplar",
       "attachFile": "Lisa fail",
-      "messagePlaceholder": "Sõnum",
       "cancelEdit": "Tühista muutmine",
       "sendMessage": "Saada sõnum"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "Ava {{filename}}",
-      "imageUnavailable": "Pilt pole saadaval.",
       "openFailed": "Manuse avamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
       "attachFailed": "Faili lisamine ebaõnnestus.",
       "limit": "Võid lisada kuni {{displayCount}} faili.",
@@ -771,7 +780,6 @@
       "yourMessage": "Sinu sõnum",
       "messageFrom": "Sõnum kasutajalt {{author}}",
       "moreActions": "Rohkem toiminguid",
-      "message": "Sõnum",
       "notDelivered": "Pole edastatud",
       "edited": "(muudetud)",
       "image": "Pilt",
@@ -783,7 +791,6 @@
       "title": "Sõnumi toimingud",
       "deleteTitle": "Kas kustutada sõnum?",
       "deleteMessage": "See eemaldab sõnumi vestlusest.",
-      "delete": "Kustuta",
       "deleteFailed": "Sõnumi kustutamine ebaõnnestus.",
       "removeReactionFailed": "Reaktsiooni eemaldamine ebaõnnestus.",
       "addReactionFailed": "Reaktsiooni lisamine ebaõnnestus.",
@@ -813,7 +820,6 @@
       "online": "Võrgus",
       "idle": "Ooterežiimis",
       "offline": "Võrguühenduseta",
-      "unknown": "Teadmata",
       "loadingUser": "Kasutaja laadimine...",
       "waitingForStatus": "Oodatakse boti olekut...",
       "offlineMessage": "Bot on võrguühenduseta. Kui ühendus taastub, jätkub sõnumivahetus."
@@ -885,7 +891,6 @@
       "destroyMessage": "See hävitab sinu KiloClaw’ eksemplari ja kõik selle andmed jäädavalt. Seda toimingut ei saa tagasi võtta.",
       "destroyTitle": "Eksemplari hävitamine",
       "instance": "Eksemplar",
-      "renameFailed": "Midagi läks valesti.",
       "couldNotCheckStatus": "Teenuse olekut ei õnnestunud kontrollida.",
       "dangerZone": "OHTLIKUD TOIMINGUD",
       "destroying": "Hävitamine…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "Seadistamiskäsku ei õnnestunud laadida.",
       "gmailNotifications": "Gmaili teatised",
       "disconnect": "Ühenda Google'i konto lahti",
-      "connected": "Ühendatud",
       "copied": "Kopeeritud",
       "copyCommand": "Kopeeri käsk",
       "disabled": "Välja lülitatud",
       "disconnectConfirm": "Ühenda lahti",
       "disconnectMessage": "Kas eemaldada oma Google'i konto sellest eksemplarist? See lülitab Gmaili teatised välja. Muudatuste rakendamiseks juuruta eksemplar pärast konto lahtiühendamist uuesti.",
-      "disconnectTitle": "Google'i lahtiühendamine",
-      "enabled": "Sisse lülitatud",
-      "notConnected": "Pole ühendatud"
+      "disconnectTitle": "Google'i lahtiühendamine"
     },
     "modelList": {
       "title": "Kõik mudelid",
       "searchPlaceholder": "Mudeli otsing",
-      "couldNotLoad": "Mudeleid ei õnnestunud laadida.",
       "clearSearch": "Tühjenda otsing",
       "noMatches": "Otsingule vastavaid mudeleid ei leitud",
       "noModels": "Mudeleid pole saadaval",
       "noModelsDescription": "Siin kuvatakse mudelid, kui need on saadaval.",
       "noResultsFor": "Otsingule „{{query}}“ ei leitud tulemusi.",
       "recommended": "Soovitatud"
-    },
-    "model": {
-      "title": "Mudel"
     },
     "secrets": {
       "title": "Salajased väärtused",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "{{label}} seadistusjuhend",
       "setupGuide": "seadistusjuhend",
       "saving": "Salvestamine…",
-      "remove": "Eemalda",
       "removing": "Eemaldamine…",
-      "connected": "Ühendatud",
-      "notConnected": "Pole ühendatud",
       "updateToken": "Uuenda pääsutõendit",
       "connect": "Ühenda"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "Loo eksemplar",
       "organizations": "Organisatsioonid",
-      "personal": "Isiklik",
       "accessIssue": {
         "trialExpired": "Prooviperiood lõppes — vormista tellimus, et eksemplari edasi kasutada",
         "subscriptionCanceled": "Tellimus pole aktiivne — telli uuesti, et eksemplari edasi kasutada",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "Ava kilo.ai",
         "provisioning": "Ressursside eraldamine",
         "review": "Ülevaatus",
-        "somethingWentWrong": "Midagi läks valesti.",
         "identityTitle": "Sinu boti identiteet",
-        "close": "Sulge",
         "couldNotLoad": "Esmase seadistuse olekut ei õnnestunud laadida.",
         "finishingSetup": "Oota hetk, viime seadistuse ja sinu konto ettevalmistamise lõpule.",
         "ready": "Valmis",
@@ -1080,7 +1072,6 @@
         "location": "Asukoht",
         "locationPlaceholder": "Linn või piirkond (valikuline)",
         "useCurrentLocation": "Kasuta praegust asukohta",
-        "continue": "Jätka",
         "locationDeniedTitle": "Juurdepääs asukohale on keelatud",
         "locationDeniedMessage": "Praeguse asukoha kasutamiseks luba seadetes juurdepääs asukohale.",
         "locationValidationFailed": "Asukohta ei õnnestunud kontrollida.",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "LÜÜSI PROTSESS",
       "lastExit": "Viimane väljumine",
       "memory": "Mälu",
-      "model": "Mudel",
       "region": "Piirkond",
       "resources": "RESSURSID",
       "restarts": "Taaskäivitused",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "Parim jõudlus. Suunab päringud arutlusvõimega tippmudelitele.",
       "balancedLabel": "Tasakaalustatud",
       "balancedDescription": "Nutikas tasakaal kiiruse ja võimekuse vahel madalama hinnaga.",
-      "cost": "Kulu",
       "performance": "Jõudlus",
       "autoModelA11y": "{{label}} automaatne mudel",
       "currentModel": "Praegune mudel",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google'i konto",
       "modelDescription": "Tehisarumudeli valik",
-      "modelLabel": "Mudel",
       "secretsDescription": "Krüpteeritud autentimisandmed",
       "secretsLabel": "Salajased väärtused",
       "versionPinDescription": "Lukusta kindlale versioonile",
@@ -1251,12 +1239,9 @@
       "placeholder": "Nt meie veakäsitluse reeglite järgimine…"
     },
     "repos": {
-      "title": "Hoidlad",
-      "couldNotLoad": "Hoidlaid ei õnnestunud laadida.",
       "unavailable": "Hoidlad pole saadaval. Lõpeta Bitbucketi seadistamine saidil kilo.ai.",
       "finishSetup": "Lõpeta seadistamine",
       "manageAccess": "Halda juurdepääsu",
-      "allRepositories": "Kõik hoidlad",
       "bitbucketNoRepositoriesDescription": "Selles Bitbucketi tööruumis pole hoidlaid saadaval.",
       "bitbucketSetup": "Bitbucketi seadistamine",
       "couldNotOpenGithubSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
@@ -1274,7 +1259,6 @@
       "roast": "Halastamatult aus ja samas lõbus",
       "strict": "Märgi kõik puudused ja nõua kõrget kvaliteeti"
     },
-    "title": "Koodiülevaataja",
     "reviewDetail": {
       "title": "Ülevaatus",
       "cancelTitle": "Kas tühistada ülevaatus?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "{{repo}} #{{number}}, autor {{author}}",
-      "findings": "Leiud",
       "noFindings": "Leide ei leitud.",
       "showMore": "Kuva rohkem",
-      "details": "Üksikasjad",
       "branch": "Haru",
-      "platform": "Platvorm",
-      "model": "Mudel",
       "created": "Loodud",
       "started": "Alustatud",
       "completed": "Lõpetatud",
-      "cost": "Kulu",
       "tokens": "Tokenid",
       "tokensInOut": "{{input}} sisendis / {{output}} väljundis",
       "openPullRequest": "Ava tõmbetaotlus",
@@ -1309,7 +1288,6 @@
       "checkRun": "Kontrolli käivitus",
       "status": "Olek",
       "threshold": "Lävi",
-      "pullRequest": "tõmbetaotlus",
       "transcriptEmpty": "Sellel ülevaatusel pole vestluslogi.",
       "transcriptLive": "Reaalajas",
       "transcriptRetry": "Ülevaatuse vestluslogi ei õnnestunud laadida.",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
       "connectProvider": "Teenusepakkuja ühendamine",
       "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
-      "connectGitHub": "Ühenda GitHub",
-      "platform": "Platvorm",
-      "notConnected": "Pole ühendatud",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",
       "instructionsPlaceholder": "Millele ülevaataja peab keskenduma…",
-      "model": "Mudel",
       "starting": "Ülevaatuse alustamine…",
       "start": "Alusta ülevaatust"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "Vali hoidlad",
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
-    "readOnlyDescription": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud ja arveldushaldurid.",
       "setupIncomplete": "Seadistamine pole lõpetatud. Lõpeta see saidil kilo.ai.",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "Organisatsioone ei õnnestunud laadida.",
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
-      "personal": "Isiklik",
       "personalSubtitle": "Sinu enda hoidlad",
       "viewOnly": "Ainult vaatamiseks"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "Kontrollimine...",
       "statusUnavailable": "Olek pole saadaval",
-      "connected": "Ühendatud",
-      "notConnected": "Pole ühendatud",
-      "organization": "Organisatsioon",
       "platforms": "Platvormid",
       "activity": "Tegevus"
     },
     "providerConnect": {
       "githubApp": "GitHubi rakendus",
-      "connectGitHub": "Ühenda GitHub",
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
       "connectGitLab": "Ühenda GitLab",
@@ -1421,10 +1389,7 @@
       "allAreas": "Kõik valdkonnad",
       "customInstructions": "Kohandatud juhised",
       "set": "Määratud",
-      "model": "Mudel",
       "mergeGate": "Mestimistingimused",
-      "repositories": "Hoidlad",
-      "allRepositories": "Kõik hoidlad",
       "nSelected": "Valitud {{displayCount}}",
       "reviewMemory": "Ülevaatuste mälu",
       "proposedReviewMdGuidance": "Soovitatud REVIEW.md-juhised"
@@ -1435,16 +1400,13 @@
       "noDecision": "Otsust pole",
       "noResult": "Tulemust pole"
     },
-    "eyebrow": "Koodiülevaataja",
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
       "pending": "Ootel",
-      "queued": "Järjekorras",
       "running": "Töötab",
       "completed": "Lõpetatud",
       "failed": "Ebaõnnestus",
-      "cancelled": "Tühistatud",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "Dokumentatsioon"
     },
     "gateThreshold": {
-      "off": "Väljas",
-      "all": "Kõik",
-      "warning": "Hoiatus",
-      "critical": "Kriitiline"
+      "warning": "Hoiatus"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei pääse kehtiva GitHubi rakenduse paigaldusega sellele hoidlale ligi. Uuenda GitHubi rakenduse paigaldust ja lülita koodiülevaataja uuesti sisse.",
         "recoveryLabel": "Uuenda GitHubi rakendust"
       },
       "githubIpAllowList": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
-        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse.",
-        "recoveryLabel": "Võta ühendust toega"
+        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei saa luua sellele GitLabi projektile juurdepääsutunnust. Anna hooldaja õigused või luba projekti juurdepääsutunnused ja lülita koodiülevaataja uuesti sisse.",
         "recoveryLabel": "Uuenda GitLabi integratsiooni"
       },
       "byokInvalidKey": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
         "description": "Koodiülevaataja lülitati välja, sest valitud BYOK API-võti on kehtetu, tühistatud või vajalike õigusteta. Uuenda võtit või vali teine mudel ja lülita koodiülevaataja uuesti sisse.",
         "recoveryLabel": "Uuenda BYOK seadeid"
       },
       "selectedModelUnavailable": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
         "description": "Koodiülevaataja lülitati välja, sest valitud mudel pole pilveagendi seansside jaoks saadaval. Vali saadaolev mudel ja lülita koodiülevaataja uuesti sisse.",
         "recoveryLabel": "Uuenda koodiülevaataja seadeid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Koodiülevaataja vajab tähelepanu.",
-        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse.",
-        "recoveryLabel": "Võta ühendust toega"
-      }
+        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+      },
+      "title": "Koodiülevaataja vajab tähelepanu.",
+      "recoveryLabel": "Võta ühendust toega"
     },
     "unknownError": "Tundmatu viga"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "Mine tagasi ja ava filtrid leidude loendist uuesti.",
       "title": "Leidude filtreerimine",
       "reset": "Lähtesta",
-      "repository": "Hoidla",
       "status": "Olek",
       "severity": "Raskusaste",
       "outcome": "Tulemus",
       "slaStatus": "SLA olek",
       "sortBy": "Sortimisalus",
-      "allRepositories": "Kõik hoidlad",
-      "all": "Kõik",
       "statusOpen": "Avatud",
       "fixed": "Parandatud",
       "statusIgnored": "Ignoreeritud",
       "statusClosed": "Suletud",
-      "severityCritical": "Kriitiline",
       "severityHigh": "Kõrge",
       "severityMedium": "Keskmine",
       "severityLow": "Madal",
       "outcomeNotAnalyzed": "Pole analüüsitud",
       "outcomeAnalyzing": "Analüüs käib",
       "outcomeFailed": "Analüüs ebaõnnestus",
-      "outcomeExploitable": "Ärakasutatav",
       "outcomeNotExploitable": "Pole ärakasutatav",
       "outcomeSafeToDismiss": "Võib ohutult kõrvale jätta",
-      "outcomeNeedsReview": "Vajab ülevaatamist",
       "outcomeTriageComplete": "Eelhindamine lõpetatud",
       "outcomeDismissed": "Kõrvale jäetud",
       "sortSeverityDesc": "Raskusaste: kõrgemast madalamani",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "Luba automaatne kõrvalejätmine",
       "enableAutoDismissSubtitle": "Jätab automaatselt kõrvale leiud, mida tehisaru hinnangul ei saa ära kasutada.",
       "confidenceThreshold": "Kindluse lävi",
-      "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "enableAutoRemediationConfirmTitle": "Kas lubada automaatne parandamine?",
       "enableAutoRemediationConfirmMessage": "Turvaagent avab automaatselt parandus-PR-id nõuetele vastavate ärakasutatavate leidude jaoks.",
       "enable": "Luba",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "Soovitatud toiming",
       "triageReasoning": "Eelhinnangu põhjendus",
       "exploitable": "Ärakasutatav",
-      "model": "Mudel",
       "notRecorded": "Pole salvestatud",
       "analyzed": "Analüüsitud",
       "exploitabilityReasoning": "Ärakasutatavuse põhjendus",
       "suggestedFix": "Soovitatud parandus",
       "whereFound": "Leiu asukohad ({{displayCount}})",
       "fullReport": "Loodud aruande täistekst",
-      "unknown": "Teadmata",
       "yes": "Jah",
       "no": "Ei"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "{{open}} avatud · {{critical}} kriitilist · {{high}} kõrge raskusastmega",
       "couldNotLoad": "Juhtpaneeli andmeid ei õnnestunud laadida.",
       "filterByRepository": "Filtreeri hoidla järgi",
-      "findings": "Leiud",
       "lastSynced": "Viimati sünkroonitud {{time}}",
       "manageRepositories": "Halda hoidlaid",
       "notYetSynced": "Pole veel sünkroonitud",
@@ -1686,23 +1629,19 @@
       "severityLabel": "Raskusaste: {{severity}}",
       "package": "Pakett",
       "vulnerableVersions": "Haavatavad versioonid",
-      "unknown": "Teadmata",
       "patchedVersion": "Parandatud versioon",
       "noPatchAvailable": "Parandust pole saadaval",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Hoidla",
       "manifest": "Manifestifail",
       "detected": "Tuvastatud",
       "updated": "Uuendatud",
-      "fixed": "Parandatud",
       "slaDeadline": "SLA tähtaeg",
       "sourceRecord": "Lähtekirje",
       "source": "Allikas",
       "sourceId": "Allika ID",
       "viewAdvisory": "Vaata turvateadet GitHubis",
       "statusSuperseded": "Asendatud",
-      "statusFixed": "Parandatud",
       "statusOpen": "Avatud",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Parandamine juba käib",
@@ -1716,25 +1655,18 @@
       "title": "Seaded",
       "couldNotLoadSettings": "Turvaagendi seadeid ei õnnestunud laadida.",
       "couldNotLoadPermissions": "Õigusi ei õnnestunud laadida.",
-      "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
-      "securityAgent": "Turvaagent",
-      "enabled": "Sisse lülitatud",
       "disabled": "Välja lülitatud",
       "on": "Sees",
-      "off": "Väljas",
-      "allRepositories": "Kõik hoidlad",
       "repositoriesCount_one": "Valitud on {{displayCount}} hoidla",
       "repositoriesCount": "Valitud on {{displayCount}} hoidlat",
       "repositoriesCount_other": "Valitud on {{displayCount}} hoidlat",
       "selectRepositories": "Vali hoidlad",
       "selectRepositoriesSubtitle": "Vali, milliseid hoidlaid turvaagent jälgib",
-      "repositories": "Hoidlad",
       "modelsAndAnalysis": "Mudelid ja analüüs",
       "analysisModeSubtitle": "{{mode}} analüüs",
       "automation": "Automatiseerimine",
       "automationAllOff": "Kõik väljas",
       "automationCount": "{{displayCount}} kolmest lubatud",
-      "notifications": "Teavitused",
       "notificationsCount": "{{displayCount}} kahest lubatud",
       "slaPolicy": "SLA reeglid",
       "disabledNoManage": "Turvaagent on välja lülitatud. Seda saavad sisse lülitada ainult organisatsiooni omanikud ja arveldushaldurid.",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "Tühistamistaotlus saadetud",
       "cancelled": "Parandamine tühistatud",
-      "pullRequest": "tõmbetaotlus",
       "couldNotLoad": "Parandamise olekut ei õnnestunud laadida.",
       "noAnalysisTitle": "Analüüsi veel pole",
       "noAnalysisDescription": "Käivita analüüs üksikasjade vahekaardilt.",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "Katsete ajalugu ({{displayCount}})",
       "attemptNumber": "Katse nr {{number}}",
       "startedBy": "Alustaja",
-      "model": "Mudel",
       "branch": "Haru",
       "queued": "Parandamine on järjekorras",
       "retryQueued": "Uus parandamiskatse lisati järjekorda",
@@ -1769,20 +1699,17 @@
         "prOpened": "PR avatud",
         "failed": "Parandamine ebaõnnestus",
         "blocked": "Parandamine on blokeeritud",
-        "noChangesNeeded": "Muudatusi pole vaja",
-        "cancelled": "Tühistatud"
+        "noChangesNeeded": "Muudatusi pole vaja"
       },
       "unavailable": "Selle leiu parandamine pole saadaval."
     },
     "analysisSettings": {
       "title": "Mudelid ja analüüs",
       "couldNotLoad": "Analüüsi seadeid ei õnnestunud laadida.",
-      "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "depth": "Analüüsi sügavus",
       "modeAuto": "Automaatne",
       "modeShallow": "Pindmine",
       "modeDeep": "Põhjalik",
-      "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
       "triageModel": "Eelhindamise mudel",
       "analysisModel": "Analüüsi mudel",
       "remediationModel": "Parandamise mudel"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "SLA reeglid",
       "couldNotLoad": "SLA seadeid ei õnnestunud laadida.",
-      "critical": "Kriitiline",
       "high": "Kõrge",
       "medium": "Keskmine",
       "low": "Madal",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "Leid",
-      "tabDetails": "Üksikasjad",
       "tabAnalysis": "Analüüs",
       "tabRemediation": "Parandamine",
       "notFound": "Leidu ei leitud",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "Jäta leid kõrvale"
     },
     "findingList": {
-      "title": "Leiud",
       "couldNotLoad": "Leide ei õnnestunud laadida.",
       "couldNotLoadMore": "Rohkem leide ei õnnestunud laadida.",
       "noMatchesTitle": "Ükski leid ei vasta filtritele",
@@ -1827,13 +1751,8 @@
       "clearFilters": "Eemalda filtrid"
     },
     "scopeList": {
-      "title": "Turvaagent",
       "couldNotLoad": "Organisatsioone ei õnnestunud laadida.",
-      "personal": "Isiklik",
       "personalSubtitle": "Sinu enda hoidlad"
-    },
-    "commandRetry": {
-      "discard": "Loobu"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Parandus-PR on avatud",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "GitHubi ei õnnestunud avada. Proovi uuesti."
     },
     "settingsSave": {
-      "discard": "Loobu",
       "keepEditing": "Jätka muutmist",
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "Auditiaruannet ei õnnestunud laadida.",
       "events": "Sündmused",
-      "findings": "Leiud",
       "generated": "Aruanne on loodud {{generatedAt}}.",
       "noActivity": "Salvestatud tegevust pole",
       "noActivityDescription": "Kilol pole ajavahemikust {{start}} kuni {{end}} aruandesse lisatavaid turvaleidudega seotud toiminguid.",
@@ -1875,8 +1792,7 @@
       "title": "Auditiaruanne",
       "unavailable": "Auditiaruanne pole saadaval",
       "unavailableDescription": "Auditiaruandeid saavad vaadata ainult organisatsiooni omanikud ja arveldushaldurid. Palu omanikul või arveldushalduril anda sulle juurdepääs.",
-      "queryFailed": "Aruande päring ei lõppenud. Proovi uuesti.",
-      "checkConnection": "Kontrolli ühendust ja proovi uuesti."
+      "queryFailed": "Aruande päring ei lõppenud. Proovi uuesti."
     },
     "notifications": {
       "couldNotLoad": "Teavitusseadeid ei õnnestunud laadida.",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "Uue leiu teavitus",
       "newFindingSeverityLabel": "Uue leiu minimaalne raskusaste",
       "newFindingSubtitle": "Saadetakse alati, kui uus leid sünkroonitakse, sealhulgas esimesel sünkroonimisel.",
-      "readOnly": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "slaLeadTimeAccessibility": "SLA hoiatuse etteteatamisaeg päevades",
       "slaLeadTimeError": "Sisesta päevade arv täisarvuna vahemikus 1–365.",
       "slaLeadTimeHint": "Sisesta täisarv vahemikus 1 kuni 365",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "Saada mulle SLA hoiatused e-postiga",
       "slaSection": "SLA hoiatused",
       "slaSeverityLabel": "SLA teavituse minimaalne raskusaste",
-      "slaSubtitle": "Teavitus saadetakse enne leiu SLA tähtaega, selle lähenemisel ja ületamisel.",
-      "title": "Teavitused"
+      "slaSubtitle": "Teavitus saadetakse enne leiu SLA tähtaega, selle lähenemisel ja ületamisel."
     },
     "repositories": {
-      "allRepositories": "Kõik hoidlad",
       "couldNotLoad": "Hoidlate seadeid ei õnnestunud laadida.",
-      "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
       "couldNotOpenGithubSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
       "githubAppSettings": "GitHubi rakenduse seaded",
       "manageAccess": "Halda GitHubi rakenduse juurdepääsu",
       "noRepositories": "Hoidlaid pole",
       "noRepositoriesDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele.",
-      "readOnly": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
       "selectAtLeastOne": "Vali vähemalt üks hoidla.",
-      "selectedRepositories": "Valitud hoidlad",
-      "title": "Hoidlad"
+      "selectedRepositories": "Valitud hoidlad"
     },
     "scopeEntry": {
       "connectDescription": "Paigalda Kilo GitHubi rakendus, et sünkroonida Dependaboti hoiatusi automaatselt ja hallata oma hoidlate turvaleide.",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "Järjekorras olevat toimingut ei õnnestunud enam jälgida. Värskenda, et näha uusimat olekut.",
     "initialSyncAdmissionFailed": "Turvaagent lülitati sisse, kuid esimest sünkroonimist ei õnnestunud järjekorda lisada. Sünkrooni uuesti.",
-    "title": "Turvaagent",
     "commands": {
       "findingAlreadyDismissed": "Leid on juba kõrvale jäetud",
       "findingDismissed": "Leid jäeti kõrvale",
@@ -1949,22 +1858,16 @@
       "failed": "Analüüs ebaõnnestus",
       "failedTitle": "Analüüs ebaõnnestus",
       "failedDescription": "Turvaagent ei suutnud analüüsi lõpule viia.",
-      "extractionFailed": "Vajab ülevaatamist",
-      "extractionFailedTitle": "Vajab ülevaatamist",
       "extractionFailedDescription": "Tehnilist aruannet ei õnnestunud struktureeritud tulemuseks muuta.",
-      "exploitable": "Ärakasutatav",
-      "exploitableTitle": "Ärakasutatav",
       "exploitableDescription": "Rakenduse kood saab haavatavat funktsiooni kasutada.",
       "notExploitable": "Kättesaamatu",
       "notExploitableTitle": "Kättesaamatu",
       "notExploitableDescription": "Selle hoidla koodist ei leitud teed haavatava funktsioonini.",
       "unknown": "Vajab ülevaatamist",
-      "unknownTitle": "Vajab ülevaatamist",
       "unknownDescription": "Analüüs ei suutnud kinnitada, kas rakenduse kood saab haavatavat funktsiooni kasutada.",
       "safeToDismiss": "Võib ohutult kõrvale jätta",
       "safeToDismissTitle": "Võib ohutult kõrvale jätta",
       "safeToDismissDescription": "Eelhindamise põhjal saab selle leiu ohutult kõrvale jätta ilma koodibaasi analüüsimata.",
-      "manualReview": "Vajab ülevaatamist",
       "manualReviewTitle": "Vajab käsitsi ülevaatamist",
       "manualReviewDescription": "Eelhindamise põhjal vajab see leid inimese ülevaatust.",
       "analysisRequired": "Analüüs on vajalik",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Parandatud enne tähtaega",
-      "fixed": "Parandatud",
       "fixedOn": "Parandatud {{date}}",
       "resolutionRecorded": "Lahendamine on registreeritud",
       "superseded": "Asendatud",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "Tühistamistaotlus saadetud",
       "notStarted": "Pole alustatud",
-      "queued": "Järjekorras",
       "starting": "Käivitub",
       "inProgress": "Käimas",
       "draftPrOpened": "PR-i mustand avatud",
@@ -2009,7 +1910,6 @@
       "blocked": "Blokeeritud",
       "failed": "Ebaõnnestus",
       "noChangesNeeded": "Muudatusi pole vaja",
-      "cancelled": "Tühistatud",
       "originAutomaticPolicy": "Automaatreegel",
       "originIncludeExistingPolicy": "Varasemate leidude kaasamise reegel",
       "originManual": "Käsitsi",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "Kas kustutada seanss?",
       "deleteMessage": "Seda ei saa tagasi võtta.",
-      "delete": "Kustuta",
       "deleteSession": "Kustuta seanss",
       "rename": "Nimeta ümber",
       "renameMessage": "Sisesta seansile uus nimi.",
@@ -2130,7 +2029,6 @@
       "title": "Seanss",
       "copyErrorDetails": "Kopeeri vea üksikasjad",
       "backToSessions": "Tagasi seansside juurde",
-      "accessDenied": "Juurdepääs keelatud",
       "accessDeniedDescription": "Sul pole õigust seda vaadata.",
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
       "cloningSession": "Seanssi kloonitakse",
-      "continue": "Jätka",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
       "notEnoughCredits": "Cloud Agenti käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "Uus seanss",
-      "repository": "Hoidla",
-      "connectGithub": "Ühenda GitHub",
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",
       "refreshRepositories": "Värskenda hoidlaid",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
       "keepEditing": "Jätka muutmist",
-      "discard": "Loobu",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
       "remoteHint": "Kohaliku kilo protsessi juhtimiseks käivita arvutis `kilo remote` või töötavas CLI-seansis `/remote`.",
       "bitbucketConnected": "Bitbucket on ühendatud",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "Uuendati {{displayCount}} faili."
     },
     "toolPatch": {
-      "operationAdded": "Lisatud",
-      "operationDeleted": "Kustutatud",
       "operationUpdated": "Uuendatud"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "Käivituskoht",
       "runOnAccessibility": "Käivituskoht: {{label}}",
       "couldNotLoad": "Eksemplaride laadimine ebaõnnestus",
-      "couldNotLoadDescription": "Kontrolli ühendust ja proovi uuesti.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Laadimine…",
       "cloudAgentDescription": "Käita Kilo pilve liivakastis",
       "noCliInstances": "Ühtegi CLI-eksemplari pole ühendatud",
       "noCliInstancesDescription": "Käivita oma arvutis projekti kaustas `kilo remote` või uuenda Kilo CLI-d, kui see juba töötab.",
@@ -2323,7 +2213,6 @@
       "loading": "Laadimine...",
       "accessibility": "Hoidla: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "Kasutaja",
       "roleAssistant": "Assistent",
       "sent": "Saadetud",
-      "model": "Mudel",
       "costAndTokens": "Kulud ja tokenid",
-      "cost": "Kulu",
       "input": "Sisend",
       "output": "Väljund",
       "reasoning": "Arutlus",
@@ -2360,7 +2247,6 @@
       "textDisplay": "Tekstikuva",
       "thinking": "Mõtlemine",
       "thought": "Mõttekäik",
-      "title": "Üksikasjad",
       "showDetails": "Kuva üksikasjad",
       "pending": "Ootel…",
       "running": "Käimas…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
-      "imageUnavailable": "Pilt pole saadaval.",
       "imageUnavailableWithAlt": "Pilt „{{alt}}“ pole saadaval.",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Saad uuesti proovida.",
       "copyToComposer": "Kopeeri sõnumi sisestusväljale",
-      "queued": "Järjekorras",
       "queuedAccessibility": "Sõnum järjekorras",
       "userMessage": "Kasutaja sõnum",
       "assistantMessage": "Assistendi sõnum",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "Filtreeri seansse",
-      "platform": "Platvorm",
       "platformCloud": "Pilv",
       "platformExtension": "Laiendus",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Muu",
       "project": "Projekt"
@@ -2539,7 +2421,6 @@
       "allModels": "Kõik mudelid"
     },
     "modelSelector": {
-      "model": "Mudel",
       "provider": "Pakkuja {{id}}",
       "modelId": "Mudel {{id}}",
       "unavailable": "pole saadaval",
@@ -2677,8 +2558,7 @@
       "merged": "liidetud liitmistaotlus",
       "draft": "Tõmbetaotluse mustand",
       "updating": "Uuendamine, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "tõmbetaotlus"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Laadi",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Sinu kontot ei õnnestunud laadida.",
-    "couldNotLoadAccountDescription": "Kontrolli ühendust ja proovi uuesti.",
     "couldNotLoadPrivacy": "Privaatsusvalikuid ei õnnestunud laadida.",
     "couldNotLoadPrivacyDescription": "Kontrolli oma seadme turvaseadeid ja proovi uuesti.",
     "contentReady": "Sisu valmis",
-    "signOut": "Logi välja",
     "retryLoadingAccount": "Proovi konto laadimist uuesti",
     "retryLoadingPrivacy": "Proovi privaatsusvalikute laadimist uuesti"
   },
@@ -2736,7 +2614,6 @@
     "signOutThisDeviceTitle": "Kas logida sellest seadmest välja?",
     "signOutThisSessionTitle": "Kas logida sellest seansist välja?",
     "signOutThisSessionMessage": "{{device}} logitakse välja. Seadme juurdepääs API-le võib säilida veel kuni tund aega.",
-    "signOutConfirm": "Logi välja",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "webBrowser": "Veebibrauser"
   },
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "Sulge {{filename}}",
-    "imageUnavailable": "Pilt pole saadaval.",
     "share": "Jaga {{filename}}"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "Internetiühendus taastatud"
   },
   "queryError": {
-    "neutralTitle": "Midagi läks valesti.",
     "neutralDescription": "Proovi uuesti.",
     "offlineTitle": "Laadimine ebaõnnestus.",
-    "offlineDescription": "Midagi läks valesti.",
-    "permissionTitle": "Juurdepääs keelatud",
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundTitle": "Ei leitud.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "Ava menüü",
     "openMenuFor": "Ava {{title}} menüü",
-    "close": "Sulge",
     "goBack": "Mine tagasi"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "Kilosse jagamine",
-    "close": "Sulge",
     "reviewPr": "Vaata PR-i üle",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Uus seanss",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "Sinu andmeid töödeldakse vastavalt",
     "privacyPolicy": "Kilo privaatsuspoliitikale",
     "onDevice": "Seadmes",
-    "loading": "Laadimine…",
     "couldNotLoadTranscription": "Sinu kõnetuvastuse seadet ei õnnestunud laadida.",
     "signInToManageTranscription": "Veebipõhise kõnetuvastuse haldamiseks logi sisse.",
     "onlineTranscription": "Veebipõhine kõnetuvastus",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "Kõnetuvastus",
     "retentionPrefix": "Kõik säilitustähtajad, sinu õigused ja kontaktandmed on kirjas",
     "backToConsent": "Tagasi nõusoleku juurde",
-    "back": "Tagasi",
     "revokeConsent": "Võta nõusolek tagasi",
     "revokeConsentTitle": "Kas võtta andmete jagamise nõusolek tagasi?",
     "acceptAndContinue": "Nõustu ja jätka",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "Kõnet töödeldakse ainult seadmes või Apple'i või Google'i teenuses, kui seade ei suuda kõnet ilma võrguühenduseta tekstiks muuta.",
     "installAttributionPromptTitle": "Kas lubada paigaldusallika tuvastamine?",
     "installAttributionPromptMessage": "Kilo kasutab Apple'i jälgimisluba ainult selleks, et teada saada, millisest kanalist sa siia jõudsid. Sinu viipasid ega vestlusi selleks kunagi ei kasutata.",
-    "continue": "Jätka",
     "what": "Mis",
     "why": "Miks",
     "who": "Kellele"
@@ -3007,7 +2875,6 @@
       "selectDescription": "Jätkamiseks vali oma profiililt organisatsioon.",
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali oma profiililt teine organisatsioon.",
-      "accessDeniedTitle": "Juurdepääs keelatud",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "Raamatupidamislik korrigeerimine",
         "credits_expired": "Krediit aegus"
       },
-      "loadMore": "Laadi veel",
       "loadMoreFailed": "Rohkem andmeid ei õnnestunud laadida.",
       "truncated": "Saadaval on ka varasemad krediiditehingud."
     },
@@ -3052,18 +2918,14 @@
         "paid": "Makstud",
         "open": "Avatud",
         "void": "Tühistatud",
-        "draft": "Mustand",
-        "uncollectible": "Sissenõudmatu",
-        "unknown": "Teadmata"
+        "uncollectible": "Sissenõudmatu"
       },
-      "loadMore": "Laadi veel",
       "loadMoreFailed": "Rohkem andmeid ei õnnestunud laadida.",
       "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nimi@ettevote.ee",
       "enableA11y": "Luba madala saldo hoiatus",
-      "enabled": "Sisse lülitatud",
       "notifyEmailsLabel": "Teavituste e-posti aadressid",
       "permissionDenied": "Sul puudub õigus arveldusteavitusi hallata.",
       "separateEmailsHint": "Eralda e-posti aadressid komadega.",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}} päevas",
       "manageA11y": "Halda liiget {{name}}",
       "manageInvitationA11y": "Halda aadressile {{email}} saadetud kutset",
-      "removeConfirm": "Eemalda",
       "removeMember": "Eemalda liige",
       "removeMemberMessage": "Kas eemaldada {{name}} sellest organisatsioonist?",
       "revokeConfirm": "Tühista",
@@ -3113,25 +2974,18 @@
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki"
     },
-    "permissionDenied": {
-      "back": "Tagasi",
-      "title": "Juurdepääs keelatud"
-    },
     "usageStats": {
-      "cost": "Kulu",
       "inputTokens": "Sisendtokenid",
       "last30Days": "Viimased 30 päeva",
       "outputTokens": "Väljundtokenid",
       "requests": "Päringud"
     },
     "hub": {
-      "title": "Organisatsioon",
       "renameTitle": "Nimeta organisatsioon ümber",
       "renamePlaceholder": "Organisatsiooni nimi",
       "balance": "Saldo",
       "organizationSeats": "Organisatsiooni kasutajakohad",
-      "lowBalanceBelow": "Alla {{amount}}",
-      "lowBalanceOff": "Väljas"
+      "lowBalanceBelow": "Alla {{amount}}"
     },
     "kiloPass": {
       "activating": "Aktiveerimine",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "Krediidi töötlemine viibib · proovitakse automaatselt uuesti",
       "ended": "Lõppenud",
       "endsOn": "Lõpeb {{date}}",
-      "loading": "Laadimine…",
       "manageHint": "Avab veebis Kilo Passi halduse.",
       "notSubscribed": "Pole tellitud",
       "overallocated": "Määratud passe on rohkem kui tasulisi kasutajakohti",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "Vestlus",
-    "composer": {
-      "placeholder": "Sõnum"
-    },
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
     },
     "working": "Töös",
     "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
-    "catalogRetry": "Mudeleid ei õnnestunud laadida.",
     "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
   },
   "glanceable": {

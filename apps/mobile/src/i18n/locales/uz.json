@@ -27,7 +27,49 @@
     "somethingWentWrong": "Xatolik yuz berdi.",
     "couldNotOpen": "{{label}}ni ochib bo'lmadi.",
     "link": "havola",
-    "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin."
+    "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin.",
+    "model": "SI modeli",
+    "accessDenied": "Kirish rad etildi.",
+    "allRepositories": "Barcha repozitoriylar",
+    "personal": "Shaxsiy",
+    "connectGithub": "GitHubni ulash",
+    "cost": "Xarajat",
+    "discard": "Bekor qilish",
+    "findings": "Aniqlangan muammolar",
+    "notConnected": "Ulanmagan",
+    "notifications": "Bildirishnomalar",
+    "pullRequest": "PR",
+    "repositories": "Repozitoriylar",
+    "securityAgent": "Xavfsizlik agenti",
+    "unknown": "Noma’lum",
+    "added": "Qo‘shilgan",
+    "cancelled": "Bekor qilindi",
+    "close": "Yopish",
+    "codeReviewer": "Kod tekshiruvchisi",
+    "connected": "Ulangan",
+    "couldNotLoadModels": "Modellarni yuklab bo‘lmadi.",
+    "couldNotLoadRepositories": "Repozitoriylarni yuklab bo‘lmadi.",
+    "critical": "O‘ta yuqori",
+    "delete": "O‘chirish",
+    "deleted": "O‘chirilgan",
+    "details": "Tafsilotlar",
+    "draft": "Qoralama",
+    "enabled": "Yoqilgan",
+    "github": "GitHub",
+    "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
+    "loading": "Yuklanmoqda…",
+    "loadMore": "Yana yuklash",
+    "message": "Xabar",
+    "off": "O‘chiq",
+    "organization": "Tashkilot",
+    "platform": "Platforma",
+    "prReview": "PRni ko‘rib chiqish",
+    "queued": "Navbatda",
+    "remove": "Olib tashlash",
+    "repository": "Repozitoriy",
+    "signOut": "Tizimdan chiqish",
+    "agents": "Agentlar",
+    "all": "Barchasi"
   },
   "language": {
     "title": "Til",
@@ -62,12 +104,10 @@
     "emailAddress": "Elektron pochta manzili",
     "emailPlaceholder": "siz@misol.com",
     "continueWithEmail": "Elektron pochta bilan davom etish",
-    "continue": "Davom etish",
     "enterCodeSentTo": "{{email}} manziliga yuborilgan kodni kiriting.",
     "codeArrivalHint": "Agar bu manzil talablarga mos kelsa, kod bir daqiqa ichida keladi.",
     "verifyCode": "Kodni tekshirish",
     "resendCode": "Kodni qayta yuborish",
-    "back": "Orqaga",
     "termsPrefix": "Davom etish orqali quyidagi hujjatlarga rozilik bildirasiz:",
     "terms": "Shartlar",
     "termsConnector": " va ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Profil",
-    "agents": "Agentlar",
-    "codeReviewer": "Kod tekshiruvchisi",
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
-    "securityAgent": "Xavfsizlik agenti",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
     "reviews": "Tekshiruvlar",
-    "prReview": "PRni ko‘rib chiqish",
     "prReviewSubtitle": "PR tekshiruvlarini mobil qurilmada bajarish",
-    "organization": "Tashkilot",
     "couldNotLoadOrganization": "Tashkilotni yuklab bo'lmadi.",
     "couldNotLoadOrganizationDescription": "Ma'lumotlar yuklanmaguncha tashkilot va agent sozlamalarini ochib bo'lmaydi.",
     "linkedAccounts": "Bog'langan hisoblar",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Hisobingizda kredit qolmagan. Bu hisobning kreditlari iOS ilovasidan tashqarida boshqariladi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
-    "signOutConfirm": "Tizimdan chiqish",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
     "deleteAccountMessage": "Bu hisobingizni butunlay o'chiradi va sizni tizimdan chiqaradi. Biz tasdiqlash kodini elektron pochta orqali yuboramiz.",
     "deleteAccountConfirm": "Hisobni o‘chirish",
     "accountDeleted": "Hisobingiz o'chirildi.",
     "viewOrganization": "Tashkilotni ko'rish",
     "manageOrganization": "Tashkilotni boshqarish",
-    "personal": "Shaxsiy",
     "selectAccount": "Hisobni tanlash",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "Elektron pochta",
     "providerTestAccount": "Sinov hisobi",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Sessiya sahifasida ekranni o'chirmaslik",
     "keepScreenOnSubtitle": "Sessiya ishlayotganda ekranni yoqilgan holda saqlash.",
     "appearance": "Ko'rinish",
-    "notifications": "Bildirishnomalar",
     "notificationsSubtitle": "Bildirishnoma sozlamalari",
     "appearanceSystem": "Tizim",
     "appearanceLight": "Och",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
     "pullRequestUnavailableDescription": "Bu PRni ochib bo'lmaydi. U o'chirilgan, ombor yopiq yoki unga Kilo GitHub ilovasi o'rnatilmagan bo'lishi mumkin.",
-    "accessDenied": "Kirish rad etildi.",
     "accessDeniedDescription": "Bu PRni ko'rishga ruxsatingiz yo'q.",
     "noFilesChanged": "Fayllar o'zgarmagan",
     "noFilesChangedDescription": "Bu PRda hech bir fayl o'zgarmagan.",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Fayllarni yuklab bo'lmadi.",
-      "checkConnection": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
       "retryLoadingFiles": "Fayllarni qayta yuklash",
       "filterPlaceholder": "Fayl yo'li bo'yicha filtr",
       "viewedCount": "{{total}} tadan {{viewed}} tasi ko'rildi",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "Qolgan izohlarni yuklab bo'lmadi.",
       "retryLoadingMore": "Qolgan izohlarni qayta yuklash",
       "loadMoreComments": "Yana izoh yuklash",
-      "loadMore": "Yana yuklash",
       "closeReactions": "Reaksiyalarni yopish",
       "reactionsTitle": "Reaksiya",
       "addReaction": "Reaksiya qo'shish",
@@ -352,7 +380,6 @@
       "reportUser": "Foydalanuvchi ustidan shikoyat qilish",
       "mute": "Bildirishnomalarni o'chirish",
       "block": "Bloklash",
-      "somethingWentWrong": "Xatolik yuz berdi.",
       "reportSubmitted": "Shikoyat yuborildi. Qayd raqami: {{receiptId}}",
       "blockedUser": "{{login}} bloklandi",
       "mutedUser": "{{login}}dan bildirishnomalar o'chirildi",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "PRni ko'rib chiqish",
     "headLine": "{{counts}} · oxirgi kommit: {{sha}}",
     "entry": {
-      "title": "PRni ko‘rib chiqish",
       "eyebrow": "PRni URL orqali oching.",
       "pastePrLink": "PR havolasini joylashtirish",
       "noRecentPrs": "Oxirgi PRlar yo'q",
       "noRecentPrsDescription": "Ko'rib chiqishni boshlash uchun yuqoriga PR havolasini joylashtiring — keyingi safar u shu yerda ko'rinadi.",
       "couldNotLoad": "Yuklab bo'lmadi.",
-      "remove": "Olib tashlash",
       "removeFromRecentsTitle": "Oxirgilar ro'yxatidan olib tashlansinmi?",
       "removeFromRecentsMessage": "Bu PR oxirgilar ro'yxatidan olib tashlanadi.",
       "removeRecentAccessibility": "{{repo}}ni oxirgilar ro'yxatidan olib tashlash",
@@ -460,13 +485,11 @@
       "pending": "{{displayCount}} tasi kutilmoqda",
       "skipped": "{{displayCount}} tasi o'tkazib yuborildi",
       "checksCount": "{{displayCount}} tekshiruv",
-      "checkDetails": "tekshiruv tafsilotlari",
-      "pullRequest": "PR"
+      "checkDetails": "tekshiruv tafsilotlari"
     },
     "inbox": {
       "title": "Kiruvchi so'rovlar",
       "recent": "Oxirgilar",
-      "draft": "Qoralama",
       "loading": "Kiruvchi so'rovlar yuklanmoqda",
       "noReviewRequests": "Ko'rib chiqish so'rovlari yo'q",
       "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi. Yuqoriga istalgan PR havolasini ham joylashtirishingiz mumkin.",
@@ -488,7 +511,6 @@
       "discardTitle": "Izoh bekor qilinsinmi?",
       "discardMessage": "Qoralamangiz yo'qoladi.",
       "keepEditing": "Tahrirlashni davom ettirish",
-      "discard": "Bekor qilish",
       "comment": "Izoh",
       "insertSuggestionA11y": "Kod taklifini kiritish",
       "insertSuggestion": "Taklifni kiritish",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "Takliflar faqat qo'shilgan qatorlarga qo'llaniladi.",
       "tapDiffLineToSuggest": "Taklif kiritish uchun farqlar ko'rsatilgan qatorni bosing."
     },
-    "screenTitle": "PRni ko‘rib chiqish",
     "connect": {
       "checkFailedTitle": "GitHub ulanishini tekshirib bo'lmadi.",
       "checkFailedMessage": "Bu ma'lumot yuklanmaguncha hisobga kirish holatini aniqlab bo'lmaydi.",
       "reconnectTitle": "GitHubga qayta ulanish",
-      "title": "GitHubni ulash",
       "reconnectDescription": "GitHub ulanishingiz bekor qilingan. Mobil qurilmada PRlarni ko'rib chiqishni davom ettirish uchun qayta ulaning.",
       "description": "Mobil qurilmada PRlarni ko'rib chiqish uchun GitHub hisobingizni ulang."
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "Ko'rib chiqish natijasini yuborish oynasini yuklab bo'lmadi.",
       "deletePendingTitle": "Navbatdagi izoh o'chirilsinmi?",
       "deletePendingMessage": "Bu izoh ko'rib chiqish navbatidan o'chiriladi.",
-      "delete": "O‘chirish",
       "summaryOptional": "Xulosa (ixtiyoriy)",
       "pendingComment_one": "navbatdagi izoh",
       "pendingComment": "yuborilmagan izoh",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "Birlashtirilgan",
       "stateClosed": "Yopilgan",
-      "stateDraft": "Qoralama",
       "stateOpenApproved": "Ochiq · Tasdiqlandi",
       "stateOpenChangesRequested": "Ochiq · O'zgarishlar so'raldi",
       "stateOpenReviewRequired": "Ochiq · Ko'rib chiqish kerak",
@@ -572,8 +590,6 @@
       "discussion": "Muhokama"
     },
     "fileStatus": {
-      "added": "Qo‘shilgan",
-      "deleted": "O‘chirilgan",
       "modified": "O'zgartirildi",
       "renamed": "Nomi o'zgartirildi",
       "copied": "Nusxalandi",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "{{label}} tanlandi, tanlovni o'zgartirish uchun bosing",
       "tapToComment": "{{label}}, izoh qoldirish uchun bosing",
       "truncationBanner": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi.",
-      "statusAdded": "Qo‘shilgan",
       "statusContext": "Atrofdagi qator",
-      "statusDeleted": "O‘chirilgan",
       "lineLabel": "{{line}}-qator, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(bo‘sh)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "Bildirishnomalar",
     "liveActivities": "Jonli jarayonlar",
     "liveActivitySubtitle": "Faol agentlarni qulflangan ekranda ko'rsatish",
     "liveUpdates": "Jonli yangilanishlar",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "Bosh sahifa",
-    "agents": "Agentlar",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "KiloClaw nusxalari yo‘q",
       "noInstancesDescription": "Suhbatlashishni boshlash uchun nusxani sozlang.",
       "setUpKiloclaw": "KiloClawni sozlash",
-      "currentInstance": "{{title}}, joriy",
-      "personal": "Shaxsiy"
+      "currentInstance": "{{title}}, joriy"
     },
     "conversation": {
       "failedToLoad": "Suhbatni yuklab bo'lmadi.",
@@ -722,7 +733,6 @@
       "cancelReply": "Javobni bekor qilish",
       "openInstance": "Nusxani ochish",
       "attachFile": "Faylni biriktirish",
-      "messagePlaceholder": "Xabar",
       "cancelEdit": "Tahrirlashni bekor qilish",
       "sendMessage": "Xabar yuborish"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "{{filename}} faylini ochish",
-      "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
       "openFailed": "Biriktirmani ochib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
       "attachFailed": "Faylni biriktirib bo'lmadi.",
       "limit": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
@@ -771,7 +780,6 @@
       "yourMessage": "Sizning xabaringiz",
       "messageFrom": "{{author}} yuborgan xabar",
       "moreActions": "Boshqa amallar",
-      "message": "Xabar",
       "notDelivered": "Yetkazilmagan",
       "edited": "(tahrirlangan)",
       "image": "Rasm",
@@ -783,7 +791,6 @@
       "title": "Xabar amallari",
       "deleteTitle": "Xabar o'chirilsinmi?",
       "deleteMessage": "Xabar suhbatdan olib tashlanadi.",
-      "delete": "O‘chirish",
       "deleteFailed": "Xabarni o'chirib bo'lmadi.",
       "removeReactionFailed": "Reaksiyani olib tashlab bo'lmadi.",
       "addReactionFailed": "Reaksiya qo'shib bo'lmadi.",
@@ -813,7 +820,6 @@
       "online": "Onlayn",
       "idle": "Kutmoqda",
       "offline": "Oflayn",
-      "unknown": "Noma’lum",
       "loadingUser": "Foydalanuvchi ma'lumotlari yuklanmoqda...",
       "waitingForStatus": "Bot holati kutilmoqda...",
       "offlineMessage": "Bot oflayn. U qayta ulangach, xabar almashish davom etadi."
@@ -885,7 +891,6 @@
       "destroyMessage": "KiloClaw nusxangiz va undagi barcha ma'lumotlar butunlay yo'q qilinadi. Bu amalni ortga qaytarib bo'lmaydi.",
       "destroyTitle": "Nusxani yo'q qilish",
       "instance": "Nusxa",
-      "renameFailed": "Xatolik yuz berdi.",
       "couldNotCheckStatus": "Xizmat holatini tekshirib bo'lmadi.",
       "dangerZone": "XAVFLI AMALLAR",
       "destroying": "Yo'q qilinmoqda…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "Sozlash buyrug'ini yuklab bo'lmadi.",
       "gmailNotifications": "Gmail bildirishnomalari",
       "disconnect": "Google hisobi bilan ulanishni uzish",
-      "connected": "Ulangan",
       "copied": "Nusxalandi",
       "copyCommand": "Buyruqni nusxalash",
       "disabled": "O‘chirilgan",
       "disconnectConfirm": "Uzish",
       "disconnectMessage": "Google hisobingiz bu nusxadan olib tashlansinmi? Gmail bildirishnomalari o'chiriladi. O'zgarishlarni qo'llash uchun ulanishni uzgach, nusxani qayta joylashtiring.",
-      "disconnectTitle": "Google bilan ulanishni uzish",
-      "enabled": "Yoqilgan",
-      "notConnected": "Ulanmagan"
+      "disconnectTitle": "Google bilan ulanishni uzish"
     },
     "modelList": {
       "title": "Barcha modellar",
       "searchPlaceholder": "Modellarni qidirish...",
-      "couldNotLoad": "Modellarni yuklab bo‘lmadi.",
       "clearSearch": "Qidiruvni tozalash",
       "noMatches": "Qidiruvingizga mos model topilmadi",
       "noModels": "Modellar mavjud emas",
       "noModelsDescription": "Modellar mavjud bo'lgach, shu yerda ko'rinadi.",
       "noResultsFor": "\"{{query}}\" so'rovi bo'yicha natija topilmadi.",
       "recommended": "Tavsiya etilgan"
-    },
-    "model": {
-      "title": "SI modeli"
     },
     "secrets": {
       "title": "Maxfiy ma’lumotlar",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "{{label}}ni sozlash bo'yicha qo'llanma",
       "setupGuide": "Sozlash qo‘llanmasi",
       "saving": "Saqlanmoqda…",
-      "remove": "Olib tashlash",
       "removing": "O'chirilmoqda…",
-      "connected": "Ulangan",
-      "notConnected": "Ulanmagan",
       "updateToken": "Tokenni yangilash",
       "connect": "Ulash"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "Nusxa yaratish",
       "organizations": "Tashkilotlar",
-      "personal": "Shaxsiy",
       "accessIssue": {
         "trialExpired": "Sinov muddati tugadi — bu nusxadan foydalanishni davom ettirish uchun obuna bo'ling",
         "subscriptionCanceled": "Obuna faol emas — bu nusxadan foydalanishni davom ettirish uchun qayta obuna bo'ling",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "kilo.ai saytini ochish",
         "provisioning": "Resurslarni tayyorlash",
         "review": "Ko‘rib chiqish",
-        "somethingWentWrong": "Xatolik yuz berdi.",
         "identityTitle": "Bot qiyofasi va xarakteri",
-        "close": "Yopish",
         "couldNotLoad": "Dastlabki sozlash holatini yuklab bo'lmadi.",
         "finishingSetup": "Sozlash yakunlanmoqda — hisobingiz tayyor bo'lguncha biroz kuting.",
         "ready": "Tayyor",
@@ -1080,7 +1072,6 @@
         "location": "Joylashuv",
         "locationPlaceholder": "Shahar yoki hudud (ixtiyoriy)",
         "useCurrentLocation": "Joriy joylashuvdan foydalanish",
-        "continue": "Davom etish",
         "locationDeniedTitle": "Joylashuvni aniqlashga ruxsat berilmagan",
         "locationDeniedMessage": "Joriy joylashuvingizdan foydalanish uchun sozlamalarda joylashuvni aniqlashga ruxsat bering.",
         "locationValidationFailed": "Joylashuvni tasdiqlab bo'lmadi.",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "SHLYUZ JARAYONI",
       "lastExit": "Oxirgi to'xtash",
       "memory": "Xotira",
-      "model": "SI modeli",
       "region": "Hudud",
       "resources": "RESURSLAR",
       "restarts": "Qayta ishga tushirishlar",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "Eng yuqori imkoniyatlar. So'rovlarni mulohaza yurita oladigan ilg'or modellarga yo'naltiradi.",
       "balancedLabel": "Muvozanatli",
       "balancedDescription": "Tezlik va imkoniyatlarning arzonroq narxdagi qulay muvozanati.",
-      "cost": "Xarajat",
       "performance": "Unumdorlik",
       "autoModelA11y": "{{label}} avtomatik modeli",
       "currentModel": "Joriy model",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google hisobi",
       "modelDescription": "Sun'iy intellekt modelini tanlash",
-      "modelLabel": "SI modeli",
       "secretsDescription": "Shifrlangan kirish ma'lumotlari",
       "secretsLabel": "Maxfiy ma’lumotlar",
       "versionPinDescription": "Muayyan versiyaga biriktirish",
@@ -1251,12 +1239,9 @@
       "placeholder": "Masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
     },
     "repos": {
-      "title": "Repozitoriylar",
-      "couldNotLoad": "Repozitoriylarni yuklab bo‘lmadi.",
       "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
       "finishSetup": "Sozlashni yakunlash",
       "manageAccess": "Kirish huquqlarini boshqarish",
-      "allRepositories": "Barcha repozitoriylar",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket ish maydonida repozitoriyalar mavjud emas.",
       "bitbucketSetup": "Bitbucketni sozlash",
       "couldNotOpenGithubSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
@@ -1274,7 +1259,6 @@
       "roast": "Ayovsiz, ammo kulgili tanqid",
       "strict": "Barcha muammolarni aniqlash, yuqori talablar qo'yish"
     },
-    "title": "Kod tekshiruvchisi",
     "reviewDetail": {
       "title": "Ko‘rib chiqish",
       "cancelTitle": "Ko'rib chiqish bekor qilinsinmi?",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "Ko'rib chiqish ma'lumotlarini yuklab bo'lmadi.",
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
       "byline": "{{repo}} #{{number}}, muallif: {{author}}",
-      "findings": "Aniqlangan muammolar",
       "noFindings": "Muammolar topilmadi.",
       "showMore": "Ko'proq ko'rsatish",
-      "details": "Tafsilotlar",
       "branch": "Tarmoq",
-      "platform": "Platforma",
-      "model": "SI modeli",
       "created": "Yaratilgan",
       "started": "Boshlangan",
       "completed": "Yakunlangan",
-      "cost": "Xarajat",
       "tokens": "Token",
       "tokensInOut": "{{input}} kirish / {{output}} chiqish",
       "openPullRequest": "Ochiq PR",
@@ -1309,7 +1288,6 @@
       "checkRun": "Tekshiruv",
       "status": "Holat",
       "threshold": "Chegara",
-      "pullRequest": "PR",
       "transcriptWaiting": "Ko'rib chiqish yozuvi kutilmoqda.",
       "transcriptEmpty": "Bu ko'rib chiqish uchun yozuv yo'q.",
       "transcriptRetry": "Ko'rib chiqish yozuvini yuklab bo'lmadi.",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "Ulangan provayderlaringizni yuklay olmadik. Iltimos, qayta urinib ko'ring.",
       "connectProvider": "Provayderni ulash",
       "connectProviderDescription": "PRni qo'lda ko'rib chiqishni boshlash uchun GitHubni ulang.",
-      "connectGitHub": "GitHubni ulash",
-      "platform": "Platforma",
-      "notConnected": "Ulanmagan",
       "pullRequestUrl": "PR manzili (URL)",
       "instructions": "Ko'rsatmalar (ixtiyoriy)",
       "instructionsPlaceholder": "Ko'rib chiqishda alohida e'tibor beriladigan jihatlar…",
-      "model": "SI modeli",
       "starting": "Ko'rib chiqish boshlanmoqda…",
       "start": "Ko'rib chiqishni boshlash"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "Repozitoriylarni tanlash",
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
-    "readOnlyDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalari va hisob-kitob menejerlari uni ulashi mumkin.",
       "setupIncomplete": "Sozlash yakunlanmagan. Uni kilo.ai saytida yakunlang.",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "Tashkilotlarni yuklab bo‘lmadi.",
       "personalStillAvailable": "Quyida shaxsiy repozitoriyalaringizdan foydalanishingiz mumkin.",
-      "personal": "Shaxsiy",
       "personalSubtitle": "O‘zingizga tegishli repozitoriylar",
       "viewOnly": "Faqat ko'rish"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "Tekshirilmoqda…",
       "statusUnavailable": "Holatni aniqlab bo'lmadi",
-      "connected": "Ulangan",
-      "notConnected": "Ulanmagan",
-      "organization": "Tashkilot",
       "platforms": "Platformalar",
       "activity": "Faoliyat"
     },
     "providerConnect": {
       "githubApp": "GitHub ilovasi",
-      "connectGitHub": "GitHubni ulash",
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
       "connectGitLab": "GitLabni ulash",
@@ -1421,10 +1389,7 @@
       "allAreas": "Barcha yo'nalishlar",
       "customInstructions": "Maxsus ko‘rsatmalar",
       "set": "Belgilangan",
-      "model": "SI modeli",
       "mergeGate": "Birlashtirish shartlari",
-      "repositories": "Repozitoriylar",
-      "allRepositories": "Barcha repozitoriylar",
       "nSelected": "{{displayCount}} ta tanlangan",
       "reviewMemory": "Ko‘rib chiqish xotirasi",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
@@ -1435,16 +1400,13 @@
       "noDecision": "Qaror yo'q",
       "noResult": "Natija yo'q"
     },
-    "eyebrow": "Kod tekshiruvchisi",
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
       "pending": "Kutilmoqda",
-      "queued": "Navbatda",
       "running": "Ishlamoqda",
       "completed": "Yakunlangan",
       "failed": "Amalga oshmadi",
-      "cancelled": "Bekor qilindi",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "Hujjatlar"
     },
     "gateThreshold": {
-      "off": "O‘chiq",
-      "all": "Barchasi",
-      "warning": "Ogohlantirish",
-      "critical": "O‘ta yuqori"
+      "warning": "Ogohlantirish"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
         "description": "Kilo o'rnatilgan faol GitHub ilovasi orqali bu repozitoriyaga kira olmagani uchun Kodni ko'rib chiquvchi o'chirildi. GitHub ilovasining o'rnatish sozlamalarini yangilang, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
         "recoveryLabel": "GitHub ilovasini yangilash"
       },
       "githubIpAllowList": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
-        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
-        "recoveryLabel": "Yordam xizmatiga murojaat qilish"
+        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
         "description": "Kilo bu loyiha uchun GitLab loyihasiga kirish tokenini yarata olmagani sababli Kodni ko'rib chiquvchi o'chirildi. Loyihani boshqarish huquqini bering yoki loyihaga kirish tokenlarini yoqing, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
         "recoveryLabel": "GitLab integratsiyasini yangilash"
       },
       "byokInvalidKey": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
         "description": "Tanlangan BYOK API kaliti yaroqsiz, bekor qilingan yoki kerakli ruxsatlarga ega emasligi sababli Kodni ko'rib chiquvchi o'chirildi. Kalitni yangilang yoki boshqa modelni tanlang, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
         "recoveryLabel": "BYOK sozlamalarini yangilash"
       },
       "selectedModelUnavailable": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
         "description": "Tanlangan model bulut agenti seanslari uchun mavjud emasligi sababli Kodni ko'rib chiquvchi o'chirildi. Mavjud modelni tanlang, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
         "recoveryLabel": "Kodni ko'rib chiquvchi sozlamalarini yangilash"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
-        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
-        "recoveryLabel": "Yordam xizmatiga murojaat qilish"
-      }
+        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
+      },
+      "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
+      "recoveryLabel": "Yordam xizmatiga murojaat qilish"
     },
     "unknownError": "Noma’lum xatolik yuz berdi."
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "Orqaga qayting va muammolar ro'yxatidan filtrlarni qayta oching.",
       "title": "Muammolarni filtrlash",
       "reset": "Asliga qaytarish",
-      "repository": "Repozitoriy",
       "status": "Holat",
       "severity": "Xavf darajasi",
       "outcome": "Natija",
       "slaStatus": "SLA holati",
       "sortBy": "Saralash mezoni",
-      "allRepositories": "Barcha repozitoriylar",
-      "all": "Barchasi",
       "statusOpen": "Ochiq",
       "fixed": "Tuzatilgan",
       "statusIgnored": "E'tiborsiz qoldirilgan",
       "statusClosed": "Yopilgan",
-      "severityCritical": "O‘ta yuqori",
       "severityHigh": "Yuqori",
       "severityMedium": "O‘rta",
       "severityLow": "Past",
       "outcomeNotAnalyzed": "Tahlil qilinmagan",
       "outcomeAnalyzing": "Tahlil qilinmoqda",
       "outcomeFailed": "Tahlil amalga oshmadi",
-      "outcomeExploitable": "Hujumda foydalanish mumkin",
       "outcomeNotExploitable": "Hujumda foydalanib bo‘lmaydi",
       "outcomeSafeToDismiss": "E’tiborsiz qoldirish mumkin",
-      "outcomeNeedsReview": "Ko‘rib chiqish kerak",
       "outcomeTriageComplete": "Dastlabki baholash yakunlandi",
       "outcomeDismissed": "E’tiborsiz qoldirilgan",
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "Avtomatik rad etishni yoqish",
       "enableAutoDismissSubtitle": "Sun'iy intellekt hujumda foydalanib bo'lmaydi deb topgan muammolarni avtomatik rad etadi.",
       "confidenceThreshold": "Ishonchlilik chegarasi",
-      "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableAutoRemediationConfirmTitle": "Avtomatik tuzatish yoqilsinmi?",
       "enableAutoRemediationConfirmMessage": "Xavfsizlik agenti hujumda foydalanish mumkin bo'lgan va shartlarga mos muammolarni tuzatish uchun avtomatik PR ochadi.",
       "enable": "Yoqish",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "Tavsiya etilgan amal",
       "triageReasoning": "Dastlabki baholash asoslari",
       "exploitable": "Hujumda foydalanish mumkin",
-      "model": "SI modeli",
       "notRecorded": "Qayd etilmagan",
       "analyzed": "Tahlil qilingan",
       "exploitabilityReasoning": "Hujumda foydalanish imkoniyati asoslari",
       "suggestedFix": "Tavsiya etilgan tuzatish",
       "whereFound": "Aniqlangan joylar ({{displayCount}})",
       "fullReport": "Yaratilgan hisobotning to'liq matni",
-      "unknown": "Noma’lum",
       "yes": "Ha",
       "no": "Yo'q"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "{{open}} ta ochiq · {{critical}} ta o'ta jiddiy · {{high}} ta yuqori",
       "couldNotLoad": "Boshqaruv paneli ma'lumotlarini yuklab bo'lmadi.",
       "filterByRepository": "Repozitoriya bo'yicha filtrlash",
-      "findings": "Aniqlangan muammolar",
       "lastSynced": "Oxirgi sinxronlash: {{time}}",
       "manageRepositories": "Repozitoriyalarni boshqarish",
       "notYetSynced": "Hali sinxronlanmagan",
@@ -1686,23 +1629,19 @@
       "severityLabel": "Xavf darajasi: {{severity}}",
       "package": "Paket",
       "vulnerableVersions": "Zaiflik mavjud versiyalar",
-      "unknown": "Noma’lum",
       "patchedVersion": "Tuzatilgan versiya",
       "noPatchAvailable": "Tuzatish mavjud emas",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Repozitoriy",
       "manifest": "Manifest fayli",
       "detected": "Aniqlangan",
       "updated": "Yangilangan",
-      "fixed": "Tuzatilgan",
       "slaDeadline": "SLA muddati",
       "sourceRecord": "Manba yozuvi",
       "source": "Manba",
       "sourceId": "Manba identifikatori",
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
       "statusSuperseded": "Almashtirildi",
-      "statusFixed": "Tuzatilgan",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Tuzatish allaqachon boshlangan",
@@ -1716,25 +1655,18 @@
       "title": "Sozlamalar",
       "couldNotLoadSettings": "Xavfsizlik agenti sozlamalarini yuklab bo'lmadi.",
       "couldNotLoadPermissions": "Ruxsatlarni yuklab bo'lmadi.",
-      "couldNotLoadRepositories": "Repozitoriylarni yuklab bo‘lmadi.",
-      "securityAgent": "Xavfsizlik agenti",
-      "enabled": "Yoqilgan",
       "disabled": "O‘chirilgan",
       "on": "Yoniq",
-      "off": "O‘chiq",
-      "allRepositories": "Barcha repozitoriylar",
       "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlangan",
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
       "repositoriesCount_other": "{{displayCount}} ta repozitoriy tanlangan",
       "selectRepositories": "Repozitoriylarni tanlash",
       "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
-      "repositories": "Repozitoriylar",
       "modelsAndAnalysis": "Modellar va tahlil",
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automation": "Avtomatlashtirish",
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
-      "notifications": "Bildirishnomalar",
       "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
       "slaPolicy": "SLA siyosati",
       "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "Bekor qilish so‘rovi yuborildi",
       "cancelled": "Tuzatish bekor qilindi",
-      "pullRequest": "PR",
       "couldNotLoad": "Tuzatish holatini yuklab bo'lmadi.",
       "noAnalysisTitle": "Hali tahlil qilinmagan",
       "noAnalysisDescription": "Tafsilotlar bo‘limidan tahlilni boshlang.",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "Urinishlar tarixi ({{displayCount}})",
       "attemptNumber": "{{number}}-urinish",
       "startedBy": "Boshlagan foydalanuvchi",
-      "model": "SI modeli",
       "branch": "Tarmoq",
       "queued": "Tuzatish navbatga qo'yildi",
       "retryQueued": "Qayta tuzatish urinishi navbatga qo'yildi",
@@ -1769,20 +1699,17 @@
         "prOpened": "PR ochildi",
         "failed": "Tuzatish amalga oshmadi",
         "blocked": "Tuzatishga to'siq bor",
-        "noChangesNeeded": "O‘zgartirish kerak emas",
-        "cancelled": "Bekor qilindi"
+        "noChangesNeeded": "O‘zgartirish kerak emas"
       },
       "unavailable": "Bu muammoni avtomatik tuzatish imkoni yo‘q."
     },
     "analysisSettings": {
       "title": "Modellar va tahlil",
       "couldNotLoad": "Tahlil sozlamalarini yuklab bo'lmadi.",
-      "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "depth": "Tahlil chuqurligi",
       "modeAuto": "Avto",
       "modeShallow": "Yuzaki",
       "modeDeep": "Chuqur",
-      "couldNotLoadModels": "Modellarni yuklab bo‘lmadi.",
       "triageModel": "Dastlabki baholash modeli",
       "analysisModel": "Tahlil modeli",
       "remediationModel": "Tuzatish modeli"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "SLA siyosati",
       "couldNotLoad": "SLA sozlamalarini yuklab bo'lmadi.",
-      "critical": "O‘ta yuqori",
       "high": "Yuqori",
       "medium": "O‘rta",
       "low": "Past",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "Muammo",
-      "tabDetails": "Tafsilotlar",
       "tabAnalysis": "Tahlil",
       "tabRemediation": "Tuzatish",
       "notFound": "Muammo topilmadi",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "Muammoni e’tiborsiz qoldirish"
     },
     "findingList": {
-      "title": "Aniqlangan muammolar",
       "couldNotLoad": "Muammolarni yuklab bo'lmadi.",
       "couldNotLoadMore": "Yana muammolarni yuklab bo'lmadi.",
       "noMatchesTitle": "Filtrlarga mos muammolar yo'q",
@@ -1827,13 +1751,8 @@
       "clearFilters": "Filtrlarni tozalash"
     },
     "scopeList": {
-      "title": "Xavfsizlik agenti",
       "couldNotLoad": "Tashkilotlarni yuklab bo‘lmadi.",
-      "personal": "Shaxsiy",
       "personalSubtitle": "O‘zingizga tegishli repozitoriylar"
-    },
-    "commandRetry": {
-      "discard": "Bekor qilish"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Tuzatish uchun PR ochilgan",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "GitHubni ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "settingsSave": {
-      "discard": "Bekor qilish",
       "keepEditing": "Tahrirlashni davom ettirish",
       "saveChanges": "O'zgarishlarni saqlash",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "Audit hisobotini yuklab bo'lmadi.",
       "events": "Hodisalar",
-      "findings": "Aniqlangan muammolar",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
       "noActivity": "Qayd etilgan faoliyat yo'q",
       "noActivityDescription": "{{start}} dan {{end}} gacha Kilo tizimida xavfsizlik muammolari bo'yicha hisobotga kiritiladigan amallar qayd etilmagan.",
@@ -1875,8 +1792,7 @@
       "title": "Audit hisoboti",
       "unavailable": "Audit hisoboti mavjud emas",
       "unavailableDescription": "Faqat tashkilot egalari va hisob-kitob menejerlari audit hisobotlarini ko'rishi mumkin. Tashkilot egasi yoki hisob-kitob menejeridan sizga kirish huquqini berishni so'rang.",
-      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring.",
-      "checkConnection": "Internetga ulanishni tekshiring va qayta urinib ko‘ring."
+      "queryFailed": "Hisobot so'rovi tugallanmadi. Qayta urinib ko'ring."
     },
     "notifications": {
       "couldNotLoad": "Bildirishnoma sozlamalarini yuklab bo'lmadi.",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "Yangi muammo haqida bildirishnoma",
       "newFindingSeverityLabel": "Yangi muammolar uchun eng past xavf darajasi",
       "newFindingSubtitle": "Har safar yangi muammo sinxronlanganda, jumladan, birinchi sinxronlashda ham yuboriladi.",
-      "readOnly": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "slaLeadTimeAccessibility": "SLA muddati tugashidan necha kun oldin ogohlantirish",
       "slaLeadTimeError": "Kunlar sonini 1 dan 365 gacha bo'lgan butun son bilan kiriting.",
       "slaLeadTimeHint": "1 dan 365 gacha bo‘lgan butun sonni kiriting",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "SLA ogohlantirishlari haqida menga elektron xat yuborish",
       "slaSection": "SLA ogohlantirish bildirishnomasi",
       "slaSeverityLabel": "SLA bildirishnomalari uchun eng past xavf darajasi",
-      "slaSubtitle": "Muammolarning SLA muddati yaqinlashishidan oldin, yaqinlashganda va o'tib ketganda yuboriladi.",
-      "title": "Bildirishnomalar"
+      "slaSubtitle": "Muammolarning SLA muddati yaqinlashishidan oldin, yaqinlashganda va o'tib ketganda yuboriladi."
     },
     "repositories": {
-      "allRepositories": "Barcha repozitoriylar",
       "couldNotLoad": "Repozitoriya sozlamalarini yuklab bo'lmadi.",
-      "couldNotLoadRepositories": "Repozitoriylarni yuklab bo‘lmadi.",
       "couldNotOpenGithubSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
       "githubAppSettings": "GitHub ilovasi sozlamalari",
       "manageAccess": "GitHub ilovasining kirish huquqlarini boshqarish",
       "noRepositories": "Repozitoriyalar yo'q",
       "noRepositoriesDescription": "Kilo GitHub ilovasiga repozitoriyalarga kirish huquqini bering.",
-      "readOnly": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "selectAtLeastOne": "Kamida bitta repozitoriyani tanlang.",
-      "selectedRepositories": "Tanlangan repozitoriylar",
-      "title": "Repozitoriylar"
+      "selectedRepositories": "Tanlangan repozitoriylar"
     },
     "scopeEntry": {
       "connectDescription": "Dependabot ogohlantirishlarini avtomatik sinxronlash va repozitoriyalaringizdagi xavfsizlik muammolarini boshqarish uchun Kilo GitHub ilovasini o'rnating.",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "Navbatga qo'yilgan amalni kuzatish imkoni yo'qoldi. Eng so'nggi holatni ko'rish uchun yangilang.",
     "initialSyncAdmissionFailed": "Xavfsizlik agenti yoqildi, lekin dastlabki sinxronlashni navbatga qo'yib bo'lmadi. Qayta sinxronlang.",
-    "title": "Xavfsizlik agenti",
     "commands": {
       "findingAlreadyDismissed": "Muammo allaqachon rad etilgan",
       "findingDismissed": "Muammo rad etildi",
@@ -1949,22 +1858,16 @@
       "failed": "Tahlil amalga oshmadi",
       "failedTitle": "Tahlil amalga oshmadi",
       "failedDescription": "Xavfsizlik agenti tahlilni yakunlay olmadi.",
-      "extractionFailed": "Ko‘rib chiqish kerak",
-      "extractionFailedTitle": "Ko‘rib chiqish kerak",
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
-      "exploitable": "Hujumda foydalanish mumkin",
-      "exploitableTitle": "Hujumda foydalanish mumkin",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
       "notExploitable": "Kodga yetib borib bo‘lmaydi",
       "notExploitableTitle": "Kodga yetib borib bo‘lmaydi",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
-      "unknownTitle": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",
       "safeToDismiss": "E’tiborsiz qoldirish mumkin",
       "safeToDismissTitle": "E’tiborsiz qoldirish mumkin",
       "safeToDismissDescription": "Dastlabki baholash bu muammoni kod bazasini tahlil qilmasdan xavfsiz rad etish mumkinligini ko'rsatdi.",
-      "manualReview": "Ko‘rib chiqish kerak",
       "manualReviewTitle": "Qo‘lda ko‘rib chiqish kerak",
       "manualReviewDescription": "Dastlabki baholashda bu muammo qo'lda ko'rib chiqish uchun belgilandi.",
       "analysisRequired": "Tahlil talab qilinadi",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Muddatdan oldin tuzatildi",
-      "fixed": "Tuzatilgan",
       "fixedOn": "Tuzatilgan sana: {{date}}",
       "resolutionRecorded": "Hal qilingani qayd etilgan",
       "superseded": "Almashtirildi",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "Bekor qilish so‘rovi yuborildi",
       "notStarted": "Boshlanmagan",
-      "queued": "Navbatda",
       "starting": "Boshlanmoqda",
       "inProgress": "Davom etmoqda",
       "draftPrOpened": "Qoralama PR ochildi",
@@ -2009,7 +1910,6 @@
       "blocked": "To'siq bor",
       "failed": "Amalga oshmadi",
       "noChangesNeeded": "O‘zgartirish kerak emas",
-      "cancelled": "Bekor qilindi",
       "originAutomaticPolicy": "Avtomatik qoida",
       "originIncludeExistingPolicy": "Mavjud muammolarni ham qo'shish qoidasi",
       "originManual": "Qo'lda",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "Sessiya o'chirilsinmi?",
       "deleteMessage": "Bu amalni ortga qaytarib bo'lmaydi.",
-      "delete": "O‘chirish",
       "deleteSession": "Sessiyani o'chirish",
       "rename": "Nomini o‘zgartirish",
       "renameMessage": "Bu sessiya uchun yangi nom kiriting.",
@@ -2130,7 +2029,6 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xato tafsilotlarini nusxalash",
       "backToSessions": "Sessiyalarga qaytish",
-      "accessDenied": "Kirish rad etildi.",
       "accessDeniedDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
-      "continue": "Davom etish",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
       "notEnoughCredits": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "Yangi seans",
-      "repository": "Repozitoriy",
-      "connectGithub": "GitHubni ulash",
       "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
       "keepEditing": "Tahrirlashni davom ettirish",
-      "discard": "Bekor qilish",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizdagi kilo jarayonini boshqarish uchun `kilo remote` buyrug'ini yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini bajaring.",
       "bitbucketConnected": "Bitbucket ulandi",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "{{displayCount}} ta fayl yangilandi."
     },
     "toolPatch": {
-      "operationAdded": "Qo‘shilgan",
-      "operationDeleted": "O‘chirilgan",
       "operationUpdated": "Yangilangan"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "Ishga tushirish muhiti",
       "runOnAccessibility": "Ishga tushirish muhiti: {{label}}",
       "couldNotLoad": "Ishlayotgan nusxalarni yuklab bo'lmadi",
-      "couldNotLoadDescription": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Yuklanmoqda…",
       "cloudAgentDescription": "Kilo bulutidagi ajratilgan muhitda ishga tushirish",
       "noCliInstances": "Hech bir CLI nusxasi ulanmagan",
       "noCliInstancesDescription": "Kompyuteringizdagi loyiha jildida `kilo remote` buyrug'ini bajaring. Agar Kilo CLI allaqachon ishlayotgan bo'lsa, uni yangilang.",
@@ -2323,7 +2213,6 @@
       "loading": "Yuklanmoqda...",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2338,9 +2227,7 @@
       "roleUser": "Foydalanuvchi",
       "roleAssistant": "Yordamchi",
       "sent": "Yuborilgan",
-      "model": "SI modeli",
       "costAndTokens": "Xarajat va tokenlar",
-      "cost": "Xarajat",
       "input": "Kirish",
       "output": "Chiqish",
       "reasoning": "Fikrlash",
@@ -2360,7 +2247,6 @@
       "textDisplay": "Matn ko'rinishi",
       "thinking": "Fikrlamoqda",
       "thought": "Fikr",
-      "title": "Tafsilotlar",
       "showDetails": "Tafsilotlarni ko'rsatish",
       "pending": "Kutilmoqda…",
       "running": "Bajarilmoqda…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
-      "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
       "imageUnavailableWithAlt": "Rasmni yuklab bo'lmadi: {{alt}}.",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Qayta urinib ko'rish mumkin.",
       "copyToComposer": "Xabar kiritish maydoniga nusxalash",
-      "queued": "Navbatda",
       "queuedAccessibility": "Xabar navbatga qo'yildi",
       "userMessage": "Foydalanuvchi xabari",
       "assistantMessage": "Yordamchi xabari",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
-      "platform": "Platforma",
       "platformCloud": "Bulut",
       "platformExtension": "Kengaytma",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Boshqa",
       "project": "Loyiha"
@@ -2539,7 +2421,6 @@
       "recommended": "Tavsiya etilgan"
     },
     "modelSelector": {
-      "model": "SI modeli",
       "provider": "Provayder: {{id}}",
       "modelId": "Model: {{id}}",
       "unavailable": "Mavjud emas",
@@ -2677,8 +2558,7 @@
       "merged": "birlashtirilgan PR",
       "draft": "Qoralama PR",
       "updating": "Yangilanmoqda, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "PR"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Yuklash",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Hisobingizni yuklab bo'lmadi.",
-    "couldNotLoadAccountDescription": "Internetga ulanishni tekshiring va qayta urinib ko‘ring.",
     "couldNotLoadPrivacy": "Maxfiylik sozlamalarini yuklab bo'lmadi.",
     "couldNotLoadPrivacyDescription": "Qurilmangizning xavfsizlik sozlamalarini tekshiring va qayta urinib ko'ring.",
     "contentReady": "Kontent tayyor",
-    "signOut": "Tizimdan chiqish",
     "retryLoadingAccount": "Hisobni qayta yuklash",
     "retryLoadingPrivacy": "Maxfiylik sozlamalarini qayta yuklash"
   },
@@ -2737,7 +2615,6 @@
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
     "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
-    "signOutConfirm": "Tizimdan chiqish",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi."
   },
   "forceUpdate": {
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "{{filename}}ni yopish",
-    "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
     "share": "{{filename}}ni ulashish"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "Internetga ulanish tiklandi"
   },
   "queryError": {
-    "neutralTitle": "Xatolik yuz berdi.",
     "neutralDescription": "Iltimos, qayta urinib ko'ring.",
     "offlineTitle": "Yuklab bo'lmadi.",
-    "offlineDescription": "Xatolik yuz berdi.",
-    "permissionTitle": "Kirish rad etildi.",
     "permissionDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
     "notFoundTitle": "Topilmadi.",
     "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "Menyuni ochish",
     "openMenuFor": "{{title}} uchun menyuni ochish",
-    "close": "Yopish",
     "goBack": "Orqaga qaytish"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "Kiloga yuborish",
-    "close": "Yopish",
     "reviewPr": "PRni ko‘rib chiqish",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Yangi seans",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "Ma'lumotlaringizni qayta ishlash qoidalari:",
     "privacyPolicy": "Kilo maxfiylik siyosati",
     "onDevice": "Qurilmada",
-    "loading": "Yuklanmoqda…",
     "couldNotLoadTranscription": "Nutqni matnga aylantirish sozlamangizni yuklab bo'lmadi.",
     "signInToManageTranscription": "Nutqni onlayn matnga aylantirish sozlamasini boshqarish uchun tizimga kiring.",
     "onlineTranscription": "Nutqni onlayn matnga aylantirish",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "Nutqni matnga aylantirish",
     "retentionPrefix": "Barcha saqlash muddatlari, huquqlaringiz va aloqa ma'lumotlari keltirilgan hujjat:",
     "backToConsent": "Rozilik sahifasiga qaytish",
-    "back": "Orqaga",
     "revokeConsent": "Rozilikni bekor qilish",
     "revokeConsentTitle": "Ma'lumot ulashishga berilgan rozilik bekor qilinsinmi?",
     "acceptAndContinue": "Qabul qilish va davom etish",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "Faqat qurilmaning o'zida qayta ishlanadi. Qurilma nutqni oflayn matnga aylantira olmasa, Apple yoki Google xizmatiga yuboriladi.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
-    "continue": "Davom etish",
     "what": "Qaysi ma'lumotlar",
     "why": "Nima uchun",
     "who": "Kimga"
@@ -3007,7 +2875,6 @@
       "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
       "selectOrganization": "Tashkilotni tanlang",
       "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan boshqa tashkilotni tanlang.",
-      "accessDeniedTitle": "Kirish rad etildi.",
       "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlarning muddati tugadi"
       },
-      "loadMore": "Yana yuklash",
       "loadMoreFailed": "Qolganlarini yuklab bo‘lmadi.",
       "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
     },
@@ -3052,18 +2918,14 @@
         "paid": "To'langan",
         "open": "Ochiq",
         "void": "Bekor qilingan",
-        "draft": "Qoralama",
-        "uncollectible": "Undirib bo'lmaydi",
-        "unknown": "Noma’lum"
+        "uncollectible": "Undirib bo'lmaydi"
       },
-      "loadMore": "Yana yuklash",
       "loadMoreFailed": "Qolganlarini yuklab bo‘lmadi.",
       "truncated": "Oldingi hisob-fakturalar ham mavjud."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ism@kompaniya.com",
       "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
-      "enabled": "Yoqilgan",
       "notifyEmailsLabel": "Xabar yuboriladigan manzillar",
       "permissionDenied": "To'lov ogohlantirishlarini boshqarishga ruxsatingiz yo'q.",
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "kuniga {{amount}}",
       "manageA11y": "A'zoni boshqarish: {{name}}",
       "manageInvitationA11y": "{{email}} uchun taklifnomani boshqarish",
-      "removeConfirm": "Olib tashlash",
       "removeMember": "A'zoni tashkilotdan chiqarish",
       "removeMemberMessage": "{{name}} bu tashkilotdan chiqarilsinmi?",
       "revokeConfirm": "Bekor qilish",
@@ -3113,25 +2974,18 @@
       "resendInvite": "Taklifnomani qayta yuborish",
       "shareInviteLink": "Taklifnoma havolasini ulashish"
     },
-    "permissionDenied": {
-      "back": "Orqaga",
-      "title": "Kirish rad etildi."
-    },
     "usageStats": {
-      "cost": "Xarajat",
       "inputTokens": "Kirish tokenlari",
       "last30Days": "Oxirgi 30 kun",
       "outputTokens": "Chiqish tokenlari",
       "requests": "So'rovlar"
     },
     "hub": {
-      "title": "Tashkilot",
       "renameTitle": "Tashkilot nomini o'zgartirish",
       "renamePlaceholder": "Tashkilot nomi",
       "balance": "Balans",
       "organizationSeats": "Tashkilotdagi o'rinlar",
-      "lowBalanceBelow": "{{amount}} dan kam",
-      "lowBalanceOff": "O‘chiq"
+      "lowBalanceBelow": "{{amount}} dan kam"
     },
     "kiloPass": {
       "activating": "Faollashtirilmoqda",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "Kreditlarni hisobga o'tkazish kechikmoqda · avtomatik qayta urinilmoqda",
       "ended": "Yakunlandi",
       "endsOn": "Tugash sanasi: {{date}}",
-      "loading": "Yuklanmoqda…",
       "manageHint": "Kilo Pass boshqaruv sahifasini saytda ochadi.",
       "notSubscribed": "Obuna yo'q",
       "overallocated": "Tayinlangan Kilo Pass obunalari soni to'langan o'rinlar sonidan ko'p",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "Suhbat",
-    "composer": {
-      "placeholder": "Xabar"
-    },
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."
     },
     "working": "Ishlamoqda",
     "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
-    "catalogRetry": "Modellarni yuklab bo‘lmadi.",
     "sendError": "Xabarni yuborib bo'lmadi. Qayta urinib ko'ring."
   },
   "glanceable": {

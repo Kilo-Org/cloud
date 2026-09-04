@@ -139,7 +139,7 @@ export default function GoogleScreen() {
                 isConnected ? 'text-good' : 'text-muted-foreground'
               )}
             >
-              {isConnected ? t('kiloclaw.google.connected') : t('kiloclaw.google.notConnected')}
+              {isConnected ? t('common.connected') : t('common.notConnected')}
             </Text>
           </View>
         </View>
@@ -219,9 +219,7 @@ export default function GoogleScreen() {
                 onPress={handleToggleGmail}
                 disabled={mutations.setGmailNotifications.isPending}
               >
-                <Text>
-                  {gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}
-                </Text>
+                <Text>{gmailEnabled ? t('common.enabled') : t('kiloclaw.google.disabled')}</Text>
               </Button>
             </View>
           </View>

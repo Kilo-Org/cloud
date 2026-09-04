@@ -29,7 +29,7 @@ type NewSessionRepositorySectionProps = {
 
 const PROVIDER_COPY = {
   github: {
-    connectTitle: 'agentChat.newSession.connectGithub',
+    connectTitle: 'common.connectGithub',
     connectDescription: 'agentChat.newSession.connectGithubDescription',
     openLabel: 'agentChat.newSession.openGithub',
     connectedTitle: 'agentChat.newSession.githubConnected',
@@ -89,7 +89,7 @@ export function NewSessionRepositorySection({
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.repository')}
+        {t('common.repository')}
       </Text>
 
       {(hasRepos || anyLoading) && (
@@ -127,7 +127,7 @@ export function NewSessionRepositorySection({
               placement="top"
               variant="server"
               title={t(PROVIDER_COPY[platform].errorTitle)}
-              message={t('agentChat.instancePicker.couldNotLoadDescription')}
+              message={t('organization.boundary.loadErrorMessage')}
               onRetry={onRefreshRepos}
               isRetrying={isRetrying}
             />

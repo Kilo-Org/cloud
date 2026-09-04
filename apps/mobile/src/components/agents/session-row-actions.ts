@@ -10,7 +10,7 @@ export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   Alert.alert(i18n.t('agents.sessionRow.deleteTitle'), i18n.t('agents.sessionRow.deleteMessage'), [
     { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('agents.sessionRow.delete'), style: 'destructive', onPress: onDelete },
+    { text: i18n.t('common.delete'), style: 'destructive', onPress: onDelete },
   ]);
 }
 

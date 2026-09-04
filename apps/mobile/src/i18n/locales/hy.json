@@ -27,7 +27,49 @@
     "somethingWentWrong": "Սխալ առաջացավ։",
     "couldNotOpen": "Չհաջողվեց բացել՝ {{label}}։",
     "link": "հղում",
-    "takingLonger": "Սա սպասվածից երկար է տևում։ Կարող ես փակել այս պատուհանը և նորից ստուգել։"
+    "takingLonger": "Սա սպասվածից երկար է տևում։ Կարող ես փակել այս պատուհանը և նորից ստուգել։",
+    "model": "Մոդել",
+    "accessDenied": "Մուտքը մերժված է։",
+    "allRepositories": "Բոլոր պահոցները",
+    "personal": "Անձնական",
+    "connectGithub": "Միացնել GitHub-ը",
+    "cost": "Արժեք",
+    "discard": "Հրաժարվել",
+    "findings": "Հայտնաբերված խնդիրներ",
+    "notConnected": "Միացված չէ",
+    "notifications": "Ծանուցումներ",
+    "pullRequest": "միավորման հարցում",
+    "repositories": "Պահոցներ",
+    "securityAgent": "Անվտանգության գործակալ",
+    "unknown": "Անհայտ",
+    "added": "Ավելացված",
+    "cancelled": "Չեղարկված",
+    "close": "Փակել",
+    "codeReviewer": "Կոդի ստուգիչ",
+    "connected": "Միացված է",
+    "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
+    "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները։",
+    "critical": "Կրիտիկական",
+    "delete": "Ջնջել",
+    "deleted": "Ջնջված",
+    "details": "Մանրամասներ",
+    "draft": "Սևագիր",
+    "enabled": "Միացված",
+    "github": "GitHub",
+    "imageUnavailable": "Պատկերը հասանելի չէ։",
+    "loading": "Բեռնվում է…",
+    "loadMore": "Բեռնել ավելին",
+    "message": "Հաղորդագրություն",
+    "off": "Անջատված",
+    "organization": "Կազմակերպություն",
+    "platform": "Հարթակ",
+    "prReview": "PR-ի ստուգում",
+    "queued": "Հերթագրված",
+    "remove": "Հեռացնել",
+    "repository": "Պահոց",
+    "signOut": "Դուրս գալ",
+    "agents": "Գործակալներ",
+    "all": "Բոլորը"
   },
   "language": {
     "title": "Լեզու",
@@ -62,12 +104,10 @@
     "emailAddress": "Էլ. փոստի հասցե",
     "emailPlaceholder": "անուն@example.com",
     "continueWithEmail": "Շարունակել էլ. փոստով",
-    "continue": "Շարունակել",
     "enterCodeSentTo": "Մուտքագրիր {{email}} հասցեին ուղարկված կոդը։",
     "codeArrivalHint": "Եթե այս հասցեն համապատասխանում է պայմաններին, կոդը կստանաս մեկ րոպեի ընթացքում։",
     "verifyCode": "Ստուգել կոդը",
     "resendCode": "Կրկին ուղարկել կոդը",
-    "back": "Հետ",
     "termsPrefix": "Շարունակելով՝ դու համաձայնում ես մեր",
     "terms": "պայմաններին",
     "termsConnector": " և ",
@@ -87,15 +127,10 @@
   },
   "profile": {
     "title": "Պրոֆիլ",
-    "agents": "Գործակալներ",
-    "codeReviewer": "Կոդի ստուգիչ",
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
-    "securityAgent": "Անվտանգության գործակալ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
     "reviews": "Ստուգումներ",
-    "prReview": "PR-ի ստուգում",
     "prReviewSubtitle": "Ստուգել միավորման հարցումները բջջային սարքում",
-    "organization": "Կազմակերպություն",
     "couldNotLoadOrganization": "Չհաջողվեց բեռնել կազմակերպությունը։",
     "couldNotLoadOrganizationDescription": "Կազմակերպության և գործակալի կարգավորումները հասանելի չեն, քանի դեռ կազմակերպության տվյալները չեն բեռնվել։",
     "linkedAccounts": "Կապված հաշիվներ",
@@ -118,21 +153,18 @@
     "creditBalanceEmpty": "Ձեր կրեդիտների մնացորդը զրո է։ Այս հաշվի կրեդիտները կառավարվում են iOS հավելվածից դուրս։",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործես։",
-    "signOutConfirm": "Դուրս գալ",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",
     "deleteAccountMessage": "Ձեր հաշիվն ընդմիշտ կջնջվի, և դուք դուրս կգաք հաշվից։ Հաստատման կոդը կուղարկենք էլփոստով։",
     "deleteAccountConfirm": "Ջնջել հաշիվը",
     "accountDeleted": "Ձեր հաշիվը ջնջվել է։",
     "viewOrganization": "Դիտել կազմակերպությունը",
     "manageOrganization": "Կառավարել կազմակերպությունը",
-    "personal": "Անձնական",
     "selectAccount": "Ընտրել հաշիվ",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
     "providerEmail": "Էլ. փոստ",
     "providerTestAccount": "Թեստային հաշիվ",
-    "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
@@ -145,7 +177,6 @@
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",
     "keepScreenOnSubtitle": "Էկրանը միացված պահել, քանի դեռ նիստն աշխատում է։",
     "appearance": "Արտաքին տեսք",
-    "notifications": "Ծանուցումներ",
     "notificationsSubtitle": "Ակնթարթային ծանուցումների կարգավորումներ",
     "appearanceSystem": "Համակարգային",
     "appearanceLight": "Բաց",
@@ -161,7 +192,6 @@
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
     "pullRequestUnavailableDescription": "Այս PR-ը հնարավոր չէ բացել։ Հնարավոր է՝ այն ջնջվել է, պահոցը մասնավոր է, կամ Kilo GitHub հավելվածը տեղադրված չէ այդ պահոցում։",
-    "accessDenied": "Մուտքը մերժված է։",
     "accessDeniedDescription": "Այս միավորման հարցումը դիտելու թույլտվություն չունես։",
     "noFilesChanged": "Փոփոխված ֆայլեր չկան",
     "noFilesChangedDescription": "Այս միավորման հարցման մեջ ֆայլերի փոփոխություններ չկան։",
@@ -177,7 +207,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Չհաջողվեց բեռնել ֆայլերը։",
-      "checkConnection": "Ստուգիր ինտերնետ կապը և կրկին փորձիր։",
       "retryLoadingFiles": "Կրկին փորձել բեռնել ֆայլերը",
       "filterPlaceholder": "Ֆայլի ուղի",
       "viewedCount": "դիտված է {{total}}-ից {{viewed}}-ը",
@@ -339,7 +368,6 @@
       "couldNotLoadMore": "Չհաջողվեց բեռնել հավելյալ մեկնաբանությունները։",
       "retryLoadingMore": "Կրկին փորձել բեռնել հավելյալ մեկնաբանությունները",
       "loadMoreComments": "Բեռնել հավելյալ մեկնաբանություններ",
-      "loadMore": "Բեռնել ավելին",
       "closeReactions": "Փակել արձագանքները",
       "reactionsTitle": "Արձագանքներ",
       "addReaction": "Ավելացնել արձագանք",
@@ -352,7 +380,6 @@
       "reportUser": "Բողոքել օգտատիրոջից",
       "mute": "Խլացնել",
       "block": "Արգելափակել",
-      "somethingWentWrong": "Սխալ առաջացավ։",
       "reportSubmitted": "Բողոքն ուղարկված է։ Գրանցման համար՝ {{receiptId}}",
       "blockedUser": "{{login}}-ն արգելափակված է",
       "mutedUser": "{{login}}-ը խլացված է",
@@ -430,13 +457,11 @@
     "reviewPullRequest": "Վերանայել միավորման հարցումը",
     "headLine": "{{counts}} · վերջին կոմիտ՝ {{sha}}",
     "entry": {
-      "title": "PR-ի ստուգում",
       "eyebrow": "Բացիր միավորման հարցումը URL-ով։",
       "pastePrLink": "Տեղադրել PR-ի հղումը",
       "noRecentPrs": "Վերջերս բացված PR-եր չկան",
       "noRecentPrsDescription": "Վերևում տեղադրիր PR-ի հղումը՝ վերանայում սկսելու համար։ Հաջորդ անգամ այն կհայտնվի այստեղ։",
       "couldNotLoad": "Չհաջողվեց բեռնել։",
-      "remove": "Հեռացնել",
       "removeFromRecentsTitle": "Հեռացնե՞լ վերջերս բացվածների ցանկից",
       "removeFromRecentsMessage": "Այս միավորման հարցումը կհեռացվի վերջերս բացվածների քո ցանկից։",
       "removeRecentAccessibility": "Հեռացնել {{repo}}-ն վերջերս բացվածների ցանկից",
@@ -460,13 +485,11 @@
       "pending": "{{displayCount}} սպասման մեջ",
       "skipped": "{{displayCount}} բաց թողնված",
       "checksCount": "{{displayCount}} ստուգում",
-      "checkDetails": "ստուգման մանրամասներ",
-      "pullRequest": "միավորման հարցում"
+      "checkDetails": "ստուգման մանրամասներ"
     },
     "inbox": {
       "title": "Մուտքային",
       "recent": "Վերջինները",
-      "draft": "Սևագիր",
       "loading": "Բեռնվում է մուտքային բաժինը",
       "noReviewRequests": "Վերանայման հարցումներ չկան",
       "noReviewRequestsDescription": "Այստեղ հայտնվում են քո վերանայմանը սպասող միավորման հարցումները։ Վերևում կարող ես նաև տեղադրել ցանկացած PR-ի հղում։",
@@ -488,7 +511,6 @@
       "discardTitle": "Հրաժարվե՞լ մեկնաբանությունից",
       "discardMessage": "Սևագիրդ կկորչի։",
       "keepEditing": "Շարունակել խմբագրել",
-      "discard": "Հրաժարվել",
       "comment": "Մեկնաբանություն",
       "insertSuggestionA11y": "Տեղադրել կոդի փոփոխության առաջարկ",
       "insertSuggestion": "Տեղադրել առաջարկ",
@@ -496,12 +518,10 @@
       "suggestionsOnlyAddedLines": "Առաջարկները կիրառվում են միայն ավելացված տողերի նկատմամբ։",
       "tapDiffLineToSuggest": "Հպիր փոփոխությունների որևէ տողի՝ առաջարկներ անելու հնարավորությունը միացնելու համար։"
     },
-    "screenTitle": "PR-ի ստուգում",
     "connect": {
       "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը։",
       "checkFailedMessage": "Մուտքի կարգավիճակը հասանելի կլինի բեռնումն ավարտվելուց հետո։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
-      "title": "Միացնել GitHub-ը",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։ Կրկին միացիր՝ հեռախոսով միավորման հարցումների վերանայումը շարունակելու համար։",
       "description": "Միացրու GitHub-ի քո հաշիվը՝ հեռախոսով միավորման հարցումներ վերանայելու համար։"
     },
@@ -514,7 +534,6 @@
       "loadFailedTitle": "Չհաջողվեց բեռնել վերանայումն ուղարկելու ձևը։",
       "deletePendingTitle": "Ջնջե՞լ չուղարկված մեկնաբանությունը",
       "deletePendingMessage": "Այս մեկնաբանությունը կհեռացվի վերանայման հերթից։",
-      "delete": "Ջնջել",
       "summaryOptional": "Ամփոփում (պարտադիր չէ)",
       "pendingComment_one": "չուղարկված մեկնաբանություն",
       "pendingComment": "չուղարկված մեկնաբանություն",
@@ -539,7 +558,6 @@
     "overview": {
       "stateMerged": "Միավորված",
       "stateClosed": "Փակ",
-      "stateDraft": "Սևագիր",
       "stateOpenApproved": "Բաց · հաստատված",
       "stateOpenChangesRequested": "Բաց · պահանջված փոփոխություններ",
       "stateOpenReviewRequired": "Բաց · պարտադիր վերանայում",
@@ -572,8 +590,6 @@
       "discussion": "Քննարկում"
     },
     "fileStatus": {
-      "added": "Ավելացված",
-      "deleted": "Ջնջված",
       "modified": "Փոփոխված",
       "renamed": "Վերանվանված",
       "copied": "Պատճենված",
@@ -583,9 +599,7 @@
       "selectedTapToChange": "Ընտրված է՝ {{label}}, հպիր՝ ընտրությունը փոխելու համար",
       "tapToComment": "{{label}}, հպիր՝ մեկնաբանելու համար",
       "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։",
-      "statusAdded": "Ավելացված",
       "statusContext": "Համատեքստ",
-      "statusDeleted": "Ջնջված",
       "lineLabel": "{{status}} տող {{line}}՝ {{text}}",
       "lineLabelNoNumber": "{{status}}՝ {{text}}",
       "emptyLine": "(դատարկ)"
@@ -613,7 +627,6 @@
     }
   },
   "notifications": {
-    "title": "Ծանուցումներ",
     "liveActivities": "Ընթացիկ գործողություններ",
     "liveActivitySubtitle": "Ցուցադրել ակտիվ գործակալներին կողպված էկրանին",
     "liveUpdates": "Ընթացիկ թարմացումներ",
@@ -669,7 +682,6 @@
   },
   "tabs": {
     "home": "Սկիզբ",
-    "agents": "Գործակալներ",
     "profile": "Պրոֆիլ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -683,8 +695,7 @@
       "noInstances": "KiloClaw-ի օրինակներ չկան",
       "noInstancesDescription": "Կարգավորիր օրինակ՝ զրույց սկսելու համար։",
       "setUpKiloclaw": "Կարգավորել KiloClaw-ը",
-      "currentInstance": "{{title}}, ընթացիկ",
-      "personal": "Անձնական"
+      "currentInstance": "{{title}}, ընթացիկ"
     },
     "conversation": {
       "failedToLoad": "Չհաջողվեց բեռնել զրույցը։",
@@ -722,7 +733,6 @@
       "cancelReply": "Չեղարկել պատասխանը",
       "openInstance": "Բացել օրինակը",
       "attachFile": "Կցել ֆայլ",
-      "messagePlaceholder": "Հաղորդագրություն",
       "cancelEdit": "Չեղարկել խմբագրումը",
       "sendMessage": "Ուղարկել հաղորդագրություն"
     },
@@ -741,7 +751,6 @@
     },
     "attachment": {
       "open": "Բացել {{filename}}-ը",
-      "imageUnavailable": "Պատկերը հասանելի չէ։",
       "openFailed": "Չհաջողվեց բացել կցորդը։ Ստուգիր կապը և կրկին փորձիր։",
       "attachFailed": "Չհաջողվեց կցել ֆայլը։",
       "limit": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
@@ -771,7 +780,6 @@
       "yourMessage": "Քո հաղորդագրությունը",
       "messageFrom": "{{author}}-ի հաղորդագրությունը",
       "moreActions": "Այլ գործողություններ",
-      "message": "Հաղորդագրություն",
       "notDelivered": "Չի առաքվել",
       "edited": "(խմբագրված)",
       "image": "Պատկեր",
@@ -783,7 +791,6 @@
       "title": "Գործողություններ հաղորդագրության հետ",
       "deleteTitle": "Ջնջե՞լ հաղորդագրությունը",
       "deleteMessage": "Հաղորդագրությունը կհեռացվի զրույցից։",
-      "delete": "Ջնջել",
       "deleteFailed": "Չհաջողվեց ջնջել հաղորդագրությունը։",
       "removeReactionFailed": "Չհաջողվեց հեռացնել արձագանքը։",
       "addReactionFailed": "Չհաջողվեց ավելացնել արձագանքը։",
@@ -813,7 +820,6 @@
       "online": "Առցանց",
       "idle": "Սպասում է",
       "offline": "Անցանց",
-      "unknown": "Անհայտ",
       "loadingUser": "Բեռնվում են օգտատիրոջ տվյալները...",
       "waitingForStatus": "Սպասում ենք բոտի կարգավիճակին...",
       "offlineMessage": "Բոտն անցանց է։ Հաղորդագրությունների փոխանակումը կվերսկսվի, երբ այն կրկին միանա։"
@@ -885,7 +891,6 @@
       "destroyMessage": "KiloClaw-ի քո օրինակը և դրա բոլոր տվյալները վերջնականապես կոչնչացվեն։ Այս գործողությունը հնարավոր չէ հետարկել։",
       "destroyTitle": "Ոչնչացնել օրինակը",
       "instance": "Օրինակ",
-      "renameFailed": "Սխալ առաջացավ։",
       "couldNotCheckStatus": "Չհաջողվեց ստուգել ծառայության կարգավիճակը։",
       "dangerZone": "ՎՏԱՆԳԱՎՈՐ ԳՈՏԻ",
       "destroying": "Ոչնչացվում է…",
@@ -934,29 +939,22 @@
       "failedToLoadCommand": "Չհաջողվեց բեռնել կարգավորման հրամանը։",
       "gmailNotifications": "Gmail-ի ծանուցումներ",
       "disconnect": "Անջատել Google-ի հաշիվը",
-      "connected": "Միացված է",
       "copied": "Պատճենված",
       "copyCommand": "Պատճենել հրամանը",
       "disabled": "Անջատված",
       "disconnectConfirm": "Անջատել",
       "disconnectMessage": "Հեռացնե՞լ Google-ի հաշիվդ այս օրինակից։ Gmail-ի ծանուցումները կանջատվեն։ Անջատելուց հետո վերատեղակայիր օրինակը՝ փոփոխությունները կիրառելու համար։",
-      "disconnectTitle": "Անջատել Google-ը",
-      "enabled": "Միացված",
-      "notConnected": "Միացված չէ"
+      "disconnectTitle": "Անջատել Google-ը"
     },
     "modelList": {
       "title": "Բոլոր մոդելները",
       "searchPlaceholder": "Մոդելների որոնում…",
-      "couldNotLoad": "Չհաջողվեց բեռնել մոդելները։",
       "clearSearch": "Մաքրել որոնումը",
       "noMatches": "Որոնմանը համապատասխան մոդելներ չկան",
       "noModels": "Հասանելի մոդելներ չկան",
       "noModelsDescription": "Մոդելները հասանելի դառնալուն պես կհայտնվեն այստեղ։",
       "noResultsFor": "«{{query}}»-ի համար արդյունքներ չկան։",
       "recommended": "Առաջարկվող"
-    },
-    "model": {
-      "title": "Մոդել"
     },
     "secrets": {
       "title": "Գաղտնի տվյալներ",
@@ -973,10 +971,7 @@
       "setupGuideA11y": "{{label}}-ի կարգավորման ուղեցույց",
       "setupGuide": "կարգավորման ուղեցույց",
       "saving": "Պահպանվում է…",
-      "remove": "Հեռացնել",
       "removing": "Հեռացվում է…",
-      "connected": "Միացված է",
-      "notConnected": "Միացված չէ",
       "updateToken": "Թարմացնել մուտքի թոքենը",
       "connect": "Միացնել"
     },
@@ -1037,7 +1032,6 @@
     "list": {
       "createInstance": "Ստեղծել օրինակ",
       "organizations": "Կազմակերպություններ",
-      "personal": "Անձնական",
       "accessIssue": {
         "trialExpired": "Փորձաշրջանն ավարտվել է․ բաժանորդագրվիր՝ այս օրինակից օգտվելը շարունակելու համար",
         "subscriptionCanceled": "Բաժանորդագրությունն ակտիվ չէ․ կրկին բաժանորդագրվիր՝ այս օրինակից օգտվելը շարունակելու համար",
@@ -1061,9 +1055,7 @@
         "openKiloAi": "Բացել kilo.ai",
         "provisioning": "Ռեսուրսների տրամադրում",
         "review": "Ստուգում",
-        "somethingWentWrong": "Սխալ առաջացավ։",
         "identityTitle": "Քո բոտի կերպարը",
-        "close": "Փակել",
         "couldNotLoad": "Չհաջողվեց բեռնել սկզբնական կարգավորման վիճակը։",
         "finishingSetup": "Կարգավորումն ավարտվում է։ Մի քիչ սպասիր, մինչև ավարտենք քո հաշվի կարգավորումը։",
         "ready": "Պատրաստ",
@@ -1080,7 +1072,6 @@
         "location": "Գտնվելու վայր",
         "locationPlaceholder": "Քաղաք կամ տարածաշրջան (պարտադիր չէ)",
         "useCurrentLocation": "Օգտագործել ներկա գտնվելու վայրը",
-        "continue": "Շարունակել",
         "locationDeniedTitle": "Գտնվելու վայրին հասանելիությունը մերժված է",
         "locationDeniedMessage": "Կարգավորումներում թույլատրիր հասանելիությունը գտնվելու վայրին՝ ներկա գտնվելու վայրդ օգտագործելու համար։",
         "locationValidationFailed": "Չհաջողվեց հաստատել գտնվելու վայրը։",
@@ -1129,7 +1120,6 @@
       "gatewayProcess": "ՑԱՆՑԱՅԻՆ ԴԱՐՊԱՍԻ ԳՈՐԾԸՆԹԱՑ",
       "lastExit": "Վերջին ավարտը",
       "memory": "Հիշողություն",
-      "model": "Մոդել",
       "region": "Տարածաշրջան",
       "resources": "ՌԵՍՈՒՐՍՆԵՐ",
       "restarts": "Վերագործարկումներ",
@@ -1153,7 +1143,6 @@
       "frontierDescription": "Ամենաբարձր կատարողականությունն է։ Հարցումներն ուղղվում են տրամաբանելու ունակ առաջատար մոդելներին։",
       "balancedLabel": "Հավասարակշռված",
       "balancedDescription": "Արագությունն ու հնարավորությունները հավասարակշռված են ավելի ցածր գնով։",
-      "cost": "Արժեք",
       "performance": "Արտադրողականություն",
       "autoModelA11y": "Մոդելի ավտոմատ ընտրություն՝ {{label}}",
       "currentModel": "Ընթացիկ մոդել",
@@ -1202,7 +1191,6 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "Google-ի հաշիվ",
       "modelDescription": "Արհեստական բանականության մոդելի ընտրություն",
-      "modelLabel": "Մոդել",
       "secretsDescription": "Գաղտնագրված մուտքի տվյալներ",
       "secretsLabel": "Գաղտնի տվյալներ",
       "versionPinDescription": "Ամրագրել որոշակի տարբերակ",
@@ -1251,12 +1239,9 @@
       "placeholder": "Օրինակ՝ հետևել սխալների մշակման մեր կանոններին…"
     },
     "repos": {
-      "title": "Պահոցներ",
-      "couldNotLoad": "Չհաջողվեց բեռնել պահոցները։",
       "unavailable": "Պահոցներն անհասանելի են։ Ավարտիր Bitbucket-ի կարգավորումը kilo.ai-ում։",
       "finishSetup": "Ավարտել կարգավորումը",
       "manageAccess": "Կառավարել հասանելիությունը",
-      "allRepositories": "Բոլոր պահոցները",
       "bitbucketNoRepositoriesDescription": "Bitbucket-ի այս աշխատանքային տարածքում հասանելի պահոցներ չկան։",
       "bitbucketSetup": "Bitbucket-ի կարգավորում",
       "couldNotOpenGithubSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
@@ -1274,7 +1259,6 @@
       "roast": "Անխնա անկեղծ՝ հումորով",
       "strict": "Նշել բոլոր խնդիրները, կիրառել խիստ չափանիշներ"
     },
-    "title": "Կոդի ստուգիչ",
     "reviewDetail": {
       "title": "Ստուգում",
       "cancelTitle": "Չեղարկե՞լ ստուգումը",
@@ -1287,17 +1271,12 @@
       "couldNotLoad": "Չհաջողվեց բեռնել ստուգումը։",
       "couldNotGetLatest": "Չհաջողվեց ստանալ վերջին տվյալները։",
       "byline": "{{repo}} #{{number}} · Հեղինակ՝ {{author}}",
-      "findings": "Հայտնաբերված խնդիրներ",
       "noFindings": "Խնդիրներ չեն հայտնաբերվել։",
       "showMore": "Ցույց տալ ավելին",
-      "details": "Մանրամասներ",
       "branch": "Ճյուղ",
-      "platform": "Հարթակ",
-      "model": "Մոդել",
       "created": "Ստեղծվել է",
       "started": "Սկսվել է",
       "completed": "Ավարտված",
-      "cost": "Արժեք",
       "tokens": "Թոքեններ",
       "tokensInOut": "{{input}} մուտքային / {{output}} ելքային",
       "openPullRequest": "Բաց միավորման հարցում",
@@ -1309,7 +1288,6 @@
       "checkRun": "Ստուգման գործարկում",
       "status": "Կարգավիճակ",
       "threshold": "Շեմ",
-      "pullRequest": "միավորման հարցում",
       "transcriptWaiting": "Սպասում ենք ստուգման արձանագրությանը։",
       "transcriptEmpty": "Այս ստուգման արձանագրությունը չկա։",
       "transcriptRetry": "Չհաջողվեց բեռնել ստուգման արձանագրությունը։",
@@ -1349,13 +1327,9 @@
       "couldNotLoadProviders": "Չհաջողվեց բեռնել քո միացրած մատակարարները։ Կրկին փորձիր։",
       "connectProvider": "Մատակարարի միացում",
       "connectProviderDescription": "Միացրու GitHub-ը՝ միավորման հարցման ձեռքով ստուգում սկսելու համար։",
-      "connectGitHub": "Միացնել GitHub-ը",
-      "platform": "Հարթակ",
-      "notConnected": "Միացված չէ",
       "pullRequestUrl": "Միավորման հարցման URL",
       "instructions": "Հրահանգներ (ըստ ցանկության)",
       "instructionsPlaceholder": "Հատուկ ուշադրություն պահանջող հարցեր…",
-      "model": "Մոդել",
       "starting": "Սկսվում է ստուգումը…",
       "start": "Սկսել ստուգումը"
     },
@@ -1367,7 +1341,6 @@
     "selectRepositories": "Ընտրել պահոցներ",
     "followReviewMd": "Հետևել REVIEW.md-ին",
     "followReviewMdSubtitle": "Հետևել յուրաքանչյուր պահոցի REVIEW.md ֆայլի հրահանգներին",
-    "readOnlyDescription": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket-ը միացված չէ։ Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են այն միացնել։",
       "setupIncomplete": "Կարգավորումն անավարտ է։ Ավարտիր այն kilo.ai-ում։",
@@ -1384,7 +1357,6 @@
     "scopeList": {
       "couldNotLoad": "Չհաջողվեց բեռնել կազմակերպությունները։",
       "personalStillAvailable": "Անձնական պահոցները դեռ հասանելի են ստորև։",
-      "personal": "Անձնական",
       "personalSubtitle": "Քո սեփական պահոցները",
       "viewOnly": "Միայն դիտում"
     },
@@ -1399,15 +1371,11 @@
     "platformList": {
       "checking": "Ստուգվում է…",
       "statusUnavailable": "Կարգավիճակը հասանելի չէ",
-      "connected": "Միացված է",
-      "notConnected": "Միացված չէ",
-      "organization": "Կազմակերպություն",
       "platforms": "Հարթակներ",
       "activity": "Գործունեություն"
     },
     "providerConnect": {
       "githubApp": "GitHub հավելված",
-      "connectGitHub": "Միացնել GitHub-ը",
       "githubError": "Չհաջողվեց բացել GitHub-ի կարգավորումը։ Կրկին փորձիր։",
       "gitlabAccount": "GitLab հաշիվ",
       "connectGitLab": "Միացնել GitLab-ը",
@@ -1421,10 +1389,7 @@
       "allAreas": "Բոլոր ոլորտները",
       "customInstructions": "Անհատական հրահանգներ",
       "set": "Սահմանված է",
-      "model": "Մոդել",
       "mergeGate": "Միավորման սահմանափակում",
-      "repositories": "Պահոցներ",
-      "allRepositories": "Բոլոր պահոցները",
       "nSelected": "Ընտրված է {{displayCount}}",
       "reviewMemory": "Ստուգումների հիշողություն",
       "proposedReviewMdGuidance": "Առաջարկվող հրահանգներ REVIEW.md-ի համար"
@@ -1435,16 +1400,13 @@
       "noDecision": "Որոշում չկա",
       "noResult": "Արդյունք չկա"
     },
-    "eyebrow": "Կոդի ստուգիչ",
     "updateFailed": "Չհաջողվեց թարմացնել Կոդի ստուգիչը։",
     "configSaveFailed": "Չհաջողվեց պահպանել ստուգման կարգավորումները։",
     "status": {
       "pending": "Սպասման մեջ",
-      "queued": "Հերթագրված",
       "running": "Ընթացքում է",
       "completed": "Ավարտված",
       "failed": "Ձախողված",
-      "cancelled": "Չեղարկված",
       "interrupted": "Ընդհատված"
     },
     "reviewStyle": {
@@ -1462,42 +1424,33 @@
       "documentation": "Փաստաթղթավորում"
     },
     "gateThreshold": {
-      "off": "Անջատված",
-      "all": "Բոլորը",
-      "warning": "Նախազգուշացում",
-      "critical": "Կրիտիկական"
+      "warning": "Նախազգուշացում"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
         "description": "Կոդի ստուգիչն անջատվել է, քանի որ Kilo-ն գործող GitHub հավելվածով չի կարող մուտք գործել այս պահոց։ Թարմացրու GitHub հավելվածի տեղադրումը, ապա կրկին միացրու Կոդի ստուգիչը։",
         "recoveryLabel": "Թարմացնել GitHub հավելվածը"
       },
       "githubIpAllowList": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
-        "description": "Կոդի ստուգիչն անջատվել է, քանի որ GitHub-ի այս կազմակերպության թույլատրված IP հասցեների ցանկն արգելափակում է Kilo-ին։ Օգնության համար գրիր hi@kilocode.ai հասցեին, ապա կրկին միացրու Կոդի ստուգիչը։",
-        "recoveryLabel": "Կապվել աջակցության ծառայության հետ"
+        "description": "Կոդի ստուգիչն անջատվել է, քանի որ GitHub-ի այս կազմակերպության թույլատրված IP հասցեների ցանկն արգելափակում է Kilo-ին։ Օգնության համար գրիր hi@kilocode.ai հասցեին, ապա կրկին միացրու Կոդի ստուգիչը։"
       },
       "gitlabProjectAccessRequired": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
         "description": "Կոդի ստուգիչն անջատվել է, քանի որ Kilo-ն չի կարող GitLab-ում այս նախագծի հասանելիության թոքեն ստեղծել։ Տրամադրիր նախագծի պատասխանատուի իրավունքներ կամ միացրու նախագծի հասանելիության թոքենները, ապա կրկին միացրու Կոդի ստուգիչը։",
         "recoveryLabel": "Թարմացնել GitLab-ի ինտեգրումը"
       },
       "byokInvalidKey": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
         "description": "Կոդի ստուգիչն անջատվել է, քանի որ ընտրված BYOK API բանալին անվավեր է, չեղարկված է կամ անհրաժեշտ թույլտվություն չունի։ Թարմացրու բանալին կամ ընտրիր այլ մոդել, ապա կրկին միացրու Կոդի ստուգիչը։",
         "recoveryLabel": "Թարմացնել BYOK-ի կարգավորումները"
       },
       "selectedModelUnavailable": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
         "description": "Կոդի ստուգիչն անջատվել է, քանի որ ընտրված մոդելը հասանելի չէ ամպային գործակալի նիստերի համար։ Ընտրիր հասանելի մոդել, ապա կրկին միացրու Կոդի ստուգիչը։",
         "recoveryLabel": "Թարմացնել Կոդի ստուգչի կարգավորումները"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
-        "description": "Կոդի ստուգիչն անջատվել է, քանի որ այսօր պահոցի կլոնավորումը երեք անգամ չի ավարտվել սահմանված ժամանակում։ Օգնության համար գրիր hi@kilocode.ai հասցեին, ապա կրկին միացրու Կոդի ստուգիչը։",
-        "recoveryLabel": "Կապվել աջակցության ծառայության հետ"
-      }
+        "description": "Կոդի ստուգիչն անջատվել է, քանի որ այսօր պահոցի կլոնավորումը երեք անգամ չի ավարտվել սահմանված ժամանակում։ Օգնության համար գրիր hi@kilocode.ai հասցեին, ապա կրկին միացրու Կոդի ստուգիչը։"
+      },
+      "title": "Կոդի ստուգիչը քո միջամտության կարիքն ունի։",
+      "recoveryLabel": "Կապվել աջակցության ծառայության հետ"
     },
     "unknownError": "Անհայտ սխալ"
   },
@@ -1507,29 +1460,23 @@
       "noFiltersDescription": "Վերադարձիր խնդիրների ցանկ և նորից բացիր զտիչները։",
       "title": "Խնդիրների զտում",
       "reset": "Զրոյացնել",
-      "repository": "Պահոց",
       "status": "Կարգավիճակ",
       "severity": "Վտանգավորություն",
       "outcome": "Արդյունք",
       "slaStatus": "SLA-ի կարգավիճակ",
       "sortBy": "Դասավորման չափանիշ",
-      "allRepositories": "Բոլոր պահոցները",
-      "all": "Բոլորը",
       "statusOpen": "Բաց",
       "fixed": "Ուղղված",
       "statusIgnored": "Անտեսված",
       "statusClosed": "Փակ",
-      "severityCritical": "Կրիտիկական",
       "severityHigh": "Բարձր",
       "severityMedium": "Միջին",
       "severityLow": "Ցածր",
       "outcomeNotAnalyzed": "Չվերլուծված",
       "outcomeAnalyzing": "Վերլուծվում է",
       "outcomeFailed": "Վերլուծությունը ձախողվեց",
-      "outcomeExploitable": "Շահագործելի",
       "outcomeNotExploitable": "Շահագործելի չէ",
       "outcomeSafeToDismiss": "Անտեսելն անվտանգ է",
-      "outcomeNeedsReview": "Ստուգում է պահանջում",
       "outcomeTriageComplete": "Նախնական գնահատումն ավարտված է",
       "outcomeDismissed": "Անտեսված",
       "sortSeverityDesc": "Վտանգավորություն՝ բարձրից ցածր",
@@ -1556,7 +1503,6 @@
       "enableAutoDismiss": "Միացնել ավտոմատ մերժումը",
       "enableAutoDismissSubtitle": "Ավտոմատ մերժել այն խնդիրները, որոնք, ըստ արհեստական բանականության, հնարավոր չէ օգտագործել հարձակման համար։",
       "confidenceThreshold": "Վստահության շեմ",
-      "permissionNote": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
       "enableAutoRemediationConfirmTitle": "Միացնե՞լ ավտոմատ շտկումը",
       "enableAutoRemediationConfirmMessage": "Անվտանգության գործակալն ավտոմատ կբացի շտկման PR-եր այն խնդիրների համար, որոնք կարող են օգտագործվել հարձակման համար և համապատասխանում են շտկման պայմաններին։",
       "enable": "Միացնել",
@@ -1588,14 +1534,12 @@
       "suggestedAction": "Առաջարկվող գործողություն",
       "triageReasoning": "Նախնական գնահատման հիմնավորում",
       "exploitable": "Շահագործելի",
-      "model": "Մոդել",
       "notRecorded": "Գրանցված չէ",
       "analyzed": "Վերլուծված",
       "exploitabilityReasoning": "Հարձակման համար օգտագործելիության հիմնավորում",
       "suggestedFix": "Առաջարկվող շտկում",
       "whereFound": "Հայտնաբերման տեղեր ({{displayCount}})",
       "fullReport": "Ստեղծված ամբողջական հաշվետվություն",
-      "unknown": "Անհայտ",
       "yes": "Այո",
       "no": "Ոչ"
     },
@@ -1626,7 +1570,6 @@
       "repoSummary": "{{open}} բաց · {{critical}} կրիտիկական · {{high}} բարձր",
       "couldNotLoad": "Չհաջողվեց բեռնել կառավարման վահանակի տվյալները։",
       "filterByRepository": "Զտել ըստ պահոցի",
-      "findings": "Հայտնաբերված խնդիրներ",
       "lastSynced": "Վերջին համաժամեցումը՝ {{time}}",
       "manageRepositories": "Կառավարել պահոցները",
       "notYetSynced": "Դեռևս չի համաժամեցվել",
@@ -1686,23 +1629,19 @@
       "severityLabel": "Վտանգավորություն՝ {{severity}}",
       "package": "Փաթեթ",
       "vulnerableVersions": "Խոցելի տարբերակներ",
-      "unknown": "Անհայտ",
       "patchedVersion": "Շտկված տարբերակ",
       "noPatchAvailable": "Շտկում չկա",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Պահոց",
       "manifest": "Մանիֆեստ",
       "detected": "Հայտնաբերված",
       "updated": "Թարմացված",
-      "fixed": "Ուղղված",
       "slaDeadline": "SLA-ի վերջնաժամկետ",
       "sourceRecord": "Աղբյուրի գրառում",
       "source": "Աղբյուր",
       "sourceId": "Աղբյուրի նույնացուցիչ",
       "viewAdvisory": "Դիտել անվտանգության տեղեկագիրը GitHub-ում",
       "statusSuperseded": "Փոխարինված",
-      "statusFixed": "Ուղղված",
       "statusOpen": "Բաց",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Ուղղումն արդեն սկսվել է",
@@ -1716,25 +1655,18 @@
       "title": "Կարգավորումներ",
       "couldNotLoadSettings": "Չհաջողվեց բեռնել Անվտանգության գործակալի կարգավորումները։",
       "couldNotLoadPermissions": "Չհաջողվեց բեռնել թույլտվությունները։",
-      "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները։",
-      "securityAgent": "Անվտանգության գործակալ",
-      "enabled": "Միացված",
       "disabled": "Անջատված",
       "on": "Միացված",
-      "off": "Անջատված",
-      "allRepositories": "Բոլոր պահոցները",
       "repositoriesCount_one": "Ընտրվել է {{displayCount}} պահոց",
       "repositoriesCount": "Ընտրված է {{displayCount}} պահոց",
       "repositoriesCount_other": "Ընտրված է {{displayCount}} պահոց",
       "selectRepositories": "Ընտրել պահոցներ",
       "selectRepositoriesSubtitle": "Ընտրել, թե որ պահոցները վերահսկի Անվտանգության գործակալը",
-      "repositories": "Պահոցներ",
       "modelsAndAnalysis": "Մոդելներ և վերլուծություն",
       "analysisModeSubtitle": "{{mode}} վերլուծություն",
       "automation": "Ավտոմատացում",
       "automationAllOff": "Բոլորն անջատված են",
       "automationCount": "Միացված է 3-ից {{displayCount}}-ը",
-      "notifications": "Ծանուցումներ",
       "notificationsCount": "Միացված է 2-ից {{displayCount}}-ը",
       "slaPolicy": "SLA-ի քաղաքականություն",
       "disabledNoManage": "Անվտանգության գործակալն անջատված է։ Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են այն միացնել։",
@@ -1744,7 +1676,6 @@
     "remediation": {
       "cancellationRequested": "Չեղարկման հարցումն ուղարկված է",
       "cancelled": "Շտկումը չեղարկվել է",
-      "pullRequest": "միավորման հարցում",
       "couldNotLoad": "Չհաջողվեց բեռնել շտկման կարգավիճակը։",
       "noAnalysisTitle": "Դեռևս վերլուծություն չկա",
       "noAnalysisDescription": "Վերլուծությունը գործարկիր «Մանրամասներ» ներդիրից։",
@@ -1760,7 +1691,6 @@
       "attemptHistory": "Փորձերի պատմություն ({{displayCount}})",
       "attemptNumber": "Փորձ №{{number}}",
       "startedBy": "Սկսել է",
-      "model": "Մոդել",
       "branch": "Ճյուղ",
       "queued": "Շտկումը հերթագրված է",
       "retryQueued": "Շտկման կրկնափորձը հերթագրված է",
@@ -1769,20 +1699,17 @@
         "prOpened": "PR-ը բացված է",
         "failed": "Շտկումը ձախողվեց",
         "blocked": "Շտկումն արգելափակված է",
-        "noChangesNeeded": "Փոփոխություններ պետք չեն",
-        "cancelled": "Չեղարկված"
+        "noChangesNeeded": "Փոփոխություններ պետք չեն"
       },
       "unavailable": "Այս հայտնաբերված խնդրի համար շտկումը հասանելի չէ։"
     },
     "analysisSettings": {
       "title": "Մոդելներ և վերլուծություն",
       "couldNotLoad": "Չհաջողվեց բեռնել վերլուծության կարգավորումները։",
-      "permissionNote": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
       "depth": "Վերլուծության խորություն",
       "modeAuto": "Ավտոմատ",
       "modeShallow": "Մակերեսային",
       "modeDeep": "Խորը",
-      "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
       "triageModel": "Նախնական գնահատման մոդել",
       "analysisModel": "Վերլուծության մոդել",
       "remediationModel": "Շտկման մոդել"
@@ -1790,7 +1717,6 @@
     "sla": {
       "title": "SLA-ի քաղաքականություն",
       "couldNotLoad": "Չհաջողվեց բեռնել SLA-ի կարգավորումները։",
-      "critical": "Կրիտիկական",
       "high": "Բարձր",
       "medium": "Միջին",
       "low": "Ցածր",
@@ -1808,7 +1734,6 @@
     },
     "findingDetail": {
       "title": "Խնդիր",
-      "tabDetails": "Մանրամասներ",
       "tabAnalysis": "Վերլուծություն",
       "tabRemediation": "Շտկում",
       "notFound": "Հայտնաբերված խնդիրը չի գտնվել",
@@ -1817,7 +1742,6 @@
       "dismissA11y": "Անտեսել հայտնաբերված խնդիրը"
     },
     "findingList": {
-      "title": "Հայտնաբերված խնդիրներ",
       "couldNotLoad": "Չհաջողվեց բեռնել խնդիրները։",
       "couldNotLoadMore": "Չհաջողվեց բեռնել լրացուցիչ խնդիրներ։",
       "noMatchesTitle": "Զտիչներին համապատասխանող խնդիրներ չկան",
@@ -1827,13 +1751,8 @@
       "clearFilters": "Մաքրել զտիչները"
     },
     "scopeList": {
-      "title": "Անվտանգության գործակալ",
       "couldNotLoad": "Չհաջողվեց բեռնել կազմակերպությունները։",
-      "personal": "Անձնական",
       "personalSubtitle": "Քո սեփական պահոցները"
-    },
-    "commandRetry": {
-      "discard": "Հրաժարվել"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Շտկման PR-ը բաց է",
@@ -1853,7 +1772,6 @@
       "couldNotOpenGithub": "Չհաջողվեց բացել GitHub-ը։ Կրկին փորձիր։"
     },
     "settingsSave": {
-      "discard": "Հրաժարվել",
       "keepEditing": "Շարունակել խմբագրել",
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
@@ -1865,7 +1783,6 @@
     "auditReport": {
       "couldNotLoad": "Չհաջողվեց բեռնել աուդիտի հաշվետվությունը։",
       "events": "Իրադարձություններ",
-      "findings": "Հայտնաբերված խնդիրներ",
       "generated": "Ստեղծվել է {{generatedAt}}։",
       "noActivity": "Գրանցված գործողություններ չկան",
       "noActivityDescription": "{{start}}-ից մինչև {{end}} Kilo-ում անվտանգության խնդիրների վերաբերյալ հաշվետվության ենթակա գործողություններ չեն գրանցվել։",
@@ -1875,8 +1792,7 @@
       "title": "Աուդիտի հաշվետվություն",
       "unavailable": "Աուդիտի հաշվետվությունն անհասանելի է",
       "unavailableDescription": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են դիտել աուդիտի հաշվետվությունները։ Խնդրիր սեփականատիրոջը կամ վճարումների կառավարչին՝ քեզ հասանելիություն տրամադրել։",
-      "queryFailed": "Հաշվետվության հարցումը չավարտվեց։ Կրկին փորձիր։",
-      "checkConnection": "Ստուգիր ինտերնետ կապը և կրկին փորձիր։"
+      "queryFailed": "Հաշվետվության հարցումը չավարտվեց։ Կրկին փորձիր։"
     },
     "notifications": {
       "couldNotLoad": "Չհաջողվեց բեռնել ծանուցումների կարգավորումները։",
@@ -1885,7 +1801,6 @@
       "newFindingSection": "Ծանուցում նոր խնդրի մասին",
       "newFindingSeverityLabel": "Նոր խնդրի նվազագույն վտանգավորություն",
       "newFindingSubtitle": "Ուղարկվում է ամեն անգամ, երբ նոր խնդիր է համաժամեցվում, այդ թվում՝ առաջին համաժամեցման ժամանակ։",
-      "readOnly": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
       "slaLeadTimeAccessibility": "SLA-ի վերջնաժամկետից քանի օր առաջ նախազգուշացնել",
       "slaLeadTimeError": "Մուտքագրիր օրերի քանակը՝ 1-ից 365 ամբողջ թվով։",
       "slaLeadTimeHint": "Մուտքագրիր 1-ից 365 միջակայքի ամբողջ թիվ",
@@ -1893,22 +1808,17 @@
       "slaPersonalTitle": "Ինձ էլ. նամակ ուղարկել SLA-ի նախազգուշացումների մասին",
       "slaSection": "Ծանուցում SLA-ի նախազգուշացման մասին",
       "slaSeverityLabel": "Նվազագույն վտանգավորություն՝ SLA-ի ծանուցման համար",
-      "slaSubtitle": "Ուղարկվում է խնդիրների SLA-ի վերջնաժամկետից առաջ, դրան մոտենալիս և այն անցնելիս։",
-      "title": "Ծանուցումներ"
+      "slaSubtitle": "Ուղարկվում է խնդիրների SLA-ի վերջնաժամկետից առաջ, դրան մոտենալիս և այն անցնելիս։"
     },
     "repositories": {
-      "allRepositories": "Բոլոր պահոցները",
       "couldNotLoad": "Չհաջողվեց բեռնել պահոցների կարգավորումները։",
-      "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները։",
       "couldNotOpenGithubSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
       "githubAppSettings": "GitHub հավելվածի կարգավորումներ",
       "manageAccess": "Կառավարել GitHub հավելվածի հասանելիությունը",
       "noRepositories": "Պահոցներ չկան",
       "noRepositoriesDescription": "Kilo-ի GitHub հավելվածին տրամադրիր պահոցների հասանելիություն։",
-      "readOnly": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
       "selectAtLeastOne": "Ընտրիր առնվազն մեկ պահոց։",
-      "selectedRepositories": "Ընտրված պահոցներ",
-      "title": "Պահոցներ"
+      "selectedRepositories": "Ընտրված պահոցներ"
     },
     "scopeEntry": {
       "connectDescription": "Տեղադրիր Kilo-ի GitHub հավելվածը՝ Dependabot-ի ահազանգերն ավտոմատ համաժամեցնելու և պահոցներիդ անվտանգության խնդիրները կառավարելու համար։",
@@ -1923,7 +1833,6 @@
     },
     "queuedActionUntracked": "Այլևս հնարավոր չէ հետևել հերթագրված գործողությանը։ Թարմացրու՝ վերջին վիճակը տեսնելու համար։",
     "initialSyncAdmissionFailed": "Անվտանգության գործակալը միացվել է, բայց չհաջողվեց հերթագրել սկզբնական համաժամեցումը։ Կրկին համաժամեցրու։",
-    "title": "Անվտանգության գործակալ",
     "commands": {
       "findingAlreadyDismissed": "Խնդիրն արդեն մերժված է",
       "findingDismissed": "Խնդիրը մերժվել է",
@@ -1949,22 +1858,16 @@
       "failed": "Վերլուծությունը ձախողվեց",
       "failedTitle": "Վերլուծությունը ձախողվեց",
       "failedDescription": "Անվտանգության գործակալը չկարողացավ ավարտել վերլուծությունը։",
-      "extractionFailed": "Ստուգում է պահանջում",
-      "extractionFailedTitle": "Ստուգում է պահանջում",
       "extractionFailedDescription": "Չհաջողվեց տեխնիկական հաշվետվությունը վերածել կառուցվածքային արդյունքի։",
-      "exploitable": "Շահագործելի",
-      "exploitableTitle": "Շահագործելի",
       "exploitableDescription": "Հավելվածի կոդը կարող է կանչել խոցելի գործառույթը։",
       "notExploitable": "Անհասանելի",
       "notExploitableTitle": "Անհասանելի",
       "notExploitableDescription": "Այս պահոցում խոցելի գործառույթին հասնող կատարման ուղի չի գտնվել։",
       "unknown": "Ստուգում է պահանջում",
-      "unknownTitle": "Ստուգում է պահանջում",
       "unknownDescription": "Վերլուծությամբ չհաջողվեց հաստատել՝ արդյոք կոդից հնարավոր է հասնել խոցելի գործառույթին։",
       "safeToDismiss": "Անտեսելն անվտանգ է",
       "safeToDismissTitle": "Անտեսելն անվտանգ է",
       "safeToDismissDescription": "Նախնական գնահատմամբ հաստատվել է, որ այս խնդիրը կարելի է անվտանգ մերժել՝ առանց կոդի բազան վերլուծելու։",
-      "manualReview": "Ստուգում է պահանջում",
       "manualReviewTitle": "Ձեռքով ստուգում է պահանջում",
       "manualReviewDescription": "Նախնական գնահատմամբ այս խնդիրը նշվել է ձեռքով ստուգման համար։",
       "analysisRequired": "Վերլուծություն է պահանջվում",
@@ -1979,7 +1882,6 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Շտկվել է վերջնաժամկետից առաջ",
-      "fixed": "Ուղղված",
       "fixedOn": "Շտկվել է՝ {{date}}",
       "resolutionRecorded": "Լուծումը գրանցված է",
       "superseded": "Փոխարինված",
@@ -2001,7 +1903,6 @@
     "remediationStatus": {
       "cancellationRequested": "Չեղարկման հարցումն ուղարկված է",
       "notStarted": "Չի սկսվել",
-      "queued": "Հերթագրված",
       "starting": "Սկսվում է",
       "inProgress": "Ընթացքի մեջ է",
       "draftPrOpened": "PR-ի սևագիրը բացված է",
@@ -2009,7 +1910,6 @@
       "blocked": "Արգելափակված",
       "failed": "Ձախողված",
       "noChangesNeeded": "Փոփոխություններ պետք չեն",
-      "cancelled": "Չեղարկված",
       "originAutomaticPolicy": "Ավտոմատացման կանոն",
       "originIncludeExistingPolicy": "Առկա խնդիրները ներառելու կանոն",
       "originManual": "Ձեռքով",
@@ -2082,7 +1982,6 @@
     "sessionRow": {
       "deleteTitle": "Ջնջե՞լ նիստը",
       "deleteMessage": "Սա հնարավոր չէ հետարկել։",
-      "delete": "Ջնջել",
       "deleteSession": "Ջնջել նիստը",
       "rename": "Վերանվանել",
       "renameMessage": "Մուտքագրիր այս նիստի նոր անունը։",
@@ -2130,7 +2029,6 @@
       "title": "Նիստ",
       "copyErrorDetails": "Պատճենել սխալի մանրամասները",
       "backToSessions": "Վերադառնալ նիստերին",
-      "accessDenied": "Մուտքը մերժված է։",
       "accessDeniedDescription": "Սա դիտելու թույլտվություն չունես։",
       "couldNotLoad": "Չհաջողվեց բեռնել նիստը։",
       "failedToLoadDetails": "Չհաջողվեց բեռնել նիստի մանրամասները։",
@@ -2146,7 +2044,6 @@
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նիստը՝ {{title}}",
       "cloningSession": "Նիստը կլոնավորվում է",
-      "continue": "Շարունակել",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նիստը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նիստը։ Կրկին փորձեք։",
       "notEnoughCredits": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։ Ավելացրեք կրեդիտներ և կրկին փորձեք։",
@@ -2180,8 +2077,6 @@
     },
     "newSession": {
       "title": "Նոր աշխատաշրջան",
-      "repository": "Պահոց",
-      "connectGithub": "Միացնել GitHub-ը",
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
@@ -2209,7 +2104,6 @@
       "discardDraftTitle": "Ջնջե՞լ սևագիրը",
       "discardDraftMessage": "Ձեր հուշումը կկորչի։",
       "keepEditing": "Շարունակել խմբագրել",
-      "discard": "Հրաժարվել",
       "discardFailed": "Չհաջողվեց ջնջել սևագիրը։ Կրկին փորձեք։",
       "remoteHint": "Տեղական kilo գործընթացը կառավարելու համար ձեր համակարգչում գործարկեք `kilo remote` կամ գործող CLI նիստում՝ `/remote`։",
       "bitbucketConnected": "Bitbucket-ը միացված է",
@@ -2238,8 +2132,6 @@
       "updatedFileCount_other": "Թարմացվել է {{displayCount}} ֆայլ։"
     },
     "toolPatch": {
-      "operationAdded": "Ավելացված",
-      "operationDeleted": "Ջնջված",
       "operationUpdated": "Թարմացված"
     },
     "toolCard": {
@@ -2280,9 +2172,7 @@
       "runOn": "Գործարկման միջավայր",
       "runOnAccessibility": "Գործարկման միջավայր՝ {{label}}",
       "couldNotLoad": "Չհաջողվեց բեռնել գործընթացները",
-      "couldNotLoadDescription": "Ստուգիր ինտերնետ կապը և կրկին փորձիր։",
       "cloudAgent": "Cloud Agent",
-      "loading": "Բեռնվում է…",
       "cloudAgentDescription": "Գործարկել Kilo-ի մեկուսացված ամպային միջավայրում",
       "noCliInstances": "Միացված CLI գործընթացներ չկան",
       "noCliInstancesDescription": "Ձեր համակարգչում բացեք նախագծի պանակը և գործարկեք `kilo remote`։ Եթե Kilo CLI-ն արդեն աշխատում է, թարմացրեք այն։",
@@ -2327,7 +2217,6 @@
       "loading": "Բեռնվում է…",
       "accessibility": "Պահոց՝ {{label}}",
       "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
       "platformGitlab": "GitLab"
     },
     "messageDetails": {
@@ -2342,9 +2231,7 @@
       "roleUser": "Օգտատեր",
       "roleAssistant": "Օգնական",
       "sent": "Ուղարկվել է",
-      "model": "Մոդել",
       "costAndTokens": "Արժեք և տոկեններ",
-      "cost": "Արժեք",
       "input": "Մուտք",
       "output": "Ելք",
       "reasoning": "Մտածում",
@@ -2360,7 +2247,6 @@
       "textDisplay": "Տեքստի ցուցադրում",
       "thinking": "Մտածում է",
       "thought": "Միտք",
-      "title": "Մանրամասներ",
       "showDetails": "Ցուցադրել մանրամասները",
       "pending": "Սպասում է…",
       "running": "Կատարվում է…"
@@ -2383,7 +2269,6 @@
     "filePart": {
       "loadingImage": "Պատկերը բեռնվում է",
       "imageUnavailableRetry": "Պատկերն անհասանելի է, կրկին փորձել բեռնել",
-      "imageUnavailable": "Պատկերը հասանելի չէ։",
       "imageUnavailableWithAlt": "Պատկերն անհասանելի է՝ {{alt}}։",
       "imagePreviewUnavailableInSession": "Պատկերի նախադիտումն անհասանելի է այս նիստում։",
       "viewImage": "Դիտել պատկերը",
@@ -2476,7 +2361,6 @@
       "failure": "{{title}}։",
       "failureRetryAvailable": "{{title}}։ Կարող եք կրկին փորձել։",
       "copyToComposer": "Պատճենել մուտքագրման դաշտում",
-      "queued": "Հերթագրված",
       "queuedAccessibility": "Հաղորդագրությունը հերթում է",
       "userMessage": "Օգտատիրոջ հաղորդագրություն",
       "assistantMessage": "Օգնականի հաղորդագրություն",
@@ -2512,12 +2396,10 @@
     },
     "sessionFilter": {
       "title": "Նիստերի զտում",
-      "platform": "Հարթակ",
       "platformCloud": "Ամպային",
       "platformExtension": "Ընդլայնում",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Այլ",
       "project": "Նախագիծ"
@@ -2539,7 +2421,6 @@
       "allModels": "Բոլոր մոդելները"
     },
     "modelSelector": {
-      "model": "Մոդել",
       "provider": "Մատակարար {{id}}",
       "modelId": "Մոդել {{id}}",
       "unavailable": "Անհասանելի",
@@ -2677,8 +2558,7 @@
       "merged": "միավորված միավորման հարցում",
       "draft": "Միավորման սևագիր հարցում",
       "updating": "Թարմացվում է, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "միավորման հարցում"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Բեռնել",
@@ -2706,11 +2586,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Չհաջողվեց բեռնել քո հաշիվը։",
-    "couldNotLoadAccountDescription": "Ստուգիր ինտերնետ կապը և կրկին փորձիր։",
     "couldNotLoadPrivacy": "Չհաջողվեց բեռնել գաղտնիության ընտրանքները։",
     "couldNotLoadPrivacyDescription": "Ստուգիր սարքիդ անվտանգության կարգավորումները և կրկին փորձիր։",
     "contentReady": "Բովանդակությունը պատրաստ է",
-    "signOut": "Դուրս գալ",
     "retryLoadingAccount": "Կրկին փորձել բեռնել հաշիվը",
     "retryLoadingPrivacy": "Կրկին փորձել բեռնել գաղտնիության ընտրանքները"
   },
@@ -2736,7 +2614,6 @@
     "signOutThisDeviceTitle": "Դո՞ւրս գալ այս սարքի հաշվից",
     "signOutThisSessionTitle": "Դո՞ւրս գալ այս նիստից",
     "signOutThisSessionMessage": "{{device}} սարքը դուրս կգա հաշվից։ Այն կարող է պահպանել API-ի հասանելիությունը մինչև մեկ ժամ։",
-    "signOutConfirm": "Դուրս գալ",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործես։",
     "webBrowser": "Վեբ զննարկիչ"
   },
@@ -2758,7 +2635,6 @@
   },
   "imageViewer": {
     "close": "Փակել {{filename}}-ը",
-    "imageUnavailable": "Պատկերը հասանելի չէ։",
     "share": "Կիսվել {{filename}} ֆայլով"
   },
   "invalidRoute": {
@@ -2777,11 +2653,8 @@
     "internetRestored": "Համացանցային կապը վերականգնվել է"
   },
   "queryError": {
-    "neutralTitle": "Սխալ առաջացավ։",
     "neutralDescription": "Կրկին փորձիր։",
     "offlineTitle": "Չհաջողվեց բեռնել։",
-    "offlineDescription": "Սխալ առաջացավ։",
-    "permissionTitle": "Մուտքը մերժված է։",
     "permissionDescription": "Սա դիտելու թույլտվություն չունես։",
     "notFoundTitle": "Չի գտնվել։",
     "notFoundDescription": "Հնարավոր է՝ այս տարրը հեռացվել է կամ այլևս հասանելի չէ։",
@@ -2791,7 +2664,6 @@
   "screenHeader": {
     "openMenu": "Բացել ընտրացանկը",
     "openMenuFor": "Բացել {{title}}-ի ընտրացանկը",
-    "close": "Փակել",
     "goBack": "Վերադառնալ"
   },
   "picker": {
@@ -2823,7 +2695,6 @@
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",
-    "close": "Փակել",
     "reviewPr": "Ստուգել PR-ը",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "Նոր աշխատաշրջան",
@@ -2925,7 +2796,6 @@
     "privacyPolicyPrefix": "Ձեր տվյալների մշակումը կարգավորում է",
     "privacyPolicy": "Kilo-ի գաղտնիության քաղաքականությունը",
     "onDevice": "Սարքում",
-    "loading": "Բեռնվում է…",
     "couldNotLoadTranscription": "Չհաջողվեց բեռնել խոսքը տեքստի փոխակերպելու ձեր կարգավորումը։",
     "signInToManageTranscription": "Մուտք գործեք՝ խոսքը տեքստի առցանց փոխակերպումը կառավարելու համար։",
     "onlineTranscription": "Խոսքի առցանց փոխակերպում տեքստի",
@@ -2942,7 +2812,6 @@
     "voiceTranscriptionTitle": "Խոսքի փոխակերպում տեքստի",
     "retentionPrefix": "Պահպանման բոլոր ժամկետները, ձեր իրավունքներն ու կապի տվյալները ներկայացնում է",
     "backToConsent": "Վերադառնալ համաձայնության էջին",
-    "back": "Հետ",
     "revokeConsent": "Չեղարկել համաձայնությունը",
     "revokeConsentTitle": "Չեղարկե՞լ տվյալների փոխանցման համաձայնությունը",
     "acceptAndContinue": "Ընդունել և շարունակել",
@@ -2985,7 +2854,6 @@
     "voiceTranscriptionWho": "Մշակվում է միայն սարքում։ Եթե սարքը չի կարող խոսքը տեքստի վերածել առանց համացանցի, ձայնագրությունը փոխանցվում է Apple-ին կամ Google-ին։",
     "installAttributionPromptTitle": "Թույլատրե՞լ որոշել տեղադրման աղբյուրը",
     "installAttributionPromptMessage": "Kilo-ն Apple-ի հետագծման թույլտվությունն օգտագործում է միայն պարզելու համար, թե որ աղբյուրից եք եկել։ Ձեր հուշումներն ու զրույցները երբեք չեն օգտագործվում այդ նպատակով։",
-    "continue": "Շարունակել",
     "what": "Ի՞նչ",
     "why": "Ինչո՞ւ",
     "who": "Ո՞վ"
@@ -3007,7 +2875,6 @@
       "selectDescription": "Շարունակելու համար ձեր պրոֆիլում ընտրեք կազմակերպություն։",
       "selectOrganization": "Ընտրել կազմակերպություն",
       "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ։ Շարունակելու համար ձեր պրոֆիլում ընտրեք այլ կազմակերպություն։",
-      "accessDeniedTitle": "Մուտքը մերժված է։",
       "accessDeniedDescription": "Դուք այս կազմակերպություն մուտք գործելու իրավունք չունեք։"
     },
     "creditActivity": {
@@ -3026,7 +2893,6 @@
         "accounting_adjustment": "Հաշվապահական ճշգրտում",
         "credits_expired": "Ժամկետանց կրեդիտներ"
       },
-      "loadMore": "Բեռնել ավելին",
       "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
       "truncated": "Հասանելի են նաև կրեդիտներով նախորդ գործարքները։"
     },
@@ -3052,18 +2918,14 @@
         "paid": "Վճարված",
         "open": "Բաց",
         "void": "Չեղարկված",
-        "draft": "Սևագիր",
-        "uncollectible": "Անհավաքագրելի",
-        "unknown": "Անհայտ"
+        "uncollectible": "Անհավաքագրելի"
       },
-      "loadMore": "Բեռնել ավելին",
       "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
       "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "անուն@ընկերություն.am",
       "enableA11y": "Միացնել ցածր մնացորդի ծանուցումը",
-      "enabled": "Միացված",
       "notifyEmailsLabel": "Ծանուցումների էլփոստի հասցեներ",
       "permissionDenied": "Դուք վճարումների ծանուցումները կառավարելու թույլտվություն չունեք։",
       "separateEmailsHint": "Էլփոստի հասցեներն առանձնացրեք ստորակետերով։",
@@ -3092,7 +2954,6 @@
       "limitPerDay": "{{amount}}/օր",
       "manageA11y": "Կառավարել {{name}} անդամի կարգավորումները",
       "manageInvitationA11y": "Կառավարել {{email}}-ի հրավերը",
-      "removeConfirm": "Հեռացնել",
       "removeMember": "Հեռացնել անդամին",
       "removeMemberMessage": "Հեռացնե՞լ {{name}} անդամին այս կազմակերպությունից։",
       "revokeConfirm": "Չեղարկել",
@@ -3113,25 +2974,18 @@
       "resendInvite": "Կրկին ուղարկել հրավերը",
       "shareInviteLink": "Տարածել հրավերի հղումը"
     },
-    "permissionDenied": {
-      "back": "Հետ",
-      "title": "Մուտքը մերժված է։"
-    },
     "usageStats": {
-      "cost": "Արժեք",
       "inputTokens": "Մուտքային տոկեններ",
       "last30Days": "Վերջին 30 օր",
       "outputTokens": "Ելքային տոկեններ",
       "requests": "Հարցումներ"
     },
     "hub": {
-      "title": "Կազմակերպություն",
       "renameTitle": "Վերանվանել կազմակերպությունը",
       "renamePlaceholder": "Կազմակերպության անունը",
       "balance": "Մնացորդ",
       "organizationSeats": "Կազմակերպության տեղեր",
-      "lowBalanceBelow": "{{amount}}-ից ցածր",
-      "lowBalanceOff": "Անջատված"
+      "lowBalanceBelow": "{{amount}}-ից ցածր"
     },
     "kiloPass": {
       "activating": "Ակտիվացվում է",
@@ -3140,7 +2994,6 @@
       "creditProcessingDelayed": "Կրեդիտների մշակումը ուշանում է · ինքնաշխատ կրկնափորձ",
       "ended": "Ավարտված",
       "endsOn": "Ավարտվում է {{date}}-ին",
-      "loading": "Բեռնվում է…",
       "manageHint": "Կայքում բացում է Kilo Pass-ի կառավարման էջը։",
       "notSubscribed": "Բաժանորդագրված չէ",
       "overallocated": "Kilo Pass-ի հատկացումների քանակը գերազանցում է վճարված տեղերի քանակը",
@@ -3205,16 +3058,12 @@
   },
   "quickChat": {
     "title": "Զրույց",
-    "composer": {
-      "placeholder": "Հաղորդագրություն"
-    },
     "empty": {
       "title": "Զրույցի սկիզբ",
       "description": "Ուղարկիր հաղորդագրություն՝ մոդելի հետ զրուցելու համար։"
     },
     "working": "Աշխատում է",
     "historyRetry": "Չհաջողվեց բեռնել զրույցի պատմությունը։",
-    "catalogRetry": "Չհաջողվեց բեռնել մոդելները։",
     "sendError": "Չհաջողվեց ուղարկել հաղորդագրությունը։ Կրկին փորձիր։"
   },
   "glanceable": {

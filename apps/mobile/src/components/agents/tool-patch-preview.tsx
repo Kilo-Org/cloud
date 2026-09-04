@@ -27,8 +27,8 @@ type ToolPatchPreviewProps = {
 export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewProps>) {
   const { t } = useTranslation();
   const operationLabel = {
-    add: t('agentChat.toolPatch.operationAdded'),
-    delete: t('agentChat.toolPatch.operationDeleted'),
+    add: t('common.added'),
+    delete: t('common.deleted'),
     update: t('agentChat.toolPatch.operationUpdated'),
   } satisfies Record<ToolPatchFile['operation'], string>;
 

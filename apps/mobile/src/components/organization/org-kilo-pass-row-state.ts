@@ -141,7 +141,7 @@ export function getOrgKiloPassRowState(params: {
       };
     }
     return {
-      subtitle: i18n.t('organization.kiloPass.loading'),
+      subtitle: i18n.t('common.loading'),
       attention: false,
       action: 'none',
       actionLabel: null,

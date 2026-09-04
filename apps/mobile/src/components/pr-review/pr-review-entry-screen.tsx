@@ -116,7 +116,7 @@ export function PrReviewEntryScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('prReview.entry.remove'),
+          text: t('common.remove'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -210,7 +210,7 @@ export function PrReviewEntryScreen() {
                     }}
                     accessibilityLabel={removeLabel}
                   >
-                    <Text>{t('prReview.entry.remove')}</Text>
+                    <Text>{t('common.remove')}</Text>
                   </Button>
                 </View>
               </View>
@@ -315,7 +315,7 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('prReview.entry.title')} eyebrow={t('prReview.entry.eyebrow')} />
+      <ScreenHeader title={t('common.prReview')} eyebrow={t('prReview.entry.eyebrow')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
     </View>
   );

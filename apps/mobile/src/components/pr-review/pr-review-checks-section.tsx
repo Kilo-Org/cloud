@@ -284,7 +284,7 @@ export function PrReviewChecksSection({
           <Button
             variant="outline"
             onPress={() => {
-              void openExternalUrl(prUrl, { label: t('prReview.checks.pullRequest') });
+              void openExternalUrl(prUrl, { label: t('common.pullRequest') });
             }}
             accessibilityLabel={t('prReview.checks.viewOnGitHub')}
           >

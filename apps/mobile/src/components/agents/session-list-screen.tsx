@@ -246,7 +246,7 @@ export function AgentSessionListScreen() {
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('tabs.agents')}
+          title={t('common.agents')}
           eyebrow={
             !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
               ? t('agents.liveCount', { count: activeSessions.length })

@@ -127,7 +127,7 @@ export function PrReviewOverview({
         <EmptyState
           refreshControl={refreshControl}
           icon={GitPullRequest}
-          title={t('prReview.accessDenied')}
+          title={t('common.accessDenied')}
           description={t('prReview.accessDeniedDescription')}
         />
       );

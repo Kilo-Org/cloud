@@ -171,7 +171,7 @@ export function SessionHistoryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('tabs.agents')}
+        title={t('common.agents')}
         className="pb-2"
         showBackButton
         headerRight={

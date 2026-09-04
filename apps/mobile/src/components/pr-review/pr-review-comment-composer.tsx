@@ -244,7 +244,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
         { text: t('prReview.composer.keepEditing'), style: 'cancel' },
         {
-          text: t('prReview.composer.discard'),
+          text: t('common.discard'),
           style: 'destructive',
           onPress: () => {
             if (draftUserId) {

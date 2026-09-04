@@ -225,9 +225,9 @@ export function OrganizationCreditActivityScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('organization.creditActivity.loadMore')}
+              accessibilityLabel={t('common.loadMore')}
             >
-              <Text>{t('organization.creditActivity.loadMore')}</Text>
+              <Text>{t('common.loadMore')}</Text>
             </Button>
           </View>
         )}

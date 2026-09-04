@@ -21,7 +21,7 @@ type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 type PrStateChipLabelKey =
   | 'prReview.overview.stateMerged'
   | 'prReview.overview.stateClosed'
-  | 'prReview.overview.stateDraft'
+  | 'common.draft'
   | 'prReview.overview.stateOpenApproved'
   | 'prReview.overview.stateOpenChangesRequested'
   | 'prReview.overview.stateOpenReviewRequired'
@@ -45,7 +45,7 @@ export function describePrState(args: {
     return { labelKey: 'prReview.overview.stateClosed', tone: 'muted', icon: GitPullRequest };
   }
   if (args.draft) {
-    return { labelKey: 'prReview.overview.stateDraft', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.draft', tone: 'muted', icon: GitPullRequest };
   }
   // state === 'open'
   if (args.reviewDecision === 'APPROVED') {

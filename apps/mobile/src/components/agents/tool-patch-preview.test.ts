@@ -101,9 +101,9 @@ describe('ToolPatchPreview', () => {
     const update = makeFile({ path: 'src/b.ts', operation: 'update' });
     const del = makeFile({ path: 'src/c.ts', operation: 'delete' });
     const root = rootElement(render(makeModel({ files: [add, update, del] })));
-    expect(findText(root, 'agentChat.toolPatch.operationAdded')).toHaveLength(1);
+    expect(findText(root, 'common.added')).toHaveLength(1);
     expect(findText(root, 'agentChat.toolPatch.operationUpdated')).toHaveLength(1);
-    expect(findText(root, 'agentChat.toolPatch.operationDeleted')).toHaveLength(1);
+    expect(findText(root, 'common.deleted')).toHaveLength(1);
   });
 
   it('renders a DiffLine for every model line', () => {
@@ -154,7 +154,7 @@ describe('ToolPatchPreview', () => {
     const del = makeFile({ path: 'src/gone.ts', operation: 'delete', lines: [] });
     const root = rootElement(render(makeModel({ files: [del] })));
     expect(findText(root, 'src/gone.ts')).toHaveLength(1);
-    expect(findText(root, 'agentChat.toolPatch.operationDeleted')).toHaveLength(1);
+    expect(findText(root, 'common.deleted')).toHaveLength(1);
     expect(findByType(root, 'DiffLine')).toHaveLength(0);
   });
 

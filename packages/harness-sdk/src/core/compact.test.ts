@@ -1,5 +1,6 @@
 import { Chunk, Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
+import { ModelError } from './model.js';
 import { textIn } from './prompt.js';
 import { catalogWindowed, options, recordingStore, runWith, texts } from './session-fixture.js';
 
@@ -171,4 +172,38 @@ it('stops charging the old prompt size against the new one', async () => {
   /* Three questions and one summariser. A second summariser would mean the
      session compacted on a number that no longer described it. */
   expect(calls).toHaveLength(4);
+});
+
+it('leaves the session alone when the summary call fails, and tries again', async () => {
+  /* A summariser that cannot answer must not take the conversation with it.
+     The question fails, the turns stand as they were, and the next question
+     tries to compact again — the session is still too full not to. */
+  const { value, calls } = await runWith({
+    replies: [
+      full,
+      { deltas: [], fail: new ModelError({ reason: 'transport', cause: 'the socket died' }) },
+      { deltas: ['the notes'] },
+      { deltas: ['after'] },
+    ],
+    catalog: catalogWindowed(window),
+    use: session =>
+      Effect.zipRight(
+        Effect.zipRight(
+          Stream.runDrain(session.ask('one')),
+          Effect.either(Stream.runDrain(session.ask('two')))
+        ),
+        Effect.zipRight(Stream.runDrain(session.ask('three')), session.history)
+      ),
+  });
+
+  /* Four calls: the question, the summary that failed, the summary that did
+     not, and the question that followed it. */
+  expect(calls).toHaveLength(4);
+  expect(texts(value)).toEqual([
+    'user:one',
+    'assistant:answered',
+    'user:',
+    'user:three',
+    'assistant:after',
+  ]);
 });

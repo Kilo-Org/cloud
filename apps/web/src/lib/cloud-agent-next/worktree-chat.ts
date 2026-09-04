@@ -152,7 +152,7 @@ export async function createWorktreeChat({
   }
 
   const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
-    headers: headersList,
+    headers: headersList ?? new Headers(),
     organizationId,
     tokenSource: 'cloud-agent',
   });

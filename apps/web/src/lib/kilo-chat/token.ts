@@ -16,8 +16,11 @@ import type { KiloChatTokenResponse } from './token-schema';
 
 const KILO_CHAT_TOKEN_TTL_SECONDS = 60 * 60;
 
-export async function createKiloChatTokenResponse(user: User): Promise<KiloChatTokenResponse> {
-  const authority = await getResourceDelegationAuthority(user);
+export async function createKiloChatTokenResponse(
+  user: User,
+  headersList: Headers = new Headers()
+): Promise<KiloChatTokenResponse> {
+  const authority = await getResourceDelegationAuthority(user, { headers: headersList });
   if (authority.credentialKind !== 'human-api' && authority.credentialKind !== 'device-access') {
     throw new Error('Kilo Chat requires a fresh user credential');
   }

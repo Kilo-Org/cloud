@@ -3,6 +3,7 @@ import { generateApiToken } from '@/lib/tokens';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
+  isSharedResourceTokenIssuanceEnabled: jest.fn(() => false),
 }));
 
 const mockRows: unknown[] = [];

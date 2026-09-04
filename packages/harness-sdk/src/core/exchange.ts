@@ -27,21 +27,26 @@ const remember = (wiring: Wiring, turn: Turn): Effect.Effect<void> =>
 /**
  * What is collected while the reply streams, to become the assistant's turn.
  *
- * One record rather than a ref per field. Copying the other three on every
- * token costs 0.054 us against 0.402 for the update alone, measured
- * 2026-09-04 over 200000 rounds, which is a third of a percent of the 18.1 us
- * a token costs through the whole session. `finish` reads it once.
+ * One record rather than a ref per field. Copying the other on every token
+ * costs 0.054 us against 0.402 for the update alone, measured 2026-09-04 over
+ * 200000 rounds, which is a third of a percent of the 18.1 us a token costs
+ * through the whole session. `finish` reads it once.
  */
 interface Spoken {
   readonly text: string;
-  readonly reasoning: string;
-  /** Empty when the shape issues none, or when the model did not think. */
-  readonly signature: string;
-  /** Thinking the provider encrypted, in the order it arrived. */
-  readonly redacted: readonly string[];
+  /**
+   * The thinking, in the order it arrived, encrypted blocks among the rest.
+   *
+   * It is a list and not a pair of fields because the provider refuses a turn
+   * whose thinking blocks do not come back in the order it produced them. A
+   * model that has part of its reasoning redacted returns thinking, then an
+   * encrypted block, then more thinking; holding the words in one field and
+   * the encrypted blocks in another loses which came first.
+   */
+  readonly thought: readonly PartDraft[];
 }
 
-const nothingSaid: Spoken = { text: '', reasoning: '', signature: '', redacted: [] };
+const nothingSaid: Spoken = { text: '', thought: [] };
 
 interface Exchange {
   readonly question: Turn;
@@ -53,34 +58,18 @@ interface Exchange {
 }
 
 /**
- * The reasoning comes first, in the order the model produced it. It is kept
- * whenever there is a signature, even with no words: a provider that returns
+ * The thinking comes first, in the order the model produced it, and the answer
+ * last. A reasoning block is kept even with no words: a provider that returns
  * the thinking as a summary defaults to no summary at all, so the block is
  * empty and still has to go back exactly as it came.
  *
  * The text part is always there: an answer of no words is still an answer, and
  * a turn with no text would shorten the prompt that follows.
- *
- * ponytail: one reasoning part per turn. A model interleaves thinking with tool
- * calls, so several blocks per turn arrive once this package has tools, and
- * each needs its own signature. Give the wire the block boundary then.
  */
-const partsSaid = (spoken: Spoken): readonly PartDraft[] => {
-  const answer: PartDraft = { kind: 'text', body: spoken.text };
-  const hidden = spoken.redacted.map((data): PartDraft => ({ kind: 'redacted', body: data }));
-  if (spoken.reasoning === '' && spoken.signature === '') {
-    return [...hidden, answer];
-  }
-  return [
-    ...hidden,
-    {
-      kind: 'reasoning',
-      body: spoken.reasoning,
-      ...(spoken.signature === '' ? {} : { signature: spoken.signature }),
-    },
-    answer,
-  ];
-};
+const partsSaid = (spoken: Spoken): readonly PartDraft[] => [
+  ...spoken.thought,
+  { kind: 'text', body: spoken.text },
+];
 
 /**
  * Writes the whole exchange and adds this call's counts to the session's. The
@@ -113,18 +102,31 @@ const finish = (
   );
 
 /**
- * Collects one thinking event. The text and the signature arrive on separate
- * events, so each is kept where it belongs.
+ * Collects one thinking event into the block it belongs to.
+ *
+ * The words and the signature arrive on separate events, so both land on the
+ * block still open. A block stays open until something else arrives: an
+ * encrypted block closes it, and the next thinking event opens a new one.
+ *
+ * ponytail: a signature closes nothing here, so two signed blocks in a row
+ * merge into one. A model only produces those between tool calls, which this
+ * package does not have yet. Split on the signature when it does.
  */
 const thinking = (
   spoken: Ref.Ref<Spoken>,
   event: Extract<ModelEvent, { kind: 'reasoning' }>
 ): Effect.Effect<void> =>
-  Ref.update(spoken, held => ({
-    ...held,
-    reasoning: held.reasoning + event.text,
-    ...(event.signature === undefined ? {} : { signature: event.signature }),
-  }));
+  Ref.update(spoken, held => {
+    const open = held.thought.at(-1);
+    const sealed = event.signature ?? (open?.kind === 'reasoning' ? open.signature : undefined);
+    const grown: PartDraft = {
+      kind: 'reasoning',
+      body: (open?.kind === 'reasoning' ? open.body : '') + event.text,
+      ...(sealed === undefined ? {} : { signature: sealed }),
+    };
+    const before = open?.kind === 'reasoning' ? held.thought.slice(0, -1) : held.thought;
+    return { ...held, thought: [...before, grown] };
+  });
 
 /**
  * Takes the question back out when no answer came.
@@ -159,9 +161,11 @@ const exchangeFor = (
 const said = (spoken: Ref.Ref<Spoken>, text: string): Effect.Effect<void> =>
   Ref.update(spoken, held => ({ ...held, text: held.text + text }));
 
-/** One block of thinking the provider encrypted, kept in the order it arrived. */
-const hidden = (spoken: Ref.Ref<Spoken>, data: string): Effect.Effect<void> =>
-  Ref.update(spoken, held => ({ ...held, redacted: [...held.redacted, data] }));
+/** One block of thinking the provider encrypted, kept where it arrived. */
+const hidden = (spoken: Ref.Ref<Spoken>, data: string): Effect.Effect<void> => {
+  const block: PartDraft = { kind: 'redacted', body: data };
+  return Ref.update(spoken, held => ({ ...held, thought: [...held.thought, block] }));
+};
 
 export type { Exchange, Spoken };
 export { exchangeFor, finish, hidden, remember, rollback, said, thinking };

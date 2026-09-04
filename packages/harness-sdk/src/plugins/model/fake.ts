@@ -29,6 +29,12 @@ interface FakeReply {
   readonly redacted?: readonly string[];
   /** Never reaches `done`, so a test can interrupt the stream part way. */
   readonly stall?: boolean;
+  /**
+   * The events to stream, in this order, instead of the fields above. It is
+   * how a test scripts an order the fields cannot express, such as thinking
+   * that is interrupted by a block the provider encrypted.
+   */
+  readonly events?: readonly ModelEvent[];
 }
 
 /**
@@ -46,14 +52,16 @@ const fakeModel = (
 
   const stream = (request: ModelRequest): Stream.Stream<ModelEvent, ModelError> => {
     const reply = nextReply(request);
-    const deltas = Stream.fromIterable([
-      ...(reply.redacted ?? []).map((data): ModelEvent => ({ kind: 'redacted', data })),
-      ...(reply.reasoning ?? []).map((text): ModelEvent => ({ kind: 'reasoning', text })),
-      ...(reply.signature === undefined
-        ? []
-        : [{ kind: 'reasoning', text: '', signature: reply.signature } as ModelEvent]),
-      ...reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text })),
-    ]);
+    const deltas = Stream.fromIterable(
+      reply.events ?? [
+        ...(reply.redacted ?? []).map((data): ModelEvent => ({ kind: 'redacted', data })),
+        ...(reply.reasoning ?? []).map((text): ModelEvent => ({ kind: 'reasoning', text })),
+        ...(reply.signature === undefined
+          ? []
+          : [{ kind: 'reasoning', text: '', signature: reply.signature } as ModelEvent]),
+        ...reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text })),
+      ]
+    );
     const done = Stream.succeed<ModelEvent>({
       kind: 'done',
       usage: { ...zeroUsage, ...reply.usage },

@@ -30,13 +30,7 @@ const layers = [
 ] as const;
 
 /** What a caller opens, continues, or reads a session with. */
-const functions = [
-  'openSession',
-  'continueSession',
-  'cloneSession',
-  'hitRatio',
-  'textOf',
-] as const;
+const functions = ['openSession', 'continueSession', 'cloneSession', 'hitRatio', 'textOf'] as const;
 
 const tags = [
   'ModelClient',

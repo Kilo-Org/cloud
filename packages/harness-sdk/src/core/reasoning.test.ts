@@ -109,3 +109,46 @@ it('keeps thinking the provider encrypted, and hands it back byte for byte', asy
     { kind: 'text', text: 'said' },
   ]);
 });
+
+it('keeps an encrypted block where it arrived, between the thinking around it', async () => {
+  /* The provider refuses a turn whose thinking blocks do not come back in the
+     order it produced them, and an encrypted block is one of those blocks. A
+     model that has part of its reasoning redacted returns thinking, then the
+     encrypted block, then more thinking. Collecting the words in one field and
+     the encrypted blocks in another loses which came first, and the next
+     request is rejected for rearranging what the model said. */
+  const { value, calls } = await run(
+    [
+      {
+        deltas: [],
+        events: [
+          { kind: 'reasoning', text: 'before' },
+          { kind: 'reasoning', text: '', signature: 'sig_one' },
+          { kind: 'redacted', data: 'ENCRYPTED' },
+          { kind: 'reasoning', text: 'after' },
+          { kind: 'reasoning', text: '', signature: 'sig_two' },
+          { kind: 'delta', text: 'said' },
+        ],
+      },
+      { deltas: ['next'] },
+    ],
+    session =>
+      Effect.zipRight(
+        Effect.zipRight(Stream.runDrain(session.ask('why')), Stream.runDrain(session.ask('and'))),
+        session.history
+      )
+  );
+
+  expect(value[1]?.parts).toMatchObject([
+    { kind: 'reasoning', body: 'before', signature: 'sig_one' },
+    { kind: 'redacted', body: 'ENCRYPTED' },
+    { kind: 'reasoning', body: 'after', signature: 'sig_two' },
+    { kind: 'text', body: 'said' },
+  ]);
+  expect(calls[1]?.prompt.messages[1]?.parts).toEqual([
+    { kind: 'reasoning', text: 'before', signature: 'sig_one' },
+    { kind: 'redacted', data: 'ENCRYPTED' },
+    { kind: 'reasoning', text: 'after', signature: 'sig_two' },
+    { kind: 'text', text: 'said' },
+  ]);
+});

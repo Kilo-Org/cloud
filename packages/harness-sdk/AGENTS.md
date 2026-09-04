@@ -643,7 +643,19 @@ no signature is left out of the prompt: it would only be refused.
 showed.** It arrives whole at the start of the block, carries no signature and
 no words, and has a part kind of its own so that nothing renders its bytes as
 text. It goes back byte for byte. Only the Anthropic shape produces one, and
-only for flagged content, so no live run has ever seen one.
+only for flagged content, so no live run has ever seen one. Anthropic documents
+no string that triggers one either — checked on 2026-09-04 against the thinking
+and extended thinking pages — so do not spend time looking for a live case.
+
+**The thinking blocks go back in the order the model made them.** Anthropic's
+thinking page: within the latest assistant message the sequence of consecutive
+thinking blocks must match what the model generated, and it may not be
+rearranged, edited, or partly dropped. An encrypted block counts as one of
+them, so a turn whose reasoning was redacted part way through is thinking, then
+the encrypted block, then more thinking. `Spoken` therefore holds one ordered
+list and not a string of words beside a list of encrypted blocks — the two
+fields could not say which came first, and this package emitted every encrypted
+block ahead of every word until 2026-09-04.
 
 **An empty thinking block is still a block.** A provider returns thinking as a
 summary and defaults to no summary at all, so `thinking` is `''` while the model

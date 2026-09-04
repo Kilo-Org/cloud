@@ -27,6 +27,11 @@ type TurnPart =
        */
       readonly signature?: string;
     }
+  /**
+   * Thinking the provider encrypted rather than showed. `body` is its opaque
+   * bytes, not words: it is a kind of its own so nothing renders it as text.
+   */
+  | { readonly id: string; readonly kind: 'redacted'; readonly body: string }
   | {
       readonly id: string;
       readonly kind: 'image';
@@ -40,6 +45,7 @@ type PartDraft =
   | { readonly kind: 'text'; readonly body: string }
   | { readonly kind: 'summary'; readonly body: string }
   | { readonly kind: 'reasoning'; readonly body: string; readonly signature?: string }
+  | { readonly kind: 'redacted'; readonly body: string }
   | { readonly kind: 'image'; readonly body: string; readonly media: string };
 
 /**
@@ -99,6 +105,9 @@ const draftOf = (part: TurnPart): PartDraft => {
     }
     case 'summary': {
       return { kind: 'summary', body: part.body };
+    }
+    case 'redacted': {
+      return { kind: 'redacted', body: part.body };
     }
     case 'text': {
       return { kind: 'text', body: part.body };

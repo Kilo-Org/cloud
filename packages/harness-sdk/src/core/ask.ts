@@ -60,6 +60,8 @@ interface Spoken {
   readonly reasoning: Ref.Ref<string>;
   /** Empty when the shape issues none, or when the model did not think. */
   readonly signature: Ref.Ref<string>;
+  /** Thinking the provider encrypted, in the order it arrived. */
+  readonly redacted: Ref.Ref<readonly string[]>;
 }
 
 /** One question and the answer it is waiting for. */
@@ -76,6 +78,7 @@ interface Exchange {
 interface Thought {
   readonly body: string;
   readonly signature: string;
+  readonly redacted: readonly string[];
 }
 
 /**
@@ -93,10 +96,12 @@ interface Thought {
  */
 const partsSaid = (said: string, thought: Thought): readonly PartDraft[] => {
   const answer: PartDraft = { kind: 'text', body: said };
+  const hidden = thought.redacted.map((data): PartDraft => ({ kind: 'redacted', body: data }));
   if (thought.body === '' && thought.signature === '') {
-    return [answer];
+    return [...hidden, answer];
   }
   return [
+    ...hidden,
     {
       kind: 'reasoning',
       body: thought.body,
@@ -120,12 +125,13 @@ const finish = (
     said: Ref.get(exchange.spoken.text),
     body: Ref.get(exchange.spoken.reasoning),
     signature: Ref.get(exchange.spoken.signature),
+    redacted: Ref.get(exchange.spoken.redacted),
   }).pipe(
-    Effect.flatMap(({ said, body, signature }) =>
+    Effect.flatMap(({ said, ...thought }) =>
       makeTurn(wiring.entropy, {
         sessionId: wiring.id,
         role: 'assistant',
-        parts: partsSaid(said, { body, signature }),
+        parts: partsSaid(said, thought),
       })
     ),
     Effect.tap(answer => remember(wiring, answer)),
@@ -183,6 +189,7 @@ const exchangeFor = (
       text: Ref.make(''),
       reasoning: Ref.make(''),
       signature: Ref.make(''),
+      redacted: Ref.make<readonly string[]>([]),
     }),
     answered: Ref.make(false),
   });
@@ -228,6 +235,9 @@ const answerOf = (
             }
             case 'reasoning': {
               return thinking(exchange.spoken, event);
+            }
+            case 'redacted': {
+              return Ref.update(exchange.spoken.redacted, held => [...held, event.data]);
             }
             case 'done': {
               return finish(wiring, exchange, event.usage);

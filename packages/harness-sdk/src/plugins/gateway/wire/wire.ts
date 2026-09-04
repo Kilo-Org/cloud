@@ -5,12 +5,15 @@ import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../
  *
  * A signature arrives on its own event, after the thinking and with no text,
  * because that is how a provider streams it.
+ *
+ * `redacted` is thinking the provider encrypted rather than showed. It has no
+ * text at all, and it is a kind of its own so that nothing can render its bytes
+ * as words by mistake.
  */
-interface WirePart {
-  readonly kind: 'delta' | 'reasoning';
-  readonly text: string;
-  readonly signature?: string;
-}
+type WirePart =
+  | { readonly kind: 'delta'; readonly text: string }
+  | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
+  | { readonly kind: 'redacted'; readonly data: string };
 
 /**
  * One gateway shape. A wire maps a request onto a body and maps the reply back.

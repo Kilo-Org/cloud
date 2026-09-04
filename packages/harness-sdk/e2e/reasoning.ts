@@ -3,16 +3,23 @@
  *
  * The unit tests prove the block survives the round trip through this package.
  * They cannot prove the provider agrees, and the provider is the only judge:
- * it signs a thinking block and refuses one whose signature it cannot read.
+ * it seals the thinking and refuses a seal it cannot read.
  *
- * So the run asks a reasoning model two questions in one session. The second
- * request carries the first answer's thinking block. If the block were wrong —
- * a signature this package dropped, text this package edited, a block put in
- * the wrong place — the second call would fail, not answer differently.
+ * Each shape seals it differently, so each is run on its own:
+ *
+ * - `messages` signs a thinking block, and the signature travels with it.
+ * - `responses` hands back a reasoning item holding its own encrypted copy,
+ *   which the request has to ask for with `include`.
+ * - `chat_completions` has no replay at all, so it is only checked for still
+ *   carrying the conversation.
+ *
+ * Two questions in one session. The second request carries the first answer's
+ * thinking. If the seal were wrong — dropped, edited, put in the wrong place —
+ * the second call would fail, not answer differently.
  */
 import assert from 'node:assert/strict';
 import { Effect, Layer, Stream } from 'effect';
-import type { ModelUsage } from '../src/core/model.js';
+import type { ApiKind } from '../src/core/catalog.js';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/wiring.js';
@@ -26,22 +33,38 @@ import { kiloToken, nodeFetch } from './node-fetch.js';
 
 const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
 const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
-/** A model that thinks. A model that does not would pass this run vacuously. */
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-sonnet-4.5';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
 
-/** Two questions that are worth thinking about, and that follow on. */
+/** Two questions worth thinking about, where the second follows on from the first. */
 const first = 'A farmer has 17 sheep. All but 9 run away. How many are left? Explain in one line.';
 const second = 'Now double that number and tell me the result.';
+
+/**
+ * A model that thinks, per shape. One that does not would pass this run
+ * vacuously, which is why the run fails when no thinking arrives.
+ */
+const shapes: readonly {
+  readonly kind: ApiKind;
+  readonly model: string;
+  /** Whether this shape hands back something that lets the thinking be replayed. */
+  readonly seals: boolean;
+}[] = [
+  { kind: 'messages', model: 'anthropic/claude-sonnet-4.5', seals: true },
+  { kind: 'responses', model: 'anthropic/claude-sonnet-4.5', seals: true },
+  /* The thinking arrives here too, but with nothing to prove it is the
+     model's own, so it is kept for the reader and never replayed. */
+  { kind: 'chat_completions', model: 'anthropic/claude-sonnet-4.5', seals: false },
+];
 
 interface Answer {
   readonly said: string;
   readonly thought: string;
-  readonly usage: ModelUsage | undefined;
+  /** What the request carried. A replayed block shows up here and nowhere else. */
+  readonly input: number;
 }
 
-const empty: Answer = { said: '', thought: '', usage: undefined };
+const empty: Answer = { said: '', thought: '', input: 0 };
 
 const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(session.ask(text, { maxTokens: 4000 }), empty, (held, event) => {
@@ -53,71 +76,82 @@ const ask = (session: SessionHandle, text: string) =>
         return { ...held, thought: held.thought + event.text };
       }
       case 'done': {
-        return { ...held, usage: event.usage };
+        return { ...held, input: event.usage.inputTokens + event.usage.cacheReadTokens };
+      }
+      case 'redacted': {
+        return held;
       }
     }
   });
 
-const catalog = layerTableCatalog({}, { apiKinds: ['messages'] });
-const layers = Layer.mergeAll(
-  layerAssembler,
-  layerWebCrypto,
-  catalog,
-  layerKiloGateway({
-    baseUrl,
-    org: { kind: 'organization', id: organizationId },
-    fetch: nodeFetch,
-  }).pipe(
-    Layer.provide(Layer.mergeAll(catalog, layerStaticToken(await kiloToken()), layerBackoff()))
-  )
-);
+const token = await kiloToken();
 
-const program = Effect.gen(function* () {
-  const session = yield* openSession({ system, model, effort: 'medium' });
-  const one = yield* ask(session, first);
-  const two = yield* ask(session, second);
-  return { one, two, history: yield* session.history };
-});
+const runShape = async (kind: ApiKind, model: string) => {
+  const catalog = layerTableCatalog({}, { apiKinds: [kind] });
+  const layers = Layer.mergeAll(
+    layerAssembler,
+    layerWebCrypto,
+    catalog,
+    layerKiloGateway({
+      baseUrl,
+      org: { kind: 'organization', id: organizationId },
+      fetch: nodeFetch,
+    }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
+  );
 
-const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
+  const program = Effect.gen(function* () {
+    const session = yield* openSession({ system, model, effort: 'medium' });
+    const one = yield* ask(session, first);
+    const two = yield* ask(session, second);
+    return { one, two, history: yield* session.history };
+  });
 
-const turns = [...result.history];
+  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+};
+
 const reasoningOf = (turn: Turn | undefined) =>
   turn?.parts.filter(part => part.kind === 'reasoning') ?? [];
-const stored = reasoningOf(turns[1]);
-const signature = stored[0]?.signature;
 
-console.log('model         ', model);
-console.log('first answer  ', JSON.stringify(result.one.said.slice(0, 60)));
-console.log('first thinking', result.one.thought.length, 'characters');
-console.log('reasoning part', stored.length, 'stored');
-console.log(
-  'signature     ',
-  signature === undefined ? 'none' : `${String(signature.length)} characters`
-);
-console.log('second answer ', JSON.stringify(result.two.said.slice(0, 60)));
-console.log('second usage  ', result.two.usage);
+console.log('shape             model                        thought  seal   input  answered');
 
 const failures: string[] = [];
 
-if (result.one.thought.length === 0 && signature === undefined) {
-  failures.push(
-    'the model produced no thinking at all, so this run proves nothing; pick a model that ' +
-      'thinks, or raise the effort'
+for (const { kind, model, seals } of shapes) {
+  const result = await runShape(kind, model);
+  if (result._tag === 'Left') {
+    console.log(`${kind.padEnd(18)}${model.padEnd(29)}FAILED ${JSON.stringify(result.left)}`);
+    failures.push(`${kind}: the call failed`);
+    continue;
+  }
+
+  const { one, two, history } = result.right;
+  const stored = reasoningOf([...history][1]);
+  const seal = stored[0]?.signature;
+  const thought = one.thought.length > 0 || seal !== undefined;
+
+  console.log(
+    `${kind.padEnd(18)}${model.padEnd(29)}${String(thought).padEnd(9)}` +
+      `${(seal === undefined ? 'none' : String(seal.length)).padEnd(7)}` +
+      `${String(two.input).padEnd(7)}` +
+      JSON.stringify(two.said.slice(0, 24))
   );
-}
-if (stored.length !== 1) {
-  failures.push(`the answer kept ${String(stored.length)} reasoning parts, and it must keep one`);
-}
-if (signature === undefined) {
-  failures.push(
-    'the stored thinking carries no signature, so it can never be replayed and the provider ' +
-      'would refuse it'
-  );
-}
-if (result.two.said.length === 0) {
-  failures.push('the second call carried the thinking back and produced no answer');
+
+  if (seals && !thought) {
+    failures.push(`${kind}: the model produced no thinking, so this shape proves nothing`);
+  }
+  if (seals && stored.length !== 1) {
+    failures.push(`${kind}: the answer kept ${String(stored.length)} reasoning parts, not one`);
+  }
+  if (seals && seal === undefined) {
+    failures.push(
+      `${kind}: the stored thinking carries no seal, so it can never be replayed and the ` +
+        'provider would refuse it'
+    );
+  }
+  if (two.said.length === 0) {
+    failures.push(`${kind}: the second call carried the thinking back and produced no answer`);
+  }
 }
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
-console.log('\nPASS: the provider took its own thinking back and answered on top of it.');
+console.log('\nPASS: every shape took its own thinking back and answered on top of it.');

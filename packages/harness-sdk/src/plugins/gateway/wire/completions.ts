@@ -60,7 +60,8 @@ const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined 
         ? { type: 'image_url', image_url, cache_control: ephemeral }
         : { type: 'image_url', image_url };
     }
-    case 'reasoning': {
+    case 'reasoning':
+    case 'redacted': {
       return undefined;
     }
   }

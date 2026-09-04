@@ -178,6 +178,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
 | One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `models` |
+| Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
 unit tests: parallel workers compete for the CPU being measured. Its ceilings
@@ -349,13 +350,23 @@ Measured on 2026-09-04 with `anthropic/claude-sonnet-4.5` at `medium` effort:
 363 characters of thinking, one reasoning part stored, a 792 character
 signature, and a second answer that built on the first.
 
-Checked by reversing the signature before sending it:
+Checked on the messages shape by reversing the signature before sending it:
 
     400 messages.1.content.0: Invalid `signature` in `thinking` block
 
-So the provider does validate it, and a pass means the block went back intact.
-Pick a model that thinks when changing `KILO_MODEL` — one that does not would
-pass this run vacuously, which is why the run fails when no thinking arrives.
+So that shape does validate it, and a pass means the block went back intact.
+
+**The responses shape carries no such proof.** Reversing its
+`encrypted_content` changes nothing: the call succeeds and the answer is right.
+So the item is built to the published shape and is sent, and nothing observable
+says the provider reads it. Treat that replay as unverified.
+
+Pick a model that thinks. One that does not would pass this run vacuously,
+which is why the run fails when a sealing shape reports no thinking.
+
+`pnpm test:e2e:probe <shape> <model>` prints the raw frames of one call. It
+asserts nothing; it exists so a question about the wire is answered by reading
+the wire. It is how the `response.reasoning.delta` name was found.
 
 ### A session that outgrows its window
 
@@ -546,17 +557,42 @@ refuses a block whose signature it cannot read, so `TurnPart` carries an opaque
 its own event, after the thinking and with no text on it. A reasoning part with
 no signature is left out of the prompt: it would only be refused.
 
+**A `redacted_thinking` block is thinking the provider encrypted rather than
+showed.** It arrives whole at the start of the block, carries no signature and
+no words, and has a part kind of its own so that nothing renders its bytes as
+text. It goes back byte for byte. Only the Anthropic shape produces one, and
+only for flagged content, so no live run has ever seen one.
+
 **An empty thinking block is still a block.** A provider returns thinking as a
 summary and defaults to no summary at all, so `thinking` is `''` while the model
 thought and was billed. The part is kept whenever there is a signature, never on
 whether there are words. Dropping empty ones would drop every block on the
 default setting.
 
-Only the messages shape replays. The responses shape replays thinking as an
-encrypted reasoning item the request has to ask for, and the chat shape has no
-replay at all, so both leave reasoning out. The three shapes also name the
-thinking field differently, and two providers relayed through the chat shape
-disagree with each other, so each is read on its own terms.
+**Each shape seals the thinking its own way, and the seal is opaque.**
+`signature` holds whatever the shape needs to hand the thinking back, and only
+that shape knows what is in it:
+
+| Shape | What it seals with | Replays |
+|---|---|---|
+| `messages` | the signature Anthropic issues with the block | yes |
+| `responses` | `{id, encrypted_content}` of the reasoning item, as JSON | yes |
+| `chat_completions` | nothing it will take back | no |
+
+A session's model is frozen and its shape follows from the model, so a seal
+made by one shape is never read by another.
+
+The responses shape does not carry thinking inside a message. It is an item
+beside the message, holding the provider's own encrypted copy, and the request
+has to ask for it with `include: ['reasoning.encrypted_content']`. The summary
+is replayed empty, which is how the item arrives: a summary this package wrote
+instead of the provider would be a change to what the provider sealed.
+
+**The gateway sends the reasoning under different names again.** Measured
+2026-09-04: the responses shape relays Anthropic's thinking as
+`response.reasoning.delta`, not the documented `response.reasoning_summary_text
+.delta`, so both are read. Two providers relayed through the chat shape name it
+`reasoning` and `reasoning_content`, so both are read there.
 
 ponytail: one reasoning part per turn. A model interleaves thinking with tool
 calls, so several blocks arrive per turn once this package has tools, and each

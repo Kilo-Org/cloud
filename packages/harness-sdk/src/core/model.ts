@@ -73,6 +73,8 @@ class ModelError extends Data.TaggedError('harness/ModelError')<{
 type ModelEvent =
   | { readonly kind: 'delta'; readonly text: string }
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
+  /** Thinking the provider encrypted. There is nothing here to show a reader. */
+  | { readonly kind: 'redacted'; readonly data: string }
   | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
 
 const zeroUsage: ModelUsage = {

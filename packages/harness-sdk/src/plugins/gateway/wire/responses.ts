@@ -1,7 +1,7 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
-import type { PromptPart } from '../../../core/prompt.js';
+import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
 import type { Wire, WirePart } from './wire.js';
 import type { TokenCount } from './usage.js';
@@ -17,9 +17,8 @@ type ResponsesBody = OpenAI.Responses.ResponseCreateParams;
  * This shape has no cache breakpoint, so a part carries no mark. An image goes
  * as a data URI, which is the only way this shape takes bytes.
  *
- * Reasoning is left out. This shape replays thinking as a reasoning item with
- * the provider's encrypted content, which the request has to ask for and which
- * this package does not read, so there is nothing here that could be sent back.
+ * Thinking is not message content here. It is an item beside the message, so it
+ * is rendered by `itemsOf` rather than by this.
  */
 const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent | undefined => {
   switch (part.kind) {
@@ -29,10 +28,64 @@ const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent | u
     case 'image': {
       return { type: 'input_image', image_url: dataUri(part), detail: 'auto' };
     }
+    /* A block the provider encrypted belongs to the Anthropic shape. This one
+       encrypts the whole reasoning item instead, and the two are not the same
+       bytes, so there is nothing here to hand back. */
+    case 'redacted':
     case 'reasoning': {
       return undefined;
     }
   }
+};
+
+/**
+ * What this shape hides inside a signature: the item's identifier and the
+ * provider's encrypted copy of the reasoning.
+ *
+ * A signature is opaque to the package and means only what the shape that made
+ * it says it means. This one is not a signature at all; it is the two fields
+ * this shape needs to hand a reasoning item back.
+ */
+interface ReasoningSeal {
+  readonly id: string;
+  readonly encrypted_content: string;
+}
+
+const assertSeal = createAssert<ReasoningSeal>();
+
+/**
+ * The reasoning item to send back, or nothing when there is none to send.
+ *
+ * A malformed seal throws, which the caller turns into a failed call. It cannot
+ * be repaired and sending the item without it would be refused anyway.
+ */
+const reasoningItem = (part: PromptPart): OpenAI.Responses.ResponseReasoningItem | undefined => {
+  if (part.kind !== 'reasoning' || part.signature === undefined) {
+    return undefined;
+  }
+  const seal = assertSeal(JSON.parse(part.signature));
+  return {
+    type: 'reasoning',
+    id: seal.id,
+    encrypted_content: seal.encrypted_content,
+    /* Empty because that is how the item arrived. The encrypted copy is the
+       authoritative one, and a summary this package wrote instead of the
+       provider is a change to a block the provider signed. */
+    summary: [],
+  };
+};
+
+/**
+ * One message, as the items this shape takes.
+ *
+ * The reasoning goes first, as its own item, which is the order the model
+ * produced it in and the order this shape reports it in. A message with nothing
+ * but reasoning produces no message item at all: an empty one is refused.
+ */
+const itemsOf = (message: PromptMessage): OpenAI.Responses.ResponseInputItem[] => {
+  const thinking = message.parts.map(reasoningItem).filter(item => item !== undefined);
+  const content = message.parts.map(renderPart).filter(part => part !== undefined);
+  return content.length === 0 ? thinking : [...thinking, { role: message.role, content }];
 };
 
 const toBody = ({
@@ -47,12 +100,13 @@ const toBody = ({
   max_output_tokens: maxTokens,
   stream,
   ...(effort === undefined ? {} : { reasoning: { effort } }),
+  /* Without this the provider keeps the reasoning and hands back only an
+     identifier, which is no use to a package that stores the session itself. */
+  include: ['reasoning.encrypted_content'],
+  store: false,
   instructions: prompt.system.map(part => part.text).join('\n'),
   ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
-  input: prompt.messages.map(message => ({
-    role: message.role,
-    content: message.parts.map(renderPart).filter(part => part !== undefined),
-  })),
+  input: prompt.messages.flatMap(itemsOf),
 });
 
 interface Counts {
@@ -110,10 +164,25 @@ interface EndEvent {
   response: { status?: string | null; incomplete_details?: { reason?: string | null } | null };
 }
 
-/** This shape streams the thinking as a summary, under a name of its own. */
+/**
+ * This shape streams the thinking under a name of its own, and under two of
+ * them: `reasoning_summary_text` when the provider returns a summary, and
+ * `reasoning` when it returns the thinking itself. The kilo gateway relays
+ * Anthropic through this shape and sends the second.
+ */
 interface ReasoningEvent {
-  type: 'response.reasoning_summary_text.delta';
+  type: 'response.reasoning_summary_text.delta' | 'response.reasoning.delta';
   delta: string;
+}
+
+/**
+ * The finished reasoning item, which is where the encrypted copy arrives. The
+ * summary streamed in pieces before it; this closes the block, the way a
+ * signature does on the Anthropic shape.
+ */
+interface ReasoningDoneEvent {
+  type: 'response.output_item.done';
+  item: { type: 'reasoning'; id: string; encrypted_content: string };
 }
 
 const assertReply = createAssert<Reply>();
@@ -121,6 +190,7 @@ const isDelta = createIs<DeltaEvent>();
 const isCompleted = createIs<CompletedEvent>();
 const isEnd = createIs<EndEvent>();
 const isReasoning = createIs<ReasoningEvent>();
+const isReasoningDone = createIs<ReasoningDoneEvent>();
 
 /** The cached count is reported inside the input total, so it is subtracted out. */
 const readUsage = (usage: Counts): Partial<ModelUsage> => {
@@ -154,7 +224,17 @@ const toDelta = (event: unknown): WirePart | undefined => {
   if (isDelta(event)) {
     return { kind: 'delta', text: event.delta };
   }
-  return isReasoning(event) ? { kind: 'reasoning', text: event.delta } : undefined;
+  if (isReasoning(event)) {
+    return { kind: 'reasoning', text: event.delta };
+  }
+  if (!isReasoningDone(event)) {
+    return undefined;
+  }
+  const seal: ReasoningSeal = {
+    id: event.item.id,
+    encrypted_content: event.item.encrypted_content,
+  };
+  return { kind: 'reasoning', text: '', signature: JSON.stringify(seal) };
 };
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>

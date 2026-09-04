@@ -22,6 +22,7 @@ interface PromptBlock {
 type PromptPart =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
+  | { readonly kind: 'redacted'; readonly data: string }
   | { readonly kind: 'image'; readonly media: string; readonly data: string };
 
 /** `cache` marks the breakpoint, which belongs to the message, not to a part. */

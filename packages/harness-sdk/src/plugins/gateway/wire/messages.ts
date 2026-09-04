@@ -10,7 +10,8 @@ import { type Counts, set, type TokenCount } from './usage.js';
 type ContentBlock =
   | Anthropic.TextBlockParam
   | Anthropic.ImageBlockParam
-  | Anthropic.ThinkingBlockParam;
+  | Anthropic.ThinkingBlockParam
+  | Anthropic.RedactedThinkingBlockParam;
 type MessagesBody = Anthropic.MessageCreateParams;
 type MediaType = Anthropic.Base64ImageSource['media_type'];
 
@@ -54,6 +55,11 @@ const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined 
       /* Without a signature the provider refuses the block, so it is left out
          rather than sent and rejected. */
       return part.signature === undefined ? undefined : thinkingBlock(part.text, part.signature);
+    }
+    case 'redacted': {
+      /* Already encrypted by the provider, so it needs no signature and must
+         go back byte for byte. */
+      return { type: 'redacted_thinking', data: part.data };
     }
   }
 };
@@ -131,6 +137,14 @@ interface SignatureEvent {
   delta: { signature: string };
 }
 
+/**
+ * Thinking the provider encrypted. Unlike a thinking block it arrives whole, at
+ * the start of the block, and there is nothing to accumulate.
+ */
+interface RedactedEvent {
+  content_block: { type: 'redacted_thinking'; data: string };
+}
+
 interface UsageEvent {
   usage: WireUsage;
 }
@@ -150,6 +164,7 @@ const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isThinking = createIs<ThinkingEvent>();
 const isSignature = createIs<SignatureEvent>();
+const isRedacted = createIs<RedactedEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 const isStart = createIs<StartEvent>();
@@ -175,9 +190,10 @@ const toDelta = (event: unknown): WirePart | undefined => {
   if (isThinking(event)) {
     return { kind: 'reasoning', text: event.delta.thinking };
   }
-  return isSignature(event)
-    ? { kind: 'reasoning', text: '', signature: event.delta.signature }
-    : undefined;
+  if (isSignature(event)) {
+    return { kind: 'reasoning', text: '', signature: event.delta.signature };
+  }
+  return isRedacted(event) ? { kind: 'redacted', data: event.content_block.data } : undefined;
 };
 
 const readUsage = (usage: WireUsage): Partial<ModelUsage> => {

@@ -25,6 +25,8 @@ interface FakeReply {
   readonly signature?: string;
   /** Why the model stopped. A scripted answer finished unless it says so. */
   readonly stop?: StopReason;
+  /** Thinking the provider encrypted, streamed whole, ahead of the deltas. */
+  readonly redacted?: readonly string[];
   /** Never reaches `done`, so a test can interrupt the stream part way. */
   readonly stall?: boolean;
 }
@@ -45,6 +47,7 @@ const fakeModel = (
   const stream = (request: ModelRequest): Stream.Stream<ModelEvent, ModelError> => {
     const reply = nextReply(request);
     const deltas = Stream.fromIterable([
+      ...(reply.redacted ?? []).map((data): ModelEvent => ({ kind: 'redacted', data })),
       ...(reply.reasoning ?? []).map((text): ModelEvent => ({ kind: 'reasoning', text })),
       ...(reply.signature === undefined
         ? []

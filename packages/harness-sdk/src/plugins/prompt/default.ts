@@ -26,6 +26,9 @@ const renderPart = (part: TurnPart): readonly PromptPart[] => {
     case 'image': {
       return [{ kind: 'image', media: part.media, data: part.body }];
     }
+    case 'redacted': {
+      return [{ kind: 'redacted', data: part.body }];
+    }
     case 'reasoning': {
       return [
         {

@@ -15,10 +15,11 @@
   },
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",
-    "check": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm test && pnpm test:perf && pnpm build",
+    "check": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm check:migrations && pnpm test && pnpm test:perf && pnpm build",
+    "check:migrations": "ttsx --project scripts/tsconfig.json scripts/check-migrations.ts",
     "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v -e '\\.test\\.ts$' -e '\\-fixture\\.ts$'",
     "lint": "pnpm -w exec oxlint --config packages/harness-sdk/.oxlintrc.json packages/harness-sdk/src",
-    "migrations": "drizzle-kit generate && ttsx --project scripts/tsconfig.json scripts/inline-migrations.ts",
+    "migrations": "drizzle-kit generate && ttsx --project scripts/tsconfig.json scripts/inline-migrations.ts && pnpm -w exec oxfmt packages/harness-sdk/src/plugins/store/migrations.ts",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "ttsx e2e/live.ts",
     "test:e2e:cancel": "ttsx e2e/cancel.ts",

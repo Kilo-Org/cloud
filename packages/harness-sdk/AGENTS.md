@@ -525,6 +525,12 @@ migration and a query can never disagree about a column. Run `pnpm migrations`
 after editing the schema: it calls drizzle-kit and then inlines the SQL into
 `src/plugins/store/migrations.ts`.
 
+`pnpm check:migrations` regenerates them and fails when anything moves, so the
+schema, the SQL and the inlined copy can never drift apart unnoticed. It is part
+of `pnpm check`. That check is the price of inlining, and it is why inlining is
+allowed. `pnpm migrations` formats what it writes, so generating twice produces
+the same bytes.
+
 **Migrations are inlined, never read from disk.** React Native has no filesystem
 to read them from, and Drizzle's answer there is a Babel plugin, which a package
 must not force on the people who install it. The applied version lives in

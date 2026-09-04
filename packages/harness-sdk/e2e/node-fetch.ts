@@ -25,13 +25,14 @@ export const nodeFetch: FetchLike = async (url, request) => {
        leave a cancelled call still running on the provider. */
     signal: (request.signal ?? null) as AbortSignal | null,
   });
+  /* Named once, so the narrowing holds inside the closure and the body needs
+     no second cast. */
+  const body = response.body;
   return {
     ok: response.ok,
     status: response.status,
     text: () => response.text(),
-    ...(response.body === null
-      ? {}
-      : { stream: () => decode(response.body as ReadableStream<Uint8Array>) }),
+    ...(body === null ? {} : { stream: () => decode(body) }),
   };
 };
 

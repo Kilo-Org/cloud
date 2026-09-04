@@ -48,7 +48,10 @@ const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
 const SETUP_COMMAND_HARD_TIMEOUT_MS = 300_000;
 const workspacePreparations = new Map<string, Promise<ControlHandlerResult | undefined>>();
 
-export type AttachPreparingEmitter = (event: PreparingEventDataV2) => void;
+export type AttachPreparingEmitter = (
+  event: PreparingEventDataV2,
+  options?: { retained?: true }
+) => void;
 
 export type ApplyAttachDeps = {
   onDiagnostic?: ControlDiagnosticReporter;

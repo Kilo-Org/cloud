@@ -241,6 +241,7 @@ describe('createSessionMessageRecord', () => {
         lastActivityAt: 20,
         wrapperInstanceId: 'runtime',
         terminalAt: 30,
+        terminalSource: 'wrapper_outcome',
       },
     ]);
   });

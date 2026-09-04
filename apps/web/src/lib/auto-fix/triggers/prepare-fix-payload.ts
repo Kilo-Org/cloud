@@ -52,6 +52,7 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
 
     // 3. Generate auth token for cloud agent with bot identifier
     const authToken = generateCloudAgentWorkflowToken(user, {
+      organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'auto-fix',
       botId: 'auto-fix',
       expiresIn: TOKEN_EXPIRY.default,

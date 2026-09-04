@@ -6,6 +6,7 @@
     "moduleResolution": "bundler",
     "types": [
       "@types/node",
+      "@cloudflare/workers-types",
       "./worker-configuration.d.ts",
       "@cloudflare/vitest-pool-workers/types"
     ],

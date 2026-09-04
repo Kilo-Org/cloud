@@ -18,7 +18,7 @@ describe('security analysis token issuance', () => {
   it('preserves legacy tokens while shared resource tokens are disabled', async () => {
     const [control, triage, session] = await Promise.all([
       generateControlToken(user, secret, 'production', false),
-      generateTriageToken(user, secret, 'production', undefined),
+      generateTriageToken(user, secret, 'production', undefined, 'organization-1'),
       generateInternalServiceToken(user.id, secret, 'false'),
     ]);
 
@@ -32,6 +32,7 @@ describe('security analysis token issuance', () => {
     expect(decodeJwt(control)).not.toHaveProperty('aud');
     expect(decodeJwt(control)).not.toHaveProperty('organizationId');
     expect(decodeJwt(triage)).not.toHaveProperty('aud');
+    expect(decodeJwt(triage)).not.toHaveProperty('organizationId');
     expect(decodeJwt(session)).not.toHaveProperty('aud');
     expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
   });
@@ -79,6 +80,19 @@ describe('security analysis token issuance', () => {
 
     expect(decodeJwt(control)).toMatchObject({ organizationId });
     expect(decodeJwt(control)).not.toMatchObject({
+      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
+  });
+
+  it('includes only the requested organization in modern triage assertions', async () => {
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const triage = await generateTriageToken(user, secret, 'production', true, organizationId);
+
+    expect(decodeJwt(triage)).toMatchObject({
+      aud: 'kilo-gateway',
+      organizationId,
+    });
+    expect(decodeJwt(triage)).not.toMatchObject({
       organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     });
   });

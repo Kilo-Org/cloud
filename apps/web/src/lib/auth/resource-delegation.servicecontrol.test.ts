@@ -8,10 +8,31 @@ jest.mock('@/lib/config.server', () => ({
 }));
 jest.mock('@/lib/user/server', () => ({ getUserFromSessionForCredentialIssuance: jest.fn() }));
 
-import { generateCloudAgentWorkflowToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, generateWorkflowGatewayToken } from '@/lib/tokens';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
 describe('workflow service control tokens', () => {
+  test('uses bounded modern gateway workflow owner claims', () => {
+    const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
+    const token = generateWorkflowGatewayToken(user, {
+      organizationId: 'organization-id',
+      tokenSource: 'reviewer',
+    });
+    const claims = jwt.verify(token, 'service-control-test-secret') as jwt.JwtPayload;
+
+    expect(claims).toMatchObject({
+      aud: 'kilo-gateway',
+      kiloUserId: user.id,
+      apiTokenPepper: 'workflow-pepper',
+      organizationId: 'organization-id',
+      tokenSource: 'reviewer',
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+    expect(claims).not.toHaveProperty('runtimeAdmission');
+    expect(claims.exp! - claims.iat!).toBe(60 * 60);
+  });
+
   test('uses bounded modern automation admission', () => {
     const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
     const token = generateCloudAgentWorkflowToken(user, {

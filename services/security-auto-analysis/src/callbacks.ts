@@ -483,7 +483,8 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         actor,
         nextAuthSecret,
         params.env.ENVIRONMENT,
-        params.env.SHARED_RESOURCE_TOKENS_ENABLED
+        params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+        finding.owned_by_organization_id ?? undefined
       );
       return runSandboxExtraction({
         finding,

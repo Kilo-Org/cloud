@@ -94,7 +94,8 @@ export async function generateTriageToken(
   user: TokenUser,
   secret: string,
   environment: string,
-  sharedResourceTokensEnabled: string | boolean | undefined
+  sharedResourceTokensEnabled: string | boolean | undefined,
+  organizationId?: string
 ): Promise<string> {
   if (!isSharedResourceTokensEnabled(sharedResourceTokensEnabled)) {
     return generateControlToken(user, secret, environment, false);
@@ -112,6 +113,7 @@ export async function generateTriageToken(
     extra: {
       internalApiUse: true,
       createdOnPlatform: 'security-agent',
+      organizationId,
     },
   });
   return token;

@@ -84,6 +84,7 @@ describe('analysis lifecycle push emit wiring', () => {
       ignored_reason: null,
       analysis_status: 'running',
       analysis: { triggeredByUserId: 'user-1' },
+      owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     } as never);
     vi.mocked(getActiveAnalysisAttemptToken).mockResolvedValue(ATTEMPT_TOKEN);
     vi.mocked(getAnalysisActorById).mockResolvedValue({
@@ -125,6 +126,17 @@ describe('analysis lifecycle push emit wiring', () => {
         },
       })
     ).resolves.toEqual({ status: 'completed-finalized' });
+
+    expect(generateTriageToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
+      'nextauth-secret',
+      'development',
+      undefined,
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    );
+    expect(extractSandboxAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+    );
 
     expect(dispatchSecurityLifecycleEventForFinding).toHaveBeenCalledWith({
       env,

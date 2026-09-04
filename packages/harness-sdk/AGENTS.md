@@ -525,6 +525,25 @@ works and simply cannot stop a call early.
 The package declares only the part of a signal it hands on, so an adapter names
 the type its own runtime has. `e2e/node-fetch.ts` shows the one line.
 
+### An exchange is written whole, or not at all
+
+The question is added to the session in memory when it is asked, because the
+prompt needs it. The **store** hears about the question and the answer together,
+in one call, when the stream reaches `done`.
+
+If no answer arrives — the caller walked away, the transport failed, the store
+refused the write — the question is taken back out again. A transcript that ends
+on an unanswered question sends it again with every later request: the caller
+pays for it each time, and the model may answer it late, on top of whatever was
+asked next. Seen live before the fix, after a cancelled question:
+
+    asked again    "ok\n\n1\n2\n3\n4\n5\n6\n7"
+
+Rolling back is a `Ref.set` to the session as it stood, which is safe because
+one session answers one question at a time and nothing else can have touched it.
+`SessionStore.append` takes a list for the same reason: two calls would leave a
+question committed without its answer if the second failed.
+
 ### A reloaded turn must equal the turn that was written
 
 The prompt prefix is rebuilt from the store. If `load` returns a turn that

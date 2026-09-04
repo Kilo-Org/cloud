@@ -165,24 +165,33 @@ const migrate = async (driver: SqlDriver): Promise<void> => {
 
 type Db = ReturnType<typeof drizzle>;
 
+/** One part, as its row. */
+const partRow = (turn: Turn, part: TurnPart) => ({
+  id: part.id,
+  turnId: turn.id,
+  sessionId: turn.sessionId,
+  kind: part.kind,
+  body: part.body,
+  ...(part.kind === 'image' ? { media: part.media } : {}),
+});
+
 /**
- * Writes the turn and its parts as one unit. A turn whose parts went missing
- * would read back as an empty message and quietly shorten the prompt.
+ * Writes the turns and their parts as one unit. A turn whose parts went missing
+ * would read back as an empty message and quietly shorten the prompt, and a
+ * question written without its answer would go back out with every later
+ * request.
  */
-const insertTurn = (db: Db, driver: SqlDriver, turn: Turn): Promise<void> =>
+const insertTurns = (db: Db, driver: SqlDriver, written: readonly Turn[]): Promise<void> =>
   transact(driver, async () => {
-    await db.insert(turns).values({ id: turn.id, sessionId: turn.sessionId, role: turn.role });
-    if (turn.parts.length > 0) {
-      await db.insert(parts).values(
-        turn.parts.map(part => ({
-          id: part.id,
-          turnId: turn.id,
-          sessionId: turn.sessionId,
-          kind: part.kind,
-          body: part.body,
-          ...(part.kind === 'image' ? { media: part.media } : {}),
-        }))
-      );
+    if (written.length === 0) {
+      return;
+    }
+    await db
+      .insert(turns)
+      .values(written.map(turn => ({ id: turn.id, sessionId: turn.sessionId, role: turn.role })));
+    const rows = written.flatMap(turn => turn.parts.map(part => partRow(turn, part)));
+    if (rows.length > 0) {
+      await db.insert(parts).values(rows);
     }
   });
 
@@ -226,7 +235,7 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
         return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
       }),
 
-    append: turn => attempt('append', () => insertTurn(db, driver, turn)),
+    append: written => attempt('append', () => insertTurns(db, driver, written)),
 
     load: sessionId => attempt('load', () => selectTurns(db, sessionId)),
 

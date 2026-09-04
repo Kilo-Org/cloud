@@ -20,6 +20,8 @@ interface FakeReply {
   readonly reasoning?: readonly string[];
   readonly usage?: Partial<ModelUsage>;
   readonly fail?: ModelError;
+  /** Never reaches `done`, so a test can interrupt the stream part way. */
+  readonly stall?: boolean;
 }
 
 /**
@@ -45,6 +47,9 @@ const fakeModel = (
       kind: 'done',
       usage: { ...zeroUsage, ...reply.usage },
     });
+    if (reply.stall === true) {
+      return Stream.concat(deltas, Stream.never);
+    }
     return reply.fail === undefined
       ? Stream.concat(deltas, done)
       : Stream.concat(deltas, Stream.fail(reply.fail));

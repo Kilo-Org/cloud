@@ -81,15 +81,12 @@ const copyTurns = (
   into: { readonly sessionId: string; readonly source: readonly Turn[] }
 ): Effect.Effect<readonly Turn[], StoreError> =>
   Effect.forEach(into.source, turn =>
-    Effect.tap(
-      makeTurn(entropy, {
-        sessionId: into.sessionId,
-        role: turn.role,
-        parts: turn.parts.map(draftOf),
-      }),
-      copy => store.append(copy)
-    )
-  );
+    makeTurn(entropy, {
+      sessionId: into.sessionId,
+      role: turn.role,
+      parts: turn.parts.map(draftOf),
+    })
+  ).pipe(Effect.tap(copies => store.append(copies)));
 
 /**
  * Opens a new session holding a copy of another session's turns.

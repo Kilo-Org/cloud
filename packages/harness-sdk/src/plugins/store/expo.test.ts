@@ -53,18 +53,22 @@ it('carries a session and its turns through the Expo shape', async () => {
   const read = await use(database, store =>
     Effect.gen(function* () {
       yield* store.create(session);
-      yield* store.append({
-        id: 'trn_1',
-        sessionId: 'ses_1',
-        role: 'user',
-        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-      });
-      yield* store.append({
-        id: 'trn_2',
-        sessionId: 'ses_1',
-        role: 'assistant',
-        parts: [{ id: `prt_${String('hi')}`, kind: 'text', body: 'hi' }],
-      });
+      yield* store.append([
+        {
+          id: 'trn_1',
+          sessionId: 'ses_1',
+          role: 'user',
+          parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+        },
+      ]);
+      yield* store.append([
+        {
+          id: 'trn_2',
+          sessionId: 'ses_1',
+          role: 'assistant',
+          parts: [{ id: `prt_${String('hi')}`, kind: 'text', body: 'hi' }],
+        },
+      ]);
       return { options: yield* store.read('ses_1'), turns: yield* store.load('ses_1') };
     })
   );
@@ -78,12 +82,14 @@ it('finalizes every statement it prepares, including the one that failed', async
 
   const failed = await use(database, store =>
     Effect.flip(
-      store.append({
-        id: 'trn_1',
-        sessionId: 'ses_missing',
-        role: 'user',
-        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-      })
+      store.append([
+        {
+          id: 'trn_1',
+          sessionId: 'ses_missing',
+          role: 'user',
+          parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+        },
+      ])
     )
   );
 

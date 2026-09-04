@@ -34,18 +34,20 @@ it('reads the turns back in the order they were appended', async () => {
     Effect.gen(function* () {
       yield* store.create(session);
       for (const [index, role] of (['user', 'assistant', 'user'] as const).entries()) {
-        yield* store.append({
-          id: `trn_${String(index)}`,
-          sessionId: session.id,
-          role,
-          parts: [
-            {
-              id: `prt_${String(`message ${String(index)}`)}`,
-              kind: 'text',
-              body: `message ${String(index)}`,
-            },
-          ],
-        });
+        yield* store.append([
+          {
+            id: `trn_${String(index)}`,
+            sessionId: session.id,
+            role,
+            parts: [
+              {
+                id: `prt_${String(`message ${String(index)}`)}`,
+                kind: 'text',
+                body: `message ${String(index)}`,
+              },
+            ],
+          },
+        ]);
       }
       return yield* store.load(session.id);
     })
@@ -80,12 +82,14 @@ it('answers with nothing for a session it has never heard of', async () => {
 it('refuses a turn whose session was never created', async () => {
   const failed = await use(database(), store =>
     store
-      .append({
-        id: 'trn_1',
-        sessionId: 'ses_missing',
-        role: 'user',
-        parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
-      })
+      .append([
+        {
+          id: 'trn_1',
+          sessionId: 'ses_missing',
+          role: 'user',
+          parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+        },
+      ])
       .pipe(Effect.flip)
   );
 
@@ -97,7 +101,7 @@ it('refuses a row the schema cannot explain rather than handing it back', async 
   await use(db, store =>
     Effect.zipRight(
       store.create(session),
-      store.append({ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] })
+      store.append([{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }])
     )
   );
   db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?)').run(
@@ -123,18 +127,22 @@ it('keeps two sessions apart', async () => {
     Effect.gen(function* () {
       yield* store.create(session);
       yield* store.create({ ...session, id: 'ses_2' });
-      yield* store.append({
-        id: 'trn_1',
-        sessionId: 'ses_1',
-        role: 'user',
-        parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
-      });
-      yield* store.append({
-        id: 'trn_2',
-        sessionId: 'ses_2',
-        role: 'user',
-        parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
-      });
+      yield* store.append([
+        {
+          id: 'trn_1',
+          sessionId: 'ses_1',
+          role: 'user',
+          parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
+        },
+      ]);
+      yield* store.append([
+        {
+          id: 'trn_2',
+          sessionId: 'ses_2',
+          role: 'user',
+          parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
+        },
+      ]);
       return yield* store.load('ses_2');
     })
   );

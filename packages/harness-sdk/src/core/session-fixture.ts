@@ -37,7 +37,12 @@ const recordingStore = (): {
   const layer = Layer.succeed(SessionStore, {
     create: () => Effect.void,
     read: () => Effect.succeed(Option.none()),
-    append: (turn: Turn) => Effect.sync(() => void seen.push(`${turn.role}:${textOf(turn)}`)),
+    append: (written: readonly Turn[]) =>
+      Effect.sync(() => {
+        for (const turn of written) {
+          seen.push(`${turn.role}:${textOf(turn)}`);
+        }
+      }),
     load: () => Effect.succeed([] as readonly Turn[]),
     flush: () => Effect.sync(() => void seen.push('flush')),
   });
@@ -58,10 +63,14 @@ const brokenStore = (
   const layer = Layer.succeed(SessionStore, {
     create: () => Effect.void,
     read: () => Effect.succeed(Option.none()),
-    append: (turn: Turn) =>
+    append: (written: readonly Turn[]) =>
       broken === 'append'
         ? refuse('append')
-        : Effect.sync(() => void seen.push(`${turn.role}:${textOf(turn)}`)),
+        : Effect.sync(() => {
+            for (const turn of written) {
+              seen.push(`${turn.role}:${textOf(turn)}`);
+            }
+          }),
     load: () => Effect.succeed([] as readonly Turn[]),
     flush: () =>
       broken === 'flush' ? refuse('flush') : Effect.sync(() => void seen.push('flush')),

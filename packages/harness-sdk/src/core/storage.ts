@@ -40,8 +40,13 @@ interface SessionStoreService {
   readonly create: (session: StoredSession) => Effect.Effect<void, StoreError>;
   /** `None` when the store has never heard of the identifier. */
   readonly read: (sessionId: string) => Effect.Effect<Option.Option<StoredSession>, StoreError>;
-  /** The session calls this on every change. The plugin decides when to write. */
-  readonly append: (turn: Turn) => Effect.Effect<void, StoreError>;
+  /**
+   * Records one completed exchange: the question and the answer together. It
+   * takes a list because the store must never hold a question with no answer.
+   * Such a question goes back out with every later request, so the caller pays
+   * for it again each time and the model may answer it late.
+   */
+  readonly append: (turns: readonly Turn[]) => Effect.Effect<void, StoreError>;
   /** The turns of one session, oldest first. */
   readonly load: (sessionId: string) => Effect.Effect<readonly Turn[], StoreError>;
   /** Writes whatever the plugin still holds. The session calls this on close. */

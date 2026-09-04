@@ -1,4 +1,4 @@
-import { Chunk, Effect, Layer, Stream } from 'effect';
+import { Chunk, Effect, Fiber, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
 import { fakeModel } from '../plugins/model/fake.js';
@@ -16,7 +16,7 @@ it('keeps the question and the answer as two turns, in order', async () => {
   expect(texts(value)).toEqual(['user:hi', 'assistant:hello']);
 });
 
-it('adds no answer turn when the stream fails part way', async () => {
+it('takes the question back out when the stream fails part way', async () => {
   const failure = new ModelError({ reason: 'transport', cause: 'cut' });
   const { value } = await run([{ deltas: ['par'], fail: failure }], session =>
     Effect.zipRight(
@@ -24,7 +24,26 @@ it('adds no answer turn when the stream fails part way', async () => {
       Effect.map(session.history, texts)
     )
   );
-  expect(value).toEqual(['user:hi']);
+
+  /* A transcript that ends on an unanswered question sends it again with
+     every later request, and the model may answer it late. */
+  expect(value).toEqual([]);
+});
+
+it('takes the question back out when the caller walks away mid-stream', async () => {
+  const { value } = await run([{ deltas: ['par'], stall: true }, { deltas: ['ok'] }], session =>
+    Effect.gen(function* () {
+      const reading = yield* Effect.fork(Stream.runDrain(session.ask('a')));
+      yield* Effect.sleep('10 millis');
+      yield* Fiber.interrupt(reading);
+      /* The session must still take a question: a `busy` flag left set by the
+         interrupt would strand it, and the abandoned question would ride along
+         on every later request. */
+      yield* Stream.runDrain(session.ask('b'));
+      return yield* Effect.map(session.history, texts);
+    })
+  );
+  expect(value).toEqual(['user:b', 'assistant:ok']);
 });
 
 it('asks the second question with the first exchange already in the prompt', async () => {
@@ -103,5 +122,6 @@ it('takes the next question after one fails part way', async () => {
     )
   );
 
-  expect(value).toEqual(['user:a', 'user:b', 'assistant:ok']);
+  /* The failed question is gone, so the transcript still alternates. */
+  expect(value).toEqual(['user:b', 'assistant:ok']);
 });

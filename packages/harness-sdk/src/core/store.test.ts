@@ -15,7 +15,7 @@ it('runs with no store at all', async () => {
   expect(value).toEqual(['user:hi', 'assistant:hello']);
 });
 
-it('keeps a turn it could not store, so memory and the store disagree', async () => {
+it('keeps memory and the store agreeing when the store refuses the write', async () => {
   const store = brokenStore('append');
   const { value } = await run(
     [{ deltas: ['x'] }],
@@ -27,10 +27,9 @@ it('keeps a turn it could not store, so memory and the store disagree', async ()
     store.layer
   );
 
-  /* The session kept the question; the store never took it. On the next load
-     the prefix would start at a different turn and miss the cache for good.
-     This test states the behavior as it is, so a change to it is deliberate. */
-  expect(value).toEqual(['user:hi']);
+  /* Neither holds the exchange. A session that kept a turn the store refused
+     would load back from a different turn and miss the cache for good. */
+  expect(value).toEqual([]);
   expect(store.seen).toEqual(['flush']);
 });
 

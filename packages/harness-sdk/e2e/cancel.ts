@@ -106,7 +106,8 @@ const program = Effect.gen(function* () {
   return {
     whole: { said: yield* Ref.get(whole), millis: wholeMillis },
     cut: { said: yield* Ref.get(cut), millis: cutMillis },
-    /* An interrupted answer is never recorded, so only the question is there. */
+    /* An interrupted exchange leaves nothing: the answer never arrived, and
+       the question goes back out with it. */
     history: yield* cutSession.history,
     /* The session must still work: a `busy` flag left set would strand it. */
     after: yield* Stream.runFold(
@@ -155,10 +156,11 @@ if (result.cut.said >= result.whole.said) {
 if (!signals.every(signal => signal?.aborted === true)) {
   failures.push('a call ended with its signal not aborted, so the socket was left open');
 }
-if (roles.length !== 1 || roles[0] !== 'user') {
+if (roles.length !== 0) {
   failures.push(
-    `the cancelled session kept ${JSON.stringify(roles)}; a half written answer must not be ` +
-      'recorded, because it would poison the prefix of every later request'
+    `the cancelled session kept ${JSON.stringify(roles)}; an interrupted exchange must leave ` +
+      'nothing, because a half written answer poisons the prefix and an unanswered question ' +
+      'goes back out with every later request'
   );
 }
 if (result.after.length === 0) {

@@ -612,12 +612,12 @@
       "labels": "Ознаки",
       "reviewers": "Рецензенти",
       "assignees": "Задолжени",
-      "linkedIssues": "Поврзани проблеми",
+      "linkedIssues": "Поврзани пријави",
       "reviewApproved": "Одобрено",
       "reviewChangesRequested": "Побарани промени",
-      "reviewCommented": "Коментирано",
-      "reviewPending": "Чека рецензија",
-      "openIssueA11y": "Отвори проблем #{{number}} на GitHub"
+      "reviewCommented": "Оставен коментар",
+      "reviewPending": "Се чека рецензија",
+      "openIssueA11y": "Отвори ја пријавата #{{number}} на GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",

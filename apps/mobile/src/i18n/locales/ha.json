@@ -609,14 +609,14 @@
       "mergedAgo": "An haɗa {{time}}",
       "mergedByAgo": "{{login}} ya haɗa {{time}}",
       "closedAgo": "An rufe {{time}}",
-      "labels": "Alamomi",
-      "reviewers": "Masu duba",
+      "labels": "Lakabobi",
+      "reviewers": "Masu bita",
       "assignees": "Waɗanda aka ba wa aiki",
-      "linkedIssues": "Batutuwa masu alaƙa",
+      "linkedIssues": "Batutuwan da aka haɗa",
       "reviewApproved": "An amince",
       "reviewChangesRequested": "An nemi canje-canje",
       "reviewCommented": "An yi sharhi",
-      "reviewPending": "Ana jiran dubawa",
+      "reviewPending": "Ana jiran bita",
       "openIssueA11y": "Buɗe batu #{{number}} a GitHub"
     },
     "pendingComment": {

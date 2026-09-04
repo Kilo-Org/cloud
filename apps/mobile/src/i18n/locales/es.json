@@ -2637,18 +2637,18 @@
       "file_many": "archivos",
       "openedAgo": "Abierto {{time}}",
       "updatedAgo": "Actualizado {{time}}",
-      "mergedAgo": "Fusionada {{time}}",
+      "mergedAgo": "Fusionado {{time}}",
       "mergedByAgo": "Fusionado por {{login}} {{time}}",
-      "closedAgo": "Cerrada {{time}}",
+      "closedAgo": "Cerrado {{time}}",
       "labels": "Etiquetas",
       "reviewers": "Revisores",
-      "assignees": "Asignados",
+      "assignees": "Responsables",
       "linkedIssues": "Incidencias vinculadas",
       "reviewApproved": "Aprobado",
       "reviewChangesRequested": "Cambios solicitados",
-      "reviewCommented": "Comentado",
+      "reviewCommented": "Con comentarios",
       "reviewPending": "Pendiente de revisión",
-      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub"
+      "openIssueA11y": "Abrir la incidencia #{{number}} en GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Todos los comentarios se enviarán juntos en una sola solicitud.",

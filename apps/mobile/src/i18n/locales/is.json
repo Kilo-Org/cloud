@@ -610,13 +610,13 @@
       "mergedByAgo": "{{login}} sameinaði {{time}}",
       "closedAgo": "Lokað {{time}}",
       "labels": "Merki",
-      "reviewers": "Yfirlesarar",
+      "reviewers": "Rýnendur",
       "assignees": "Ábyrgðaraðilar",
       "linkedIssues": "Tengd mál",
       "reviewApproved": "Samþykkt",
       "reviewChangesRequested": "Óskað eftir breytingum",
       "reviewCommented": "Athugasemd gerð",
-      "reviewPending": "Bíður yfirlestrar",
+      "reviewPending": "Bíður rýni",
       "openIssueA11y": "Opna mál #{{number}} á GitHub"
     },
     "pendingComment": {

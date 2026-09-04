@@ -624,14 +624,14 @@
       "mergedByAgo": "Zlúčil {{login}} {{time}}",
       "closedAgo": "Zatvorené {{time}}",
       "labels": "Štítky",
-      "reviewers": "Recenzenti",
-      "assignees": "Pridelení",
+      "reviewers": "Posudzovatelia",
+      "assignees": "Priradené osoby",
       "linkedIssues": "Prepojené úlohy",
       "reviewApproved": "Schválené",
       "reviewChangesRequested": "Vyžiadané zmeny",
       "reviewCommented": "Okomentované",
-      "reviewPending": "Čaká na recenziu",
-      "openIssueA11y": "Otvoriť úlohu #{{number}} na GitHube"
+      "reviewPending": "Čaká na posúdenie",
+      "openIssueA11y": "Otvoriť úlohu #{{number}} na platforme GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Upraviť neaktuálny neodoslaný komentár k {{location}}",

@@ -618,13 +618,13 @@
       "closedAgo": "Zatvoreno {{time}}",
       "labels": "Oznake",
       "reviewers": "Recenzenti",
-      "assignees": "Dodijeljeni",
-      "linkedIssues": "Povezani problemi",
+      "assignees": "Zadužene osobe",
+      "linkedIssues": "Povezani zadaci",
       "reviewApproved": "Odobreno",
       "reviewChangesRequested": "Tražene izmjene",
       "reviewCommented": "Komentirano",
-      "reviewPending": "Čeka recenziju",
-      "openIssueA11y": "Otvori problem #{{number}} na GitHubu"
+      "reviewPending": "Čeka se recenzija",
+      "openIssueA11y": "Otvori zadatak #{{number}} na GitHubu"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na lokaciji {{location}}",

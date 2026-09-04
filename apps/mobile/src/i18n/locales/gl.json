@@ -611,13 +611,13 @@
       "closedAgo": "Pechado {{time}}",
       "labels": "Etiquetas",
       "reviewers": "Revisores",
-      "assignees": "Asignados",
+      "assignees": "Responsables",
       "linkedIssues": "Incidencias vinculadas",
       "reviewApproved": "Aprobado",
       "reviewChangesRequested": "Cambios solicitados",
-      "reviewCommented": "Comentado",
+      "reviewCommented": "Con comentarios",
       "reviewPending": "Á espera de revisión",
-      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub"
+      "openIssueA11y": "Abrir a incidencia #{{number}} en GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentario pendente desactualizado en {{location}}",

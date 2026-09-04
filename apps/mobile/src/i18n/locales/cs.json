@@ -624,13 +624,13 @@
       "mergedByAgo": "Sloučil {{login}} {{time}}",
       "closedAgo": "Uzavřeno {{time}}",
       "labels": "Štítky",
-      "reviewers": "Recenzenti",
-      "assignees": "Přiřazení",
+      "reviewers": "Kontrolující",
+      "assignees": "Řešitelé",
       "linkedIssues": "Propojené úkoly",
       "reviewApproved": "Schváleno",
       "reviewChangesRequested": "Vyžádány změny",
       "reviewCommented": "Okomentováno",
-      "reviewPending": "Čeká na recenzi",
+      "reviewPending": "Čeká na kontrolu",
       "openIssueA11y": "Otevřít úkol #{{number}} na GitHubu"
     },
     "pendingComment": {

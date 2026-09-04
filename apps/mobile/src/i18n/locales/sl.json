@@ -625,13 +625,13 @@
       "closedAgo": "Zaprto {{time}}",
       "labels": "Oznake",
       "reviewers": "Pregledovalci",
-      "assignees": "Dodeljeni",
-      "linkedIssues": "Povezane težave",
+      "assignees": "Zadolženi",
+      "linkedIssues": "Povezane zadeve",
       "reviewApproved": "Odobreno",
       "reviewChangesRequested": "Zahtevane spremembe",
-      "reviewCommented": "Komentirano",
+      "reviewCommented": "Dodan komentar",
       "reviewPending": "Čaka na pregled",
-      "openIssueA11y": "Odpri težavo #{{number}} na GitHubu"
+      "openIssueA11y": "Odpri zadevo #{{number}} na GitHubu"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",

@@ -606,18 +606,18 @@
       "file_other": "ไฟล์",
       "openedAgo": "เปิดเมื่อ {{time}}",
       "updatedAgo": "อัปเดตเมื่อ {{time}}",
-      "mergedAgo": "รวมแล้ว {{time}}",
+      "mergedAgo": "ผสานเมื่อ {{time}}",
       "mergedByAgo": "{{login}} ผสานเมื่อ {{time}}",
-      "closedAgo": "ปิดแล้ว {{time}}",
+      "closedAgo": "ปิดเมื่อ {{time}}",
       "labels": "ป้ายกำกับ",
       "reviewers": "ผู้ตรวจทาน",
       "assignees": "ผู้รับผิดชอบ",
-      "linkedIssues": "ปัญหาที่เชื่อมโยง",
+      "linkedIssues": "ประเด็นที่เชื่อมโยง",
       "reviewApproved": "อนุมัติแล้ว",
       "reviewChangesRequested": "ขอให้แก้ไข",
       "reviewCommented": "แสดงความคิดเห็นแล้ว",
       "reviewPending": "รอการตรวจทาน",
-      "openIssueA11y": "เปิดปัญหา #{{number}} บน GitHub"
+      "openIssueA11y": "เปิดประเด็น #{{number}} บน GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอส่งและอ้างอิงโค้ดเก่าที่ {{location}}",

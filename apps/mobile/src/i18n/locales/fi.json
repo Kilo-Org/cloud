@@ -607,7 +607,7 @@
       "openedAgo": "Avattu {{time}}",
       "updatedAgo": "Päivitetty {{time}}",
       "mergedAgo": "Yhdistetty {{time}}",
-      "mergedByAgo": "Yhdistänyt {{login}} {{time}}",
+      "mergedByAgo": "{{login}} yhdisti {{time}}",
       "closedAgo": "Suljettu {{time}}",
       "labels": "Tunnisteet",
       "reviewers": "Katselmoijat",

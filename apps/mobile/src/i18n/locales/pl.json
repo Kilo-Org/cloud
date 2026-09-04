@@ -2657,18 +2657,18 @@
       "file_many": "plików",
       "openedAgo": "Otwarto {{time}}",
       "updatedAgo": "Zaktualizowano {{time}}",
-      "mergedAgo": "Scalony {{time}}",
-      "mergedByAgo": "Scalone przez {{login}} {{time}}",
-      "closedAgo": "Zamknięty {{time}}",
+      "mergedAgo": "Scalono {{time}}",
+      "mergedByAgo": "PR scalony przez {{login}} {{time}}",
+      "closedAgo": "Zamknięto {{time}}",
       "labels": "Etykiety",
       "reviewers": "Recenzenci",
-      "assignees": "Przypisani",
+      "assignees": "Przypisane osoby",
       "linkedIssues": "Powiązane zgłoszenia",
       "reviewApproved": "Zatwierdzono",
       "reviewChangesRequested": "Poproszono o zmiany",
       "reviewCommented": "Skomentowano",
       "reviewPending": "Oczekuje na recenzję",
-      "openIssueA11y": "Otwórz zgłoszenie #{{number}} w GitHub"
+      "openIssueA11y": "Otwórz zgłoszenie #{{number}} w serwisie GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Wszystkie komentarze zostaną wysłane w jednym zbiorczym żądaniu.",

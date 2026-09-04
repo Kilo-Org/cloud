@@ -2658,17 +2658,17 @@
       "openedAgo": "Відкрито {{time}}",
       "updatedAgo": "Оновлено {{time}}",
       "mergedAgo": "Злито {{time}}",
-      "mergedByAgo": "Об'єднав {{login}} {{time}}",
+      "mergedByAgo": "Злито користувачем {{login}} {{time}}",
       "closedAgo": "Закрито {{time}}",
       "labels": "Мітки",
       "reviewers": "Рецензенти",
       "assignees": "Відповідальні",
-      "linkedIssues": "Пов'язані задачі",
+      "linkedIssues": "Пов’язані завдання",
       "reviewApproved": "Схвалено",
       "reviewChangesRequested": "Запитано зміни",
       "reviewCommented": "Прокоментовано",
-      "reviewPending": "Очікує рецензії",
-      "openIssueA11y": "Відкрити задачу #{{number}} на GitHub"
+      "reviewPending": "Очікується рецензія",
+      "openIssueA11y": "Відкрити завдання #{{number}} на GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Усі коментарі буде надіслано разом одним запитом.",

@@ -610,13 +610,13 @@
       "mergedByAgo": "Flettet af {{login}} {{time}}",
       "closedAgo": "Lukket {{time}}",
       "labels": "Etiketter",
-      "reviewers": "Anmeldere",
-      "assignees": "Tildelte",
+      "reviewers": "Kodegranskere",
+      "assignees": "Ansvarlige",
       "linkedIssues": "Tilknyttede sager",
       "reviewApproved": "Godkendt",
       "reviewChangesRequested": "Ændringer ønsket",
       "reviewCommented": "Kommenteret",
-      "reviewPending": "Afventer gennemgang",
+      "reviewPending": "Afventer kodegranskning",
       "openIssueA11y": "Åbn sag #{{number}} på GitHub"
     },
     "pendingComment": {

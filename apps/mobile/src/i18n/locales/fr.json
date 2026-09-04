@@ -2642,13 +2642,13 @@
       "closedAgo": "Fermée {{time}}",
       "labels": "Étiquettes",
       "reviewers": "Relecteurs",
-      "assignees": "Assignés",
+      "assignees": "Responsables",
       "linkedIssues": "Tickets liés",
       "reviewApproved": "Approuvée",
       "reviewChangesRequested": "Modifications demandées",
       "reviewCommented": "Commentée",
       "reviewPending": "En attente de relecture",
-      "openIssueA11y": "Ouvrir le ticket #{{number}} sur GitHub"
+      "openIssueA11y": "Ouvrir le ticket n° {{number}} sur GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Tous les commentaires seront envoyés ensemble dans une seule requête.",

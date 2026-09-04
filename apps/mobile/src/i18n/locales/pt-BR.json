@@ -2643,12 +2643,12 @@
       "labels": "Etiquetas",
       "reviewers": "Revisores",
       "assignees": "Responsáveis",
-      "linkedIssues": "Issues vinculadas",
+      "linkedIssues": "Problemas vinculados",
       "reviewApproved": "Aprovado",
       "reviewChangesRequested": "Alterações solicitadas",
-      "reviewCommented": "Comentado",
+      "reviewCommented": "Com comentários",
       "reviewPending": "Aguardando revisão",
-      "openIssueA11y": "Abrir issue #{{number}} no GitHub"
+      "openIssueA11y": "Abrir problema #{{number}} no GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Todos os comentários serão enviados juntos, em uma única solicitação.",

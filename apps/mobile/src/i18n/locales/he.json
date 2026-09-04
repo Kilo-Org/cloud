@@ -2637,18 +2637,18 @@
       "file_two": "קבצים",
       "openedAgo": "נפתחה {{time}}",
       "updatedAgo": "עודכנה {{time}}",
-      "mergedAgo": "מוזג {{time}}",
+      "mergedAgo": "מוזגה {{time}}",
       "mergedByAgo": "מוזגה על ידי {{login}} {{time}}",
-      "closedAgo": "סגור {{time}}",
+      "closedAgo": "נסגרה {{time}}",
       "labels": "תוויות",
       "reviewers": "סוקרים",
       "assignees": "אחראים",
       "linkedIssues": "סוגיות מקושרות",
       "reviewApproved": "אושרה",
       "reviewChangesRequested": "התבקשו שינויים",
-      "reviewCommented": "הוגשה תגובה",
-      "reviewPending": "ממתינה לסקירה",
-      "openIssueA11y": "פתח סוגיה #{{number}} ב-GitHub"
+      "reviewCommented": "נוספה תגובה",
+      "reviewPending": "בהמתנה לסקירה",
+      "openIssueA11y": "פתיחת סוגיה #{{number}} ב-GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "כל התגובות יישלחו יחד בבקשה אחת.",

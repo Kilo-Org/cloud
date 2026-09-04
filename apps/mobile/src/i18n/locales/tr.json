@@ -2615,11 +2615,11 @@
       "stateOpenChangesRequested": "Açık · Değişiklik istendi",
       "stateOpenReviewRequired": "Açık · İnceleme gerekli",
       "unknownAuthor": "Bilinmeyen yazar",
-      "openedAgo": "Açıldı {{time}}",
-      "updatedAgo": "Güncellendi {{time}}",
-      "mergedAgo": "Birleştirildi {{time}}",
-      "mergedByAgo": "{{login}} birleştirdi {{time}}",
-      "closedAgo": "Kapalı {{time}}",
+      "openedAgo": "{{time}} açıldı",
+      "updatedAgo": "{{time}} güncellendi",
+      "mergedAgo": "{{time}} birleştirildi",
+      "mergedByAgo": "{{time}} {{login}} tarafından birleştirildi",
+      "closedAgo": "{{time}} kapatıldı",
       "labels": "Etiketler",
       "reviewers": "İnceleyenler",
       "assignees": "Atananlar",
@@ -2627,8 +2627,8 @@
       "reviewApproved": "Onaylandı",
       "reviewChangesRequested": "Değişiklik istendi",
       "reviewCommented": "Yorum yapıldı",
-      "reviewPending": "İnceleme bekliyor",
-      "openIssueA11y": "GitHub'da #{{number}} sorununu aç"
+      "reviewPending": "İnceleme bekleniyor",
+      "openIssueA11y": "#{{number}} numaralı sorunu GitHub'da aç"
     },
     "pendingComment": {
       "allQueuedHint": "Tüm yorumlar tek bir istekte toplu olarak gönderilecek.",

@@ -132,7 +132,8 @@
     "truncated": "Qisqartirilgan",
     "updated": "Yangilangan",
     "working": "Ishlamoqda",
-    "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar"
+    "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
+    "dismissed": "E’tiborsiz qoldirilgan"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "O'zgarishlar so'ralgan",
       "reviewCommented": "Izoh qoldirilgan",
       "reviewPending": "Ko'rib chiqish kutilmoqda",
-      "openIssueA11y": "GitHub'da #{{number}} masalasini ochish",
-      "reviewDismissed": "Rad etilgan"
+      "openIssueA11y": "GitHub'da #{{number}} masalasini ochish"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}dagi eskirgan navbatdagi izohni tahrirlash",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Tuzatilgan sana: {{date}}",
       "resolutionRecorded": "Hal qilingani qayd etilgan",
       "superseded": "Almashtirildi",
-      "dismissed": "E’tiborsiz qoldirilgan",
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "Muddat belgilanmagan",
       "noSlaDeadline": "SLA muddati belgilanmagan",

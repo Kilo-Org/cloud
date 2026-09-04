@@ -132,7 +132,8 @@
     "truncated": "Обрезано",
     "updated": "Обновлено",
     "working": "В работе",
-    "yourOwnRepositories": "Личные репозитории"
+    "yourOwnRepositories": "Личные репозитории",
+    "dismissed": "Отклонено"
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -1379,7 +1380,6 @@
       "fixedOn": "Исправлено {{date}}",
       "resolutionRecorded": "Устранение зафиксировано",
       "superseded": "Заменено",
-      "dismissed": "Отклонено",
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Срок не установлен",
       "noSlaDeadline": "Нет срока исправления по SLA",
@@ -2668,8 +2668,7 @@
       "reviewChangesRequested": "Запрошены изменения",
       "reviewCommented": "Прокомментировано",
       "reviewPending": "Ожидает рецензии",
-      "openIssueA11y": "Открыть задачу #{{number}} на GitHub",
-      "reviewDismissed": "Отклонено"
+      "openIssueA11y": "Открыть задачу #{{number}} на GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Все комментарии будут отправлены одним запросом.",

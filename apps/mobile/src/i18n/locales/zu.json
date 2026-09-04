@@ -132,7 +132,8 @@
     "truncated": "Kunqanyuliwe",
     "updated": "Kubuyekezwe",
     "working": "Kuyasebenza",
-    "yourOwnRepositories": "Izinqolobane zakho zekhodi"
+    "yourOwnRepositories": "Izinqolobane zakho zekhodi",
+    "dismissed": "Kuchithiwe"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Kuceliwe izinguquko",
       "reviewCommented": "Kuphawuliwe",
       "reviewPending": "Kulindele ukubuyekezwa",
-      "openIssueA11y": "Vula inkinga #{{number}} ku-GitHub",
-      "reviewDismissed": "Ichithiwe"
+      "openIssueA11y": "Vula inkinga #{{number}} ku-GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hlela amazwana alindile aphelelwe yisikhathi ku-{{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Kulungisiwe ngo-{{date}}",
       "resolutionRecorded": "Isixazululo sirekhodiwe",
       "superseded": "Kuthathelwe indawo",
-      "dismissed": "Kuchithiwe",
       "closedOn": "{{status}} ngo-{{date}}",
       "deadlineNotSet": "Umnqamulajuqu awukabekwa",
       "noSlaDeadline": "Awukho umnqamulajuqu we-SLA",

@@ -132,7 +132,8 @@
     "truncated": "შეკვეცილია",
     "updated": "განახლებულია",
     "working": "მუშაობს",
-    "yourOwnRepositories": "შენი რეპოზიტორიები"
+    "yourOwnRepositories": "შენი რეპოზიტორიები",
+    "dismissed": "უგულებელყოფილია"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "მოთხოვნილია ცვლილებები",
       "reviewCommented": "დაკომენტარებულია",
       "reviewPending": "ელოდება მიმოხილვას",
-      "openIssueA11y": "გახსენი საკითხი #{{number}} GitHub-ზე",
-      "reviewDismissed": "გაუქმებულია"
+      "openIssueA11y": "გახსენი საკითხი #{{number}} GitHub-ზე"
     },
     "pendingComment": {
       "editOutdatedA11y": "მოძველებული გასაგზავნი კომენტარის რედაქტირება: {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "შესწორებულია {{date}}",
       "resolutionRecorded": "მოგვარება დაფიქსირებულია",
       "superseded": "ჩანაცვლებულია",
-      "dismissed": "უგულებელყოფილია",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "ვადა დაუდგენელია",
       "noSlaDeadline": "SLA ვადა არ არის",

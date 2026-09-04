@@ -132,7 +132,8 @@
     "truncated": "Trunchiat",
     "updated": "Actualizat",
     "working": "În lucru",
-    "yourOwnRepositories": "Depozitele tale de cod"
+    "yourOwnRepositories": "Depozitele tale de cod",
+    "dismissed": "Ignorată"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -623,8 +624,7 @@
       "reviewChangesRequested": "Modificări solicitate",
       "reviewCommented": "Comentat",
       "reviewPending": "În așteptarea recenziei",
-      "openIssueA11y": "Deschide problema #{{number}} pe GitHub",
-      "reviewDismissed": "Respinsă"
+      "openIssueA11y": "Deschide problema #{{number}} pe GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul depășit, aflat în așteptare, de la {{location}}",
@@ -1814,7 +1814,6 @@
       "fixedOn": "Remediată la {{date}}",
       "resolutionRecorded": "Rezolvare înregistrată",
       "superseded": "Înlocuită",
-      "dismissed": "Ignorată",
       "closedOn": "{{status}} la {{date}}",
       "deadlineNotSet": "Termen limită nestabilit",
       "noSlaDeadline": "Fără termen limită SLA",

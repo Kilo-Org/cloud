@@ -132,7 +132,8 @@
     "truncated": "Sutrumpinta",
     "updated": "Atnaujinta",
     "working": "Vykdoma",
-    "yourOwnRepositories": "Tavo saugyklos"
+    "yourOwnRepositories": "Tavo saugyklos",
+    "dismissed": "Atmesta"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -629,7 +630,6 @@
       "reviewApproved": "Patvirtinta",
       "reviewChangesRequested": "Paprašyta pakeitimų",
       "reviewCommented": "Pakomentuota",
-      "reviewDismissed": "Atmesta",
       "reviewPending": "Laukiama peržiūros",
       "openIssueA11y": "Atverti problemą #{{number}} GitHub'e"
     },
@@ -1825,7 +1825,6 @@
       "fixedOn": "Ištaisyta {{date}}",
       "resolutionRecorded": "Užfiksuotas išsprendimas",
       "superseded": "Pakeista naujesne",
-      "dismissed": "Atmesta",
       "closedOn": "Būsena: {{status}}. Data: {{date}}",
       "deadlineNotSet": "Terminas nenustatytas",
       "noSlaDeadline": "Nėra SLA termino",

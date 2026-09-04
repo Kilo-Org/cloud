@@ -132,7 +132,8 @@
     "truncated": "Կրճատված",
     "updated": "Թարմացված",
     "working": "Աշխատում է",
-    "yourOwnRepositories": "Քո սեփական պահոցները"
+    "yourOwnRepositories": "Քո սեփական պահոցները",
+    "dismissed": "Անտեսված"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Փոփոխություններ են պահանջվել",
       "reviewCommented": "Մեկնաբանված է",
       "reviewPending": "Սպասում է գրախոսության",
-      "openIssueA11y": "Բացել #{{number}} խնդիրը GitHub-ում",
-      "reviewDismissed": "Մերժված"
+      "openIssueA11y": "Բացել #{{number}} խնդիրը GitHub-ում"
     },
     "pendingComment": {
       "editOutdatedA11y": "Խմբագրել հնացած չուղարկված մեկնաբանությունը՝ {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Շտկվել է՝ {{date}}",
       "resolutionRecorded": "Լուծումը գրանցված է",
       "superseded": "Փոխարինված",
-      "dismissed": "Անտեսված",
       "closedOn": "{{status}}՝ {{date}}",
       "deadlineNotSet": "Վերջնաժամկետ սահմանված չէ",
       "noSlaDeadline": "SLA-ի վերջնաժամկետ չկա",

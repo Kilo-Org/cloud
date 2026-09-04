@@ -112,7 +112,7 @@ export function getDeadlineCopy(state: FindingDeadlineState): DeadlineCopy {
     case 'closed': {
       const status = state.superseded
         ? i18n.t('securityAgent.deadline.superseded')
-        : i18n.t('securityAgent.deadline.dismissed');
+        : i18n.t('common.dismissed');
       return {
         label: status,
         detail: i18n.t('securityAgent.deadline.closedOn', {

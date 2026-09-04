@@ -132,7 +132,8 @@
     "truncated": "ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "updated": "ನವೀಕರಿಸಲಾಗಿದೆ",
     "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
-    "yourOwnRepositories": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು"
+    "yourOwnRepositories": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು",
+    "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "ಬದಲಾವಣೆಗಳನ್ನು ಕೋರಲಾಗಿದೆ",
       "reviewCommented": "ಕಾಮೆಂಟ್ ಮಾಡಲಾಗಿದೆ",
       "reviewPending": "ಪರಿಶೀಲನೆಗಾಗಿ ಕಾಯುತ್ತಿದೆ",
-      "openIssueA11y": "GitHub ನಲ್ಲಿ ಸಮಸ್ಯೆ #{{number}} ತೆರೆಯಿರಿ",
-      "reviewDismissed": "ತೆಗೆದುಹಾಕಲಾಗಿದೆ"
+      "openIssueA11y": "GitHub ನಲ್ಲಿ ಸಮಸ್ಯೆ #{{number}} ತೆರೆಯಿರಿ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}ನಲ್ಲಿರುವ ಹಳೆಯ ಆವೃತ್ತಿಗೆ ಸಂಬಂಧಿಸಿದ, ಸಲ್ಲಿಸಲು ಬಾಕಿ ಇರುವ ಕಾಮೆಂಟ್ ಸಂಪಾದಿಸಿ",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} ರಂದು ಸರಿಪಡಿಸಲಾಗಿದೆ",
       "resolutionRecorded": "ಪರಿಹಾರ ದಾಖಲಿಸಲಾಗಿದೆ",
       "superseded": "ಹೊಸದು ಬದಲಿಗೆ ಬಂದಿದೆ",
-      "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ",
       "closedOn": "{{date}} ರಂದು {{status}}",
       "deadlineNotSet": "ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",
       "noSlaDeadline": "SLA ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",

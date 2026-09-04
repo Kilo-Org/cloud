@@ -132,7 +132,8 @@
     "truncated": "আংশিক",
     "updated": "আপডেট হয়েছে",
     "working": "কাজ চলছে",
-    "yourOwnRepositories": "আপনার নিজের রিপোজিটরি"
+    "yourOwnRepositories": "আপনার নিজের রিপোজিটরি",
+    "dismissed": "খারিজ"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "পরিবর্তন চাওয়া হয়েছে",
       "reviewCommented": "মন্তব্য করা হয়েছে",
       "reviewPending": "পর্যালোচনার অপেক্ষায়",
-      "openIssueA11y": "GitHub-এ ইস্যু #{{number}} খুলুন",
-      "reviewDismissed": "খারিজ করা হয়েছে"
+      "openIssueA11y": "GitHub-এ ইস্যু #{{number}} খুলুন"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-এ পুরোনো সংস্করণের অপেক্ষমাণ মন্তব্য সম্পাদনা করুন",
@@ -1803,7 +1803,6 @@
       "fixedOn": "সমাধানের তারিখ: {{date}}",
       "resolutionRecorded": "সমাধান রেকর্ড করা হয়েছে",
       "superseded": "প্রতিস্থাপিত",
-      "dismissed": "খারিজ",
       "closedOn": "{{status}} — {{date}}",
       "deadlineNotSet": "সময়সীমা নির্ধারিত নেই",
       "noSlaDeadline": "কোনো SLA সময়সীমা নেই",

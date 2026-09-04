@@ -132,7 +132,8 @@
     "truncated": "Gekürzt",
     "updated": "Aktualisiert",
     "working": "In Bearbeitung",
-    "yourOwnRepositories": "Deine eigenen Code-Repositories"
+    "yourOwnRepositories": "Deine eigenen Code-Repositories",
+    "dismissed": "Verworfen"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -1371,7 +1372,6 @@
       "fixedOn": "Behoben am {{date}}",
       "resolutionRecorded": "Behebung erfasst",
       "superseded": "Ersetzt",
-      "dismissed": "Verworfen",
       "closedOn": "{{status}} am {{date}}",
       "deadlineNotSet": "Keine Frist festgelegt",
       "noSlaDeadline": "Keine SLA-Frist",
@@ -2628,8 +2628,7 @@
       "reviewChangesRequested": "Änderungen erbeten",
       "reviewCommented": "Kommentiert",
       "reviewPending": "Wartet auf Prüfung",
-      "openIssueA11y": "Vorgang #{{number}} auf GitHub öffnen",
-      "reviewDismissed": "Verworfen"
+      "openIssueA11y": "Vorgang #{{number}} auf GitHub öffnen"
     },
     "pendingComment": {
       "allQueuedHint": "Alle Kommentare werden zusammen in einer Anfrage gesendet.",

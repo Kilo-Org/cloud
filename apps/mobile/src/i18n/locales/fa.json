@@ -132,7 +132,8 @@
     "truncated": "کوتاه‌شده",
     "updated": "به‌روزشده",
     "working": "در حال کار",
-    "yourOwnRepositories": "مخازن خودتان"
+    "yourOwnRepositories": "مخازن خودتان",
+    "dismissed": "نادیده‌گرفته‌شده"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "تغییرات درخواست شد",
       "reviewCommented": "نظر داده شد",
       "reviewPending": "در انتظار بازبینی",
-      "openIssueA11y": "باز کردن مسئله #{{number}} در GitHub",
-      "reviewDismissed": "رد شده"
+      "openIssueA11y": "باز کردن مسئله #{{number}} در GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر در انتظار ارسال دربارهٔ نسخهٔ قبلی {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "برطرف‌شده در {{date}}",
       "resolutionRecorded": "برطرف شدن یافته ثبت شد",
       "superseded": "جایگزین‌شده",
-      "dismissed": "نادیده‌گرفته‌شده",
       "closedOn": "{{status}} در {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "بدون مهلت SLA",

@@ -132,7 +132,8 @@
     "truncated": "An yanke",
     "updated": "An sabunta",
     "working": "Ana aiki",
-    "yourOwnRepositories": "Ma'ajiyoyinka"
+    "yourOwnRepositories": "Ma'ajiyoyinka",
+    "dismissed": "An yi watsi da shi"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "An nemi canje-canje",
       "reviewCommented": "An yi sharhi",
       "reviewPending": "Ana jiran dubawa",
-      "openIssueA11y": "Buɗe batu #{{number}} a GitHub",
-      "reviewDismissed": "An watsar"
+      "openIssueA11y": "Buɗe batu #{{number}} a GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Gyara tsohon tsokacin da ke jira a {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "An gyara {{date}}",
       "resolutionRecorded": "An rubuta cewa an warware matsalar",
       "superseded": "An maye gurbinsa",
-      "dismissed": "An yi watsi da shi",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ba a saita wa'adi ba",
       "noSlaDeadline": "Babu wa'adin SLA",

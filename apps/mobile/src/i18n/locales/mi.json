@@ -132,7 +132,8 @@
     "truncated": "Kua poroa",
     "updated": "Kua whakahoutia",
     "working": "Kei te mahi",
-    "yourOwnRepositories": "Ō ake pūranga waehere"
+    "yourOwnRepositories": "Ō ake pūranga waehere",
+    "dismissed": "Kua whakakorea"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -615,7 +616,6 @@
       "reviewApproved": "Kua whakaaetia",
       "reviewChangesRequested": "I tonoa he panonitanga",
       "reviewCommented": "Kua tākupu",
-      "reviewDismissed": "Kua whakakorea",
       "reviewPending": "E tatari ana ki te arotake",
       "openIssueA11y": "Huakina te take #{{number}} i GitHub"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "I whakatikahia i te {{date}}",
       "resolutionRecorded": "Kua tuhia te whakataunga",
       "superseded": "Kua whakakapia",
-      "dismissed": "Kua whakakorea",
       "closedOn": "{{status}} i te {{date}}",
       "deadlineNotSet": "Kāore anō kia whakaritea he wā kati",
       "noSlaDeadline": "Kāore he wā kati SLA",

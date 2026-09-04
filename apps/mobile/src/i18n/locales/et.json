@@ -132,7 +132,8 @@
     "truncated": "Kärbitud",
     "updated": "Uuendatud",
     "working": "Töös",
-    "yourOwnRepositories": "Sinu enda hoidlad"
+    "yourOwnRepositories": "Sinu enda hoidlad",
+    "dismissed": "Kõrvale jäetud"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Muudatusi soovitud",
       "reviewCommented": "Kommenteeritud",
       "reviewPending": "Ootab ülevaatust",
-      "openIssueA11y": "Ava teema #{{number}} GitHubis",
-      "reviewDismissed": "Kõrvale jäetud"
+      "openIssueA11y": "Ava teema #{{number}} GitHubis"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Parandatud {{date}}",
       "resolutionRecorded": "Lahendamine on registreeritud",
       "superseded": "Asendatud",
-      "dismissed": "Kõrvale jäetud",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Tähtaega pole määratud",
       "noSlaDeadline": "SLA tähtaega pole määratud",

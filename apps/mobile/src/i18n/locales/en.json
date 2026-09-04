@@ -132,7 +132,8 @@
     "truncated": "Truncated",
     "updated": "Updated",
     "working": "Working",
-    "yourOwnRepositories": "Your own repositories"
+    "yourOwnRepositories": "Your own repositories",
+    "dismissed": "Dismissed"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -615,7 +616,6 @@
       "reviewApproved": "Approved",
       "reviewChangesRequested": "Changes requested",
       "reviewCommented": "Commented",
-      "reviewDismissed": "Dismissed",
       "reviewPending": "Awaiting review",
       "openIssueA11y": "Open issue #{{number}} on GitHub"
     },
@@ -1811,7 +1811,6 @@
       "fixedOn": "Fixed {{date}}",
       "resolutionRecorded": "Resolution recorded",
       "superseded": "Superseded",
-      "dismissed": "Dismissed",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Deadline not set",
       "noSlaDeadline": "No SLA deadline",

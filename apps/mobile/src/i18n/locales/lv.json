@@ -132,7 +132,8 @@
     "truncated": "Saīsināts",
     "updated": "Atjaunināts",
     "working": "Strādā",
-    "yourOwnRepositories": "Tavi repozitoriji"
+    "yourOwnRepositories": "Tavi repozitoriji",
+    "dismissed": "Noraidīts"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -622,7 +623,6 @@
       "reviewApproved": "Apstiprināts",
       "reviewChangesRequested": "Pieprasītas izmaiņas",
       "reviewCommented": "Komentēts",
-      "reviewDismissed": "Noraidīts",
       "reviewPending": "Gaida recenziju",
       "openIssueA11y": "Atvērt pieteikumu #{{number}} vietnē GitHub"
     },
@@ -1814,7 +1814,6 @@
       "fixedOn": "Izlabots {{date}}",
       "resolutionRecorded": "Atrisināšana reģistrēta",
       "superseded": "Aizstāts",
-      "dismissed": "Noraidīts",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termiņš nav noteikts",
       "noSlaDeadline": "Nav SLA termiņa",

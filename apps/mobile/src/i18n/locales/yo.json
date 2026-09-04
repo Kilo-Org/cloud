@@ -132,7 +132,8 @@
     "truncated": "A ti gé kúrú",
     "updated": "A ti ṣe ìmúdójúìwọ̀n",
     "working": "Ń ṣiṣẹ́",
-    "yourOwnRepositories": "Àwọn ibi ìpamọ́ kóòdù tìrẹ"
+    "yourOwnRepositories": "Àwọn ibi ìpamọ́ kóòdù tìrẹ",
+    "dismissed": "A ti kọ̀ sílẹ̀"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -615,7 +616,6 @@
       "reviewApproved": "Ti fọwọ́sí",
       "reviewChangesRequested": "Wọ́n béèrè àwọn àyípadà",
       "reviewCommented": "Ti sọ̀rọ̀",
-      "reviewDismissed": "Ti fi silẹ",
       "reviewPending": "Ń dúró de àyẹ̀wò",
       "openIssueA11y": "Ṣí ọ̀rọ̀ #{{number}} lórí GitHub"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "A tún un ṣe ní {{date}}",
       "resolutionRecorded": "A ti ṣe àkọsílẹ̀ ìyanjú",
       "superseded": "A ti fi òmíràn rọ́pò rẹ̀",
-      "dismissed": "A ti kọ̀ sílẹ̀",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "A kò tíì ṣètò ọjọ́ ìparí",
       "noSlaDeadline": "Kò sí ọjọ́ ìparí SLA",

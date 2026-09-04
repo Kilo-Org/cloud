@@ -132,7 +132,8 @@
     "truncated": "Csonkolva",
     "updated": "Frissítve",
     "working": "Dolgozik",
-    "yourOwnRepositories": "Saját adattáraid"
+    "yourOwnRepositories": "Saját adattáraid",
+    "dismissed": "Elvetve"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Változtatásokat kértek",
       "reviewCommented": "Hozzászólva",
       "reviewPending": "Értékelésre vár",
-      "openIssueA11y": "#{{number}} hibajegy megnyitása a GitHubon",
-      "reviewDismissed": "Elvetve"
+      "openIssueA11y": "#{{number}} hibajegy megnyitása a GitHubon"
     },
     "pendingComment": {
       "editOutdatedA11y": "Elavult, függőben lévő hozzászólás szerkesztése: {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Javítva: {{date}}",
       "resolutionRecorded": "Megoldás rögzítve",
       "superseded": "Újabbal helyettesítve",
-      "dismissed": "Elvetve",
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA-határidő",

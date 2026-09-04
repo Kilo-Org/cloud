@@ -132,7 +132,8 @@
     "truncated": "Dipotong",
     "updated": "Diperbarui",
     "working": "Bekerja",
-    "yourOwnRepositories": "Repositori milikmu"
+    "yourOwnRepositories": "Repositori milikmu",
+    "dismissed": "Diabaikan"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -1371,7 +1372,6 @@
       "fixedOn": "Diperbaiki {{date}}",
       "resolutionRecorded": "Penyelesaian tercatat",
       "superseded": "Digantikan",
-      "dismissed": "Diabaikan",
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tenggat belum ditetapkan",
       "noSlaDeadline": "Tidak ada tenggat SLA",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "Disetujui",
       "reviewChangesRequested": "Perubahan diminta",
       "reviewCommented": "Dikomentari",
-      "reviewDismissed": "Diabaikan",
       "reviewPending": "Menunggu tinjauan",
       "openIssueA11y": "Buka isu #{{number}} di GitHub"
     },

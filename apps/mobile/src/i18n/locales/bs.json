@@ -132,7 +132,8 @@
     "truncated": "Skraćeno",
     "updated": "Ažurirano",
     "working": "U toku",
-    "yourOwnRepositories": "Tvoji repozitoriji"
+    "yourOwnRepositories": "Tvoji repozitoriji",
+    "dismissed": "Odbačeno"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -622,7 +623,6 @@
       "reviewApproved": "Odobreno",
       "reviewChangesRequested": "Tražene izmjene",
       "reviewCommented": "Komentarisano",
-      "reviewDismissed": "Odbijeno",
       "reviewPending": "Čeka recenziju",
       "openIssueA11y": "Otvori problem #{{number}} na GitHubu"
     },
@@ -1814,7 +1814,6 @@
       "fixedOn": "Otklonjeno {{date}}",
       "resolutionRecorded": "Rješenje zabilježeno",
       "superseded": "Zamijenjeno",
-      "dismissed": "Odbačeno",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Rok nije postavljen",
       "noSlaDeadline": "Nema roka prema SLA-u",

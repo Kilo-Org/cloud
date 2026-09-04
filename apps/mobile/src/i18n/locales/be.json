@@ -132,7 +132,8 @@
     "truncated": "Абрэзана",
     "updated": "Абноўлена",
     "working": "Працуе",
-    "yourOwnRepositories": "Твае рэпазіторыі"
+    "yourOwnRepositories": "Твае рэпазіторыі",
+    "dismissed": "Адхілена"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -630,8 +631,7 @@
       "reviewChangesRequested": "Запытаны змены",
       "reviewCommented": "Пракаменціравана",
       "reviewPending": "Чакае рэцэнзіі",
-      "openIssueA11y": "Адкрыць задачу #{{number}} на GitHub",
-      "reviewDismissed": "Адхілена"
+      "openIssueA11y": "Адкрыць задачу #{{number}} на GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы неадпраўлены каментар: {{location}}",
@@ -1825,7 +1825,6 @@
       "fixedOn": "Выпраўлена {{date}}",
       "resolutionRecorded": "Вырашэнне праблемы зафіксавана",
       "superseded": "Заменена",
-      "dismissed": "Адхілена",
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Тэрмін не ўстаноўлены",
       "noSlaDeadline": "Тэрмін SLA не прызначаны",

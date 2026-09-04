@@ -132,7 +132,8 @@
     "truncated": "Dipotong",
     "updated": "Dikemas kini",
     "working": "Memproses…",
-    "yourOwnRepositories": "Repositori anda sendiri"
+    "yourOwnRepositories": "Repositori anda sendiri",
+    "dismissed": "Diketepikan"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Perubahan diminta",
       "reviewCommented": "Diulas",
       "reviewPending": "Menunggu semakan",
-      "openIssueA11y": "Buka isu #{{number}} di GitHub",
-      "reviewDismissed": "Diketepikan"
+      "openIssueA11y": "Buka isu #{{number}} di GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Dibaiki pada {{date}}",
       "resolutionRecorded": "Penyelesaian direkodkan",
       "superseded": "Digantikan",
-      "dismissed": "Diketepikan",
       "closedOn": "{{status}} pada {{date}}",
       "deadlineNotSet": "Tarikh akhir tidak ditetapkan",
       "noSlaDeadline": "Tiada tarikh akhir SLA",

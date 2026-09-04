@@ -132,7 +132,8 @@
     "truncated": "کورتکراوە",
     "updated": "نوێکراوەتەوە",
     "working": "لە کاردا",
-    "yourOwnRepositories": "کۆگاکانی خۆت"
+    "yourOwnRepositories": "کۆگاکانی خۆت",
+    "dismissed": "پشتگوێخراو"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -615,7 +616,6 @@
       "reviewApproved": "پەسەندکرا",
       "reviewChangesRequested": "گۆڕانکاری داواکرا",
       "reviewCommented": "لێدوان درا",
-      "reviewDismissed": "لابراو",
       "reviewPending": "چاوەڕێی پێداچوونەوە",
       "openIssueA11y": "کێشەی #{{number}} لە GitHub بکەرەوە"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "لە {{date}} چاککرا",
       "resolutionRecorded": "چارەسەر تۆمارکرا",
       "superseded": "جێگەی گیراوەتەوە",
-      "dismissed": "پشتگوێخراو",
       "closedOn": "{{status}} لە {{date}}",
       "deadlineNotSet": "مۆڵەت دیارینەکراوە",
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA نییە",

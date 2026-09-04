@@ -132,7 +132,8 @@
     "truncated": "కుదించారు",
     "updated": "నవీకరించారు",
     "working": "పని జరుగుతోంది",
-    "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు"
+    "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
+    "dismissed": "విస్మరించారు"
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -615,7 +616,6 @@
       "reviewApproved": "ఆమోదించబడింది",
       "reviewChangesRequested": "మార్పులు కోరబడ్డాయి",
       "reviewCommented": "వ్యాఖ్యానించబడింది",
-      "reviewDismissed": "తోసివేయబడింది",
       "reviewPending": "సమీక్ష కోసం వేచి ఉంది",
       "openIssueA11y": "GitHub లో సమస్య #{{number}} తెరవండి"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "పరిష్కరించిన తేదీ: {{date}}",
       "resolutionRecorded": "పరిష్కారం నమోదు చేయబడింది",
       "superseded": "కొత్తదానితో భర్తీ చేశారు",
-      "dismissed": "విస్మరించారు",
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "గడువు నిర్ణయించబడలేదు",
       "noSlaDeadline": "SLA గడువు లేదు",

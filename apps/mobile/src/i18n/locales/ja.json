@@ -132,7 +132,8 @@
     "truncated": "一部省略",
     "updated": "更新",
     "working": "作業中",
-    "yourOwnRepositories": "自分のリポジトリ"
+    "yourOwnRepositories": "自分のリポジトリ",
+    "dismissed": "却下済み"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -1371,7 +1372,6 @@
       "fixedOn": "{{date}}に修正",
       "resolutionRecorded": "解決を記録済み",
       "superseded": "置き換え済み",
-      "dismissed": "却下済み",
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "期限未設定",
       "noSlaDeadline": "SLA期限なし",
@@ -2628,8 +2628,7 @@
       "reviewChangesRequested": "変更を要求",
       "reviewCommented": "コメント済み",
       "reviewPending": "レビュー待ち",
-      "openIssueA11y": "GitHub でイシュー #{{number}} を開く",
-      "reviewDismissed": "却下済み"
+      "openIssueA11y": "GitHub でイシュー #{{number}} を開く"
     },
     "pendingComment": {
       "allQueuedHint": "すべてのコメントを1回のリクエストにまとめて送信します。",

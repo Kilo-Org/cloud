@@ -132,7 +132,8 @@
     "truncated": "Stytt",
     "updated": "Uppfært",
     "working": "Í vinnslu",
-    "yourOwnRepositories": "Þín eigin kóðasöfn"
+    "yourOwnRepositories": "Þín eigin kóðasöfn",
+    "dismissed": "Vísað frá"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Óskað eftir breytingum",
       "reviewCommented": "Athugasemd gerð",
       "reviewPending": "Bíður yfirlestrar",
-      "openIssueA11y": "Opna mál #{{number}} á GitHub",
-      "reviewDismissed": "Vísað frá"
+      "openIssueA11y": "Opna mál #{{number}} á GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri athugasemd í bið við {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Lagað {{date}}",
       "resolutionRecorded": "Lausn skráð",
       "superseded": "Leyst af hólmi",
-      "dismissed": "Vísað frá",
       "closedOn": "{{status}} þann {{date}}",
       "deadlineNotSet": "Frestur ekki ákveðinn",
       "noSlaDeadline": "Enginn SLA-frestur",

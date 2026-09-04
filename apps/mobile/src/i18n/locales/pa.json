@@ -132,7 +132,8 @@
     "truncated": "ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
     "updated": "ਅੱਪਡੇਟ ਕੀਤਾ ਗਿਆ",
     "working": "ਕੰਮ ਜਾਰੀ",
-    "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ"
+    "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
+    "dismissed": "ਖਾਰਜ"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "ਤਬਦੀਲੀਆਂ ਮੰਗੀਆਂ",
       "reviewCommented": "ਟਿੱਪਣੀ ਕੀਤੀ",
       "reviewPending": "ਸਮੀਖਿਆ ਦੀ ਉਡੀਕ",
-      "openIssueA11y": "GitHub ਉੱਤੇ ਮੁੱਦਾ #{{number}} ਖੋਲ੍ਹੋ",
-      "reviewDismissed": "ਖਾਰਜ ਕੀਤਾ ਗਿਆ"
+      "openIssueA11y": "GitHub ਉੱਤੇ ਮੁੱਦਾ #{{number}} ਖੋਲ੍ਹੋ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} 'ਤੇ ਪੁਰਾਣੀ ਲੰਬਿਤ ਟਿੱਪਣੀ ਸੋਧੋ",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} ਨੂੰ ਠੀਕ ਕੀਤਾ ਗਿਆ",
       "resolutionRecorded": "ਹੱਲ ਰਿਕਾਰਡ ਕੀਤਾ ਗਿਆ",
       "superseded": "ਨਵੇਂ ਨਤੀਜੇ ਨਾਲ ਬਦਲਿਆ ਗਿਆ",
-      "dismissed": "ਖਾਰਜ",
       "closedOn": "{{date}} ਨੂੰ {{status}}",
       "deadlineNotSet": "ਸਮਾਂ ਸੀਮਾ ਨਿਰਧਾਰਤ ਨਹੀਂ",
       "noSlaDeadline": "ਕੋਈ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",

@@ -132,7 +132,8 @@
     "truncated": "已截断",
     "updated": "已更新",
     "working": "处理中",
-    "yourOwnRepositories": "你自己的仓库"
+    "yourOwnRepositories": "你自己的仓库",
+    "dismissed": "已忽略"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -1371,7 +1372,6 @@
       "fixedOn": "已于 {{date}} 修复",
       "resolutionRecorded": "已记录解决情况",
       "superseded": "已取代",
-      "dismissed": "已忽略",
       "closedOn": "{{date}} {{status}}",
       "deadlineNotSet": "未设置截止时间",
       "noSlaDeadline": "无 SLA 截止时间",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "已批准",
       "reviewChangesRequested": "已请求修改",
       "reviewCommented": "已评论",
-      "reviewDismissed": "已忽略",
       "reviewPending": "等待审查",
       "openIssueA11y": "在 GitHub 上打开议题 #{{number}}"
     },

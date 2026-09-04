@@ -132,7 +132,8 @@
     "truncated": "קוצר",
     "updated": "עודכן",
     "working": "בפעולה",
-    "yourOwnRepositories": "המאגרים שלך"
+    "yourOwnRepositories": "המאגרים שלך",
+    "dismissed": "סומן להתעלמות"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -1375,7 +1376,6 @@
       "fixedOn": "תוקן ב-{{date}}",
       "resolutionRecorded": "תועד פתרון",
       "superseded": "הוחלף",
-      "dismissed": "סומן להתעלמות",
       "closedOn": "{{status}} ב-{{date}}",
       "deadlineNotSet": "לא הוגדר מועד אחרון",
       "noSlaDeadline": "אין מועד אחרון לפי SLA",
@@ -2647,7 +2647,6 @@
       "reviewApproved": "אושרה",
       "reviewChangesRequested": "התבקשו שינויים",
       "reviewCommented": "הוגשה תגובה",
-      "reviewDismissed": "נדחה",
       "reviewPending": "ממתינה לסקירה",
       "openIssueA11y": "פתח סוגיה #{{number}} ב-GitHub"
     },

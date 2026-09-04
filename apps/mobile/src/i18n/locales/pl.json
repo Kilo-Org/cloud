@@ -132,7 +132,8 @@
     "truncated": "Skrócono",
     "updated": "Zaktualizowano",
     "working": "W toku",
-    "yourOwnRepositories": "Twoje repozytoria"
+    "yourOwnRepositories": "Twoje repozytoria",
+    "dismissed": "Odrzucone"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -1379,7 +1380,6 @@
       "fixedOn": "Naprawiono {{date}}",
       "resolutionRecorded": "Zarejestrowano rozwiązanie",
       "superseded": "Zastąpione",
-      "dismissed": "Odrzucone",
       "closedOn": "{{status}} · Data: {{date}}",
       "deadlineNotSet": "Nie ustawiono terminu",
       "noSlaDeadline": "Brak terminu SLA",
@@ -2668,8 +2668,7 @@
       "reviewChangesRequested": "Poproszono o zmiany",
       "reviewCommented": "Skomentowano",
       "reviewPending": "Oczekuje na recenzję",
-      "openIssueA11y": "Otwórz zgłoszenie #{{number}} w GitHub",
-      "reviewDismissed": "Odrzucone"
+      "openIssueA11y": "Otwórz zgłoszenie #{{number}} w GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Wszystkie komentarze zostaną wysłane w jednym zbiorczym żądaniu.",

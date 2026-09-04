@@ -132,7 +132,8 @@
     "truncated": "Skrajšano",
     "updated": "Posodobljeno",
     "working": "V teku",
-    "yourOwnRepositories": "Tvoji repozitoriji"
+    "yourOwnRepositories": "Tvoji repozitoriji",
+    "dismissed": "Zavrženo"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -630,8 +631,7 @@
       "reviewChangesRequested": "Zahtevane spremembe",
       "reviewCommented": "Komentirano",
       "reviewPending": "Čaka na pregled",
-      "openIssueA11y": "Odpri težavo #{{number}} na GitHubu",
-      "reviewDismissed": "Zavrženo"
+      "openIssueA11y": "Odpri težavo #{{number}} na GitHubu"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
@@ -1825,7 +1825,6 @@
       "fixedOn": "Popravljeno {{date}}",
       "resolutionRecorded": "Razrešitev zabeležena",
       "superseded": "Nadomeščeno",
-      "dismissed": "Zavrženo",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Rok ni določen",
       "noSlaDeadline": "Brez roka SLA",

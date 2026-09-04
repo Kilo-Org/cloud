@@ -132,7 +132,8 @@
     "truncated": "Қысқартылған",
     "updated": "Жаңартылды",
     "working": "Орындалуда",
-    "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз"
+    "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз",
+    "dismissed": "Еленбейді"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -615,7 +616,6 @@
       "reviewApproved": "Мақұлданды",
       "reviewChangesRequested": "Өзгертулер сұралды",
       "reviewCommented": "Пікір қалдырылды",
-      "reviewDismissed": "Болдырылды",
       "reviewPending": "Қарауды күтуде",
       "openIssueA11y": "GitHub-та #{{number}} мәселесін ашу"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} күні түзетілді",
       "resolutionRecorded": "Мәселенің шешілгені тіркелді",
       "superseded": "Жаңасымен ауыстырылды",
-      "dismissed": "Еленбейді",
       "closedOn": "{{date}} күні: {{status}}",
       "deadlineNotSet": "Мерзім белгіленбеген",
       "noSlaDeadline": "SLA мерзімі жоқ",

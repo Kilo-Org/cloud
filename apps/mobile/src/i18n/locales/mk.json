@@ -132,7 +132,8 @@
     "truncated": "Скратено",
     "updated": "Ажурирано",
     "working": "Во тек",
-    "yourOwnRepositories": "Твоите репозиториуми"
+    "yourOwnRepositories": "Твоите репозиториуми",
+    "dismissed": "Отфрлено"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Побарани промени",
       "reviewCommented": "Коментирано",
       "reviewPending": "Чека рецензија",
-      "openIssueA11y": "Отвори проблем #{{number}} на GitHub",
-      "reviewDismissed": "Отфрлен"
+      "openIssueA11y": "Отвори проблем #{{number}} на GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Поправено {{date}}",
       "resolutionRecorded": "Решавањето е запишано",
       "superseded": "Заменето",
-      "dismissed": "Отфрлено",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Рокот не е поставен",
       "noSlaDeadline": "Нема рок според SLA",

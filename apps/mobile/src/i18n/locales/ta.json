@@ -132,7 +132,8 @@
     "truncated": "துண்டிக்கப்பட்டது",
     "updated": "புதுப்பிக்கப்பட்டது",
     "working": "பணியில்",
-    "yourOwnRepositories": "உங்கள் சொந்தக் களஞ்சியங்கள்"
+    "yourOwnRepositories": "உங்கள் சொந்தக் களஞ்சியங்கள்",
+    "dismissed": "புறக்கணிக்கப்பட்டது"
   },
   "language": {
     "restarting": "மொழி மாற்றத்தைப் பயன்படுத்த மறுதொடக்கம் செய்கிறது",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "மாற்றங்கள் கோரப்பட்டன",
       "reviewCommented": "கருத்து தெரிவிக்கப்பட்டது",
       "reviewPending": "மதிப்பாய்வுக்காகக் காத்திருக்கிறது",
-      "openIssueA11y": "GitHub இல் சிக்கல் #{{number}} ஐத் திறக்கவும்",
-      "reviewDismissed": "நிராகரிக்கப்பட்டது"
+      "openIssueA11y": "GitHub இல் சிக்கல் #{{number}} ஐத் திறக்கவும்"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-இல் பழைய பதிப்பைக் குறிக்கும் நிலுவைக் கருத்தைத் திருத்தவும்",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} அன்று சரிசெய்யப்பட்டது",
       "resolutionRecorded": "தீர்வு பதிவு செய்யப்பட்டது",
       "superseded": "புதிய பதிவால் மாற்றப்பட்டது",
-      "dismissed": "புறக்கணிக்கப்பட்டது",
       "closedOn": "{{date}} அன்று {{status}}",
       "deadlineNotSet": "காலக்கெடு அமைக்கப்படவில்லை",
       "noSlaDeadline": "SLA காலக்கெடு இல்லை",

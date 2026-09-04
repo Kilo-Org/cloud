@@ -132,7 +132,8 @@
     "truncated": "Skrátené",
     "updated": "Aktualizované",
     "working": "Pracuje sa",
-    "yourOwnRepositories": "Tvoje vlastné repozitáre"
+    "yourOwnRepositories": "Tvoje vlastné repozitáre",
+    "dismissed": "Ignorované"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -629,7 +630,6 @@
       "reviewApproved": "Schválené",
       "reviewChangesRequested": "Vyžiadané zmeny",
       "reviewCommented": "Okomentované",
-      "reviewDismissed": "Odmietnuté",
       "reviewPending": "Čaká na recenziu",
       "openIssueA11y": "Otvoriť úlohu #{{number}} na GitHube"
     },
@@ -1825,7 +1825,6 @@
       "fixedOn": "Opravené {{date}}",
       "resolutionRecorded": "Vyriešenie zaznamenané",
       "superseded": "Nahradené",
-      "dismissed": "Ignorované",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Termín nie je nastavený",
       "noSlaDeadline": "Bez termínu SLA",

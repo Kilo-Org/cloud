@@ -132,7 +132,8 @@
     "truncated": "已截斷",
     "updated": "已更新",
     "working": "處理中",
-    "yourOwnRepositories": "你自己的存放庫"
+    "yourOwnRepositories": "你自己的存放庫",
+    "dismissed": "已忽略"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -1371,7 +1372,6 @@
       "fixedOn": "已於 {{date}} 修復",
       "resolutionRecorded": "已記錄處理結果",
       "superseded": "已被取代",
-      "dismissed": "已忽略",
       "closedOn": "{{date}}：{{status}}",
       "deadlineNotSet": "未設定期限",
       "noSlaDeadline": "無 SLA 期限",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "已核准",
       "reviewChangesRequested": "已要求修改",
       "reviewCommented": "已評論",
-      "reviewDismissed": "已忽略",
       "reviewPending": "等待審查",
       "openIssueA11y": "在 GitHub 上開啟議題 #{{number}}"
     },

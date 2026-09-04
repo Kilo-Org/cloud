@@ -132,7 +132,8 @@
     "truncated": "Đã cắt bớt",
     "updated": "Đã cập nhật",
     "working": "Đang xử lý",
-    "yourOwnRepositories": "Kho mã nguồn của riêng bạn"
+    "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
+    "dismissed": "Đã bỏ qua"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -1371,7 +1372,6 @@
       "fixedOn": "Đã khắc phục vào {{date}}",
       "resolutionRecorded": "Đã ghi nhận việc giải quyết",
       "superseded": "Đã thay thế",
-      "dismissed": "Đã bỏ qua",
       "closedOn": "{{status}} vào {{date}}",
       "deadlineNotSet": "Chưa đặt hạn chót",
       "noSlaDeadline": "Không có hạn chót SLA",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "Đã phê duyệt",
       "reviewChangesRequested": "Đã yêu cầu thay đổi",
       "reviewCommented": "Đã bình luận",
-      "reviewDismissed": "Đã bỏ qua",
       "reviewPending": "Đang chờ đánh giá",
       "openIssueA11y": "Mở vấn đề #{{number}} trên GitHub"
     },

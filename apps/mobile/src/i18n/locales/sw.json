@@ -132,7 +132,8 @@
     "truncated": "Imepunguzwa",
     "updated": "Imesasishwa",
     "working": "Inafanya kazi",
-    "yourOwnRepositories": "Hazina zako mwenyewe"
+    "yourOwnRepositories": "Hazina zako mwenyewe",
+    "dismissed": "Imepuuzwa"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Mabadiliko yameombwa",
       "reviewCommented": "Imetolewa maoni",
       "reviewPending": "Inasubiri ukaguzi",
-      "openIssueA11y": "Fungua suala #{{number}} kwenye GitHub",
-      "reviewDismissed": "Imefutwa"
+      "openIssueA11y": "Fungua suala #{{number}} kwenye GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni yaliyopitwa na wakati yanayosubiri kutumwa kwenye {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Limerekebishwa {{date}}",
       "resolutionRecorded": "Utatuzi umerekodiwa",
       "superseded": "Imebadilishwa na nyingine",
-      "dismissed": "Imepuuzwa",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Muda wa mwisho haujawekwa",
       "noSlaDeadline": "Hakuna muda wa mwisho wa SLA",

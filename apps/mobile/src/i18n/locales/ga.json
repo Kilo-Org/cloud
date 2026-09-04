@@ -132,7 +132,8 @@
     "truncated": "Teasctha",
     "updated": "Nuashonraithe",
     "working": "Ag obair",
-    "yourOwnRepositories": "Do stóir féin"
+    "yourOwnRepositories": "Do stóir féin",
+    "dismissed": "Curtha as an áireamh"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -636,7 +637,6 @@
       "reviewApproved": "Ceadaithe",
       "reviewChangesRequested": "Iarradh athruithe",
       "reviewCommented": "Trácht déanta",
-      "reviewDismissed": "Díbithe",
       "reviewPending": "Ag fanacht le hathbhreithniú",
       "openIssueA11y": "Oscail ceist #{{number}} ar GitHub"
     },
@@ -1836,7 +1836,6 @@
       "fixedOn": "Deisithe: {{date}}",
       "resolutionRecorded": "Taifeadadh an réiteach",
       "superseded": "Ceann nua ina áit",
-      "dismissed": "Curtha as an áireamh",
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Gan spriocdháta socraithe",
       "noSlaDeadline": "Gan spriocdháta SLA",

@@ -132,7 +132,8 @@
     "truncated": "Katkaistu",
     "updated": "Päivitetty",
     "working": "Työn alla",
-    "yourOwnRepositories": "Omat koodivarastosi"
+    "yourOwnRepositories": "Omat koodivarastosi",
+    "dismissed": "Sivuutettu"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Muutoksia pyydetty",
       "reviewCommented": "Kommentoitu",
       "reviewPending": "Odottaa katselmointia",
-      "openIssueA11y": "Avaa tiketti #{{number}} GitHubissa",
-      "reviewDismissed": "Hylätty"
+      "openIssueA11y": "Avaa tiketti #{{number}} GitHubissa"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta lähettämätöntä kommenttia: {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Korjattu {{date}}",
       "resolutionRecorded": "Ratkaisu kirjattu",
       "superseded": "Korvattu",
-      "dismissed": "Sivuutettu",
       "closedOn": "Tila: {{status}} · {{date}}",
       "deadlineNotSet": "Määräaikaa ei ole asetettu",
       "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",

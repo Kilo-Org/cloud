@@ -132,7 +132,8 @@
     "truncated": "Περικομμένο",
     "updated": "Ενημερώθηκε",
     "working": "Σε εξέλιξη",
-    "yourOwnRepositories": "Τα δικά σου αποθετήρια"
+    "yourOwnRepositories": "Τα δικά σου αποθετήρια",
+    "dismissed": "Απορρίφθηκε"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Ζητήθηκαν αλλαγές",
       "reviewCommented": "Σχολιάστηκε",
       "reviewPending": "Σε αναμονή κριτικής",
-      "openIssueA11y": "Άνοιγμα ζητήματος #{{number}} στο GitHub",
-      "reviewDismissed": "Απορρίφθηκε"
+      "openIssueA11y": "Άνοιγμα ζητήματος #{{number}} στο GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Επεξεργασία παρωχημένου εκκρεμούς σχολίου στο {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Διορθώθηκε στις {{date}}",
       "resolutionRecorded": "Η επίλυση καταγράφηκε",
       "superseded": "Αντικαταστάθηκε",
-      "dismissed": "Απορρίφθηκε",
       "closedOn": "{{status}} στις {{date}}",
       "deadlineNotSet": "Η προθεσμία δεν έχει οριστεί",
       "noSlaDeadline": "Χωρίς προθεσμία SLA",

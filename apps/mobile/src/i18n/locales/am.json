@@ -132,7 +132,8 @@
     "truncated": "ተቆርጧል",
     "updated": "ተዘምኗል",
     "working": "በመሥራት ላይ",
-    "yourOwnRepositories": "የራስህ ማከማቻዎች"
+    "yourOwnRepositories": "የራስህ ማከማቻዎች",
+    "dismissed": "ተወግዷል"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "ለውጦች ተጠይቀዋል",
       "reviewCommented": "አስተያየት ተሰጥቷል",
       "reviewPending": "ግምገማ በመጠባበቅ ላይ",
-      "openIssueA11y": "ጉዳይ #{{number}} በGitHub ላይ ክፈት",
-      "reviewDismissed": "ተወግዷል"
+      "openIssueA11y": "ጉዳይ #{{number}} በGitHub ላይ ክፈት"
     },
     "pendingComment": {
       "editOutdatedA11y": "በ{{location}} ላይ ያለውን ከአሁኑ ኮድ ጋር የማይዛመድ ያልተላከ አስተያየት አርትዕ",
@@ -1803,7 +1803,6 @@
       "fixedOn": "በ{{date}} ተስተካክሏል",
       "resolutionRecorded": "መፍትሄ ተመዝግቧል",
       "superseded": "ተተክቷል",
-      "dismissed": "ተወግዷል",
       "closedOn": "{{date}}፦ {{status}}",
       "deadlineNotSet": "የጊዜ ገደብ አልተወሰነም",
       "noSlaDeadline": "የSLA ጊዜ ገደብ የለም",

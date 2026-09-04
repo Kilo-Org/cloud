@@ -132,7 +132,8 @@
     "truncated": "ถูกตัดทอน",
     "updated": "อัปเดตแล้ว",
     "working": "กำลังทำงาน",
-    "yourOwnRepositories": "คลังโค้ดของคุณเอง"
+    "yourOwnRepositories": "คลังโค้ดของคุณเอง",
+    "dismissed": "ละเว้นแล้ว"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "ขอให้แก้ไข",
       "reviewCommented": "แสดงความคิดเห็นแล้ว",
       "reviewPending": "รอการตรวจทาน",
-      "openIssueA11y": "เปิดปัญหา #{{number}} บน GitHub",
-      "reviewDismissed": "ละเว้นแล้ว"
+      "openIssueA11y": "เปิดปัญหา #{{number}} บน GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอส่งและอ้างอิงโค้ดเก่าที่ {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "แก้ไขเมื่อ {{date}}",
       "resolutionRecorded": "บันทึกการแก้ไขแล้ว",
       "superseded": "ถูกแทนที่แล้ว",
-      "dismissed": "ละเว้นแล้ว",
       "closedOn": "{{status}} เมื่อ {{date}}",
       "deadlineNotSet": "ยังไม่ได้ตั้งกำหนดเวลา",
       "noSlaDeadline": "ไม่มีกำหนดเวลา SLA",

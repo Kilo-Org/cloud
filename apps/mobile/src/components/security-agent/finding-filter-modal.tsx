@@ -43,7 +43,7 @@ const OUTCOME_OPTIONS = [
   { value: 'needs_review', labelKey: 'securityAgent.analysisState.unknown' },
   { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
-  { value: 'dismissed', labelKey: 'securityAgent.deadline.dismissed' },
+  { value: 'dismissed', labelKey: 'common.dismissed' },
 ] as const satisfies readonly { value: SecurityOutcomeFilter; labelKey: string }[];
 
 const SORT_OPTIONS = [

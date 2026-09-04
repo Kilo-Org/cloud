@@ -132,7 +132,8 @@
     "truncated": "Wedi'i gwtogi",
     "updated": "Diweddarwyd",
     "working": "Yn gweithio",
-    "yourOwnRepositories": "Dy ystorfeydd dy hun"
+    "yourOwnRepositories": "Dy ystorfeydd dy hun",
+    "dismissed": "Wedi'i ddiystyru"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -643,7 +644,6 @@
       "reviewApproved": "Cymeradwywyd",
       "reviewChangesRequested": "Gofynnwyd am newidiadau",
       "reviewCommented": "Sylwadwyd",
-      "reviewDismissed": "Wedi'i ddiystyru",
       "reviewPending": "Yn aros am adolygiad",
       "openIssueA11y": "Agor mater #{{number}} ar GitHub"
     },
@@ -1847,7 +1847,6 @@
       "fixedOn": "Wedi'i drwsio {{date}}",
       "resolutionRecorded": "Datrysiad wedi'i gofnodi",
       "superseded": "Wedi'i ddisodli",
-      "dismissed": "Wedi'i ddiystyru",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dyddiad terfyn heb ei osod",
       "noSlaDeadline": "Dim dyddiad terfyn SLA",

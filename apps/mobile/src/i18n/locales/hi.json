@@ -132,7 +132,8 @@
     "truncated": "आंशिक सामग्री",
     "updated": "अपडेट किया गया",
     "working": "काम जारी",
-    "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी"
+    "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
+    "dismissed": "खारिज"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -1371,7 +1372,6 @@
       "fixedOn": "{{date}} को ठीक किया गया",
       "resolutionRecorded": "समाधान दर्ज किया गया",
       "superseded": "नए रिकॉर्ड से बदला गया",
-      "dismissed": "खारिज",
       "closedOn": "{{date}} को {{status}}",
       "deadlineNotSet": "समय सीमा निर्धारित नहीं",
       "noSlaDeadline": "SLA की कोई समय सीमा नहीं",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "स्वीकृत",
       "reviewChangesRequested": "बदलाव मांगे गए",
       "reviewCommented": "टिप्पणी की गई",
-      "reviewDismissed": "खारिज किया गया",
       "reviewPending": "समीक्षा की प्रतीक्षा",
       "openIssueA11y": "GitHub पर मुद्दा #{{number}} खोलें"
     },

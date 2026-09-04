@@ -132,7 +132,8 @@
     "truncated": "Съкратено",
     "updated": "Актуализирано",
     "working": "В процес",
-    "yourOwnRepositories": "Личните ти хранилища"
+    "yourOwnRepositories": "Личните ти хранилища",
+    "dismissed": "Отхвърлено"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Заявени промени",
       "reviewCommented": "Коментирано",
       "reviewPending": "Очаква преглед",
-      "openIssueA11y": "Отвори задача #{{number}} в GitHub",
-      "reviewDismissed": "Отхвърлено"
+      "openIssueA11y": "Отвори задача #{{number}} в GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Редактирай неактуалния неизпратен коментар към {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Отстранен на {{date}}",
       "resolutionRecorded": "Решаването на проблема е записано",
       "superseded": "Заменено",
-      "dismissed": "Отхвърлено",
       "closedOn": "{{status}} на {{date}}",
       "deadlineNotSet": "Няма зададен краен срок",
       "noSlaDeadline": "Няма краен срок по SLA",

@@ -132,7 +132,8 @@
     "truncated": "Truncat",
     "updated": "Actualitzat",
     "working": "En curs",
-    "yourOwnRepositories": "Els teus repositoris"
+    "yourOwnRepositories": "Els teus repositoris",
+    "dismissed": "Descartat"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -622,7 +623,6 @@
       "reviewApproved": "Aprovat",
       "reviewChangesRequested": "Canvis sol·licitats",
       "reviewCommented": "Comentat",
-      "reviewDismissed": "Descartat",
       "reviewPending": "Pendent de revisió",
       "openIssueA11y": "Obre la incidència #{{number}} a GitHub"
     },
@@ -1814,7 +1814,6 @@
       "fixedOn": "Corregida el {{date}}",
       "resolutionRecorded": "Resolució registrada",
       "superseded": "Substituït",
-      "dismissed": "Descartat",
       "closedOn": "{{status}} el {{date}}",
       "deadlineNotSet": "Termini no establert",
       "noSlaDeadline": "Sense termini de l'SLA",

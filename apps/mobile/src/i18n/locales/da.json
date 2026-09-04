@@ -132,7 +132,8 @@
     "truncated": "Afkortet",
     "updated": "Opdateret",
     "working": "I gang",
-    "yourOwnRepositories": "Dine egne kodelagre"
+    "yourOwnRepositories": "Dine egne kodelagre",
+    "dismissed": "Afvist"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Ændringer ønsket",
       "reviewCommented": "Kommenteret",
       "reviewPending": "Afventer gennemgang",
-      "openIssueA11y": "Åbn sag #{{number}} på GitHub",
-      "reviewDismissed": "Afvist"
+      "openIssueA11y": "Åbn sag #{{number}} på GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet, ventende kommentar ved {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Løst den {{date}}",
       "resolutionRecorded": "Løsning registreret",
       "superseded": "Erstattet",
-      "dismissed": "Afvist",
       "closedOn": "{{status}} den {{date}}",
       "deadlineNotSet": "Frist ikke angivet",
       "noSlaDeadline": "Ingen SLA-frist",

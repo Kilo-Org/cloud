@@ -132,7 +132,8 @@
     "truncated": "ഭാഗികം",
     "updated": "പുതുക്കി",
     "working": "പ്രവർത്തിക്കുന്നു",
-    "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ"
+    "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
+    "dismissed": "ഒഴിവാക്കി"
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "മാറ്റങ്ങൾ ആവശ്യപ്പെട്ടു",
       "reviewCommented": "അഭിപ്രായം രേഖപ്പെടുത്തി",
       "reviewPending": "അവലോകനത്തിനായി കാത്തിരിക്കുന്നു",
-      "openIssueA11y": "GitHub-ൽ പ്രശ്നം #{{number}} തുറക്കുക",
-      "reviewDismissed": "നിരസിച്ചു"
+      "openIssueA11y": "GitHub-ൽ പ്രശ്നം #{{number}} തുറക്കുക"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} എന്നിടത്തെ കാലഹരണപ്പെട്ട, സമർപ്പിക്കാത്ത അഭിപ്രായം എഡിറ്റ് ചെയ്യുക",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}}-ൽ പരിഹരിച്ചു",
       "resolutionRecorded": "പരിഹാരം രേഖപ്പെടുത്തി",
       "superseded": "മാറ്റിസ്ഥാപിച്ചു",
-      "dismissed": "ഒഴിവാക്കി",
       "closedOn": "{{date}}: {{status}}",
       "deadlineNotSet": "സമയപരിധി സജ്ജീകരിച്ചിട്ടില്ല",
       "noSlaDeadline": "SLA സമയപരിധിയില്ല",

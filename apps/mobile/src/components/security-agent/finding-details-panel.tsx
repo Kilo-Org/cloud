@@ -41,7 +41,7 @@ const SEVERITY_KEYS = {
 const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.deadline.superseded',
   fixed: 'securityAgent.filter.fixed',
-  dismissed: 'securityAgent.deadline.dismissed',
+  dismissed: 'common.dismissed',
   open: 'securityAgent.findingDetails.statusOpen',
 } satisfies Record<string, string>;
 
@@ -109,7 +109,7 @@ function DismissalOrSupersessionNote({
 
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.deadline.dismissed')}</Text>
+      <Text className="text-sm font-medium">{t('common.dismissed')}</Text>
       <Text variant="muted" className="text-xs" selectable>
         {t('securityAgent.findingDetails.dismissedBecause', {
           reason: getDismissalReasonLabel(finding.ignored_reason),

@@ -132,7 +132,8 @@
     "truncated": "Tronqué",
     "updated": "Mis à jour",
     "working": "En cours",
-    "yourOwnRepositories": "Vos propres dépôts"
+    "yourOwnRepositories": "Vos propres dépôts",
+    "dismissed": "Ignoré"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -1357,7 +1358,6 @@
       "fixedOn": "Corrigé le {{date}}",
       "resolutionRecorded": "Résolution enregistrée",
       "superseded": "Remplacé",
-      "dismissed": "Ignoré",
       "closedOn": "{{status}} le {{date}}",
       "deadlineNotSet": "Aucune échéance définie",
       "noSlaDeadline": "Aucune échéance de SLA",
@@ -2647,7 +2647,6 @@
       "reviewApproved": "Approuvée",
       "reviewChangesRequested": "Modifications demandées",
       "reviewCommented": "Commentée",
-      "reviewDismissed": "Ignoré",
       "reviewPending": "En attente de relecture",
       "openIssueA11y": "Ouvrir le ticket #{{number}} sur GitHub"
     },

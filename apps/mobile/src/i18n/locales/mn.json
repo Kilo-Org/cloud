@@ -132,7 +132,8 @@
     "truncated": "Хэсэгчилсэн",
     "updated": "Шинэчлэгдсэн",
     "working": "Ажиллаж байна",
-    "yourOwnRepositories": "Таны кодын сангууд"
+    "yourOwnRepositories": "Таны кодын сангууд",
+    "dismissed": "Хасагдсан"
   },
   "language": {
     "restarting": "Сонгосон хэлийг хэрэглэхийн тулд дахин ачаалж байна",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Өөрчлөлт хүссэн",
       "reviewCommented": "Сэтгэгдэл үлдээсэн",
       "reviewPending": "Хяналт хүлээж байна",
-      "openIssueA11y": "GitHub дээр #{{number}} асуудлыг нээх",
-      "reviewDismissed": "Хасагдсан"
+      "openIssueA11y": "GitHub дээр #{{number}} асуудлыг нээх"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} дээрх хуучирсан, илгээгээгүй сэтгэгдлийг засах",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Зассан огноо: {{date}}",
       "resolutionRecorded": "Шийдвэрлэснийг бүртгэсэн",
       "superseded": "Орлогдсон",
-      "dismissed": "Хасагдсан",
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "Эцсийн хугацаа тогтоогоогүй",
       "noSlaDeadline": "SLA эцсийн хугацаагүй",

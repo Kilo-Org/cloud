@@ -132,7 +132,8 @@
     "truncated": "Avkortat",
     "updated": "Uppdaterad",
     "working": "Arbetar",
-    "yourOwnRepositories": "Dina egna kodarkiv"
+    "yourOwnRepositories": "Dina egna kodarkiv",
+    "dismissed": "Avskriven"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Ändringar begärda",
       "reviewCommented": "Kommenterad",
       "reviewPending": "Väntar på granskning",
-      "openIssueA11y": "Öppna ärende #{{number}} på GitHub",
-      "reviewDismissed": "Avskriven"
+      "openIssueA11y": "Öppna ärende #{{number}} på GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redigera inaktuell oskickad kommentar vid {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Åtgärdat {{date}}",
       "resolutionRecorded": "Åtgärd registrerad",
       "superseded": "Ersatt",
-      "dismissed": "Avskriven",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen tidsfrist angiven",
       "noSlaDeadline": "Ingen SLA-tidsfrist",

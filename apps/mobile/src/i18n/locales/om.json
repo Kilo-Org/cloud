@@ -132,7 +132,8 @@
     "truncated": "Gabaabfame",
     "updated": "Haaromfame",
     "working": "Hojjechaa jira",
-    "yourOwnRepositories": "Kuusaalee koodii mataa keetii"
+    "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
+    "dismissed": "Dhiifame"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Jijjiiramni gaafatameera",
       "reviewCommented": "Yaadni kennameera",
       "reviewPending": "Qorannoo eeggachaa jira",
-      "openIssueA11y": "Rakkoo #{{number}} GitHub irratti bani",
-      "reviewDismissed": "Dhiifame"
+      "openIssueA11y": "Rakkoo #{{number}} GitHub irratti bani"
     },
     "pendingComment": {
       "editOutdatedA11y": "Yaada yeroon darbee fi erguuf eegamaa jiru {{location}} irratti gulaali",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} irratti sirreeffame",
       "resolutionRecorded": "Furmaanni galmaa'eera",
       "superseded": "Bakka bu'ame",
-      "dismissed": "Dhiifame",
       "closedOn": "{{date}} irratti {{status}}",
       "deadlineNotSet": "Guyyaan xumuraa hin murtoofne",
       "noSlaDeadline": "Guyyaan xumuraa SLA hin jiru",

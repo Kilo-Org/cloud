@@ -132,7 +132,8 @@
     "truncated": "مقتطع",
     "updated": "تم التحديث",
     "working": "جارٍ العمل",
-    "yourOwnRepositories": "مستودعاتك الخاصة"
+    "yourOwnRepositories": "مستودعاتك الخاصة",
+    "dismissed": "مستبعدة"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -1387,7 +1388,6 @@
       "fixedOn": "تم الإصلاح في {{date}}",
       "resolutionRecorded": "تم تسجيل الحل",
       "superseded": "مستبدلة",
-      "dismissed": "مستبعدة",
       "closedOn": "{{status}} في {{date}}",
       "deadlineNotSet": "الموعد النهائي غير محدد",
       "noSlaDeadline": "لا يوجد موعد نهائي حسب SLA",
@@ -2708,8 +2708,7 @@
       "reviewChangesRequested": "طُلبت تغييرات",
       "reviewCommented": "علّق",
       "reviewPending": "بانتظار المراجعة",
-      "openIssueA11y": "افتح المشكلة #{{number}} على GitHub",
-      "reviewDismissed": "مرفوض"
+      "openIssueA11y": "افتح المشكلة #{{number}} على GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "ستُرسل جميع التعليقات في طلب مجمّع واحد.",

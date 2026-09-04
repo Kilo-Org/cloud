@@ -132,7 +132,8 @@
     "truncated": "ဖြတ်တောက်ထား",
     "updated": "မွမ်းမံပြီး",
     "working": "လုပ်ဆောင်နေ",
-    "yourOwnRepositories": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ"
+    "yourOwnRepositories": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ",
+    "dismissed": "ပယ်ချပြီး"
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
@@ -615,7 +616,6 @@
       "reviewApproved": "အတည်ပြုပြီး",
       "reviewChangesRequested": "ပြောင်းလဲမှုများ တောင်းဆိုထားသည်",
       "reviewCommented": "မှတ်ချက်ပေးထားသည်",
-      "reviewDismissed": "ဖျက်သိမ်းပြီး",
       "reviewPending": "စိစစ်မှု စောင့်ဆိုင်းနေသည်",
       "openIssueA11y": "GitHub တွင် ကိစ္စ #{{number}} ကို ဖွင့်ပါ"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} တွင် ပြင်ဆင်ပြီး",
       "resolutionRecorded": "ဖြေရှင်းမှု မှတ်တမ်းတင်ပြီး",
       "superseded": "အသစ်ဖြင့် အစားထိုးပြီး",
-      "dismissed": "ပယ်ချပြီး",
       "closedOn": "{{date}} တွင် {{status}}",
       "deadlineNotSet": "သတ်မှတ်ရက် သတ်မှတ်မထား",
       "noSlaDeadline": "SLA သတ်မှတ်ရက် မရှိ",

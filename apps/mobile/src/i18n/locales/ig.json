@@ -132,7 +132,8 @@
     "truncated": "Ebipụrụ akụkụ",
     "updated": "Emelitere",
     "working": "Na-arụ ọrụ",
-    "yourOwnRepositories": "Ebe nchekwa koodu nke gị"
+    "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
+    "dismissed": "Elegharala anya"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Arịọrọ mgbanwe",
       "reviewCommented": "Ekwuru okwu",
       "reviewPending": "Na-echere nyocha",
-      "openIssueA11y": "Mepee okwu #{{number}} na GitHub",
-      "reviewDismissed": "Ekagburu"
+      "openIssueA11y": "Mepee okwu #{{number}} na GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Dezie okwu ochie na-eche iziga na {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "E doziri {{date}}",
       "resolutionRecorded": "Edekọrọ ndozi",
       "superseded": "Edochiri",
-      "dismissed": "Elegharala anya",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Edebeghị oge njedebe",
       "noSlaDeadline": "Enweghị oge njedebe SLA",

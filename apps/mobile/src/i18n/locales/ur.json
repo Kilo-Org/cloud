@@ -132,7 +132,8 @@
     "truncated": "نامکمل",
     "updated": "اپ ڈیٹ کیا گیا",
     "working": "کام جاری ہے",
-    "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز"
+    "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
+    "dismissed": "نظر انداز کردہ"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "تبدیلیاں طلب کی گئیں",
       "reviewCommented": "تبصرہ کیا گیا",
       "reviewPending": "جائزے کا منتظر",
-      "openIssueA11y": "GitHub پر مسئلہ #{{number}} کھولیں",
-      "reviewDismissed": "مسترد کیا گیا"
+      "openIssueA11y": "GitHub پر مسئلہ #{{number}} کھولیں"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} پر موجود پرانے زیر التوا تبصرے میں ترمیم کریں",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} کو اصلاح ہو گئی",
       "resolutionRecorded": "حل درج کیا گیا",
       "superseded": "نئے اندراج سے بدل دیا گیا",
-      "dismissed": "نظر انداز کردہ",
       "closedOn": "{{date}} کو {{status}}",
       "deadlineNotSet": "آخری تاریخ مقرر نہیں",
       "noSlaDeadline": "SLA کی کوئی آخری تاریخ نہیں",

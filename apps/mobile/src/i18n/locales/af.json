@@ -132,7 +132,8 @@
     "truncated": "Afgekap",
     "updated": "Bygewerk",
     "working": "Besig",
-    "yourOwnRepositories": "Jou eie bewaarplekke"
+    "yourOwnRepositories": "Jou eie bewaarplekke",
+    "dismissed": "Verwerp"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Veranderinge versoek",
       "reviewCommented": "Kommentaar gelewer",
       "reviewPending": "Wag vir resensie",
-      "openIssueA11y": "Open kwessie #{{number}} op GitHub",
-      "reviewDismissed": "Verwerp"
+      "openIssueA11y": "Open kwessie #{{number}} op GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Wysig verouderde hangende kommentaar op {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Reggestel op {{date}}",
       "resolutionRecorded": "Oplossing aangeteken",
       "superseded": "Vervang",
-      "dismissed": "Verwerp",
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Sperdatum nie gestel nie",
       "noSlaDeadline": "Geen SLA-sperdatum nie",

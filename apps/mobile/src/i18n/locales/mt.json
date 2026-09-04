@@ -132,7 +132,8 @@
     "truncated": "Imqassar",
     "updated": "Aġġornat",
     "working": "Fix-xogħol",
-    "yourOwnRepositories": "Ir-repożitorji tiegħek stess"
+    "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
+    "dismissed": "Imwarrba"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -637,8 +638,7 @@
       "reviewChangesRequested": "Intalbu bidliet",
       "reviewCommented": "Ikkummentata",
       "reviewPending": "Tistenna reviżjoni",
-      "openIssueA11y": "Iftaħ il-kwistjoni #{{number}} fuq GitHub",
-      "reviewDismissed": "Mwarrab"
+      "openIssueA11y": "Iftaħ il-kwistjoni #{{number}} fuq GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editja l-kumment pendenti mhux aġġornat fuq {{location}}",
@@ -1836,7 +1836,6 @@
       "fixedOn": "Solvuta {{date}}",
       "resolutionRecorded": "Soluzzjoni rreġistrata",
       "superseded": "Sostitwita",
-      "dismissed": "Imwarrba",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Skadenza mhux issettjata",
       "noSlaDeadline": "L-ebda skadenza tas-SLA",

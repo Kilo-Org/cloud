@@ -132,7 +132,8 @@
     "truncated": "Koupe",
     "updated": "Mete ajou",
     "working": "Ap travay",
-    "yourOwnRepositories": "Pwòp depo ou yo"
+    "yourOwnRepositories": "Pwòp depo ou yo",
+    "dismissed": "Rejte"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Chanjman mande",
       "reviewCommented": "Komante",
       "reviewPending": "Ap tann revizyon",
-      "openIssueA11y": "Ouvri pwoblèm #{{number}} sou GitHub",
-      "reviewDismissed": "Rejte"
+      "openIssueA11y": "Ouvri pwoblèm #{{number}} sou GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè ki poko voye e ki pa ajou sou {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Korije {{date}}",
       "resolutionRecorded": "Solisyon an anrejistre",
       "superseded": "Ranplase",
-      "dismissed": "Rejte",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Dat limit pa fikse",
       "noSlaDeadline": "Pa gen dat limit SLA",

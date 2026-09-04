@@ -132,7 +132,8 @@
     "truncated": "Ingekort",
     "updated": "Bijgewerkt",
     "working": "Bezig",
-    "yourOwnRepositories": "Je eigen coderepository's"
+    "yourOwnRepositories": "Je eigen coderepository's",
+    "dismissed": "Genegeerd"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -1371,7 +1372,6 @@
       "fixedOn": "Opgelost op {{date}}",
       "resolutionRecorded": "Oplossing vastgelegd",
       "superseded": "Vervangen",
-      "dismissed": "Genegeerd",
       "closedOn": "{{status}} op {{date}}",
       "deadlineNotSet": "Deadline niet ingesteld",
       "noSlaDeadline": "Geen SLA-deadline",
@@ -2627,7 +2627,6 @@
       "reviewApproved": "Goedgekeurd",
       "reviewChangesRequested": "Wijzigingen gevraagd",
       "reviewCommented": "Becommentarieerd",
-      "reviewDismissed": "Afgewezen",
       "reviewPending": "Wacht op beoordeling",
       "openIssueA11y": "Issue #{{number}} openen op GitHub"
     },

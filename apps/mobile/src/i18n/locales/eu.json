@@ -132,7 +132,8 @@
     "truncated": "Moztuta",
     "updated": "Eguneratuta",
     "working": "Lanean",
-    "yourOwnRepositories": "Zure biltegiak"
+    "yourOwnRepositories": "Zure biltegiak",
+    "dismissed": "Baztertuta"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Aldaketak eskatuta",
       "reviewCommented": "Iruzkindua",
       "reviewPending": "Berrikuspenaren zain",
-      "openIssueA11y": "Ireki #{{number}} arazoa GitHuben",
-      "reviewDismissed": "Baztertuta"
+      "openIssueA11y": "Ireki #{{number}} arazoa GitHuben"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editatu bidaltzeko dagoen iruzkin zaharkitua: {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Konponketa-data: {{date}}",
       "resolutionRecorded": "Ebazpena erregistratuta",
       "superseded": "Ordezkatuta",
-      "dismissed": "Baztertuta",
       "closedOn": "{{status}} · {{date}}",
       "deadlineNotSet": "Ez da eperik ezarri",
       "noSlaDeadline": "SLAren epemugarik gabe",

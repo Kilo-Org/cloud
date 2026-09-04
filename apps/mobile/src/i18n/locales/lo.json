@@ -132,7 +132,8 @@
     "truncated": "ສະແດງບໍ່ຄົບ",
     "updated": "ອັບເດດແລ້ວ",
     "working": "ກຳລັງເຮັດວຽກ",
-    "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ"
+    "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
+    "dismissed": "ລະເວັ້ນແລ້ວ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "ຮ້ອງຂໍການປ່ຽນແປງ",
       "reviewCommented": "ໄດ້ໃຫ້ຄຳເຫັນ",
       "reviewPending": "ລໍຖ້າການກວດສອບ",
-      "openIssueA11y": "ເປີດບັນຫາ #{{number}} ໃນ GitHub",
-      "reviewDismissed": "ຖືກປິດ"
+      "openIssueA11y": "ເປີດບັນຫາ #{{number}} ໃນ GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງແລະອ້າງອີງໂຄດເກົ່າຢູ່ {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "ແກ້ໄຂເມື່ອ {{date}}",
       "resolutionRecorded": "ບັນທຶກການແກ້ໄຂແລ້ວ",
       "superseded": "ແທນທີ່ແລ້ວ",
-      "dismissed": "ລະເວັ້ນແລ້ວ",
       "closedOn": "{{status}} ເມື່ອ {{date}}",
       "deadlineNotSet": "ຍັງບໍ່ໄດ້ຕັ້ງວັນຄົບກຳນົດ",
       "noSlaDeadline": "ບໍ່ມີວັນຄົບກຳນົດ SLA",

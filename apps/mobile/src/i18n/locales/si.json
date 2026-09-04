@@ -132,7 +132,8 @@
     "truncated": "කෙටි කර ඇත",
     "updated": "යාවත්කාලීන කර ඇත",
     "working": "ක්‍රියාත්මකයි",
-    "yourOwnRepositories": "ඔබේම කේත ගබඩා"
+    "yourOwnRepositories": "ඔබේම කේත ගබඩා",
+    "dismissed": "ඉවතලා ඇත"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "වෙනස්කම් ඉල්ලා ඇත",
       "reviewCommented": "අදහස් දක්වා ඇත",
       "reviewPending": "සමාලෝචනය බලාපොරොත්තුවෙන්",
-      "openIssueA11y": "GitHub හි #{{number}} ගැටලුව විවෘත කරන්න",
-      "reviewDismissed": "ඉවතලා ඇත"
+      "openIssueA11y": "GitHub හි #{{number}} ගැටලුව විවෘත කරන්න"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} හි යල් පැන ගිය, යැවීමට ඇති අදහස සංස්කරණය කරන්න",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} දින නිවැරදි කර ඇත",
       "resolutionRecorded": "විසඳුම සටහන් කර ඇත",
       "superseded": "ප්‍රතිස්ථාපනය වී ඇත",
-      "dismissed": "ඉවතලා ඇත",
       "closedOn": "{{date}} දින {{status}}",
       "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
       "noSlaDeadline": "SLA අවසන් දිනයක් නැත",

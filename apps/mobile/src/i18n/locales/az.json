@@ -132,7 +132,8 @@
     "truncated": "Qısaldılıb",
     "updated": "Yenilənib",
     "working": "İşləyir",
-    "yourOwnRepositories": "Öz repozitoriyaların"
+    "yourOwnRepositories": "Öz repozitoriyaların",
+    "dismissed": "Rədd edilib"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Dəyişikliklər tələb olunub",
       "reviewCommented": "Şərh yazılıb",
       "reviewPending": "Baxış gözlənilir",
-      "openIssueA11y": "#{{number}} məsələsini GitHub-da aç",
-      "reviewDismissed": "Rədd edilib"
+      "openIssueA11y": "#{{number}} məsələsini GitHub-da aç"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} yerindəki köhnəlmiş, göndərilməmiş şərhi redaktə et",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} tarixində düzəldilib",
       "resolutionRecorded": "Həll qeydə alınıb",
       "superseded": "Əvəz edilib",
-      "dismissed": "Rədd edilib",
       "closedOn": "{{date}} — {{status}}",
       "deadlineNotSet": "Müddət təyin edilməyib",
       "noSlaDeadline": "SLA müddəti yoxdur",

@@ -132,7 +132,8 @@
     "truncated": "ଆଂଶିକ",
     "updated": "ଅଦ୍ୟତନ",
     "working": "କାମ କରୁଛି",
-    "yourOwnRepositories": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ"
+    "yourOwnRepositories": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ",
+    "dismissed": "ଖାରଜ ହୋଇଛି"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -615,7 +616,6 @@
       "reviewApproved": "ଅନୁମୋଦିତ",
       "reviewChangesRequested": "ପରିବର୍ତ୍ତନ ଅନୁରୋଧ କରାଯାଇଛି",
       "reviewCommented": "ମନ୍ତବ୍ୟ ଦିଆଯାଇଛି",
-      "reviewDismissed": "ଖାରଜ ହୋଇଛି",
       "reviewPending": "ସମୀକ୍ଷା ଅପେକ୍ଷାରେ",
       "openIssueA11y": "GitHub ରେ ସମସ୍ୟା #{{number}} ଖୋଲନ୍ତୁ"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} ରେ ସମାଧାନ ହୋଇଛି",
       "resolutionRecorded": "ସମାଧାନ ରେକର୍ଡ ହେଲା",
       "superseded": "ନୂଆଟି ଦ୍ୱାରା ପ୍ରତିସ୍ଥାପିତ",
-      "dismissed": "ଖାରଜ ହୋଇଛି",
       "closedOn": "{{date}} ରେ {{status}}",
       "deadlineNotSet": "ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "noSlaDeadline": "କୌଣସି SLA ସମୟସୀମା ନାହିଁ",

@@ -132,7 +132,8 @@
     "truncated": "پرې شوی",
     "updated": "تازه شوی",
     "working": "په کار بوخت",
-    "yourOwnRepositories": "ستاسو خپل زېرمتونونه"
+    "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
+    "dismissed": "له پامه غورځول شوی"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "بدلونونه غوښتل شوي",
       "reviewCommented": "تبصره وشوه",
       "reviewPending": "د بیاکتنې په تمه",
-      "openIssueA11y": "په GitHub کې مسئله #{{number}} پرانیزئ",
-      "reviewDismissed": "له پامه غورځول شوی"
+      "openIssueA11y": "په GitHub کې مسئله #{{number}} پرانیزئ"
     },
     "pendingComment": {
       "editOutdatedA11y": "په {{location}} کې پخوانۍ په تمه تبصره سمه کړئ",
@@ -1803,7 +1803,6 @@
       "fixedOn": "په {{date}} اصلاح شوی",
       "resolutionRecorded": "حل ثبت شو",
       "superseded": "ځای یې بلې نیولی",
-      "dismissed": "له پامه غورځول شوی",
       "closedOn": "په {{date}} {{status}}",
       "deadlineNotSet": "وروستۍ نېټه نه ده ټاکل شوې",
       "noSlaDeadline": "د SLA وروستۍ نېټه نشته",

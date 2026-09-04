@@ -132,7 +132,8 @@
     "truncated": "Обрізано",
     "updated": "Оновлено",
     "working": "У роботі",
-    "yourOwnRepositories": "Власні репозиторії"
+    "yourOwnRepositories": "Власні репозиторії",
+    "dismissed": "Відхилено"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -1379,7 +1380,6 @@
       "fixedOn": "Виправлено {{date}}",
       "resolutionRecorded": "Закриття зафіксовано",
       "superseded": "Замінено",
-      "dismissed": "Відхилено",
       "closedOn": "{{status}}: {{date}}",
       "deadlineNotSet": "Термін не встановлено",
       "noSlaDeadline": "Терміну за SLA немає",
@@ -2668,8 +2668,7 @@
       "reviewChangesRequested": "Запитано зміни",
       "reviewCommented": "Прокоментовано",
       "reviewPending": "Очікує рецензії",
-      "openIssueA11y": "Відкрити задачу #{{number}} на GitHub",
-      "reviewDismissed": "Відхилено"
+      "openIssueA11y": "Відкрити задачу #{{number}} на GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Усі коментарі буде надіслано разом одним запитом.",

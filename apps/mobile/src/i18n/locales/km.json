@@ -132,7 +132,8 @@
     "truncated": "បានកាត់ឱ្យខ្លី",
     "updated": "បានធ្វើបច្ចុប្បន្នភាព",
     "working": "កំពុងដំណើរការ",
-    "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក"
+    "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
+    "dismissed": "បានសម្គាល់ថាមិនអើពើ"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "បានស្នើសុំការផ្លាស់ប្ដូរ",
       "reviewCommented": "បានផ្ដល់មតិ",
       "reviewPending": "កំពុងរង់ចាំការត្រួតពិនិត្យ",
-      "openIssueA11y": "បើកបញ្ហា #{{number}} នៅលើ GitHub",
-      "reviewDismissed": "បានបដិសេធ"
+      "openIssueA11y": "បើកបញ្ហា #{{number}} នៅលើ GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "កែសម្រួលមតិយោបល់មិនទាន់ផ្ញើដែលលែងទាន់សម័យនៅ {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "បានជួសជុលនៅ {{date}}",
       "resolutionRecorded": "បានកត់ត្រាការដោះស្រាយ",
       "superseded": "ត្រូវបានជំនួស",
-      "dismissed": "បានសម្គាល់ថាមិនអើពើ",
       "closedOn": "{{status}} នៅ {{date}}",
       "deadlineNotSet": "មិនទាន់កំណត់ថ្ងៃកំណត់",
       "noSlaDeadline": "គ្មានថ្ងៃកំណត់ SLA",

@@ -132,7 +132,8 @@
     "truncated": "Forkortet",
     "updated": "Oppdatert",
     "working": "Jobber",
-    "yourOwnRepositories": "Dine egne kodelagre"
+    "yourOwnRepositories": "Dine egne kodelagre",
+    "dismissed": "Avvist"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Endringer bedt om",
       "reviewCommented": "Kommentert",
       "reviewPending": "Venter på vurdering",
-      "openIssueA11y": "Åpne sak #{{number}} på GitHub",
-      "reviewDismissed": "Avvist"
+      "openIssueA11y": "Åpne sak #{{number}} på GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert, usendt kommentar ved {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Rettet {{date}}",
       "resolutionRecorded": "Løsning registrert",
       "superseded": "Erstattet",
-      "dismissed": "Avvist",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ingen frist angitt",
       "noSlaDeadline": "Ingen SLA-frist",

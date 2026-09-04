@@ -132,7 +132,8 @@
     "truncated": "Kısaltıldı",
     "updated": "Güncellendi",
     "working": "Çalışıyor",
-    "yourOwnRepositories": "Kendi depoların"
+    "yourOwnRepositories": "Kendi depoların",
+    "dismissed": "Yok sayıldı"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -1371,7 +1372,6 @@
       "fixedOn": "{{date}} tarihinde düzeltildi",
       "resolutionRecorded": "Çözüm kaydedildi",
       "superseded": "Yerini yenisi aldı",
-      "dismissed": "Yok sayıldı",
       "closedOn": "{{date}} tarihindeki durum: {{status}}",
       "deadlineNotSet": "Son tarih belirtilmedi",
       "noSlaDeadline": "SLA son tarihi yok",
@@ -2628,8 +2628,7 @@
       "reviewChangesRequested": "Değişiklik istendi",
       "reviewCommented": "Yorum yapıldı",
       "reviewPending": "İnceleme bekliyor",
-      "openIssueA11y": "GitHub'da #{{number}} sorununu aç",
-      "reviewDismissed": "Yok sayıldı"
+      "openIssueA11y": "GitHub'da #{{number}} sorununu aç"
     },
     "pendingComment": {
       "allQueuedHint": "Tüm yorumlar tek bir istekte toplu olarak gönderilecek.",

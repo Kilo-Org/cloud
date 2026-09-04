@@ -132,7 +132,8 @@
     "truncated": "일부 생략됨",
     "updated": "업데이트됨",
     "working": "작업 중",
-    "yourOwnRepositories": "내 저장소"
+    "yourOwnRepositories": "내 저장소",
+    "dismissed": "무시됨"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -1371,7 +1372,6 @@
       "fixedOn": "{{date}} 수정됨",
       "resolutionRecorded": "해결 내역 기록됨",
       "superseded": "대체됨",
-      "dismissed": "무시됨",
       "closedOn": "{{date}} · {{status}}",
       "deadlineNotSet": "마감일 미설정",
       "noSlaDeadline": "SLA 마감일 미지정",
@@ -2628,8 +2628,7 @@
       "reviewChangesRequested": "변경 요청됨",
       "reviewCommented": "댓글 남김",
       "reviewPending": "검토 대기 중",
-      "openIssueA11y": "GitHub에서 이슈 #{{number}} 열기",
-      "reviewDismissed": "해제됨"
+      "openIssueA11y": "GitHub에서 이슈 #{{number}} 열기"
     },
     "pendingComment": {
       "allQueuedHint": "모든 댓글을 한 번의 요청으로 함께 전송합니다.",

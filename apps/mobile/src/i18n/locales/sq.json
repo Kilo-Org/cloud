@@ -132,7 +132,8 @@
     "truncated": "Shkurtuar",
     "updated": "Përditësuar",
     "working": "Duke punuar",
-    "yourOwnRepositories": "Depot e tua"
+    "yourOwnRepositories": "Depot e tua",
+    "dismissed": "E hedhur poshtë"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Kërkuar ndryshime",
       "reviewCommented": "Komentuar",
       "reviewPending": "Në pritje të rishikimit",
-      "openIssueA11y": "Hap çështjen #{{number}} në GitHub",
-      "reviewDismissed": "E hedhur poshtë"
+      "openIssueA11y": "Hap çështjen #{{number}} në GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin e vjetëruar në pritje te {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "E rregulluar më {{date}}",
       "resolutionRecorded": "Zgjidhja u regjistrua",
       "superseded": "E zëvendësuar",
-      "dismissed": "E hedhur poshtë",
       "closedOn": "{{status}} më {{date}}",
       "deadlineNotSet": "Afati nuk është caktuar",
       "noSlaDeadline": "Pa afat SLA",

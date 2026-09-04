@@ -132,7 +132,8 @@
     "truncated": "अंशतः दाखवलेले",
     "updated": "अद्ययावत केले",
     "working": "काम सुरू आहे",
-    "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी"
+    "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
+    "dismissed": "दुर्लक्षित"
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -615,7 +616,6 @@
       "reviewApproved": "मंजूर",
       "reviewChangesRequested": "बदल मागवले",
       "reviewCommented": "टिप्पणी केली",
-      "reviewDismissed": "रद्द केलेले",
       "reviewPending": "समीक्षेच्या प्रतीक्षेत",
       "openIssueA11y": "GitHub वर मुद्दा #{{number}} उघडा"
     },
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} रोजी निराकरण झाले",
       "resolutionRecorded": "निराकरणाची नोंद केली",
       "superseded": "नव्या निष्कर्षाने बदललेले",
-      "dismissed": "दुर्लक्षित",
       "closedOn": "{{date}} रोजी {{status}}",
       "deadlineNotSet": "मुदत निश्चित नाही",
       "noSlaDeadline": "SLA मुदत नाही",

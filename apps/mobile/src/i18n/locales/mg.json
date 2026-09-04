@@ -132,7 +132,8 @@
     "truncated": "Nohafohy",
     "updated": "Nohavaozina",
     "working": "Miasa",
-    "yourOwnRepositories": "Ny tahirin-kaodinao manokana"
+    "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
+    "dismissed": "Nesorina"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "Nangatahana fanovana",
       "reviewCommented": "Nanome hevitra",
       "reviewPending": "Miandry fandinihana",
-      "openIssueA11y": "Sokafy ny olana #{{number}} ao amin'ny GitHub",
-      "reviewDismissed": "Voala"
+      "openIssueA11y": "Sokafy ny olana #{{number}} ao amin'ny GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Ovao ny hevitra miandry fandefasana tsy mifanaraka intsony amin'ny {{location}}",
@@ -1803,7 +1803,6 @@
       "fixedOn": "Voavaha tamin'ny {{date}}",
       "resolutionRecorded": "Voarakitra ny famahana ilay olana",
       "superseded": "Nosoloina",
-      "dismissed": "Nesorina",
       "closedOn": "{{status}} tamin'ny {{date}}",
       "deadlineNotSet": "Tsy voafaritra ny fe-potoana",
       "noSlaDeadline": "Tsy misy fe-potoana SLA",

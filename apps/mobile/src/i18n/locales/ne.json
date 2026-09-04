@@ -132,7 +132,8 @@
     "truncated": "आंशिक",
     "updated": "अद्यावधिक गरियो",
     "working": "काम गर्दै",
-    "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू"
+    "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
+    "dismissed": "खारेज गरियो"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -616,8 +617,7 @@
       "reviewChangesRequested": "परिवर्तन अनुरोध गरियो",
       "reviewCommented": "टिप्पणी गरियो",
       "reviewPending": "समीक्षाको प्रतीक्षामा",
-      "openIssueA11y": "GitHub मा मुद्दा #{{number}} खोल्नुहोस्",
-      "reviewDismissed": "खारेज गरियो"
+      "openIssueA11y": "GitHub मा मुद्दा #{{number}} खोल्नुहोस्"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} मा पठाउन बाँकी पुरानो टिप्पणी सम्पादन गर्नुहोस्",
@@ -1803,7 +1803,6 @@
       "fixedOn": "{{date}} मा समाधान गरियो",
       "resolutionRecorded": "समाधानको अभिलेख राखिएको",
       "superseded": "प्रतिस्थापित",
-      "dismissed": "खारेज गरियो",
       "closedOn": "{{date}} मा {{status}}",
       "deadlineNotSet": "म्याद तोकिएको छैन",
       "noSlaDeadline": "SLA म्याद छैन",

@@ -3,7 +3,8 @@ import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { SessionStore, type SessionStoreService } from '../../core/storage.js';
 import { expoDriver, type ExpoDatabase } from './expo.js';
-import { layerSqliteStore, type SqlValue } from './sqlite.js';
+import type { SqlValue } from './driver.js';
+import { layerSqliteStore } from './sqlite.js';
 import { textOf } from '../../core/turn.js';
 
 /**

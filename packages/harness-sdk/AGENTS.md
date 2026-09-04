@@ -548,9 +548,11 @@ at once, to batch, or to buffer.
 
 ### The store is one shared implementation and a one-function driver
 
-`src/plugins/store/sqlite.ts` holds every query. A driver supplies one function
-— run this SQL with these parameters, give back the rows by position — so
-`node.ts` and `expo.ts` are about twenty lines each and share all of it.
+`src/plugins/store/sqlite.ts` holds every query. The seam is `driver.ts`: one
+function — run this SQL with these parameters, give back the rows by position —
+so `node.ts` and `expo.ts` are about twenty lines each and share all of it.
+`rows.ts` says what a row means and asserts it, and `migrate.ts` applies the
+migrations the bundle carries.
 
 The schema is written in `schema.ts` and the SQL is generated from it, so a
 migration and a query can never disagree about a column. Run `pnpm migrations`
@@ -811,7 +813,11 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
-| `src/plugins/store/` | The SQLite store, and one adapter per platform |
+| `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
+| `src/plugins/store/driver.ts` | The one-function seam an adapter fills, and `transact` |
+| `src/plugins/store/rows.ts` | What comes off the disk, and the assertions that check it |
+| `src/plugins/store/migrate.ts` | Applying the migrations the bundle carries |
+| `src/plugins/store/node.ts`, `expo.ts` | One adapter per platform |
 | `src/plugins/gateway/` | The kilo gateway plugin |
 | `README.md` | What a consumer reads: the example, the events, the plugin table |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |

@@ -1,7 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { Layer } from 'effect';
 import type { SessionStore, StoreError } from '../../core/storage.js';
-import { layerSqliteStore, type SqlDriver, type SqlValue } from './sqlite.js';
+import type { SqlDriver, SqlValue } from './driver.js';
+import { layerSqliteStore } from './sqlite.js';
 
 /**
  * The store on Node's own SQLite. This file is one of the two in the package

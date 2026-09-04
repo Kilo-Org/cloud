@@ -1,7 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Layer } from 'effect';
 import type { SessionStore, StoreError } from '../../core/storage.js';
-import { layerSqliteStore, type SqlDriver, type SqlValue } from './sqlite.js';
+import type { SqlDriver, SqlValue } from './driver.js';
+import { layerSqliteStore } from './sqlite.js';
 
 /**
  * The store on Expo's SQLite, which is how a React Native app reaches one.

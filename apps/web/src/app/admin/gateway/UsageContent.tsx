@@ -21,8 +21,7 @@ import {
   GATEWAY_USAGE_COLUMNS,
   GatewayUsageRangeSchema,
   gatewayUsageToTsv,
-  queryGatewayUsageRange,
-  type GatewayUsageProgress,
+  gatewayUsageRangeQueryOptions,
   type GatewayUsageRangeInput,
 } from './gateway-usage-report';
 
@@ -33,31 +32,19 @@ export function UsageContent() {
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [model, setModel] = useState('');
   const [submitted, setSubmitted] = useState<GatewayUsageRangeInput | null>(null);
-  const [progress, setProgress] = useState<GatewayUsageProgress | null>(null);
   const [copying, setCopying] = useState(false);
   const models = useQuery(trpc.models.list.queryOptions());
-  const report = useQuery({
-    queryKey: ['admin-gateway-usage-range', submitted],
-    queryFn: ({ signal }) => {
-      if (!submitted) throw new Error('Choose a date range and model ID.');
-      return queryGatewayUsageRange(submitted, {
+  const report = useQuery(
+    gatewayUsageRangeQueryOptions(submitted, (input, signal) =>
+      client.admin.gatewayUsage.getHourlyUsage.query(input, {
         signal,
-        onProgress: setProgress,
-        fetchDay: (input, signal) =>
-          client.admin.gatewayUsage.getDailyUsage.query(input, {
-            signal,
-            context: { skipBatch: true },
-          }),
-      });
-    },
-    enabled: submitted !== null,
-    staleTime: 0,
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
-  });
-  const tsv = report.data ? gatewayUsageToTsv(report.data) : '';
+        context: { skipBatch: true },
+      })
+    )
+  );
+  const progress = report.data?.progress;
+  const isPartial = progress !== undefined && progress.completedHours < progress.totalHours;
+  const tsv = report.data ? gatewayUsageToTsv(report.data.rows) : '';
 
   function runReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -70,7 +57,6 @@ export function UsageContent() {
       return;
     }
     const input = parsed.data;
-    setProgress(null);
     if (
       submitted?.startDate === input.startDate &&
       submitted.endDate === input.endDate &&
@@ -86,7 +72,11 @@ export function UsageContent() {
     setCopying(true);
     try {
       await navigator.clipboard.writeText(tsv);
-      toast.success('Report copied. Paste it into your spreadsheet.');
+      toast.success(
+        isPartial
+          ? 'Partial results copied. Only completed hours are included.'
+          : 'Report copied. Paste it into your spreadsheet.'
+      );
     } catch {
       toast.error('Could not copy. Select and copy the tab-separated text below.');
     } finally {
@@ -99,9 +89,10 @@ export function UsageContent() {
       <div>
         <h3 className="text-lg font-semibold">Model usage</h3>
         <p className="text-muted-foreground text-sm">
-          PostgreSQL read-replica usage grouped by date, provider, and gateway BYOK. Excludes user
-          BYOK and counts logged-in users separately from anonymous users. Each UTC day is queried
-          separately, with a 10-minute timeout per day. Both selected dates are included.
+          PostgreSQL read-replica usage grouped by UTC hour, provider, and gateway BYOK. Excludes
+          user BYOK and counts logged-in users separately from anonymous users. Queries run one hour
+          at a time, with a 10-minute timeout per hour. Results appear as each hour completes. Both
+          selected dates are included.
         </p>
       </div>
       <form onSubmit={runReport} className="flex flex-wrap items-end gap-4">
@@ -164,18 +155,19 @@ export function UsageContent() {
       {report.isFetching && (
         <p role="status" className="text-muted-foreground text-sm">
           {progress
-            ? `Querying ${progress.date}. ${progress.completedDays} of ${progress.totalDays} days completed. `
-            : 'Starting daily queries. '}
+            ? `Querying ${progress.hourStart}. ${progress.completedHours} of ${progress.totalHours} hours completed. `
+            : 'Starting hourly queries. '}
           Keep this tab open while the report runs.
         </p>
       )}
       {report.error && (
         <p role="alert" className="text-destructive text-sm">
-          {report.error.message}. Run the report again to retry.
+          {report.error.message}. Completed hours remain available below. Run the report again to
+          restart the range.
         </p>
       )}
-      {submitted && report.data && !report.isFetching && !report.error && (
-        <section className="min-w-0 space-y-4" aria-label="Daily usage results">
+      {submitted && report.data && (
+        <section className="min-w-0 space-y-4" aria-label="Hourly usage results">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-medium">
@@ -183,22 +175,28 @@ export function UsageContent() {
               </p>
               <p className="text-muted-foreground text-xs">
                 Costs are in microdollars (1 USD = 1,000,000 microdollars). Null values are shown as
-                NULL and copied as empty cells. User counts are distinct within each daily row and
-                must not be summed across days or providers.
+                NULL and copied as empty cells. User counts are distinct within each hourly row and
+                must not be summed across hours or providers.
+              </p>
+              <p role="status" className="text-muted-foreground text-sm">
+                {isPartial ? 'Partial results' : 'Complete'} · {report.data.progress.completedHours}{' '}
+                of {report.data.progress.totalHours} hours completed
               </p>
             </div>
             <Button
               variant="outline"
               onClick={() => void copyReport()}
-              disabled={copying || report.data.length === 0}
+              disabled={copying || report.data.rows.length === 0}
             >
               <Copy className="size-4" aria-hidden="true" />
-              {copying ? 'Copying…' : 'Copy for spreadsheet'}
+              {copying ? 'Copying…' : isPartial ? 'Copy partial results' : 'Copy for spreadsheet'}
             </Button>
           </div>
-          {report.data.length === 0 ? (
+          {report.data.rows.length === 0 ? (
             <p role="status" className="text-muted-foreground py-4 text-sm">
-              No usage found for this model and date range.
+              {isPartial
+                ? 'No usage found in the completed hours yet.'
+                : 'No usage found for this model and date range.'}
             </p>
           ) : (
             <>
@@ -212,8 +210,8 @@ export function UsageContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.data.map(row => (
-                      <TableRow key={JSON.stringify([row.date, row.provider, row.is_byok])}>
+                    {report.data.rows.map(row => (
+                      <TableRow key={JSON.stringify([row.hour_start, row.provider, row.is_byok])}>
                         {GATEWAY_USAGE_COLUMNS.map(column => (
                           <TableCell key={column} className="tabular-nums">
                             {row[column] === null ? 'NULL' : String(row[column])}
@@ -230,7 +228,7 @@ export function UsageContent() {
                   id="gateway-usage-tsv"
                   value={tsv}
                   readOnly
-                  rows={Math.min(report.data.length + 1, 10)}
+                  rows={Math.min(report.data.rows.length + 1, 10)}
                   onFocus={event => event.currentTarget.select()}
                   className="font-mono text-xs whitespace-pre"
                   aria-label="Tab-separated results ready to copy into a spreadsheet"

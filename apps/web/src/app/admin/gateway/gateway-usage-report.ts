@@ -1,4 +1,5 @@
-import type { inferRouterOutputs } from '@trpc/server';
+import { queryOptions } from '@tanstack/react-query';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import * as z from 'zod';
 import type { RootRouter } from '@/routers/root-router';
 
@@ -23,45 +24,59 @@ export const GatewayUsageRangeSchema = z
 export type GatewayUsageRangeInput = z.infer<typeof GatewayUsageRangeSchema>;
 
 export type GatewayUsageRow =
-  inferRouterOutputs<RootRouter>['admin']['gatewayUsage']['getDailyUsage'][number];
+  inferRouterOutputs<RootRouter>['admin']['gatewayUsage']['getHourlyUsage'][number];
 
 export type GatewayUsageProgress = {
-  date: string;
-  completedDays: number;
-  totalDays: number;
+  hourStart: string;
+  completedHours: number;
+  totalHours: number;
 };
+
+export type GatewayUsageReport = {
+  rows: GatewayUsageRow[];
+  progress: GatewayUsageProgress;
+};
+
+type FetchGatewayUsageHour = (
+  input: inferRouterInputs<RootRouter>['admin']['gatewayUsage']['getHourlyUsage'],
+  signal: AbortSignal
+) => Promise<GatewayUsageRow[]>;
 
 export async function queryGatewayUsageRange(
   input: GatewayUsageRangeInput,
   options: {
     signal: AbortSignal;
-    fetchDay: (
-      input: { date: string; model: string },
-      signal: AbortSignal
-    ) => Promise<GatewayUsageRow[]>;
-    onProgress: (progress: GatewayUsageProgress) => void;
+    fetchHour: FetchGatewayUsageHour;
+    onProgress: (report: GatewayUsageReport) => void;
   }
-): Promise<GatewayUsageRow[]> {
+): Promise<GatewayUsageReport> {
   const { startDate, endDate, model } = GatewayUsageRangeSchema.parse(input);
-  const { signal, fetchDay, onProgress } = options;
+  const { signal, fetchHour, onProgress } = options;
   signal.throwIfAborted();
 
   const start = Date.parse(`${startDate}T00:00:00.000Z`);
-  const end = Date.parse(`${endDate}T00:00:00.000Z`);
-  const dayMilliseconds = 86_400_000;
-  const totalDays = (end - start) / dayMilliseconds + 1;
-  const rows: GatewayUsageRow[] = [];
-  let completedDays = 0;
+  const end = Date.parse(`${endDate}T23:00:00.000Z`);
+  const hourMilliseconds = 3_600_000;
+  const totalHours = (end - start) / hourMilliseconds + 1;
+  let report: GatewayUsageReport = {
+    rows: [],
+    progress: { hourStart: `${startDate}T00:00:00.000Z`, completedHours: 0, totalHours },
+  };
 
-  for (let timestamp = start; timestamp <= end; timestamp += dayMilliseconds) {
+  for (let timestamp = start; timestamp <= end; timestamp += hourMilliseconds) {
     signal.throwIfAborted();
-    const date = new Date(timestamp).toISOString().slice(0, 10);
-    onProgress({ date, completedDays, totalDays });
+    const hour = new Date(timestamp);
+    const hourStart = hour.toISOString();
+    report = { ...report, progress: { ...report.progress, hourStart } };
+    onProgress(report);
     signal.throwIfAborted();
 
-    let dayRows: GatewayUsageRow[];
+    let hourRows: GatewayUsageRow[];
     try {
-      dayRows = await fetchDay({ date, model }, signal);
+      hourRows = await fetchHour(
+        { date: hourStart.slice(0, 10), hour: hour.getUTCHours(), model },
+        signal
+      );
     } catch (error) {
       signal.throwIfAborted();
       if (
@@ -73,23 +88,49 @@ export async function queryGatewayUsageRange(
         throw error;
       }
       throw new Error(
-        `Failed to fetch gateway usage for ${date}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to fetch gateway usage for ${hourStart}: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error }
       );
     }
     signal.throwIfAborted();
 
-    for (const row of dayRows) rows.push(row);
-    completedDays += 1;
-    onProgress({ date, completedDays, totalDays });
+    report = {
+      rows: [...report.rows, ...hourRows],
+      progress: { hourStart, completedHours: report.progress.completedHours + 1, totalHours },
+    };
+    onProgress(report);
+    signal.throwIfAborted();
   }
 
-  signal.throwIfAborted();
-  return rows;
+  return report;
+}
+
+export function gatewayUsageRangeQueryOptions(
+  input: GatewayUsageRangeInput | null,
+  fetchHour: FetchGatewayUsageHour
+) {
+  return queryOptions({
+    queryKey: ['admin-gateway-usage-hourly-range', input] as const,
+    queryFn: ({ client, queryKey, signal }) => {
+      const range = queryKey[1];
+      if (range === null) throw new Error('Gateway usage range is required');
+      return queryGatewayUsageRange(range, {
+        signal,
+        fetchHour,
+        onProgress: snapshot => client.setQueryData(queryKey, snapshot),
+      });
+    },
+    enabled: input !== null,
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
 }
 
 export const GATEWAY_USAGE_COLUMNS = [
-  'date',
+  'hour_start',
   'provider',
   'is_byok',
   'users',

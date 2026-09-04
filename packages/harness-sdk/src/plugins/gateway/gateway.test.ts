@@ -6,6 +6,7 @@ import { testGateway } from './test-gateway.js';
 import type { FetchLike } from '../../core/fetch.js';
 import type { OrgContext } from './http.js';
 import { ModelClient } from '../../core/model.js';
+import { TokenError, type TokenSourceService } from '../../core/token.js';
 
 const reply: Reply = {
   ok: true,
@@ -26,6 +27,7 @@ const call = async (options: {
   readonly org?: OrgContext;
   readonly kinds?: readonly ApiKind[];
   readonly replies?: readonly Reply[];
+  readonly token?: TokenSourceService;
 }) => {
   const { calls, fetch } = fakeFetch(options.replies ?? [reply]);
   const result = await ModelClient.pipe(
@@ -38,6 +40,7 @@ const call = async (options: {
         retries: 2,
         ...(options.org === undefined ? {} : { org: options.org }),
         ...(options.kinds === undefined ? {} : { kinds: options.kinds }),
+        ...(options.token === undefined ? {} : { token: options.token }),
       })
     ),
     Effect.runPromise
@@ -125,6 +128,31 @@ it('tries again after a rate limit and then succeeds', async () => {
   const { calls, result } = await call({ replies: [limited, limited, reply] });
   expect(calls).toHaveLength(3);
   expect(Either.getOrThrow(result).content).toBe('hi');
+});
+
+it('reports a credential it could not get as a transport failure, and asks again', async () => {
+  /* The token is read inside the retried effect, so a source that refreshes
+     gets another chance rather than failing the call. That is why a token
+     failure is a transport failure: it is the one kind of failure this
+     package cannot tell from a flaky network. */
+  let asked = 0;
+  const refusing: TokenSourceService = {
+    /* Suspended, so the count follows the runs. A `get` that does its work
+       while building the effect is asked once however often the call is
+       retried, because the retry re-runs the effect it was given. */
+    get: () =>
+      Effect.suspend(() => {
+        asked += 1;
+        return Effect.fail(new TokenError({ cause: 'no session' }));
+      }),
+  };
+  const { calls, result } = await call({ token: refusing });
+
+  expect(asked).toBe(3);
+  expect(calls).toHaveLength(0);
+  expect(Either.getLeft(result).pipe(Option.map(error => error.reason))).toStrictEqual(
+    Option.some('transport')
+  );
 });
 
 it('does not try again on a status the gateway will answer the same way', async () => {

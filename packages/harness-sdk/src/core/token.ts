@@ -14,6 +14,12 @@ class TokenError extends Data.TaggedError('harness/TokenError')<{
  *
  * The call is on the request path, so a plugin that fetches must cache; the
  * package asks every time and does not cache on the plugin's behalf.
+ *
+ * **Return the work, do not do it.** A failed call is retried by re-running
+ * the effect this returned, `get` included, so a plugin that reads its state
+ * while building the effect hands the same stale credential to every attempt.
+ * `Effect.suspend`, `Effect.promise` and `Effect.sync` all defer to run time;
+ * a bare `Effect.succeed(cache.token)` does not.
  */
 interface TokenSourceService {
   readonly get: () => Effect.Effect<string, TokenError>;

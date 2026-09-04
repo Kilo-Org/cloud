@@ -18,13 +18,20 @@
  * - **Answered in order, from the transcript.** The first queued message asks
  *   the model to repeat the word it just said, so an answer carrying that word
  *   proves the round ran in this session and not beside it.
+ * - **Written down like any other.** The session is reopened from SQLite at the
+ *   end, and holds all three exchanges. A round the session ran on its own is
+ *   an exchange, so a caller who closes the app loses none of it.
  */
 import assert from 'node:assert/strict';
-import { Effect, Stream } from 'effect';
+import { DatabaseSync } from 'node:sqlite';
+import { Effect, Layer, Stream } from 'effect';
 import type { SessionHandle } from '../src/core/handle.js';
 import type { ModelEvent } from '../src/core/model.js';
 import type { Continued, Waiting } from '../src/core/queue.js';
+import { continueSession } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
+import { layerNodeStore } from '../src/plugins/store/node.js';
+import type { Turn } from '../src/core/turn.js';
 import { kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
@@ -96,6 +103,9 @@ const askAndHand = (session: SessionHandle) =>
     return { said: held.text, handed: held.handed };
   });
 
+/** The event of one thing that happened, or nothing when the round failed. */
+const eventIn = (one: Continued) => ('failed' in one ? undefined : one.event);
+
 /**
  * True when a round is over rather than paused on a tool.
  *
@@ -104,7 +114,13 @@ const askAndHand = (session: SessionHandle) =>
  * answer, so it is the one stop reason that is not the end of anything. This is
  * how a caller knows a queued message has been answered in full.
  */
-const over = (one: Continued): boolean => one.event.kind === 'done' && one.event.stop !== 'tools';
+const over = (one: Continued): boolean => {
+  const event = eventIn(one);
+  return event?.kind === 'done' && event.stop !== 'tools';
+};
+
+/** The rounds that were refused rather than answered. Empty is the healthy shape. */
+const refused: (readonly string[])[] = [];
 
 /** Collects the rounds the session runs on its own, until `count` have ended. */
 const watch = (session: SessionHandle, count: number) => {
@@ -116,10 +132,16 @@ const watch = (session: SessionHandle, count: number) => {
     (one: Continued) =>
       Effect.sync(() => {
         held.answering = one.answering;
-        if (one.event.kind === 'delta') {
-          held.text += one.event.text;
+        const event = eventIn(one);
+        if (event?.kind === 'delta') {
+          held.text += event.text;
         }
-        if (over(one)) {
+        /* A refused round is one message's bad news, not the end of the feed.
+           The run says so rather than waiting for words that never come. */
+        if ('failed' in one) {
+          refused.push(one.answering);
+        }
+        if (over(one) || 'failed' in one) {
           rounds.push({ answering: held.answering, text: held.text });
           held.text = '';
         }
@@ -137,16 +159,24 @@ const program = Effect.gen(function* () {
   const watching = yield* Effect.fork(Effect.timeout(watch(session, 2), '120 seconds'));
   const { said, handed } = yield* askAndHand(session);
   const rounds = yield* watching.await;
+  /* Reopened from the store, which is the only place the rounds the session ran
+     on its own could have gone. */
+  const reopened = yield* continueSession(session.id);
   return {
     said,
     handed,
     rounds,
     left: yield* session.queued,
     history: yield* session.history,
+    stored: yield* reopened.history,
   };
 });
 
-const got = await Effect.runPromise(Effect.scoped(Effect.provide(program, kilo())));
+const database = new DatabaseSync(':memory:');
+
+const got = await Effect.runPromise(
+  Effect.scoped(Effect.provide(program, Layer.merge(kilo(), layerNodeStore(database))))
+);
 
 const failures: string[] = [];
 const wrongIf = (broken: boolean, why: string): void => {
@@ -157,9 +187,10 @@ const wrongIf = (broken: boolean, why: string): void => {
 
 const { handed } = got;
 const rounds = got.rounds._tag === 'Success' ? got.rounds.value : [];
-const spoken = got.history
-  .filter(turn => turn.role === 'user')
-  .map(turn => turn.parts.map(part => part.body).join(''));
+const wordsIn = (turns: readonly Turn[]): readonly string[] =>
+  turns.filter(turn => turn.role === 'user').map(turn => turn.parts.map(part => part.body).join(''));
+
+const spoken = wordsIn(got.history);
 
 console.log('model', model);
 console.log(`\nasked while free:  ${JSON.stringify(got.said.trim())}`);
@@ -170,6 +201,7 @@ console.log(`\nwaiting while busy: ${JSON.stringify((handed?.waiting ?? []).map(
 console.log(`took one back: ${String(handed?.tookBack)}, and again: ${String(handed?.twice)}`);
 console.log(`left in the line: ${String(got.left.length)}`);
 console.log(`what the session was asked: ${JSON.stringify(spoken)}`);
+console.log(`turns held by the store: ${String(got.stored.length)}`);
 
 if (handed === undefined) {
   failures.push('the first answer streamed no event, so nothing was ever handed over');
@@ -210,9 +242,23 @@ wrongIf(
   'the session was not asked the three messages, in the order they joined'
 );
 wrongIf(got.left.length !== 0, 'the line still holds a message the session never asked');
+wrongIf(
+  JSON.stringify(wordsIn(got.stored)) !== JSON.stringify(spoken),
+  'the session reopened from the store without the rounds it ran on its own'
+);
+wrongIf(
+  got.stored.length !== got.history.length,
+  `the store held ${String(got.stored.length)} turns, not the ${String(got.history.length)} the session had`
+);
+
+wrongIf(
+  refused.length > 0,
+  `the session was refused ${String(refused.length)} of the rounds it ran on its own`
+);
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
 console.log(
   '\nPASS: two messages were handed over while busy, one was taken back, and the ' +
-    'rest were answered in order from the same transcript.'
+    'rest were answered in order from the same transcript, and the store held ' +
+    'every round.'
 );

@@ -143,19 +143,25 @@ export const asking = Effect.gen(function* () {
 
 /* The README's queue: the identifier, the line, taking one back, and reading
    one message's answer out of the rounds the session ran on its own. */
-/* The README's rule for knowing a queued message is answered in full. */
-export const over = ({ event }: Continued): boolean =>
-  event.kind === 'done' && event.stop !== 'tools';
+/* The README's rule for knowing a queued message is answered in full, and
+   what a caller reads when a round was refused instead. */
+export const over = (one: Continued): boolean =>
+  !('failed' in one) && one.event.kind === 'done' && one.event.stop !== 'tools';
 
 export const queueing = Effect.gen(function* () {
   const session = yield* openSession({ system: 'sys', model: 'm' });
   const id = yield* session.queue('and what about Lisbon?');
   const waiting = yield* session.queued;
   const dropped = yield* session.cancel(id);
-  yield* Stream.runForEach(session.continued, ({ answering, event }) =>
+  yield* Stream.runForEach(session.continued, one =>
     Effect.sync(() => {
-      if (event.kind === 'delta' && answering.includes(id)) {
-        process.stdout.write(event.text);
+      if (!one.answering.includes(id)) {
+        return;
+      }
+      if ('failed' in one) {
+        process.stdout.write(`that one failed: ${String(one.failed)}`);
+      } else if (one.event.kind === 'delta') {
+        process.stdout.write(one.event.text);
       }
     })
   );

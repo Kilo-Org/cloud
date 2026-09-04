@@ -83,9 +83,10 @@ it('starts a round of its own when the call finally answers', async () => {
   });
 
   /* Nobody asked a question. The result landing is what started the round. */
-  expect(seen.value.flatMap(one => (one.event.kind === 'delta' ? [one.event.text] : []))).toEqual([
-    'the build passed',
-  ]);
+  const deltas = seen.value.flatMap(one =>
+    'failed' in one || one.event.kind !== 'delta' ? [] : [one.event.text]
+  );
+  expect(deltas).toEqual(['the build passed']);
   /* And the request carried the answer as something the conversation said,
      never as a second result for a call that was already answered. */
   const said = askedWith(seen.calls[2]?.prompt.messages.at(-1)?.parts ?? []);

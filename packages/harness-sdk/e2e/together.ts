@@ -91,6 +91,9 @@ interface Round {
   readonly text: string;
 }
 
+/** The event of one thing that happened, or nothing when the round failed. */
+const eventIn = (one: Continued) => ('failed' in one ? undefined : one.event);
+
 /**
  * True when a round is over rather than paused on a tool.
  *
@@ -99,8 +102,13 @@ interface Round {
  * answer, so it is the one stop reason that is not the end of anything. This is
  * how a caller knows a queued message has been answered in full.
  */
-const over = (one: Continued): boolean =>
-  one.event.kind === 'done' && one.event.stop !== 'tools';
+const over = (one: Continued): boolean => {
+  const event = eventIn(one);
+  return event?.kind === 'done' && event.stop !== 'tools';
+};
+
+/** The rounds that were refused rather than answered. Empty is the healthy shape. */
+const refused: (readonly string[])[] = [];
 
 /** Collects the rounds the session runs on its own, until `count` have ended. */
 const watch = (session: SessionHandle, count: number) => {
@@ -112,10 +120,16 @@ const watch = (session: SessionHandle, count: number) => {
     (one: Continued) =>
       Effect.sync(() => {
         held.answering = one.answering;
-        if (one.event.kind === 'delta') {
-          held.text += one.event.text;
+        const event = eventIn(one);
+        if (event?.kind === 'delta') {
+          held.text += event.text;
         }
-        if (over(one)) {
+        /* A refused round is one message's bad news, not the end of the feed.
+           The run says so rather than waiting for words that never come. */
+        if ('failed' in one) {
+          refused.push(one.answering);
+        }
+        if (over(one) || 'failed' in one) {
           rounds.push({ answering: held.answering, text: held.text });
           held.text = '';
         }
@@ -257,6 +271,11 @@ wrongIf(
 wrongIf(
   !(textFor(got.last) ?? '').toLowerCase().includes('pelican'),
   'the message typed after the answer was never answered'
+);
+
+wrongIf(
+  refused.length > 0,
+  `the session was refused ${String(refused.length)} of the rounds it ran on its own`
 );
 
 assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);

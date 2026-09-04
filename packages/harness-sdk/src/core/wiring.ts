@@ -1,4 +1,4 @@
-import { type Duration, Effect, type Option, PubSub, Ref, type Scope, type Take } from 'effect';
+import { type Duration, Effect, type Option, PubSub, Ref, type Scope } from 'effect';
 import type { SessionBusyError } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { EntropySource, type EntropySourceService } from './entropy.js';
@@ -114,7 +114,7 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    * it. Values are dropped rather than held when nobody is listening: these are
    * for display, and the transcript is the record.
    */
-  readonly continued: PubSub.PubSub<Take.Take<Continued, ContinuedError>>;
+  readonly continued: PubSub.PubSub<Continued>;
 }
 
 /**
@@ -174,7 +174,7 @@ const wiringFor = (
       locks: yield* locksFor(tools),
       scope: yield* Effect.scope,
       pending: yield* makePending(yield* EntropySource),
-      continued: yield* PubSub.sliding<Take.Take<Continued, ContinuedError>>({
+      continued: yield* PubSub.sliding<Continued>({
         capacity: continuedCapacity,
         replay: continuedCapacity,
       }),

@@ -154,18 +154,29 @@ const waiting = yield* session.queued;
 const dropped = yield* session.cancel(id);
 ```
 
-Every event on `continued` names the queued entries its round answers, so one
-message's answer is told from another's:
+Everything on `continued` names the queued entries its round answers, so one
+message's answer is told from another's. A round either says something or was
+refused, so narrow before you read it:
 
 ```ts
-yield* Stream.runForEach(session.continued, ({ answering, event }) =>
+yield* Stream.runForEach(session.continued, one =>
   Effect.sync(() => {
-    if (event.kind === 'delta' && answering.includes(id)) {
-      process.stdout.write(event.text);
+    if (!one.answering.includes(id)) {
+      return;
+    }
+    if ('failed' in one) {
+      process.stdout.write(`that one failed: ${String(one.failed)}`);
+    } else if (one.event.kind === 'delta') {
+      process.stdout.write(one.event.text);
     }
   })
 );
 ```
+
+A refused round is one message's bad news, not the end of the feed. The stream
+itself never fails: the session goes on running rounds for the rest of the line,
+and a caller whose subscription had died on the first refused round would hear
+about none of them.
 
 `done` ends one call to the model, not the round: a round that calls a tool
 makes several, and `stop` is `'tools'` on each one that is waiting for a call

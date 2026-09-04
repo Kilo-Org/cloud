@@ -6,7 +6,7 @@ import type { ModelError, ModelEvent, ModelUsage } from './model.js';
 import { cancelQueued, type Continued, enqueueMessage, type Waiting } from './queue.js';
 import type { StoreError } from './storage.js';
 import type { PartDraft, Turn } from './turn.js';
-import type { ContinuedError, Wiring } from './wiring.js';
+import type { Wiring } from './wiring.js';
 
 /** A live session. It owns the turns, so a caller cannot lose one. */
 interface SessionHandle {
@@ -62,10 +62,16 @@ interface SessionHandle {
    * A queued message is answered in full on the first `done` that stops on
    * anything else.
    *
+   * A round the model or the store refused arrives here as `failed`, marked
+   * with the same identifiers, rather than as a failure of the stream. One
+   * message's bad news is not the end of the feed: the session keeps running
+   * rounds for the rest of the line, and a caller whose subscription died on
+   * the first refused round would hear about none of them.
+   *
    * The rounds happen whether or not anybody reads this. A caller that does not
    * watch loses the events, never the work, and the transcript holds all of it.
    */
-  readonly continued: Stream.Stream<Continued, ContinuedError>;
+  readonly continued: Stream.Stream<Continued>;
 }
 
 /**

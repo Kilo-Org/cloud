@@ -859,6 +859,24 @@ saw anything at all, because the round can start before the subscription does.
 It is still a display buffer and not a log: it slides at 256 events, and the
 transcript is the record.
 
+### A refused round is a value, not a failed stream
+
+`continued` never fails. A round the model or the store refused arrives on it as
+`{ answering, failed }`, marked with the same identifiers as the events would
+have been, and the driver goes straight back to the line.
+
+It was the other way first, as a `Take.fail` on the PubSub, which reads as the
+idiomatic Effect shape and is wrong here for two reasons. A failure ends the
+subscription for every watcher, so one refused message took the whole feed down
+with it, and the caller lost every later round for a session that was still
+running them. And the PubSub replays, so subscribing again replayed the failure
+and died again: after one refused round, `continued` was unreachable for the
+life of the session. A test asking only "is a later round still seen after an
+earlier one failed" fails against that design, which is how it was found.
+
+The type is a union rather than an optional field, so the compiler makes every
+caller decide what to do about a refused round. `'failed' in one` narrows it.
+
 ### A session names its tools; the registry defines them
 
 The `ToolRegistry` plugin holds every tool the harness has. A session names the

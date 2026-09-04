@@ -1,9 +1,9 @@
-import { Duration, Effect, PubSub, Queue, Schedule, Stream, Take } from 'effect';
-import { askHeld, SessionBusyError, whileFree } from './ask.js';
-import type { ModelError, ModelEvent } from './model.js';
+import { Duration, Effect, PubSub, Queue, Schedule, Stream } from 'effect';
+import { askHeld, type SessionBusyError, whileFree } from './ask.js';
+import type { ModelError } from './model.js';
 import { type Continued, takeRun, type Waiting } from './queue.js';
 import type { StoreError } from './storage.js';
-import type { ContinuedError, Wiring } from './wiring.js';
+import type { Wiring } from './wiring.js';
 
 /**
  * What the session says when nobody is streaming an answer out of it.
@@ -45,18 +45,25 @@ const idsIn = (run: readonly Waiting[]) => run.map(one => one.id);
  * looking at `queued` would not see it and `cancel` would say it was too late
  * while nothing had been sent.
  */
-const attempt = (wiring: Wiring): Effect.Effect<void, ContinuedError> =>
+const attempt = (wiring: Wiring): Effect.Effect<void, SessionBusyError> =>
   whileFree(
     wiring,
-    Effect.flatMap(takeRun(wiring.pending), (run): Effect.Effect<void, ModelError | StoreError> => {
+    Effect.flatMap(takeRun(wiring.pending), (run): Effect.Effect<void> => {
       const answering = idsIn(run);
-      const publish = (event: ModelEvent) =>
-        PubSub.publish(wiring.continued, Take.of<Continued>({ answering, event }));
+      const say = (one: Continued) => PubSub.publish(wiring.continued, one);
       /* An empty run is what a cancelled message leaves behind. It starts no
          round rather than asking the model nothing at all. */
       return run.length === 0
         ? Effect.void
-        : Stream.runForEach(askHeld(wiring)(partsIn(run), run[0]?.options), publish);
+        : Stream.runForEach(askHeld(wiring)(partsIn(run), run[0]?.options), event =>
+            say({ answering, event })
+          ).pipe(
+            /* The round is what failed, and the caller is told so on the same
+               stream that carries every other round. */
+            Effect.catchAll((failed: ModelError | StoreError) =>
+              Effect.asVoid(say({ answering, failed }))
+            )
+          );
     })
   );
 
@@ -68,28 +75,31 @@ const attempt = (wiring: Wiring): Effect.Effect<void, ContinuedError> =>
  * for is still asked; only the events go unseen, and the transcript holds them.
  *
  * A round is retried while the session is busy and given up on when the model
- * or the store refuses it. The failure reaches the watcher, which ends that
- * subscription and not the session: reading `session.continued` again starts a
- * new one, and the next thing to join the line still gets its round.
+ * or the store refuses it. The failure goes out on `continued` as one more
+ * thing that happened, marked with the message it was owed to. It is not a
+ * failure of the stream: the driver goes straight back to the line, and a
+ * caller who lost their subscription to the first refused round would never
+ * hear about any round after it.
  */
 const drivePending = (wiring: Wiring): Effect.Effect<void> =>
   Effect.forever(
     Effect.zipRight(
       Queue.take(wiring.pending.arrived),
       attempt(wiring).pipe(
-        Effect.retry({
-          while: (refused: ContinuedError) => refused instanceof SessionBusyError,
-          schedule: whenBusy,
-        }),
-        Effect.catchAll(refused =>
-          Effect.asVoid(PubSub.publish(wiring.continued, Take.fail(refused)))
+        Effect.retry({ while: () => true, schedule: whenBusy }),
+        /* Five minutes of a session that never went free. Nothing was taken out
+           of the line, so the entries are still in it: they are shown by
+           `queued`, they can still be cancelled, and the next thing to join
+           wakes the driver onto them again. */
+        Effect.catchAll(failed =>
+          Effect.asVoid(PubSub.publish(wiring.continued, { answering: [], failed }))
         )
       )
     )
   );
 
 /** What a caller reads to see the rounds it did not ask for. */
-const continuedOf = (wiring: Wiring): Stream.Stream<Continued, ContinuedError> =>
-  Stream.flattenTake(Stream.fromPubSub(wiring.continued));
+const continuedOf = (wiring: Wiring): Stream.Stream<Continued> =>
+  Stream.fromPubSub(wiring.continued);
 
 export { continuedOf, drivePending };

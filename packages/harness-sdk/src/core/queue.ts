@@ -1,5 +1,6 @@
 import { Effect, Queue, Ref } from 'effect';
 import type { AskOptions } from './ask.js';
+import type { ContinuedError } from './wiring.js';
 import type { EntropySourceService } from './entropy.js';
 import { makeId } from './id.js';
 import type { ModelEvent } from './model.js';
@@ -37,16 +38,28 @@ interface Waiting {
   readonly options?: AskOptions;
 }
 
-/** One event of a round the caller did not ask for, and what it answers. */
-interface Continued {
+/** What every piece of a round names: the entries it is answering. */
+interface Answering {
   /**
    * The queued entries this round is answering, in the order they joined the
    * line. One for a message; one or more for tool results that ran together.
    * It is how a caller tells one queued message's answer from another's.
    */
   readonly answering: readonly string[];
-  readonly event: ModelEvent;
 }
+
+/**
+ * One thing that happened in a round the caller did not ask for.
+ *
+ * A round either says something or fails, so this is a union rather than a
+ * stream that fails. A failed round is one message's bad news and not the end
+ * of the feed: the session goes on running rounds for everything else in the
+ * line, and a caller who lost the stream to the first refused round would never
+ * hear about any of them. Narrow with `'failed' in one`.
+ */
+type Continued =
+  | (Answering & { readonly event: ModelEvent })
+  | (Answering & { readonly failed: ContinuedError });
 
 /** The line, the bell that tells the driver something joined it, and the names. */
 interface Pending {
@@ -124,5 +137,5 @@ const takeRun = (pending: Pending): Effect.Effect<readonly Waiting[]> =>
     return [held.slice(0, taken), held.slice(taken)];
   });
 
-export type { Continued, Pending, Waiting };
+export type { Answering, Continued, Pending, Waiting };
 export { cancelQueued, enqueue, enqueueMessage, makePending, takeRun };

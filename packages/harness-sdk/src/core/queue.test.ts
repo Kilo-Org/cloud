@@ -1,5 +1,6 @@
 import { Deferred, Duration, Effect, Fiber, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
+import { ModelError } from './model.js';
 import type { Continued } from './queue.js';
 import type { SessionHandle } from './handle.js';
 import { recordingStore, runWith } from './session-fixture.js';
@@ -18,8 +19,16 @@ import { type Tool, ToolRegistry } from './tool.js';
 
 const options = { system: 'sys', model: 'claude-opus-5', maxTokens: 1024 };
 
+/** The event of one thing that happened, or nothing when the round failed. */
+const eventIn = (one: Continued) => ('failed' in one ? undefined : one.event);
+
 const said = (seen: readonly Continued[]): string =>
-  seen.map(one => (one.event.kind === 'delta' ? one.event.text : '')).join('');
+  seen
+    .map(one => {
+      const event = eventIn(one);
+      return event?.kind === 'delta' ? event.text : '';
+    })
+    .join('');
 
 /**
  * Everything each round of `continued` said, and what it was answering. An
@@ -41,7 +50,7 @@ const watching = (session: SessionHandle, count: number) => {
   return Effect.fork(
     Stream.runCollect(
       Stream.takeUntil(session.continued, one => {
-        ended += one.event.kind === 'done' ? 1 : 0;
+        ended += eventIn(one)?.kind === 'done' ? 1 : 0;
         return ended === count;
       })
     )
@@ -246,4 +255,31 @@ it('takes the ceiling a queued message named, and not the session default', asyn
   });
 
   expect(calls[0]?.maxTokens).toBe(7);
+});
+
+it('tells the caller a round failed, and goes on running the rest of the line', async () => {
+  const { value, calls } = await runWith({
+    options,
+    replies: [
+      /* The first queued message is refused outright. The second must not be. */
+      { deltas: [], fail: new ModelError({ reason: 'transport', cause: 'no route' }) },
+      { deltas: ['the second one'] },
+    ],
+    use: session =>
+      Effect.gen(function* () {
+        const seen = yield* watching(session, 1);
+        const refused = yield* session.queue('one');
+        const answered = yield* session.queue('two');
+        return { refused, answered, seen: [...(yield* Fiber.join(seen))] };
+      }),
+  });
+
+  /* Both were asked. The first failed at the model, which is one round's bad
+     news and not the end of the feed. */
+  expect(calls).toHaveLength(2);
+  const failures = value.seen.filter(one => 'failed' in one);
+  expect(failures).toMatchObject([{ answering: [value.refused] }]);
+  expect(rounds(value.seen.filter(one => !('failed' in one)))).toEqual([
+    { answering: [value.answered], said: 'the second one' },
+  ]);
 });

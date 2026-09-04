@@ -218,6 +218,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
 | One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `models` |
+| Every live run | `pnpm test:e2e:all` (add names to pick a few) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
@@ -249,8 +250,9 @@ stack it printed.
 - Do not add a dependency for work that a few lines do.
 - Keep the file count low. Put one plugin point in one file.
 - Name a file in kebab case. Export a type with `export type`.
-- Run `pnpm check` in this directory before you commit. It runs the compiler,
-  the linter, the boundary check, and the tests.
+- Run `pnpm check` in this directory before you commit. It runs the compiler
+  over `src/` and over `e2e/`, the linter, the boundary check, the migration
+  check, the tests, the build, the platform check, and the timing gate.
 
 ## The kilo gateway
 

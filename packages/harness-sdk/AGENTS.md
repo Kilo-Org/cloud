@@ -889,6 +889,13 @@ The summariser is told what to keep. Left to its own judgement it writes a
 readable paragraph and drops the identifiers, and the summary is all the model
 will have of that work.
 
+The summary is streamed and folded, like every other call. `ModelClient` had a
+second method that fetched a whole reply, and compaction was its only caller:
+one parser per shape that nothing else exercised, free to disagree with the one
+that mattered. It did, and this is the bug below. It was deleted on 2026-09-04
+along with the three `toReply` readers and `ModelRequest.stream`, which the
+gateway overwrote on every call anyway.
+
 **The summary call is counted.** It is a call to the model, it is billed, and
 until 2026-09-04 its tokens went nowhere: `session.usage` under-reported every
 session that had ever compacted, by the whole cost of every summary. It does

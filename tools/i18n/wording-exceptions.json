@@ -94,7 +94,7 @@
     "unknown"
   ],
   "cy": ["commit", "open", "open pull request", "review"],
-  "da": ["open", "open pull request", "review"],
+  "da": ["commit", "open", "open pull request", "plan", "review"],
   "de": ["block", "open", "open pull request"],
   "el": ["balanced", "critical", "open", "open pull request"],
   "es": [

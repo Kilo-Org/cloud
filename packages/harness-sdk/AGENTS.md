@@ -838,7 +838,9 @@ Inside `src/plugins/gateway/`:
 
 `layerKilo` is the wiring almost every caller writes: the assembler, the
 entropy source, the catalog, and the gateway with its token and retry policy
-under it. It exists because that wiring has an order and a trap — the catalog
+under it. A model it knows nothing about is assumed to speak all three shapes,
+which is true of everything the gateway relays, so the smallest call names four
+things: the URL, the org, a `fetch`, and a token. It exists because that wiring has an order and a trap — the catalog
 must be one instance shared by the session and the gateway, not two that agree
 — and because the package's own live runs were copying twenty-five lines of it
 each. Every plugin is still a plugin: a caller who needs a token that refreshes

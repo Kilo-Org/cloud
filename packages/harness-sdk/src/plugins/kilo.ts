@@ -29,6 +29,16 @@ interface KiloSetup extends KiloGatewayConfig {
   readonly token: string;
   /** What each model can do. A model the table does not name uses `fallback`. */
   readonly models?: Readonly<Record<string, ModelFacts>>;
+  /**
+   * What to assume about a model the table does not name. By default, that it
+   * speaks all three shapes, which the gateway's relayed models do — the best
+   * one a model actually speaks is picked from this list, so naming all three
+   * costs nothing and naming none would refuse every model.
+   *
+   * It says nothing about a context window, so a session wired this way never
+   * compacts. A caller who wants compaction names the window here, or writes
+   * the model into `models`.
+   */
   readonly fallback?: ModelFacts;
   /** How many times a failed call is tried again. */
   readonly retries?: number;
@@ -52,8 +62,11 @@ type KiloLayer = Layer.Layer<
  * holds a different instance from the one the session reads, which is a trap
  * worth closing here rather than documenting.
  */
+/** Best first, which is how `wireFor` reads the list. */
+const everyShape: ModelFacts = { apiKinds: ['messages', 'responses', 'chat_completions'] };
+
 const layerKilo = (setup: KiloSetup): KiloLayer => {
-  const catalog = layerTableCatalog(setup.models ?? {}, setup.fallback);
+  const catalog = layerTableCatalog(setup.models ?? {}, setup.fallback ?? everyShape);
   return Layer.mergeAll(
     layerAssembler,
     layerWebCrypto,

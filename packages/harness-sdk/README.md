@@ -21,7 +21,6 @@ const layers = layerKilo({
   org: { kind: 'organization', id: 'org_...' },
   fetch: myFetch, // see "Your fetch" below
   token: '...',
-  fallback: { apiKinds: ['messages'] },
 });
 
 const program = Effect.gen(function* () {
@@ -37,6 +36,11 @@ const program = Effect.gen(function* () {
 
 await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
 ```
+
+A model this knows nothing about is assumed to speak all three gateway shapes,
+and the best one it actually speaks is used. Name what a model can do in
+`models`, or change the assumption with `fallback` — that is also where a
+context window goes, and without one a session never compacts.
 
 `layerKilo` is the wiring almost every caller writes: the prompt assembler, the
 entropy source, the model catalog, and the gateway with its token and retry

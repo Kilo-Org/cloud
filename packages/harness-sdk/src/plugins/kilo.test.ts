@@ -1,5 +1,6 @@
 import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
+import type { ModelFacts } from '../core/catalog.js';
 import { openSession } from '../core/run.js';
 import { fakeFetch, type Reply } from './gateway/fake.js';
 import { layerKilo } from './kilo.js';
@@ -24,14 +25,14 @@ const answer: Reply = {
   ),
 };
 
-const ask = (token: string) => {
+const ask = (token: string, facts?: ModelFacts) => {
   const { fetch, calls } = fakeFetch([answer]);
   const layers = layerKilo({
     baseUrl: 'https://gateway.test',
     org: { kind: 'organization', id: 'org_1' },
     fetch,
     token,
-    fallback: { apiKinds: ['messages'] },
+    ...(facts === undefined ? {} : { fallback: facts }),
   });
   const said = Effect.scoped(
     Effect.flatMap(openSession({ system: 'sys', model: 'm', maxTokens: 8 }), session =>
@@ -58,8 +59,17 @@ it('sends the token and the organization the caller named', async () => {
   });
 });
 
-it('sends the model to the shape its catalog names', async () => {
+it('sends a model it knows nothing about to the best shape there is', async () => {
+  /* No catalog at all. The gateway relays every model through all three
+     shapes, so assuming all three and picking the best one is what a caller
+     who names nothing wants. */
   const { calls } = await Effect.runPromise(ask('tok_3'));
 
   expect(calls[0]?.url).toBe('https://gateway.test/api/gateway/v1/messages');
+});
+
+it('sends the model to the shape its catalog names', async () => {
+  const { calls } = await Effect.runPromise(ask('tok_4', { apiKinds: ['chat_completions'] }));
+
+  expect(calls[0]?.url).toBe('https://gateway.test/api/gateway/v1/chat/completions');
 });

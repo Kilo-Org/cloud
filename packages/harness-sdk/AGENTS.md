@@ -251,7 +251,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `models` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `models` |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 

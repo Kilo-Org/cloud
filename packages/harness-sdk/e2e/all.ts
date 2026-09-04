@@ -20,6 +20,7 @@ const runs = [
   'image',
   'cancel',
   'session',
+  'resume',
   'reasoning',
   'compact',
   'models',

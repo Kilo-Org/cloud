@@ -54,8 +54,17 @@ file before you change any file in this package.
     expensive than answering no: an is-check that misses costs 0.004 us, and
     an assert that throws costs 2.8 us, which is 700 times as much. Measured
     2026-09-03, Node v24.14.1, macOS arm64, median of 7 runs.
-11. Keep the package maintainable. Keep a file small and give it one job. If a
-    file passes about 100 lines, split it.
+11. Keep the package maintainable. Give a file one job, and keep it small
+    enough to hold in your head. Past about 100 lines, ask whether it has
+    picked up a second job; oxlint refuses one past 300.
+
+    Thirteen files are over 100 today and none of them is wrong. A gateway
+    shape is one job whether it takes 190 lines or 250, and splitting
+    `responses.ts` into a renderer and a reader would make a reader who asks
+    "how does this shape work" open two files instead of one. Length is the
+    prompt to ask the question, never the answer. Split when the second job
+    has a name — that is how `store/sqlite.ts` became four files and how
+    `ask.ts` gave up `exchange.ts`.
 12. Be agnostic about the platform. Anything a runtime does differently is a
     plugin point, not a branch and not an import. Do not reference `node:`,
     `Buffer`, `process`, `globalThis`, or a DOM type anywhere in `core/`.

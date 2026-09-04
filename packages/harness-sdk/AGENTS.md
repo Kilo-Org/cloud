@@ -280,6 +280,10 @@ stack it printed.
 - Run `pnpm check` in this directory before you commit. It runs the compiler
   over `src/` and over `e2e/`, the linter, the boundary check, the migration
   check, the tests, the build, the platform check, and the timing gate.
+- If you change a code block in the README, change `e2e/readme-check.ts` with
+  it. It is every README snippet against this source tree, and it is
+  typechecked and never run: a snippet that does not compile is worse than no
+  snippet. `pnpm typecheck:e2e` is what catches it.
 
 ## The kilo gateway
 
@@ -906,7 +910,8 @@ summary, so what the last one cost says nothing about what the next one will.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither.
+build, so both are dev dependencies and a consumer installs neither: 18.8 MB
+unpacked between them, against 4 runtime dependencies that are all used.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither

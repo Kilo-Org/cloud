@@ -1,10 +1,11 @@
-import { randomUUID, timingSafeEqual as nodeTSE } from 'crypto';
+import { randomUUID } from 'crypto';
 import {
   createSecurityAgentCommand,
   markSecurityAgentCommandQueueAdmissionFailed,
   type SecurityAgentCommandOwner,
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
 import {
   buildScheduledJobFailureEvent,
@@ -31,19 +32,6 @@ import {
   startManualRemediation,
 } from './remediation.js';
 
-/**
- * Constant-time string equality that does not leak either string's length.
- * Both inputs are hashed first so the comparison is always on equal-length digests.
- */
-async function timingSafeEqual(a: string, b: string): Promise<boolean> {
-  const enc = new TextEncoder();
-  const [digestA, digestB] = await Promise.all([
-    crypto.subtle.digest('SHA-256', enc.encode(a)),
-    crypto.subtle.digest('SHA-256', enc.encode(b)),
-  ]);
-  return nodeTSE(new Uint8Array(digestA), new Uint8Array(digestB));
-}
-
 async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
   const url = new URL(request.url);
 
@@ -59,7 +47,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     const internalSecret = await env.INTERNAL_API_SECRET.get();
     const authHeader = request.headers.get('x-internal-api-key');
 
-    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -79,7 +67,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     }
     const internalSecret = await env.INTERNAL_API_SECRET.get();
     const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -120,7 +108,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
     const internalSecret = await env.INTERNAL_API_SECRET.get();
     const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -161,7 +149,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
     const internalSecret = await env.INTERNAL_API_SECRET.get();
     const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -186,7 +174,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
     const internalSecret = await env.INTERNAL_API_SECRET.get();
     const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

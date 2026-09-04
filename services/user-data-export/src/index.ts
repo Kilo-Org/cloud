@@ -2,6 +2,7 @@ import { AdmitExportSchema, DownloadRequestSchema } from './contracts';
 import type { ExportEnv } from './worker';
 import type { ExportQueueMessage } from './contracts';
 import type { StateDb } from './databases';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { createR2Client } from '@kilocode/worker-utils/r2-client';
 import { verifyKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { extractBearerToken } from '@kilocode/worker-utils';
@@ -22,19 +23,14 @@ function downloadExpiration(objectExpiresAt: string, now: number = Date.now()) {
   return { expiresIn, expiresAt: new Date(now + expiresIn * 1000).toISOString() };
 }
 
-async function authorized(request: Request, expected: string): Promise<boolean> {
+function authorized(request: Request, expected: string): boolean {
   const received = request.headers.get('x-internal-api-key');
   if (!received) return false;
-  const encoder = new TextEncoder();
-  const [left, right] = await Promise.all([
-    crypto.subtle.digest('SHA-256', encoder.encode(received)),
-    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
-  ]);
-  return left.byteLength === right.byteLength && crypto.subtle.timingSafeEqual(left, right);
+  return timingSafeEqual(received, expected);
 }
 
 async function authenticatedUserId(request: Request, env: ExportEnv): Promise<string | null> {
-  if (!(await authorized(request, env.INTERNAL_API_SECRET))) return null;
+  if (!authorized(request, env.INTERNAL_API_SECRET)) return null;
   const token = extractBearerToken(request.headers.get('authorization'));
   if (!token) return null;
   try {

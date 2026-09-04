@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import {
@@ -124,17 +124,7 @@ async function hasValidInternalSecret(c: {
   const expected = await c.env.INTERNAL_API_SECRET.get();
   if (!provided || !expected) return false;
 
-  const encoder = new TextEncoder();
-  const providedBytes = encoder.encode(provided);
-  const expectedBytes = encoder.encode(expected);
-  if (providedBytes.byteLength !== expectedBytes.byteLength) {
-    // timingSafeEqual requires equal lengths; self-compare so a length
-    // mismatch is not observably faster to reject than a value mismatch.
-    timingSafeEqual(providedBytes, providedBytes);
-    return false;
-  }
-
-  return timingSafeEqual(providedBytes, expectedBytes);
+  return timingSafeEqual(provided, expected);
 }
 
 // Internal service-to-service dispatch (low-balance + security-finding).

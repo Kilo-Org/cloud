@@ -1,7 +1,7 @@
 /* The README's first example, with the package name resolved to this source
    tree. It is typechecked, never run: a snippet that does not compile is worse
    than no snippet. */
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Fiber, Layer, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import { layerKilo } from '../src/plugins/kilo.js';
 import { continueSession, cloneSession } from '../src/core/resume.js';
@@ -102,4 +102,11 @@ export const refreshed = layerKilo({
   org: { kind: 'organization', id: 'org_...' },
   fetch: nodeFetch,
   token: refreshing,
+});
+
+/* The README's stop button. */
+export const stopped = Effect.gen(function* () {
+  const session = yield* openSession({ system: 'sys', model: 'm' });
+  const reading = yield* Effect.fork(Stream.runDrain(session.ask('Count to 300.')));
+  yield* Fiber.interrupt(reading);
 });

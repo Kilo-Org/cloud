@@ -171,6 +171,23 @@ One session does one thing at a time. A second question, or a `compact`,
 started while the first answer is still streaming fails with
 `SessionBusyError` rather than queueing.
 
+## Stopping a question
+
+Interrupt the fiber reading the stream. That aborts the request through the
+`signal` your `fetch` adapter passes on, so the provider stops sending.
+
+```ts
+const reading = yield* Effect.fork(Stream.runDrain(session.ask('Count to 300.')));
+// ...a stop button, a timeout, a closed tab
+yield* Fiber.interrupt(reading);
+```
+
+The exchange leaves nothing behind: no answer arrived, so the question goes
+back out of the conversation with it, and the session is free for the next
+question. What this cannot promise is that the provider stops charging —
+nothing the package can read reports that. `pnpm test:e2e:cancel` proves the
+rest against a real call.
+
 ## When it fails
 
 Every failure is a tagged error, so `Effect.catchTag` picks one out by name.

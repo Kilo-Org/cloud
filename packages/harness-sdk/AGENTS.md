@@ -691,14 +691,24 @@ local end-to-end run.
 
 ## What is not pluggable, and why
 
-Two seams were cut after they were built. Both failed the same test: name the
-second implementation, and say whether a caller should be allowed to write it.
+Two seams were cut after they were built, and one default was tried and could
+not be written. The two failed the same test: name the second implementation,
+and say whether a caller should be allowed to write it.
 
 **The identifier ordering.** An identifier must sort by the order it was made
 in, because a store rebuilds the prompt prefix in that order. A plugin
 returning a random identifier typechecks, passes every test, and breaks the
 cache one reload later. The ordering is not a choice; where the randomness
 comes from is, and that is `EntropySource`.
+
+**A shipped `fetch` adapter.** Every caller writes the same twenty lines to
+join their runtime's `fetch` to `FetchLike`, and it was tried as
+`plugins/fetch/web.ts`. It cannot be written here: `AbortLike` is deliberately
+not `AbortSignal`, so the adapter needs one cast that only code holding the
+runtime's own type can make honestly, and `no-unsafe-type-assertion` is on for
+a reason. The adapter is in the README instead, and in `e2e/node-fetch.ts`
+where every live run uses it. React Native needs its own regardless: its
+`fetch` does not stream a response body without a polyfill.
 
 **The token ceiling.** It was the third of three ways to set one number and
 fired only when a caller set neither of the other two. `ModelCatalog` already
@@ -744,6 +754,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/` | The SQLite store, and one adapter per platform |
 | `src/plugins/gateway/` | The kilo gateway plugin |
+| `README.md` | What a consumer reads: the example, the events, the plugin table |
 | `.oxlintrc.json` | The package lint config; stricter than the root config |
 | `tsconfig.json` | The package compiler config. The repo has no root `tsconfig.json`; this one stands alone |
 

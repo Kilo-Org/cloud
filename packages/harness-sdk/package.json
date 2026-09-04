@@ -53,6 +53,7 @@
     "vitest": "catalog:"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ]
 }

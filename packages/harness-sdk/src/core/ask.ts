@@ -8,9 +8,10 @@ import type { PartDraft } from './turn.js';
 import type { Wiring } from './wiring.js';
 
 /**
- * A second question was asked while the first was still streaming. One session
- * answers one question at a time, so the second is refused rather than queued.
- * Wait for the first stream to end, then ask again.
+ * Something else already holds the session: a question was asked, or a
+ * compaction started, while an answer was still streaming. One session does
+ * one thing at a time, so the second is refused rather than queued. Wait for
+ * the stream to end, then try again.
  */
 class SessionBusyError extends Data.TaggedError('harness/SessionBusyError')<{
   readonly sessionId: string;
@@ -107,8 +108,8 @@ const answerOf = (
 /**
  * Asks the model and streams the reply.
  *
- * One session answers one question at a time: two at once would both build on
- * the same prefix, and the second would miss the cache. A second question
+ * One session does one thing at a time: two answers at once would both build
+ * on the same prefix, and the second would miss the cache. A second question
  * asked while the first still streams fails with `SessionBusyError`. It is
  * refused rather than queued because a queued question cannot be released
  * under `Stream.merge` — the merged stream holds every child resource until

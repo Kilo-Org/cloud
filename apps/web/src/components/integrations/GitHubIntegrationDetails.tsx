@@ -120,6 +120,27 @@ export function buildAppReturnOutcomeView(input: {
   };
 }
 
+export function getGitHubUserConnectionErrorMessage(
+  error: string | undefined,
+  flow: string | null
+): string | null {
+  if (flow !== 'user-connect') return null;
+  switch (error) {
+    case 'authorization_cancelled':
+      return 'GitHub account authorization was cancelled. Start a new connection when you are ready.';
+    case 'missing_code':
+      return 'GitHub did not return a valid authorization code. Start a new connection.';
+    case 'invalid_state':
+      return 'This GitHub account connection attempt is no longer valid. Start a new connection.';
+    case 'connection_failed':
+      return 'We could not complete your GitHub account connection. Start a new connection and try again.';
+    case 'account_mismatch':
+      return 'Sign in to the Kilo account that started this GitHub connection, then start a new connection.';
+    default:
+      return null;
+  }
+}
+
 function GitHubIntegrationOutcomeToasts({
   success,
   userConnectionSuccess,
@@ -170,7 +191,11 @@ function GitHubIntegrationOutcomeToasts({
     } else if (error === 'install_state_user_mismatch') {
       // Handled by the fromApp fallback card or non-app mismatch landing.
     } else if (error) {
-      toast.error(`GitHub connection failed: ${error}`);
+      const userConnectionMessage = getGitHubUserConnectionErrorMessage(
+        error,
+        new URLSearchParams(window.location.search).get('flow')
+      );
+      toast.error(userConnectionMessage ?? `GitHub connection failed: ${error}`);
     }
   }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
 

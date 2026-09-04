@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { layerTableCatalog } from './plugins/catalog/table.js';
 import { messagesWire } from './plugins/gateway/wire/messages.js';
 import { seededEntropy, layerSeededEntropy } from './plugins/entropy/seeded.js';
-import { fakeFetch, type Reply } from './plugins/gateway/fake.js';
+import { fakeFetch, type Reply, sse } from './plugins/gateway/fake.js';
 import { testGateway } from './plugins/gateway/test-gateway.js';
 import { assemble, layerAssembler } from './plugins/prompt/default.js';
 import { makeId } from './core/id.js';
@@ -140,11 +140,8 @@ const repeat = async (times: number, run: () => Promise<void>): Promise<void> =>
   await repeat(times - 1, run);
 };
 
-const sse = (...events: readonly unknown[]): readonly string[] =>
-  events.map(event => `data: ${JSON.stringify(event)}\n\n`);
-
-it('streams a token for under 90 us end to end', async () => {
-  const tokens = 200;
+/** One whole answer of `tokens` deltas, timed over `rounds`, in microseconds. */
+const perToken = async (tokens: number, rounds: number): Promise<number> => {
   const chunks = sse(
     { type: 'message_start', message: { usage: { input_tokens: 5 } } },
     ...Array.from({ length: tokens }, () => ({
@@ -175,16 +172,29 @@ it('streams a token for under 90 us end to end', async () => {
   };
 
   await once();
-  const rounds = 20;
   const started = performance.now();
   await repeat(rounds, once);
-  const perToken = ((performance.now() - started) * 1000) / (rounds * tokens);
+  return ((performance.now() - started) * 1000) / (rounds * tokens);
+};
 
+it('streams a token for under 90 us end to end', async () => {
   /* Measured at 18.1 us per token through the whole session, which is more
      than the 7 us of the gateway path alone because this counts the session,
      the store hook and the turn recording too. The ceiling catches a rewrite
      that adds an order of magnitude, which an accidental await or copy would. */
-  expect(perToken).toBeLessThan(90);
+  expect(await perToken(200, 20)).toBeLessThan(90);
+});
+
+it('costs no more per token on a long answer than on a short one', async () => {
+  /* The answer is built up a delta at a time, so a copy of the whole answer
+     per delta would be quadratic and would only show on a long one. It is not:
+     measured 19.6 us per token over 200 and 7.0 over 5000, because the fixed
+     cost of opening the session is spread over more tokens. The comparison is
+     the guard, not either figure, and the two are 2.8 times apart. */
+  const short = await perToken(200, 20);
+  const long = await perToken(5000, 4);
+
+  expect(long).toBeLessThan(short);
 });
 
 it('holds a 2000 turn session in memory linear in the turn count', () => {

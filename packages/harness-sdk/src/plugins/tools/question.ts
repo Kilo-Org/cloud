@@ -180,33 +180,38 @@ interface QuestionOptions {
 /**
  * The tool, given a way to ask.
  *
- * It is `concurrent: false`, so two rounds of questions queue rather than
- * arriving on one person at once. The asker is therefore never called again
- * before the last call answers, which is what lets a caller write one that owns
- * the terminal, or one dialog, without a lock of its own.
+ * **It holds one permit, so the asker is never called again before the last
+ * call answers.** That is what lets a caller write one that owns the terminal,
+ * or one dialog, without a lock of its own.
  *
- * That holds across sessions, because the permit belongs to this tool and not
- * to whoever is running it. One `questionTool(ask)` in one registry, given to a
- * parent and to its subagents, is one person being asked one thing at a time.
+ * The permit is here rather than in the session because the session is not what
+ * it protects: the asker is, and one asker is one terminal and one person. A
+ * session knows nothing about either. So one `questionTool(ask)` is one person
+ * asked one thing at a time, however many sessions call it — and two of them
+ * over one asker is two permits and two dialogs, which is a reason to build one.
  */
-const questionTool = (ask: Asker, options?: QuestionOptions): Tool => ({
-  definition: { name: options?.name ?? 'question', description, parameters },
-  concurrent: false,
-  /* The model asked because it cannot go on without the answer, so waiting is
-     what it wants. It is still only the default: a model with work the answer
-     does not block says so on the call, and the deadline still moves it on. */
-  wait: options?.wait ?? true,
-  ...(options?.inlineFor === undefined ? {} : { inlineFor: options.inlineFor }),
-  run: (call: ToolCall) =>
-    Effect.flatMap(asked(call), ({ questions }) =>
-      ask(questions).pipe(
-        Effect.mapError(cause =>
-          cause instanceof ToolFailure ? cause : new ToolFailure({ cause })
-        ),
-        Effect.map(answers => wordsFor(questions, answers))
-      )
-    ),
-});
+const questionTool = (ask: Asker, options?: QuestionOptions): Tool => {
+  const permit = Effect.unsafeMakeSemaphore(1);
+  return {
+    definition: { name: options?.name ?? 'question', description, parameters },
+    /* The model asked because it cannot go on without the answer, so waiting is
+       what it wants. It is still only the default: a model with work the answer
+       does not block says so on the call, and the deadline still moves it on. */
+    wait: options?.wait ?? true,
+    ...(options?.inlineFor === undefined ? {} : { inlineFor: options.inlineFor }),
+    run: (call: ToolCall) =>
+      permit.withPermits(1)(
+        Effect.flatMap(asked(call), ({ questions }) =>
+          ask(questions).pipe(
+            Effect.mapError(cause =>
+              cause instanceof ToolFailure ? cause : new ToolFailure({ cause })
+            ),
+            Effect.map(answers => wordsFor(questions, answers))
+          )
+        )
+      ),
+  };
+};
 
 export type { Answer, Asker, Choice, Question, QuestionOptions };
 export { questionTool };

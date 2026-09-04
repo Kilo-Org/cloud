@@ -138,10 +138,21 @@ it('fails the call rather than the session when the asking itself fails', async 
   expect(got._tag === 'Left' && String(got.left.cause)).toContain('nobody is at the terminal');
 });
 
-it('refuses to overlap with itself, so two rounds never ask over each other', () => {
-  const { ask } = asking([]);
+it('never asks over itself, so two rounds reach one person one at a time', async () => {
+  const seen: string[] = [];
+  const slow: Asker = questions =>
+    Effect.sync(() => void seen.push('in'))
+      .pipe(Effect.flatMap(() => Effect.sleep('30 millis')))
+      .pipe(Effect.tap(() => Effect.sync(() => void seen.push('out'))))
+      .pipe(Effect.as(questions.map(question => ({ id: question.id, text: 'yes' }))));
+  const tool = questionTool(slow);
+  const one = call({ questions: [{ id: 'a', prompt: 'a?' }] });
 
-  expect({ concurrent: questionTool(ask).concurrent }).toEqual({ concurrent: false });
+  /* Two callers at once, which is a parent and its subagent over one terminal.
+     The permit is the tool's, so the session they run in is beside the point. */
+  await Promise.all([run(tool, one), run(tool, one)]);
+
+  expect(seen).toStrictEqual(['in', 'out', 'in', 'out']);
 });
 
 it('takes the name and the deadline a harness gives it', () => {

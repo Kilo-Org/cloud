@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { lockFor, resolveTools, type Tool, ToolMissingError, ToolRegistry } from './tool.js';
+import { resolveTools, type Tool, ToolMissingError, ToolRegistry } from './tool.js';
 
 /**
  * The tools a session offers are resolved when it opens, not when a question
@@ -8,9 +8,8 @@ import { lockFor, resolveTools, type Tool, ToolMissingError, ToolRegistry } from
  * prefix promising a tool it cannot run, and the model would call it.
  */
 
-const named = (name: string, concurrent?: boolean): Tool => ({
+const named = (name: string): Tool => ({
   definition: { name, description: name, parameters: { type: 'object', properties: {} } },
-  ...(concurrent === undefined ? {} : { concurrent }),
   run: () => Effect.succeed('done'),
 });
 
@@ -40,24 +39,4 @@ it('asks for no registry when the session names no tool', async () => {
   const resolved = await Effect.runPromise(resolveTools([]));
 
   expect(resolved).toEqual([]);
-});
-
-it('gives a permit only to the tools that refuse to overlap with themselves', () => {
-  expect(lockFor(named('free'))).toBeUndefined();
-  expect(lockFor(named('open', true))).toBeUndefined();
-  expect(lockFor(named('serial', false))).toBeDefined();
-});
-
-it('gives one tool one permit, however many times it is asked for', () => {
-  const tool = named('serial', false);
-
-  /* The permit is the tool's, so every session that runs this tool holds the
-     same one. A permit per session would lock nothing between two sessions. */
-  expect(lockFor(tool)).toBe(lockFor(tool));
-});
-
-it('gives two tools of one name two permits', () => {
-  /* Two tools built separately hold two different things, so serialising one
-     against the other would be a wait bought for nothing. */
-  expect(lockFor(named('serial', false))).not.toBe(lockFor(named('serial', false)));
 });

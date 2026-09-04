@@ -1,13 +1,6 @@
 import { Cause, Deferred, Duration, Effect, type Exit, Fiber, Option } from 'effect';
 import { enqueue } from './queue.js';
-import {
-  lockFor,
-  type Tool,
-  type ToolCall,
-  type ToolFailure,
-  type ToolResult,
-  toolNamed,
-} from './tool.js';
+import { type Tool, type ToolCall, type ToolFailure, type ToolResult, toolNamed } from './tool.js';
 import { makeTurn, type PartDraft, type Turn } from './turn.js';
 import { waited, waitFor, wanted, whileWaiting } from './waiting.js';
 import type { Wiring } from './wiring.js';
@@ -23,8 +16,9 @@ import type { Wiring } from './wiring.js';
  *
  * The calls of one turn run at once. The model asks for several because they
  * are independent, and running them one after another spends the wall clock for
- * nothing. A tool that holds one thing says `concurrent: false` and the session
- * gives it a permit, so two calls to it queue while everything else overlaps.
+ * nothing. Nothing here serialises anything: a tool that holds one thing holds a
+ * permit beside it, because the thing is the caller's and the session cannot see
+ * it. See "A session is independent of every other" in AGENTS.md.
  */
 
 /** What the model is told when it names a tool the session does not offer. */
@@ -69,9 +63,12 @@ const stillRunning = (call: ToolCall): ToolResult => ({
  * Interruption passes through rather than becoming a result: a session the
  * caller stopped has nobody left to tell, and a result written after the stream
  * was dropped would land in a transcript nobody asked for.
+ *
+ * Nothing here serialises anything. A tool that must not be re-entered holds
+ * its own permit — see "A session is independent of every other" in AGENTS.md.
  */
-const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
-  const work: Effect.Effect<ToolResult> = tool.run(call).pipe(
+const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> =>
+  tool.run(call).pipe(
     Effect.map((body): ToolResult => ({ callId: call.id, body, failed: false })),
     Effect.catchAllCause(cause =>
       Cause.isInterruptedOnly(cause)
@@ -79,9 +76,6 @@ const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
         : Effect.succeed(refusal(call, reasonOf(cause)))
     )
   );
-  const permit = lockFor(tool);
-  return permit === undefined ? work : permit.withPermits(1)(work);
-};
 
 /**
  * One call, run under a deadline it can outlive.

@@ -257,14 +257,23 @@ name the session does not offer, arguments that are not JSON — because the mod
 is the only party that can decide what to do about it. Each of those comes back
 as a failed result.
 
-The calls of one turn run at once. A tool that holds one thing — a terminal, a
-file, a person — says `concurrent: false` and gets a permit, so two calls to it
-queue while everything else overlaps.
+The calls of one turn run at once, and the session serialises nothing. A tool
+that holds one thing — a terminal, a file, a person — holds a permit beside it:
 
-The permit belongs to the tool, so it holds across sessions too: a parent and a
-subagent sharing one registry share the permit, and cannot both reach the person
-at once. Two tools built separately hold two different things and get two
-permits.
+```ts
+const oneAtATime = (run: Tool['run']): Tool['run'] => {
+  const permit = Effect.unsafeMakeSemaphore(1);
+  return call => permit.withPermits(1)(run(call));
+};
+```
+
+The permit is the tool's because the thing it protects is the tool's. A session
+knows nothing about your terminal, so it is in no position to guard it — and a
+session that guarded it would only guard it against itself, which is not where
+the second caller comes from. `questionTool` and `todoTool` both do this.
+
+Sessions share nothing. A subagent has its own transcript, counts, queue and
+running calls, and no way to observe its parent's.
 
 ### A call that outlives the request
 

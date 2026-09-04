@@ -1,16 +1,24 @@
 import { Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { runWith } from './session-fixture.js';
-import { type Tool, ToolRegistry } from './tool.js';
+import { type Tool, type ToolDefinition, ToolRegistry } from './tool.js';
 
 /**
- * A tool that refuses to overlap, across two sessions that share it.
+ * A session serialises nothing, and a tool that must not be re-entered says so
+ * itself.
  *
- * `concurrent: false` protects the thing the tool holds — the terminal the
- * asker owns, the one dialog, the file it rewrites — and that thing outlives
- * any one session. A permit made per session would lock nothing between two of
- * them, which is what a parent and its subagent are: two sessions, one registry,
- * one person to interrupt.
+ * The session used to own this, as a `concurrent: false` flag and a permit the
+ * runner took before calling `run`. It was the wrong owner twice over. A permit
+ * per session locked nothing between two sessions, which was a plain bug; and
+ * the fix for that — one permit per tool object, kept by the core — had the core
+ * inventing an identity for a thing it does not own, to protect a thing it
+ * cannot see. What needs protecting is the terminal, the file, the person: all
+ * the caller's, all supplied by the caller along with the tool that touches
+ * them. So the caller holds the permit, in the tool, next to the thing.
+ *
+ * What that buys is the invariant these tests are for: **a session is
+ * independent of every other in every way.** There is nothing left in the core
+ * that two sessions share.
  */
 
 const options = {
@@ -22,25 +30,29 @@ const options = {
 
 const call = { id: 'tc_1', name: 'hold', arguments: '{}' };
 
-/**
- * A tool that says when it starts and when it stops, and takes long enough in
- * between that an overlap is a certainty rather than a race.
- */
-const holding = (seen: string[], concurrent?: boolean): Tool => ({
-  definition: {
-    name: 'hold',
-    description: 'hold',
-    parameters: { type: 'object', properties: {}, additionalProperties: false },
-  },
-  ...(concurrent === undefined ? {} : { concurrent }),
-  run: () =>
-    Effect.sync(() => void seen.push('in'))
-      .pipe(Effect.flatMap(() => Effect.sleep('50 millis')))
-      .pipe(Effect.as('held'))
-      .pipe(Effect.tap(() => Effect.sync(() => void seen.push('out')))),
-});
+const definition: ToolDefinition = {
+  name: 'hold',
+  description: 'hold',
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
+};
 
-/** One session, asking for the tool once and reading the answer. */
+/** Says when it starts and stops, and takes long enough that an overlap shows. */
+const marking = (seen: string[]): Effect.Effect<string> =>
+  Effect.sync(() => void seen.push('in'))
+    .pipe(Effect.flatMap(() => Effect.sleep('50 millis')))
+    .pipe(Effect.tap(() => Effect.sync(() => void seen.push('out'))))
+    .pipe(Effect.as('held'));
+
+/** A tool that lets anything overlap, which is every tool by default. */
+const open = (seen: string[]): Tool => ({ definition, run: () => marking(seen) });
+
+/** A tool that holds one thing, and holds a permit beside it. */
+const guarded = (seen: string[]): Tool => {
+  const permit = Effect.unsafeMakeSemaphore(1);
+  return { definition, run: () => permit.withPermits(1)(marking(seen)) };
+};
+
+/** One session, asking for the tool once. */
 const asking = (tool: Tool) =>
   runWith({
     options,
@@ -49,37 +61,51 @@ const asking = (tool: Tool) =>
     use: session => Stream.runCollect(session.ask('hold it')),
   });
 
-/** Two sessions, at the same time, over one tool. */
-const both = async (tool: Tool): Promise<void> => {
-  await Promise.all([asking(tool), asking(tool)]);
-};
-
-it('keeps two sessions out of one tool that refuses to overlap', async () => {
+it('keeps two sessions out of a tool that holds its own permit', async () => {
   const seen: string[] = [];
+  const tool = guarded(seen);
 
-  await both(holding(seen, false));
+  await Promise.all([asking(tool), asking(tool)]);
 
-  /* One in and out before the next in. Interleaved would be in,in,out,out, and
-     that is the shape a per-session permit produced. */
+  /* One in and out before the next in. This is a parent and its subagent over
+     one terminal, and the tool is the only party that knew there was one. */
   expect(seen).toStrictEqual(['in', 'out', 'in', 'out']);
 });
 
-it('lets two sessions into a tool that allows overlap', async () => {
+it('leaves two sessions alone when the tool holds nothing', async () => {
   const seen: string[] = [];
+  const tool = open(seen);
 
-  await both(holding(seen));
+  await Promise.all([asking(tool), asking(tool)]);
 
-  /* The default, and the reason the flag is worth having: a tool holding
-     nothing runs both calls at once rather than paying the wall clock twice. */
   expect(seen).toStrictEqual(['in', 'in', 'out', 'out']);
 });
 
-it('lets two sessions into two tools that each refuse to overlap alone', async () => {
+it('serialises two calls in one turn, from inside the tool', async () => {
+  const seen: string[] = [];
+  const tool = guarded(seen);
+
+  await runWith({
+    options,
+    tools: Layer.succeed(ToolRegistry, { tools: [tool] }),
+    replies: [
+      { deltas: [], calls: [call, { ...call, id: 'tc_2' }], stop: 'tools' },
+      { deltas: ['done'] },
+    ],
+    use: session => Stream.runCollect(session.ask('hold it twice')),
+  });
+
+  /* The runner starts both at once, because the model asks for several when
+     they are independent. The tool is what makes these two not independent. */
+  expect(seen).toStrictEqual(['in', 'out', 'in', 'out']);
+});
+
+it('keeps two tools over two things out of each other’s way', async () => {
   const seen: string[] = [];
 
-  /* Two tools built separately hold two different things. Serialising one
-     against the other would be a wait bought for nothing. */
-  await Promise.all([asking(holding(seen, false)), asking(holding(seen, false))]);
+  /* Two permits, because two tools built separately hold two different things.
+     Serialising one against the other would be a wait bought for nothing. */
+  await Promise.all([asking(guarded(seen)), asking(guarded(seen))]);
 
   expect(seen).toStrictEqual(['in', 'in', 'out', 'out']);
 });

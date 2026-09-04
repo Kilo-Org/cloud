@@ -978,31 +978,41 @@ The words are the failure's own cause and never `Cause.pretty` — a stack trace
 in a tool result is paid for on every request of the session from then on.
 
 The calls of one turn run at once, because the model asks for several when they
-are independent. A tool that holds one thing says `concurrent: false` and gets
-an `Effect.Semaphore` of one permit, so two calls to it queue while everything
-else overlaps.
+are independent. The session serialises nothing and offers no way to ask it to:
+**a tool that must not be re-entered holds its own permit**, beside the thing it
+is protecting. `questionTool` and `todoTool` both do, in four lines each.
 
-**The permit belongs to the tool object, not to the session.** It used to be one
-per session, built by `locksFor` inside `wiringFor`, and that was a bug rather
-than a choice: a permit locks only against whoever holds the same permit, so a
-permit per session locked nothing between two of them. A harness builds
-`questionTool(ask)` once and gives one registry to a parent and to its
-subagents; each session made a permit of its own, and the parent and the
-subagent could put two dialogs on one person at the same moment — the one thing
-`concurrent: false` exists to stop. What the flag protects is the thing the tool
-holds, and that outlives any one session.
+### A session is independent of every other
 
-`lockFor` keeps the permits in a `WeakMap` keyed by the tool, so one lives
-exactly as long as the tool it belongs to, and two tools built separately get
-two permits. That last part is deliberate: `questionTool(askA)` and
-`questionTool(askB)` are two askers and two things to protect, and serialising
-one against the other would buy a wait for nothing.
+Nothing in the core is shared between two sessions. Not the transcript, the
+counts, the busy flag, the running calls, the queue, or the scope — `wiringFor`
+builds every one of them per session. A subagent is a session, so this is the
+line that says a subagent cannot reach into its parent.
 
-One risk this creates and did not have before: a call now waits on a permit held
-in another session. A cycle would deadlock — a serialised tool that cannot
-finish until something else acquires the same permit. Nothing shipped can do
-that, because no shipped tool waits on another session while holding a permit.
-Check that before writing one that does.
+It took two tries to get here, and both wrong turns are worth knowing.
+
+There was a `concurrent: false` flag on `Tool`, and the runner took a permit
+before calling `run`. The permit was made per session, by `locksFor` inside
+`wiringFor`. That locked nothing: a permit is only a lock against whoever holds
+the same permit, and two sessions held two. A harness that built
+`questionTool(ask)` once and gave one registry to a parent and its subagents got
+two dialogs on one person at the same moment — the one thing the flag existed to
+stop.
+
+The first fix kept the flag and moved the permit to the tool object, in a
+`WeakMap` in the core. It worked, and it was still wrong: the core was inventing
+an identity for a thing it does not own, in order to protect a thing it cannot
+see. It also bought a deadlock that had not existed, because a call could now
+wait on a permit held in another session.
+
+What actually needs protecting is a terminal, a file, a person. All of them are
+the caller's, and all of them arrive with the tool the caller wrote to touch
+them. So the caller holds the permit, in the tool, next to the thing. The flag
+is gone, `locksFor` and `lockFor` are gone, and the core has nothing left to say
+about two calls overlapping.
+
+The rule this leaves is worth more than the flag was: **if two sessions can
+observe each other, something is in the wrong place.**
 
 ### Every call can outlive the request
 
@@ -1119,9 +1129,11 @@ may be picked, one answer or several, whether it may be skipped. Everything
 about the asking is the caller's, in one function. The package holds the middle:
 the shape of a question, the shape of an answer, and the words the model reads.
 
-It is `concurrent: false`, so two rounds of questions queue rather than arriving
-on one person at once. A caller writing an asker that owns the terminal, or one
-dialog, therefore needs no lock of its own.
+It holds one permit, so two rounds of questions queue rather than arriving on
+one person at once. A caller writing an asker that owns the terminal, or one
+dialog, therefore needs no lock of its own — and gets that guarantee across
+sessions, because the permit sits with the asker rather than with whoever is
+calling it.
 
 It renders the answers by walking the questions, not the answers: a caller who
 answers two of three is reported as answering two of three, and an answer to a

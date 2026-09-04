@@ -16,9 +16,8 @@ import { type Tool, type ToolCall, ToolFailure, ToolRegistry } from './tool.js';
 
 const call = (id: string, name: string, args = '{}'): ToolCall => ({ id, name, arguments: args });
 
-const tool = (name: string, run: Tool['run'], concurrent?: boolean): Tool => ({
+const tool = (name: string, run: Tool['run']): Tool => ({
   definition: { name, description: name, parameters: { type: 'object', properties: {} } },
-  ...(concurrent === undefined ? {} : { concurrent }),
   run,
 });
 
@@ -122,23 +121,25 @@ it('refuses a tool the session does not offer, and says so to the model', async 
   expect(result?.body).toContain('no tool named stocks');
 });
 
-it('runs the calls of one turn at once, and serialises the tool that refuses to overlap', async () => {
+it('runs the calls of one turn at once, and leaves a tool to serialise itself', async () => {
   const order: string[] = [];
-  const slow = (name: string, concurrent?: boolean) =>
-    tool(
-      name,
-      () =>
-        Effect.sync(() => order.push(`${name} in`)).pipe(
-          Effect.zipRight(Effect.sleep(Duration.millis(20))),
-          Effect.zipRight(Effect.sync(() => order.push(`${name} out`))),
-          Effect.as('done')
-        ),
-      concurrent
+  const marking = (name: string) =>
+    Effect.sync(() => order.push(`${name} in`)).pipe(
+      Effect.zipRight(Effect.sleep(Duration.millis(20))),
+      Effect.zipRight(Effect.sync(() => order.push(`${name} out`))),
+      Effect.as('done')
     );
+  const slow = (name: string) => tool(name, () => marking(name));
+  /* The session serialises nothing, so a tool that must not overlap says so in
+     its own body. This is the four lines a caller writes. */
+  const serialised = (name: string) => {
+    const permit = Effect.unsafeMakeSemaphore(1);
+    return tool(name, () => permit.withPermits(1)(marking(name)));
+  };
 
   await runWith({
     options: { ...options, tools: ['a', 'b', 'serial'] },
-    tools: registry(slow('a'), slow('b'), slow('serial', false)),
+    tools: registry(slow('a'), slow('b'), serialised('serial')),
     replies: [
       {
         deltas: [],
@@ -157,7 +158,7 @@ it('runs the calls of one turn at once, and serialises the tool that refuses to 
 
   /* `a` and `b` overlap: both are in before either is out. */
   expect(order.slice(0, 2).toSorted()).toEqual(['a in', 'b in']);
-  /* The two calls to `serial` do not: the second waits for the first to leave. */
+  /* The two calls to `serial` do not: its own permit holds the second back. */
   const serial = order.filter(step => step.startsWith('serial'));
   expect(serial).toEqual(['serial in', 'serial out', 'serial in', 'serial out']);
 });

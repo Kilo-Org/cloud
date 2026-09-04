@@ -112,29 +112,31 @@ interface TodoOptions {
  * option the package could pick, because a tool is handed no session — see
  * "A tool is handed no context" in AGENTS.md.
  *
- * It is `concurrent: false`. The model asks for several tools at once and this
- * one replaces the whole list, so two overlapping calls would lose one of the
- * two writes entirely rather than merging badly.
+ * It holds one permit, beside the list it protects. The model asks for several
+ * tools at once and this one replaces the whole list, so two overlapping calls
+ * would lose one of the two writes entirely rather than merging badly.
  */
 const todoTool = (options?: TodoOptions): Tool => {
   const held = Ref.unsafeMake<readonly Todo[]>([]);
+  const permit = Effect.unsafeMakeSemaphore(1);
   return {
     definition: { name: options?.name ?? 'todo', description, parameters },
-    concurrent: false,
     run: (call: ToolCall) =>
-      Effect.try({
-        try: () => assertAsked(JSON.parse(call.arguments)),
-        catch: cause => new ToolFailure({ cause }),
-      }).pipe(
-        Effect.tap(({ todos }) => Ref.set(held, todos)),
-        Effect.tap(({ todos }) =>
-          (options?.onChanged?.(todos) ?? Effect.void).pipe(
-            Effect.mapError(cause =>
-              cause instanceof ToolFailure ? cause : new ToolFailure({ cause })
+      permit.withPermits(1)(
+        Effect.try({
+          try: () => assertAsked(JSON.parse(call.arguments)),
+          catch: cause => new ToolFailure({ cause }),
+        }).pipe(
+          Effect.tap(({ todos }) => Ref.set(held, todos)),
+          Effect.tap(({ todos }) =>
+            (options?.onChanged?.(todos) ?? Effect.void).pipe(
+              Effect.mapError(cause =>
+                cause instanceof ToolFailure ? cause : new ToolFailure({ cause })
+              )
             )
-          )
-        ),
-        Effect.flatMap(() => Effect.map(Ref.get(held), wordsFor))
+          ),
+          Effect.flatMap(() => Effect.map(Ref.get(held), wordsFor))
+        )
       ),
   };
 };

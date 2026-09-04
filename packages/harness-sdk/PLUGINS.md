@@ -202,10 +202,13 @@ const layerTools = Layer.succeed(ToolRegistry, { tools: [weather, questionTool(a
 
 A tool is a definition and a function. `run` never fails the session: return a
 `ToolFailure` and the model reads it as a failed result and decides what to do.
-Say `concurrent: false` for a tool that holds one thing — a terminal, a file, a
-person — and it gets a permit. The permit is the tool's, not the session's, so
-one tool in two sessions still runs one call at a time. Say `inlineFor` for one
-that usually outlives a request.
+A tool that holds one thing — a terminal, a file, a person — takes a permit for
+it, because the session will not: hold an `Effect.unsafeMakeSemaphore(1)` beside
+the thing and wrap `run` in `permit.withPermits(1)`. Two sessions calling one
+tool then queue, which is what a parent and its subagent over one terminal need.
+Two tools you build separately hold two permits, so build one per thing rather
+than one per session. Say `inlineFor` for a tool that usually outlives a
+request.
 
 Say `wait` for whether the model waits at all — the session shows it to the
 model as that field's default, and reads it from `inlineFor` when you say

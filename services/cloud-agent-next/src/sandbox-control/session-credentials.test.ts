@@ -1848,23 +1848,23 @@ describe('native Vercel worktree policies', () => {
       ])
     );
 
-    const handle = 'opaque-runtime-proxy-handle';
+    const worktreeHandle = 'opaque-runtime-proxy-handle';
     const policy = buildControlNetworkPolicy([
       {
         ...grant,
         kilo: {
           ...grant.kilo,
-          runtimeProxy: { ...grant.kilo.runtimeProxy!, handle },
+          runtimeProxy: { ...grant.kilo.runtimeProxy!, worktreeHandle },
         },
       },
     ]);
     const serialized = JSON.stringify(policy);
-    expect(serialized).toContain(handle);
+    expect(serialized).toContain(worktreeHandle);
     expect(serialized).not.toContain(backingToken);
     expect(serialized).not.toContain('runtimeAuthorization');
     expect(
       policy.injectionRules
-        .filter(rule => rule.headers.authorization === `Bearer ${handle}`)
+        .filter(rule => rule.headers.authorization === `Bearer ${worktreeHandle}`)
         .every(rule => rule.domain === 'worker.example.test')
     ).toBe(true);
     expect(
@@ -1873,7 +1873,7 @@ describe('native Vercel worktree policies', () => {
           'https://worker.example.test/api/runtime-credential-proxy/provider/anything-else'
         ),
         method: 'POST',
-        headers: new Headers({ authorization: `Bearer ${handle}` }),
+        headers: new Headers({ authorization: `Bearer ${worktreeHandle}` }),
       })
     ).toBeUndefined();
   });
@@ -1924,6 +1924,61 @@ describe('native Vercel worktree policies', () => {
       allowedDomains: ['*'],
       injectionRules: [],
     });
+  });
+
+  it('keeps the control worktree credential stable for distinct modern sibling authorities', async () => {
+    const { broker } = createBroker();
+    const env = { ...environment(broker), WORKER_URL: 'https://worker.example.test' };
+    const firstToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'first-backing-secret'
+    );
+    const secondToken = jwt.sign(
+      { runtimeAuthorization: { id: '22222222-2222-4222-8222-222222222222' } },
+      'second-backing-secret'
+    );
+    const first = await prepare(
+      env,
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: firstToken } })
+    );
+    const second = await prepare(
+      env,
+      vercelMetadata({
+        identity: secondRoot().identity,
+        auth: { kiloSessionId: SECOND_ROOT_ID, kilocodeToken: secondToken },
+      }),
+      first.grant
+    );
+    expect(second.grant.kilo.token).toBe(firstToken);
+    expect(second.grant.members).toEqual([
+      { sessionId: SESSION_ID, kiloSessionId: ROOT_ID },
+      { sessionId: SECOND_SESSION_ID, kiloSessionId: SECOND_ROOT_ID },
+    ]);
+    expect(JSON.stringify(buildControlNetworkPolicy([second.grant]))).not.toContain(secondToken);
+  });
+
+  it('rejects a persisted singleton runtime proxy handle', async () => {
+    const { broker } = createBroker();
+    const backingToken = jwt.sign(
+      { runtimeAuthorization: { id: '11111111-1111-4111-8111-111111111111' } },
+      'backing-secret'
+    );
+    const { grant } = await prepare(
+      { ...environment(broker), WORKER_URL: 'https://worker.example.test' },
+      vercelMetadata({ auth: { kiloSessionId: ROOT_ID, kilocodeToken: backingToken } })
+    );
+    const runtimeProxy = grant.kilo.runtimeProxy;
+    if (!runtimeProxy) throw new Error('Expected runtime proxy');
+
+    expect(
+      sessionCredentialGrantSchema.safeParse({
+        ...grant,
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: { ...runtimeProxy, handle: 'old-singleton-handle' },
+        },
+      }).success
+    ).toBe(false);
   });
 
   it('refreshes native GitHub injection on trusted prepare while preserving the integration pin and alias', async () => {

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   createRuntimeProxyGrant,
+  createWorktreeRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
+  issueWorktreeRuntimeCredentialProxyHandle,
   matchesRuntimeProxyGrant,
   runtimeProxyGrantSchema,
   runtimeCredentialProxyBaseUrl,
@@ -121,6 +123,37 @@ describe('runtime credential proxy', () => {
         jwt.sign({ ...claims, exp: claims.iat + 120 }, 'test-secret', { algorithm: 'HS384' })
       )
     ).resolves.toBeNull();
+  });
+
+  it('issues a separate strict worktree handle with no session authority', async () => {
+    const env = { NEXTAUTH_SECRET: 'test-secret' } as never;
+    const now = Date.now();
+    const grant = createWorktreeRuntimeProxyGrant({
+      sandboxId: 'sandbox_1',
+      scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      directory: '/workspace/worktree',
+      userId: 'user_1',
+      orgId: 'org_1',
+      leaseExpiresAt: now + 60_000,
+      state: 'active',
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      connectionId: 'connection_1',
+      wrapperInstanceId: 'wrapper_1',
+    });
+    const handle = await issueWorktreeRuntimeCredentialProxyHandle(env, grant, now);
+    const claims = await verifyRuntimeCredentialProxyHandle(env, handle);
+    expect(claims).toMatchObject({
+      kind: 'worktree',
+      grantId: grant.grantId,
+      sandboxId: grant.sandboxId,
+      scopeId: grant.scopeId,
+      directory: grant.directory,
+      userId: grant.userId,
+      nonce: grant.nonce,
+    });
+    expect(claims).not.toHaveProperty('sessionId');
+    expect(claims).not.toHaveProperty('authorizationId');
   });
 
   it('keeps control and legacy runtime grant fences disjoint and decodes v1 as legacy only', async () => {

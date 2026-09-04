@@ -105,7 +105,7 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     const policy = buildVercelCredentialNetworkPolicy({
       kilo: kiloInput({
         runtimeProxy: {
-          handle: 'runtime-proxy-handle',
+          worktreeHandle: 'runtime-proxy-handle',
           targets: {
             backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
             providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
@@ -147,6 +147,56 @@ describe('buildVercelCredentialNetworkPolicy', () => {
         url: 'https://worker.example.com/api/runtime-credential-proxy/provider/chat/completions',
         authorization,
         method: 'POST',
+      })
+    ).toBeUndefined();
+  });
+
+  it('keeps a shared worktree handle static while rewriting only exact member roots', () => {
+    const worktreeHandle = 'worktree-runtime-handle';
+    const policy = buildVercelCredentialNetworkPolicy({
+      kilo: kiloInput({
+        rootSessionIds: [ROOT_SESSION_ID, OTHER_SESSION_ID],
+        runtimeProxy: {
+          worktreeHandle,
+          members: [
+            { sessionId: 'workspace_a', kiloSessionId: ROOT_SESSION_ID, handle: 'member-a' },
+            { sessionId: 'workspace_b', kiloSessionId: OTHER_SESSION_ID, handle: 'member-b' },
+          ],
+          targets: {
+            backendBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/backend',
+            providerBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/provider',
+            sessionIngestBaseUrl: 'https://worker.example.com/api/runtime-credential-proxy/ingest',
+          },
+        },
+      }),
+    });
+    const authorization = `Bearer ${worktreeHandle}`;
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+        method: 'POST',
+        authorization,
+      })
+    ).toBe(authorization);
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/${ROOT_SESSION_ID}/ingest`,
+        method: 'POST',
+        authorization,
+      })
+    ).toBe('Bearer member-a');
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/${OTHER_SESSION_ID}/title`,
+        method: 'POST',
+        authorization,
+      })
+    ).toBe('Bearer member-b');
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/runtime-credential-proxy/ingest/api/session/unrelated/ingest',
+        method: 'POST',
+        authorization,
       })
     ).toBeUndefined();
   });

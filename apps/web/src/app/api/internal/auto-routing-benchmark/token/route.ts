@@ -15,11 +15,11 @@
  * (`Authorization: Bearer ${INTERNAL_API_SECRET_PROD}`), and
  * INTERNAL_API_SECRET_PROD holds the same value as INTERNAL_API_SECRET here.
  *
- * Token issuance requires shared-resource tokens, an active benchmark user
- * with a non-empty API-token pepper, and (when supplied) a current owner or
- * member organization membership. The token includes that pepper so API and
- * gateway requests validate it as a real user token; an internal-service token
- * would be rejected by gateway pepper validation. It expires in 6 hours.
+ * While shared-resource issuance is disabled, this preserves the existing
+ * audience-less benchmark token. Once enabled, issuance requires an active
+ * benchmark user with a non-empty API-token pepper and (when supplied) a
+ * current owner or member organization membership. The modern token has exact
+ * API and gateway audiences and never falls back to the legacy shape.
  *
  * URL: POST /api/internal/auto-routing-benchmark/token
  */
@@ -37,6 +37,7 @@ import {
   INTERNAL_API_SECRET,
   NEXTAUTH_SECRET,
 } from '@/lib/config.server';
+import { generateApiToken } from '@/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
@@ -56,10 +57,6 @@ export async function POST(req: NextRequest) {
   if (!INTERNAL_API_SECRET || !token || !timingSafeEqual(token, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (!isSharedResourceTokenIssuanceEnabled()) {
-    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
-  }
-
   let body: unknown;
   try {
     body = await req.json();
@@ -84,33 +81,49 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
+  const sharedResourceTokensEnabled = isSharedResourceTokenIssuanceEnabled();
   if (
-    typeof user.api_token_pepper !== 'string' ||
-    user.api_token_pepper.trim().length === 0 ||
-    user.blocked_at !== null ||
-    user.blocked_reason !== null
+    sharedResourceTokensEnabled &&
+    (typeof user.api_token_pepper !== 'string' ||
+      user.api_token_pepper.trim().length === 0 ||
+      user.blocked_at !== null ||
+      user.blocked_reason !== null)
   ) {
     return NextResponse.json(
       { error: 'User is not eligible for benchmark tokens' },
       { status: 403 }
     );
   }
-
   const extraPayload = { tokenSource: 'auto-routing-benchmark' };
   const organizationId = parsed.data.organizationId;
-  let organizationRole: 'owner' | 'member' | undefined;
+  let organizationRole: Awaited<ReturnType<typeof getOrganizationRole>> | undefined;
   if (organizationId) {
     const role = await getOrganizationRole(parsed.data.userId, organizationId);
     if (role === null) {
       return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
     }
-    if (role !== 'owner' && role !== 'member') {
+    organizationRole = role;
+  }
+
+  if (!sharedResourceTokensEnabled) {
+    const legacyToken = generateApiToken(
+      user,
+      { ...extraPayload, organizationId, organizationRole },
+      { expiresIn: SIX_HOURS_IN_SECONDS }
+    );
+    return NextResponse.json({
+      token: legacyToken,
+      expiresAt: new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString(),
+    });
+  }
+
+  if (organizationRole !== undefined) {
+    if (organizationRole !== 'owner' && organizationRole !== 'member') {
       return NextResponse.json(
         { error: 'Organization role is not supported for benchmark tokens' },
         { status: 403 }
       );
     }
-    organizationRole = role;
   }
 
   const issuedAt = Math.floor(Date.now() / 1000);

@@ -56,6 +56,15 @@ const ask = (session: SessionHandle, text: string) =>
         : held
   );
 
+/**
+ * What went wrong, in one line. A `ModelError` whose cause is an `Error`
+ * stringifies to `{}`, which tells a reader nothing about the run that failed.
+ */
+const why = (error: object): string => {
+  const cause = 'cause' in error ? error.cause : undefined;
+  return cause instanceof Error ? cause.message : JSON.stringify(error).slice(0, 300);
+};
+
 const reasoningIn = (turns: readonly Turn[]): readonly TurnPart[] =>
   turns.flatMap(turn => turn.parts.filter(part => part.kind === 'reasoning'));
 
@@ -112,7 +121,7 @@ for (const { kind, seals } of shapes) {
     console.log(`${kind.padEnd(18)}${String(written?.length ?? 'none').padEnd(14)}FAILED`);
     /* The whole point of the run. A seal the provider will not take back is a
        session that cannot be continued at all. */
-    failures.push(`${kind}: the reopened session was refused: ${JSON.stringify(reopened.left)}`);
+    failures.push(`${kind}: the reopened session was refused: ${why(reopened.left)}`);
     continue;
   }
 

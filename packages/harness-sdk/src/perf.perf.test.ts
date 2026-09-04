@@ -1,6 +1,7 @@
 import { Chunk, Effect, Layer, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { layerTableCatalog } from './plugins/catalog/table.js';
+import { messagesWire } from './plugins/gateway/wire/messages.js';
 import { seededEntropy, layerSeededEntropy } from './plugins/entropy/seeded.js';
 import { fakeFetch, type Reply } from './plugins/gateway/fake.js';
 import { testGateway } from './plugins/gateway/test-gateway.js';
@@ -75,6 +76,34 @@ it('assembles in time linear in the turn count, not quadratic', () => {
   /* Eight times the turns. Linear lands near 8x; quadratic lands near 64x.
      Twenty catches the shape change without failing on a noisy machine. */
   expect(largeCost / smallCost).toBeLessThan(20);
+});
+
+it('builds a whole 200 turn request in well under 250 us', () => {
+  const { turns } = sessionOf(200);
+  const system = Array.from({ length: 200 }, (_, index) => `Rule ${String(index)}: be terse.`).join(
+    '\n'
+  );
+
+  /* Everything one question costs before the socket: the prompt, the body of
+     the shape, and the JSON. Measured at 48 us — 17 to assemble, 6 for the
+     body, 32 for `JSON.stringify` of 27 kilobytes. The provider's own first
+     token took between 849 and 4064 ms on the ten model matrix, so this whole
+     path is a ten-thousandth of the wait and is not worth optimising. The
+     ceiling is here to catch a rewrite that makes it matter. */
+  const cost = medianMicros(
+    500,
+    () =>
+      void JSON.stringify(
+        messagesWire.toBody({
+          prompt: assemble({ system, turns }),
+          model: 'm',
+          maxTokens: 1024,
+          stream: true,
+          cacheKey: 'ses_1',
+        })
+      )
+  );
+  expect(cost).toBeLessThan(250);
 });
 
 it('makes an identifier in under 5 us', () => {

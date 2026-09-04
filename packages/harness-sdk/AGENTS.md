@@ -163,6 +163,27 @@ Nothing here is being changed: 7 us per token is 7 ms on a thousand token
 answer, against seconds of model latency. The table exists so the next change
 to this path argues from data, in either direction.
 
+### What a whole request costs before the socket
+
+Everything one question costs on this side, for a 200 turn session and a 200
+rule system prompt, measured 2026-09-04 on the same machine:
+
+| | us |
+|---|---:|
+| `assemble` | 16.8 |
+| `messagesWire.toBody` | 5.8 |
+| `responsesWire.toBody` | 11.0 |
+| `completionsWire.toBody` | 7.5 |
+| `JSON.stringify` of the body, 27 kB | 32.0 |
+| all three together | 48.1 |
+
+Against that, the ten model matrix reported a median time to the first piece
+of the answer between 849 ms and 4064 ms. The whole client path is a
+ten-thousandth of the wait, and `JSON.stringify` is two thirds of it — so
+there is nothing here worth optimising, and a change that claims to speed up
+a request has to say what it is actually speeding up. The perf suite gates it
+at 250 us to catch a rewrite that makes it matter.
+
 ## The toolchain
 
 The compiler is `ttsc`, not `tsc` or `tsgo`. It is the TypeScript-Go compiler

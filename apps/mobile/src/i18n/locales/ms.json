@@ -602,7 +602,22 @@
       "commit_other": "komit",
       "file_one": "fail",
       "file": "fail",
-      "file_other": "fail"
+      "file_other": "fail",
+      "openedAgo": "Dibuka {{time}}",
+      "updatedAgo": "Dikemas kini {{time}}",
+      "mergedAgo": "Digabung {{time}}",
+      "mergedByAgo": "Digabungkan oleh {{login}} {{time}}",
+      "closedAgo": "Ditutup {{time}}",
+      "labels": "Label",
+      "reviewers": "Penyemak",
+      "assignees": "Penerima tugasan",
+      "linkedIssues": "Isu berkaitan",
+      "reviewApproved": "Diluluskan",
+      "reviewChangesRequested": "Perubahan diminta",
+      "reviewCommented": "Diulas",
+      "reviewPending": "Menunggu semakan",
+      "openIssueA11y": "Buka isu #{{number}} di GitHub",
+      "reviewDismissed": "Diketepikan"
     },
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",

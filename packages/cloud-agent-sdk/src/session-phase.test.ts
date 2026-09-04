@@ -83,7 +83,7 @@ function createSessionWithStateCapture(
     (_sessionId: string) => 'test-ticket'
   )
 ) {
-  const { createEvent, kilocode, resetCounter } = createEventHelpers();
+  const { createEvent, kilocode, resetCounter } = createEventHelpers(TEST_CLOUD_AGENT_ID);
   resetCounter();
 
   const errors: string[] = [];
@@ -376,7 +376,11 @@ describe('session state transitions', () => {
   });
 
   it('session.created fires onSessionCreated', async () => {
-    const { createEvent: _createEvent, kilocode, resetCounter } = createEventHelpers();
+    const {
+      createEvent: _createEvent,
+      kilocode,
+      resetCounter,
+    } = createEventHelpers(TEST_CLOUD_AGENT_ID);
     resetCounter();
 
     const sessions: unknown[] = [];
@@ -491,7 +495,7 @@ describe('authoritative message failure settlement', () => {
       suggestion: store.get(manager.atoms.suggestion),
       activeSuggestion: store.get(manager.atoms.activeSuggestion),
     });
-    const events = createEventHelpers();
+    const events = createEventHelpers(TEST_CLOUD_AGENT_ID);
     const requestInput = () => {
       for (const sessionID of [TEST_KILO_ID, 'child-session']) {
         sendRaw(

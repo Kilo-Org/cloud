@@ -602,7 +602,22 @@
       "commit_other": "కమిట్లు",
       "file_one": "ఫైల్",
       "file": "ఫైళ్లు",
-      "file_other": "ఫైళ్లు"
+      "file_other": "ఫైళ్లు",
+      "openedAgo": "తెరవబడింది {{time}}",
+      "updatedAgo": "నవీకరించబడింది {{time}}",
+      "mergedAgo": "మెర్జ్ అయింది {{time}}",
+      "mergedByAgo": "{{login}} విలీనం చేశారు {{time}}",
+      "closedAgo": "మూసివేయబడింది {{time}}",
+      "labels": "లేబుళ్లు",
+      "reviewers": "సమీక్షకులు",
+      "assignees": "కేటాయించినవారు",
+      "linkedIssues": "అనుసంధానిత సమస్యలు",
+      "reviewApproved": "ఆమోదించబడింది",
+      "reviewChangesRequested": "మార్పులు కోరబడ్డాయి",
+      "reviewCommented": "వ్యాఖ్యానించబడింది",
+      "reviewDismissed": "తోసివేయబడింది",
+      "reviewPending": "సమీక్ష కోసం వేచి ఉంది",
+      "openIssueA11y": "GitHub లో సమస్య #{{number}} తెరవండి"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}పై ఇంకా సమర్పించని పాత వ్యాఖ్యను సవరించండి",

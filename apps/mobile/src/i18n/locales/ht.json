@@ -602,7 +602,22 @@
       "commit_other": "komit",
       "file_one": "fichye",
       "file": "fichye",
-      "file_other": "fichye"
+      "file_other": "fichye",
+      "openedAgo": "Ouvri {{time}}",
+      "updatedAgo": "Mete ajou {{time}}",
+      "mergedAgo": "Fizyonnen {{time}}",
+      "mergedByAgo": "{{login}} fizyone li {{time}}",
+      "closedAgo": "Fèmen {{time}}",
+      "labels": "Etikèt",
+      "reviewers": "Moun k ap revize",
+      "assignees": "Moun ki responsab",
+      "linkedIssues": "Pwoblèm ki lye",
+      "reviewApproved": "Apwouve",
+      "reviewChangesRequested": "Chanjman mande",
+      "reviewCommented": "Komante",
+      "reviewPending": "Ap tann revizyon",
+      "openIssueA11y": "Ouvri pwoblèm #{{number}} sou GitHub",
+      "reviewDismissed": "Rejte"
     },
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè ki poko voye e ki pa ajou sou {{location}}",

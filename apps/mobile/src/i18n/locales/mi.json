@@ -602,7 +602,22 @@
       "commit_other": "whakapūmautanga",
       "file_one": "kōnae",
       "file": "kōnae",
-      "file_other": "kōnae"
+      "file_other": "kōnae",
+      "openedAgo": "I whakatuwherahia {{time}}",
+      "updatedAgo": "I whakahoutia {{time}}",
+      "mergedAgo": "Kua whakakotahitia {{time}}",
+      "mergedByAgo": "Nā {{login}} i whakakotahi {{time}}",
+      "closedAgo": "Kua kati {{time}}",
+      "labels": "Ngā tapanga",
+      "reviewers": "Ngā kaiarotake",
+      "assignees": "Ngā kaiwhiwhi mahi",
+      "linkedIssues": "Ngā take honoa",
+      "reviewApproved": "Kua whakaaetia",
+      "reviewChangesRequested": "I tonoa he panonitanga",
+      "reviewCommented": "Kua tākupu",
+      "reviewDismissed": "Kua whakakorea",
+      "reviewPending": "E tatari ana ki te arotake",
+      "openIssueA11y": "Huakina te take #{{number}} i GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Whakatikahia te kōrero tawhito e tatari ana mō {{location}}",

@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "खुली · स्वीकृत",
       "stateOpenChangesRequested": "खुली · बदलाव माँगे गए",
       "stateOpenReviewRequired": "खुली · समीक्षा आवश्यक",
-      "unknownAuthor": "अज्ञात लेखक"
+      "unknownAuthor": "अज्ञात लेखक",
+      "openedAgo": "खोला गया {{time}}",
+      "updatedAgo": "अपडेट किया गया {{time}}",
+      "mergedAgo": "मर्ज हो गया {{time}}",
+      "mergedByAgo": "{{login}} ने मर्ज किया {{time}}",
+      "closedAgo": "बंद {{time}}",
+      "labels": "लेबल",
+      "reviewers": "समीक्षक",
+      "assignees": "सौंपे गए",
+      "linkedIssues": "जुड़े हुए मुद्दे",
+      "reviewApproved": "स्वीकृत",
+      "reviewChangesRequested": "बदलाव मांगे गए",
+      "reviewCommented": "टिप्पणी की गई",
+      "reviewDismissed": "खारिज किया गया",
+      "reviewPending": "समीक्षा की प्रतीक्षा",
+      "openIssueA11y": "GitHub पर मुद्दा #{{number}} खोलें"
     },
     "pendingComment": {
       "allQueuedHint": "सभी टिप्पणियाँ एक ही अनुरोध में एक साथ भेजी जाएँगी।",

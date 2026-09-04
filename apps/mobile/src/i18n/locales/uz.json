@@ -602,7 +602,22 @@
       "commit_other": "kommit",
       "file_one": "fayl",
       "file": "fayl",
-      "file_other": "fayl"
+      "file_other": "fayl",
+      "openedAgo": "Ochilgan {{time}}",
+      "updatedAgo": "Yangilangan {{time}}",
+      "mergedAgo": "Birlashtirildi {{time}}",
+      "mergedByAgo": "{{login}} birlashtirdi {{time}}",
+      "closedAgo": "Yopilgan {{time}}",
+      "labels": "Yorliqlar",
+      "reviewers": "Ko'rib chiquvchilar",
+      "assignees": "Mas'ullar",
+      "linkedIssues": "Bog'langan masalalar",
+      "reviewApproved": "Tasdiqlangan",
+      "reviewChangesRequested": "O'zgarishlar so'ralgan",
+      "reviewCommented": "Izoh qoldirilgan",
+      "reviewPending": "Ko'rib chiqish kutilmoqda",
+      "openIssueA11y": "GitHub'da #{{number}} masalasini ochish",
+      "reviewDismissed": "Rad etilgan"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}dagi eskirgan navbatdagi izohni tahrirlash",

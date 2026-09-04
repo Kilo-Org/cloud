@@ -602,7 +602,22 @@
       "commit_other": "კომიტი",
       "file_one": "ფაილი",
       "file": "ფაილი",
-      "file_other": "ფაილი"
+      "file_other": "ფაილი",
+      "openedAgo": "გაიხსნა {{time}}",
+      "updatedAgo": "განახლდა {{time}}",
+      "mergedAgo": "შერწყმულია {{time}}",
+      "mergedByAgo": "შეარწყა {{login}}-მა {{time}}",
+      "closedAgo": "დახურულია {{time}}",
+      "labels": "იარლიყები",
+      "reviewers": "მიმომხილველები",
+      "assignees": "პასუხისმგებლები",
+      "linkedIssues": "დაკავშირებული საკითხები",
+      "reviewApproved": "დამტკიცებულია",
+      "reviewChangesRequested": "მოთხოვნილია ცვლილებები",
+      "reviewCommented": "დაკომენტარებულია",
+      "reviewPending": "ელოდება მიმოხილვას",
+      "openIssueA11y": "გახსენი საკითხი #{{number}} GitHub-ზე",
+      "reviewDismissed": "გაუქმებულია"
     },
     "pendingComment": {
       "editOutdatedA11y": "Მოძველებული გასაგზავნი კომენტარის რედაქტირება: {{location}}",

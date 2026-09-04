@@ -90,6 +90,8 @@ describe('sandbox control frames', () => {
   it('recognizes known operations', () => {
     expect(isControlOperation('sandbox.hello')).toBe(true);
     expect(isControlOperation('session.prompt')).toBe(true);
+    expect(isControlOperation('session.git.summary')).toBe(true);
+    expect(isSessionOperation('session.git.summary')).toBe(true);
     expect(isControlOperation('http.tunnel')).toBe(false);
     for (const operation of [
       'session.terminal.create',
@@ -251,6 +253,32 @@ describe('sandbox control frames', () => {
         agent: { mode: 'code', provider: 'anthropic' },
       }).ok
     ).toBe(false);
+  });
+
+  it('validates summary requests without accepting a payload directory', () => {
+    expect(parseOperationPayload('session.git.summary', { revision: 1 })).toEqual({
+      ok: true,
+      payload: { revision: 1 },
+    });
+    expect(
+      parseOperationPayload('session.git.summary', {
+        revision: 2,
+        baseRef: 'refs/remotes/origin/main',
+      }).ok
+    ).toBe(true);
+    for (const payload of [
+      {},
+      { revision: 0 },
+      { revision: 1.5 },
+      { revision: Number.MAX_SAFE_INTEGER + 1 },
+      { revision: 1, baseRef: '--help' },
+      { revision: 1, directory: '/outside' },
+    ]) {
+      expect(parseOperationPayload('session.git.summary', payload)).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid session.git.summary payload' },
+      });
+    }
   });
 
   it('accepts a full sandbox.heartbeat payload', () => {

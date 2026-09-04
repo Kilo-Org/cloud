@@ -602,7 +602,22 @@
       "commit_other": "commit",
       "file_one": "fájl",
       "file": "fájl",
-      "file_other": "fájl"
+      "file_other": "fájl",
+      "openedAgo": "Megnyitva {{time}}",
+      "updatedAgo": "Frissítve {{time}}",
+      "mergedAgo": "Összevonva {{time}}",
+      "mergedByAgo": "Egyesítette: {{login}} {{time}}",
+      "closedAgo": "Lezárva {{time}}",
+      "labels": "Címkék",
+      "reviewers": "Értékelők",
+      "assignees": "Felelősök",
+      "linkedIssues": "Kapcsolt hibajegyek",
+      "reviewApproved": "Jóváhagyva",
+      "reviewChangesRequested": "Változtatásokat kértek",
+      "reviewCommented": "Hozzászólva",
+      "reviewPending": "Értékelésre vár",
+      "openIssueA11y": "#{{number}} hibajegy megnyitása a GitHubon",
+      "reviewDismissed": "Elvetve"
     },
     "pendingComment": {
       "editOutdatedA11y": "Elavult, függőben lévő hozzászólás szerkesztése: {{location}}",

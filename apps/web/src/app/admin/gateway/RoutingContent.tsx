@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  DEFAULT_FRIENDLI_PERCENTAGE,
   DEFAULT_PERPLEXITY_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE_FREE,
@@ -26,7 +25,6 @@ export function RoutingContent() {
 
   const [inputValue, setInputValue] = useState('');
   const [freeInputValue, setFreeInputValue] = useState('');
-  const [friendliInputValue, setFriendliInputValue] = useState('');
   const [perplexityInputValue, setPerplexityInputValue] = useState('');
   const [optOutModelsValue, setOptOutModelsValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
@@ -36,7 +34,6 @@ export function RoutingContent() {
     if (data) {
       setInputValue(data.vercel_routing_percentage?.toString() ?? '');
       setFreeInputValue(data.vercel_routing_percentage_free?.toString() ?? '');
-      setFriendliInputValue(data.friendli_routing_percentage?.toString() ?? '');
       setPerplexityInputValue(data.perplexity_routing_percentage?.toString() ?? '');
       setOptOutModelsValue(data.vercel_routing_opt_out_models.join('\n'));
       setNoteValue(data.note ?? '');
@@ -86,14 +83,8 @@ export function RoutingContent() {
     const note = noteInput();
     const paid = parsePercentage(inputValue);
     const free = parsePercentage(freeInputValue);
-    const friendli = parsePercentage(friendliInputValue);
     const perplexity = parsePercentage(perplexityInputValue);
-    if (
-      paid === undefined ||
-      free === undefined ||
-      friendli === undefined ||
-      perplexity === undefined
-    ) {
+    if (paid === undefined || free === undefined || perplexity === undefined) {
       toast.error(
         'Enter a percentage between 0 and 100 with up to 3 decimal places, or leave it empty for the default.'
       );
@@ -103,7 +94,6 @@ export function RoutingContent() {
       vercel_routing_percentage: paid,
       vercel_routing_percentage_free: free,
       vercel_routing_opt_out_models: optOutModels(),
-      friendli_routing_percentage: friendli,
       perplexity_routing_percentage: perplexity,
       note,
     });
@@ -114,7 +104,6 @@ export function RoutingContent() {
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: optOutModels(),
-      friendli_routing_percentage: null,
       perplexity_routing_percentage: null,
       note: noteInput(),
     });
@@ -126,12 +115,10 @@ export function RoutingContent() {
 
   const currentOverride = data?.vercel_routing_percentage;
   const currentFreeOverride = data?.vercel_routing_percentage_free;
-  const currentFriendliOverride = data?.friendli_routing_percentage;
   const currentPerplexityOverride = data?.perplexity_routing_percentage;
   const isOverrideActive =
     (currentOverride !== null && currentOverride !== undefined) ||
     (currentFreeOverride !== null && currentFreeOverride !== undefined) ||
-    (currentFriendliOverride !== null && currentFriendliOverride !== undefined) ||
     (currentPerplexityOverride !== null && currentPerplexityOverride !== undefined);
 
   return (
@@ -144,8 +131,8 @@ export function RoutingContent() {
             to Vercel (vs OpenRouter). Models not available on Vercel always go to OpenRouter, so
             overall traffic may still be skewed towards OpenRouter. Paid and free models are
             configured separately. Leave empty to use the default ({DEFAULT_VERCEL_PERCENTAGE}% for
-            paid, {DEFAULT_VERCEL_PERCENTAGE_FREE}% for free). Friendli and Perplexity route only
-            their configured models and default to 0%.
+            paid, {DEFAULT_VERCEL_PERCENTAGE_FREE}% for free). Perplexity routes only its configured
+            models and defaults to {DEFAULT_PERPLEXITY_PERCENTAGE}%.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -197,29 +184,6 @@ export function RoutingContent() {
             <span className="text-muted-foreground text-sm">%</span>
           </div>
           <p className="pt-2 text-sm font-medium">Direct partners</p>
-          <div className="flex items-center gap-3">
-            <Label htmlFor="routing-friendli" className="w-24 shrink-0">
-              Friendli
-            </Label>
-            <Input
-              id="routing-friendli"
-              type="number"
-              min={0}
-              max={100}
-              step={0.001}
-              placeholder={`Default: ${DEFAULT_FRIENDLI_PERCENTAGE}%`}
-              value={friendliInputValue}
-              onChange={e => {
-                setFriendliInputValue(e.target.value);
-                setHasChanges(true);
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSave();
-              }}
-              className="w-48"
-            />
-            <span className="text-muted-foreground text-sm">%</span>
-          </div>
           <div className="flex items-center gap-3">
             <Label htmlFor="routing-perplexity" className="w-24 shrink-0">
               Perplexity
@@ -305,11 +269,7 @@ export function RoutingContent() {
                 <span className="text-foreground font-medium">
                   {currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE}%
                 </span>{' '}
-                of free traffic goes to Vercel. Friendli receives{' '}
-                <span className="text-foreground font-medium">
-                  {currentFriendliOverride ?? DEFAULT_FRIENDLI_PERCENTAGE}%
-                </span>{' '}
-                of eligible GLM 5.2 traffic, and Perplexity receives{' '}
+                of free traffic goes to Vercel. Perplexity receives{' '}
                 <span className="text-foreground font-medium">
                   {currentPerplexityOverride ?? DEFAULT_PERPLEXITY_PERCENTAGE}%
                 </span>{' '}
@@ -324,9 +284,8 @@ export function RoutingContent() {
             ) : (
               <p>
                 No override set. Using default routing ({DEFAULT_VERCEL_PERCENTAGE}% of paid and{' '}
-                {DEFAULT_VERCEL_PERCENTAGE_FREE}% of free traffic to Vercel,{' '}
-                {DEFAULT_FRIENDLI_PERCENTAGE}% to Friendli, and {DEFAULT_PERPLEXITY_PERCENTAGE}% to
-                Perplexity).
+                {DEFAULT_VERCEL_PERCENTAGE_FREE}% of free traffic to Vercel and{' '}
+                {DEFAULT_PERPLEXITY_PERCENTAGE}% to Perplexity).
               </p>
             )}
             {data?.note && (

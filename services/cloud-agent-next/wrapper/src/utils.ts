@@ -58,10 +58,9 @@ export function isTimeoutTermination(result: ExecResult): boolean {
 function utf8Tail(value: string, maxBytes: number): string {
   const bytes = Buffer.from(value);
   if (bytes.length <= maxBytes) return value;
-  return bytes
-    .subarray(bytes.length - maxBytes)
-    .toString('utf8')
-    .replace(/^\uFFFD/, '');
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  return bytes.subarray(start).toString('utf8');
 }
 
 function appendBoundedTail(
@@ -233,8 +232,7 @@ export function runProcess(
       inactivityTimer = setTimeout(() => terminate('inactivity_timeout'), opts.inactivityTimeoutMs);
     };
 
-    const captureOutput = (stream: ProcessOutputStream, output: Buffer): void => {
-      const text = output.toString();
+    const captureOutput = (stream: ProcessOutputStream, text: string): void => {
       if (stream === 'stdout') {
         const bounded = appendBoundedTail(stdout, text, maxOutputBytes);
         stdout = bounded.value;
@@ -260,8 +258,10 @@ export function runProcess(
       hardTimeoutTimer = setTimeout(() => terminate('hard_timeout'), opts.hardTimeoutMs);
     }
 
-    proc.stdout.on('data', (output: Buffer) => captureOutput('stdout', output));
-    proc.stderr.on('data', (output: Buffer) => captureOutput('stderr', output));
+    proc.stdout.setEncoding('utf8');
+    proc.stderr.setEncoding('utf8');
+    proc.stdout.on('data', (output: string) => captureOutput('stdout', output));
+    proc.stderr.on('data', (output: string) => captureOutput('stderr', output));
 
     if (opts?.signal) {
       if (opts.signal.aborted) {

@@ -602,7 +602,22 @@
       "commit_other": "innsjekkinger",
       "file_one": "fil",
       "file": "filer",
-      "file_other": "filer"
+      "file_other": "filer",
+      "openedAgo": "Åpnet {{time}}",
+      "updatedAgo": "Oppdatert {{time}}",
+      "mergedAgo": "Flettet {{time}}",
+      "mergedByAgo": "Slått sammen av {{login}} {{time}}",
+      "closedAgo": "Lukket {{time}}",
+      "labels": "Etiketter",
+      "reviewers": "Vurderere",
+      "assignees": "Ansvarlige",
+      "linkedIssues": "Tilknyttede saker",
+      "reviewApproved": "Godkjent",
+      "reviewChangesRequested": "Endringer bedt om",
+      "reviewCommented": "Kommentert",
+      "reviewPending": "Venter på vurdering",
+      "openIssueA11y": "Åpne sak #{{number}} på GitHub",
+      "reviewDismissed": "Avvist"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert, usendt kommentar ved {{location}}",

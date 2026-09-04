@@ -602,7 +602,22 @@
       "commit_other": "કમિટ",
       "file_one": "ફાઇલ",
       "file": "ફાઇલો",
-      "file_other": "ફાઇલો"
+      "file_other": "ફાઇલો",
+      "openedAgo": "ખોલવામાં આવ્યું {{time}}",
+      "updatedAgo": "અપડેટ થયું {{time}}",
+      "mergedAgo": "મર્જ થયું {{time}}",
+      "mergedByAgo": "{{login}} દ્વારા મર્જ થયું {{time}}",
+      "closedAgo": "બંધ {{time}}",
+      "labels": "લેબલ",
+      "reviewers": "સમીક્ષકો",
+      "assignees": "સોંપાયેલા",
+      "linkedIssues": "જોડાયેલા મુદ્દા",
+      "reviewApproved": "મંજૂર",
+      "reviewChangesRequested": "ફેરફારો માંગ્યા",
+      "reviewCommented": "ટિપ્પણી કરી",
+      "reviewPending": "સમીક્ષાની રાહ જુએ છે",
+      "openIssueA11y": "GitHub પર મુદ્દો #{{number}} ખોલો",
+      "reviewDismissed": "કાઢી નાખેલ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} પરની જૂની બાકી ટિપ્પણીમાં ફેરફાર કરો",

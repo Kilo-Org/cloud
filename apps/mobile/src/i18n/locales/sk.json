@@ -616,7 +616,22 @@
       "commit_few": "commity",
       "commit_many": "commitu",
       "file_few": "súbory",
-      "file_many": "súboru"
+      "file_many": "súboru",
+      "openedAgo": "Otvorené {{time}}",
+      "updatedAgo": "Aktualizované {{time}}",
+      "mergedAgo": "Zlúčené {{time}}",
+      "mergedByAgo": "Zlúčil {{login}} {{time}}",
+      "closedAgo": "Zatvorené {{time}}",
+      "labels": "Štítky",
+      "reviewers": "Recenzenti",
+      "assignees": "Pridelení",
+      "linkedIssues": "Prepojené úlohy",
+      "reviewApproved": "Schválené",
+      "reviewChangesRequested": "Vyžiadané zmeny",
+      "reviewCommented": "Okomentované",
+      "reviewDismissed": "Odmietnuté",
+      "reviewPending": "Čaká na recenziu",
+      "openIssueA11y": "Otvoriť úlohu #{{number}} na GitHube"
     },
     "pendingComment": {
       "editOutdatedA11y": "Upraviť neaktuálny neodoslaný komentár k {{location}}",

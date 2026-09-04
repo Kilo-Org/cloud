@@ -602,7 +602,22 @@
       "commit_other": "កូមីត",
       "file_one": "ឯកសារ",
       "file": "ឯកសារ",
-      "file_other": "ឯកសារ"
+      "file_other": "ឯកសារ",
+      "openedAgo": "បើក {{time}}",
+      "updatedAgo": "ធ្វើបច្ចុប្បន្នភាព {{time}}",
+      "mergedAgo": "បានបញ្ចូល {{time}}",
+      "mergedByAgo": "{{login}} បានបញ្ចូលគ្នា {{time}}",
+      "closedAgo": "បានបិទ {{time}}",
+      "labels": "ស្លាក",
+      "reviewers": "អ្នកត្រួតពិនិត្យ",
+      "assignees": "អ្នកទទួលបន្ទុក",
+      "linkedIssues": "បញ្ហាដែលភ្ជាប់",
+      "reviewApproved": "បានអនុម័ត",
+      "reviewChangesRequested": "បានស្នើសុំការផ្លាស់ប្ដូរ",
+      "reviewCommented": "បានផ្ដល់មតិ",
+      "reviewPending": "កំពុងរង់ចាំការត្រួតពិនិត្យ",
+      "openIssueA11y": "បើកបញ្ហា #{{number}} នៅលើ GitHub",
+      "reviewDismissed": "បានបដិសេធ"
     },
     "pendingComment": {
       "editOutdatedA11y": "កែសម្រួលមតិយោបល់មិនទាន់ផ្ញើដែលលែងទាន់សម័យនៅ {{location}}",

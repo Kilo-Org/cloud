@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "Open · goedgekeurd",
       "stateOpenChangesRequested": "Open · wijzigingen gevraagd",
       "stateOpenReviewRequired": "Open · beoordeling vereist",
-      "unknownAuthor": "Onbekende auteur"
+      "unknownAuthor": "Onbekende auteur",
+      "openedAgo": "Geopend {{time}}",
+      "updatedAgo": "Bijgewerkt {{time}}",
+      "mergedAgo": "Samengevoegd {{time}}",
+      "mergedByAgo": "Samengevoegd door {{login}} {{time}}",
+      "closedAgo": "Gesloten {{time}}",
+      "labels": "Labels",
+      "reviewers": "Beoordelaars",
+      "assignees": "Toegewezenen",
+      "linkedIssues": "Gekoppelde issues",
+      "reviewApproved": "Goedgekeurd",
+      "reviewChangesRequested": "Wijzigingen gevraagd",
+      "reviewCommented": "Becommentarieerd",
+      "reviewDismissed": "Afgewezen",
+      "reviewPending": "Wacht op beoordeling",
+      "openIssueA11y": "Issue #{{number}} openen op GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Alle opmerkingen worden samen in één verzoek verzonden.",

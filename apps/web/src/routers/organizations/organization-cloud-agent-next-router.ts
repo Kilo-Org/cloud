@@ -40,6 +40,7 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
+  baseWorktreeChangesNextSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -71,6 +72,10 @@ import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
 import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
+import {
+  getWorktreeChangesOutputSchema,
+  refreshWorktreeChangesOutputSchema,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -178,6 +183,10 @@ const GetSessionInput = baseGetSessionNextSchema.extend({
 });
 
 const GetSandboxStatusInput = baseGetSandboxStatusNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorktreeChangesInput = baseWorktreeChangesNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -456,6 +465,32 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  getWorktreeChanges: organizationMemberProcedure
+    .input(WorktreeChangesInput)
+    .output(getWorktreeChangesOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      return await client.getWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
+  refreshWorktreeChanges: organizationMemberProcedure
+    .input(WorktreeChangesInput)
+    .output(refreshWorktreeChangesOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
     }),
 
   createTerminal: organizationMemberMutationProcedure

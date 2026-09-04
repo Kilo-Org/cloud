@@ -2634,7 +2634,22 @@
       "stateOpenReviewRequired": "Ouverte · Revue requise",
       "unknownAuthor": "Auteur inconnu",
       "commit_many": "validations",
-      "file_many": "fichiers"
+      "file_many": "fichiers",
+      "openedAgo": "Ouverte {{time}}",
+      "updatedAgo": "Mise à jour {{time}}",
+      "mergedAgo": "Fusionnée {{time}}",
+      "mergedByAgo": "Fusionnée par {{login}} {{time}}",
+      "closedAgo": "Fermée {{time}}",
+      "labels": "Étiquettes",
+      "reviewers": "Relecteurs",
+      "assignees": "Assignés",
+      "linkedIssues": "Tickets liés",
+      "reviewApproved": "Approuvée",
+      "reviewChangesRequested": "Modifications demandées",
+      "reviewCommented": "Commentée",
+      "reviewDismissed": "Ignoré",
+      "reviewPending": "En attente de relecture",
+      "openIssueA11y": "Ouvrir le ticket #{{number}} sur GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Tous les commentaires seront envoyés ensemble dans une seule requête.",

@@ -630,7 +630,22 @@
       "file_zero": "ffeil",
       "file_two": "ffeil",
       "file_few": "ffeil",
-      "file_many": "ffeil"
+      "file_many": "ffeil",
+      "openedAgo": "Agorwyd {{time}}",
+      "updatedAgo": "Diweddarwyd {{time}}",
+      "mergedAgo": "Wedi'i gyfuno {{time}}",
+      "mergedByAgo": "Cyfunwyd gan {{login}} {{time}}",
+      "closedAgo": "Ar gau {{time}}",
+      "labels": "Labeli",
+      "reviewers": "Adolygwyr",
+      "assignees": "Neilltuwyd i",
+      "linkedIssues": "Materion cysylltiedig",
+      "reviewApproved": "Cymeradwywyd",
+      "reviewChangesRequested": "Gofynnwyd am newidiadau",
+      "reviewCommented": "Sylwadwyd",
+      "reviewDismissed": "Wedi'i ddiystyru",
+      "reviewPending": "Yn aros am adolygiad",
+      "openIssueA11y": "Agor mater #{{number}} ar GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Golygu'r sylw sydd wedi dyddio ac sydd heb ei gyflwyno ar {{location}}",

@@ -237,7 +237,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         }
       />
       <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} />
+        <PrReviewTabSelector
+          activeTab={tab}
+          onChange={setTab}
+          discussionCount={pr.data?.commentCount}
+        />
       </View>
       {body}
     </View>

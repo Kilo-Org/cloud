@@ -602,7 +602,22 @@
       "commit_other": "hifadhi za mabadiliko",
       "file_one": "faili",
       "file": "faili",
-      "file_other": "faili"
+      "file_other": "faili",
+      "openedAgo": "Ilifunguliwa {{time}}",
+      "updatedAgo": "Ilisasishwa {{time}}",
+      "mergedAgo": "Imeunganishwa {{time}}",
+      "mergedByAgo": "Iliunganishwa na {{login}} {{time}}",
+      "closedAgo": "Imefungwa {{time}}",
+      "labels": "Lebo",
+      "reviewers": "Wakaguzi",
+      "assignees": "Waliopewa jukumu",
+      "linkedIssues": "Masuala yaliyounganishwa",
+      "reviewApproved": "Imeidhinishwa",
+      "reviewChangesRequested": "Mabadiliko yameombwa",
+      "reviewCommented": "Imetolewa maoni",
+      "reviewPending": "Inasubiri ukaguzi",
+      "openIssueA11y": "Fungua suala #{{number}} kwenye GitHub",
+      "reviewDismissed": "Imefutwa"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni yaliyopitwa na wakati yanayosubiri kutumwa kwenye {{location}}",

@@ -4,6 +4,7 @@ import { platform_integrations, kilocode_users, organizations } from '@kilocode/
 import { and, eq } from 'drizzle-orm';
 import {
   deleteIntegration,
+  deleteGitHubInstallationRecords,
   deleteIntegrationForOwner,
   createPendingIntegration,
   findIntegrationByInstallationId,
@@ -513,6 +514,124 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].platform_installation_id).toBe(siblingInstallId);
       expect(rows[0].github_app_type).toBe('lite');
+    });
+
+    test('deleteGitHubInstallationRecords deletes all effective standard rows for one installation', async () => {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '1000',
+          platform_account_login: 'user-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_user_id: otherUserId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '2000',
+          platform_account_login: 'user-legacy-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: null,
+        },
+        {
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '3000',
+          platform_account_login: 'org-lite',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'lite',
+        },
+        {
+          owned_by_organization_id: otherOrgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: siblingInstallId,
+          platform_account_id: '4000',
+          platform_account_login: 'org-unrelated-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+      ]);
+
+      await deleteGitHubInstallationRecords(destructiveInstallId, 'standard');
+
+      expect(await getRowsByInstallId()).toEqual([
+        expect.objectContaining({
+          platform_installation_id: destructiveInstallId,
+          github_app_type: 'lite',
+        }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.platform_installation_id, siblingInstallId))
+      ).toEqual([
+        expect.objectContaining({
+          github_app_type: 'standard',
+          owned_by_organization_id: otherOrgId,
+        }),
+      ]);
+    });
+
+    test('deleteGitHubInstallationRecords deletes only lite rows for a lite webhook', async () => {
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '1000',
+          platform_account_login: 'user-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+        {
+          owned_by_user_id: otherUserId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '2000',
+          platform_account_login: 'user-legacy-standard',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: null,
+        },
+        {
+          owned_by_organization_id: orgId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: destructiveInstallId,
+          platform_account_id: '3000',
+          platform_account_login: 'org-lite',
+          repository_access: 'all',
+          integration_status: 'active',
+          github_app_type: 'lite',
+        },
+      ]);
+
+      await deleteGitHubInstallationRecords(destructiveInstallId, 'lite');
+
+      const rows = await getRowsByInstallId();
+      expect(rows).toHaveLength(2);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ github_app_type: 'standard' }),
+          expect.objectContaining({ github_app_type: null }),
+        ])
+      );
     });
 
     test('suspendIntegration with app type leaves the owner sibling app-type row active', async () => {

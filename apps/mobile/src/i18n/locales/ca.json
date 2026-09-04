@@ -609,7 +609,22 @@
       "file": "fitxers",
       "file_other": "fitxers",
       "commit_many": "consignacions",
-      "file_many": "fitxers"
+      "file_many": "fitxers",
+      "openedAgo": "Obert {{time}}",
+      "updatedAgo": "Actualitzat {{time}}",
+      "mergedAgo": "Fusionada {{time}}",
+      "mergedByAgo": "Fusionat per {{login}} {{time}}",
+      "closedAgo": "Tancada {{time}}",
+      "labels": "Etiquetes",
+      "reviewers": "Revisors",
+      "assignees": "Assignats",
+      "linkedIssues": "Incidències vinculades",
+      "reviewApproved": "Aprovat",
+      "reviewChangesRequested": "Canvis sol·licitats",
+      "reviewCommented": "Comentat",
+      "reviewDismissed": "Descartat",
+      "reviewPending": "Pendent de revisió",
+      "openIssueA11y": "Obre la incidència #{{number}} a GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edita el comentari pendent desactualitzat a {{location}}",

@@ -602,7 +602,22 @@
       "commit_other": "muutostallennusta",
       "file_one": "tiedosto",
       "file": "tiedostoa",
-      "file_other": "tiedostoa"
+      "file_other": "tiedostoa",
+      "openedAgo": "Avattu {{time}}",
+      "updatedAgo": "Päivitetty {{time}}",
+      "mergedAgo": "Yhdistetty {{time}}",
+      "mergedByAgo": "Yhdistänyt {{login}} {{time}}",
+      "closedAgo": "Suljettu {{time}}",
+      "labels": "Tunnisteet",
+      "reviewers": "Katselmoijat",
+      "assignees": "Vastuuhenkilöt",
+      "linkedIssues": "Linkitetyt tiketit",
+      "reviewApproved": "Hyväksytty",
+      "reviewChangesRequested": "Muutoksia pyydetty",
+      "reviewCommented": "Kommentoitu",
+      "reviewPending": "Odottaa katselmointia",
+      "openIssueA11y": "Avaa tiketti #{{number}} GitHubissa",
+      "reviewDismissed": "Hylätty"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta lähettämätöntä kommenttia: {{location}}",

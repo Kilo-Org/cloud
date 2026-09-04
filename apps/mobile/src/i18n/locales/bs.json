@@ -609,7 +609,22 @@
       "file": "datoteka",
       "file_other": "datoteka",
       "commit_few": "potvrde izmjena",
-      "file_few": "datoteke"
+      "file_few": "datoteke",
+      "openedAgo": "Otvoreno {{time}}",
+      "updatedAgo": "Ažurirano {{time}}",
+      "mergedAgo": "Spojeno {{time}}",
+      "mergedByAgo": "Spojio {{login}} {{time}}",
+      "closedAgo": "Zatvoreno {{time}}",
+      "labels": "Oznake",
+      "reviewers": "Recenzenti",
+      "assignees": "Dodijeljeni",
+      "linkedIssues": "Povezani problemi",
+      "reviewApproved": "Odobreno",
+      "reviewChangesRequested": "Tražene izmjene",
+      "reviewCommented": "Komentarisano",
+      "reviewDismissed": "Odbijeno",
+      "reviewPending": "Čeka recenziju",
+      "openIssueA11y": "Otvori problem #{{number}} na GitHubu"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na {{location}}",

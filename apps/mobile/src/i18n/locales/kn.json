@@ -602,7 +602,22 @@
       "commit_other": "ಕಮಿಟ್‌ಗಳು",
       "file_one": "ಫೈಲ್",
       "file": "ಫೈಲ್‌ಗಳು",
-      "file_other": "ಫೈಲ್‌ಗಳು"
+      "file_other": "ಫೈಲ್‌ಗಳು",
+      "openedAgo": "ತೆರೆಯಲಾಗಿದೆ {{time}}",
+      "updatedAgo": "ನವೀಕರಿಸಲಾಗಿದೆ {{time}}",
+      "mergedAgo": "ವಿಲೀನಗೊಳಿಸಲಾಗಿದೆ {{time}}",
+      "mergedByAgo": "{{login}} ವಿಲೀನಗೊಳಿಸಿದ್ದಾರೆ {{time}}",
+      "closedAgo": "ಮುಚ್ಚಲಾಗಿದೆ {{time}}",
+      "labels": "ಲೇಬಲ್‌ಗಳು",
+      "reviewers": "ಪರಿಶೀಲಕರು",
+      "assignees": "ನಿಯೋಜಿತರು",
+      "linkedIssues": "ಸಂಬಂಧಿತ ಸಮಸ್ಯೆಗಳು",
+      "reviewApproved": "ಅನುಮೋದಿಸಲಾಗಿದೆ",
+      "reviewChangesRequested": "ಬದಲಾವಣೆಗಳನ್ನು ಕೋರಲಾಗಿದೆ",
+      "reviewCommented": "ಕಾಮೆಂಟ್ ಮಾಡಲಾಗಿದೆ",
+      "reviewPending": "ಪರಿಶೀಲನೆಗಾಗಿ ಕಾಯುತ್ತಿದೆ",
+      "openIssueA11y": "GitHub ನಲ್ಲಿ ಸಮಸ್ಯೆ #{{number}} ತೆರೆಯಿರಿ",
+      "reviewDismissed": "ತೆಗೆದುಹಾಕಲಾಗಿದೆ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}ನಲ್ಲಿರುವ ಹಳೆಯ ಆವೃತ್ತಿಗೆ ಸಂಬಂಧಿಸಿದ, ಸಲ್ಲಿಸಲು ಬಾಕಿ ಇರುವ ಕಾಮೆಂಟ್ ಸಂಪಾದಿಸಿ",

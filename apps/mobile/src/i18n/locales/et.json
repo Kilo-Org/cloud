@@ -602,7 +602,22 @@
       "commit_other": "sissekannet",
       "file_one": "fail",
       "file": "faili",
-      "file_other": "faili"
+      "file_other": "faili",
+      "openedAgo": "Avatud {{time}}",
+      "updatedAgo": "Uuendatud {{time}}",
+      "mergedAgo": "Ühendatud {{time}}",
+      "mergedByAgo": "Liitis {{login}} {{time}}",
+      "closedAgo": "Suletud {{time}}",
+      "labels": "Sildid",
+      "reviewers": "Ülevaatajad",
+      "assignees": "Määratud",
+      "linkedIssues": "Seotud teemad",
+      "reviewApproved": "Kinnitatud",
+      "reviewChangesRequested": "Muudatusi soovitud",
+      "reviewCommented": "Kommenteeritud",
+      "reviewPending": "Ootab ülevaatust",
+      "openIssueA11y": "Ava teema #{{number}} GitHubis",
+      "reviewDismissed": "Kõrvale jäetud"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",

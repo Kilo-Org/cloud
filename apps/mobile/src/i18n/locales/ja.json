@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "オープン · 承認済み",
       "stateOpenChangesRequested": "オープン · 変更要求あり",
       "stateOpenReviewRequired": "オープン · レビューが必要",
-      "unknownAuthor": "不明な作成者"
+      "unknownAuthor": "不明な作成者",
+      "openedAgo": "作成 {{time}}",
+      "updatedAgo": "更新 {{time}}",
+      "mergedAgo": "まーじずみ {{time}}",
+      "mergedByAgo": "{{login}} がマージ {{time}}",
+      "closedAgo": "くろーずずみ {{time}}",
+      "labels": "ラベル",
+      "reviewers": "レビュー担当者",
+      "assignees": "担当者",
+      "linkedIssues": "関連イシュー",
+      "reviewApproved": "承認済み",
+      "reviewChangesRequested": "変更を要求",
+      "reviewCommented": "コメント済み",
+      "reviewPending": "レビュー待ち",
+      "openIssueA11y": "GitHub でイシュー #{{number}} を開く",
+      "reviewDismissed": "却下済み"
     },
     "pendingComment": {
       "allQueuedHint": "すべてのコメントを1回のリクエストにまとめて送信します。",

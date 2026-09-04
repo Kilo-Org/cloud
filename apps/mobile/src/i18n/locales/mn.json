@@ -602,7 +602,22 @@
       "commit_other": "коммит",
       "file_one": "файл",
       "file": "файл",
-      "file_other": "файл"
+      "file_other": "файл",
+      "openedAgo": "Нээгдсэн {{time}}",
+      "updatedAgo": "Шинэчлэгдсэн {{time}}",
+      "mergedAgo": "Нэгтгэсэн {{time}}",
+      "mergedByAgo": "{{login}} нэгтгэсэн {{time}}",
+      "closedAgo": "Хаалттай {{time}}",
+      "labels": "Шошго",
+      "reviewers": "Хянагчид",
+      "assignees": "Хариуцагчид",
+      "linkedIssues": "Холбоотой асуудлууд",
+      "reviewApproved": "Батлагдсан",
+      "reviewChangesRequested": "Өөрчлөлт хүссэн",
+      "reviewCommented": "Сэтгэгдэл үлдээсэн",
+      "reviewPending": "Хяналт хүлээж байна",
+      "openIssueA11y": "GitHub дээр #{{number}} асуудлыг нээх",
+      "reviewDismissed": "Хасагдсан"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} дээрх хуучирсан, илгээгээгүй сэтгэгдлийг засах",

@@ -602,7 +602,22 @@
       "commit_other": "na commit",
       "file_one": "payl",
       "file": "mga payl",
-      "file_other": "mga payl"
+      "file_other": "mga payl",
+      "openedAgo": "Binuksan {{time}}",
+      "updatedAgo": "In-update {{time}}",
+      "mergedAgo": "Na-merge {{time}}",
+      "mergedByAgo": "Isinama ni {{login}} {{time}}",
+      "closedAgo": "Sarado {{time}}",
+      "labels": "Mga label",
+      "reviewers": "Mga tagasuri",
+      "assignees": "Mga naatasan",
+      "linkedIssues": "Mga naka-link na isyu",
+      "reviewApproved": "Naaprubahan",
+      "reviewChangesRequested": "Humiling ng mga pagbabago",
+      "reviewCommented": "May komento",
+      "reviewDismissed": "Na-dismiss",
+      "reviewPending": "Naghihintay ng pagsusuri",
+      "openIssueA11y": "Buksan ang isyu #{{number}} sa GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "I-edit ang nakabinbing komento sa lumang bersyon ng {{location}}",

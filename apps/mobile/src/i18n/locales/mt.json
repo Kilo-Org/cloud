@@ -623,7 +623,22 @@
       "commit_many": "reġistrazzjoni tal-bidliet",
       "file_two": "fajls",
       "file_few": "fajls",
-      "file_many": "fajl"
+      "file_many": "fajl",
+      "openedAgo": "Infetħet {{time}}",
+      "updatedAgo": "Aġġornata {{time}}",
+      "mergedAgo": "Ffuż {{time}}",
+      "mergedByAgo": "Ingħaqdet minn {{login}} {{time}}",
+      "closedAgo": "Magħluq {{time}}",
+      "labels": "Tikketti",
+      "reviewers": "Reviżuri",
+      "assignees": "Assenjati",
+      "linkedIssues": "Kwistjonijiet marbuta",
+      "reviewApproved": "Approvata",
+      "reviewChangesRequested": "Intalbu bidliet",
+      "reviewCommented": "Ikkummentata",
+      "reviewPending": "Tistenna reviżjoni",
+      "openIssueA11y": "Iftaħ il-kwistjoni #{{number}} fuq GitHub",
+      "reviewDismissed": "Mwarrab"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editja l-kumment pendenti mhux aġġornat fuq {{location}}",

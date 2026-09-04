@@ -25,6 +25,8 @@ describe('buildOverviewDto', () => {
     mergeable: true,
     mergeable_state: 'clean',
     auto_merge: { merge_method: 'squash' },
+    created_at: '2026-03-01T12:00:00Z',
+    updated_at: '2026-03-02T09:30:00Z',
   };
 
   it('returns overview DTO with all required fields populated', () => {
@@ -91,6 +93,136 @@ describe('buildOverviewDto', () => {
     expect(dto.author).toBeNull();
     expect(dto.reviewDecision).toBeNull();
     expect(dto.repo.viewerLogin).toBeNull();
+  });
+
+  it('maps labels, assignees, timestamps, merged-by and the comment count from REST', () => {
+    const dto = buildOverviewDto({
+      pr: {
+        ...basePr,
+        merged: true,
+        labels: [
+          { name: 'bug', color: 'd73a4a' },
+          { name: 'no-color', color: null },
+          { name: null, color: 'ffffff' },
+        ],
+        assignees: [{ login: 'octocat', avatar_url: 'https://avatars.example/octocat' }, null],
+        closed_at: '2026-03-03T10:00:00Z',
+        merged_at: '2026-03-03T10:00:00Z',
+        merged_by: { login: 'hubot', avatar_url: 'https://avatars.example/hubot' },
+        comments: 4,
+        review_comments: 7,
+      },
+      repo: {},
+      graphQl: { repository: { pullRequest: { reviewDecision: null } }, viewer: null },
+      viewer: null,
+    });
+    // A label without a name is dropped; a null color falls back to empty.
+    expect(dto.labels).toEqual([
+      { name: 'bug', color: 'd73a4a' },
+      { name: 'no-color', color: '' },
+    ]);
+    expect(dto.assignees).toEqual([
+      { login: 'octocat', avatarUrl: 'https://avatars.example/octocat' },
+    ]);
+    expect(dto.createdAt).toBe('2026-03-01T12:00:00Z');
+    expect(dto.updatedAt).toBe('2026-03-02T09:30:00Z');
+    expect(dto.closedAt).toBe('2026-03-03T10:00:00Z');
+    expect(dto.mergedAt).toBe('2026-03-03T10:00:00Z');
+    expect(dto.mergedBy).toEqual({ login: 'hubot', avatarUrl: 'https://avatars.example/hubot' });
+    expect(dto.commentCount).toBe(11);
+  });
+
+  it('defaults every REST-sourced sidebar field when GitHub omits it', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: null,
+      viewer: null,
+    });
+    expect(dto.labels).toEqual([]);
+    expect(dto.assignees).toEqual([]);
+    expect(dto.closedAt).toBeNull();
+    expect(dto.mergedAt).toBeNull();
+    expect(dto.mergedBy).toBeNull();
+    expect(dto.commentCount).toBe(0);
+    // A degraded GraphQL leg must not blank the overview.
+    expect(dto.reviewers).toEqual([]);
+    expect(dto.linkedIssues).toEqual([]);
+  });
+
+  it('lists submitted reviewers first and requested-only reviewers as PENDING', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: {
+        repository: {
+          pullRequest: {
+            reviewDecision: 'CHANGES_REQUESTED',
+            latestReviews: {
+              nodes: [
+                { state: 'APPROVED', author: { login: 'ada', avatarUrl: 'https://a.example/ada' } },
+                { state: 'CHANGES_REQUESTED', author: { login: 'grace', avatarUrl: null } },
+                // An unknown state and a null author are both skipped.
+                { state: 'SOMETHING_NEW', author: { login: 'linus', avatarUrl: null } },
+                { state: 'COMMENTED', author: null },
+                null,
+              ],
+            },
+            reviewRequests: {
+              nodes: [
+                { requestedReviewer: { login: 'ken', avatarUrl: null } },
+                // Already reviewed — keeps the submitted verdict, no PENDING row.
+                { requestedReviewer: { login: 'ada', avatarUrl: 'https://a.example/ada' } },
+                // A requested TEAM resolves to null and is dropped.
+                { requestedReviewer: null },
+              ],
+            },
+          },
+        },
+        viewer: { login: 'octocat' },
+      },
+      viewer: { login: 'octocat' },
+    });
+    expect(dto.reviewers).toEqual([
+      { login: 'ada', avatarUrl: 'https://a.example/ada', state: 'APPROVED' },
+      { login: 'grace', avatarUrl: null, state: 'CHANGES_REQUESTED' },
+      { login: 'ken', avatarUrl: null, state: 'PENDING' },
+    ]);
+  });
+
+  it('maps the issues the PR closes', () => {
+    const dto = buildOverviewDto({
+      pr: basePr,
+      repo: {},
+      graphQl: {
+        repository: {
+          pullRequest: {
+            reviewDecision: null,
+            closingIssuesReferences: {
+              nodes: [
+                {
+                  number: 42,
+                  title: 'Flux capacitor leaks',
+                  url: 'https://github.com/kilo/flux/issues/42',
+                  closed: false,
+                },
+                null,
+              ],
+            },
+          },
+        },
+        viewer: null,
+      },
+      viewer: null,
+    });
+    expect(dto.linkedIssues).toEqual([
+      {
+        number: 42,
+        title: 'Flux capacitor leaks',
+        url: 'https://github.com/kilo/flux/issues/42',
+        closed: false,
+      },
+    ]);
   });
 });
 

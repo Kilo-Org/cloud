@@ -602,7 +602,22 @@
       "commit_other": "depozitime",
       "file_one": "skedar",
       "file": "skedarë",
-      "file_other": "skedarë"
+      "file_other": "skedarë",
+      "openedAgo": "Hapur {{time}}",
+      "updatedAgo": "Përditësuar {{time}}",
+      "mergedAgo": "E shkrirë {{time}}",
+      "mergedByAgo": "Bashkuar nga {{login}} {{time}}",
+      "closedAgo": "E mbyllur {{time}}",
+      "labels": "Etiketat",
+      "reviewers": "Rishikuesit",
+      "assignees": "Të ngarkuarit",
+      "linkedIssues": "Çështje të lidhura",
+      "reviewApproved": "Miratuar",
+      "reviewChangesRequested": "Kërkuar ndryshime",
+      "reviewCommented": "Komentuar",
+      "reviewPending": "Në pritje të rishikimit",
+      "openIssueA11y": "Hap çështjen #{{number}} në GitHub",
+      "reviewDismissed": "E hedhur poshtë"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin e vjetëruar në pritje te {{location}}",

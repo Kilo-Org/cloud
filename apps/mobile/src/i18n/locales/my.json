@@ -602,7 +602,22 @@
       "commit_other": "ကွန်မစ်",
       "file_one": "ဖိုင်",
       "file": "ဖိုင်",
-      "file_other": "ဖိုင်"
+      "file_other": "ဖိုင်",
+      "openedAgo": "ဖွင့်ခဲ့သည် {{time}}",
+      "updatedAgo": "မွမ်းမံခဲ့သည် {{time}}",
+      "mergedAgo": "ပေါင်းစည်းပြီးပါပြီ {{time}}",
+      "mergedByAgo": "{{login}} က ပေါင်းစည်းခဲ့သည် {{time}}",
+      "closedAgo": "ပိတ်ထား {{time}}",
+      "labels": "အညွှန်းများ",
+      "reviewers": "စိစစ်သူများ",
+      "assignees": "တာဝန်ခံများ",
+      "linkedIssues": "ချိတ်ဆက်ထားသော ကိစ္စများ",
+      "reviewApproved": "အတည်ပြုပြီး",
+      "reviewChangesRequested": "ပြောင်းလဲမှုများ တောင်းဆိုထားသည်",
+      "reviewCommented": "မှတ်ချက်ပေးထားသည်",
+      "reviewDismissed": "ဖျက်သိမ်းပြီး",
+      "reviewPending": "စိစစ်မှု စောင့်ဆိုင်းနေသည်",
+      "openIssueA11y": "GitHub တွင် ကိစ္စ #{{number}} ကို ဖွင့်ပါ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} ရှိ ခေတ်မမီတော့သော မတင်ရသေးသည့် မှတ်ချက်ကို တည်းဖြတ်ပါ",

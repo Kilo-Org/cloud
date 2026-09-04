@@ -602,7 +602,22 @@
       "commit_other": "կոմիտ",
       "file_one": "ֆայլ",
       "file": "ֆայլեր",
-      "file_other": "ֆայլեր"
+      "file_other": "ֆայլեր",
+      "openedAgo": "Բացվել է {{time}}",
+      "updatedAgo": "Թարմացվել է {{time}}",
+      "mergedAgo": "Միավորված {{time}}",
+      "mergedByAgo": "Միաձուլել է {{login}}-ը {{time}}",
+      "closedAgo": "Փակ {{time}}",
+      "labels": "Պիտակներ",
+      "reviewers": "Գրախոսներ",
+      "assignees": "Նշանակվածներ",
+      "linkedIssues": "Կապված խնդիրներ",
+      "reviewApproved": "Հաստատված է",
+      "reviewChangesRequested": "Փոփոխություններ են պահանջվել",
+      "reviewCommented": "Մեկնաբանված է",
+      "reviewPending": "Սպասում է գրախոսության",
+      "openIssueA11y": "Բացել #{{number}} խնդիրը GitHub-ում",
+      "reviewDismissed": "Մերժված"
     },
     "pendingComment": {
       "editOutdatedA11y": "Խմբագրել հնացած չուղարկված մեկնաբանությունը՝ {{location}}",

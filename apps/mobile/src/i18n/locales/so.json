@@ -602,7 +602,22 @@
       "commit_other": "kaydino",
       "file_one": "fayl",
       "file": "faylal",
-      "file_other": "faylal"
+      "file_other": "faylal",
+      "openedAgo": "La furay {{time}}",
+      "updatedAgo": "La cusbooneysiiyay {{time}}",
+      "mergedAgo": "Waa la daray {{time}}",
+      "mergedByAgo": "{{login}} ayaa isku daray {{time}}",
+      "closedAgo": "Waa xiran {{time}}",
+      "labels": "Calaamado",
+      "reviewers": "Dib-u-eegayaal",
+      "assignees": "Loo xilsaaray",
+      "linkedIssues": "Arrimo xiriirsan",
+      "reviewApproved": "La ansixiyay",
+      "reviewChangesRequested": "Isbeddello la codsaday",
+      "reviewCommented": "Faallo la bixiyay",
+      "reviewPending": "Sugaya dib-u-eegis",
+      "openIssueA11y": "Fur arrinta #{{number}} ee GitHub",
+      "reviewDismissed": "Waa la xiray"
     },
     "pendingComment": {
       "editOutdatedA11y": "Wax ka beddel faallada duugoobay ee sugaysa dirista kuna taal {{location}}",

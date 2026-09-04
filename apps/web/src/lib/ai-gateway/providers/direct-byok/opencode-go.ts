@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { generateProviderSpecificSessionHash } from '@/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
@@ -8,6 +10,11 @@ export default {
   supported_chat_apis: ['chat_completions', 'messages', 'responses'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
+    context.extraHeaders['x-opencode-session'] = generateProviderSpecificSessionHash(
+      context.kilo_user_id,
+      context.session_id ?? randomUUID(),
+      context.provider
+    );
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }

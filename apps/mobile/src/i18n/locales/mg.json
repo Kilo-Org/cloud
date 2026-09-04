@@ -602,7 +602,22 @@
       "commit_other": "commit",
       "file_one": "rakitra",
       "file": "rakitra",
-      "file_other": "rakitra"
+      "file_other": "rakitra",
+      "openedAgo": "Nosokafana {{time}}",
+      "updatedAgo": "Nohavaozina {{time}}",
+      "mergedAgo": "Nampirina {{time}}",
+      "mergedByAgo": "Nakamban'i {{login}} {{time}}",
+      "closedAgo": "Mihidy {{time}}",
+      "labels": "Marika",
+      "reviewers": "Mpandinika",
+      "assignees": "Voatendry",
+      "linkedIssues": "Olana mifandray",
+      "reviewApproved": "Nankatoavina",
+      "reviewChangesRequested": "Nangatahana fanovana",
+      "reviewCommented": "Nanome hevitra",
+      "reviewPending": "Miandry fandinihana",
+      "openIssueA11y": "Sokafy ny olana #{{number}} ao amin'ny GitHub",
+      "reviewDismissed": "Voala"
     },
     "pendingComment": {
       "editOutdatedA11y": "Ovao ny hevitra miandry fandefasana tsy mifanaraka intsony amin'ny {{location}}",

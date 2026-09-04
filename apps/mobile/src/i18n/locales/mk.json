@@ -602,7 +602,22 @@
       "commit_other": "комити",
       "file_one": "датотека",
       "file": "датотеки",
-      "file_other": "датотеки"
+      "file_other": "датотеки",
+      "openedAgo": "Отворено {{time}}",
+      "updatedAgo": "Ажурирано {{time}}",
+      "mergedAgo": "Споено {{time}}",
+      "mergedByAgo": "Споено од {{login}} {{time}}",
+      "closedAgo": "Затворено {{time}}",
+      "labels": "Ознаки",
+      "reviewers": "Рецензенти",
+      "assignees": "Задолжени",
+      "linkedIssues": "Поврзани проблеми",
+      "reviewApproved": "Одобрено",
+      "reviewChangesRequested": "Побарани промени",
+      "reviewCommented": "Коментирано",
+      "reviewPending": "Чека рецензија",
+      "openIssueA11y": "Отвори проблем #{{number}} на GitHub",
+      "reviewDismissed": "Отфрлен"
     },
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",

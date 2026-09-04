@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "未結案 · 已核准",
       "stateOpenChangesRequested": "未結案 · 已要求變更",
       "stateOpenReviewRequired": "未結案 · 待審查",
-      "unknownAuthor": "未知作者"
+      "unknownAuthor": "未知作者",
+      "openedAgo": "建立於 {{time}}",
+      "updatedAgo": "更新於 {{time}}",
+      "mergedAgo": "已合併 {{time}}",
+      "mergedByAgo": "由 {{login}} 合併 {{time}}",
+      "closedAgo": "已關閉 {{time}}",
+      "labels": "標籤",
+      "reviewers": "審查者",
+      "assignees": "指派人",
+      "linkedIssues": "關聯的議題",
+      "reviewApproved": "已核准",
+      "reviewChangesRequested": "已要求修改",
+      "reviewCommented": "已評論",
+      "reviewDismissed": "已忽略",
+      "reviewPending": "等待審查",
+      "openIssueA11y": "在 GitHub 上開啟議題 #{{number}}"
     },
     "pendingComment": {
       "allQueuedHint": "所有留言會透過同一個請求一次送出。",

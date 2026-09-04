@@ -18,6 +18,7 @@ import { createControlTerminalRuntime } from './terminal-runtime';
 import { createWorktreeKiloRuntimes } from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { controlLogWrapperIdSchema } from '../../../src/shared/control-diagnostics.js';
+import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 
 const retirementCauses = new Map([
   ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
@@ -53,6 +54,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onDiagnostic: diagnostics.onDiagnostic,
     onEvent: (runtime, event) => {
+      mutationNotifications.observe(runtime, event);
       const identity = sessionEventIdentity({
         ...event,
         sessionId: eventKiloSessionId(event.properties),
@@ -116,6 +118,13 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
     retireRuntime: reason => shutdown(1, reason),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   };
+
+  const mutationNotifications = createWorktreeMutationNotifications({
+    sessions: deps.sessions,
+    kiloRuntimes,
+    signal: abort.signal,
+    sendEvent: (event, payload, identity) => control?.sendEvent?.(event, payload, identity),
+  });
 
   function withHeartbeatReason(payload: SandboxHeartbeatPayload): SandboxHeartbeatPayload {
     if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;

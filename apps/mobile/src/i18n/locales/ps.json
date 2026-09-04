@@ -602,7 +602,22 @@
       "commit_other": "کمېټونه",
       "file_one": "فایل",
       "file": "فایلونه",
-      "file_other": "فایلونه"
+      "file_other": "فایلونه",
+      "openedAgo": "پرانیستل شوی {{time}}",
+      "updatedAgo": "تازه شوی {{time}}",
+      "mergedAgo": "یوځای شو {{time}}",
+      "mergedByAgo": "{{login}} یوځای کړ {{time}}",
+      "closedAgo": "تړل شوی {{time}}",
+      "labels": "نښې",
+      "reviewers": "بیاکتونکي",
+      "assignees": "ګمارل شوي",
+      "linkedIssues": "تړل شوې مسئلې",
+      "reviewApproved": "تصویب شوی",
+      "reviewChangesRequested": "بدلونونه غوښتل شوي",
+      "reviewCommented": "تبصره وشوه",
+      "reviewPending": "د بیاکتنې په تمه",
+      "openIssueA11y": "په GitHub کې مسئله #{{number}} پرانیزئ",
+      "reviewDismissed": "له پامه غورځول شوی"
     },
     "pendingComment": {
       "editOutdatedA11y": "په {{location}} کې پخوانۍ په تمه تبصره سمه کړئ",

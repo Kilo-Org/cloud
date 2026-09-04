@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "Đang mở · Đã phê duyệt",
       "stateOpenChangesRequested": "Đang mở · Đã yêu cầu thay đổi",
       "stateOpenReviewRequired": "Đang mở · Cần đánh giá",
-      "unknownAuthor": "Không rõ tác giả"
+      "unknownAuthor": "Không rõ tác giả",
+      "openedAgo": "Đã mở {{time}}",
+      "updatedAgo": "Đã cập nhật {{time}}",
+      "mergedAgo": "Đã hợp nhất {{time}}",
+      "mergedByAgo": "{{login}} đã gộp {{time}}",
+      "closedAgo": "Đã đóng {{time}}",
+      "labels": "Nhãn",
+      "reviewers": "Người đánh giá",
+      "assignees": "Người phụ trách",
+      "linkedIssues": "Vấn đề liên kết",
+      "reviewApproved": "Đã phê duyệt",
+      "reviewChangesRequested": "Đã yêu cầu thay đổi",
+      "reviewCommented": "Đã bình luận",
+      "reviewDismissed": "Đã bỏ qua",
+      "reviewPending": "Đang chờ đánh giá",
+      "openIssueA11y": "Mở vấn đề #{{number}} trên GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Tất cả bình luận sẽ được gửi chung trong một yêu cầu.",

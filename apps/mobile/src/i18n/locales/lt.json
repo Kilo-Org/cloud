@@ -616,7 +616,22 @@
       "commit_few": "pakeitimų įrašai",
       "commit_many": "pakeitimų įrašo",
       "file_few": "failai",
-      "file_many": "failo"
+      "file_many": "failo",
+      "openedAgo": "Atidaryta {{time}}",
+      "updatedAgo": "Atnaujinta {{time}}",
+      "mergedAgo": "Sujungta {{time}}",
+      "mergedByAgo": "Suliejo {{login}} {{time}}",
+      "closedAgo": "Uždaryta {{time}}",
+      "labels": "Žymos",
+      "reviewers": "Peržiūrėtojai",
+      "assignees": "Priskirtieji",
+      "linkedIssues": "Susietos problemos",
+      "reviewApproved": "Patvirtinta",
+      "reviewChangesRequested": "Paprašyta pakeitimų",
+      "reviewCommented": "Pakomentuota",
+      "reviewDismissed": "Atmesta",
+      "reviewPending": "Laukiama peržiūros",
+      "openIssueA11y": "Atverti problemą #{{number}} GitHub'e"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redaguoti pasenusį nepateiktą komentarą: {{location}}",

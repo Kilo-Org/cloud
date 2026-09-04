@@ -2614,7 +2614,22 @@
       "stateOpenApproved": "Offen · Freigegeben",
       "stateOpenChangesRequested": "Offen · Änderungen angefordert",
       "stateOpenReviewRequired": "Offen · Review erforderlich",
-      "unknownAuthor": "Unbekannter Autor"
+      "unknownAuthor": "Unbekannter Autor",
+      "openedAgo": "Geöffnet {{time}}",
+      "updatedAgo": "Aktualisiert {{time}}",
+      "mergedAgo": "Zusammengeführt {{time}}",
+      "mergedByAgo": "Zusammengeführt von {{login}} {{time}}",
+      "closedAgo": "Geschlossen {{time}}",
+      "labels": "Labels",
+      "reviewers": "Prüfer",
+      "assignees": "Zuständige",
+      "linkedIssues": "Verknüpfte Vorgänge",
+      "reviewApproved": "Genehmigt",
+      "reviewChangesRequested": "Änderungen erbeten",
+      "reviewCommented": "Kommentiert",
+      "reviewPending": "Wartet auf Prüfung",
+      "openIssueA11y": "Vorgang #{{number}} auf GitHub öffnen",
+      "reviewDismissed": "Verworfen"
     },
     "pendingComment": {
       "allQueuedHint": "Alle Kommentare werden zusammen in einer Anfrage gesendet.",

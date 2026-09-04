@@ -602,7 +602,22 @@
       "commit_other": "کۆمیت",
       "file_one": "پەڕگە",
       "file": "پەڕگە",
-      "file_other": "پەڕگە"
+      "file_other": "پەڕگە",
+      "openedAgo": "کرایەوە {{time}}",
+      "updatedAgo": "نوێکرایەوە {{time}}",
+      "mergedAgo": "تێکەڵ کرا {{time}}",
+      "mergedByAgo": "{{login}} تێکەڵی کرد {{time}}",
+      "closedAgo": "داخراو {{time}}",
+      "labels": "پێناسەکان",
+      "reviewers": "پێداچوونەوەکاران",
+      "assignees": "دیاریکراوان",
+      "linkedIssues": "کێشە بەستراوەکان",
+      "reviewApproved": "پەسەندکرا",
+      "reviewChangesRequested": "گۆڕانکاری داواکرا",
+      "reviewCommented": "لێدوان درا",
+      "reviewDismissed": "لابراو",
+      "reviewPending": "چاوەڕێی پێداچوونەوە",
+      "openIssueA11y": "کێشەی #{{number}} لە GitHub بکەرەوە"
     },
     "pendingComment": {
       "editOutdatedA11y": "دەستکاری بۆچوونە چاوەڕوانە کۆنبووەوەکە لە {{location}} بکە",

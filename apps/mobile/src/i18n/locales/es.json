@@ -2634,7 +2634,22 @@
       "stateOpenReviewRequired": "Abierta · Revisión obligatoria",
       "unknownAuthor": "Autor desconocido",
       "commit_many": "confirmaciones",
-      "file_many": "archivos"
+      "file_many": "archivos",
+      "openedAgo": "Abierto {{time}}",
+      "updatedAgo": "Actualizado {{time}}",
+      "mergedAgo": "Fusionada {{time}}",
+      "mergedByAgo": "Fusionado por {{login}} {{time}}",
+      "closedAgo": "Cerrada {{time}}",
+      "labels": "Etiquetas",
+      "reviewers": "Revisores",
+      "assignees": "Asignados",
+      "linkedIssues": "Incidencias vinculadas",
+      "reviewApproved": "Aprobado",
+      "reviewChangesRequested": "Cambios solicitados",
+      "reviewCommented": "Comentado",
+      "reviewDismissed": "Descartado",
+      "reviewPending": "Pendiente de revisión",
+      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Todos los comentarios se enviarán juntos en una sola solicitud.",

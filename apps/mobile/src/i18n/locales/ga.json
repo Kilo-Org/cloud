@@ -623,7 +623,22 @@
       "commit_many": "dtaifead",
       "file_two": "chomhad",
       "file_few": "chomhad",
-      "file_many": "gcomhad"
+      "file_many": "gcomhad",
+      "openedAgo": "Oscailte {{time}}",
+      "updatedAgo": "Nuashonraithe {{time}}",
+      "mergedAgo": "Cumascaithe {{time}}",
+      "mergedByAgo": "Cumaiscthe ag {{login}} {{time}}",
+      "closedAgo": "Dúnta {{time}}",
+      "labels": "Lipéid",
+      "reviewers": "Athbhreithneoirí",
+      "assignees": "Sannaithe",
+      "linkedIssues": "Ceisteanna nasctha",
+      "reviewApproved": "Ceadaithe",
+      "reviewChangesRequested": "Iarradh athruithe",
+      "reviewCommented": "Trácht déanta",
+      "reviewDismissed": "Díbithe",
+      "reviewPending": "Ag fanacht le hathbhreithniú",
+      "openIssueA11y": "Oscail ceist #{{number}} ar GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Cuir an trácht ar feitheamh atá as dáta ag {{location}} in eagar",

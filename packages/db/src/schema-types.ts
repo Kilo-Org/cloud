@@ -1980,6 +1980,81 @@ export const NormalizedOpenRouterResponse = z.object({
   generated_at: z.string(),
 });
 
+export const EnkryptScoreSchema = z.object({
+  model_name: z.string().min(1),
+  provider: z.string().min(1),
+  source: z.string().nullish(),
+  risk_score: z.number().nullable().optional(),
+  bias_score: z.number().nullable().optional(),
+  cbrn_score: z.number().nullable().optional(),
+  harmful_score: z.number().nullable().optional(),
+  insecure_code_score: z.number().nullable().optional(),
+  toxicity_score: z.number().nullable().optional(),
+  robustness_score: z.number().nullable().optional(),
+  jailbreak_score: z.number().nullable().optional(),
+  evasion_score: z.number().nullable().optional(),
+  safety_score: z.number().nullable().optional(),
+  nist_score: z.number().nullable().optional(),
+  owasp_score: z.number().nullable().optional(),
+});
+
+export type EnkryptScore = z.infer<typeof EnkryptScoreSchema>;
+
+export const EnkryptBenchmarkSchema = EnkryptScoreSchema.extend({
+  ingestedAt: z.string().datetime(),
+  evaluatedAt: z.null(),
+});
+
+export type EnkryptBenchmark = z.infer<typeof EnkryptBenchmarkSchema>;
+
+export const EnkryptVerificationSchema = z.object({
+  checkedAt: z.string().datetime(),
+  scoreHash: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+export type EnkryptVerification = z.infer<typeof EnkryptVerificationSchema>;
+
+export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVerificationSchema);
+
+export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
+
+export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
+
+export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
+  lastCheckedAt: z.string().datetime(),
+  staleAfter: z.string().datetime(),
+  freshness: z.enum(['fresh', 'stale']),
+});
+
+export type EnkryptPublishedBenchmark = z.infer<typeof EnkryptPublishedBenchmarkSchema>;
+
+export const EnkryptSyncCountsSchema = z.object({
+  fetchedCount: z.number().int().nonnegative(),
+  rejectedCount: z.number().int().nonnegative(),
+  matchedCount: z.number().int().nonnegative(),
+  unmatchedCount: z.number().int().nonnegative(),
+  ambiguousCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+});
+
+export type EnkryptSyncCounts = z.infer<typeof EnkryptSyncCountsSchema>;
+
+export const EnkryptFailureCategorySchema = z.enum([
+  'configuration',
+  'authentication',
+  'rate_limited',
+  'response_validation',
+  'timeout',
+  'network',
+  'upstream',
+  'database',
+  'coverage',
+  'superseded',
+  'unexpected',
+]);
+
+export type EnkryptFailureCategory = z.infer<typeof EnkryptFailureCategorySchema>;
+
 export const OpenCodePromptSchema = z.enum([
   'codex',
   'gemini',
@@ -2033,6 +2108,23 @@ export const OpenCodeVariantSchema = z.object({
 });
 
 export type OpenCodeVariant = z.infer<typeof OpenCodeVariantSchema>;
+
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
+
+export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
+
+export const DirectByokModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
+  context_length: z.number(),
+  max_completion_tokens: z.number(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+});
+
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
+export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export const OpenCodeSettingsSchema = z.object({
   ai_sdk_provider: CustomLlmProviderSchema.optional(),

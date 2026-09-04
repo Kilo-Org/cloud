@@ -2654,7 +2654,22 @@
       "commit_few": "коміти",
       "commit_many": "комітів",
       "file_few": "файли",
-      "file_many": "файлів"
+      "file_many": "файлів",
+      "openedAgo": "Відкрито {{time}}",
+      "updatedAgo": "Оновлено {{time}}",
+      "mergedAgo": "Злито {{time}}",
+      "mergedByAgo": "Об'єднав {{login}} {{time}}",
+      "closedAgo": "Закрито {{time}}",
+      "labels": "Мітки",
+      "reviewers": "Рецензенти",
+      "assignees": "Відповідальні",
+      "linkedIssues": "Пов'язані задачі",
+      "reviewApproved": "Схвалено",
+      "reviewChangesRequested": "Запитано зміни",
+      "reviewCommented": "Прокоментовано",
+      "reviewPending": "Очікує рецензії",
+      "openIssueA11y": "Відкрити задачу #{{number}} на GitHub",
+      "reviewDismissed": "Відхилено"
     },
     "pendingComment": {
       "allQueuedHint": "Усі коментарі буде надіслано разом одним запитом.",

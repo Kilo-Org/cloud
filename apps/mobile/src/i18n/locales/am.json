@@ -602,7 +602,22 @@
       "commit_other": "ኮሚቶች",
       "file_one": "ፋይል",
       "file": "ፋይሎች",
-      "file_other": "ፋይሎች"
+      "file_other": "ፋይሎች",
+      "openedAgo": "የተከፈተው {{time}}",
+      "updatedAgo": "የተዘመነው {{time}}",
+      "mergedAgo": "ተዋህዷል {{time}}",
+      "mergedByAgo": "በ{{login}} የተዋሃደው {{time}}",
+      "closedAgo": "ተዘግቷል {{time}}",
+      "labels": "መለያዎች",
+      "reviewers": "ገምጋሚዎች",
+      "assignees": "ተመዳቢዎች",
+      "linkedIssues": "የተገናኙ ጉዳዮች",
+      "reviewApproved": "ጸድቋል",
+      "reviewChangesRequested": "ለውጦች ተጠይቀዋል",
+      "reviewCommented": "አስተያየት ተሰጥቷል",
+      "reviewPending": "ግምገማ በመጠባበቅ ላይ",
+      "openIssueA11y": "ጉዳይ #{{number}} በGitHub ላይ ክፈት",
+      "reviewDismissed": "ተወግዷል"
     },
     "pendingComment": {
       "editOutdatedA11y": "በ{{location}} ላይ ያለውን ከአሁኑ ኮድ ጋር የማይዛመድ ያልተላከ አስተያየት አርትዕ",

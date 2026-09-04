@@ -602,7 +602,22 @@
       "commit_other": "confirmacións",
       "file_one": "ficheiro",
       "file": "ficheiros",
-      "file_other": "ficheiros"
+      "file_other": "ficheiros",
+      "openedAgo": "Aberto {{time}}",
+      "updatedAgo": "Actualizado {{time}}",
+      "mergedAgo": "Fusionado {{time}}",
+      "mergedByAgo": "Fusionado por {{login}} {{time}}",
+      "closedAgo": "Pechado {{time}}",
+      "labels": "Etiquetas",
+      "reviewers": "Revisores",
+      "assignees": "Asignados",
+      "linkedIssues": "Incidencias vinculadas",
+      "reviewApproved": "Aprobado",
+      "reviewChangesRequested": "Cambios solicitados",
+      "reviewCommented": "Comentado",
+      "reviewDismissed": "Descartado",
+      "reviewPending": "Á espera de revisión",
+      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentario pendente desactualizado en {{location}}",

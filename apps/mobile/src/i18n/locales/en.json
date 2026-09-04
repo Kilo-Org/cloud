@@ -602,7 +602,22 @@
       "commit_other": "commits",
       "file_one": "file",
       "file": "files",
-      "file_other": "files"
+      "file_other": "files",
+      "openedAgo": "Opened {{time}}",
+      "updatedAgo": "Updated {{time}}",
+      "mergedAgo": "Merged {{time}}",
+      "mergedByAgo": "Merged by {{login}} {{time}}",
+      "closedAgo": "Closed {{time}}",
+      "labels": "Labels",
+      "reviewers": "Reviewers",
+      "assignees": "Assignees",
+      "linkedIssues": "Linked issues",
+      "reviewApproved": "Approved",
+      "reviewChangesRequested": "Changes requested",
+      "reviewCommented": "Commented",
+      "reviewDismissed": "Dismissed",
+      "reviewPending": "Awaiting review",
+      "openIssueA11y": "Open issue #{{number}} on GitHub"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edit outdated pending comment on {{location}}",

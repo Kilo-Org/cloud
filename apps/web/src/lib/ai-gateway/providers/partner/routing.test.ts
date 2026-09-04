@@ -1,28 +1,18 @@
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  FRIENDLI_GLM_PUBLIC_ID,
-  PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/partner/constants';
-import {
-  FRIENDLI_GLM_PROVIDER,
-  PERPLEXITY_KIMI_PROVIDER,
-} from '@/lib/ai-gateway/providers/partner/providers';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PROVIDER } from '@/lib/ai-gateway/providers/partner/providers';
 import {
   selectPercentageRoutedPartnerProvider,
   type PercentageRoutedPartnerInput,
 } from '@/lib/ai-gateway/providers/partner/routing';
 import type { RuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 
-const originalFriendliApiKey = FRIENDLI_GLM_PROVIDER.apiKey;
 const originalPerplexityApiKey = PERPLEXITY_KIMI_PROVIDER.apiKey;
 
-function setApiKey(
-  provider: typeof FRIENDLI_GLM_PROVIDER | typeof PERPLEXITY_KIMI_PROVIDER,
-  value: string
-) {
-  Object.defineProperty(provider, 'apiKey', {
+function setApiKey(value: string) {
+  Object.defineProperty(PERPLEXITY_KIMI_PROVIDER, 'apiKey', {
     value,
     configurable: true,
     enumerable: true,
@@ -31,13 +21,11 @@ function setApiKey(
 }
 
 beforeEach(() => {
-  setApiKey(FRIENDLI_GLM_PROVIDER, 'test-friendli-key');
-  setApiKey(PERPLEXITY_KIMI_PROVIDER, 'test-perplexity-key');
+  setApiKey('test-perplexity-key');
 });
 
 afterAll(() => {
-  setApiKey(FRIENDLI_GLM_PROVIDER, originalFriendliApiKey);
-  setApiKey(PERPLEXITY_KIMI_PROVIDER, originalPerplexityApiKey);
+  setApiKey(originalPerplexityApiKey);
 });
 
 function request(
@@ -62,12 +50,11 @@ const routingConfig: RuntimeGatewayRoutingConfig = {
   vercelPaid: 50,
   vercelFree: 50,
   vercelOptOutModels: new Set(),
-  friendli: 100,
   perplexity: 100,
 };
 
 const defaultInput = {
-  requestedModel: FRIENDLI_GLM_PUBLIC_ID,
+  requestedModel: PERPLEXITY_KIMI_PUBLIC_ID,
   request: request(),
   randomSeed: 'user-id',
   sourceProviderId: 'openrouter',
@@ -81,87 +68,80 @@ function selectPartner(
   return selectPercentageRoutedPartnerProvider({ ...defaultInput, ...overrides }, config);
 }
 
-describe('getPercentageRoutedPartnerProvider', () => {
-  it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, FRIENDLI_GLM_PROVIDER],
-    [PERPLEXITY_KIMI_PUBLIC_ID, PERPLEXITY_KIMI_PROVIDER],
-  ])('routes exact model %s', (model, expectedProvider) => {
-    expect(selectPartner({ requestedModel: model })).toBe(expectedProvider);
+describe('selectPercentageRoutedPartnerProvider', () => {
+  it('routes the exact Kimi model for chat completions requests', () => {
+    expect(selectPartner()).toBe(PERPLEXITY_KIMI_PROVIDER);
   });
 
-  it('routes chat completions requests', () => {
-    expect(selectPartner()).toBe(FRIENDLI_GLM_PROVIDER);
-  });
+  it.each(['openrouter', 'vercel'] as const)(
+    'does not route GLM 5.2 from %s to a direct partner',
+    sourceProviderId => {
+      expect(selectPartner({ requestedModel: 'z-ai/glm-5.2', sourceProviderId })).toBeNull();
+    }
+  );
 
   it.each(['messages', 'responses'] as const)('does not route untested %s requests', kind => {
     expect(selectPartner({ request: request(kind) })).toBeNull();
   });
 
   it('allows an empty provider object', () => {
-    expect(selectPartner({ request: request('chat_completions', {}) })).toBe(FRIENDLI_GLM_PROVIDER);
-  });
-
-  it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, 'friendli', FRIENDLI_GLM_PROVIDER],
-    [PERPLEXITY_KIMI_PUBLIC_ID, 'perplexity', PERPLEXITY_KIMI_PROVIDER],
-  ])('honors provider filters for %s', (requestedModel, providerId, expectedProvider) => {
-    expect(
-      selectPartner({
-        requestedModel,
-        request: request('chat_completions', { only: [providerId] }),
-      })
-    ).toBe(expectedProvider);
-    expect(
-      selectPartner({
-        requestedModel,
-        request: request('chat_completions', { ignore: ['openai'] }),
-      })
-    ).toBe(expectedProvider);
-    expect(
-      selectPartner({ requestedModel, request: request('chat_completions', { only: ['openai'] }) })
-    ).toBeNull();
-    expect(
-      selectPartner({
-        requestedModel,
-        request: request('chat_completions', { ignore: [providerId] }),
-      })
-    ).toBeNull();
-  });
-
-  it.each([
-    [FRIENDLI_GLM_PUBLIC_ID, { data_collection: 'deny' } as const, FRIENDLI_GLM_PROVIDER],
-    [PERPLEXITY_KIMI_PUBLIC_ID, { zdr: true } as const, PERPLEXITY_KIMI_PROVIDER],
-  ])('routes ZDR model %s with data policy options', (requestedModel, provider, expected) => {
-    expect(selectPartner({ requestedModel, request: request('chat_completions', provider) })).toBe(
-      expected
+    expect(selectPartner({ request: request('chat_completions', {}) })).toBe(
+      PERPLEXITY_KIMI_PROVIDER
     );
   });
+
+  it('honors provider filters', () => {
+    expect(selectPartner({ request: request('chat_completions', { only: ['perplexity'] }) })).toBe(
+      PERPLEXITY_KIMI_PROVIDER
+    );
+    expect(selectPartner({ request: request('chat_completions', { ignore: ['openai'] }) })).toBe(
+      PERPLEXITY_KIMI_PROVIDER
+    );
+    expect(
+      selectPartner({ request: request('chat_completions', { only: ['openai'] }) })
+    ).toBeNull();
+    expect(
+      selectPartner({ request: request('chat_completions', { ignore: ['perplexity'] }) })
+    ).toBeNull();
+  });
+
+  it.each([{ data_collection: 'deny' } as const, { zdr: true } as const])(
+    'routes the ZDR model with data policy options %p',
+    provider => {
+      expect(selectPartner({ request: request('chat_completions', provider) })).toBe(
+        PERPLEXITY_KIMI_PROVIDER
+      );
+    }
+  );
 
   it.each(['openrouter', 'vercel'] as const)(
     'routes from managed provider %s',
     sourceProviderId => {
-      expect(selectPartner({ sourceProviderId })).toBe(FRIENDLI_GLM_PROVIDER);
+      expect(selectPartner({ sourceProviderId })).toBe(PERPLEXITY_KIMI_PROVIDER);
     }
   );
 
-  it.each(['friendli', 'custom', 'direct-byok'] as const)(
+  it.each(['perplexity', 'custom', 'direct-byok'] as const)(
     'does not override provider %s',
     sourceProviderId => {
       expect(selectPartner({ sourceProviderId })).toBeNull();
     }
   );
 
-  it('does not override user BYOK', () => {
-    expect(selectPartner({ sourceProviderId: 'vercel', hasUserByok: true })).toBeNull();
-  });
+  it.each(['openrouter', 'vercel'] as const)(
+    'does not override user BYOK from %s',
+    sourceProviderId => {
+      expect(selectPartner({ sourceProviderId, hasUserByok: true })).toBeNull();
+    }
+  );
 
-  it('does not route without a non-empty partner API key', () => {
-    setApiKey(FRIENDLI_GLM_PROVIDER, '  ');
+  it.each(['', '  '])('does not route with an empty partner API key %p', apiKey => {
+    setApiKey(apiKey);
 
     expect(selectPartner()).toBeNull();
   });
 
-  it.each([`${FRIENDLI_GLM_PUBLIC_ID}-fast`, `${PERPLEXITY_KIMI_PUBLIC_ID}-fast`, 'zai/glm-5.2'])(
+  it.each([`${PERPLEXITY_KIMI_PUBLIC_ID}-fast`, 'perplexity/kimi-k3'])(
     'does not route non-exact model %s',
     model => {
       expect(selectPartner({ requestedModel: model })).toBeNull();
@@ -171,7 +151,6 @@ describe('getPercentageRoutedPartnerProvider', () => {
   it('does not route at zero percent', () => {
     const disabledConfig: RuntimeGatewayRoutingConfig = {
       ...routingConfig,
-      friendli: 0,
       perplexity: 0,
     };
 

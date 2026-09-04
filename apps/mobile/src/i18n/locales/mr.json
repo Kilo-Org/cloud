@@ -602,7 +602,22 @@
       "commit_other": "कमिट",
       "file_one": "फाइल",
       "file": "फाइली",
-      "file_other": "फाइली"
+      "file_other": "फाइली",
+      "openedAgo": "उघडले {{time}}",
+      "updatedAgo": "अद्ययावत केले {{time}}",
+      "mergedAgo": "मर्ज केले {{time}}",
+      "mergedByAgo": "{{login}} यांनी विलीन केले {{time}}",
+      "closedAgo": "बंद {{time}}",
+      "labels": "लेबल",
+      "reviewers": "समीक्षक",
+      "assignees": "नियुक्त व्यक्ती",
+      "linkedIssues": "जोडलेले मुद्दे",
+      "reviewApproved": "मंजूर",
+      "reviewChangesRequested": "बदल मागवले",
+      "reviewCommented": "टिप्पणी केली",
+      "reviewDismissed": "रद्द केलेले",
+      "reviewPending": "समीक्षेच्या प्रतीक्षेत",
+      "openIssueA11y": "GitHub वर मुद्दा #{{number}} उघडा"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} वरील कालबाह्य प्रलंबित टिप्पणी संपादित करा",

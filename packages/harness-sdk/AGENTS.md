@@ -763,6 +763,12 @@ the fragment reaches the caller and nothing else. Before 2026-09-04 the frame
 matched no reader, was dropped as an unknown event, and the stream ended on
 `done` with a fragment stored as a whole answer.
 
+Reading a field this way risks calling a good frame a failure, so it was
+checked against real traffic: the whole live sweep, the ten model matrix, and
+`pnpm test:e2e:probe` on each of the three shapes, all on 2026-09-04. Not one
+frame of a call that succeeded carried a top-level `error` object. The probe
+prints any that does, so that check takes one command.
+
 ### Why the model stopped is part of the answer
 
 `done` carries a `StopReason` beside the counts: `end`, `maxTokens`, `refusal`,

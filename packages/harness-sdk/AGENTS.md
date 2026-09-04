@@ -310,7 +310,7 @@ caller gives the plugin an `apiKinds` function.
 |---|---|---|
 | `messages` | `/api/gateway/v1/messages` | An explicit `cache_control` breakpoint |
 | `responses` | `/api/gateway/v1/responses` | A `prompt_cache_key` the caller names |
-| `chat_completions` | `/api/gateway/v1/chat/completions` | Whatever the provider does on its own |
+| `chat_completions` | `/api/gateway/v1/chat/completions` | Whatever the gateway does on its own |
 
 **The hit ratio is not comparable between shapes.** `pnpm test:e2e:shapes` asks
 the same two questions of the same model through each one:
@@ -331,6 +331,15 @@ a shape to `cacheReadTokens > 0`, not to a ratio, unless it is `messages`.
 The plugin picks `messages` first, then `responses`, then `chat_completions`.
 That order is the cache order: an explicit breakpoint beats a key, and a key
 beats no control at all.
+
+The last of the three controls nothing, and that was measured rather than
+assumed. Until 2026-09-04 it sent Anthropic's `cache_control` on the last
+block. Against a prefix nobody had sent before — a nonce in all 200 system
+rules, so the first call is cold — the second call read 12229 cached tokens for
+`openai/gpt-5.6-luna` and 13630 for `anthropic/claude-haiku-4.5`, the same to
+the token with the breakpoint and without it. So the field bought nothing on
+either provider and the shape stopped sending it. Re-run that measurement
+before putting it back; `wire/image.test.ts` holds the method.
 
 A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 502, 503, and 504. The retry stops as soon as the status is good, before the

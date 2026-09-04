@@ -52,10 +52,12 @@ export type InstallStatePreflightResult =
   | InstallStateUserMismatch
   | UnusableInstallState;
 
+export type InstallStateRejectionReason = 'consumed' | 'expired' | 'not_found' | 'unavailable';
+
 export type ConsumeInstallStateResult =
   | { status: 'success'; state: GitHubInstallState }
   | InstallStateUserMismatch
-  | UnusableInstallState;
+  | { status: 'unusable'; reason: InstallStateRejectionReason };
 
 export async function checkInstallState(
   token: string,
@@ -109,8 +111,30 @@ export async function consumeInstallState(
   const state = result[0];
   if (state) return { status: 'success', state };
 
-  const diagnostic = await checkInstallState(token, userId);
-  return diagnostic.status === 'user_mismatch' ? diagnostic : { status: 'unusable' };
+  const [diagnostic] = await db
+    .select({
+      userId: github_install_states.kilo_user_id,
+      ownerType: github_install_states.owner_type,
+      ownerId: github_install_states.owner_id,
+      returnTo: github_install_states.return_to,
+      consumed: sql<boolean>`${github_install_states.consumed_at} IS NOT NULL`,
+      expired: sql<boolean>`${github_install_states.expires_at} <= NOW()`,
+    })
+    .from(github_install_states)
+    .where(eq(github_install_states.token, token))
+    .limit(1);
+
+  if (!diagnostic) return { status: 'unusable', reason: 'not_found' };
+  if (diagnostic.consumed) return { status: 'unusable', reason: 'consumed' };
+  if (diagnostic.expired) return { status: 'unusable', reason: 'expired' };
+  if (diagnostic.userId !== userId) {
+    return {
+      status: 'user_mismatch',
+      returnTo: diagnostic.returnTo,
+      organizationId: diagnostic.ownerType === 'org' ? diagnostic.ownerId : null,
+    };
+  }
+  return { status: 'unusable', reason: 'unavailable' };
 }
 
 /**

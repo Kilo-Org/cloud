@@ -4,7 +4,7 @@ import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { hasHtmlToken, MarkdownHtml, parseMarkdownHtml } from './markdown-html';
+import { MarkdownHtml, splitMarkdownHtml } from './markdown-html';
 import {
   getMarkdownStyles,
   getPalette,
@@ -43,34 +43,44 @@ export function MarkdownText({
   const colors = useThemeColors();
 
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
-  const containsHtml = useMemo(() => hasHtmlToken(value), [value]);
-  const html = useMemo(
-    () => (containsHtml ? parseMarkdownHtml(value) : null),
-    [containsHtml, value]
-  );
+  const segments = useMemo(() => splitMarkdownHtml(value), [value]);
 
-  if (html !== null) {
+  if (segments.length === 1 && segments[0]?.type === 'markdown') {
     return (
-      <View>
-        <MarkdownHtml
-          html={html}
-          palette={palette}
-          selectable={selectable}
-          onLongPressLink={onLongPressLink}
-          onPressLink={onPressLink}
-        />
-      </View>
+      <MarkdownContent
+        value={value}
+        palette={palette}
+        selectable={selectable}
+        onLongPressLink={onLongPressLink}
+        onPressLink={onPressLink}
+      />
     );
   }
 
   return (
-    <MarkdownContent
-      value={value}
-      palette={palette}
-      selectable={selectable}
-      onLongPressLink={onLongPressLink}
-      onPressLink={onPressLink}
-    />
+    <View>
+      {segments.map((segment, index) =>
+        segment.type === 'html' ? (
+          <MarkdownHtml
+            key={`md-html-${index}`}
+            html={segment.raw}
+            palette={palette}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+          />
+        ) : (
+          <MarkdownContent
+            key={`md-content-${index}`}
+            value={segment.raw}
+            palette={palette}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+          />
+        )
+      )}
+    </View>
   );
 }
 

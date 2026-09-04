@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used by the mobile test harness */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the HTML routing, sanitization, and interaction tests share one React Native module mock harness */
 // eslint-disable-next-line import/no-nodejs-modules -- the real HTML engine needs a React Native stub in the node test environment
 import Module from 'node:module';
 import { type ComponentType, createElement, type ReactElement } from 'react';
@@ -92,6 +92,8 @@ type RenderHtmlHostProps = {
 const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
 const AnchorType = 'Anchor' as unknown as ComponentType;
 const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
+const MarkdownTableType = 'MarkdownTable' as unknown as ComponentType;
+const ViewType = 'View' as unknown as ComponentType;
 
 async function mount(element: ReactElement): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -143,11 +145,20 @@ beforeEach(() => {
 });
 
 describe('MarkdownText HTML routing', () => {
+  it('keeps an empty value on the Markdown renderer path', async () => {
+    const renderer = await mount(<MarkdownText value="" />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(renderer.root.findAllByType(ViewType)).toHaveLength(1);
+    expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
+  });
+
   it('keeps plain Markdown and fenced HTML on the existing renderer path', async () => {
     const value = 'Hello **world**\n\n```html\n<div>code only</div>\n```';
     const renderer = await mount(<MarkdownText value={value} />);
 
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(renderer.root.findAllByType(ViewType)).toHaveLength(2);
     expect(vi.mocked(useMarkdown)).toHaveBeenCalledWith(value, expect.any(Object));
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
 
@@ -158,28 +169,91 @@ describe('MarkdownText HTML routing', () => {
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
   });
 
-  it('converts the complete mixed source and keeps native output order', async () => {
+  it('keeps Markdown on its renderer and routes only raw HTML segments', async () => {
     const value =
       '# Heading\n\nBefore <span>HTML</span> and **Markdown**.\n\n- one\n- two\n\n[Docs](https://example.com)\n\n<img src="https://example.com/a.png">';
     const renderer = await mount(<MarkdownText value={value} />);
-    const props = htmlProps(renderer);
+    const htmlNodes = renderer.root.findAllByType(RenderHTMLType);
 
-    expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
-    expect(props.source).toEqual({
-      html: expect.stringMatching(
-        /^<h1>Heading<\/h1>[\s\S]*<span>HTML<\/span>[\s\S]*<strong>Markdown<\/strong>[\s\S]*<ul>[\s\S]*<a href="https:\/\/example.com">Docs<\/a>[\s\S]*<img src="https:\/\/example.com\/a.png">/
-      ),
-    });
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([
+      '# Heading\n\nBefore ',
+      ' and **Markdown**.\n\n- one\n- two\n\n[Docs](https://example.com)\n\n',
+    ]);
+    expect(htmlNodes.map(node => node.props.source)).toEqual([
+      { html: '<span>HTML</span>' },
+      { html: '<img src="https://example.com/a.png">' },
+    ]);
+    const props = htmlNodes[0]?.props as RenderHtmlHostProps;
     expect(props.baseStyle).toMatchObject({ color: '#111111', fontSize: 16, lineHeight: 24 });
     expect(props.defaultTextProps).toEqual({ selectable: true });
 
-    const firstSource = props.source;
     await act(async () => {
       await Promise.resolve();
       renderer.update(<MarkdownText value={value} selectable={false} />);
     });
-    expect(htmlProps(renderer).source).toBe(firstSource);
-    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAllByType(RenderHTMLType)[0]?.props.source).toBe(props.source);
+  });
+
+  it('routes inline HTML inside a Markdown heading', async () => {
+    const renderer = await mount(<MarkdownText value="# Heading <span>HTML</span>" />);
+
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual(['# Heading ']);
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<span>HTML</span>' },
+    ]);
+  });
+
+  it('does not match raw HTML inside a preceding code span', async () => {
+    const renderer = await mount(<MarkdownText value="Before `<span>` <span>HTML</span> after" />);
+
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([
+      'Before `<span>` ',
+      ' after',
+    ]);
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<span>HTML</span>' },
+    ]);
+  });
+
+  it('keeps inline HTML inside a blockquote on the Markdown path', async () => {
+    const value = '> <div>quoted</div>';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([value]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it.each([
+    ['link', '[<b>bold</b>](https://example.com)'],
+    ['emphasis', '*<b>bold</b>*'],
+    ['strong', '**<i>bold</i>**'],
+  ])('keeps inline HTML inside Markdown %s on the Markdown path', async (_name, value) => {
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([value]);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('keeps a table with inline HTML on the table path', async () => {
+    const value = '| Path | Note |\n| ---- | ---- |\n| a/b | line1<br>line2 |';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(1);
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+  });
+
+  it('keeps tables and fenced code around block HTML on the Markdown path', async () => {
+    const value =
+      '| Name |\n| --- |\n| Kilo |\n\n<section>safe HTML</section>\n\n```ts\nconst answer = 42;\n```';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(1);
+    expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
+      { html: '<section>safe HTML</section>' },
+    ]);
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toContain(
+      '\n\n```ts\nconst answer = 42;\n```'
+    );
   });
 
   it('routes block HTML and removes active, style, form, media, SVG, and metadata nodes', async () => {

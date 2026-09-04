@@ -17,7 +17,9 @@ interface HttpResponse {
  * The package declares it rather than pulling in the DOM library, and never
  * reads it: it makes one per call and hands it over, so that a caller who stops
  * listening stops the request as well. An adapter that calls the platform
- * `fetch` names the type it has, as `request.signal as AbortSignal | undefined`.
+ * `fetch` names the type it has, as `(request.signal ?? null) as AbortSignal |
+ * null`. That cast is why no adapter ships here — only code that already has
+ * the runtime's own signal type can join the two. The README writes it out.
  */
 interface AbortLike {
   readonly aborted: boolean;

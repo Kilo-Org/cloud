@@ -237,3 +237,24 @@ it('refuses to compact while a question is still streaming', async () => {
   expect(calls).toHaveLength(2);
   expect(texts(value.history)).toEqual(['user:and', 'assistant:after']);
 });
+
+it('counts what the summary call cost', async () => {
+  /* A summary is a call to the model like any other: it is billed, and a
+     caller reading `usage` to know what a session spent must see it. Leaving
+     it out under-reports every session that ever compacted. */
+  const { value } = await runWith({
+    replies: [
+      { deltas: ['answered'], usage: { inputTokens: 900, outputTokens: 5 } },
+      { deltas: ['the notes'], usage: { inputTokens: 40, outputTokens: 20 } },
+      { deltas: ['after'], usage: { inputTokens: 7, outputTokens: 3 } },
+    ],
+    catalog: catalogWindowed(1000),
+    use: session =>
+      Effect.zipRight(
+        Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+        session.usage
+      ),
+  });
+
+  expect(value).toMatchObject({ inputTokens: 947, outputTokens: 28 });
+});

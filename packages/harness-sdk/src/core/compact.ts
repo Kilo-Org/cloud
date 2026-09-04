@@ -2,6 +2,7 @@ import { Effect, Option, Ref } from 'effect';
 import type { ModelError } from './model.js';
 import { appendTurn, sinceSummary } from './session.js';
 import { onStore, type StoreError } from './storage.js';
+import { add } from './usage.js';
 import { makeTurn } from './turn.js';
 import type { Wiring } from './wiring.js';
 
@@ -72,15 +73,22 @@ const isFull = (wiring: Wiring): Effect.Effect<boolean> =>
     })
   );
 
-/** Asks the model to summarise what the session holds now. */
+/**
+ * Asks the model to summarise what the session holds now.
+ *
+ * The counts go into the session's total. A summary is a call like any other
+ * and is billed like one, so a caller reading `usage` to know what a session
+ * spent must see it; leaving it out under-reports every session that ever
+ * compacted.
+ */
 const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
   Effect.flatMap(Ref.get(wiring.state), session => {
     const prompt = wiring.assembler.assemble({
       system: wiring.system,
       turns: sinceSummary(session.turns),
     });
-    return Effect.map(
-      wiring.client.send({
+    return wiring.client
+      .send({
         prompt: {
           system: prompt.system,
           messages: [
@@ -91,9 +99,11 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
         model: wiring.model,
         maxTokens: wiring.summaryTokens ?? defaultSummaryTokens,
         stream: false,
-      }),
-      reply => reply.content
-    );
+      })
+      .pipe(
+        Effect.tap(reply => Ref.update(wiring.totals, held => add(held, reply.usage))),
+        Effect.map(reply => reply.content)
+      );
   });
 
 /**

@@ -25,6 +25,9 @@ const bodies: Readonly<Record<keyof typeof paths, unknown>> = {
     model,
     max_tokens: 2000,
     stream: true,
+    /* The same dial the wire sends, so a probe of this shape shows the
+       thinking frames rather than none. */
+    output_config: { effort: 'medium' },
     messages: [{ role: 'user', content: [{ type: 'text', text: question }] }],
   },
   responses: {

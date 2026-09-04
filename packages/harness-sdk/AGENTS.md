@@ -868,6 +868,12 @@ The summariser is told what to keep. Left to its own judgement it writes a
 readable paragraph and drops the identifiers, and the summary is all the model
 will have of that work.
 
+**The summary call is counted.** It is a call to the model, it is billed, and
+until 2026-09-04 its tokens went nowhere: `session.usage` under-reported every
+session that had ever compacted, by the whole cost of every summary. It does
+not touch `prompted`, which is deliberate — the next request starts from the
+summary, so what the last one cost says nothing about what the next one will.
+
 ### A reloaded turn must equal the turn that was written
 
 The prompt prefix is rebuilt from the store. If `load` returns a turn that

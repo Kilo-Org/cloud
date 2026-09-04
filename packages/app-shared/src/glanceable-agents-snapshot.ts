@@ -25,6 +25,12 @@ export const GLANCEABLE_TERMINAL_MS = 8000;
  * showing idle work: placing one is the user asking for exactly that.
  */
 export const GLANCEABLE_IDLE_ONLY_MS = 600_000;
+/**
+ * A Live Activity that has taken no update for this long reads as unknown, not
+ * as current: ActivityKit dims stale content. Every real transition pushes an
+ * update well inside the window, and an idle card is already gone by then.
+ */
+export const GLANCEABLE_STALE_MS = 1_800_000;
 
 export type GlanceableAgentsSnapshotStatus =
   | 'waiting'

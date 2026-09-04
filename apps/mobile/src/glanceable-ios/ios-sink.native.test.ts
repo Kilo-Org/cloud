@@ -102,6 +102,7 @@ vi.mock('expo-widgets/src/ExpoWidgets', () => ({
 vi.mock('./active-agents-live-activity', async () => {
   const { LiveActivityFactory } = await import('expo-widgets/src/Widgets');
   return {
+    OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
     ActiveAgentsLiveActivity: new LiveActivityFactory('ActiveAgentsLiveActivity', () => ({
       banner: null,
     })),

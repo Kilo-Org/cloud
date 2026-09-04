@@ -1,5 +1,6 @@
 import {
   GLANCEABLE_IDLE_ONLY_MS,
+  GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   isEligibleGlanceableWork,
   isIdleOnlyGlanceableWork,
@@ -12,7 +13,7 @@ import { i18n } from '@/i18n';
 import { getGlanceableDelivery, type GlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 
-import { ActiveAgentsLiveActivity } from './active-agents-live-activity';
+import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import { ActiveAgentsWidget } from './active-agents-widget';
 import {
   buildExpiredWidgetProps,
@@ -21,8 +22,8 @@ import {
   toWidgetProps,
 } from './view-props';
 
-/** Open-agents destination, kept in step with the inlined widget URL. */
-const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
+/** ActivityKit takes the stale window in seconds. */
+const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
 
 type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 
@@ -305,7 +306,7 @@ export const iosSink: GlanceableSink = {
     // Never start here. Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
-      inFlightUpdate = activity.update(lastProps);
+      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
       if (isIdleOnlyGlanceableWork(snapshot)) {
         // Everything went idle: hand ActivityKit the dismissal date and stop
         // owning the surface. A JavaScript timer would never fire — the app is
@@ -346,7 +347,11 @@ export const iosSink: GlanceableSink = {
       // here, keeping its own content, so two cards never share the screen.
       endNow(null, null);
       try {
-        activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL);
+        activity = ActiveAgentsLiveActivity.start(
+          contentState,
+          OPEN_AGENTS_URL,
+          STALE_AFTER_SECONDS
+        );
         inFlightUpdate = null;
       } catch (error) {
         // Only ActivityKit unavailability is permanent; transient starts retry later.
@@ -370,7 +375,7 @@ export const iosSink: GlanceableSink = {
       return;
     }
     lastProps = contentState;
-    inFlightUpdate = activity.update(contentState);
+    inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
     revision = snapshot.revision;
   },
 

@@ -902,6 +902,24 @@ session that had ever compacted, by the whole cost of every summary. It does
 not touch `prompted`, which is deliberate — the next request starts from the
 summary, so what the last one cost says nothing about what the next one will.
 
+### The two model SDKs are types, not code
+
+`openai` and `@anthropic-ai/sdk` are the contract the three wires are written
+against, and every import of either is a type. Nothing of either survives the
+build, so both are dev dependencies and a consumer installs neither.
+
+That holds only while no published declaration names one. Exporting a type
+built out of one — `ContentBlock`, say, which two wires exported and neither
+read — puts the import back into a `.d.ts`, and the consumer's own typecheck
+then fails on a package nobody told them to add. The compiler here cannot see
+it, because here they are installed, so `pnpm check:platform` reads the built
+declarations and fails on either name.
+
+The store plugins go the other way. `plugins/store/expo` names `SQLiteDatabase`
+in its types, so `expo-sqlite` is an optional peer dependency. `plugins/store/
+node` names `node:sqlite`, which needs Node 22.13 or newer to import without a
+flag.
+
 ### A reloaded turn must equal the turn that was written
 
 The prompt prefix is rebuilt from the store. If `load` returns a turn that

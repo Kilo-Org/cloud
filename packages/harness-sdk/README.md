@@ -169,9 +169,14 @@ const store = layerNodeStore(new DatabaseSync('sessions.db'));
 const program = Effect.provide(work, Layer.mergeAll(layers, store));
 ```
 
-`layerExpoStore` is the same store on Expo's SQLite. Both are the same
-implementation over a one-function driver, so a session written on one reads
-back on the other.
+This needs Node 22.13 or newer, which is where `node:sqlite` stopped asking for
+`--experimental-sqlite`. On 22.5 to 22.12 the import fails unless the flag is
+passed, and before 22.5 the module does not exist.
+
+`layerExpoStore` is the same store on Expo's SQLite, which the caller supplies:
+it is an optional peer dependency, because its types name it. Both stores are
+the same implementation over a one-function driver, so a session written on one
+reads back on the other.
 
 Then `continueSession(id)` reopens a stored session, and `cloneSession(id)`
 copies its turns onto a new one so a conversation can branch without paying to

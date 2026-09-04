@@ -142,11 +142,13 @@
   "fi": [
     "block",
     "comment",
+    "commit",
     "edit",
     "files",
     "merge",
     "open",
     "open pull request",
+    "plan",
     "reactions",
     "review",
     "tokens"

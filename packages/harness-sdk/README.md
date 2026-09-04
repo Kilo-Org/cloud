@@ -282,6 +282,12 @@ the bill and most of the wait.
 
 Measured live: 0.9997 of the input read from the cache on a ten-call session.
 
+The kilo gateway places breakpoints of its own, so the one this package marks
+is redundant there today — measured on 2026-09-04 across both providers and all
+three shapes, with and without it, on prefixes nobody had sent before. What is
+not redundant is everything above it: the gateway's breakpoints need a prefix
+that does not move as much as an explicit one would.
+
 The cache is the provider's, and it does not last. Anthropic's entries live
 five minutes from the start of the request that wrote or read them, and every
 call refreshes them for free — so a session that keeps talking stays warm, and

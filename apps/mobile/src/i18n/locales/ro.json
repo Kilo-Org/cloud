@@ -38,7 +38,7 @@
     "findings": "Probleme detectate",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Depozite de cod",
     "securityAgent": "Agent de securitate",
     "unknown": "Necunoscut",
@@ -169,7 +169,7 @@
     "verifyCode": "Verifică codul",
     "resendCode": "Retrimite codul",
     "termsPrefix": "Dacă continui, accepți",
-    "terms": "termenii de utilizare",
+    "terms": "Termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
@@ -200,7 +200,7 @@
     "signOut": "Deconectează-te",
     "deleteAccount": "Șterge contul",
     "confirmationCode": "Cod de confirmare",
-    "confirmationCodePlaceholder": "Cod din 6 cifre",
+    "confirmationCodePlaceholder": "cod din 6 cifre",
     "confirmDeletion": "Confirmă ștergerea",
     "credits": "Credite",
     "failedToLoadBalance": "Încărcarea soldului a eșuat. Atinge pentru a reîncerca.",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Diferențele sunt prea mari pentru a fi afișate.",
       "openOnGitHub": "Deschide pe GitHub",
       "openDiffOnGitHub": "Deschide comparația acestui fișier pe GitHub",
-      "githubDiff": "comparația de pe GitHub"
+      "githubDiff": "Comparația de pe GitHub"
     },
     "floatingActions": {
       "clearSelection": "Anulează selecția",
@@ -423,8 +423,8 @@
       "addReaction": "Adaugă o reacție",
       "reactionPill": "reacție {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacție",
-      "reaction": "Reacții",
-      "reaction_other": "Reacții",
+      "reaction": "reacții",
+      "reaction_other": "reacții",
       "commentActions": "Acțiuni pentru comentariu",
       "reportContent": "Raportează conținutul",
       "reportUser": "Raportează utilizatorul",
@@ -602,19 +602,19 @@
       "stateOpenReviewRequired": "Deschis · revizuire necesară",
       "stateOpen": "Deschidere",
       "unknownAuthor": "Autor necunoscut",
-      "commit_one": "Commit",
+      "commit_one": "commit",
       "commit": "de commituri",
       "commit_other": "de commituri",
-      "file_one": "Fișier",
-      "file": "Fișiere",
-      "file_other": "Fișiere",
+      "file_one": "fișier",
+      "file": "fișiere",
+      "file_other": "fișiere",
       "commit_few": "commit-uri",
       "file_few": "fișiere"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul depășit, aflat în așteptare, de la {{location}}",
       "editA11y": "Editează comentariul în așteptare de la {{location}}",
-      "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
+      "staleHint": "pR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
       "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
@@ -978,7 +978,7 @@
       "allFieldsRequired": "Toate câmpurile sunt obligatorii pentru a conecta {{label}}.",
       "setupGuideFallback": "ghid de configurare",
       "setupGuideA11y": "ghid de configurare pentru {{label}}",
-      "setupGuide": "ghid de configurare",
+      "setupGuide": "Ghid de configurare",
       "saving": "Se salvează…",
       "removing": "Se elimină…",
       "updateToken": "Actualizează tokenul"
@@ -1133,12 +1133,12 @@
       "destroying": "SE ȘTERGE DEFINITIV",
       "provisioned": "PUS ÎN FUNCȚIUNE",
       "restarting": "SE REPORNEȘTE",
-      "running": "Rulează",
+      "running": "RULEAZĂ",
       "shuttingDown": "SE ÎNCHIDE",
-      "starting": "Se pornește",
+      "starting": "SE PORNEȘTE",
       "stopped": "OPRIT",
       "stopping": "SE OPREȘTE",
-      "unknown": "Necunoscut",
+      "unknown": "NECUNOSCUT",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1226,7 +1226,7 @@
     "instructions": {
       "title": "Instrucțiuni personalizate",
       "deprecation": "Funcția de instrucțiuni personalizate urmează să fie retrasă. Mută aceste instrucțiuni într-un fișier REVIEW.md din depozitul tău.",
-      "placeholder": "De exemplu: respectarea convențiilor noastre de gestionare a erorilor…"
+      "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…"
     },
     "repos": {
       "unavailable": "Depozitele nu sunt disponibile. Finalizează configurarea Bitbucket pe kilo.ai.",
@@ -1348,9 +1348,9 @@
       "activity": "Activitate"
     },
     "providerConnect": {
-      "githubApp": "aplicația GitHub",
+      "githubApp": "Aplicația GitHub",
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
-      "gitlabAccount": "contul GitLab",
+      "gitlabAccount": "Contul GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
       "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile.",
       "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
@@ -1558,11 +1558,11 @@
     "dismiss": {
       "title": "Ignoră problema",
       "reason": "Motiv",
-      "reasonFixStarted": "remedierea a început deja",
-      "reasonNoBandwidth": "nu sunt resurse disponibile",
-      "reasonTolerableRisk": "riscul este acceptabil",
-      "reasonInaccurate": "problema a fost detectată incorect",
-      "reasonNotUsed": "codul vulnerabil nu este utilizat",
+      "reasonFixStarted": "Remedierea a început deja",
+      "reasonNoBandwidth": "Nu sunt resurse disponibile",
+      "reasonTolerableRisk": "Riscul este acceptabil",
+      "reasonInaccurate": "Problema a fost detectată incorect",
+      "reasonNotUsed": "Codul vulnerabil nu este utilizat",
       "commentLabel": "Comentariu (opțional)",
       "commentAccessibility": "Comentariu de respingere",
       "commentPlaceholder": "Detalii despre motivul respingerii…",
@@ -1660,7 +1660,7 @@
       "highDescription": "Posibilă expunere semnificativă a datelor.",
       "mediumDescription": "Impact limitat sau condiții specifice.",
       "lowDescription": "Impact minim asupra securității.",
-      "invalidDayCount": "Introdu un număr întreg de zile între 1 și 365.",
+      "invalidDayCount": "introdu un număr întreg de zile între 1 și 365.",
       "remediationDeadlineA11y": "Termen limită de remediere în zile pentru {{label}}",
       "enterWholeNumber": "Introdu un număr întreg între 1 și 365",
       "permissionNote": "Doar proprietarii organizației și responsabilii cu facturarea pot modifica aceste setări.",
@@ -1736,7 +1736,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nu s-au putut încărca setările depozitelor.",
-      "githubAppSettings": "setările aplicației GitHub",
+      "githubAppSettings": "Setările aplicației GitHub",
       "manageAccess": "Gestionează accesul aplicației GitHub",
       "noRepositories": "Niciun depozit",
       "noRepositoriesDescription": "Acordă aplicației Kilo pentru GitHub acces la depozite.",
@@ -1884,7 +1884,7 @@
       "couldNotSearch": "Nu s-a putut căuta în sesiuni.",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune anterioară",
-      "live": "În timp real",
+      "live": "ÎN TIMP REAL",
       "updating": "Se actualizează"
     },
     "sessionRow": {
@@ -1909,7 +1909,7 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -1929,8 +1929,8 @@
     "remoteSpawnRetryable": "Nu s-a putut stabili conexiunea cu instanța — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică sistemul sau actualizează CLI-ul.",
     "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
-    "liveCount_one": "{{count}} în timp real",
-    "liveCount_other": "{{count}} în timp real",
+    "liveCount_one": "{{count}} ÎN TIMP REAL",
+    "liveCount_other": "{{count}} ÎN TIMP REAL",
     "liveCount_few": "{{count}} ACTIVE"
   },
   "agentChat": {
@@ -2036,14 +2036,14 @@
       "accessibilityLabel": "Instrumentul {{name}}, {{status}}",
       "noTasks": "Nu există sarcini.",
       "toolRead": "citire",
-      "toolEdit": "Editează",
+      "toolEdit": "editează",
       "toolWrite": "scriere",
       "toolBash": "bash",
       "toolGlob": "căutare de fișiere",
       "toolGrep": "căutare în conținut",
       "toolList": "listare",
       "toolPatch": "aplicare de modificări",
-      "toolTask": "Sarcină",
+      "toolTask": "sarcină",
       "readTodos": "Citește sarcinile",
       "updateTodos": "Actualizează sarcinile",
       "linesBadge": "{{displayCount}} linii",
@@ -2060,7 +2060,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[date de intrare care nu pot fi serializate]",
-      "errorPrefix": "eroare: {{error}}"
+      "errorPrefix": "Eroare: {{error}}"
     },
     "instancePicker": {
       "runOn": "Mediu de execuție",
@@ -2310,14 +2310,14 @@
     "modelSelector": {
       "provider": "Furnizor {{id}}",
       "modelId": "Modelul {{id}}",
-      "unavailable": "indisponibil",
+      "unavailable": "Indisponibil",
       "unavailableState": "indisponibil",
       "selectedState": "selectat",
       "thinkingEffort": "Efort de raționament",
       "thinkingEffortAccessibility": "efort de raționament: {{label}}",
       "thinkingEffortSelected": "efort de raționament: {{label}}, selectat",
       "thinkingEffortWithModel": "{{model}}, efort de raționament: {{variant}}",
-      "lockedByAgent": ", blocat de agentul „{{agent}}”",
+      "lockedByAgent": ", Blocat de agentul „{{agent}}”",
       "addToFavorites": "Adaugă {{name}} la favorite",
       "removeFromFavorites": "Elimină {{name}} din favorite",
       "thinkingEffortXhigh": "F. RID.",
@@ -2424,7 +2424,7 @@
       "olderActivity": "Activitate anterioară",
       "olderActivityDescription": "Cost neatribuit istoricului încărcat",
       "ofWindowTokens": "din {{window}} tokenuri",
-      "tokens": "Tokenuri",
+      "tokens": "tokenuri",
       "tokensWithPercentage": "tokenuri ({{percentage}})",
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} de pași",
@@ -2433,10 +2433,10 @@
       "stepsCount_few": "{{steps}} pași"
     },
     "prBadge": {
-      "open": "Deschidere PR",
-      "closed": "PR închis",
-      "merged": "PR integrat",
-      "draft": "PR în stadiu de ciornă",
+      "open": "deschidere PR",
+      "closed": "pR închis",
+      "merged": "pR integrat",
+      "draft": "pR în stadiu de ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2543,7 +2543,7 @@
     "optionsExpiredDescription": "Revino la ecranul anterior și redeschide selectorul."
   },
   "sessionRow": {
-    "needsInput": "așteaptă un răspuns"
+    "needsInput": "AȘTEAPTĂ UN RĂSPUNS"
   },
   "voiceInput": {
     "listening": "Se ascultă…",
@@ -2610,11 +2610,11 @@
     "verifyPurchaseFailed": "Achiziția ta nu a putut fi verificată. Verifică conexiunea și încearcă din nou.",
     "productsCouldNotLoad": "Produsele Kilo Pass nu au putut fi încărcate din App Store.",
     "tryingAgain": "Se încearcă din nou...",
-    "kiloPassManagement": "gestionarea Kilo Pass",
+    "kiloPassManagement": "Gestionarea Kilo Pass",
     "legalConnectorTerms": " Prin abonare, ești de acord cu ",
     "legalConnectorPrivacy": " și confirmi că ai luat cunoștință de ",
     "manageFailed": "Nu s-a putut deschide pagina de gestionare a abonamentelor din App Store.",
-    "kiloPassSetup": "configurarea Kilo Pass",
+    "kiloPassSetup": "Configurarea Kilo Pass",
     "subscriptionHeaderDescription": "Un abonament lunar care adaugă credite la soldul tău Kilo pentru sesiuni de programare cu inteligență artificială în Kilo App: agenți cloud, sesiuni la distanță și conversații KiloClaw.",
     "tierDescription": "Credite plătite în valoare de {{price}}, adăugate lunar pentru utilizarea Kilo App.",
     "subscribe": "Abonează-te",
@@ -2662,7 +2662,7 @@
     "helpImproveDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării. Poți modifica oricând această opțiune în setări.",
     "seeFullDetails": "Vezi toate detaliile",
     "privacyPolicyPrefix": "Datele tale sunt gestionate conform",
-    "privacyPolicy": "politicii de confidențialitate Kilo",
+    "privacyPolicy": "Politicii de confidențialitate Kilo",
     "onDevice": "Pe dispozitiv",
     "couldNotLoadTranscription": "Setarea ta de transcriere nu a putut fi încărcată.",
     "signInToManageTranscription": "Autentifică-te pentru a gestiona transcrierea online.",
@@ -2929,7 +2929,7 @@
     "signedOut": "Autentifică-te pentru a vedea agenții",
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
-    "needsInput": "așteaptă un răspuns",
+    "needsInput": "Așteaptă un răspuns",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   }

@@ -1049,7 +1049,7 @@
         "genericErrorBody": "आत्ता तुमच्या इन्स्टन्सचा सेटअप पूर्ण करता आला नाही.",
         "manualReviewBody": "इन्स्टन्स तयार करण्यापूर्वी तुमच्या खात्याची स्थिती तपासणे आवश्यक आहे. पुढील प्रक्रिया kilo.ai वर पूर्ण करा.",
         "manualReviewTitle": "सेटअपसाठी आमच्या टीमची तपासणी आवश्यक",
-        "openKiloAi": "kilo.ai उघडा",
+        "openKiloAi": "Kilo.ai उघडा",
         "provisioning": "इन्स्टन्सची निर्मिती",
         "review": "समीक्षा",
         "identityTitle": "तुमच्या बॉटला ओळख द्या",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw वापरत राहण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये सदस्यत्व घेता येत नाही.",
       "subscriptionCanceledTitle": "वेबवर सदस्यता घ्या",
       "subscriptionCanceledBody": "KiloClaw वापरण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये सदस्यत्व घेता येत नाही.",
-      "subscriptionCanceledCta": "kilo.ai/claw उघडा",
+      "subscriptionCanceledCta": "Kilo.ai/claw उघडा",
       "subscriptionPastDueTitle": "वेबवर पेमेंटची माहिती अपडेट करा",
       "subscriptionPastDueBody": "तुमच्या सर्वात अलीकडील पेमेंटमध्ये अडचण आली. पेमेंटची माहिती अपडेट करण्यासाठी तुमच्या ब्राउझरमधून kilo.ai/claw वर जा. अॅपमध्ये बिलिंग व्यवस्थापित करता येत नाही.",
       "quarantinedTitle": "इन्स्टन्स दुरुस्त करणे आवश्यक",
       "quarantinedBody": "तुमचा KiloClaw इन्स्टन्स विलगीकरणात आहे आणि सध्या वापरता येत नाही. तो पुन्हा वापरण्यायोग्य करण्यासाठी आमच्या टीमची मदत आवश्यक आहे.",
       "multipleCurrentConflictBody": "तुमच्या खात्यावर एकापेक्षा जास्त सक्रिय सदस्यत्वे आढळली. तुमच्याकडून दोनदा शुल्क आकारले जाऊ नये म्हणून आम्ही प्रक्रिया थांबवली आहे.",
-      "multipleCurrentConflictCta": "kilo.ai वर सुरू ठेवा",
+      "multipleCurrentConflictCta": "Kilo.ai वर सुरू ठेवा",
       "nonCanonicalEarlybirdTitle": "जुनी योजना आढळली",
       "nonCanonicalEarlybirdBody": "तुमची लवकर प्रवेश देणारी योजना मोबाइलवर वापरण्यापूर्वी आमच्या टीमने तपासणे आवश्यक आहे.",
-      "iosTitle": "iOS वर KiloClaw अनुपलब्ध",
+      "iosTitle": "IOS वर KiloClaw अनुपलब्ध",
       "iosBody": "या खात्यासाठी KiloClaw वापरण्याची परवानगी iOS अॅपच्या बाहेर व्यवस्थापित केली जाते.",
       "iosContact": "काही प्रश्न आहेत? hi@kilo.ai वर संपर्क साधा."
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
       "openUnread_other": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
       "openSettings": "{{name}} साठी सेटिंग्ज उघडा",
-      "fixOnKiloAi": "kilo.ai वर दुरुस्त करा: {{label}}"
+      "fixOnKiloAi": "Kilo.ai वर दुरुस्त करा: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

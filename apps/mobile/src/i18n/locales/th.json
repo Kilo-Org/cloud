@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอส่งและอ้างอิงโค้ดเก่าที่ {{location}}",
       "editA11y": "แก้ไขความคิดเห็นที่รอส่งที่ {{location}}",
-      "staleHint": "PR มีการเปลี่ยนแปลงหลังจากคุณเขียนความคิดเห็นนี้",
+      "staleHint": "pR มีการเปลี่ยนแปลงหลังจากคุณเขียนความคิดเห็นนี้",
       "deleteA11y": "ลบความคิดเห็นที่รอส่งที่ {{location}}",
       "deletedAnnouncement": "ลบความคิดเห็นที่รอส่งแล้ว",
       "noCommentsQueued": "ไม่มีความคิดเห็นที่รอส่ง รีวิวนี้จะส่งเฉพาะประเภทรีวิวที่เลือกด้านบน",
@@ -1894,7 +1894,7 @@
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
       "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -2413,8 +2413,8 @@
     },
     "prBadge": {
       "open": "เปิดพูลรีเควสต์",
-      "closed": "PR ที่ปิดแล้ว",
-      "merged": "PR ที่รวมโค้ดแล้ว",
+      "closed": "pR ที่ปิดแล้ว",
+      "merged": "pR ที่รวมโค้ดแล้ว",
       "draft": "พูลรีเควสต์ฉบับร่าง",
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
       "label": "{{label}} หมายเลข {{number}}"

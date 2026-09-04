@@ -93,7 +93,7 @@
     "email": "Adresa e emailit",
     "ends": "Përfundon më {{date}}",
     "failed": "Dështoi",
-    "file": "skedar",
+    "file": "Skedar",
     "gitlab": "GitLab",
     "goBack": "Kthehu",
     "idle": "Në pritje",
@@ -112,7 +112,7 @@
     "preferences": "Preferencat",
     "privacyPolicy": "Politika e privatësisë",
     "profile": "Profili",
-    "reactions": "reagime",
+    "reactions": "Reagime",
     "recent": "Të fundit",
     "recommended": "Të rekomanduara",
     "remaining": "Mbeten",
@@ -200,7 +200,7 @@
     "signOut": "Dil",
     "deleteAccount": "Fshi llogarinë",
     "confirmationCode": "Kodi i konfirmimit",
-    "confirmationCodePlaceholder": "Kod me 6 shifra",
+    "confirmationCodePlaceholder": "kod me 6 shifra",
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
@@ -272,7 +272,7 @@
       "diffTooLarge": "shumë ndryshime për t'u shfaqur",
       "openFile": "Hap {{path}}",
       "openFileViewed": "Hap {{path}} (i parë)",
-      "title": "skedarë"
+      "title": "Skedarë"
     },
     "fileRows": {
       "markViewed": "Shëno {{path}} si të parë",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
       "openOnGitHub": "Hap në GitHub",
       "openDiffOnGitHub": "Hap ndryshimet e këtij skedari në GitHub",
-      "githubDiff": "ndryshimet në GitHub"
+      "githubDiff": "Ndryshimet në GitHub"
     },
     "floatingActions": {
       "clearSelection": "Pastro përzgjedhjen",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Shko te skeda e përmbledhjes"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Mungon rreshti i ri në fund të skedarit.",
+      "noNewlineAtEndOfFile": "mungon rreshti i ri në fund të skedarit.",
       "emptyDiffColumn": "kolonë bosh në pamjen e ndryshimeve",
       "oldNew": "Më parë: {{old}} | Tani: {{new}}",
       "oldOnly": "Vetëm më parë: {{text}}",
@@ -385,7 +385,7 @@
         "failingChecksDetail": "Kontrollet e detyrueshme të statusit po dështojnë.",
         "unstableTitle": "Disa kontrolle po dështojnë",
         "unstableDetail": "Kontrollet opsionale po dështojnë. Ato nuk do ta bllokojnë bashkimin.",
-        "draftTitle": "kërkesë bashkimi paraprake",
+        "draftTitle": "Kërkesë bashkimi paraprake",
         "draftDetail": "Shëno kërkesën për bashkim si gati për rishikim përpara se ta bashkosh.",
         "behindTitle": "Dega nuk është e përditësuar",
         "behindDetailUpdatable": "Përditëso degën nga dega bazë ose ribazoje përpara bashkimit.",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin e vjetëruar në pritje te {{location}}",
       "editA11y": "Redakto komentin në pritje te {{location}}",
-      "staleHint": "PR-ja ka ndryshuar që kur e shkrove këtë koment.",
+      "staleHint": "pR-ja ka ndryshuar që kur e shkrove këtë koment.",
       "deleteA11y": "Fshi komentin në pritje te {{location}}",
       "deletedAnnouncement": "Komenti në pritje u fshi",
       "noCommentsQueued": "Nuk ka komente në radhë. Rishikimi do të dërgohet vetëm me llojin e zgjedhur më sipër.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Përmbledhja",
-      "files": "skedarë",
+      "files": "Skedarë",
       "discussion": "Diskutimi"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Bëj foto",
       "photoLibrary": "Biblioteka e fotove",
-      "files": "skedarë",
+      "files": "Skedarë",
       "cameraAccessMessage": "Lejo qasjen te kamera në cilësime për të bërë një foto."
     },
     "typingIndicator": {
@@ -877,7 +877,7 @@
       "planName": {
         "standard": "Standard"
       },
-      "commit": "depozitim"
+      "commit": "Depozitim"
     },
     "changelog": {
       "title": "Çfarë ka të re",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Të gjitha fushat janë të detyrueshme për të lidhur {{label}}.",
       "setupGuideFallback": "udhëzuesi i konfigurimit",
       "setupGuideA11y": "Udhëzuesi i konfigurimit të {{label}}",
-      "setupGuide": "udhëzuesi i konfigurimit",
+      "setupGuide": "Udhëzuesi i konfigurimit",
       "saving": "Po ruhet…",
       "removing": "Po hiqet…",
       "updateToken": "Përditëso kodin e autentikimit"
@@ -1125,12 +1125,12 @@
       "destroying": "PO FSHIHET",
       "provisioned": "U KRIJUA",
       "restarting": "PO RINISET",
-      "running": "Në ekzekutim",
+      "running": "NË EKZEKUTIM",
       "shuttingDown": "PO FIKET",
-      "starting": "Po fillon",
+      "starting": "PO FILLON",
       "stopped": "U NDAL",
       "stopping": "PO NDALET",
-      "unknown": "Pa të dhëna",
+      "unknown": "PA TË DHËNA",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Udhëzime të personalizuara",
       "deprecation": "Funksioni i udhëzimeve të personalizuara do të hiqet nga përdorimi. Zhvendosi këto udhëzime në një skedar REVIEW.md në depon tënde.",
-      "placeholder": "P.sh. respektimi i rregullave tona për trajtimin e gabimeve…"
+      "placeholder": "p.sh. respektimi i rregullave tona për trajtimin e gabimeve…"
     },
     "repos": {
       "unavailable": "Depot nuk janë të disponueshme. Përfundo konfigurimin e Bitbucket në kilo.ai.",
@@ -1252,7 +1252,7 @@
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
-      "tokens": "tokenë",
+      "tokens": "Tokenë",
       "tokensInOut": "{{input}} hyrës / {{output}} dalës",
       "council": "Këshilli",
       "decision": "Vendimi",
@@ -1339,9 +1339,9 @@
       "activity": "Aktiviteti"
     },
     "providerConnect": {
-      "githubApp": "aplikacioni GitHub",
+      "githubApp": "Aplikacioni GitHub",
       "githubError": "Nuk u hap konfigurimi i GitHub. Provo përsëri.",
-      "gitlabAccount": "llogaria GitLab",
+      "gitlabAccount": "Llogaria GitLab",
       "gitlabError": "Nuk u hap konfigurimi i GitLab. Provo përsëri.",
       "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR.",
       "bitbucketError": "Nuk u hap konfigurimi i Bitbucket. Provo përsëri."
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Hidh poshtë gjetjen",
       "reason": "Arsyeja",
-      "reasonFixStarted": "rregullimi ka filluar tashmë",
-      "reasonNoBandwidth": "mungojnë burimet për ta trajtuar",
-      "reasonTolerableRisk": "rreziku është i pranueshëm",
-      "reasonInaccurate": "gjetja është e pasaktë",
-      "reasonNotUsed": "kodi me dobësi sigurie nuk përdoret",
+      "reasonFixStarted": "Rregullimi ka filluar tashmë",
+      "reasonNoBandwidth": "Mungojnë burimet për ta trajtuar",
+      "reasonTolerableRisk": "Rreziku është i pranueshëm",
+      "reasonInaccurate": "Gjetja është e pasaktë",
+      "reasonNotUsed": "Kodi me dobësi sigurie nuk përdoret",
       "commentLabel": "Komenti (opsional)",
       "commentAccessibility": "Komenti i hedhjes poshtë",
       "commentPlaceholder": "Shpjegim shtesë për hedhjen poshtë…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Rrezik për ekspozim të konsiderueshëm të të dhënave.",
       "mediumDescription": "Ndikim i kufizuar ose kushte specifike.",
       "lowDescription": "Ndikim minimal në siguri.",
-      "invalidDayCount": "Shkruaj një numër të plotë ditësh nga 1 deri në 365.",
+      "invalidDayCount": "shkruaj një numër të plotë ditësh nga 1 deri në 365.",
       "remediationDeadlineA11y": "Afati i korrigjimit në ditë për nivelin {{label}}",
       "enterWholeNumber": "Shkruaj një numër të plotë nga 1 deri në 365",
       "permissionNote": "Vetëm pronarët e organizatës dhe menaxherët e faturimit mund t'i ndryshojnë këto cilësime.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nuk u ngarkuan cilësimet e depove.",
-      "githubAppSettings": "cilësimet e aplikacionit GitHub",
+      "githubAppSettings": "Cilësimet e aplikacionit GitHub",
       "manageAccess": "Menaxho qasjen e aplikacionit GitHub",
       "noRepositories": "Asnjë depo",
       "noRepositoriesDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Kërkimi i seancave dështoi.",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
-      "live": "Drejtpërdrejt",
+      "live": "DREJTPËRDREJT",
       "updating": "Po përditësohet"
     },
     "sessionRow": {
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Nuk u arrit lidhja me instancën. Ajo mund të jetë shkëputur.",
     "remoteSpawnNonRetryable": "Instanca nuk arriti të niste seancën. Kontrollo kompjuterin ose përditëso CLI-në.",
     "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nis një seancë në Cloud Agent ose zgjidh një instancë tjetër.",
-    "liveCount_one": "{{count}} drejtpërdrejt",
-    "liveCount_other": "{{count}} drejtpërdrejt"
+    "liveCount_one": "{{count}} DREJTPËRDREJT",
+    "liveCount_other": "{{count}} DREJTPËRDREJT"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Mjeti {{name}}, {{status}}",
       "noTasks": "Nuk ka detyra.",
       "toolRead": "lexo",
-      "toolEdit": "Redakto",
+      "toolEdit": "redakto",
       "toolWrite": "shkruaj",
       "toolBash": "bash",
       "toolGlob": "kërkim skedarësh",
       "toolGrep": "kërkim teksti",
       "toolList": "listo",
       "toolPatch": "zbato ndryshimet",
-      "toolTask": "Detyrë",
+      "toolTask": "detyrë",
       "readTodos": "Lexo listën e detyrave",
       "updateTodos": "Përditëso listën e detyrave",
       "linesBadge": "{{displayCount}} rreshta",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[të dhëna hyrëse që nuk mund të serializohen]",
-      "errorPrefix": "gabim: {{error}}"
+      "errorPrefix": "Gabim: {{error}}"
     },
     "instancePicker": {
       "runOn": "Ekzekuto në",
@@ -2290,14 +2290,14 @@
     "modelSelector": {
       "provider": "Ofruesi {{id}}",
       "modelId": "Modeli {{id}}",
-      "unavailable": "i padisponueshëm",
+      "unavailable": "I padisponueshëm",
       "unavailableState": "i padisponueshëm",
       "selectedState": "i zgjedhur",
       "thinkingEffort": "Niveli i arsyetimit",
       "thinkingEffortAccessibility": "niveli i arsyetimit: {{label}}",
       "thinkingEffortSelected": "niveli i arsyetimit: {{label}}, i zgjedhur",
       "thinkingEffortWithModel": "{{model}}, niveli i arsyetimit: {{variant}}",
-      "lockedByAgent": ", i bllokuar nga agjenti «{{agent}}»",
+      "lockedByAgent": ", I bllokuar nga agjenti «{{agent}}»",
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
       "thinkingEffortXhigh": "XH",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Biblioteka e fotove",
-      "files": "skedarë",
+      "files": "Skedarë",
       "couldNotOpenPhotoPicker": "Nuk u hap zgjedhësi i fotove. Rinis Kilo dhe provo përsëri.",
       "maxFilesAllowed": "Lejohen jo më shumë se {{displayCount}} skedarë.",
       "onlyAddingFiles": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})"
@@ -2412,7 +2412,7 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Hapja e kërkesës së bashkimit",
+      "open": "hapja e kërkesës së bashkimit",
       "closed": "kërkesë për bashkim e mbyllur",
       "merged": "kërkesë për bashkim e bashkuar",
       "draft": "kërkesë bashkimi paraprake",
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Kthehu prapa dhe rihap këtë zgjedhës nga ekrani i mëparshëm."
   },
   "sessionRow": {
-    "needsInput": "pret përgjigje"
+    "needsInput": "PRET PËRGJIGJE"
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Nuk u verifikua blerja jote. Kontrollo lidhjen dhe provo përsëri.",
     "productsCouldNotLoad": "Produktet e Kilo Pass nuk u ngarkuan nga App Store.",
     "tryingAgain": "Po provohet përsëri...",
-    "kiloPassManagement": "menaxhimi i Kilo Pass",
+    "kiloPassManagement": "Menaxhimi i Kilo Pass",
     "legalConnectorTerms": " Duke u abonuar, pranon ",
     "legalConnectorPrivacy": " dhe konfirmon se ke lexuar ",
     "manageFailed": "Menaxhimi i abonimit në App Store nuk u hap.",
-    "kiloPassSetup": "konfigurimi i Kilo Pass",
+    "kiloPassSetup": "Konfigurimi i Kilo Pass",
     "subscriptionHeaderDescription": "Abonimi mujor shton kredite në gjendjen tënde në Kilo për sesione kodimi me inteligjencë artificiale në Kilo App: agjentë në re, sesione në distancë dhe biseda në KiloClaw.",
     "tierDescription": "Çdo muaj shtohen kredite të paguara me vlerë {{price}} për përdorimin e Kilo App.",
     "subscribe": "Abonohu",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
     "seeFullDetails": "Shiko detajet e plota",
     "privacyPolicyPrefix": "Të dhënat e tua trajtohen sipas",
-    "privacyPolicy": "politikës së privatësisë së Kilo",
+    "privacyPolicy": "Politikës së privatësisë së Kilo",
     "onDevice": "Në pajisje",
     "couldNotLoadTranscription": "Nuk u ngarkua cilësimi yt i transkriptimit.",
     "signInToManageTranscription": "Hyr për të menaxhuar transkriptimin në linjë.",
@@ -2816,7 +2816,7 @@
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
-      "last30Days": "30 ditët e fundit",
+      "last30Days": "30 Ditët e fundit",
       "outputTokens": "Tokenët dalës",
       "requests": "Kërkesat"
     },
@@ -2907,7 +2907,7 @@
     "signedOut": "Hyr për të parë agjentët",
     "privacy": "Hap Kilo për të parë agjentët",
     "openAgents": "Hap agjentët",
-    "needsInput": "pret përgjigje",
+    "needsInput": "Pret përgjigje",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   }

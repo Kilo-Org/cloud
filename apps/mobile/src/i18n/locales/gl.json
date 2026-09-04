@@ -110,7 +110,7 @@
     "pending": "Pendente",
     "performance": "Rendemento",
     "preferences": "Preferencias",
-    "privacyPolicy": "política de privacidade",
+    "privacyPolicy": "Política de privacidade",
     "profile": "Perfil",
     "reactions": "Reaccións",
     "recent": "Recentes",
@@ -169,7 +169,7 @@
     "verifyCode": "Verificar código",
     "resendCode": "Reenviar código",
     "termsPrefix": "Ao continuar aceptas os nosos",
-    "terms": "termos",
+    "terms": "Termos",
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Máis opcións de inicio de sesión",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir as diferenzas deste ficheiro en GitHub",
-      "githubDiff": "diferenzas en GitHub"
+      "githubDiff": "Diferenzas en GitHub"
     },
     "floatingActions": {
       "clearSelection": "Limpar a selección",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Ir á pestana de vista xeral"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Falta un salto de liña ao final do ficheiro.",
+      "noNewlineAtEndOfFile": "falta un salto de liña ao final do ficheiro.",
       "emptyDiffColumn": "columna de diferenzas baleira",
       "oldNew": "Antes: {{old}} | Agora: {{new}}",
       "oldOnly": "Só na versión anterior: {{text}}",
@@ -421,8 +421,8 @@
       "addReaction": "Engadir unha reacción",
       "reactionPill": "reacción {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacción",
-      "reaction": "Reaccións",
-      "reaction_other": "Reaccións",
+      "reaction": "reaccións",
+      "reaction_other": "reaccións",
       "commentActions": "Accións do comentario",
       "reportContent": "Denunciar contido",
       "reportUser": "Denunciar usuario",
@@ -545,7 +545,7 @@
       "addTitle": "Engadir comentario",
       "unavailableTitle": "Comentario non dispoñible",
       "unavailableMessage": "Este comentario pendente xa foi eliminado ou enviado.",
-      "ok": "Aceptar",
+      "ok": "ACEPTAR",
       "loadFailedTitle": "Non se puido cargar o editor de comentarios.",
       "discardTitle": "Descartar comentario?",
       "discardMessage": "Perderás o borrador.",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Aberta · Revisión obrigatoria",
       "stateOpen": "Apertura",
       "unknownAuthor": "Autor descoñecido",
-      "commit_one": "Confirmación",
+      "commit_one": "confirmación",
       "commit": "confirmacións",
       "commit_other": "confirmacións",
-      "file_one": "Ficheiro",
-      "file": "Ficheiros",
-      "file_other": "Ficheiros"
+      "file_one": "ficheiro",
+      "file": "ficheiros",
+      "file_other": "ficheiros"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentario pendente desactualizado en {{location}}",
@@ -968,7 +968,7 @@
       "hide": "Ocultar {{label}}",
       "show": "Amosar {{label}}",
       "allFieldsRequired": "Todos os campos son obrigatorios para conectar {{label}}.",
-      "setupGuideFallback": "Guía de configuración",
+      "setupGuideFallback": "guía de configuración",
       "setupGuideA11y": "Guía de configuración de {{label}}",
       "setupGuide": "Guía de configuración",
       "saving": "Gardando…",
@@ -1125,12 +1125,12 @@
       "destroying": "DESTRUÍNDO",
       "provisioned": "PREPARADO",
       "restarting": "REINICIANDO",
-      "running": "En execución",
+      "running": "EN EXECUCIÓN",
       "shuttingDown": "APAGANDO",
-      "starting": "Iniciando",
+      "starting": "INICIANDO",
       "stopped": "PARADO",
       "stopping": "PARANDO",
-      "unknown": "Descoñecido",
+      "unknown": "DESCOÑECIDO",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Instrucións personalizadas",
       "deprecation": "Está previsto deixar de admitir as instrucións personalizadas. Traslada estas pautas a un ficheiro REVIEW.md do teu repositorio.",
-      "placeholder": "P. ex.: aplicar as nosas convencións de xestión de erros…"
+      "placeholder": "p. ex.: aplicar as nosas convencións de xestión de erros…"
     },
     "repos": {
       "unavailable": "Os repositorios non están dispoñibles. Remata a configuración de Bitbucket en kilo.ai.",
@@ -1339,9 +1339,9 @@
       "activity": "Actividade"
     },
     "providerConnect": {
-      "githubApp": "aplicación de GitHub",
+      "githubApp": "Aplicación de GitHub",
       "githubError": "Non se puido abrir a configuración de GitHub. Téntao de novo.",
-      "gitlabAccount": "conta de GitLab",
+      "gitlabAccount": "Conta de GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
       "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente.",
       "bitbucketError": "Non se puido abrir a configuración de Bitbucket. Téntao de novo."
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Ver o aviso de seguridade en GitHub",
       "statusOpen": "Apertura",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Corrección xa iniciada",
-      "reasonNoBandwidth": "Falta de tempo",
-      "reasonTolerableRisk": "Risco aceptable",
-      "reasonInaccurate": "Problema detectado incorrecto",
-      "reasonNotUsed": "Código vulnerable sen uso",
+      "reasonFixStarted": "corrección xa iniciada",
+      "reasonNoBandwidth": "falta de tempo",
+      "reasonTolerableRisk": "risco aceptable",
+      "reasonInaccurate": "problema detectado incorrecto",
+      "reasonNotUsed": "código vulnerable sen uso",
       "reasonAfterReview": "despois da revisión"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Posible exposición significativa de datos.",
       "mediumDescription": "Impacto limitado ou condicións específicas.",
       "lowDescription": "Impacto mínimo na seguridade.",
-      "invalidDayCount": "O prazo debe ser de 1 a 365 días, sen decimais.",
+      "invalidDayCount": "o prazo debe ser de 1 a 365 días, sen decimais.",
       "remediationDeadlineA11y": "Prazo de corrección para a gravidade {{label}}, en días",
       "enterWholeNumber": "Introduce un número enteiro entre 1 e 365",
       "permissionNote": "Só os propietarios da organización e os xestores de facturación poden cambiar esta configuración.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Non se puido cargar a configuración dos repositorios.",
-      "githubAppSettings": "configuración da aplicación de GitHub",
+      "githubAppSettings": "Configuración da aplicación de GitHub",
       "manageAccess": "Xestionar o acceso da aplicación de GitHub",
       "noRepositories": "Sen repositorios",
       "noRepositoriesDescription": "Concédelle á aplicación de Kilo en GitHub acceso aos repositorios.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Non se puideron buscar sesións.",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Non hai sesións anteriores",
-      "live": "En tempo real",
+      "live": "EN TEMPO REAL",
       "updating": "Actualizando"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Non se puido copiar o ID da sesión.",
       "untitled": "Sesión sen título",
       "sessionDeleted": "Sesión eliminada",
-      "needsInput": "Agardando resposta",
+      "needsInput": "agardando resposta",
       "fromPlatform": "desde {{platform}}",
       "cent_one": "céntimo",
       "cent": "céntimos",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Non se puido conectar coa instancia. Pode que se desconectase.",
     "remoteSpawnNonRetryable": "A instancia non puido iniciar a sesión. Comproba a máquina ou actualiza o CLI.",
     "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicia unha sesión en Cloud Agent ou escolle outra instancia.",
-    "liveCount_one": "{{count}} en tempo real",
-    "liveCount_other": "{{count}} en tempo real"
+    "liveCount_one": "{{count}} EN TEMPO REAL",
+    "liveCount_other": "{{count}} EN TEMPO REAL"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Ferramenta {{name}}, {{status}}",
       "noTasks": "Non hai tarefas.",
       "toolRead": "ler",
-      "toolEdit": "Editar",
+      "toolEdit": "editar",
       "toolWrite": "escribir",
       "toolBash": "bash",
       "toolGlob": "buscar ficheiros",
       "toolGrep": "buscar texto",
       "toolList": "listar",
       "toolPatch": "aplicar parche",
-      "toolTask": "Tarefa",
+      "toolTask": "tarefa",
       "readTodos": "Ler tarefas",
       "updateTodos": "Actualizar tarefas",
       "linesBadge": "{{displayCount}} liñas",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[entrada non serializable]",
-      "errorPrefix": "erro: {{error}}"
+      "errorPrefix": "Erro: {{error}}"
     },
     "instancePicker": {
       "runOn": "Executar en",
@@ -2291,13 +2291,13 @@
       "provider": "Provedor {{id}}",
       "modelId": "Modelo {{id}}",
       "unavailable": "Non dispoñible",
-      "unavailableState": "Non dispoñible",
+      "unavailableState": "non dispoñible",
       "selectedState": "seleccionado",
       "thinkingEffort": "Esforzo de razoamento",
       "thinkingEffortAccessibility": "Esforzo de razoamento: {{label}}",
       "thinkingEffortSelected": "Esforzo de razoamento: {{label}}, seleccionado",
       "thinkingEffortWithModel": "{{model}}, esforzo de razoamento: {{variant}}",
-      "lockedByAgent": ", bloqueado polo axente «{{agent}}»",
+      "lockedByAgent": ", Bloqueado polo axente «{{agent}}»",
       "addToFavorites": "Engadir {{name}} aos favoritos",
       "removeFromFavorites": "Eliminar {{name}} dos favoritos",
       "thinkingEffortXhigh": "MA",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Actividade anterior",
       "olderActivityDescription": "Custo non atribuído ao historial cargado",
       "ofWindowTokens": "de {{window}} tokens",
-      "tokens": "Unidades de texto",
+      "tokens": "unidades de texto",
       "tokensWithPercentage": "tokens usados ({{percentage}})",
       "stepsCount_one": "{{steps}} paso",
       "stepsCount": "{{steps}} pasos",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Apertura da solicitude de cambios",
+      "open": "apertura da solicitude de cambios",
       "closed": "solicitude de integración pechada",
       "merged": "solicitude de integración fusionada",
-      "draft": "Solicitude de cambios en borrador",
+      "draft": "solicitude de cambios en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Volve e reabre este selector desde a pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "Agardando resposta"
+    "needsInput": "AGARDANDO RESPOSTA"
   },
   "voiceInput": {
     "listening": "Escoitando...",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Non se puido verificar a túa compra. Comproba a túa conexión e téntao de novo.",
     "productsCouldNotLoad": "Non se puideron cargar os produtos de Kilo Pass desde a App Store.",
     "tryingAgain": "Tentando de novo...",
-    "kiloPassManagement": "xestión de Kilo Pass",
+    "kiloPassManagement": "Xestión de Kilo Pass",
     "legalConnectorTerms": " Ao subscribirte, aceptas os ",
     "legalConnectorPrivacy": " e declaras coñecer a ",
     "manageFailed": "Non se puido abrir a xestión de subscricións da App Store.",
-    "kiloPassSetup": "configuración de Kilo Pass",
+    "kiloPassSetup": "Configuración de Kilo Pass",
     "subscriptionHeaderDescription": "Unha subscrición mensual que engade créditos ao teu saldo de Kilo para programar con IA en Kilo App: axentes na nube, sesións remotas e chats de KiloClaw.",
     "tierDescription": "Cada mes engádense {{price}} en créditos de pago para usar en Kilo App.",
     "subscribe": "Subscribirse",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass non está dispoñible como compra dentro da aplicación en Android. Xestiónao na web.",
     "webManagementDescription": "Este Kilo Pass xestiónase na web.",
     "legalDisclosure": "Kilo Pass é unha subscrición mensual con renovación automática. O importe cárgase ao teu Apple ID ao confirmar a compra. A subscrición renóvase automaticamente cada mes ao prezo indicado, salvo que a canceles polo menos 24 horas antes de que remate o período actual. Podes xestionala ou cancelala en calquera momento na configuración da túa conta da App Store.",
-    "legalTermsOfUse": "termos de uso (EULA)",
+    "legalTermsOfUse": "Termos de uso (EULA)",
     "purchaseDifferentAccount": "Esta compra da App Store non está vinculada á túa conta de Kilo. Inicia sesión na Apple Account que usaches para a compra e téntao de novo.",
     "restoreFailed": "Non se puideron restaurar as compras. Téntao de novo.",
     "purchaseFailed": "Non se puido completar a compra.",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento na configuración.",
     "seeFullDetails": "Ver todos os detalles",
     "privacyPolicyPrefix": "Os teus datos trátanse segundo a",
-    "privacyPolicy": "política de privacidade de Kilo",
+    "privacyPolicy": "Política de privacidade de Kilo",
     "onDevice": "No dispositivo",
     "couldNotLoadTranscription": "Non se puido cargar a túa configuración de transcrición.",
     "signInToManageTranscription": "Inicia sesión para xestionar a transcrición en liña.",

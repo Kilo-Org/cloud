@@ -38,7 +38,7 @@
     "findings": "Zjištění",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repozitáře",
     "securityAgent": "Bezpečnostní agent",
     "unknown": "Neznámé",
@@ -169,7 +169,7 @@
     "verifyCode": "Ověřit kód",
     "resendCode": "Odeslat kód znovu",
     "termsPrefix": "Pokračováním souhlasíte s našimi",
-    "terms": "podmínkami",
+    "terms": "Podmínkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Další možnosti přihlášení",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Přehled změn je příliš velký na zobrazení.",
       "openOnGitHub": "Otevřít na GitHubu",
       "openDiffOnGitHub": "Otevřít přehled změn tohoto souboru na GitHubu",
-      "githubDiff": "přehled změn na GitHubu"
+      "githubDiff": "Přehled změn na GitHubu"
     },
     "floatingActions": {
       "clearSelection": "Zrušit výběr",
@@ -328,7 +328,7 @@
       "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souboru z {{total}}"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Na konci souboru chybí nový řádek.",
+      "noNewlineAtEndOfFile": "na konci souboru chybí nový řádek.",
       "emptyDiffColumn": "prázdný sloupec přehledu změn",
       "oldNew": "Původní: {{old}} | Nový: {{new}}",
       "oldOnly": "Pouze původní: {{text}}",
@@ -917,7 +917,7 @@
       "destroyTitle": "Smazat instanci",
       "instance": "Výpočetní instance",
       "couldNotCheckStatus": "Stav služby se nepodařilo ověřit.",
-      "dangerZone": "Nebezpečné akce",
+      "dangerZone": "NEBEZPEČNÉ AKCE",
       "destroying": "Mazání…",
       "serviceDegraded": "Služba má potíže — klepnutím zobrazíš stav",
       "up": "SPUŠTĚNO"
@@ -986,7 +986,7 @@
       "allFieldsRequired": "Pro připojení {{label}} musíš vyplnit všechna pole.",
       "setupGuideFallback": "průvodce nastavením",
       "setupGuideA11y": "Průvodce nastavením {{label}}",
-      "setupGuide": "průvodce nastavením",
+      "setupGuide": "Průvodce nastavením",
       "saving": "Ukládá se…",
       "removing": "Odebírá se…",
       "updateToken": "Aktualizovat token"
@@ -1129,11 +1129,11 @@
     "status": {
       "cpu": "CPU",
       "exitCode": "Návratový kód {{code}}",
-      "gatewayProcess": "Proces brány",
+      "gatewayProcess": "PROCES BRÁNY",
       "lastExit": "Poslední ukončení",
       "memory": "Paměť",
       "region": "Oblast",
-      "resources": "Prostředky",
+      "resources": "PROSTŘEDKY",
       "restarts": "Restarty",
       "state": "Stav",
       "uptime": "Doba provozu",
@@ -1141,12 +1141,12 @@
       "destroying": "MAZÁNÍ",
       "provisioned": "ZŘÍZENO",
       "restarting": "RESTARTUJE SE",
-      "running": "Běží",
+      "running": "BĚŽÍ",
       "shuttingDown": "VYPÍNÁ SE",
-      "starting": "Spouští se",
+      "starting": "SPOUŠTÍ SE",
       "stopped": "ZASTAVENO",
       "stopping": "ZASTAVUJE SE",
-      "unknown": "Neznámé",
+      "unknown": "NEZNÁMÉ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1235,7 +1235,7 @@
     "instructions": {
       "title": "Vlastní pokyny",
       "deprecation": "Podporu vlastních pokynů plánujeme ukončit. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
-      "placeholder": "Např. vyžadovat dodržování našich pravidel pro zpracování chyb…"
+      "placeholder": "např. vyžadovat dodržování našich pravidel pro zpracování chyb…"
     },
     "repos": {
       "unavailable": "Repozitáře nejsou k dispozici. Dokončete nastavení služby Bitbucket na kilo.ai.",
@@ -1357,9 +1357,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "aplikace GitHub",
+      "githubApp": "Aplikace GitHub",
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "gitlabAccount": "účet GitLab",
+      "gitlabAccount": "Účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky.",
       "bitbucketError": "Nastavení služby Bitbucket se nepodařilo otevřít. Zkuste to znovu."
@@ -1604,11 +1604,11 @@
       "viewAdvisory": "Zobrazit bezpečnostní upozornění na GitHubu",
       "statusOpen": "Otevřeno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Oprava už probíhá",
-      "reasonNoBandwidth": "Chybí kapacita",
-      "reasonTolerableRisk": "Riziko je přijatelné",
-      "reasonInaccurate": "Zjištění je nepřesné",
-      "reasonNotUsed": "Zranitelný kód se nepoužívá",
+      "reasonFixStarted": "oprava už probíhá",
+      "reasonNoBandwidth": "chybí kapacita",
+      "reasonTolerableRisk": "riziko je přijatelné",
+      "reasonInaccurate": "zjištění je nepřesné",
+      "reasonNotUsed": "zranitelný kód se nepoužívá",
       "reasonAfterReview": "po posouzení"
     },
     "settingsOverview": {
@@ -1671,7 +1671,7 @@
       "highDescription": "Riziko závažného úniku dat.",
       "mediumDescription": "Omezený dopad nebo specifické podmínky.",
       "lowDescription": "Minimální dopad na bezpečnost.",
-      "invalidDayCount": "Zadejte počet dní od 1 do 365 jako celé číslo.",
+      "invalidDayCount": "zadejte počet dní od 1 do 365 jako celé číslo.",
       "remediationDeadlineA11y": "Lhůta pro nápravu ve dnech, závažnost: {{label}}",
       "enterWholeNumber": "Zadej celé číslo od 1 do 365",
       "permissionNote": "Tato nastavení mohou měnit pouze vlastníci organizace a správci fakturace.",
@@ -1747,7 +1747,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nastavení repozitářů se nepodařilo načíst.",
-      "githubAppSettings": "nastavení aplikace GitHub",
+      "githubAppSettings": "Nastavení aplikace GitHub",
       "manageAccess": "Spravovat přístup aplikace GitHub",
       "noRepositories": "Žádné repozitáře",
       "noRepositoriesDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům.",
@@ -1897,7 +1897,7 @@
       "couldNotSearch": "Relace se nepodařilo vyhledat.",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné předchozí relace",
-      "live": "Živě",
+      "live": "ŽIVĚ",
       "updating": "Aktualizace"
     },
     "sessionRow": {
@@ -1910,7 +1910,7 @@
       "couldNotCopyId": "ID relace se nepodařilo zkopírovat.",
       "untitled": "Nepojmenovaná relace",
       "sessionDeleted": "Relace smazána",
-      "needsInput": "Čeká na reakci",
+      "needsInput": "čeká na reakci",
       "fromPlatform": "z {{platform}}",
       "cent_one": "americký cent",
       "cent": "centů",
@@ -1924,7 +1924,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -1944,8 +1944,8 @@
     "remoteSpawnRetryable": "K instanci se nepodařilo připojit. Možná se odpojila.",
     "remoteSpawnNonRetryable": "Instance nedokázala spustit relaci. Zkontroluj počítač nebo aktualizuj CLI.",
     "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusť relaci ve službě Cloud Agent nebo vyber jinou instanci.",
-    "liveCount_one": "{{count}} živě",
-    "liveCount_other": "{{count}} živě",
+    "liveCount_one": "{{count}} ŽIVĚ",
+    "liveCount_other": "{{count}} ŽIVĚ",
     "liveCount_few": "BĚŽÍ: {{count}}",
     "liveCount_many": "BĚŽÍ: {{count}}"
   },
@@ -2053,14 +2053,14 @@
       "accessibilityLabel": "Nástroj {{name}}, {{status}}",
       "noTasks": "Nejsou tu žádné úkoly.",
       "toolRead": "čtení",
-      "toolEdit": "Upravit",
+      "toolEdit": "upravit",
       "toolWrite": "zápis",
       "toolBash": "bash",
       "toolGlob": "hledání souborů",
       "toolGrep": "hledání v obsahu",
       "toolList": "výpis",
       "toolPatch": "úprava",
-      "toolTask": "Úkol",
+      "toolTask": "úkol",
       "readTodos": "Přečíst úkoly",
       "updateTodos": "Aktualizovat úkoly",
       "linesBadge": "řádky: {{displayCount}}",
@@ -2077,7 +2077,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[neserializovatelný vstup]",
-      "errorPrefix": "chyba: {{error}}"
+      "errorPrefix": "Chyba: {{error}}"
     },
     "instancePicker": {
       "runOn": "Místo spuštění",
@@ -2331,13 +2331,13 @@
       "provider": "Poskytovatel {{id}}",
       "modelId": "Model: {{id}}",
       "unavailable": "Nedostupné",
-      "unavailableState": "Nedostupné",
+      "unavailableState": "nedostupné",
       "selectedState": "vybráno",
       "thinkingEffort": "Úroveň uvažování",
       "thinkingEffortAccessibility": "Úroveň uvažování: {{label}}",
       "thinkingEffortSelected": "Úroveň uvažování: {{label}}, vybráno",
       "thinkingEffortWithModel": "{{model}}, úroveň uvažování: {{variant}}",
-      "lockedByAgent": ", uzamčeno agentem „{{agent}}“",
+      "lockedByAgent": ", Uzamčeno agentem „{{agent}}“",
       "addToFavorites": "Přidat {{name}} do oblíbených",
       "removeFromFavorites": "Odebrat {{name}} z oblíbených",
       "thinkingEffortXhigh": "XH",
@@ -2457,7 +2457,7 @@
       "open": "otevřený PR",
       "closed": "uzavřený PR",
       "merged": "sloučený PR",
-      "draft": "Koncept PR",
+      "draft": "koncept PR",
       "updating": "Aktualizuje se, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2564,7 +2564,7 @@
     "optionsExpiredDescription": "Vraťte se na předchozí obrazovku a znovu otevřete tento výběr."
   },
   "sessionRow": {
-    "needsInput": "Čeká na reakci"
+    "needsInput": "ČEKÁ NA REAKCI"
   },
   "voiceInput": {
     "listening": "Poslouchám…",
@@ -2631,11 +2631,11 @@
     "verifyPurchaseFailed": "Váš nákup se nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu.",
     "productsCouldNotLoad": "Produkty Kilo Pass se nepodařilo načíst z App Store.",
     "tryingAgain": "Zkouší se to znovu…",
-    "kiloPassManagement": "správa Kilo Pass",
+    "kiloPassManagement": "Správa Kilo Pass",
     "legalConnectorTerms": " Sjednáním předplatného souhlasíte s ",
     "legalConnectorPrivacy": " a berete na vědomí ",
     "manageFailed": "Otevření správy předplatného v App Store se nezdařilo.",
-    "kiloPassSetup": "nastavení Kilo Pass",
+    "kiloPassSetup": "Nastavení Kilo Pass",
     "subscriptionHeaderDescription": "Měsíční předplatné doplňuje kredity na váš účet Kilo. V aplikaci Kilo App je využijete na programování s AI v relacích cloudových agentů, vzdálených relacích a chatech KiloClaw.",
     "tierDescription": "Každý měsíc získáte placené kredity v hodnotě {{price}} pro používání aplikace Kilo App.",
     "subscribe": "Předplatit",
@@ -2683,7 +2683,7 @@
     "helpImproveDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace. Tuto volbu můžete kdykoli změnit v nastavení.",
     "seeFullDetails": "Zobrazit podrobnosti",
     "privacyPolicyPrefix": "Vaše data se zpracovávají podle",
-    "privacyPolicy": "zásad ochrany osobních údajů Kilo",
+    "privacyPolicy": "Zásad ochrany osobních údajů Kilo",
     "onDevice": "V zařízení",
     "couldNotLoadTranscription": "Vaše nastavení přepisu se nepodařilo načíst.",
     "signInToManageTranscription": "Chcete-li spravovat online přepis, přihlaste se.",

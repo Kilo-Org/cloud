@@ -93,7 +93,7 @@
     "email": "Posta elektronikoa",
     "ends": "Amaiera: {{date}}",
     "failed": "Huts egin du",
-    "file": "fitxategi",
+    "file": "Fitxategi",
     "gitlab": "GitLab",
     "goBack": "Itzuli",
     "idle": "Geldirik",
@@ -112,7 +112,7 @@
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
     "profile": "Profila",
-    "reactions": "erreakzio",
+    "reactions": "Erreakzio",
     "recent": "Azkenak",
     "recommended": "Gomendatuak",
     "remaining": "Geratzen dena",
@@ -272,7 +272,7 @@
       "diffTooLarge": "diferentziak handiegiak dira",
       "openFile": "Ireki {{path}}",
       "openFileViewed": "Ireki {{path}} (ikusita)",
-      "title": "fitxategi"
+      "title": "Fitxategi"
     },
     "fileRows": {
       "markViewed": "Markatu {{path}} ikusitako gisa",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Joan ikuspegi orokorreko fitxara"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ Ez dago lerro-jauzirik fitxategiaren amaieran.",
+      "noNewlineAtEndOfFile": "⚠️ ez dago lerro-jauzirik fitxategiaren amaieran.",
       "emptyDiffColumn": "diferentzien zutabe hutsa",
       "oldNew": "Zaharra: {{old}} | Berria: {{new}}",
       "oldOnly": "Zaharra soilik: {{text}}",
@@ -434,7 +434,7 @@
       "replyBody": "Erantzunaren testua",
       "submitReply": "Bidali erantzuna",
       "termsTitle": "Zerbitzu-baldintzak",
-      "termsCopy": "13 urte edo gehiago izan behar dituzu argitaratzeko.",
+      "termsCopy": "13 Urte edo gehiago izan behar dituzu argitaratzeko.",
       "termsAcceptRetry": "Ezin izan dira zerbitzu-baldintzak onartu. Egiaztatu konexioa eta saiatu berriro.",
       "viewTerms": "Ikusi baldintzak",
       "acceptTerms": "Onartu",
@@ -545,7 +545,7 @@
       "addTitle": "Iruzkina gehitzea",
       "unavailableTitle": "Iruzkina ez dago eskuragarri",
       "unavailableMessage": "Bidaltzeko zegoen iruzkin hau dagoeneko ezabatu edo bidali da.",
-      "ok": "Ados",
+      "ok": "ADOS",
       "loadFailedTitle": "Ezin izan da iruzkin-editorea kargatu.",
       "discardTitle": "Baztertu iruzkina?",
       "discardMessage": "Zure zirriborroa galduko da.",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editatu bidaltzeko dagoen iruzkin zaharkitua: {{location}}",
       "editA11y": "Editatu bidaltzeko dagoen iruzkina: {{location}}",
-      "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
+      "staleHint": "pRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
       "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Ikuspegi orokorra",
-      "files": "fitxategi",
+      "files": "Fitxategi",
       "discussion": "Eztabaida"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Atera argazkia",
       "photoLibrary": "Argazki-bilduma",
-      "files": "fitxategi",
+      "files": "Fitxategi",
       "cameraAccessMessage": "Eman kamera erabiltzeko baimena ezarpenetan, argazki bat ateratzeko."
     },
     "typingIndicator": {
@@ -877,7 +877,7 @@
       "planName": {
         "standard": "Standard"
       },
-      "commit": "egikaritze"
+      "commit": "Egikaritze"
     },
     "changelog": {
       "title": "Berritasunak",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Eremu guztiak beharrezkoak dira {{label}} konektatzeko.",
       "setupGuideFallback": "konfigurazio-gida",
       "setupGuideA11y": "{{label}} konfiguratzeko gida",
-      "setupGuide": "konfigurazio-gida",
+      "setupGuide": "Konfigurazio-gida",
       "saving": "Gordetzen…",
       "removing": "Kentzen…",
       "updateToken": "Eguneratu tokena"
@@ -1125,12 +1125,12 @@
       "destroying": "SUNTSITZEN",
       "provisioned": "HORNITUTA",
       "restarting": "BERRABIARAZTEN",
-      "running": "Martxan",
+      "running": "MARTXAN",
       "shuttingDown": "ITZALTZEN",
-      "starting": "Abiarazten",
+      "starting": "ABIARAZTEN",
       "stopped": "GELDITUTA",
       "stopping": "GELDITZEN",
-      "unknown": "Ezezaguna",
+      "unknown": "EZEZAGUNA",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
       "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
-      "placeholder": "Adib.: gure errore-kudeaketako arauak betearaztea…"
+      "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…"
     },
     "repos": {
       "unavailable": "Biltegiak ez daude erabilgarri. Amaitu Bitbucket-en konfigurazioa kilo.ai-n.",
@@ -1252,7 +1252,7 @@
       "showMore": "Erakutsi gehiago",
       "created": "Sortuta",
       "started": "Hasita",
-      "tokens": "token",
+      "tokens": "Token",
       "tokensInOut": "{{input}} sarreran / {{output}} irteeran",
       "council": "Kontseilua",
       "decision": "Erabakia",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Ikusi segurtasun-abisua GitHub-en",
       "statusOpen": "Ireki",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Konponketa hasita dago",
-      "reasonNoBandwidth": "Ez dago horretarako baliabiderik",
-      "reasonTolerableRisk": "Arriskua onargarria da",
-      "reasonInaccurate": "Antzemandako arazoa ez da zehatza",
-      "reasonNotUsed": "Kode zaurgarria ez da erabiltzen",
+      "reasonFixStarted": "konponketa hasita dago",
+      "reasonNoBandwidth": "ez dago horretarako baliabiderik",
+      "reasonTolerableRisk": "arriskua onargarria da",
+      "reasonInaccurate": "antzemandako arazoa ez da zehatza",
+      "reasonNotUsed": "kode zaurgarria ez da erabiltzen",
       "reasonAfterReview": "berrikuspenaren ondoren"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Datu kopuru handia agerian geratzeko arriskua.",
       "mediumDescription": "Eragin mugatua edo baldintza zehatzak.",
       "lowDescription": "Segurtasunean eragin oso txikia.",
-      "invalidDayCount": "Egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
+      "invalidDayCount": "egun kopuruak 1 eta 365 arteko zenbaki osoa izan behar du.",
       "remediationDeadlineA11y": "Konponketa-epea egunetan, larritasuna: {{label}}",
       "enterWholeNumber": "Sartu 1etik 365era bitarteko zenbaki oso bat",
       "permissionNote": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Ezin izan dira saioak bilatu.",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
-      "live": "Zuzenean",
+      "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Ezin izan da saio-IDa kopiatu.",
       "untitled": "Izenik gabeko saioa",
       "sessionDeleted": "Saioa ezabatuta",
-      "needsInput": "Zure erantzunaren zain",
+      "needsInput": "zure erantzunaren zain",
       "fromPlatform": "jatorria: {{platform}}",
       "cent_one": "zentimo",
       "cent": "zentimo",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
     "remoteSpawnNonRetryable": "Instantziak ezin izan du saioa hasi; egiaztatu makina edo eguneratu CLI-a.",
     "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat.",
-    "liveCount_one": "{{count}} zuzenean",
-    "liveCount_other": "{{count}} zuzenean"
+    "liveCount_one": "{{count}} ZUZENEAN",
+    "liveCount_other": "{{count}} ZUZENEAN"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} tresna, {{status}}",
       "noTasks": "Ez dago zereginik.",
       "toolRead": "irakurri",
-      "toolEdit": "Editatu",
+      "toolEdit": "editatu",
       "toolWrite": "idatzi",
       "toolBash": "bash",
       "toolGlob": "fitxategi-bilaketa",
       "toolGrep": "testu-bilaketa",
       "toolList": "zerrendatu",
       "toolPatch": "aplikatu adabakia",
-      "toolTask": "Zeregina",
+      "toolTask": "zeregina",
       "readTodos": "Irakurri zereginak",
       "updateTodos": "Eguneratu zereginak",
       "linesBadge": "{{displayCount}} lerro",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[serializatu ezineko sarrera]",
-      "errorPrefix": "errorea: {{error}}"
+      "errorPrefix": "Errorea: {{error}}"
     },
     "instancePicker": {
       "runOn": "Exekuzio-ingurunea",
@@ -2291,7 +2291,7 @@
       "provider": "Hornitzailea: {{id}}",
       "modelId": "Modeloa: {{id}}",
       "unavailable": "Ez dago eskuragarri",
-      "unavailableState": "Ez dago eskuragarri",
+      "unavailableState": "ez dago eskuragarri",
       "selectedState": "hautatuta",
       "thinkingEffort": "Arrazoiketa-ahalegina",
       "thinkingEffortAccessibility": "Arrazoiketa-ahalegina: {{label}}",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
-      "files": "fitxategi",
+      "files": "Fitxategi",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})"
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Ireki bateratze-eskaera",
+      "open": "ireki bateratze-eskaera",
       "closed": "bateratze-eskaera itxia",
       "merged": "bateratutako bateratze-eskaera",
-      "draft": "Bateratze-eskaeraren zirriborroa",
+      "draft": "bateratze-eskaeraren zirriborroa",
       "updating": "Eguneratzen, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Itzuli aurreko pantailara eta ireki hautatzaile hau berriro."
   },
   "sessionRow": {
-    "needsInput": "Zure erantzunaren zain"
+    "needsInput": "ZURE ERANTZUNAREN ZAIN"
   },
   "voiceInput": {
     "listening": "Entzuten...",

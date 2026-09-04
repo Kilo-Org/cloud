@@ -38,7 +38,7 @@
     "findings": "Bevindingen",
     "notConnected": "Niet gekoppeld",
     "notifications": "Meldingen",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Coderepository's",
     "securityAgent": "Beveiligingsagent",
     "unknown": "Onbekend",
@@ -93,7 +93,7 @@
     "email": "E-mail",
     "ends": "Eindigt op {{date}}",
     "failed": "Mislukt",
-    "file": "bestand",
+    "file": "Bestand",
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
@@ -110,9 +110,9 @@
     "pending": "In afwachting",
     "performance": "Prestaties",
     "preferences": "Voorkeuren",
-    "privacyPolicy": "privacybeleid",
+    "privacyPolicy": "Privacybeleid",
     "profile": "Profiel",
-    "reactions": "reacties",
+    "reactions": "Reacties",
     "recent": "Onlangs",
     "recommended": "Aanbevolen",
     "remaining": "Resterend",
@@ -169,7 +169,7 @@
     "verifyCode": "Code controleren",
     "resendCode": "Code opnieuw verzenden",
     "termsPrefix": "Door verder te gaan ga je akkoord met onze",
-    "terms": "voorwaarden",
+    "terms": "Voorwaarden",
     "termsConnector": " en ",
     "termsSuffix": ".",
     "moreSignInOptions": "Meer aanmeldopties",
@@ -200,7 +200,7 @@
     "signOut": "Afmelden",
     "deleteAccount": "Account verwijderen",
     "confirmationCode": "Bevestigingscode",
-    "confirmationCodePlaceholder": "Code van 6 cijfers",
+    "confirmationCodePlaceholder": "code van 6 cijfers",
     "confirmDeletion": "Verwijderen bevestigen",
     "credits": "Tegoed",
     "failedToLoadBalance": "Het saldo kon niet worden geladen. Tik om het opnieuw te proberen.",
@@ -404,7 +404,7 @@
     "attachmentPicker": {
       "takePhoto": "Foto maken",
       "photoLibrary": "Fotobibliotheek",
-      "files": "bestanden",
+      "files": "Bestanden",
       "cameraAccessMessage": "Geef in de instellingen toegang tot de camera om een foto te maken."
     },
     "typingIndicator": {
@@ -552,7 +552,7 @@
       "hide": "{{label}} verbergen",
       "removing": "Verwijderen…",
       "saving": "Opslaan…",
-      "setupGuide": "installatiehandleiding",
+      "setupGuide": "Installatiehandleiding",
       "setupGuideA11y": "Configuratiehandleiding voor {{label}}",
       "setupGuideFallback": "installatiehandleiding",
       "show": "{{label}} tonen",
@@ -595,7 +595,7 @@
       "quarantinedBody": "Je KiloClaw-instantie staat in quarantaine en kan nu niet worden gebruikt. Ons team moet helpen om de instantie te herstellen.",
       "quarantinedTitle": "Instantie moet worden hersteld",
       "subscriptionCanceledBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te gebruiken. Je kunt je niet in de app abonneren.",
-      "subscriptionCanceledCta": "kilo.ai/claw openen",
+      "subscriptionCanceledCta": "Kilo.ai/claw openen",
       "subscriptionCanceledTitle": "Abonneren via de website",
       "subscriptionPastDueBody": "Er was een probleem met je laatste betaling. Ga in je browser naar kilo.ai/claw om je betaalgegevens bij te werken. Je kunt de facturering niet in de app beheren.",
       "subscriptionPastDueTitle": "Betaalgegevens via de website bijwerken",
@@ -670,7 +670,7 @@
         "identityTitle": "Een identiteit voor je bot",
         "manualReviewBody": "Je account moet worden gecontroleerd voordat we een instantie kunnen maken. Ga verder op kilo.ai.",
         "manualReviewTitle": "Handmatige beoordeling nodig voor de installatie",
-        "openKiloAi": "kilo.ai openen",
+        "openKiloAi": "Kilo.ai openen",
         "provisioning": "Inrichten",
         "ready": "Klaar",
         "review": "Beoordeling",
@@ -743,12 +743,12 @@
       "destroying": "VERWIJDEREN",
       "provisioned": "INGERICHT",
       "restarting": "HERSTARTEN",
-      "running": "Actief",
+      "running": "ACTIEF",
       "shuttingDown": "AFSLUITEN",
-      "starting": "Opstarten",
+      "starting": "OPSTARTEN",
       "stopped": "GESTOPT",
       "stopping": "STOPPEN",
-      "unknown": "Onbekend",
+      "unknown": "ONBEKEND",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -800,7 +800,7 @@
     "instructions": {
       "title": "Eigen instructies",
       "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
-      "placeholder": "Bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
+      "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…"
     },
     "repos": {
       "unavailable": "De repositories zijn niet beschikbaar. Voltooi het instellen van Bitbucket op kilo.ai.",
@@ -883,7 +883,7 @@
       "started": "Gestart",
       "threshold": "Drempelwaarde",
       "title": "Beoordeling",
-      "tokens": "teksttokens",
+      "tokens": "Teksttokens",
       "tokensInOut": "{{input}} invoer / {{output}} uitvoer",
       "transcriptWaiting": "Het transcript van de review is nog niet beschikbaar.",
       "transcriptEmpty": "Er is geen transcript voor deze review.",
@@ -1056,7 +1056,7 @@
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",
       "noActivity": "Geen vastgelegde activiteit",
       "noActivityDescription": "Kilo heeft van {{start}} tot {{end}} geen activiteit rond beveiligingsbevindingen om te rapporteren.",
-      "periodUtc": "{{start}} tot {{end}} · UTC",
+      "periodUtc": "{{start}} TOT {{end}} · UTC",
       "queryFailed": "Het opvragen van het rapport is niet voltooid. Probeer het opnieuw.",
       "repositoryNotRecorded": "Repository niet vastgelegd",
       "summary": "Rapportsamenvatting",
@@ -1165,11 +1165,11 @@
       "notFoundDescription": "Deze bevinding is mogelijk verwijderd of je hebt er geen toegang meer toe.",
       "notFoundTitle": "Bevinding niet gevonden",
       "reason": "Reden",
-      "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
-      "reasonInaccurate": "de bevinding is onjuist",
-      "reasonNoBandwidth": "er is geen capaciteit beschikbaar",
-      "reasonNotUsed": "kwetsbare code wordt niet gebruikt",
-      "reasonTolerableRisk": "het risico is aanvaardbaar",
+      "reasonFixStarted": "Er wordt al aan een oplossing gewerkt",
+      "reasonInaccurate": "De bevinding is onjuist",
+      "reasonNoBandwidth": "Er is geen capaciteit beschikbaar",
+      "reasonNotUsed": "Kwetsbare code wordt niet gebruikt",
+      "reasonTolerableRisk": "Het risico is aanvaardbaar",
       "title": "Bevinding negeren"
     },
     "findingDetail": {
@@ -1265,7 +1265,7 @@
     },
     "repositories": {
       "couldNotLoad": "De repository-instellingen konden niet worden geladen.",
-      "githubAppSettings": "instellingen van de GitHub-app",
+      "githubAppSettings": "Instellingen van de GitHub-app",
       "manageAccess": "Toegang tot de GitHub-app beheren",
       "noRepositories": "Geen repositories",
       "noRepositoriesDescription": "Geef de Kilo GitHub-app toegang tot repositories.",
@@ -1316,7 +1316,7 @@
       "enterWholeNumber": "Voer een geheel getal in tussen 1 en 365",
       "high": "Hoog",
       "highDescription": "Risico op een groot datalek.",
-      "invalidDayCount": "Voer een geheel aantal dagen in tussen 1 en 365.",
+      "invalidDayCount": "voer een geheel aantal dagen in tussen 1 en 365.",
       "low": "Laag",
       "lowDescription": "Minimale gevolgen voor de beveiliging.",
       "medium": "Gemiddeld",
@@ -1454,7 +1454,7 @@
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
-      "live": "Actief",
+      "live": "ACTIEF",
       "updating": "Bijwerken"
     },
     "sessionRow": {
@@ -1467,17 +1467,17 @@
       "couldNotCopyId": "De sessie-ID kon niet worden gekopieerd.",
       "untitled": "Naamloze sessie",
       "sessionDeleted": "Sessie verwijderd",
-      "needsInput": "Invoer nodig",
+      "needsInput": "invoer nodig",
       "fromPlatform": "van {{platform}}",
       "cent_one": "dollarcent",
       "cent": "cent",
       "cent_other": "cent",
-      "dollar_one": "Amerikaanse dollar",
+      "dollar_one": "amerikaanse dollar",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -1497,8 +1497,8 @@
     "remoteSpawnRetryable": "De instantie kon niet worden bereikt. De verbinding is mogelijk verbroken.",
     "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
     "remoteSpawnInstanceDisconnected": "De verbinding met de geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie.",
-    "liveCount_one": "{{count}} actief",
-    "liveCount_other": "{{count}} actief"
+    "liveCount_one": "{{count}} ACTIEF",
+    "liveCount_other": "{{count}} ACTIEF"
   },
   "agentChat": {
     "session": {
@@ -1602,14 +1602,14 @@
       "accessibilityLabel": "Tool {{name}}, {{status}}",
       "noTasks": "Er zijn geen taken.",
       "toolRead": "lezen",
-      "toolEdit": "Bewerken",
+      "toolEdit": "bewerken",
       "toolWrite": "schrijven",
       "toolBash": "bash",
       "toolGlob": "bestanden zoeken",
       "toolGrep": "inhoud doorzoeken",
       "toolList": "inhoud weergeven",
       "toolPatch": "wijzigingen toepassen",
-      "toolTask": "Taak",
+      "toolTask": "taak",
       "readTodos": "Taken lezen",
       "updateTodos": "Taken bijwerken",
       "linesBadge": "{{displayCount}} regels",
@@ -1626,7 +1626,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[niet-serialiseerbare invoer]",
-      "errorPrefix": "fout: {{error}}"
+      "errorPrefix": "Fout: {{error}}"
     },
     "instancePicker": {
       "runOn": "Uitvoeren op",
@@ -1874,13 +1874,13 @@
       "provider": "Aanbieder {{id}}",
       "modelId": "Model: {{id}}",
       "unavailable": "Niet beschikbaar",
-      "unavailableState": "Niet beschikbaar",
+      "unavailableState": "niet beschikbaar",
       "selectedState": "geselecteerd",
       "thinkingEffort": "Denkinspanning",
       "thinkingEffortAccessibility": "Denkinspanning: {{label}}",
       "thinkingEffortSelected": "Denkinspanning: {{label}}, geselecteerd",
       "thinkingEffortWithModel": "{{model}}, denkinspanning: {{variant}}",
-      "lockedByAgent": ", vergrendeld door agent \"{{agent}}\"",
+      "lockedByAgent": ", Vergrendeld door agent \"{{agent}}\"",
       "addToFavorites": "{{name}} aan favorieten toevoegen",
       "removeFromFavorites": "{{name}} uit favorieten verwijderen",
       "thinkingEffortXhigh": "XH",
@@ -1904,7 +1904,7 @@
     "attachmentPicker": {
       "camera": "Foto maken",
       "photoLibrary": "Fotobibliotheek",
-      "files": "bestanden",
+      "files": "Bestanden",
       "couldNotOpenPhotoPicker": "De fotokiezer kon niet worden geopend. Start Kilo opnieuw op en probeer het opnieuw.",
       "maxFilesAllowed": "Je kunt maximaal {{displayCount}} bestanden toevoegen.",
       "onlyAddingFiles": "Er worden slechts {{accepted}} van de {{total}} bestanden toegevoegd (max. {{max}})"
@@ -1995,10 +1995,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "PR openen",
+      "open": "pR openen",
       "closed": "gesloten PR",
       "merged": "samengevoegde PR",
-      "draft": "Concept-PR",
+      "draft": "concept-PR",
       "updating": "Bijwerken, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2105,7 +2105,7 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "Invoer nodig"
+    "needsInput": "INVOER NODIG"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2198,7 +2198,7 @@
     "unavailableDescription": "Kilo Pass is niet beschikbaar als aankoop in de app op Android. Beheer je Kilo Pass via de website.",
     "webManagementDescription": "Deze Kilo Pass wordt via de website beheerd.",
     "legalDisclosure": "Kilo Pass is een maandabonnement dat automatisch wordt verlengd. De kosten worden bij bevestiging van de aankoop via je Apple ID in rekening gebracht. Het abonnement wordt elke maand automatisch verlengd tegen de getoonde prijs, tenzij je ten minste 24 uur voor het einde van de lopende periode opzegt. Je kunt je abonnement op elk moment beheren of opzeggen in je accountinstellingen in de App Store.",
-    "legalTermsOfUse": "gebruiksvoorwaarden (EULA)",
+    "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)",
     "purchaseDifferentAccount": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Meld je aan met de Apple Account die voor de aankoop is gebruikt en probeer het opnieuw.",
     "restoreFailed": "De aankopen konden niet worden hersteld. Probeer het opnieuw.",
     "purchaseFailed": "De aankoop kon niet worden voltooid.",
@@ -2224,7 +2224,7 @@
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen in de instellingen.",
     "seeFullDetails": "Volledige details bekijken",
     "privacyPolicyPrefix": "Je gegevens worden verwerkt volgens het",
-    "privacyPolicy": "privacybeleid van Kilo",
+    "privacyPolicy": "Privacybeleid van Kilo",
     "onDevice": "Op het apparaat",
     "couldNotLoadTranscription": "Je transcriptie-instelling kon niet worden geladen.",
     "signInToManageTranscription": "Meld je aan om online transcriptie te beheren.",
@@ -2465,7 +2465,7 @@
       "retryLoadingAllFiles": "Alle bestanden opnieuw laden",
       "retryLoadingFiles": "Bestanden opnieuw laden",
       "retryLoadingMoreFiles": "Meer bestanden opnieuw proberen te laden",
-      "title": "bestanden",
+      "title": "Bestanden",
       "viewedCount": "{{viewed}} van {{total}} bekeken",
       "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
     },
@@ -2605,7 +2605,7 @@
     "overview": {
       "commit": "codecommits",
       "commit_other": "codecommits",
-      "commit_one": "Commit",
+      "commit_one": "commit",
       "file": "bestanden",
       "file_other": "bestanden",
       "file_one": "bestand",
@@ -2644,7 +2644,7 @@
       "emptyDiffColumn": "lege diffkolom",
       "emptyDiffRow": "Lege diffrij",
       "newOnly": "Alleen nieuw: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ Het bestand eindigt niet met een regeleinde.",
+      "noNewlineAtEndOfFile": "⚠️ het bestand eindigt niet met een regeleinde.",
       "oldNew": "Oud: {{old}} | Nieuw: {{new}}",
       "oldOnly": "Alleen oud: {{text}}"
     },
@@ -2670,7 +2670,7 @@
     },
     "tabs": {
       "discussion": "Discussie",
-      "files": "bestanden",
+      "files": "Bestanden",
       "overview": "Overzicht"
     },
     "diff": {

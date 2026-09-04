@@ -38,7 +38,7 @@
     "findings": "Problemes",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repositoris",
     "securityAgent": "Agent de seguretat",
     "unknown": "Desconegut",
@@ -93,7 +93,7 @@
     "email": "Correu electrònic",
     "ends": "Finalitza el {{date}}",
     "failed": "Error d'execució",
-    "file": "fitxer",
+    "file": "Fitxer",
     "gitlab": "GitLab",
     "goBack": "Torna enrere",
     "idle": "En espera",
@@ -110,9 +110,9 @@
     "pending": "Pendent",
     "performance": "Rendiment",
     "preferences": "Preferències",
-    "privacyPolicy": "política de privadesa",
+    "privacyPolicy": "Política de privadesa",
     "profile": "Perfil",
-    "reactions": "reaccions",
+    "reactions": "Reaccions",
     "recent": "Recents",
     "recommended": "Recomanats",
     "remaining": "Restant",
@@ -169,7 +169,7 @@
     "verifyCode": "Verifica el codi",
     "resendCode": "Torna a enviar el codi",
     "termsPrefix": "En continuar, acceptes les nostres",
-    "terms": "condicions d'ús",
+    "terms": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Més opcions d'inici de sessió",
@@ -272,7 +272,7 @@
       "diffTooLarge": "massa diferències",
       "openFile": "Obre {{path}}",
       "openFileViewed": "Obre {{path}} (vist)",
-      "title": "fitxers"
+      "title": "Fitxers"
     },
     "fileRows": {
       "markViewed": "Marca {{path}} com a vist",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre les diferències d'aquest fitxer a GitHub",
-      "githubDiff": "diferències a GitHub"
+      "githubDiff": "Diferències a GitHub"
     },
     "floatingActions": {
       "clearSelection": "Desfés la selecció",
@@ -549,7 +549,7 @@
       "addTitle": "Comentari nou",
       "unavailableTitle": "Comentari no disponible",
       "unavailableMessage": "Aquest comentari pendent ja s'ha eliminat o s'ha enviat.",
-      "ok": "D'acord",
+      "ok": "D'ACORD",
       "loadFailedTitle": "No s'ha pogut carregar l'editor de comentaris.",
       "discardTitle": "Vols descartar el comentari?",
       "discardMessage": "Perdràs l'esborrany.",
@@ -625,7 +625,7 @@
     },
     "tabs": {
       "overview": "Visió general",
-      "files": "fitxers",
+      "files": "Fitxers",
       "discussion": "Discussió"
     },
     "fileStatus": {
@@ -828,7 +828,7 @@
     "attachmentPicker": {
       "takePhoto": "Fes una foto",
       "photoLibrary": "Fototeca",
-      "files": "fitxers",
+      "files": "Fitxers",
       "cameraAccessMessage": "Permet l'accés a la càmera a la configuració per fer una foto."
     },
     "typingIndicator": {
@@ -885,7 +885,7 @@
       "planName": {
         "standard": "Standard"
       },
-      "commit": "canvi"
+      "commit": "Canvi"
     },
     "changelog": {
       "title": "Novetats",
@@ -978,7 +978,7 @@
       "allFieldsRequired": "Tots els camps són obligatoris per connectar {{label}}.",
       "setupGuideFallback": "guia de configuració",
       "setupGuideA11y": "Guia de configuració de {{label}}",
-      "setupGuide": "guia de configuració",
+      "setupGuide": "Guia de configuració",
       "saving": "S'està desant…",
       "removing": "S'està eliminant…",
       "updateToken": "Actualitza el testimoni"
@@ -1133,12 +1133,12 @@
       "destroying": "DESTRUINT",
       "provisioned": "APROVISIONAT",
       "restarting": "REINICIANT",
-      "running": "En execució",
+      "running": "EN EXECUCIÓ",
       "shuttingDown": "APAGANT",
-      "starting": "S'està iniciant",
+      "starting": "S'ESTÀ INICIANT",
       "stopped": "ATURAT",
       "stopping": "ATURANT",
-      "unknown": "Desconegut",
+      "unknown": "DESCONEGUT",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1226,7 +1226,7 @@
     "instructions": {
       "title": "Instruccions personalitzades",
       "deprecation": "Està previst retirar les instruccions personalitzades. Trasllada aquestes pautes a un fitxer REVIEW.md del teu repositori.",
-      "placeholder": "P. ex., aplica les nostres convencions de gestió d'errors…"
+      "placeholder": "p. ex., aplica les nostres convencions de gestió d'errors…"
     },
     "repos": {
       "unavailable": "Els repositoris no estan disponibles. Acaba la configuració de Bitbucket a kilo.ai.",
@@ -1261,7 +1261,7 @@
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
-      "tokens": "unitats de text",
+      "tokens": "Unitats de text",
       "tokensInOut": "{{input}} d'entrada / {{output}} de sortida",
       "council": "Consell",
       "decision": "Decisió",
@@ -1348,9 +1348,9 @@
       "activity": "Activitat"
     },
     "providerConnect": {
-      "githubApp": "aplicació de GitHub",
+      "githubApp": "Aplicació de GitHub",
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
-      "gitlabAccount": "compte de GitLab",
+      "gitlabAccount": "Compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
       "description": "Connecta {{label}} de Kilo per revisar automàticament les sol·licituds d'integració.",
       "bitbucketError": "No s'ha pogut obrir la configuració de Bitbucket. Torna-ho a provar."
@@ -1558,11 +1558,11 @@
     "dismiss": {
       "title": "Descarta el problema",
       "reason": "Motiu",
-      "reasonFixStarted": "la correcció ja està en curs",
-      "reasonNoBandwidth": "no hi ha recursos disponibles",
-      "reasonTolerableRisk": "el risc és tolerable",
-      "reasonInaccurate": "el problema detectat és inexacte",
-      "reasonNotUsed": "el codi vulnerable no s'utilitza",
+      "reasonFixStarted": "La correcció ja està en curs",
+      "reasonNoBandwidth": "No hi ha recursos disponibles",
+      "reasonTolerableRisk": "El risc és tolerable",
+      "reasonInaccurate": "El problema detectat és inexacte",
+      "reasonNotUsed": "El codi vulnerable no s'utilitza",
       "commentLabel": "Comentari (opcional)",
       "commentAccessibility": "Comentari sobre el descart",
       "commentPlaceholder": "Context del descart…",
@@ -1660,7 +1660,7 @@
       "highDescription": "Possible exposició significativa de dades.",
       "mediumDescription": "Impacte limitat o condicions específiques.",
       "lowDescription": "Impacte mínim en la seguretat.",
-      "invalidDayCount": "El termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
+      "invalidDayCount": "el termini ha de ser d'entre 1 i 365 dies, en nombres enters.",
       "remediationDeadlineA11y": "Termini de correcció en dies per a la gravetat {{label}}",
       "enterWholeNumber": "Introdueix un nombre enter entre 1 i 365",
       "permissionNote": "Només els propietaris de l'organització i els gestors de facturació poden canviar aquesta configuració.",
@@ -1736,7 +1736,7 @@
     },
     "repositories": {
       "couldNotLoad": "No s'ha pogut carregar la configuració dels repositoris.",
-      "githubAppSettings": "configuració de l'aplicació de GitHub",
+      "githubAppSettings": "Configuració de l'aplicació de GitHub",
       "manageAccess": "Gestiona l'accés de l'aplicació de GitHub",
       "noRepositories": "Cap repositori",
       "noRepositoriesDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris.",
@@ -1884,7 +1884,7 @@
       "couldNotSearch": "No s'han pogut cercar les sessions.",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
-      "live": "En directe",
+      "live": "EN DIRECTE",
       "updating": "S'està actualitzant"
     },
     "sessionRow": {
@@ -1929,8 +1929,8 @@
     "remoteSpawnRetryable": "No s'ha pogut connectar amb la instància. Pot ser que s'hagi desconnectat.",
     "remoteSpawnNonRetryable": "La instància no ha pogut iniciar la sessió. Comprova la màquina o actualitza la CLI.",
     "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicia una sessió a Cloud Agent o tria una altra instància.",
-    "liveCount_one": "{{count}} en directe",
-    "liveCount_other": "{{count}} en directe",
+    "liveCount_one": "{{count}} EN DIRECTE",
+    "liveCount_other": "{{count}} EN DIRECTE",
     "liveCount_many": "{{count}} ACTIUS"
   },
   "agentChat": {
@@ -2036,14 +2036,14 @@
       "accessibilityLabel": "Eina {{name}}, {{status}}",
       "noTasks": "No hi ha cap tasca.",
       "toolRead": "llegeix",
-      "toolEdit": "Edita",
+      "toolEdit": "edita",
       "toolWrite": "escriu",
       "toolBash": "bash",
       "toolGlob": "cerca de fitxers",
       "toolGrep": "cerca de text",
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
-      "toolTask": "Tasca",
+      "toolTask": "tasca",
       "readTodos": "Llegeix les tasques pendents",
       "updateTodos": "Actualitza les tasques pendents",
       "linesBadge": "{{displayCount}} línies",
@@ -2060,7 +2060,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[entrada no serialitzable]",
-      "errorPrefix": "error detectat: {{error}}"
+      "errorPrefix": "Error detectat: {{error}}"
     },
     "instancePicker": {
       "runOn": "Destinació de l'execució",
@@ -2310,14 +2310,14 @@
     "modelSelector": {
       "provider": "Proveïdor {{id}}",
       "modelId": "Model: {{id}}",
-      "unavailable": "no disponible",
+      "unavailable": "No disponible",
       "unavailableState": "no disponible",
       "selectedState": "seleccionat",
       "thinkingEffort": "Esforç de raonament",
       "thinkingEffortAccessibility": "Esforç de raonament {{label}}",
       "thinkingEffortSelected": "Esforç de raonament {{label}}, seleccionat",
       "thinkingEffortWithModel": "{{model}}, esforç de raonament {{variant}}",
-      "lockedByAgent": ", bloquejat per l'agent «{{agent}}»",
+      "lockedByAgent": ", Bloquejat per l'agent «{{agent}}»",
       "addToFavorites": "Afegeix {{name}} als preferits",
       "removeFromFavorites": "Treu {{name}} dels preferits",
       "thinkingEffortXhigh": "MA",
@@ -2341,7 +2341,7 @@
     "attachmentPicker": {
       "camera": "Càmera",
       "photoLibrary": "Fototeca",
-      "files": "fitxers",
+      "files": "Fitxers",
       "couldNotOpenPhotoPicker": "No s'ha pogut obrir el selector de fotos. Reinicia Kilo i torna-ho a provar.",
       "maxFilesAllowed": "Es permeten com a màxim {{displayCount}} fitxers.",
       "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
@@ -2433,10 +2433,10 @@
       "stepsCount_many": "{{steps}} passos"
     },
     "prBadge": {
-      "open": "PR oberta",
+      "open": "pR oberta",
       "closed": "sol·licitud d'integració tancada",
       "merged": "sol·licitud d'integració fusionada",
-      "draft": "PR en esborrany",
+      "draft": "pR en esborrany",
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} núm. {{number}}"
     },
@@ -2543,7 +2543,7 @@
     "optionsExpiredDescription": "Torna enrere i reobre aquest selector des de la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "pendent de resposta"
+    "needsInput": "PENDENT DE RESPOSTA"
   },
   "voiceInput": {
     "listening": "S'està escoltant…",
@@ -2610,11 +2610,11 @@
     "verifyPurchaseFailed": "No s'ha pogut verificar la compra. Comprova la connexió i torna-ho a provar.",
     "productsCouldNotLoad": "No s'han pogut carregar els productes de Kilo Pass des de l'App Store.",
     "tryingAgain": "S'està tornant a provar…",
-    "kiloPassManagement": "gestió de Kilo Pass",
+    "kiloPassManagement": "Gestió de Kilo Pass",
     "legalConnectorTerms": " En subscriure't, acceptes les ",
     "legalConnectorPrivacy": " i confirmes que has llegit la ",
     "manageFailed": "No s'ha pogut obrir la gestió de subscripcions de l'App Store.",
-    "kiloPassSetup": "configuració de Kilo Pass",
+    "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Aquesta subscripció mensual afegeix crèdits al teu saldo de Kilo per programar amb IA a Kilo App: agents al núvol, sessions remotes i xats de KiloClaw.",
     "tierDescription": "Cada mes s'afegeixen {{price}} en crèdits de pagament per utilitzar Kilo App.",
     "subscribe": "Subscriu-te",
@@ -2636,7 +2636,7 @@
     "unavailableDescription": "Kilo Pass no està disponible com a compra dins de l'aplicació a Android. Gestiona'l al web.",
     "webManagementDescription": "Aquest Kilo Pass es gestiona al web.",
     "legalDisclosure": "Kilo Pass és una subscripció mensual de renovació automàtica. El pagament es carrega al teu Apple ID en confirmar la compra. La subscripció es renova automàticament cada mes al preu indicat, tret que la cancel·lis com a mínim 24 hores abans del final del període actual. Gestiona-la o cancel·la-la en qualsevol moment des de la configuració del teu compte de l'App Store.",
-    "legalTermsOfUse": "condicions d'ús (EULA)",
+    "legalTermsOfUse": "Condicions d'ús (EULA)",
     "purchaseDifferentAccount": "Aquesta compra de l'App Store no està vinculada al teu compte de Kilo. Inicia la sessió amb l'Apple Account que vas utilitzar per fer la compra i torna-ho a provar.",
     "restoreFailed": "No s'han pogut restaurar les compres. Torna-ho a provar.",
     "purchaseFailed": "No s'ha pogut completar la compra.",
@@ -2662,7 +2662,7 @@
     "helpImproveDescription": "Comparteix dades anònimes d'ús del producte i l'origen de la instal·lació. Pots canviar-ho en qualsevol moment a la configuració.",
     "seeFullDetails": "Mostra tots els detalls",
     "privacyPolicyPrefix": "Les teves dades es gestionen segons la",
-    "privacyPolicy": "política de privadesa de Kilo",
+    "privacyPolicy": "Política de privadesa de Kilo",
     "onDevice": "Al dispositiu",
     "couldNotLoadTranscription": "No s'ha pogut carregar la teva configuració de transcripció.",
     "signInToManageTranscription": "Inicia la sessió per gestionar la transcripció en línia.",
@@ -2929,7 +2929,7 @@
     "signedOut": "Inicia la sessió per veure els agents",
     "privacy": "Obre Kilo per veure els agents",
     "openAgents": "Obre els agents",
-    "needsInput": "pendent de resposta",
+    "needsInput": "Pendent de resposta",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
   }

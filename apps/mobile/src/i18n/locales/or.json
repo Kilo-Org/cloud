@@ -1049,7 +1049,7 @@
         "genericErrorBody": "ଆମେ ବର୍ତ୍ତମାନ ଆପଣଙ୍କ ଇନ୍ସଟାନ୍ସ ସେଟଅପ୍ ସମାପ୍ତ କରିପାରିଲୁ ନାହିଁ।",
         "manualReviewBody": "ଇନ୍ସଟାନ୍ସ ତିଆରି କରିବା ପୂର୍ବରୁ ଆପଣଙ୍କ ଆକାଉଣ୍ଟର ସ୍ଥିତି ଯାଞ୍ଚ କରିବା ଆବଶ୍ୟକ। kilo.ai ରେ ଜାରି ରଖନ୍ତୁ।",
         "manualReviewTitle": "ସେଟଅପ୍ ପାଇଁ ସମୀକ୍ଷକଙ୍କ ଯାଞ୍ଚ ଆବଶ୍ୟକ",
-        "openKiloAi": "kilo.ai ଖୋଲନ୍ତୁ",
+        "openKiloAi": "Kilo.ai ଖୋଲନ୍ତୁ",
         "provisioning": "ଇନ୍ସଟାନ୍ସ ପ୍ରସ୍ତୁତି",
         "review": "ସମୀକ୍ଷା",
         "identityTitle": "ଆପଣଙ୍କ ବଟ୍‌ର ପରିଚୟ",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw ବ୍ୟବହାର ଜାରି ରଖିବାକୁ ବ୍ରାଉଜରରେ kilo.ai/claw ଖୋଲନ୍ତୁ। ଆପ୍‌ରେ ସବସ୍କ୍ରାଇବ୍ କରିହେବ ନାହିଁ।",
       "subscriptionCanceledTitle": "ୱେବ୍‌ରେ ସଦସ୍ୟତା ନିଅନ୍ତୁ",
       "subscriptionCanceledBody": "KiloClaw ବ୍ୟବହାର କରିବାକୁ ବ୍ରାଉଜରରେ kilo.ai/claw ଖୋଲନ୍ତୁ। ଆପ୍‌ରେ ସବସ୍କ୍ରାଇବ୍ କରିହେବ ନାହିଁ।",
-      "subscriptionCanceledCta": "kilo.ai/claw ଖୋଲନ୍ତୁ",
+      "subscriptionCanceledCta": "Kilo.ai/claw ଖୋଲନ୍ତୁ",
       "subscriptionPastDueTitle": "ୱେବ୍‌ରେ ଦେୟ ତଥ୍ୟ ଅପଡେଟ୍",
       "subscriptionPastDueBody": "ଆପଣଙ୍କ ଶେଷ ଦେୟ ଗ୍ରହଣ କରିବାରେ ସମସ୍ୟା ହୋଇଥିଲା। ଦେୟ ତଥ୍ୟ ଅପଡେଟ୍ କରିବାକୁ ବ୍ରାଉଜରରେ kilo.ai/claw ଖୋଲନ୍ତୁ। ଆପ୍‌ରେ ବିଲିଂ ପରିଚାଳନା କରିହେବ ନାହିଁ।",
       "quarantinedTitle": "ଇନ୍ସଟାନ୍ସର ସମସ୍ୟା ସମାଧାନ ଆବଶ୍ୟକ",
       "quarantinedBody": "ଆପଣଙ୍କ KiloClaw ଇନ୍ସଟାନ୍ସକୁ ଅଲଗା ରଖାଯାଇଛି ଓ ଏବେ ବ୍ୟବହାର କରିହେବ ନାହିଁ। ଏହାକୁ ପୁଣି ଚାଲୁ କରିବାକୁ ଆମ ଦଳର ସହାୟତା ଆବଶ୍ୟକ।",
       "multipleCurrentConflictBody": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଏକାଧିକ ସକ୍ରିୟ ସବସ୍କ୍ରିପ୍ସନ୍ ମିଳିଛି। ଦୁଇଥର ଦେୟ ନକଟିବା ପାଇଁ ଆମେ ପ୍ରକ୍ରିୟାକୁ ଅଟକାଇଛୁ।",
-      "multipleCurrentConflictCta": "kilo.ai ରେ ଜାରି ରଖନ୍ତୁ",
+      "multipleCurrentConflictCta": "Kilo.ai ରେ ଜାରି ରଖନ୍ତୁ",
       "nonCanonicalEarlybirdTitle": "ପୁରୁଣା ଯୋଜନା ମିଳିଛି",
       "nonCanonicalEarlybirdBody": "ମୋବାଇଲ୍‌ରେ ବ୍ୟବହାର କରିବା ପୂର୍ବରୁ ଆପଣଙ୍କ ପ୍ରାରମ୍ଭିକ ସୁବିଧା ଯୋଜନାକୁ ଜଣେ ସମୀକ୍ଷକ ଯାଞ୍ଚ କରିବା ଆବଶ୍ୟକ।",
-      "iosTitle": "iOS ରେ KiloClaw ଉପଲବ୍ଧ ନାହିଁ",
+      "iosTitle": "IOS ରେ KiloClaw ଉପଲବ୍ଧ ନାହିଁ",
       "iosBody": "ଏହି ଆକାଉଣ୍ଟ ପାଇଁ KiloClaw ବ୍ୟବହାରର ଅନୁମତି iOS ଆପ୍ ବାହାରେ ପରିଚାଳନା କରାଯାଏ।",
       "iosContact": "କିଛି ପ୍ରଶ୍ନ ଅଛି? hi@kilo.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ।"
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}}ଟି ଅପଢ଼ା ସନ୍ଦେଶ",
       "openUnread_other": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}}ଟି ଅପଢ଼ା ସନ୍ଦେଶ",
       "openSettings": "{{name}} ପାଇଁ ସେଟିଂ ଖୋଲନ୍ତୁ",
-      "fixOnKiloAi": "kilo.ai ରେ ସମାଧାନ କରନ୍ତୁ: {{label}}"
+      "fixOnKiloAi": "Kilo.ai ରେ ସମାଧାନ କରନ୍ତୁ: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

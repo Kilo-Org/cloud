@@ -169,7 +169,7 @@
     "verifyCode": "Kinnita kood",
     "resendCode": "Saada kood uuesti",
     "termsPrefix": "Jätkates nõustud meie",
-    "terms": "kasutustingimustega",
+    "terms": "Kasutustingimustega",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Mine ülevaate vahekaardile"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Faili lõpus puudub reavahetus.",
+      "noNewlineAtEndOfFile": "faili lõpus puudub reavahetus.",
       "emptyDiffColumn": "tühi veerg muudatuste vaates",
       "oldNew": "Vana: {{old}} | Uus: {{new}}",
       "oldOnly": "Ainult vana: {{text}}",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
       "editA11y": "Muuda ootel kommentaari asukohas {{location}}",
-      "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
+      "staleHint": "pR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
       "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Ühenduse loomiseks tuleb täita kõik väljad ({{label}}).",
       "setupGuideFallback": "seadistusjuhend",
       "setupGuideA11y": "{{label}} seadistusjuhend",
-      "setupGuide": "seadistusjuhend",
+      "setupGuide": "Seadistusjuhend",
       "saving": "Salvestamine…",
       "removing": "Eemaldamine…",
       "updateToken": "Uuenda pääsutõendit"
@@ -1125,12 +1125,12 @@
       "destroying": "HÄVITAMINE",
       "provisioned": "RESSURSID ERALDATUD",
       "restarting": "TAASKÄIVITAMINE",
-      "running": "Töötab",
+      "running": "TÖÖTAB",
       "shuttingDown": "VÄLJALÜLITAMINE",
-      "starting": "Käivitub",
+      "starting": "KÄIVITUB",
       "stopped": "PEATATUD",
       "stopping": "PEATAMINE",
-      "unknown": "Teadmata",
+      "unknown": "TEADMATA",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Kohandatud juhised",
       "deprecation": "Kohandatud juhiste funktsioon on kavas kasutuselt kõrvaldada. Tõsta need juhised oma hoidla faili REVIEW.md.",
-      "placeholder": "Nt meie veakäsitluse reeglite järgimine…"
+      "placeholder": "nt meie veakäsitluse reeglite järgimine…"
     },
     "repos": {
       "unavailable": "Hoidlad pole saadaval. Lõpeta Bitbucketi seadistamine saidil kilo.ai.",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Vaata turvateadet GitHubis",
       "statusOpen": "Avatud",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Parandamine juba käib",
-      "reasonNoBandwidth": "Selleks pole aega",
-      "reasonTolerableRisk": "Risk on talutav",
-      "reasonInaccurate": "Leid on ebatäpne",
-      "reasonNotUsed": "Haavatavat koodi ei kasutata",
+      "reasonFixStarted": "parandamine juba käib",
+      "reasonNoBandwidth": "selleks pole aega",
+      "reasonTolerableRisk": "risk on talutav",
+      "reasonInaccurate": "leid on ebatäpne",
+      "reasonNotUsed": "haavatavat koodi ei kasutata",
       "reasonAfterReview": "pärast ülevaatamist"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Võib põhjustada ulatusliku andmelekke.",
       "mediumDescription": "Mõju on piiratud või ärakasutamine eeldab kindlaid tingimusi.",
       "lowDescription": "Mõju turvalisusele on minimaalne.",
-      "invalidDayCount": "Päevade arv peab olema täisarv vahemikus 1–365.",
+      "invalidDayCount": "päevade arv peab olema täisarv vahemikus 1–365.",
       "remediationDeadlineA11y": "{{label}}: parandamise tähtaeg päevades",
       "enterWholeNumber": "Sisesta täisarv vahemikus 1 kuni 365",
       "permissionNote": "Neid seadeid saavad muuta ainult organisatsiooni omanikud ja arveldushaldurid.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Seansse ei õnnestunud otsida.",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Varasemaid seansse pole",
-      "live": "Reaalajas",
+      "live": "REAALAJAS",
       "updating": "Uuendamine"
     },
     "sessionRow": {
@@ -1889,7 +1889,7 @@
       "cent_one": "sent",
       "cent": "senti",
       "cent_other": "senti",
-      "dollar_one": "USA dollar",
+      "dollar_one": "uSA dollar",
       "dollar": "dollarit",
       "dollar_other": "dollarit",
       "costSpoken": "kulu {{cost}}",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Eksemplariga ei õnnestunud ühendust saada — ühendus võib olla katkenud.",
     "remoteSpawnNonRetryable": "Eksemplar ei suutnud seanssi käivitada — kontrolli arvutit või uuenda CLI-d.",
     "remoteSpawnInstanceDisconnected": "Valitud eksemplari ühendus katkes. Alusta seanssi Cloud Agentis või vali teine eksemplar.",
-    "liveCount_one": "{{count}} reaalajas",
-    "liveCount_other": "{{count}} reaalajas"
+    "liveCount_one": "{{count}} REAALAJAS",
+    "liveCount_other": "{{count}} REAALAJAS"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Tööriist {{name}}, {{status}}",
       "noTasks": "Ülesandeid pole.",
       "toolRead": "loe",
-      "toolEdit": "Muuda",
+      "toolEdit": "muuda",
       "toolWrite": "kirjuta",
       "toolBash": "bash",
       "toolGlob": "failiotsing",
       "toolGrep": "tekstiotsing",
       "toolList": "loetle",
       "toolPatch": "rakenda paik",
-      "toolTask": "Ülesanne",
+      "toolTask": "ülesanne",
       "readTodos": "Loe ülesannete loendit",
       "updateTodos": "Uuenda ülesannete loendit",
       "linesBadge": "{{displayCount}} rida",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[serialiseerimatu sisend]",
-      "errorPrefix": "viga: {{error}}"
+      "errorPrefix": "Viga: {{error}}"
     },
     "instancePicker": {
       "runOn": "Käivituskoht",
@@ -2290,14 +2290,14 @@
     "modelSelector": {
       "provider": "Pakkuja {{id}}",
       "modelId": "Mudel {{id}}",
-      "unavailable": "pole saadaval",
+      "unavailable": "Pole saadaval",
       "unavailableState": "pole saadaval",
       "selectedState": "valitud",
       "thinkingEffort": "Mõtlemise põhjalikkus",
       "thinkingEffortAccessibility": "Mõtlemise põhjalikkus: {{label}}",
       "thinkingEffortSelected": "Mõtlemise põhjalikkus: {{label}}, valitud",
       "thinkingEffortWithModel": "{{model}}, mõtlemise põhjalikkus: {{variant}}",
-      "lockedByAgent": ", lukustanud agent „{{agent}}“",
+      "lockedByAgent": ", Lukustanud agent „{{agent}}“",
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
       "thinkingEffortXhigh": "VK",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Avatud tõmbetaotlus",
+      "open": "avatud tõmbetaotlus",
       "closed": "suletud liitmistaotlus",
       "merged": "liidetud liitmistaotlus",
-      "draft": "Tõmbetaotluse mustand",
+      "draft": "tõmbetaotluse mustand",
       "updating": "Uuendamine, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Mine tagasi ja ava see valik eelmiselt ekraanilt uuesti."
   },
   "sessionRow": {
-    "needsInput": "vajab sisendit"
+    "needsInput": "VAJAB SISENDIT"
   },
   "voiceInput": {
     "listening": "Kuulamine...",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass pole Androidis rakendusesiseselt ostetav. Halda seda veebis.",
     "webManagementDescription": "Seda Kilo Passi hallatakse veebis.",
     "legalDisclosure": "Kilo Pass on automaatselt uuenev kuutellimus. Ostu kinnitamisel võetakse tasu sinu Apple ID-ga seotud makseviisilt. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne käimasoleva perioodi lõppu. Saad tellimust igal ajal hallata või tühistada oma App Store'i konto seadetes.",
-    "legalTermsOfUse": "kasutustingimustega (EULA)",
+    "legalTermsOfUse": "Kasutustingimustega (EULA)",
     "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple Accountiga ja proovi uuesti.",
     "restoreFailed": "Ostude taastamine ebaõnnestus. Proovi uuesti.",
     "purchaseFailed": "Ostu lõpetamine ebaõnnestus.",
@@ -2907,7 +2907,7 @@
     "signedOut": "Agentide nägemiseks logi sisse",
     "privacy": "Agentide nägemiseks ava Kilo",
     "openAgents": "Ava agendid",
-    "needsInput": "vajab sisendit",
+    "needsInput": "Vajab sisendit",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
   }

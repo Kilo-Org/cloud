@@ -169,7 +169,7 @@
     "verifyCode": "Potvrdi kôd",
     "resendCode": "Pošalji kôd ponovno",
     "termsPrefix": "Nastavkom prihvaćaš naše",
-    "terms": "uvjete",
+    "terms": "Uvjete",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više načina prijave",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Razlike su prevelike za prikaz.",
       "openOnGitHub": "Otvori na GitHubu",
       "openDiffOnGitHub": "Otvori prikaz razlika ove datoteke na GitHubu",
-      "githubDiff": "prikaz razlika na GitHubu"
+      "githubDiff": "Prikaz razlika na GitHubu"
     },
     "floatingActions": {
       "clearSelection": "Poništi odabir",
@@ -549,7 +549,7 @@
       "addTitle": "Novi komentar",
       "unavailableTitle": "Komentar nedostupan",
       "unavailableMessage": "Ovaj je komentar na čekanju već izbrisan ili poslan.",
-      "ok": "U redu",
+      "ok": "U REDU",
       "loadFailedTitle": "Nije moguće učitati obrazac za komentar.",
       "discardTitle": "Odbaciti komentar?",
       "discardMessage": "Tvoj će se nacrt izgubiti.",
@@ -614,7 +614,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na lokaciji {{location}}",
       "editA11y": "Uredi komentar na čekanju na lokaciji {{location}}",
-      "staleHint": "PR je ažuriran nakon pisanja ovog komentara.",
+      "staleHint": "pR je ažuriran nakon pisanja ovog komentara.",
       "deleteA11y": "Izbriši komentar na čekanju na lokaciji {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je izbrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled koda poslat će se samo s gore odabranom vrstom.",
@@ -978,7 +978,7 @@
       "allFieldsRequired": "Za povezivanje s uslugom {{label}} sva polja moraju biti popunjena.",
       "setupGuideFallback": "vodič za postavljanje",
       "setupGuideA11y": "vodič za postavljanje: {{label}}",
-      "setupGuide": "vodič za postavljanje",
+      "setupGuide": "Vodič za postavljanje",
       "saving": "Spremanje…",
       "removing": "Uklanjanje…",
       "updateToken": "Ažuriraj token"
@@ -1133,12 +1133,12 @@
       "destroying": "TRAJNO BRISANJE",
       "provisioned": "PRIPREMLJENO",
       "restarting": "PONOVNO POKRETANJE",
-      "running": "U tijeku",
+      "running": "U TIJEKU",
       "shuttingDown": "GAŠENJE",
-      "starting": "Pokretanje",
+      "starting": "POKRETANJE",
       "stopped": "ZAUSTAVLJENO",
       "stopping": "ZAUSTAVLJANJE",
-      "unknown": "Nepoznato",
+      "unknown": "NEPOZNATO",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1226,7 +1226,7 @@
     "instructions": {
       "title": "Prilagođene upute",
       "deprecation": "Planira se ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
-      "placeholder": "Npr. primjena naših pravila za obradu pogrešaka…"
+      "placeholder": "npr. primjena naših pravila za obradu pogrešaka…"
     },
     "repos": {
       "unavailable": "Repozitoriji nisu dostupni. Dovrši postavljanje za Bitbucket na kilo.ai.",
@@ -1348,9 +1348,9 @@
       "activity": "Aktivnost"
     },
     "providerConnect": {
-      "githubApp": "aplikaciju GitHub",
+      "githubApp": "Aplikaciju GitHub",
       "githubError": "Nije moguće otvoriti postavljanje za GitHub. Pokušaj ponovno.",
-      "gitlabAccount": "račun na GitLabu",
+      "gitlabAccount": "Račun na GitLabu",
       "gitlabError": "Nije moguće otvoriti postavljanje za GitLab. Pokušaj ponovno.",
       "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje.",
       "bitbucketError": "Nije moguće otvoriti postavljanje za Bitbucket. Pokušaj ponovno."
@@ -1594,11 +1594,11 @@
       "viewAdvisory": "Pogledaj sigurnosnu obavijest na GitHubu",
       "statusOpen": "Otvoreno",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Ispravak je već u tijeku",
-      "reasonNoBandwidth": "Nema slobodnih kapaciteta",
-      "reasonTolerableRisk": "Rizik je prihvatljiv",
-      "reasonInaccurate": "Nalaz je netočan",
-      "reasonNotUsed": "Ranjivi kod nije u upotrebi",
+      "reasonFixStarted": "ispravak je već u tijeku",
+      "reasonNoBandwidth": "nema slobodnih kapaciteta",
+      "reasonTolerableRisk": "rizik je prihvatljiv",
+      "reasonInaccurate": "nalaz je netočan",
+      "reasonNotUsed": "ranjivi kod nije u upotrebi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
@@ -1660,7 +1660,7 @@
       "highDescription": "Mogućnost otkrivanja znatne količine podataka.",
       "mediumDescription": "Ograničen utjecaj ili posebni uvjeti.",
       "lowDescription": "Minimalan utjecaj na sigurnost.",
-      "invalidDayCount": "Broj dana mora biti cijeli broj od 1 do 365.",
+      "invalidDayCount": "broj dana mora biti cijeli broj od 1 do 365.",
       "remediationDeadlineA11y": "Rok za sanaciju u danima, ozbiljnost: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
       "permissionNote": "Samo vlasnici organizacije i voditelji naplate mogu promijeniti ove postavke.",
@@ -1736,7 +1736,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nije moguće učitati postavke repozitorija.",
-      "githubAppSettings": "postavke aplikacije GitHub",
+      "githubAppSettings": "Postavke aplikacije GitHub",
       "manageAccess": "Upravljaj pristupom aplikacije GitHub",
       "noRepositories": "Nema repozitorija",
       "noRepositoriesDescription": "Odobri aplikaciji Kilo za GitHub pristup repozitorijima.",
@@ -1884,7 +1884,7 @@
       "couldNotSearch": "Nije moguće pretražiti sesije.",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prethodnih sesija",
-      "live": "Uživo",
+      "live": "UŽIVO",
       "updating": "Ažuriranje"
     },
     "sessionRow": {
@@ -1897,7 +1897,7 @@
       "couldNotCopyId": "Nije moguće kopirati ID sesije.",
       "untitled": "Sesija bez naziva",
       "sessionDeleted": "Sesija izbrisana",
-      "needsInput": "Čeka unos",
+      "needsInput": "čeka unos",
       "fromPlatform": "s platforme {{platform}}",
       "cent_one": "stotinka dolara",
       "cent": "centi",
@@ -1929,8 +1929,8 @@
     "remoteSpawnRetryable": "Nije moguće povezati se s instancom — veza se možda prekinula.",
     "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjeri računalo ili ažuriraj CLI.",
     "remoteSpawnInstanceDisconnected": "Veza s odabranom instancom se prekinula. Pokreni sesiju na usluzi Cloud Agent ili odaberi drugu instancu.",
-    "liveCount_one": "{{count}} uživo",
-    "liveCount_other": "{{count}} uživo",
+    "liveCount_one": "{{count}} UŽIVO",
+    "liveCount_other": "{{count}} UŽIVO",
     "liveCount_few": "{{count}} UŽIVO"
   },
   "agentChat": {
@@ -2036,14 +2036,14 @@
       "accessibilityLabel": "alat {{name}}, {{status}}",
       "noTasks": "Nema zadataka.",
       "toolRead": "pročitaj",
-      "toolEdit": "Uredi",
+      "toolEdit": "uredi",
       "toolWrite": "zapiši",
       "toolBash": "bash",
       "toolGlob": "pretraži nazive datoteka",
       "toolGrep": "pretraži sadržaj",
       "toolList": "prikaži popis",
       "toolPatch": "primijeni izmjene",
-      "toolTask": "Zadatak",
+      "toolTask": "zadatak",
       "readTodos": "Pročitaj zadatke",
       "updateTodos": "Ažuriraj zadatke",
       "linesBadge": "redaka: {{displayCount}}",
@@ -2060,7 +2060,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[ulaz koji nije moguće serijalizirati]",
-      "errorPrefix": "pogreška: {{error}}"
+      "errorPrefix": "Pogreška: {{error}}"
     },
     "instancePicker": {
       "runOn": "Mjesto pokretanja",
@@ -2311,16 +2311,16 @@
       "provider": "Pružatelj {{id}}",
       "modelId": "Model: {{id}}",
       "unavailable": "Nedostupan",
-      "unavailableState": "Nedostupan",
+      "unavailableState": "nedostupan",
       "selectedState": "odabrano",
       "thinkingEffort": "Intenzitet razmišljanja",
       "thinkingEffortAccessibility": "intenzitet razmišljanja: {{label}}",
       "thinkingEffortSelected": "intenzitet razmišljanja: {{label}}, odabrano",
       "thinkingEffortWithModel": "{{model}}, intenzitet razmišljanja: {{variant}}",
-      "lockedByAgent": ", zaključao agent „{{agent}}”",
+      "lockedByAgent": ", Zaključao agent „{{agent}}”",
       "addToFavorites": "Dodaj {{name}} u favorite",
       "removeFromFavorites": "Ukloni {{name}} iz favorita",
-      "thinkingEffortXhigh": "V. vis.",
+      "thinkingEffortXhigh": "V. VIS.",
       "thinkingEffortMedium": "Sred.",
       "sessionModel": "Model sesije"
     },
@@ -2433,10 +2433,10 @@
       "stepsCount_few": "{{steps}} koraka"
     },
     "prBadge": {
-      "open": "Otvoreni zahtjev za spajanje",
+      "open": "otvoreni zahtjev za spajanje",
       "closed": "zatvoreni zahtjev za spajanje",
       "merged": "spojeni zahtjev za spajanje",
-      "draft": "Nacrt zahtjeva za spajanje",
+      "draft": "nacrt zahtjeva za spajanje",
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2543,7 +2543,7 @@
     "optionsExpiredDescription": "Vrati se na prethodni zaslon i ponovno otvori ovaj odabir."
   },
   "sessionRow": {
-    "needsInput": "Čeka unos"
+    "needsInput": "ČEKA UNOS"
   },
   "voiceInput": {
     "listening": "Slušanje…",
@@ -2636,7 +2636,7 @@
     "unavailableDescription": "Kilo Pass nije dostupan kao kupnja unutar aplikacije na Androidu. Upravljaj njime na webu.",
     "webManagementDescription": "Ovim Kilo Passom upravlja se na webu.",
     "legalDisclosure": "Kilo Pass je mjesečna pretplata koja se automatski obnavlja. Pri potvrdi kupnje tereti se tvoj Apple ID. Pretplata se automatski obnavlja svakog mjeseca po prikazanoj cijeni, osim ako je otkažeš najmanje 24 sata prije kraja tekućeg razdoblja. Pretplatom možeš upravljati ili je otkazati u bilo kojem trenutku u postavkama svog računa u App Storeu.",
-    "legalTermsOfUse": "uvjete korištenja (EULA)",
+    "legalTermsOfUse": "Uvjete korištenja (EULA)",
     "purchaseDifferentAccount": "Ova kupnja iz App Storea nije povezana s tvojim Kilo računom. Prijavi se na račun Apple Account s kojim je kupnja obavljena, a zatim pokušaj ponovno.",
     "restoreFailed": "Nije moguće obnoviti kupnje. Pokušaj ponovno.",
     "purchaseFailed": "Nije moguće dovršiti kupnju.",
@@ -2662,7 +2662,7 @@
     "helpImproveDescription": "Podijeli anonimne analitičke podatke o korištenju aplikacije i izvoru instalacije. To možeš promijeniti u bilo kojem trenutku u postavkama.",
     "seeFullDetails": "Prikaži sve pojedinosti",
     "privacyPolicyPrefix": "Tvoji se podaci obrađuju prema",
-    "privacyPolicy": "politici privatnosti aplikacije Kilo",
+    "privacyPolicy": "Politici privatnosti aplikacije Kilo",
     "onDevice": "Na uređaju",
     "couldNotLoadTranscription": "Nije moguće učitati tvoju postavku transkripcije.",
     "signInToManageTranscription": "Prijavi se za upravljanje transkripcijom putem interneta.",

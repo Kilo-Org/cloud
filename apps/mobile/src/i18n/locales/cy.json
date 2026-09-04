@@ -200,7 +200,7 @@
     "signOut": "Allgofnodi",
     "deleteAccount": "Dileu cyfrif",
     "confirmationCode": "Cod cadarnhau",
-    "confirmationCodePlaceholder": "Cod 6 digid",
+    "confirmationCodePlaceholder": "cod 6 digid",
     "confirmDeletion": "Cadarnhau dileu",
     "credits": "Credydau",
     "failedToLoadBalance": "Methu llwytho'r balans. Tapiwch i geisio eto.",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor gwahaniaethau'r ffeil hon ar GitHub",
-      "githubDiff": "gwahaniaethau ar GitHub"
+      "githubDiff": "Gwahaniaethau ar GitHub"
     },
     "floatingActions": {
       "clearSelection": "Clirio'r dewis",
@@ -429,8 +429,8 @@
       "addReaction": "Ychwanegu ymateb",
       "reactionPill": "ymateb {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ymateb",
-      "reaction": "Ymatebion",
-      "reaction_other": "Ymatebion",
+      "reaction": "ymatebion",
+      "reaction_other": "ymatebion",
       "commentActions": "Gweithredoedd y sylw",
       "reportContent": "Adrodd am gynnwys",
       "reportUser": "Adrodd am ddefnyddiwr",
@@ -561,7 +561,7 @@
       "addTitle": "Ychwanegu sylw",
       "unavailableTitle": "Sylw ddim ar gael",
       "unavailableMessage": "Mae'r sylw hwn eisoes wedi'i ddileu neu ei gyflwyno.",
-      "ok": "Iawn",
+      "ok": "IAWN",
       "loadFailedTitle": "Ni lwyddwyd i lwytho'r golygydd sylwadau.",
       "discardTitle": "Gwaredu'r sylw?",
       "discardMessage": "Byddwch yn colli'ch drafft.",
@@ -617,12 +617,12 @@
       "stateOpenReviewRequired": "Ar agor · angen adolygiad",
       "stateOpen": "Agor",
       "unknownAuthor": "Awdur anhysbys",
-      "commit_one": "Cofnod newid",
+      "commit_one": "cofnod newid",
       "commit": "cofnodion newid",
       "commit_other": "cofnodion newid",
-      "file_one": "Ffeil",
-      "file": "Ffeiliau",
-      "file_other": "Ffeiliau",
+      "file_one": "ffeil",
+      "file": "ffeiliau",
+      "file_other": "ffeiliau",
       "commit_zero": "cyflwyniad",
       "commit_two": "gyflwyniad",
       "commit_few": "chyflwyniad",
@@ -1002,7 +1002,7 @@
       "allFieldsRequired": "Rhaid llenwi pob maes i gysylltu {{label}}.",
       "setupGuideFallback": "canllaw gosod",
       "setupGuideA11y": "canllaw gosod {{label}}",
-      "setupGuide": "canllaw gosod",
+      "setupGuide": "Canllaw gosod",
       "saving": "Yn cadw…",
       "removing": "Yn tynnu…",
       "updateToken": "Diweddaru'r tocyn"
@@ -1157,12 +1157,12 @@
       "destroying": "YN DINISTRIO",
       "provisioned": "WEDI'I DDARPARU",
       "restarting": "YN AILGYCHWYN",
-      "running": "Yn rhedeg",
+      "running": "YN RHEDEG",
       "shuttingDown": "YN DIFFODD",
-      "starting": "Yn cychwyn",
+      "starting": "YN CYCHWYN",
       "stopped": "WEDI STOPIO",
       "stopping": "YN STOPIO",
-      "unknown": "Anhysbys",
+      "unknown": "ANHYSBYS",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1375,9 +1375,9 @@
       "activity": "Gweithgaredd"
     },
     "providerConnect": {
-      "githubApp": "ap GitHub",
+      "githubApp": "Ap GitHub",
       "githubError": "Ni ellid agor y broses sefydlu GitHub. Ceisiwch eto.",
-      "gitlabAccount": "cyfrif GitLab",
+      "gitlabAccount": "Cyfrif GitLab",
       "gitlabError": "Ni ellid agor y broses sefydlu GitLab. Ceisiwch eto.",
       "description": "Cysylltwch {{label}} Kilo i adolygu ceisiadau tynnu'n awtomatig.",
       "bitbucketError": "Ni ellid agor y broses sefydlu Bitbucket. Ceisiwch eto."
@@ -1624,11 +1624,11 @@
       "viewAdvisory": "Gweld yr hysbysiad diogelwch ar GitHub",
       "statusOpen": "Agor",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Mae'r gwaith trwsio eisoes wedi dechrau",
-      "reasonNoBandwidth": "Dim capasiti ar gael",
-      "reasonTolerableRisk": "Mae'r risg yn oddefadwy",
-      "reasonInaccurate": "Mae'r canfyddiad yn anghywir",
-      "reasonNotUsed": "Nid yw'r cod bregus yn cael ei ddefnyddio",
+      "reasonFixStarted": "mae'r gwaith trwsio eisoes wedi dechrau",
+      "reasonNoBandwidth": "dim capasiti ar gael",
+      "reasonTolerableRisk": "mae'r risg yn oddefadwy",
+      "reasonInaccurate": "mae'r canfyddiad yn anghywir",
+      "reasonNotUsed": "nid yw'r cod bregus yn cael ei ddefnyddio",
       "reasonAfterReview": "ar ôl adolygiad"
     },
     "settingsOverview": {
@@ -1693,7 +1693,7 @@
       "highDescription": "Posibilrwydd o ddatgelu llawer o ddata.",
       "mediumDescription": "Effaith gyfyngedig neu amodau penodol.",
       "lowDescription": "Ychydig iawn o effaith ar ddiogelwch.",
-      "invalidDayCount": "Rhaid nodi rhwng 1 a 365 diwrnod, mewn rhifau cyfan yn unig.",
+      "invalidDayCount": "rhaid nodi rhwng 1 a 365 diwrnod, mewn rhifau cyfan yn unig.",
       "remediationDeadlineA11y": "Dyddiad terfyn cywiro mewn diwrnodau: {{label}}",
       "enterWholeNumber": "Rho rif cyfan rhwng 1 a 365",
       "permissionNote": "Dim ond perchnogion y sefydliad a rheolwyr bilio sy'n gallu newid y gosodiadau hyn.",
@@ -1769,7 +1769,7 @@
     },
     "repositories": {
       "couldNotLoad": "Ni ellid llwytho gosodiadau'r ystorfeydd.",
-      "githubAppSettings": "gosodiadau ap GitHub",
+      "githubAppSettings": "Gosodiadau ap GitHub",
       "manageAccess": "Rheoli mynediad ap GitHub",
       "noRepositories": "Dim ystorfeydd",
       "noRepositoriesDescription": "Rhowch fynediad at ystorfeydd i ap GitHub Kilo.",
@@ -1923,7 +1923,7 @@
       "couldNotSearch": "Ni lwyddwyd i chwilio'r sesiynau.",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau blaenorol",
-      "live": "Byw",
+      "live": "BYW",
       "updating": "Yn diweddaru"
     },
     "sessionRow": {
@@ -1974,8 +1974,8 @@
     "remoteSpawnRetryable": "Ni lwyddwyd i gysylltu â'r instans — efallai ei fod wedi datgysylltu.",
     "remoteSpawnNonRetryable": "Methodd yr instans â dechrau'r sesiwn — gwiriwch y peiriant neu ddiweddarwch y CLI.",
     "remoteSpawnInstanceDisconnected": "Mae'r instans a ddewiswyd wedi datgysylltu. Dechreuwch sesiwn ar Cloud Agent neu dewiswch instans arall.",
-    "liveCount_one": "{{count}} byw",
-    "liveCount_other": "{{count}} byw",
+    "liveCount_one": "{{count}} BYW",
+    "liveCount_other": "{{count}} BYW",
     "liveCount_zero": "{{count}} BYW",
     "liveCount_two": "{{count}} BYW",
     "liveCount_few": "{{count}} BYW",
@@ -2087,14 +2087,14 @@
       "accessibilityLabel": "Offeryn {{name}}, {{status}}",
       "noTasks": "Nid oes tasgau.",
       "toolRead": "darllen",
-      "toolEdit": "Golygu",
+      "toolEdit": "golygu",
       "toolWrite": "ysgrifennu",
       "toolBash": "bash",
       "toolGlob": "chwilio enwau ffeiliau",
       "toolGrep": "chwilio cynnwys",
       "toolList": "rhestru",
       "toolPatch": "clytio",
-      "toolTask": "Tasg",
+      "toolTask": "tasg",
       "readTodos": "Darllen y rhestr dasgau",
       "updateTodos": "Diweddaru'r rhestr dasgau",
       "linesBadge": "{{displayCount}} llinell",
@@ -2111,7 +2111,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[mewnbwn na ellir ei gyfresoli]",
-      "errorPrefix": "gwall: {{error}}"
+      "errorPrefix": "Gwall: {{error}}"
     },
     "instancePicker": {
       "runOn": "Rhedeg ar",
@@ -2371,13 +2371,13 @@
       "provider": "Darparwr {{id}}",
       "modelId": "Y model {{id}}",
       "unavailable": "Ddim ar gael",
-      "unavailableState": "Ddim ar gael",
+      "unavailableState": "ddim ar gael",
       "selectedState": "wedi'i ddewis",
       "thinkingEffort": "Ymdrech feddwl",
       "thinkingEffortAccessibility": "Ymdrech feddwl {{label}}",
       "thinkingEffortSelected": "Ymdrech feddwl {{label}}, wedi'i dewis",
       "thinkingEffortWithModel": "{{model}}, ymdrech feddwl {{variant}}",
-      "lockedByAgent": ", wedi'i gloi gan yr asiant \"{{agent}}\"",
+      "lockedByAgent": ", Wedi'i gloi gan yr asiant \"{{agent}}\"",
       "addToFavorites": "Ychwanegu {{name}} i'r ffefrynnau",
       "removeFromFavorites": "Tynnu {{name}} o'r ffefrynnau",
       "thinkingEffortXhigh": "UI",
@@ -2484,7 +2484,7 @@
       "olderActivity": "Gweithgaredd cynharach",
       "olderActivityDescription": "Cost heb ei phriodoli i'r hanes a lwythwyd",
       "ofWindowTokens": "o {{window}} tocyn",
-      "tokens": "Tocynnau",
+      "tokens": "tocynnau",
       "tokensWithPercentage": "tocyn ({{percentage}})",
       "stepsCount_one": "{{steps}} cam",
       "stepsCount": "{{steps}} cam",
@@ -2496,10 +2496,10 @@
       "stepsCount_many": "{{steps}} cham"
     },
     "prBadge": {
-      "open": "Agor cais tynnu",
+      "open": "agor cais tynnu",
       "closed": "cais tynnu wedi'i gau",
       "merged": "cais tynnu wedi'i uno",
-      "draft": "Cais tynnu drafft",
+      "draft": "cais tynnu drafft",
       "updating": "Yn diweddaru, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2606,7 +2606,7 @@
     "optionsExpiredDescription": "Ewch yn ôl ac ailagorwch y dewisydd hwn o'r sgrin flaenorol."
   },
   "sessionRow": {
-    "needsInput": "angen mewnbwn"
+    "needsInput": "ANGEN MEWNBWN"
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
@@ -2725,7 +2725,7 @@
     "helpImproveDescription": "Rhannwch ddata dadansoddeg dienw am y cynnyrch a ffynhonnell y gosodiad. Gallwch newid hyn unrhyw bryd yn y gosodiadau.",
     "seeFullDetails": "Gweld y manylion llawn",
     "privacyPolicyPrefix": "Trinir eich data yn unol â",
-    "privacyPolicy": "polisi preifatrwydd Kilo",
+    "privacyPolicy": "Polisi preifatrwydd Kilo",
     "onDevice": "Ar y ddyfais",
     "couldNotLoadTranscription": "Methu llwytho'ch gosodiad trawsgrifio.",
     "signInToManageTranscription": "Mewngofnodwch i reoli trawsgrifio ar-lein.",
@@ -2995,7 +2995,7 @@
     "signedOut": "Mewngofnodwch i weld asiantau",
     "privacy": "Agorwch Kilo i weld asiantau",
     "openAgents": "Agor asiantau",
-    "needsInput": "angen mewnbwn",
+    "needsInput": "Angen mewnbwn",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
   }

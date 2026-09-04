@@ -38,7 +38,7 @@
     "findings": "တွေ့ရှိချက်များ",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "ကုဒ်သိုလှောင်ရာများ",
     "securityAgent": "လုံခြုံရေးအေးဂျင့်",
     "unknown": "မသိရ",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "သင့်အင်စတန့်ကို အခု အပြီးသတ် ပြင်ဆင်၍မရပါ။",
         "manualReviewBody": "အင်စတန့် မဖန်တီးမီ သင့်အကောင့်အခြေအနေကို စစ်ဆေးရန်လိုပါသည်။ kilo.ai တွင် ဆက်လုပ်ပါ။",
         "manualReviewTitle": "စတင်ပြင်ဆင်မှုကို လူကိုယ်တိုင် စစ်ဆေးရန်လိုသည်",
-        "openKiloAi": "kilo.ai ကို ဖွင့်ပါ",
+        "openKiloAi": "Kilo.ai ကို ဖွင့်ပါ",
         "provisioning": "ပြင်ဆင်နေသည်",
         "review": "စစ်ဆေးမှု",
         "identityTitle": "သင့်ဘော့တ်၏ ကိုယ်ပိုင်ပုံစံ",
@@ -1147,13 +1147,13 @@
       "trialExpiredBody": "KiloClaw ကို ဆက်သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
       "subscriptionCanceledTitle": "ဝက်ဘ်ဆိုက်တွင် အခပေးအစီအစဉ် ဝယ်ယူပါ",
       "subscriptionCanceledBody": "KiloClaw ကို သုံးရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် စာရင်းသွင်း၍မရပါ။",
-      "subscriptionCanceledCta": "kilo.ai/claw ကို ဖွင့်ပါ",
+      "subscriptionCanceledCta": "Kilo.ai/claw ကို ဖွင့်ပါ",
       "subscriptionPastDueTitle": "ဝဘ်ပေါ်တွင် ငွေပေးချေမှု မွမ်းမံခြင်း",
       "subscriptionPastDueBody": "သင့်နောက်ဆုံး ငွေပေးချေမှုတွင် ပြဿနာရှိခဲ့ပါသည်။ မွမ်းမံရန် ဘရောက်ဆာမှ kilo.ai/claw သို့ သွားပါ။ အက်ပ်ထဲတွင် ငွေတောင်းခံမှုကို စီမံ၍မရပါ။",
       "quarantinedTitle": "အင်စတန့်ကို ပြန်ပြင်ရန်လိုသည်",
       "quarantinedBody": "သင့် KiloClaw အင်စတန့်ကို သီးခြားခွဲထားသဖြင့် လောလောဆယ် အသုံးပြု၍မရပါ။ ပြန်သုံးနိုင်ရန် ကျွန်ုပ်တို့အဖွဲ့က ကူညီပြင်ဆင်ပေးရပါမည်။",
       "multipleCurrentConflictBody": "သင့်အကောင့်တွင် အသုံးပြုဆဲ စာရင်းသွင်းမှု တစ်ခုထက်ပိုနေပါသည်။ ငွေထပ်တောင်းခံမှု မဖြစ်စေရန် ယာယီရပ်ဆိုင်းထားပါသည်။",
-      "multipleCurrentConflictCta": "kilo.ai တွင် ဆက်လုပ်ပါ",
+      "multipleCurrentConflictCta": "Kilo.ai တွင် ဆက်လုပ်ပါ",
       "nonCanonicalEarlybirdTitle": "အစီအစဉ်အဟောင်း တွေ့ရှိသည်",
       "nonCanonicalEarlybirdBody": "သင့်ကြိုတင်အသုံးပြုခွင့် အစီအစဉ်ကို ဖုန်းပေါ်တွင် မသုံးမီ လူကိုယ်တိုင် စစ်ဆေးရန်လိုပါသည်။",
       "iosTitle": "KiloClaw ကို iOS တွင် မရရှိနိုင်ပါ",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} ကို ဖွင့်ပါ၊ မဖတ်ရသေးသော မက်ဆေ့ချ် {{displayCount}} စောင်",
       "openUnread_other": "{{name}} ကို ဖွင့်ပါ၊ မဖတ်ရသေးသော မက်ဆေ့ချ် {{displayCount}} စောင်",
       "openSettings": "{{name}} ၏ ဆက်တင်များကို ဖွင့်ပါ",
-      "fixOnKiloAi": "kilo.ai တွင် ဖြေရှင်းပါ: {{label}}"
+      "fixOnKiloAi": "Kilo.ai တွင် ဖြေရှင်းပါ: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1894,7 +1894,7 @@
       "dollar_other": "ဒေါ်လာ",
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
       "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}၊ {{time}}",
-      "pullRequest": "PR အမှတ် {{number}}"
+      "pullRequest": "pR အမှတ် {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို ဖွင့်၍မရပါ",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}"
     },
     "prBadge": {
-      "open": "PR ဖွင့်",
+      "open": "pR ဖွင့်",
       "closed": "ပိတ်ထားသော PR",
       "merged": "ပေါင်းစည်းပြီးသော PR",
-      "draft": "PR မူကြမ်း",
+      "draft": "pR မူကြမ်း",
       "updating": "နောက်ဆုံးအခြေအနေကို ရယူနေသည်၊ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

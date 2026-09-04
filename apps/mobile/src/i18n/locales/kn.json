@@ -1049,7 +1049,7 @@
         "genericErrorBody": "ಈಗ ನಿಮ್ಮ ಇನ್‌ಸ್ಟನ್ಸ್‌ನ ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
         "manualReviewBody": "ಇನ್‌ಸ್ಟನ್ಸ್ ರಚಿಸುವ ಮೊದಲು ನಿಮ್ಮ ಖಾತೆಯ ಸ್ಥಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಬೇಕು. kilo.aiನಲ್ಲಿ ಮುಂದುವರಿಸಿ.",
         "manualReviewTitle": "ಸೆಟಪ್‌ಗೆ ಸಿಬ್ಬಂದಿಯ ಪರಿಶೀಲನೆ ಅಗತ್ಯ",
-        "openKiloAi": "kilo.ai ತೆರೆಯಿರಿ",
+        "openKiloAi": "Kilo.ai ತೆರೆಯಿರಿ",
         "provisioning": "ಸಂಪನ್ಮೂಲಗಳ ಸಿದ್ಧತೆ",
         "review": "ಪರಿಶೀಲನೆ",
         "identityTitle": "ನಿಮ್ಮ ಬಾಟ್‌ನ ಪರಿಚಯ",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw ಬಳಕೆ ಮುಂದುವರಿಸಲು ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ kilo.ai/claw ತೆರೆಯಿರಿ. ಆ್ಯಪ್‌ನಲ್ಲಿ ಚಂದಾದಾರಿಕೆ ಪಡೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "subscriptionCanceledTitle": "ವೆಬ್‌ಸೈಟ್‌ನಲ್ಲಿ ಚಂದಾದಾರರಾಗಿ",
       "subscriptionCanceledBody": "KiloClaw ಬಳಸಲು ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ kilo.ai/claw ತೆರೆಯಿರಿ. ಆ್ಯಪ್‌ನಲ್ಲಿ ಚಂದಾದಾರಿಕೆ ಪಡೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",
-      "subscriptionCanceledCta": "kilo.ai/claw ತೆರೆಯಿರಿ",
+      "subscriptionCanceledCta": "Kilo.ai/claw ತೆರೆಯಿರಿ",
       "subscriptionPastDueTitle": "ವೆಬ್‌ನಲ್ಲಿ ಪಾವತಿ ನವೀಕರಣ",
       "subscriptionPastDueBody": "ನಿಮ್ಮ ಇತ್ತೀಚಿನ ಪಾವತಿಯಲ್ಲಿ ಸಮಸ್ಯೆ ಉಂಟಾಯಿತು. ಪಾವತಿಯ ವಿವರಗಳನ್ನು ನವೀಕರಿಸಲು ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ kilo.ai/claw ತೆರೆಯಿರಿ. ಆ್ಯಪ್‌ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಹಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "quarantinedTitle": "ಇನ್‌ಸ್ಟನ್ಸ್‌ನ ಸಮಸ್ಯೆ ಸರಿಪಡಿಸಬೇಕು",
       "quarantinedBody": "ನಿಮ್ಮ KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್ ಅನ್ನು ಪ್ರತ್ಯೇಕಿಸಲಾಗಿದೆ. ಅದನ್ನು ಈಗ ಬಳಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ಪುನಃಸ್ಥಾಪಿಸಲು ನಮ್ಮ ತಂಡದ ಸಹಾಯ ಅಗತ್ಯವಿದೆ.",
       "multipleCurrentConflictBody": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಒಂದಕ್ಕಿಂತ ಹೆಚ್ಚು ಸಕ್ರಿಯ ಚಂದಾದಾರಿಕೆಗಳು ಕಂಡುಬಂದಿವೆ. ನಿಮಗೆ ಎರಡು ಬಾರಿ ಶುಲ್ಕ ವಿಧಿಸುವುದನ್ನು ತಪ್ಪಿಸಲು ಸೇವೆಯನ್ನು ತಾತ್ಕಾಲಿಕವಾಗಿ ತಡೆಹಿಡಿದಿದ್ದೇವೆ.",
-      "multipleCurrentConflictCta": "kilo.ai ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+      "multipleCurrentConflictCta": "Kilo.ai ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
       "nonCanonicalEarlybirdTitle": "ಹಳೆಯ ಯೋಜನೆ ಪತ್ತೆಯಾಗಿದೆ",
       "nonCanonicalEarlybirdBody": "ನಿಮ್ಮ ಆರಂಭಿಕ ಪ್ರವೇಶ ಯೋಜನೆಯನ್ನು ಮೊಬೈಲ್‌ನಲ್ಲಿ ಬಳಸುವ ಮೊದಲು ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲಿಸಬೇಕು.",
-      "iosTitle": "iOSನಲ್ಲಿ KiloClaw ಲಭ್ಯವಿಲ್ಲ",
+      "iosTitle": "IOSನಲ್ಲಿ KiloClaw ಲಭ್ಯವಿಲ್ಲ",
       "iosBody": "ಈ ಖಾತೆಯ KiloClaw ಪ್ರವೇಶವನ್ನು iOS ಆ್ಯಪ್‌ನ ಹೊರಗೆ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
       "iosContact": "ಪ್ರಶ್ನೆಗಳಿವೆಯೇ? hi@kilo.aiಗೆ ಇಮೇಲ್ ಮಾಡಿ."
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
       "openUnread_other": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
       "openSettings": "{{name}} ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಿರಿ",
-      "fixOnKiloAi": "kilo.ai ನಲ್ಲಿ ಸರಿಪಡಿಸಿ: {{label}}"
+      "fixOnKiloAi": "Kilo.ai ನಲ್ಲಿ ಸರಿಪಡಿಸಿ: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

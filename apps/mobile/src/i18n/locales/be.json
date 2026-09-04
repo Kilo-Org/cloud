@@ -169,7 +169,7 @@
     "verifyCode": "Праверыць код",
     "resendCode": "Даслаць код яшчэ раз",
     "termsPrefix": "Працягваючы, вы згаджаецеся з нашымі",
-    "terms": "умовамі",
+    "terms": "Умовамі",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Іншыя спосабы ўваходу",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Змен занадта шмат для паказу.",
       "openOnGitHub": "Адкрыць на GitHub",
       "openDiffOnGitHub": "Адкрыць змены гэтага файла на GitHub",
-      "githubDiff": "змены на GitHub"
+      "githubDiff": "Змены на GitHub"
     },
     "floatingActions": {
       "clearSelection": "Зняць вылучэнне",
@@ -553,7 +553,7 @@
       "addTitle": "Новы каментар",
       "unavailableTitle": "Каментар недаступны",
       "unavailableMessage": "Гэты неадпраўлены каментар ужо выдалілі або адправілі.",
-      "ok": "Добра",
+      "ok": "ДОБРА",
       "loadFailedTitle": "Не атрымалася загрузіць рэдактар каментарыяў.",
       "discardTitle": "Адкінуць каментар?",
       "discardMessage": "Твой чарнавік будзе страчаны.",
@@ -621,7 +621,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы неадпраўлены каментар: {{location}}",
       "editA11y": "Рэдагаваць неадпраўлены каментар: {{location}}",
-      "staleHint": "PR змяніўся пасля напісання гэтага каментара.",
+      "staleHint": "pR змяніўся пасля напісання гэтага каментара.",
       "deleteA11y": "Выдаліць неадпраўлены каментар: {{location}}",
       "deletedAnnouncement": "Неадпраўлены каментар выдалены",
       "noCommentsQueued": "У чарзе няма каментароў. Праверка кода будзе адпраўлена толькі з выбраным вышэй вынікам.",
@@ -984,7 +984,7 @@
       "hide": "Схаваць {{label}}",
       "show": "Паказаць {{label}}",
       "allFieldsRequired": "Каб падключыць {{label}}, трэба запоўніць усе палі.",
-      "setupGuideFallback": "Інструкцыя па наладжванні",
+      "setupGuideFallback": "інструкцыя па наладжванні",
       "setupGuideA11y": "Кіраўніцтва па наладцы {{label}}",
       "setupGuide": "Інструкцыя па наладжванні",
       "saving": "Захаванне…",
@@ -1141,12 +1141,12 @@
       "destroying": "ЗНІШЧЭННЕ",
       "provisioned": "ПАДРЫХТАВАНЫ",
       "restarting": "ПЕРАЗАПУСК",
-      "running": "Працуе",
+      "running": "ПРАЦУЕ",
       "shuttingDown": "ВЫКЛЮЧЭННЕ",
-      "starting": "Запуск",
+      "starting": "ЗАПУСК",
       "stopped": "СПЫНЕНЫ",
       "stopping": "СПЫНЕННЕ",
-      "unknown": "Невядома",
+      "unknown": "НЕВЯДОМА",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1235,7 +1235,7 @@
     "instructions": {
       "title": "Уласныя інструкцыі",
       "deprecation": "Падтрымку ўласных інструкцый плануецца спыніць. Перанясіце гэтыя рэкамендацыі ў файл REVIEW.md у вашым рэпазіторыі.",
-      "placeholder": "Напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…"
+      "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…"
     },
     "repos": {
       "unavailable": "Рэпазіторыі недаступныя. Завяршыце наладжванне Bitbucket на kilo.ai.",
@@ -1357,9 +1357,9 @@
       "activity": "Актыўнасць"
     },
     "providerConnect": {
-      "githubApp": "праграма GitHub",
+      "githubApp": "Праграма GitHub",
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
-      "gitlabAccount": "уліковы запіс GitLab",
+      "gitlabAccount": "Уліковы запіс GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
       "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё.",
       "bitbucketError": "Не атрымалася адкрыць наладжванне Bitbucket. Паспрабуйце яшчэ раз."
@@ -1604,11 +1604,11 @@
       "viewAdvisory": "Праглядзець бюлетэнь бяспекі на GitHub",
       "statusOpen": "Адкрыта",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Выпраўленне ўжо пачата",
-      "reasonNoBandwidth": "Няма рэсурсаў на выпраўленне",
-      "reasonTolerableRisk": "Рызыка прымальная",
-      "reasonInaccurate": "Праблема вызначана недакладна",
-      "reasonNotUsed": "Уразлівы код не выкарыстоўваецца",
+      "reasonFixStarted": "выпраўленне ўжо пачата",
+      "reasonNoBandwidth": "няма рэсурсаў на выпраўленне",
+      "reasonTolerableRisk": "рызыка прымальная",
+      "reasonInaccurate": "праблема вызначана недакладна",
+      "reasonNotUsed": "уразлівы код не выкарыстоўваецца",
       "reasonAfterReview": "пасля праверкі"
     },
     "settingsOverview": {
@@ -1671,7 +1671,7 @@
       "highDescription": "Магчымая значная ўцечка даных.",
       "mediumDescription": "Абмежаваныя наступствы або патрэба ў асаблівых умовах.",
       "lowDescription": "Мінімальны ўплыў на бяспеку.",
-      "invalidDayCount": "Увядзіце цэлы лік дзён ад 1 да 365.",
+      "invalidDayCount": "увядзіце цэлы лік дзён ад 1 да 365.",
       "remediationDeadlineA11y": "Тэрмін выпраўлення ў днях, узровень небяспекі: {{label}}",
       "enterWholeNumber": "Увядзі цэлы лік ад 1 да 365",
       "permissionNote": "Толькі ўладальнікі арганізацыі і адміністратары аплаты могуць змяняць гэтыя налады.",
@@ -1747,7 +1747,7 @@
     },
     "repositories": {
       "couldNotLoad": "Не атрымалася загрузіць налады рэпазіторыяў.",
-      "githubAppSettings": "налады праграмы GitHub",
+      "githubAppSettings": "Налады праграмы GitHub",
       "manageAccess": "Кіраваць доступам праграмы GitHub",
       "noRepositories": "Няма рэпазіторыяў",
       "noRepositoriesDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў.",
@@ -1897,7 +1897,7 @@
       "couldNotSearch": "Не атрымалася выканаць пошук сеансаў.",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма завершаных сеансаў",
-      "live": "Нажыва",
+      "live": "НАЖЫВА",
       "updating": "Абнаўленне"
     },
     "sessionRow": {
@@ -1910,7 +1910,7 @@
       "couldNotCopyId": "Не атрымалася скапіраваць ідэнтыфікатар сеанса.",
       "untitled": "Сеанс без назвы",
       "sessionDeleted": "Сеанс выдалены",
-      "needsInput": "Чакае адказу",
+      "needsInput": "чакае адказу",
       "fromPlatform": "з {{platform}}",
       "cent_one": "цэнт",
       "cent": "цэнта",
@@ -1944,8 +1944,8 @@
     "remoteSpawnRetryable": "Не атрымалася злучыцца з экзэмплярам — магчыма, ён адключыўся.",
     "remoteSpawnNonRetryable": "Экзэмпляр не змог запусціць сеанс — правер камп'ютар або абнаві CLI.",
     "remoteSpawnInstanceDisconnected": "Выбраны экзэмпляр адключыўся. Запусці сеанс у Cloud Agent або выберы іншы экзэмпляр.",
-    "liveCount_one": "Нажыва: {{count}}",
-    "liveCount_other": "Нажыва: {{count}}",
+    "liveCount_one": "НАЖЫВА: {{count}}",
+    "liveCount_other": "НАЖЫВА: {{count}}",
     "liveCount_few": "{{count}} АКТЫЎНЫЯ",
     "liveCount_many": "{{count}} АКТЫЎНЫХ"
   },
@@ -2053,14 +2053,14 @@
       "accessibilityLabel": "Інструмент {{name}}, {{status}}",
       "noTasks": "Няма задач.",
       "toolRead": "чытанне",
-      "toolEdit": "Рэдагаваць",
+      "toolEdit": "рэдагаваць",
       "toolWrite": "запіс",
       "toolBash": "bash",
       "toolGlob": "пошук файлаў",
       "toolGrep": "пошук у тэксце",
       "toolList": "спіс файлаў",
       "toolPatch": "выпраўленне",
-      "toolTask": "Задача",
+      "toolTask": "задача",
       "readTodos": "Прачытаць спіс задач",
       "updateTodos": "Абнавіць спіс задач",
       "linesBadge": "радкоў: {{displayCount}}",
@@ -2077,7 +2077,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[уваходныя даныя немагчыма серыялізаваць]",
-      "errorPrefix": "памылка: {{error}}"
+      "errorPrefix": "Памылка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Асяроддзе запуску",
@@ -2331,13 +2331,13 @@
       "provider": "Пастаўшчык {{id}}",
       "modelId": "Мадэль {{id}}",
       "unavailable": "Недаступная",
-      "unavailableState": "Недаступная",
+      "unavailableState": "недаступная",
       "selectedState": "выбрана",
       "thinkingEffort": "Узровень разважанняў",
       "thinkingEffortAccessibility": "узровень разважанняў: {{label}}",
       "thinkingEffortSelected": "узровень разважанняў: {{label}}, выбрана",
       "thinkingEffortWithModel": "{{model}}, узровень разважанняў: {{variant}}",
-      "lockedByAgent": ", заблакавана агентам «{{agent}}»",
+      "lockedByAgent": ", Заблакавана агентам «{{agent}}»",
       "addToFavorites": "Дадаць {{name}} у абранае",
       "removeFromFavorites": "Прыбраць {{name}} з абранага",
       "thinkingEffortXhigh": "ВВ",
@@ -2457,7 +2457,7 @@
       "open": "адкрыты запыт на зліццё",
       "closed": "закрыты запыт на зліццё",
       "merged": "аб'яднаны запыт на зліццё",
-      "draft": "Чарнавік запыту на зліццё",
+      "draft": "чарнавік запыту на зліццё",
       "updating": "Абнаўленне, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2564,7 +2564,7 @@
     "optionsExpiredDescription": "Вярніцеся на папярэдні экран і зноў адкрыйце акно выбару."
   },
   "sessionRow": {
-    "needsInput": "Чакае адказу"
+    "needsInput": "ЧАКАЕ АДКАЗУ"
   },
   "voiceInput": {
     "listening": "Слухаем…",
@@ -2631,11 +2631,11 @@
     "verifyPurchaseFailed": "Не атрымалася праверыць вашу пакупку. Праверце падключэнне і паспрабуйце яшчэ раз.",
     "productsCouldNotLoad": "Не атрымалася загрузіць прадукты Kilo Pass з App Store.",
     "tryingAgain": "Паўторная спроба…",
-    "kiloPassManagement": "кіраванне Kilo Pass",
+    "kiloPassManagement": "Кіраванне Kilo Pass",
     "legalConnectorTerms": " Афармляючы падпіску, вы прымаеце ",
     "legalConnectorPrivacy": " і пацвярджаеце, што азнаёміліся з ",
     "manageFailed": "Не атрымалася адкрыць кіраванне падпіскай у App Store.",
-    "kiloPassSetup": "наладжванне Kilo Pass",
+    "kiloPassSetup": "Наладжванне Kilo Pass",
     "subscriptionHeaderDescription": "Штомесячная падпіска папаўняе ваш баланс Kilo крэдытамі для праграмавання са штучным інтэлектам у Kilo App: з хмарнымі агентамі, у аддаленых сеансах і чатах KiloClaw.",
     "tierDescription": "Штомесяц налічваюцца аплачаныя крэдыты на суму {{price}} для выкарыстання ў Kilo App.",
     "subscribe": "Падпісацца",
@@ -2657,7 +2657,7 @@
     "unavailableDescription": "На Android нельга набыць Kilo Pass у праграме. Кіруйце падпіскай на сайце.",
     "webManagementDescription": "Кіраванне гэтай падпіскай Kilo Pass даступна на сайце.",
     "legalDisclosure": "Kilo Pass — штомесячная падпіска з аўтаматычным падаўжэннем. Аплата спаганяецца з вашага Apple ID пры пацвярджэнні пакупкі. Падпіска аўтаматычна падаўжаецца кожны месяц па паказанай цане, калі не адмяніць яе не пазней чым за 24 гадзіны да заканчэння бягучага перыяду. Вы можаце кіраваць падпіскай або адмяніць яе ў любы час у наладах уліковага запісу App Store.",
-    "legalTermsOfUse": "умовы выкарыстання (EULA)",
+    "legalTermsOfUse": "Умовы выкарыстання (EULA)",
     "purchaseDifferentAccount": "Гэтая пакупка ў App Store не звязана з вашым уліковым запісам Kilo. Увайдзіце ў Apple Account, які выкарыстоўваўся для пакупкі, і паспрабуйце яшчэ раз.",
     "restoreFailed": "Не атрымалася аднавіць пакупкі. Паспрабуйце яшчэ раз.",
     "purchaseFailed": "Не атрымалася завяршыць пакупку.",
@@ -2683,7 +2683,7 @@
     "helpImproveDescription": "Дазвольце перадаваць ананімныя даныя аб выкарыстанні праграмы і крыніцы яе ўсталявання. Вы можаце змяніць гэта ў любы час у наладах.",
     "seeFullDetails": "Паказаць усе падрабязнасці",
     "privacyPolicyPrefix": "Вашы даныя апрацоўваюцца адпаведна",
-    "privacyPolicy": "палітыцы прыватнасці Kilo",
+    "privacyPolicy": "Палітыцы прыватнасці Kilo",
     "onDevice": "На прыладзе",
     "couldNotLoadTranscription": "Не ўдалося загрузіць наладу распазнавання маўлення.",
     "signInToManageTranscription": "Увайдзіце, каб кіраваць распазнаваннем маўлення праз інтэрнэт.",

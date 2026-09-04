@@ -434,7 +434,7 @@
       "plan": "Çalışma planı",
       "finalTermEnds": "Son dönemin bitiş tarihi",
       "afterFinalTerm": "Son dönemden sonra",
-      "lessThanOneDay": "1 günden az",
+      "lessThanOneDay": "1 Günden az",
       "ends": "Bitiş tarihi",
       "expires": "Son geçerlilik tarihi",
       "noActivePlan": "Etkin plan yok",
@@ -449,7 +449,7 @@
       "renews": "Yenileme tarihi",
       "standardMonthToMonth": "Aylık Standard planı",
       "standardStartsOn": "Standard planı {{date}} tarihinde {{price}} ücretle başlıyor.",
-      "yourStandardMonthlyPrice": "Standard planının aylık ücreti",
+      "yourStandardMonthlyPrice": "standard planının aylık ücreti",
       "perMonth": "/ay",
       "earlybirdAccessUntil": "Earlybird erişimi {{date}} tarihine kadar geçerli.",
       "earlybirdEnding": "Earlybird erişiminin bitmesine {{remaining}} kaldı.",
@@ -552,7 +552,7 @@
       "hide": "{{label}} değerini gizle",
       "removing": "Kaldırılıyor…",
       "saving": "Kaydediliyor…",
-      "setupGuide": "kurulum kılavuzu",
+      "setupGuide": "Kurulum kılavuzu",
       "setupGuideA11y": "{{label}} kurulum kılavuzu",
       "setupGuideFallback": "kurulum kılavuzu",
       "show": "{{label}} değerini göster",
@@ -589,13 +589,13 @@
       "iosContact": "Sorun mu var? hi@kilo.ai adresine yaz.",
       "iosTitle": "KiloClaw iOS'ta kullanılamıyor",
       "multipleCurrentConflictBody": "Hesabında birden fazla etkin abonelik bulduk. Senden iki kez ücret almamak için işlemleri duraklattık.",
-      "multipleCurrentConflictCta": "kilo.ai sitesinde devam et",
+      "multipleCurrentConflictCta": "Kilo.ai sitesinde devam et",
       "nonCanonicalEarlybirdBody": "Erken erişim planının mobilde kullanılabilmesi için önce elle incelenmesi gerekiyor.",
       "nonCanonicalEarlybirdTitle": "Eski plan tespit edildi",
       "quarantinedBody": "KiloClaw örneğin karantinada ve şu anda kullanılamıyor. Tekrar çalışır hâle gelmesi için ekibimizin müdahalesi gerekiyor.",
       "quarantinedTitle": "Örnekteki sorunların giderilmesi gerekiyor",
       "subscriptionCanceledBody": "KiloClaw'ı kullanmak için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
-      "subscriptionCanceledCta": "kilo.ai/claw'ı aç",
+      "subscriptionCanceledCta": "Kilo.ai/claw'ı aç",
       "subscriptionCanceledTitle": "Web sitesinden abone ol",
       "subscriptionPastDueBody": "Son ödemende sorun yaşadık. Ödeme bilgilerini güncellemek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden faturalandırmayı yönetemezsin.",
       "subscriptionPastDueTitle": "Ödeme bilgilerini web üzerinden güncelle",
@@ -628,7 +628,7 @@
       "notFoundDescription": "Bu örnek kalıcı olarak silinmiş olabilir veya bağlantı artık geçerli olmayabilir."
     },
     "instanceCard": {
-      "fixOnKiloAi": "kilo.ai üzerinden düzelt: {{label}}",
+      "fixOnKiloAi": "Kilo.ai üzerinden düzelt: {{label}}",
       "needsAttention": "{{name}} için müdahale gerekiyor: {{label}}",
       "openSettings": "{{name}} için ayarları aç",
       "openUnread": "{{name}} öğesini aç, {{displayCount}} okunmamış mesaj",
@@ -651,7 +651,7 @@
       "autoModelA11y": "{{label}} otomatik modeli",
       "balancedDescription": "Daha düşük maliyetle hız ve beceri arasında denge kurar.",
       "browseAllModels": "veya 500'den fazla model arasından seç",
-      "browseAllModelsA11y": "500'den fazla modelin tümüne göz at",
+      "browseAllModelsA11y": "500'Den fazla modelin tümüne göz at",
       "currentModel": "Seçili model",
       "frontierDescription": "En yüksek performansı sunar. Akıl yürütebilen öncü modellere yönlendirir.",
       "frontierLabel": "Öncü",
@@ -670,7 +670,7 @@
         "identityTitle": "Botuna bir kimlik ver",
         "manualReviewBody": "Bir örnek oluşturabilmemiz için önce hesabındaki sorunun çözülmesi gerekiyor. kilo.ai üzerinden devam et.",
         "manualReviewTitle": "Kurulumun elle incelenmesi gerekiyor",
-        "openKiloAi": "kilo.ai'yi aç",
+        "openKiloAi": "Kilo.ai'yi aç",
         "provisioning": "Hazırlanıyor",
         "ready": "Hazır",
         "review": "İnceleme",
@@ -743,12 +743,12 @@
       "destroying": "SİLİNİYOR",
       "provisioned": "HAZIRLANDI",
       "restarting": "YENİDEN BAŞLATILIYOR",
-      "running": "Çalışıyor",
+      "running": "ÇALIŞIYOR",
       "shuttingDown": "KAPATILIYOR",
-      "starting": "Başlatılıyor",
+      "starting": "BAŞLATILIYOR",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
-      "unknown": "Bilinmiyor",
+      "unknown": "BİLİNMİYOR",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -800,7 +800,7 @@
     "instructions": {
       "title": "Özel talimatlar",
       "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
-      "placeholder": "Örn. Hata işleme kurallarımıza uy…"
+      "placeholder": "örn. Hata işleme kurallarımıza uy…"
     },
     "repos": {
       "unavailable": "Depolara erişilemiyor. Bitbucket kurulumunu kilo.ai üzerinden tamamla.",
@@ -1197,11 +1197,11 @@
       "vulnerableVersions": "Güvenlik açığı içeren sürümler",
       "statusOpen": "Açık",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Düzeltmeye başlandı",
-      "reasonNoBandwidth": "Yeterli kaynak yok",
-      "reasonTolerableRisk": "Risk kabul edilebilir",
-      "reasonInaccurate": "Bulgu hatalı",
-      "reasonNotUsed": "Açık içeren kod kullanılmıyor",
+      "reasonFixStarted": "düzeltmeye başlandı",
+      "reasonNoBandwidth": "yeterli kaynak yok",
+      "reasonTolerableRisk": "risk kabul edilebilir",
+      "reasonInaccurate": "bulgu hatalı",
+      "reasonNotUsed": "açık içeren kod kullanılmıyor",
       "reasonAfterReview": "incelemeden sonra"
     },
     "findingList": {
@@ -1313,10 +1313,10 @@
       "deadlinesHeading": "Düzeltme süreleri (gün)",
       "enableTracking": "SLA takibini etkinleştir",
       "enableTrackingSubtitle": "Bulguların önem derecesine göre düzeltme sürelerini belirle.",
-      "enterWholeNumber": "1 ile 365 arasında bir tam sayı gir",
+      "enterWholeNumber": "1 İle 365 arasında bir tam sayı gir",
       "high": "Yüksek",
       "highDescription": "Ciddi veri sızıntısına yol açabilir.",
-      "invalidDayCount": "Gün sayısı 1 ile 365 arasında bir tam sayı olmalıdır.",
+      "invalidDayCount": "gün sayısı 1 ile 365 arasında bir tam sayı olmalıdır.",
       "low": "Düşük",
       "lowDescription": "Güvenliğe etkisi çok düşüktür.",
       "medium": "Orta",
@@ -1454,7 +1454,7 @@
       "couldNotSearch": "Oturumlar aranamadı.",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
-      "live": "Canlı",
+      "live": "CANLI",
       "updating": "Güncelleniyor"
     },
     "sessionRow": {
@@ -1467,7 +1467,7 @@
       "couldNotCopyId": "Oturum kimliği kopyalanamadı.",
       "untitled": "Başlıksız oturum",
       "sessionDeleted": "Oturum silindi",
-      "needsInput": "Yanıt bekliyor",
+      "needsInput": "yanıt bekliyor",
       "fromPlatform": "{{platform}} üzerinden",
       "cent_one": "sent",
       "cent": "sent",
@@ -1497,8 +1497,8 @@
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı. Makineyi kontrol et veya CLI'yi güncelle.",
     "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç.",
-    "liveCount_one": "{{count}} canlı",
-    "liveCount_other": "{{count}} canlı"
+    "liveCount_one": "{{count}} CANLI",
+    "liveCount_other": "{{count}} CANLI"
   },
   "agentChat": {
     "session": {
@@ -1602,14 +1602,14 @@
       "accessibilityLabel": "{{name}} aracı, {{status}}",
       "noTasks": "Görev yok.",
       "toolRead": "oku",
-      "toolEdit": "Düzenle",
+      "toolEdit": "düzenle",
       "toolWrite": "yaz",
       "toolBash": "bash",
       "toolGlob": "dosya bul",
       "toolGrep": "metin ara",
       "toolList": "listele",
       "toolPatch": "yama uygula",
-      "toolTask": "Görev",
+      "toolTask": "görev",
       "readTodos": "Görevleri oku",
       "updateTodos": "Görevleri güncelle",
       "linesBadge": "{{displayCount}} satır",
@@ -1626,7 +1626,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[serileştirilemeyen girdi]",
-      "errorPrefix": "hata: {{error}}"
+      "errorPrefix": "Hata: {{error}}"
     },
     "instancePicker": {
       "runOn": "Çalıştırma yeri",
@@ -1874,7 +1874,7 @@
       "provider": "Sağlayıcı {{id}}",
       "modelId": "Model kimliği: {{id}}",
       "unavailable": "Kullanılamıyor",
-      "unavailableState": "Kullanılamıyor",
+      "unavailableState": "kullanılamıyor",
       "selectedState": "seçili",
       "thinkingEffort": "Düşünme düzeyi",
       "thinkingEffortAccessibility": "{{label}} düşünme düzeyi",
@@ -1987,7 +1987,7 @@
       "olderActivity": "Önceki etkinlikler",
       "olderActivityDescription": "Yüklenen geçmişle ilişkilendirilemeyen maliyet",
       "ofWindowTokens": "/ {{window}} token",
-      "tokens": "Belirteç",
+      "tokens": "belirteç",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} adım",
       "stepsCount": "{{steps}} adım",
@@ -1995,10 +1995,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Açık çekme isteği",
+      "open": "açık çekme isteği",
       "closed": "kapatılmış çekme isteği",
       "merged": "birleştirilmiş çekme isteği",
-      "draft": "Taslak çekme isteği",
+      "draft": "taslak çekme isteği",
       "updating": "Güncelleniyor, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2105,7 +2105,7 @@
     "optionsExpiredDescription": "Geri dön ve bu seçim penceresini önceki ekrandan yeniden aç."
   },
   "sessionRow": {
-    "needsInput": "Yanıt bekliyor"
+    "needsInput": "YANIT BEKLİYOR"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -2319,7 +2319,7 @@
       "insertSuggestion": "Öneri ekle",
       "insertSuggestionA11y": "Kod önerisi ekle",
       "loadFailedTitle": "Yorum alanı yüklenemedi.",
-      "ok": "Tamam",
+      "ok": "TAMAM",
       "unavailableMessage": "Gönderilmeyi bekleyen bu yorum zaten silindi veya gönderildi.",
       "unavailableTitle": "Yorum kullanılamıyor",
       "bodyEmpty": "Yorum metni boş olamaz.",
@@ -2378,8 +2378,8 @@
       "outdated": "Güncel değil",
       "quotedDiffSnippet": "Alıntılanan fark parçası",
       "reactionPill": "{{emoji}} tepkisi, {{displayCount}} {{countLabel}}",
-      "reaction": "Tepki",
-      "reaction_other": "Tepki",
+      "reaction": "tepki",
+      "reaction_other": "tepki",
       "reaction_one": "tepki",
       "replyBadRequest": "Bu yanıt gönderilemiyor. Yorum dizisi değişmiş olabilir.",
       "replyBody": "Yanıt metni",
@@ -2603,12 +2603,12 @@
     "noFilesChanged": "Değişen dosya yok",
     "noFilesChangedDescription": "Bu çekme isteğinde dosya değişikliği yok.",
     "overview": {
-      "commit": "Değişiklik kaydı",
-      "commit_other": "Değişiklik kaydı",
-      "commit_one": "Değişiklik kaydı",
-      "file": "Dosya",
-      "file_other": "Dosya",
-      "file_one": "Dosya",
+      "commit": "değişiklik kaydı",
+      "commit_other": "değişiklik kaydı",
+      "commit_one": "değişiklik kaydı",
+      "file": "dosya",
+      "file_other": "dosya",
+      "file_one": "dosya",
       "stateMerged": "Birleştirildi",
       "stateOpen": "Açık",
       "stateOpenApproved": "Açık · Onaylandı",
@@ -2644,7 +2644,7 @@
       "emptyDiffColumn": "boş fark sütunu",
       "emptyDiffRow": "Boş fark satırı",
       "newOnly": "Yalnızca yeni: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ Dosyanın sonunda yeni satır yok.",
+      "noNewlineAtEndOfFile": "⚠️ dosyanın sonunda yeni satır yok.",
       "oldNew": "Eski: {{old}} | Yeni: {{new}}",
       "oldOnly": "Yalnızca eski: {{text}}"
     },
@@ -2773,7 +2773,7 @@
       "thresholdLabel": "Uyarı eşiği (USD)",
       "title": "Düşük bakiye uyarısı",
       "emailsError": "En az bir geçerli e-posta adresi gir. Birden fazla adresi virgülle ayır.",
-      "thresholdError": "0'dan büyük bir tutar gir."
+      "thresholdError": "0'Dan büyük bir tutar gir."
     },
     "memberLimit": {
       "limitLabel": "Günlük sınır (USD)",
@@ -2783,7 +2783,7 @@
       "removeLimit": "Sınırı kaldır",
       "title": "Günlük kullanım sınırı",
       "blankError": "Bir tutar gir veya aşağıdaki “Sınırı kaldır” düğmesini kullan.",
-      "rangeError": "0 ile {{max}} arasında bir tutar gir."
+      "rangeError": "0 İle {{max}} arasında bir tutar gir."
     },
     "members": {
       "changeRole": "Rolü değiştir",

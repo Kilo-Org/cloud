@@ -38,7 +38,7 @@
     "findings": "Zistenia",
     "notConnected": "Nepripojené",
     "notifications": "Upozornenia",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repozitáre",
     "securityAgent": "Bezpečnostný agent",
     "unknown": "Neznáme",
@@ -169,7 +169,7 @@
     "verifyCode": "Overiť kód",
     "resendCode": "Odoslať kód znova",
     "termsPrefix": "Pokračovaním súhlasíte s našimi",
-    "terms": "podmienkami",
+    "terms": "Podmienkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ďalšie možnosti prihlásenia",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
       "openOnGitHub": "Otvoriť na GitHub",
       "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
-      "githubDiff": "prehľad zmien na GitHub"
+      "githubDiff": "Prehľad zmien na GitHub"
     },
     "floatingActions": {
       "clearSelection": "Zrušiť výber",
@@ -425,8 +425,8 @@
       "addReaction": "Pridať reakciu",
       "reactionPill": "reakcia {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcia",
-      "reaction": "Reakcií",
-      "reaction_other": "Reakcií",
+      "reaction": "reakcií",
+      "reaction_other": "reakcií",
       "commentActions": "Akcie komentára",
       "reportContent": "Nahlásiť obsah",
       "reportUser": "Nahlásiť používateľa",
@@ -607,12 +607,12 @@
       "stateOpenReviewRequired": "Otvorené · nutná kontrola kódu",
       "stateOpen": "Otvorené",
       "unknownAuthor": "Neznámy autor",
-      "commit_one": "Revízia",
+      "commit_one": "revízia",
       "commit": "revízií",
       "commit_other": "revízií",
-      "file_one": "Súbor",
-      "file": "Súborov",
-      "file_other": "Súborov",
+      "file_one": "súbor",
+      "file": "súborov",
+      "file_other": "súborov",
       "commit_few": "commity",
       "commit_many": "commitu",
       "file_few": "súbory",
@@ -621,7 +621,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Upraviť neaktuálny neodoslaný komentár k {{location}}",
       "editA11y": "Upraviť neodoslaný komentár k {{location}}",
-      "staleHint": "PR sa od napísania tohto komentára zmenil.",
+      "staleHint": "pR sa od napísania tohto komentára zmenil.",
       "deleteA11y": "Odstrániť neodoslaný komentár k {{location}}",
       "deletedAnnouncement": "Neodoslaný komentár bol odstránený",
       "noCommentsQueued": "Na odoslanie nečakajú žiadne komentáre. Kontrola kódu sa odošle len s výsledkom zvoleným vyššie.",
@@ -986,7 +986,7 @@
       "allFieldsRequired": "Na pripojenie služby {{label}} musíš vyplniť všetky polia.",
       "setupGuideFallback": "návod na nastavenie",
       "setupGuideA11y": "návod na nastavenie {{label}}",
-      "setupGuide": "návod na nastavenie",
+      "setupGuide": "Návod na nastavenie",
       "saving": "Ukladá sa…",
       "removing": "Odstraňuje sa…",
       "updateToken": "Aktualizovať token"
@@ -1141,12 +1141,12 @@
       "destroying": "ODSTRAŇUJE SA",
       "provisioned": "ZRIADENÉ",
       "restarting": "REŠTARTUJE SA",
-      "running": "Prebieha",
+      "running": "PREBIEHA",
       "shuttingDown": "VYPÍNA SA",
-      "starting": "Spúšťa sa",
+      "starting": "SPÚŠŤA SA",
       "stopped": "ZASTAVENÉ",
       "stopping": "ZASTAVUJE SA",
-      "unknown": "Neznáme",
+      "unknown": "NEZNÁME",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1235,7 +1235,7 @@
     "instructions": {
       "title": "Vlastné pokyny",
       "deprecation": "Podpora vlastných pokynov sa plánuje ukončiť. Presuňte tieto pokyny do súboru REVIEW.md vo svojom repozitári.",
-      "placeholder": "Napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…"
+      "placeholder": "napr. vyžadovať dodržiavanie našich pravidiel spracovania chýb…"
     },
     "repos": {
       "unavailable": "Repozitáre nie sú dostupné. Dokončite nastavenie pripojenia k platforme Bitbucket na kilo.ai.",
@@ -1357,9 +1357,9 @@
       "activity": "Aktivita"
     },
     "providerConnect": {
-      "githubApp": "aplikáciu GitHub",
+      "githubApp": "Aplikáciu GitHub",
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
-      "gitlabAccount": "účet GitLab",
+      "gitlabAccount": "Účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
       "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
       "bitbucketError": "Nastavenie pripojenia k platforme Bitbucket sa nepodarilo otvoriť. Skúste to znova."
@@ -1604,11 +1604,11 @@
       "viewAdvisory": "Zobraziť bezpečnostné upozornenie na platforme GitHub",
       "statusOpen": "Otvorené",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Oprava sa už začala",
-      "reasonNoBandwidth": "Nie je voľná kapacita",
-      "reasonTolerableRisk": "Riziko je prijateľné",
-      "reasonInaccurate": "Zistenie je nepresné",
-      "reasonNotUsed": "Zraniteľný kód sa nepoužíva",
+      "reasonFixStarted": "oprava sa už začala",
+      "reasonNoBandwidth": "nie je voľná kapacita",
+      "reasonTolerableRisk": "riziko je prijateľné",
+      "reasonInaccurate": "zistenie je nepresné",
+      "reasonNotUsed": "zraniteľný kód sa nepoužíva",
       "reasonAfterReview": "po preskúmaní"
     },
     "settingsOverview": {
@@ -1671,7 +1671,7 @@
       "highDescription": "Možný závažný únik údajov.",
       "mediumDescription": "Obmedzený dosah alebo osobitné podmienky zneužitia.",
       "lowDescription": "Minimálny vplyv na bezpečnosť.",
-      "invalidDayCount": "Zadajte počet dní od 1 do 365 ako celé číslo.",
+      "invalidDayCount": "zadajte počet dní od 1 do 365 ako celé číslo.",
       "remediationDeadlineA11y": "Lehota na nápravu v dňoch, závažnosť: {{label}}",
       "enterWholeNumber": "Zadaj celé číslo od 1 do 365",
       "permissionNote": "Tieto nastavenia môžu meniť iba vlastníci organizácie a správcovia fakturácie.",
@@ -1747,7 +1747,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nastavenia repozitárov sa nepodarilo načítať.",
-      "githubAppSettings": "nastavenia aplikácie GitHub",
+      "githubAppSettings": "Nastavenia aplikácie GitHub",
       "manageAccess": "Spravovať prístup aplikácie GitHub",
       "noRepositories": "Žiadne repozitáre",
       "noRepositoriesDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom.",
@@ -1897,7 +1897,7 @@
       "couldNotSearch": "Relácie sa nepodarilo vyhľadať.",
       "completedWillAppear": "Tu sa zobrazia dokončené relácie.",
       "noPastSessions": "Žiadne predchádzajúce relácie",
-      "live": "Naživo",
+      "live": "NAŽIVO",
       "updating": "Aktualizuje sa"
     },
     "sessionRow": {
@@ -1910,7 +1910,7 @@
       "couldNotCopyId": "ID relácie sa nepodarilo skopírovať.",
       "untitled": "Relácia bez názvu",
       "sessionDeleted": "Relácia bola odstránená",
-      "needsInput": "Čaká na odpoveď",
+      "needsInput": "čaká na odpoveď",
       "fromPlatform": "z {{platform}}",
       "cent_one": "cent dolára",
       "cent": "centov",
@@ -1944,8 +1944,8 @@
     "remoteSpawnRetryable": "S inštanciou sa nepodarilo spojiť — možno sa odpojila.",
     "remoteSpawnNonRetryable": "Inštancii sa nepodarilo spustiť reláciu. Skontroluj zariadenie alebo aktualizuj CLI.",
     "remoteSpawnInstanceDisconnected": "Vybraná inštancia sa odpojila. Spusti reláciu v službe Cloud Agent alebo vyber inú inštanciu.",
-    "liveCount_one": "{{count}} naživo",
-    "liveCount_other": "{{count}} naživo",
+    "liveCount_one": "{{count}} NAŽIVO",
+    "liveCount_other": "{{count}} NAŽIVO",
     "liveCount_few": "AKTÍVNE: {{count}}",
     "liveCount_many": "AKTÍVNE: {{count}}"
   },
@@ -2053,14 +2053,14 @@
       "accessibilityLabel": "Nástroj {{name}}, {{status}}",
       "noTasks": "Žiadne úlohy.",
       "toolRead": "čítať súbor",
-      "toolEdit": "Upraviť",
+      "toolEdit": "upraviť",
       "toolWrite": "zapísať súbor",
       "toolBash": "bash",
       "toolGlob": "hľadať súbory",
       "toolGrep": "hľadať v obsahu",
       "toolList": "zobraziť zoznam",
       "toolPatch": "použiť záplatu",
-      "toolTask": "Úloha",
+      "toolTask": "úloha",
       "readTodos": "Prečítať úlohy",
       "updateTodos": "Aktualizovať úlohy",
       "linesBadge": "riadky: {{displayCount}}",
@@ -2077,7 +2077,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[neserializovateľný vstup]",
-      "errorPrefix": "chyba: {{error}}"
+      "errorPrefix": "Chyba: {{error}}"
     },
     "instancePicker": {
       "runOn": "Spustiť na",
@@ -2331,16 +2331,16 @@
       "provider": "Poskytovateľ {{id}}",
       "modelId": "Identifikátor modelu: {{id}}",
       "unavailable": "Nedostupný",
-      "unavailableState": "Nedostupný",
+      "unavailableState": "nedostupný",
       "selectedState": "vybraný",
       "thinkingEffort": "Intenzita uvažovania",
       "thinkingEffortAccessibility": "Intenzita uvažovania: {{label}}",
       "thinkingEffortSelected": "Intenzita uvažovania: {{label}}, vybraná",
       "thinkingEffortWithModel": "{{model}}, intenzita uvažovania: {{variant}}",
-      "lockedByAgent": ", uzamknuté agentom „{{agent}}“",
+      "lockedByAgent": ", Uzamknuté agentom „{{agent}}“",
       "addToFavorites": "Pridať {{name}} do obľúbených",
       "removeFromFavorites": "Odstrániť {{name}} z obľúbených",
-      "thinkingEffortXhigh": "Extr.",
+      "thinkingEffortXhigh": "EXTR.",
       "thinkingEffortMedium": "Str.",
       "sessionModel": "Model relácie"
     },
@@ -2444,7 +2444,7 @@
       "olderActivity": "Staršia aktivita",
       "olderActivityDescription": "Náklady nepriradené k načítanej histórii",
       "ofWindowTokens": "z {{window}} tokenov",
-      "tokens": "Tokeny",
+      "tokens": "tokeny",
       "tokensWithPercentage": "tokenov ({{percentage}})",
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} krokov",
@@ -2454,10 +2454,10 @@
       "stepsCount_many": "{{steps}} kroku"
     },
     "prBadge": {
-      "open": "Otvoriť PR",
+      "open": "otvoriť PR",
       "closed": "uzavretý PR",
       "merged": "zlúčený PR",
-      "draft": "Koncept PR",
+      "draft": "koncept PR",
       "updating": "Aktualizuje sa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2564,7 +2564,7 @@
     "optionsExpiredDescription": "Vráť sa na predchádzajúcu obrazovku a znova otvor tento výber."
   },
   "sessionRow": {
-    "needsInput": "Čaká na odpoveď"
+    "needsInput": "ČAKÁ NA ODPOVEĎ"
   },
   "voiceInput": {
     "listening": "Počúva sa…",
@@ -2631,11 +2631,11 @@
     "verifyPurchaseFailed": "Váš nákup sa nepodarilo overiť. Skontrolujte pripojenie a skúste to znova.",
     "productsCouldNotLoad": "Produkty Kilo Pass sa nepodarilo načítať z App Store.",
     "tryingAgain": "Prebieha ďalší pokus…",
-    "kiloPassManagement": "správa Kilo Pass",
+    "kiloPassManagement": "Správa Kilo Pass",
     "legalConnectorTerms": " Predplatením vyjadrujete súhlas s dokumentom ",
     "legalConnectorPrivacy": " a beriete na vedomie dokument ",
     "manageFailed": "Správu predplatného v App Store sa nepodarilo otvoriť.",
-    "kiloPassSetup": "nastavenie Kilo Pass",
+    "kiloPassSetup": "Nastavenie Kilo Pass",
     "subscriptionHeaderDescription": "Mesačné predplatné, ktoré dopĺňa kredity na váš účet Kilo na programovanie s AI v aplikácii Kilo App: relácie cloudových agentov, vzdialené relácie a chaty s KiloClaw.",
     "tierDescription": "Každý mesiac sa pripíšu platené kredity v hodnote {{price}} na používanie aplikácie Kilo App.",
     "subscribe": "Predplatiť si",
@@ -2683,7 +2683,7 @@
     "helpImproveDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie. Túto voľbu môžeš kedykoľvek zmeniť v nastaveniach.",
     "seeFullDetails": "Zobraziť všetky podrobnosti",
     "privacyPolicyPrefix": "Tvoje údaje spracúvame podľa",
-    "privacyPolicy": "zásad ochrany súkromia Kilo",
+    "privacyPolicy": "Zásad ochrany súkromia Kilo",
     "onDevice": "V zariadení",
     "couldNotLoadTranscription": "Tvoje nastavenie prepisu sa nepodarilo načítať.",
     "signInToManageTranscription": "Ak chceš spravovať online prepis, prihlás sa.",

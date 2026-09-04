@@ -20,7 +20,7 @@
     "copiedToClipboard": "Đã sao chép vào bộ nhớ tạm",
     "couldNotCopyToClipboard": "Không thể sao chép vào bộ nhớ tạm.",
     "required": "bắt buộc",
-    "error": "Lỗi: {{error}}",
+    "error": "lỗi: {{error}}",
     "notNow": "Để sau",
     "continue": "Tiếp tục",
     "back": "Quay lại",
@@ -200,7 +200,7 @@
     "signOut": "Đăng xuất",
     "deleteAccount": "Xóa tài khoản",
     "confirmationCode": "Mã xác nhận",
-    "confirmationCodePlaceholder": "Mã 6 chữ số",
+    "confirmationCodePlaceholder": "mã 6 chữ số",
     "confirmDeletion": "Xác nhận xóa",
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
@@ -552,7 +552,7 @@
       "hide": "Ẩn {{label}}",
       "removing": "Đang xóa…",
       "saving": "Đang lưu…",
-      "setupGuide": "hướng dẫn thiết lập",
+      "setupGuide": "Hướng dẫn thiết lập",
       "setupGuideA11y": "Hướng dẫn thiết lập {{label}}",
       "setupGuideFallback": "hướng dẫn thiết lập",
       "show": "Hiện {{label}}",
@@ -743,12 +743,12 @@
       "destroying": "ĐANG XÓA VĨNH VIỄN",
       "provisioned": "ĐÃ CẤP PHÁT",
       "restarting": "ĐANG KHỞI ĐỘNG LẠI",
-      "running": "Đang chạy",
+      "running": "ĐANG CHẠY",
       "shuttingDown": "ĐANG TẮT",
-      "starting": "Đang khởi động",
+      "starting": "ĐANG KHỞI ĐỘNG",
       "stopped": "ĐÃ DỪNG",
       "stopping": "ĐANG DỪNG",
-      "unknown": "Không xác định",
+      "unknown": "KHÔNG XÁC ĐỊNH",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -800,7 +800,7 @@
     "instructions": {
       "title": "Hướng dẫn tùy chỉnh",
       "deprecation": "Tính năng hướng dẫn tùy chỉnh dự kiến sẽ ngừng được hỗ trợ. Hãy chuyển các hướng dẫn này vào tệp REVIEW.md trong kho lưu trữ.",
-      "placeholder": "Ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…"
+      "placeholder": "ví dụ: Tuân thủ các quy ước xử lý lỗi của nhóm…"
     },
     "repos": {
       "unavailable": "Không thể truy cập các kho lưu trữ. Hãy hoàn tất thiết lập Bitbucket trên kilo.ai.",
@@ -855,9 +855,9 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
-      "githubApp": "ứng dụng GitHub",
+      "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
-      "gitlabAccount": "tài khoản GitLab",
+      "gitlabAccount": "Tài khoản GitLab",
       "gitlabError": "Không thể mở trang thiết lập GitLab. Vui lòng thử lại.",
       "bitbucketError": "Không thể mở trang thiết lập Bitbucket. Vui lòng thử lại."
     },
@@ -1197,11 +1197,11 @@
       "vulnerableVersions": "Phiên bản có lỗ hổng",
       "statusOpen": "Mở",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Đã bắt đầu khắc phục",
-      "reasonNoBandwidth": "Không đủ nguồn lực",
-      "reasonTolerableRisk": "Rủi ro có thể chấp nhận được",
-      "reasonInaccurate": "Vấn đề được xác định sai",
-      "reasonNotUsed": "Không sử dụng mã có lỗ hổng",
+      "reasonFixStarted": "đã bắt đầu khắc phục",
+      "reasonNoBandwidth": "không đủ nguồn lực",
+      "reasonTolerableRisk": "rủi ro có thể chấp nhận được",
+      "reasonInaccurate": "vấn đề được xác định sai",
+      "reasonNotUsed": "không sử dụng mã có lỗ hổng",
       "reasonAfterReview": "sau khi rà soát"
     },
     "findingList": {
@@ -1265,7 +1265,7 @@
     },
     "repositories": {
       "couldNotLoad": "Không thể tải cài đặt kho lưu trữ.",
-      "githubAppSettings": "cài đặt ứng dụng GitHub",
+      "githubAppSettings": "Cài đặt ứng dụng GitHub",
       "manageAccess": "Quản lý quyền truy cập của ứng dụng GitHub",
       "noRepositories": "Không có kho lưu trữ",
       "noRepositoriesDescription": "Cấp quyền truy cập các kho lưu trữ cho ứng dụng Kilo trên GitHub.",
@@ -1316,7 +1316,7 @@
       "enterWholeNumber": "Nhập một số nguyên từ 1 đến 365",
       "high": "Cao",
       "highDescription": "Có nguy cơ rò rỉ dữ liệu ở mức đáng kể.",
-      "invalidDayCount": "Số ngày phải là số nguyên từ 1 đến 365.",
+      "invalidDayCount": "số ngày phải là số nguyên từ 1 đến 365.",
       "low": "Thấp",
       "lowDescription": "Ảnh hưởng rất ít đến bảo mật.",
       "medium": "Trung bình",
@@ -1454,7 +1454,7 @@
       "couldNotSearch": "Không thể tìm kiếm phiên.",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Chưa có phiên đã hoàn tất",
-      "live": "Trực tiếp",
+      "live": "TRỰC TIẾP",
       "updating": "Đang cập nhật"
     },
     "sessionRow": {
@@ -1467,7 +1467,7 @@
       "couldNotCopyId": "Không thể sao chép ID phiên.",
       "untitled": "Phiên chưa đặt tên",
       "sessionDeleted": "Đã xóa phiên",
-      "needsInput": "Cần phản hồi",
+      "needsInput": "cần phản hồi",
       "fromPlatform": "từ {{platform}}",
       "cent_one": "xu",
       "cent": "xu",
@@ -1477,7 +1477,7 @@
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -1497,8 +1497,8 @@
     "remoteSpawnRetryable": "Không thể kết nối với phiên chạy — có thể phiên chạy đã mất kết nối.",
     "remoteSpawnNonRetryable": "Phiên chạy không thể mở phiên làm việc — hãy kiểm tra máy hoặc cập nhật CLI.",
     "remoteSpawnInstanceDisconnected": "Phiên chạy đã chọn bị ngắt kết nối. Bắt đầu phiên trên Cloud Agent hoặc chọn phiên chạy khác.",
-    "liveCount_one": "{{count}} trực tiếp",
-    "liveCount_other": "{{count}} trực tiếp"
+    "liveCount_one": "{{count}} TRỰC TIẾP",
+    "liveCount_other": "{{count}} TRỰC TIẾP"
   },
   "agentChat": {
     "session": {
@@ -1602,14 +1602,14 @@
       "accessibilityLabel": "công cụ {{name}}, {{status}}",
       "noTasks": "Không có tác vụ nào.",
       "toolRead": "đọc",
-      "toolEdit": "Chỉnh sửa",
+      "toolEdit": "chỉnh sửa",
       "toolWrite": "ghi",
       "toolBash": "bash",
       "toolGlob": "tìm tệp theo mẫu",
       "toolGrep": "tìm trong nội dung",
       "toolList": "liệt kê",
       "toolPatch": "áp dụng bản vá",
-      "toolTask": "Tác vụ",
+      "toolTask": "tác vụ",
       "readTodos": "Đọc danh sách việc cần làm",
       "updateTodos": "Cập nhật danh sách việc cần làm",
       "linesBadge": "{{displayCount}} dòng",
@@ -1874,16 +1874,16 @@
       "provider": "Nhà cung cấp {{id}}",
       "modelId": "Mô hình {{id}}",
       "unavailable": "Không khả dụng",
-      "unavailableState": "Không khả dụng",
+      "unavailableState": "không khả dụng",
       "selectedState": "đã chọn",
       "thinkingEffort": "Mức độ suy luận",
       "thinkingEffortAccessibility": "mức độ suy luận {{label}}",
       "thinkingEffortSelected": "mức độ suy luận {{label}}, đã chọn",
       "thinkingEffortWithModel": "{{model}}, mức độ suy luận {{variant}}",
-      "lockedByAgent": ", do tác nhân \"{{agent}}\" khóa",
+      "lockedByAgent": ", Do tác nhân \"{{agent}}\" khóa",
       "addToFavorites": "Thêm {{name}} vào mục yêu thích",
       "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
-      "thinkingEffortXhigh": "Rất cao",
+      "thinkingEffortXhigh": "RẤT CAO",
       "thinkingEffortMedium": "TB",
       "sessionModel": "Mô hình của phiên"
     },
@@ -1987,7 +1987,7 @@
       "olderActivity": "Hoạt động trước đó",
       "olderActivityDescription": "Chi phí không thuộc phần lịch sử đã tải",
       "ofWindowTokens": "trên {{window}} token",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} bước",
       "stepsCount": "{{steps}} bước",
@@ -1995,10 +1995,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Mở yêu cầu hợp nhất",
+      "open": "mở yêu cầu hợp nhất",
       "closed": "yêu cầu hợp nhất đã đóng",
       "merged": "yêu cầu hợp nhất đã được hợp nhất",
-      "draft": "Yêu cầu hợp nhất nháp",
+      "draft": "yêu cầu hợp nhất nháp",
       "updating": "Đang cập nhật, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2105,7 +2105,7 @@
     "optionsExpiredDescription": "Quay lại màn hình trước rồi mở lại danh sách lựa chọn này."
   },
   "sessionRow": {
-    "needsInput": "Cần phản hồi"
+    "needsInput": "CẦN PHẢN HỒI"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -2172,11 +2172,11 @@
     "verifyPurchaseFailed": "Không thể xác minh giao dịch mua của bạn. Kiểm tra kết nối và thử lại.",
     "productsCouldNotLoad": "Không thể tải các sản phẩm Kilo Pass từ App Store.",
     "tryingAgain": "Đang thử lại...",
-    "kiloPassManagement": "quản lý Kilo Pass",
+    "kiloPassManagement": "Quản lý Kilo Pass",
     "legalConnectorTerms": " Khi đăng ký, bạn đồng ý với ",
     "legalConnectorPrivacy": " và xác nhận đã đọc ",
     "manageFailed": "Không thể mở trang quản lý gói đăng ký trên App Store.",
-    "kiloPassSetup": "thiết lập Kilo Pass",
+    "kiloPassSetup": "Thiết lập Kilo Pass",
     "subscriptionHeaderDescription": "Gói đăng ký hằng tháng bổ sung điểm sử dụng vào số dư Kilo để bạn chạy các phiên lập trình bằng AI trong Kilo App, gồm các phiên trợ lý đám mây, phiên từ xa và trò chuyện KiloClaw.",
     "tierDescription": "Mỗi tháng, bạn nhận thêm điểm sử dụng đã thanh toán trị giá {{price}} để dùng trong Kilo App.",
     "subscribe": "Đăng ký",
@@ -2224,7 +2224,7 @@
     "helpImproveDescription": "Chia sẻ dữ liệu phân tích sản phẩm ẩn danh và nguồn cài đặt ứng dụng. Bạn có thể thay đổi lựa chọn này bất cứ lúc nào trong Cài đặt.",
     "seeFullDetails": "Xem đầy đủ thông tin",
     "privacyPolicyPrefix": "Dữ liệu của bạn được xử lý theo",
-    "privacyPolicy": "chính sách quyền riêng tư của Kilo",
+    "privacyPolicy": "Chính sách quyền riêng tư của Kilo",
     "onDevice": "Trên thiết bị",
     "couldNotLoadTranscription": "Không thể tải cài đặt chuyển giọng nói thành văn bản của bạn.",
     "signInToManageTranscription": "Đăng nhập để quản lý tính năng chuyển giọng nói thành văn bản trực tuyến.",
@@ -2378,8 +2378,8 @@
       "outdated": "Lỗi thời",
       "quotedDiffSnippet": "Đoạn trích từ bản so sánh",
       "reactionPill": "Cảm xúc {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction": "Biểu cảm",
-      "reaction_other": "Biểu cảm",
+      "reaction": "biểu cảm",
+      "reaction_other": "biểu cảm",
       "reaction_one": "cảm xúc",
       "replyBadRequest": "Không thể đăng câu trả lời này. Chuỗi thảo luận có thể đã thay đổi.",
       "replyBody": "Nội dung trả lời",
@@ -2477,7 +2477,7 @@
       "openDiffOnGitHub": "Mở bản so sánh của tệp này trên GitHub",
       "openOnGitHub": "Mở trên GitHub",
       "unmarkViewed": "Bỏ dấu đã xem của {{path}}",
-      "githubDiff": "bản so sánh trên GitHub"
+      "githubDiff": "Bản so sánh trên GitHub"
     },
     "floatingActions": {
       "clear": "Bỏ chọn",
@@ -2603,12 +2603,12 @@
     "noFilesChanged": "Không có tệp nào thay đổi",
     "noFilesChangedDescription": "PR này không có tệp nào thay đổi.",
     "overview": {
-      "commit": "Commit",
-      "commit_other": "Commit",
-      "commit_one": "Commit",
-      "file": "Tệp",
-      "file_other": "Tệp",
-      "file_one": "Tệp",
+      "commit": "commit",
+      "commit_other": "commit",
+      "commit_one": "commit",
+      "file": "tệp",
+      "file_other": "tệp",
+      "file_one": "tệp",
       "stateMerged": "Đã hợp nhất",
       "stateOpen": "Mở",
       "stateOpenApproved": "Đang mở · Đã phê duyệt",
@@ -2623,7 +2623,7 @@
       "editA11y": "Chỉnh sửa bình luận chờ gửi tại {{location}}",
       "editOutdatedA11y": "Chỉnh sửa bình luận chờ gửi không còn cập nhật tại {{location}}",
       "noCommentsQueued": "Không có bình luận nào chờ gửi. Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên mà không kèm bình luận.",
-      "staleHint": "PR đã thay đổi kể từ khi bạn viết bình luận này.",
+      "staleHint": "pR đã thay đổi kể từ khi bạn viết bình luận này.",
       "staleQueueHint": "Các bình luận gắn với bản ghi cũ hơn sẽ không được gửi. Chúng vẫn nằm trong danh sách chờ gửi để bạn chỉnh sửa hoặc xóa.",
       "summaryA11y": "Tóm tắt đánh giá",
       "summaryPlaceholder": "Tóm tắt đánh giá (không bắt buộc)"
@@ -2644,7 +2644,7 @@
       "emptyDiffColumn": "cột so sánh trống",
       "emptyDiffRow": "Dòng so sánh trống",
       "newOnly": "Chỉ có ở bản mới: {{text}}",
-      "noNewlineAtEndOfFile": "Không có ký tự xuống dòng ở cuối tệp.",
+      "noNewlineAtEndOfFile": "không có ký tự xuống dòng ở cuối tệp.",
       "oldNew": "Cũ: {{old}} | Mới: {{new}}",
       "oldOnly": "Chỉ có ở bản cũ: {{text}}"
     },
@@ -2815,7 +2815,7 @@
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",
-      "last30Days": "30 ngày qua",
+      "last30Days": "30 Ngày qua",
       "outputTokens": "Token đầu ra",
       "requests": "Yêu cầu"
     },

@@ -169,7 +169,7 @@
     "verifyCode": "Перевірити код",
     "resendCode": "Надіслати код повторно",
     "termsPrefix": "Продовжуючи, ви погоджуєтеся з нашими",
-    "terms": "умовами",
+    "terms": "Умовами",
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Інші способи входу",
@@ -486,7 +486,7 @@
       "destroyTitle": "Видалення екземпляра",
       "instance": "Екземпляр",
       "couldNotCheckStatus": "Не вдалося перевірити стан сервісу.",
-      "dangerZone": "Небезпечні дії",
+      "dangerZone": "НЕБЕЗПЕЧНІ ДІЇ",
       "destroying": "Видалення…",
       "serviceDegraded": "Сервіс працює зі збоями — торкніться, щоб переглянути стан",
       "up": "ПРАЦЮЄ"
@@ -554,7 +554,7 @@
       "hide": "Приховати {{label}}",
       "removing": "Видалення…",
       "saving": "Збереження…",
-      "setupGuide": "інструкція з налаштування",
+      "setupGuide": "Інструкція з налаштування",
       "setupGuideA11y": "Посібник із налаштування {{label}}",
       "setupGuideFallback": "інструкція з налаштування",
       "show": "Показати {{label}}",
@@ -735,11 +735,11 @@
     "status": {
       "cpu": "CPU",
       "exitCode": "Код {{code}}",
-      "gatewayProcess": "Процес шлюзу",
+      "gatewayProcess": "ПРОЦЕС ШЛЮЗУ",
       "lastExit": "Останнє завершення",
       "memory": "Пам'ять",
       "region": "Регіон",
-      "resources": "Ресурси",
+      "resources": "РЕСУРСИ",
       "restarts": "Перезапуски",
       "state": "Стан",
       "uptime": "Час роботи",
@@ -747,12 +747,12 @@
       "destroying": "ВИДАЛЕННЯ",
       "provisioned": "ПІДГОТОВЛЕНО",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "Виконується",
+      "running": "ВИКОНУЄТЬСЯ",
       "shuttingDown": "ЗАВЕРШЕННЯ РОБОТИ",
-      "starting": "Запуск",
+      "starting": "ЗАПУСК",
       "stopped": "ЗУПИНЕНО",
       "stopping": "ЗУПИНЕННЯ",
-      "unknown": "Невідомо",
+      "unknown": "НЕВІДОМО",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -804,7 +804,7 @@
     "instructions": {
       "title": "Власні інструкції",
       "deprecation": "Підтримку власних інструкцій планують припинити. Перенесіть ці настанови у файл REVIEW.md у своєму репозиторії.",
-      "placeholder": "Наприклад: дотримуватися наших правил обробки помилок…"
+      "placeholder": "наприклад: дотримуватися наших правил обробки помилок…"
     },
     "repos": {
       "unavailable": "Репозиторії недоступні — завершіть налаштування Bitbucket на kilo.ai.",
@@ -859,9 +859,9 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
-      "githubApp": "застосунок GitHub",
+      "githubApp": "Застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
-      "gitlabAccount": "обліковий запис GitLab",
+      "gitlabAccount": "Обліковий запис GitLab",
       "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз.",
       "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
@@ -1171,11 +1171,11 @@
       "notFoundDescription": "Цю проблему могли видалити, або ви більше не маєте до неї доступу.",
       "notFoundTitle": "Виявлену проблему не знайдено",
       "reason": "Причина",
-      "reasonFixStarted": "виправлення вже розпочато",
-      "reasonInaccurate": "проблему визначено неточно",
-      "reasonNoBandwidth": "немає ресурсів на виправлення",
-      "reasonNotUsed": "уразливий код не використовується",
-      "reasonTolerableRisk": "ризик прийнятний",
+      "reasonFixStarted": "Виправлення вже розпочато",
+      "reasonInaccurate": "Проблему визначено неточно",
+      "reasonNoBandwidth": "Немає ресурсів на виправлення",
+      "reasonNotUsed": "Уразливий код не використовується",
+      "reasonTolerableRisk": "Ризик прийнятний",
       "title": "Відхилити виявлену проблему"
     },
     "findingDetail": {
@@ -1271,7 +1271,7 @@
     },
     "repositories": {
       "couldNotLoad": "Не вдалося завантажити налаштування репозиторіїв.",
-      "githubAppSettings": "налаштування застосунку GitHub",
+      "githubAppSettings": "Налаштування застосунку GitHub",
       "manageAccess": "Керувати доступом застосунку GitHub",
       "noRepositories": "Немає репозиторіїв",
       "noRepositoriesDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв.",
@@ -1324,7 +1324,7 @@
       "enterWholeNumber": "Введи ціле число від 1 до 365",
       "high": "Високий",
       "highDescription": "Можливий значний витік даних.",
-      "invalidDayCount": "Укажіть цілу кількість днів від 1 до 365.",
+      "invalidDayCount": "укажіть цілу кількість днів від 1 до 365.",
       "low": "Низький",
       "lowDescription": "Мінімальний вплив на безпеку.",
       "medium": "Середній",
@@ -1466,7 +1466,7 @@
       "couldNotSearch": "Не вдалося виконати пошук сеансів.",
       "completedWillAppear": "Завершені сеанси з'являться тут.",
       "noPastSessions": "Немає попередніх сеансів",
-      "live": "Наживо",
+      "live": "НАЖИВО",
       "updating": "Оновлення"
     },
     "sessionRow": {
@@ -1479,7 +1479,7 @@
       "couldNotCopyId": "Не вдалося скопіювати ідентифікатор сеансу.",
       "untitled": "Сеанс без назви",
       "sessionDeleted": "Сеанс видалено",
-      "needsInput": "Очікує відповіді",
+      "needsInput": "очікує відповіді",
       "fromPlatform": "з {{platform}}",
       "cent_one": "цент",
       "cent": "цента",
@@ -1513,8 +1513,8 @@
     "remoteSpawnRetryable": "Не вдалося з'єднатися з екземпляром — можливо, він від'єднався.",
     "remoteSpawnNonRetryable": "Не вдалося запустити сеанс на екземплярі — перевірте комп'ютер або оновіть CLI.",
     "remoteSpawnInstanceDisconnected": "Вибраний екземпляр від'єднався. Запустіть сеанс у Cloud Agent або виберіть інший екземпляр.",
-    "liveCount_one": "{{count}} наживо",
-    "liveCount_other": "{{count}} наживо",
+    "liveCount_one": "{{count}} НАЖИВО",
+    "liveCount_other": "{{count}} НАЖИВО",
     "liveCount_few": "{{count}} АКТИВНІ",
     "liveCount_many": "{{count}} АКТИВНИХ"
   },
@@ -1622,14 +1622,14 @@
       "accessibilityLabel": "Інструмент {{name}}, {{status}}",
       "noTasks": "Немає завдань.",
       "toolRead": "прочитати",
-      "toolEdit": "Редагувати",
+      "toolEdit": "редагувати",
       "toolWrite": "записати",
       "toolBash": "bash",
       "toolGlob": "пошук файлів за шаблоном",
       "toolGrep": "пошук у вмісті файлів",
       "toolList": "показати список",
       "toolPatch": "застосувати зміни",
-      "toolTask": "Завдання",
+      "toolTask": "завдання",
       "readTodos": "Прочитати список завдань",
       "updateTodos": "Оновити список завдань",
       "linesBadge": "рядків: {{displayCount}}",
@@ -1646,7 +1646,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[вхідні дані неможливо серіалізувати]",
-      "errorPrefix": "помилка: {{error}}"
+      "errorPrefix": "Помилка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Середовище запуску",
@@ -1900,13 +1900,13 @@
       "provider": "Постачальник {{id}}",
       "modelId": "Модель {{id}}",
       "unavailable": "Недоступна",
-      "unavailableState": "Недоступна",
+      "unavailableState": "недоступна",
       "selectedState": "вибрано",
       "thinkingEffort": "Рівень міркування",
       "thinkingEffortAccessibility": "рівень міркування: {{label}}",
       "thinkingEffortSelected": "рівень міркування: {{label}}, вибрано",
       "thinkingEffortWithModel": "{{model}}, рівень міркування: {{variant}}",
-      "lockedByAgent": ", заблоковано агентом «{{agent}}»",
+      "lockedByAgent": ", Заблоковано агентом «{{agent}}»",
       "addToFavorites": "Додати {{name}} до обраного",
       "removeFromFavorites": "Прибрати {{name}} з обраного",
       "thinkingEffortXhigh": "ДВ",
@@ -2013,7 +2013,7 @@
       "olderActivity": "Попередня активність",
       "olderActivityDescription": "Витрати, не враховані в завантаженій історії",
       "ofWindowTokens": "з {{window}} токенів",
-      "tokens": "Токени",
+      "tokens": "токени",
       "tokensWithPercentage": "ток. ({{percentage}})",
       "stepsCount_one": "{{steps}} крок",
       "stepsCount": "Кроків: {{steps}}",
@@ -2023,10 +2023,10 @@
       "stepsCount_many": "{{steps}} кроків"
     },
     "prBadge": {
-      "open": "Відкритий запит на злиття",
+      "open": "відкритий запит на злиття",
       "closed": "закритий запит на злиття",
       "merged": "об'єднаний запит на злиття",
-      "draft": "Чернетка запиту на злиття",
+      "draft": "чернетка запиту на злиття",
       "updating": "Оновлення, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2133,7 +2133,7 @@
     "optionsExpiredDescription": "Поверніться на попередній екран і знову відкрийте це вікно вибору."
   },
   "sessionRow": {
-    "needsInput": "Очікує відповіді"
+    "needsInput": "ОЧІКУЄ ВІДПОВІДІ"
   },
   "voiceInput": {
     "listening": "Слухаємо…",
@@ -2200,11 +2200,11 @@
     "verifyPurchaseFailed": "Не вдалося підтвердити вашу покупку. Перевірте з'єднання та спробуйте ще раз.",
     "productsCouldNotLoad": "Не вдалося завантажити тарифи Kilo Pass з App Store.",
     "tryingAgain": "Повторна спроба…",
-    "kiloPassManagement": "керування Kilo Pass",
+    "kiloPassManagement": "Керування Kilo Pass",
     "legalConnectorTerms": " Оформлюючи підписку, ви приймаєте ",
     "legalConnectorPrivacy": " і підтверджуєте, що прочитали ",
     "manageFailed": "Не вдалося відкрити керування підписками App Store.",
-    "kiloPassSetup": "налаштування Kilo Pass",
+    "kiloPassSetup": "Налаштування Kilo Pass",
     "subscriptionHeaderDescription": "Щомісячна підписка поповнює ваш баланс Kilo кредитами для роботи над кодом із ШІ в Kilo App: сеансів хмарних агентів, віддалених сеансів і чатів KiloClaw.",
     "tierDescription": "Щомісяця нараховуються оплачені кредити на суму {{price}} для використання в Kilo App.",
     "subscribe": "Підписатися",
@@ -2252,7 +2252,7 @@
     "helpImproveDescription": "Надсилайте анонімні дані про використання застосунку та джерело його встановлення. Цей вибір можна будь-коли змінити в налаштуваннях.",
     "seeFullDetails": "Переглянути повні відомості",
     "privacyPolicyPrefix": "Ваші дані обробляються відповідно до",
-    "privacyPolicy": "політики конфіденційності Kilo",
+    "privacyPolicy": "Політики конфіденційності Kilo",
     "onDevice": "На пристрої",
     "couldNotLoadTranscription": "Не вдалося завантажити налаштування розпізнавання мовлення.",
     "signInToManageTranscription": "Увійдіть, щоб керувати розпізнаванням мовлення онлайн.",
@@ -2347,7 +2347,7 @@
       "insertSuggestion": "Вставити пропозицію",
       "insertSuggestionA11y": "Вставити пропозицію зміни коду",
       "loadFailedTitle": "Не вдалося завантажити редактор коментарів.",
-      "ok": "Гаразд",
+      "ok": "ГАРАЗД",
       "unavailableMessage": "Цей ненадісланий коментар уже видалено або надіслано.",
       "unavailableTitle": "Коментар недоступний",
       "bodyEmpty": "Текст коментаря не може бути порожнім.",
@@ -2406,8 +2406,8 @@
       "outdated": "Застаріло",
       "quotedDiffSnippet": "Цитований фрагмент змін",
       "reactionPill": "реакція {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction": "Реакції",
-      "reaction_other": "Реакції",
+      "reaction": "реакції",
+      "reaction_other": "реакції",
       "reaction_one": "реакція",
       "replyBadRequest": "Цю відповідь неможливо опублікувати. Можливо, обговорення змінилося.",
       "replyBody": "Текст відповіді",
@@ -2509,7 +2509,7 @@
       "openDiffOnGitHub": "Відкрити зміни цього файлу на GitHub",
       "openOnGitHub": "Відкрити на GitHub",
       "unmarkViewed": "Зняти позначку перегляду з {{path}}",
-      "githubDiff": "зміни на GitHub"
+      "githubDiff": "Зміни на GitHub"
     },
     "floatingActions": {
       "clear": "Очистити",
@@ -2644,7 +2644,7 @@
       "commit_one": "коміт",
       "file": "файлу",
       "file_other": "файлу",
-      "file_one": "Файл",
+      "file_one": "файл",
       "stateMerged": "Злито",
       "stateOpen": "Відкрито",
       "stateOpenApproved": "Відкрито · схвалено",
@@ -2663,7 +2663,7 @@
       "editA11y": "Редагувати ненадісланий коментар: {{location}}",
       "editOutdatedA11y": "Редагувати неактуальний ненадісланий коментар: {{location}}",
       "noCommentsQueued": "Коментарів у черзі немає. Буде надіслано лише вибраний вище результат перевірки коду.",
-      "staleHint": "PR змінився після написання цього коментаря.",
+      "staleHint": "pR змінився після написання цього коментаря.",
       "staleQueueHint": "Коментарі, написані до старішого коміту, не надсилаються. Вони залишаються у вашій черзі, щоб ви могли їх редагувати або видалити.",
       "summaryA11y": "Підсумок перевірки коду",
       "summaryPlaceholder": "Підсумок перевірки коду (необов'язково)"
@@ -2684,7 +2684,7 @@
       "emptyDiffColumn": "порожній стовпець змін",
       "emptyDiffRow": "Порожній рядок змін",
       "newOnly": "Лише в новій версії: {{text}}",
-      "noNewlineAtEndOfFile": "Наприкінці файлу немає символу нового рядка.",
+      "noNewlineAtEndOfFile": "наприкінці файлу немає символу нового рядка.",
       "oldNew": "Попередня версія: {{old}} | Нова версія: {{new}}",
       "oldOnly": "Лише в попередній версії: {{text}}"
     },

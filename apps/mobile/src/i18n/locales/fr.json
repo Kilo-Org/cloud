@@ -38,7 +38,7 @@
     "findings": "Problèmes détectés",
     "notConnected": "Non connecté",
     "notifications": "Alertes et notifications",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Dépôts",
     "securityAgent": "Agent de sécurité",
     "unknown": "Inconnu",
@@ -93,7 +93,7 @@
     "email": "E-mail",
     "ends": "Se termine le {{date}}",
     "failed": "Échec",
-    "file": "fichier",
+    "file": "Fichier",
     "gitlab": "GitLab",
     "goBack": "Retour",
     "idle": "En veille",
@@ -110,9 +110,9 @@
     "pending": "En attente",
     "performance": "Performances",
     "preferences": "Préférences",
-    "privacyPolicy": "politique de confidentialité",
+    "privacyPolicy": "Politique de confidentialité",
     "profile": "Profil",
-    "reactions": "réactions",
+    "reactions": "Réactions",
     "recent": "Récentes",
     "recommended": "Recommandés",
     "remaining": "Restant",
@@ -169,7 +169,7 @@
     "verifyCode": "Vérifier le code",
     "resendCode": "Renvoyer le code",
     "termsPrefix": "En continuant, vous acceptez nos",
-    "terms": "conditions d'utilisation",
+    "terms": "Conditions d'utilisation",
     "termsConnector": " et ",
     "termsSuffix": ".",
     "moreSignInOptions": "Autres options de connexion",
@@ -200,7 +200,7 @@
     "signOut": "Se déconnecter",
     "deleteAccount": "Supprimer le compte",
     "confirmationCode": "Code de confirmation",
-    "confirmationCodePlaceholder": "Code à 6 chiffres",
+    "confirmationCodePlaceholder": "code à 6 chiffres",
     "confirmDeletion": "Confirmer la suppression",
     "credits": "Crédits",
     "failedToLoadBalance": "Échec du chargement du solde. Touchez pour réessayer.",
@@ -386,7 +386,7 @@
     "attachmentPicker": {
       "takePhoto": "Prendre une photo",
       "photoLibrary": "Photothèque",
-      "files": "fichiers",
+      "files": "Fichiers",
       "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les paramètres pour prendre une photo."
     },
     "typingIndicator": {
@@ -467,7 +467,7 @@
       "destroyTitle": "Détruire l'instance",
       "instance": "Instance KiloClaw",
       "couldNotCheckStatus": "Impossible de vérifier l'état du service.",
-      "dangerZone": "Actions irréversibles",
+      "dangerZone": "ACTIONS IRRÉVERSIBLES",
       "destroying": "Destruction…",
       "serviceDegraded": "Service perturbé — touchez pour consulter son état",
       "up": "EN LIGNE"
@@ -535,7 +535,7 @@
       "hide": "Masquer {{label}}",
       "removing": "Suppression…",
       "saving": "Enregistrement…",
-      "setupGuide": "guide de configuration",
+      "setupGuide": "Guide de configuration",
       "setupGuideA11y": "Guide de configuration de {{label}}",
       "setupGuideFallback": "guide de configuration",
       "show": "Afficher {{label}}",
@@ -715,11 +715,11 @@
     "status": {
       "cpu": "CPU",
       "exitCode": "Code de sortie {{code}}",
-      "gatewayProcess": "Processus de la passerelle",
+      "gatewayProcess": "PROCESSUS DE LA PASSERELLE",
       "lastExit": "Dernier arrêt",
       "memory": "Mémoire",
       "region": "Région",
-      "resources": "Ressources",
+      "resources": "RESSOURCES",
       "restarts": "Redémarrages",
       "state": "État",
       "uptime": "Durée de fonctionnement",
@@ -727,12 +727,12 @@
       "destroying": "DESTRUCTION",
       "provisioned": "PROVISIONNÉ",
       "restarting": "REDÉMARRAGE",
-      "running": "En cours",
+      "running": "EN COURS",
       "shuttingDown": "EXTINCTION",
-      "starting": "Démarrage",
+      "starting": "DÉMARRAGE",
       "stopped": "ARRÊTÉ",
       "stopping": "ARRÊT",
-      "unknown": "Inconnu",
+      "unknown": "INCONNU",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -784,7 +784,7 @@
     "instructions": {
       "title": "Instructions personnalisées",
       "deprecation": "La suppression des instructions personnalisées est prévue. Déplacez ces consignes dans un fichier REVIEW.md de votre dépôt.",
-      "placeholder": "Ex. : respecter nos conventions de gestion des erreurs…"
+      "placeholder": "ex. : respecter nos conventions de gestion des erreurs…"
     },
     "repos": {
       "unavailable": "Les dépôts sont indisponibles. Terminez la configuration de Bitbucket sur kilo.ai.",
@@ -839,9 +839,9 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
-      "githubApp": "application GitHub",
+      "githubApp": "Application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
-      "gitlabAccount": "compte GitLab",
+      "gitlabAccount": "Compte GitLab",
       "gitlabError": "Impossible d'ouvrir la configuration de GitLab. Réessayez.",
       "bitbucketError": "Impossible d'ouvrir la configuration de Bitbucket. Réessayez."
     },
@@ -867,7 +867,7 @@
       "started": "Date de début",
       "threshold": "Seuil",
       "title": "Revue",
-      "tokens": "jetons",
+      "tokens": "Jetons",
       "tokensInOut": "{{input}} en entrée / {{output}} en sortie",
       "transcriptWaiting": "La transcription de la revue n'est pas encore disponible.",
       "transcriptEmpty": "Aucune transcription n'est disponible pour cette revue.",
@@ -1150,11 +1150,11 @@
       "notFoundDescription": "Ce signalement a peut-être été supprimé, ou vous n'y avez plus accès.",
       "notFoundTitle": "Problème introuvable",
       "reason": "Motif",
-      "reasonFixStarted": "correction déjà en cours",
-      "reasonInaccurate": "problème mal identifié",
-      "reasonNoBandwidth": "manque de ressources disponibles",
-      "reasonNotUsed": "code vulnérable non utilisé",
-      "reasonTolerableRisk": "risque acceptable",
+      "reasonFixStarted": "Correction déjà en cours",
+      "reasonInaccurate": "Problème mal identifié",
+      "reasonNoBandwidth": "Manque de ressources disponibles",
+      "reasonNotUsed": "Code vulnérable non utilisé",
+      "reasonTolerableRisk": "Risque acceptable",
       "title": "Ignorer le problème"
     },
     "findingDetail": {
@@ -1250,7 +1250,7 @@
     },
     "repositories": {
       "couldNotLoad": "Impossible de charger les paramètres des dépôts.",
-      "githubAppSettings": "paramètres de l'application GitHub",
+      "githubAppSettings": "Paramètres de l'application GitHub",
       "manageAccess": "Gérer l'accès de l'application GitHub",
       "noRepositories": "Aucun dépôt",
       "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts.",
@@ -1302,7 +1302,7 @@
       "enterWholeNumber": "Saisissez un nombre entier entre 1 et 365",
       "high": "Élevé",
       "highDescription": "Risque important d'exposition de données.",
-      "invalidDayCount": "Saisissez un nombre entier de jours entre 1 et 365.",
+      "invalidDayCount": "saisissez un nombre entier de jours entre 1 et 365.",
       "low": "Faible",
       "lowDescription": "Impact minimal sur la sécurité.",
       "medium": "Moyen",
@@ -1530,14 +1530,14 @@
       "accessibilityLabel": "Outil {{name}}, {{status}}",
       "noTasks": "Aucune tâche.",
       "toolRead": "lire",
-      "toolEdit": "Modifier",
+      "toolEdit": "modifier",
       "toolWrite": "écrire",
       "toolBash": "bash",
       "toolGlob": "rechercher des fichiers",
       "toolGrep": "rechercher du texte",
       "toolList": "lister",
       "toolPatch": "appliquer un correctif",
-      "toolTask": "Tâche",
+      "toolTask": "tâche",
       "readTodos": "Lire les tâches",
       "updateTodos": "Mettre à jour les tâches",
       "linesBadge": "{{displayCount}} lignes",
@@ -1554,7 +1554,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[entrée non sérialisable]",
-      "errorPrefix": "erreur : {{error}}"
+      "errorPrefix": "Erreur : {{error}}"
     },
     "instancePicker": {
       "runOn": "Lieu d'exécution",
@@ -1804,14 +1804,14 @@
     "modelSelector": {
       "provider": "Fournisseur {{id}}",
       "modelId": "Modèle {{id}}",
-      "unavailable": "indisponible",
+      "unavailable": "Indisponible",
       "unavailableState": "indisponible",
       "selectedState": "sélectionné",
       "thinkingEffort": "Niveau de réflexion",
       "thinkingEffortAccessibility": "niveau de réflexion : {{label}}",
       "thinkingEffortSelected": "niveau de réflexion : {{label}}, sélectionné",
       "thinkingEffortWithModel": "{{model}}, niveau de réflexion : {{variant}}",
-      "lockedByAgent": ", verrouillé par l'agent « {{agent}} »",
+      "lockedByAgent": ", Verrouillé par l'agent « {{agent}} »",
       "addToFavorites": "Ajouter {{name}} aux favoris",
       "removeFromFavorites": "Retirer {{name}} des favoris",
       "thinkingEffortXhigh": "TÉ",
@@ -1835,7 +1835,7 @@
     "attachmentPicker": {
       "camera": "Appareil photo",
       "photoLibrary": "Photothèque",
-      "files": "fichiers",
+      "files": "Fichiers",
       "couldNotOpenPhotoPicker": "Impossible d'ouvrir le sélecteur de photos. Redémarrez Kilo et réessayez.",
       "maxFilesAllowed": "Vous pouvez joindre jusqu'à {{displayCount}} fichiers.",
       "onlyAddingFiles": "Ajout de {{accepted}} fichiers seulement sur {{total}} (maximum : {{max}})"
@@ -1927,10 +1927,10 @@
       "stepsCount_many": "{{steps}} étapes"
     },
     "prBadge": {
-      "open": "Ouverture de la PR",
-      "closed": "PR fermée",
-      "merged": "PR fusionnée",
-      "draft": "PR en brouillon",
+      "open": "ouverture de la PR",
+      "closed": "pR fermée",
+      "merged": "pR fusionnée",
+      "draft": "pR en brouillon",
       "updating": "Mise à jour en cours, {{label}} n° {{number}}",
       "label": "{{label}} n° {{number}}"
     },
@@ -2051,7 +2051,7 @@
     "optionsExpiredDescription": "Revenez en arrière et rouvrez ce sélecteur depuis l'écran précédent."
   },
   "sessionRow": {
-    "needsInput": "intervention requise"
+    "needsInput": "INTERVENTION REQUISE"
   },
   "voiceInput": {
     "listening": "À l'écoute…",
@@ -2118,11 +2118,11 @@
     "verifyPurchaseFailed": "Impossible de vérifier votre achat. Vérifiez votre connexion et réessayez.",
     "productsCouldNotLoad": "Les produits Kilo Pass n'ont pas pu être chargés depuis l'App Store.",
     "tryingAgain": "Nouvelle tentative…",
-    "kiloPassManagement": "gestion de Kilo Pass",
+    "kiloPassManagement": "Gestion de Kilo Pass",
     "legalConnectorTerms": " En vous abonnant, vous acceptez les ",
     "legalConnectorPrivacy": " et confirmez avoir pris connaissance de la ",
     "manageFailed": "Impossible d'ouvrir la gestion des abonnements de l'App Store.",
-    "kiloPassSetup": "configuration de Kilo Pass",
+    "kiloPassSetup": "Configuration de Kilo Pass",
     "subscriptionHeaderDescription": "Cet abonnement mensuel ajoute des crédits à votre solde Kilo pour programmer avec l'IA dans Kilo App : agents cloud, sessions à distance et discussions KiloClaw.",
     "tierDescription": "{{price}} de crédits payants sont ajoutés chaque mois pour utiliser Kilo App.",
     "subscribe": "S'abonner",
@@ -2144,7 +2144,7 @@
     "unavailableDescription": "Kilo Pass n'est pas disponible comme achat intégré sur Android. Gérez-le sur le web.",
     "webManagementDescription": "Ce Kilo Pass est géré sur le web.",
     "legalDisclosure": "Kilo Pass est un abonnement mensuel à renouvellement automatique. Le paiement est facturé à votre Apple ID à la confirmation de l'achat. L'abonnement se renouvelle automatiquement chaque mois au prix indiqué, sauf résiliation au moins 24 heures avant la fin de la période en cours. Vous pouvez le gérer ou le résilier à tout moment dans les réglages de votre compte App Store.",
-    "legalTermsOfUse": "conditions d'utilisation (EULA)",
+    "legalTermsOfUse": "Conditions d'utilisation (EULA)",
     "purchaseDifferentAccount": "Cet achat sur l'App Store n'est pas lié à votre compte Kilo. Connectez-vous au compte Apple Account utilisé pour l'achat, puis réessayez.",
     "restoreFailed": "Échec de la restauration des achats. Réessayez.",
     "purchaseFailed": "Impossible de finaliser l'achat.",
@@ -2170,7 +2170,7 @@
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
     "seeFullDetails": "Voir tous les détails",
     "privacyPolicyPrefix": "Vos données sont traitées conformément à la",
-    "privacyPolicy": "politique de confidentialité de Kilo",
+    "privacyPolicy": "Politique de confidentialité de Kilo",
     "onDevice": "Sur l'appareil",
     "couldNotLoadTranscription": "Impossible de charger votre réglage de transcription.",
     "signInToManageTranscription": "Connectez-vous pour gérer la transcription en ligne.",
@@ -2248,7 +2248,7 @@
       "couldNotSearch": "Impossible de rechercher des sessions.",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session terminée",
-      "live": "En direct",
+      "live": "EN DIRECT",
       "updating": "Mise à jour en cours"
     },
     "sessionRow": {
@@ -2293,8 +2293,8 @@
     "remoteSpawnRetryable": "Impossible de joindre l'instance. Elle s'est peut-être déconnectée.",
     "remoteSpawnNonRetryable": "L'instance n'a pas pu démarrer la session. Vérifiez la machine ou mettez à jour la CLI.",
     "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance.",
-    "liveCount_one": "{{count}} en direct",
-    "liveCount_other": "{{count}} en direct",
+    "liveCount_one": "{{count}} EN DIRECT",
+    "liveCount_other": "{{count}} EN DIRECT",
     "liveCount_many": "{{count}} EN COURS"
   },
   "monoScrollBlock": {
@@ -2481,7 +2481,7 @@
       "retryLoadingAllFiles": "Réessayer de charger tous les fichiers",
       "retryLoadingFiles": "Réessayer de charger les fichiers",
       "retryLoadingMoreFiles": "Réessayer de charger d'autres fichiers",
-      "title": "fichiers",
+      "title": "Fichiers",
       "viewedCount": "{{viewed}} sur {{total}} consultés",
       "viewedOfListed": "{{viewed}} sur {{total}} consultés parmi les fichiers affichés"
     },
@@ -2493,7 +2493,7 @@
       "openDiffOnGitHub": "Ouvrir les différences de ce fichier sur GitHub",
       "openOnGitHub": "Ouvrir sur GitHub",
       "unmarkViewed": "Marquer {{path}} comme non consulté",
-      "githubDiff": "différences sur GitHub"
+      "githubDiff": "Différences sur GitHub"
     },
     "floatingActions": {
       "clear": "Désélectionner",
@@ -2623,7 +2623,7 @@
     "overview": {
       "commit": "validations",
       "commit_other": "validations",
-      "commit_one": "Validation",
+      "commit_one": "validation",
       "file": "fichiers",
       "file_other": "fichiers",
       "file_one": "fichier",
@@ -2664,7 +2664,7 @@
       "emptyDiffColumn": "colonne de différences vide",
       "emptyDiffRow": "Ligne de différences vide",
       "newOnly": "Nouvelle version uniquement : {{text}}",
-      "noNewlineAtEndOfFile": "Le fichier ne se termine pas par un saut de ligne.",
+      "noNewlineAtEndOfFile": "le fichier ne se termine pas par un saut de ligne.",
       "oldNew": "Avant : {{old}} | Après : {{new}}",
       "oldOnly": "Ancienne version uniquement : {{text}}"
     },
@@ -2691,7 +2691,7 @@
     },
     "tabs": {
       "discussion": "Échanges",
-      "files": "fichiers",
+      "files": "Fichiers",
       "overview": "Aperçu"
     },
     "diff": {
@@ -2836,7 +2836,7 @@
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",
-      "last30Days": "30 derniers jours",
+      "last30Days": "30 Derniers jours",
       "outputTokens": "Jetons de sortie",
       "requests": "Requêtes"
     },
@@ -2929,7 +2929,7 @@
     "signedOut": "Connectez-vous pour voir les agents",
     "privacy": "Ouvrez Kilo pour voir les agents",
     "openAgents": "Ouvrir les agents",
-    "needsInput": "intervention requise",
+    "needsInput": "Intervention requise",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
   }

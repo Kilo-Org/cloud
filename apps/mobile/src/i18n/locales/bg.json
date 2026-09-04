@@ -169,7 +169,7 @@
     "verifyCode": "Провери кода",
     "resendCode": "Изпрати кода отново",
     "termsPrefix": "Като продължиш, приемаш нашите",
-    "terms": "условия",
+    "terms": "Условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Разликите са твърде големи, за да се покажат.",
       "openOnGitHub": "Отвори в GitHub",
       "openDiffOnGitHub": "Отвори разликите в този файл в GitHub",
-      "githubDiff": "разликите в GitHub"
+      "githubDiff": "Разликите в GitHub"
     },
     "floatingActions": {
       "clearSelection": "Изчисти избора",
@@ -421,8 +421,8 @@
       "addReaction": "Добави реакция",
       "reactionPill": "реакция {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
-      "reaction": "Реакции",
-      "reaction_other": "Реакции",
+      "reaction": "реакции",
+      "reaction_other": "реакции",
       "commentActions": "Действия с коментара",
       "reportContent": "Сигнализирай за съдържание",
       "reportUser": "Сигнализирай за потребител",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Отворена · Нужен преглед",
       "stateOpen": "Отваряне",
       "unknownAuthor": "Неизвестен автор",
-      "commit_one": "Комит",
+      "commit_one": "комит",
       "commit": "комита",
       "commit_other": "комита",
-      "file_one": "Файл",
-      "file": "Файлове",
-      "file_other": "Файлове"
+      "file_one": "файл",
+      "file": "файлове",
+      "file_other": "файлове"
     },
     "pendingComment": {
       "editOutdatedA11y": "Редактирай неактуалния неизпратен коментар към {{location}}",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Всички полета са задължителни, за да се свърже {{label}}.",
       "setupGuideFallback": "ръководство за настройка",
       "setupGuideA11y": "Ръководство за настройка на {{label}}",
-      "setupGuide": "ръководство за настройка",
+      "setupGuide": "Ръководство за настройка",
       "saving": "Запазване…",
       "removing": "Премахване…",
       "updateToken": "Актуализирай токена"
@@ -1125,12 +1125,12 @@
       "destroying": "УНИЩОЖАВАНЕ",
       "provisioned": "ПОДГОТВЕНА",
       "restarting": "РЕСТАРТИРАНЕ",
-      "running": "Изпълнява се",
+      "running": "ИЗПЪЛНЯВА СЕ",
       "shuttingDown": "ИЗКЛЮЧВАНЕ",
-      "starting": "Стартиране",
+      "starting": "СТАРТИРАНЕ",
       "stopped": "СПРЯНА",
       "stopping": "СПИРАНЕ",
-      "unknown": "Неизвестно",
+      "unknown": "НЕИЗВЕСТНО",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Персонализирани инструкции",
       "deprecation": "Предстои спиране на поддръжката за персонализираните инструкции. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
-      "placeholder": "Напр. спазване на правилата ни за обработка на грешки…"
+      "placeholder": "напр. спазване на правилата ни за обработка на грешки…"
     },
     "repos": {
       "unavailable": "Хранилищата са недостъпни — завърши настройката на Bitbucket в kilo.ai.",
@@ -1339,9 +1339,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "приложението за GitHub",
+      "githubApp": "Приложението за GitHub",
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
-      "gitlabAccount": "акаунта в GitLab",
+      "gitlabAccount": "Акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
       "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане.",
       "bitbucketError": "Не успяхме да отворим настройката на Bitbucket. Опитай отново."
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Виж бюлетина за сигурност в GitHub",
       "statusOpen": "Отваряне",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Отстраняването вече е започнало",
-      "reasonNoBandwidth": "Няма свободен капацитет",
-      "reasonTolerableRisk": "Рискът е приемлив",
-      "reasonInaccurate": "Проблемът е докладван неточно",
-      "reasonNotUsed": "Уязвимият код не се използва",
+      "reasonFixStarted": "отстраняването вече е започнало",
+      "reasonNoBandwidth": "няма свободен капацитет",
+      "reasonTolerableRisk": "рискът е приемлив",
+      "reasonInaccurate": "проблемът е докладван неточно",
+      "reasonNotUsed": "уязвимият код не се използва",
       "reasonAfterReview": "след преглед"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Възможно е значително изтичане на данни.",
       "mediumDescription": "Ограничено въздействие или специфични условия.",
       "lowDescription": "Минимално въздействие върху сигурността.",
-      "invalidDayCount": "Въведи брой дни от 1 до 365 като цяло число.",
+      "invalidDayCount": "въведи брой дни от 1 до 365 като цяло число.",
       "remediationDeadlineA11y": "Краен срок за отстраняване в дни — {{label}}",
       "enterWholeNumber": "Въведи цяло число между 1 и 365",
       "permissionNote": "Само собствениците на организацията и отговорниците за фактурирането могат да променят тези настройки.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Не успяхме да заредим настройките за хранилищата.",
-      "githubAppSettings": "настройките на приложението за GitHub",
+      "githubAppSettings": "Настройките на приложението за GitHub",
       "manageAccess": "Управлявай достъпа на приложението за GitHub",
       "noRepositories": "Няма хранилища",
       "noRepositoriesDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Не можахме да извършим търсенето на сесии.",
       "completedWillAppear": "Завършените сесии ще се появят тук.",
       "noPastSessions": "Няма предишни сесии",
-      "live": "На живо",
+      "live": "НА ЖИВО",
       "updating": "Актуализиране"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Не можахме да копираме идентификатора на сесията.",
       "untitled": "Сесия без име",
       "sessionDeleted": "Сесията е изтрита",
-      "needsInput": "Нужен е отговор",
+      "needsInput": "нужен е отговор",
       "fromPlatform": "от {{platform}}",
       "cent_one": "цент",
       "cent": "цента",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Не можахме да се свържем с инстанцията — връзката с нея може да е прекъсната.",
     "remoteSpawnNonRetryable": "Инстанцията не успя да стартира сесията — провери машината или актуализирай CLI.",
     "remoteSpawnInstanceDisconnected": "Връзката с избраната инстанция е прекъсната. Стартирай сесия в Cloud Agent или избери друга инстанция.",
-    "liveCount_one": "{{count}} на живо",
-    "liveCount_other": "{{count}} на живо"
+    "liveCount_one": "{{count}} НА ЖИВО",
+    "liveCount_other": "{{count}} НА ЖИВО"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Инструмент {{name}}, {{status}}",
       "noTasks": "Няма задачи.",
       "toolRead": "четене",
-      "toolEdit": "Редактиране",
+      "toolEdit": "редактиране",
       "toolWrite": "запис",
       "toolBash": "bash",
       "toolGlob": "търсене на файлове",
       "toolGrep": "търсене в текст",
       "toolList": "изброяване",
       "toolPatch": "прилагане на корекция",
-      "toolTask": "Задача",
+      "toolTask": "задача",
       "readTodos": "Прочети задачите",
       "updateTodos": "Актуализирай задачите",
       "linesBadge": "{{displayCount}} реда",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[входни данни, които не могат да се сериализират]",
-      "errorPrefix": "грешка: {{error}}"
+      "errorPrefix": "Грешка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Място на изпълнение",
@@ -2291,13 +2291,13 @@
       "provider": "Доставчик {{id}}",
       "modelId": "Модел {{id}}",
       "unavailable": "Недостъпен",
-      "unavailableState": "Недостъпен",
+      "unavailableState": "недостъпен",
       "selectedState": "избран",
       "thinkingEffort": "Усилие за разсъждение",
       "thinkingEffortAccessibility": "Усилие за разсъждение: {{label}}",
       "thinkingEffortSelected": "Усилие за разсъждение: {{label}}, избрано",
       "thinkingEffortWithModel": "{{model}}, усилие за разсъждение: {{variant}}",
-      "lockedByAgent": ", заключено от агента „{{agent}}“",
+      "lockedByAgent": ", Заключено от агента „{{agent}}“",
       "addToFavorites": "Добави {{name}} към любимите",
       "removeFromFavorites": "Премахни {{name}} от любимите",
       "thinkingEffortXhigh": "МВ",
@@ -2404,7 +2404,7 @@
       "olderActivity": "По-стара активност",
       "olderActivityDescription": "Разход, неотнесен към заредената история",
       "ofWindowTokens": "от {{window}} токена",
-      "tokens": "Токени",
+      "tokens": "токени",
       "tokensWithPercentage": "токена ({{percentage}})",
       "stepsCount_one": "{{steps}} стъпка",
       "stepsCount": "{{steps}} стъпки",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Отваряне на заявка за сливане",
+      "open": "отваряне на заявка за сливане",
       "closed": "затворена заявка за сливане",
       "merged": "слята заявка за сливане",
-      "draft": "Чернова на заявка за сливане",
+      "draft": "чернова на заявка за сливане",
       "updating": "Актуализиране, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Върни се назад и отвори отново този прозорец за избор от предишния екран."
   },
   "sessionRow": {
-    "needsInput": "Нужен е отговор"
+    "needsInput": "НУЖЕН Е ОТГОВОР"
   },
   "voiceInput": {
     "listening": "Слушам…",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Не успяхме да потвърдим покупката ти. Провери връзката си и опитай отново.",
     "productsCouldNotLoad": "Продуктите на Kilo Pass не можаха да се заредят от App Store.",
     "tryingAgain": "Повторен опит…",
-    "kiloPassManagement": "управление на Kilo Pass",
+    "kiloPassManagement": "Управление на Kilo Pass",
     "legalConnectorTerms": " С абонирането приемаш ",
     "legalConnectorPrivacy": " и потвърждаваш, че си прочел ",
     "manageFailed": "Не успяхме да отворим управлението на абонамента в App Store.",
-    "kiloPassSetup": "настройка на Kilo Pass",
+    "kiloPassSetup": "Настройка на Kilo Pass",
     "subscriptionHeaderDescription": "Този месечен абонамент добавя кредити към баланса ти в Kilo за сесии за програмиране с изкуствен интелект в Kilo App — облачни агенти, отдалечени сесии и чатове с KiloClaw.",
     "tierDescription": "Всеки месец се добавят платени кредити на стойност {{price}} за използване в Kilo App.",
     "subscribe": "Абонирай се",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass не може да се закупи в приложението за Android. Управлявай го през сайта.",
     "webManagementDescription": "Този Kilo Pass се управлява през сайта.",
     "legalDisclosure": "Kilo Pass е месечен абонамент с автоматично подновяване. Сумата се начислява към твоя Apple ID при потвърждаване на покупката. Абонаментът се подновява автоматично всеки месец на показаната цена, освен ако не го прекратиш поне 24 часа преди края на текущия период. Можеш да го управляваш или прекратиш по всяко време от настройките на акаунта си в App Store.",
-    "legalTermsOfUse": "условията за ползване (EULA)",
+    "legalTermsOfUse": "Условията за ползване (EULA)",
     "purchaseDifferentAccount": "Тази покупка от App Store не е свързана с акаунта ти в Kilo. Влез в Apple Account, използван за покупката, и опитай отново.",
     "restoreFailed": "Не успяхме да възстановим покупките. Опитай отново.",
     "purchaseFailed": "Не можахме да завършим покупката.",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Споделяй анонимни данни за използването на приложението и източника на инсталацията. Можеш да промениш избора си по всяко време в настройките.",
     "seeFullDetails": "Виж всички подробности",
     "privacyPolicyPrefix": "Данните ти се обработват съгласно",
-    "privacyPolicy": "политиката за поверителност на Kilo",
+    "privacyPolicy": "Политиката за поверителност на Kilo",
     "onDevice": "На устройството",
     "couldNotLoadTranscription": "Не успяхме да заредим настройката ти за транскрипция.",
     "signInToManageTranscription": "Влез в акаунта си, за да управляваш онлайн транскрипцията.",

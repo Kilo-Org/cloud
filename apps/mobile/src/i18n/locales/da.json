@@ -38,7 +38,7 @@
     "findings": "Fund",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Kodelagre",
     "securityAgent": "Sikkerhedsagent",
     "unknown": "Ukendt",
@@ -93,7 +93,7 @@
     "email": "E-mail",
     "ends": "Udløber {{date}}",
     "failed": "Mislykket",
-    "file": "fil",
+    "file": "Fil",
     "gitlab": "GitLab",
     "goBack": "Gå tilbage",
     "idle": "Inaktiv",
@@ -110,9 +110,9 @@
     "pending": "Afventer",
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
-    "privacyPolicy": "privatlivspolitik",
+    "privacyPolicy": "Privatlivspolitik",
     "profile": "Profil",
-    "reactions": "reaktioner",
+    "reactions": "Reaktioner",
     "recent": "Seneste",
     "recommended": "Anbefalede",
     "remaining": "Tilbage",
@@ -169,7 +169,7 @@
     "verifyCode": "Bekræft kode",
     "resendCode": "Send kode igen",
     "termsPrefix": "Ved at fortsætte accepterer du vores",
-    "terms": "vilkår",
+    "terms": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere muligheder for login",
@@ -272,7 +272,7 @@
       "diffTooLarge": "ændringsvisningen er for stor",
       "openFile": "Åbn {{path}}",
       "openFileViewed": "Åbn {{path}} (gennemset)",
-      "title": "filer"
+      "title": "Filer"
     },
     "fileRows": {
       "markViewed": "Markér {{path}} som gennemset",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Ændringerne er for omfattende til at blive vist.",
       "openOnGitHub": "Åbn på GitHub",
       "openDiffOnGitHub": "Åbn filens ændringsvisning på GitHub",
-      "githubDiff": "ændringsvisning på GitHub"
+      "githubDiff": "Ændringsvisning på GitHub"
     },
     "floatingActions": {
       "clearSelection": "Fjern markeringen",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Gå til fanen Oversigt"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ Filen slutter ikke med et linjeskift.",
+      "noNewlineAtEndOfFile": "⚠️ filen slutter ikke med et linjeskift.",
       "emptyDiffColumn": "tom kolonne i ændringsvisningen",
       "oldNew": "Før: {{old}} | Efter: {{new}}",
       "oldOnly": "Kun før: {{text}}",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet, ventende kommentar ved {{location}}",
       "editA11y": "Rediger ventende kommentar ved {{location}}",
-      "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
+      "staleHint": "pR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
       "noCommentsQueued": "Der er ingen kommentarer i køen. Gennemgangen sendes kun med det valgte resultat ovenfor.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Oversigt",
-      "files": "filer",
+      "files": "Filer",
       "discussion": "Diskussion"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Tag billede",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "cameraAccessMessage": "Giv adgang til kameraet i indstillingerne for at tage et billede."
     },
     "typingIndicator": {
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Udfyld alle felter for at tilslutte {{label}}.",
       "setupGuideFallback": "opsætningsvejledning",
       "setupGuideA11y": "opsætningsvejledning til {{label}}",
-      "setupGuide": "opsætningsvejledning",
+      "setupGuide": "Opsætningsvejledning",
       "saving": "Gemmer…",
       "removing": "Fjerner…",
       "updateToken": "Opdater token"
@@ -1125,12 +1125,12 @@
       "destroying": "SLETTER",
       "provisioned": "KLARGJORT",
       "restarting": "GENSTARTER",
-      "running": "Kører",
+      "running": "KØRER",
       "shuttingDown": "LUKKER NED",
-      "starting": "Starter",
+      "starting": "STARTER",
       "stopped": "STOPPET",
       "stopping": "STOPPER",
-      "unknown": "Ukendt",
+      "unknown": "UKENDT",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
       "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
-      "placeholder": "F.eks. overhold vores regler for fejlhåndtering…"
+      "placeholder": "f.eks. overhold vores regler for fejlhåndtering…"
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgængelige. Afslut opsætningen af Bitbucket på kilo.ai.",
@@ -1252,7 +1252,7 @@
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
-      "tokens": "teksttokens",
+      "tokens": "Teksttokens",
       "tokensInOut": "{{input}} ind / {{output}} ud",
       "council": "Bedømmelsespanel",
       "decision": "Beslutning",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Afvis fund",
       "reason": "Begrundelse",
-      "reasonFixStarted": "rettelsen er allerede i gang",
-      "reasonNoBandwidth": "der er ingen ledig kapacitet",
-      "reasonTolerableRisk": "risikoen er acceptabel",
-      "reasonInaccurate": "fundet er misvisende",
-      "reasonNotUsed": "sårbar kode bruges ikke",
+      "reasonFixStarted": "Rettelsen er allerede i gang",
+      "reasonNoBandwidth": "Der er ingen ledig kapacitet",
+      "reasonTolerableRisk": "Risikoen er acceptabel",
+      "reasonInaccurate": "Fundet er misvisende",
+      "reasonNotUsed": "Sårbar kode bruges ikke",
       "commentLabel": "Kommentar (valgfri)",
       "commentAccessibility": "Kommentar til afvisningen",
       "commentPlaceholder": "Baggrund for afvisningen…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Risiko for omfattende datalæk.",
       "mediumDescription": "Begrænset påvirkning eller krav om særlige betingelser.",
       "lowDescription": "Minimal påvirkning af sikkerheden.",
-      "invalidDayCount": "Angiv 1–365 dage som et helt tal.",
+      "invalidDayCount": "angiv 1–365 dage som et helt tal.",
       "remediationDeadlineA11y": "Frist for udbedring i dage ved {{label}} alvorlighed",
       "enterWholeNumber": "Indtast et helt tal mellem 1 og 365",
       "permissionNote": "Kun organisationsejere og faktureringsadministratorer kan ændre disse indstillinger.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Indstillingerne for kodelagre kunne ikke indlæses.",
-      "githubAppSettings": "indstillinger for GitHub-appen",
+      "githubAppSettings": "Indstillinger for GitHub-appen",
       "manageAccess": "Administrér GitHub-appens adgang",
       "noRepositories": "Ingen kodelagre",
       "noRepositoriesDescription": "Giv Kilos GitHub-app adgang til kodelagre.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Der kunne ikke søges i sessionerne.",
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
-      "live": "I realtid",
+      "live": "I REALTID",
       "updating": "Opdaterer"
     },
     "sessionRow": {
@@ -1894,7 +1894,7 @@
       "dollar_other": "dollar",
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Der kunne ikke oprettes forbindelse til instansen. Den har muligvis mistet forbindelsen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte sessionen — kontrollér maskinen eller opdater CLI'en.",
     "remoteSpawnInstanceDisconnected": "Den valgte instans har mistet forbindelsen. Start en session på Cloud Agent, eller vælg en anden instans.",
-    "liveCount_one": "{{count}} i realtid",
-    "liveCount_other": "{{count}} i realtid"
+    "liveCount_one": "{{count}} I REALTID",
+    "liveCount_other": "{{count}} I REALTID"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Værktøj: {{name}}, {{status}}",
       "noTasks": "Ingen opgaver.",
       "toolRead": "læs",
-      "toolEdit": "Redigér",
+      "toolEdit": "redigér",
       "toolWrite": "skriv",
       "toolBash": "bash",
       "toolGlob": "filsøgning",
       "toolGrep": "tekstsøgning",
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
-      "toolTask": "Opgave",
+      "toolTask": "opgave",
       "readTodos": "Læs opgavelisten",
       "updateTodos": "Opdatér opgavelisten",
       "linesBadge": "{{displayCount}} linjer",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[inddata kan ikke serialiseres]",
-      "errorPrefix": "fejl: {{error}}"
+      "errorPrefix": "Fejl: {{error}}"
     },
     "instancePicker": {
       "runOn": "Kør på",
@@ -2290,14 +2290,14 @@
     "modelSelector": {
       "provider": "Udbyder {{id}}",
       "modelId": "Model-id: {{id}}",
-      "unavailable": "utilgængelig",
+      "unavailable": "Utilgængelig",
       "unavailableState": "utilgængelig",
       "selectedState": "valgt",
       "thinkingEffort": "Ræsonnementsniveau",
       "thinkingEffortAccessibility": "Ræsonnementsniveau: {{label}}",
       "thinkingEffortSelected": "Ræsonnementsniveau: {{label}}, valgt",
       "thinkingEffortWithModel": "{{model}}, ræsonnementsniveau: {{variant}}",
-      "lockedByAgent": ", låst af agenten \"{{agent}}\"",
+      "lockedByAgent": ", Låst af agenten \"{{agent}}\"",
       "addToFavorites": "Tilføj {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "thinkingEffortXhigh": "EH",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "couldNotOpenPhotoPicker": "Kunne ikke åbne billedvælgeren. Genstart Kilo og prøv igen.",
       "maxFilesAllowed": "Du kan højst tilføje {{displayCount}} filer.",
       "onlyAddingFiles": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})"
@@ -2415,7 +2415,7 @@
       "open": "åben PR",
       "closed": "lukket PR",
       "merged": "flettet PR",
-      "draft": "PR-kladde",
+      "draft": "pR-kladde",
       "updating": "Opdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Gå tilbage til den forrige skærm og åbn valgmulighederne igen."
   },
   "sessionRow": {
-    "needsInput": "afventer svar"
+    "needsInput": "AFVENTER SVAR"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass kan ikke købes i appen på Android. Administrér abonnementet på nettet.",
     "webManagementDescription": "Dette Kilo Pass-abonnement administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et månedligt abonnement, der fornyes automatisk. Betalingen trækkes via dit Apple ID, når du bekræfter købet. Abonnementet fornyes automatisk hver måned til den viste pris, medmindre du opsiger det mindst 24 timer før den aktuelle periodes udløb. Du kan til enhver tid administrere eller opsige abonnementet i kontoindstillingerne i App Store.",
-    "legalTermsOfUse": "brugsvilkår (EULA)",
+    "legalTermsOfUse": "Brugsvilkår (EULA)",
     "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
     "restoreFailed": "Kunne ikke gendanne køb. Prøv igen.",
     "purchaseFailed": "Kunne ikke fuldføre købet.",
@@ -2907,7 +2907,7 @@
     "signedOut": "Log ind for at se agenter",
     "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
-    "needsInput": "afventer svar",
+    "needsInput": "Afventer svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   }

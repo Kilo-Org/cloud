@@ -169,7 +169,7 @@
     "verifyCode": "Vahvista koodi",
     "resendCode": "Lähetä koodi uudelleen",
     "termsPrefix": "Jatkamalla hyväksyt",
-    "terms": "käyttöehdot",
+    "terms": "Käyttöehdot",
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Lisää kirjautumisvaihtoehtoja",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Siirry Yleiskatsaus-välilehdelle"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Tiedoston lopusta puuttuu rivinvaihto.",
+      "noNewlineAtEndOfFile": "tiedoston lopusta puuttuu rivinvaihto.",
       "emptyDiffColumn": "tyhjä muutosvertailun sarake",
       "oldNew": "Vanha: {{old}} | Uusi: {{new}}",
       "oldOnly": "Vain vanha: {{text}}",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta lähettämätöntä kommenttia: {{location}}",
       "editA11y": "Muokkaa lähettämätöntä kommenttia: {{location}}",
-      "staleHint": "PR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
+      "staleHint": "pR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
       "deleteA11y": "Poista lähettämätön kommentti: {{location}}",
       "deletedAnnouncement": "Lähettämätön kommentti poistettu",
       "noCommentsQueued": "Lähetysjonossa ei ole kommentteja. Katselmointi lähetetään vain yllä valitulla tuloksella.",
@@ -866,7 +866,7 @@
       "renews": "Uusiutuu",
       "standardMonthToMonth": "Standard-kuukausitilaus",
       "standardStartsOn": "Standard-tilaus alkaa {{date}} hintaan {{price}}.",
-      "yourStandardMonthlyPrice": "Standard-kuukausihintasi",
+      "yourStandardMonthlyPrice": "standard-kuukausihintasi",
       "perMonth": "/kk",
       "earlybirdAccessUntil": "Earlybird-käyttöoikeus on voimassa {{date}} asti.",
       "earlybirdEnding": "Earlybird-käyttöoikeus päättyy: {{remaining}}.",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Täytä kaikki kentät, jotta voit muodostaa yhteyden palveluun {{label}}.",
       "setupGuideFallback": "käyttöönotto-opas",
       "setupGuideA11y": "Käyttöönotto-ohje: {{label}}",
-      "setupGuide": "käyttöönotto-opas",
+      "setupGuide": "Käyttöönotto-opas",
       "saving": "Tallennetaan…",
       "removing": "Poistetaan…",
       "updateToken": "Päivitä pääsytunniste"
@@ -1125,12 +1125,12 @@
       "destroying": "TUHOTAAN",
       "provisioned": "LUOTU",
       "restarting": "KÄYNNISTETÄÄN UUDELLEEN",
-      "running": "Käynnissä",
+      "running": "KÄYNNISSÄ",
       "shuttingDown": "SAMMUTETAAN",
-      "starting": "Käynnistetään",
+      "starting": "KÄYNNISTETÄÄN",
       "stopped": "PYSÄYTETTY",
       "stopping": "PYSÄYTETÄÄN",
-      "unknown": "Tuntematon",
+      "unknown": "TUNTEMATON",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Mukautetut ohjeet",
       "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet tietovarastosi REVIEW.md-tiedostoon.",
-      "placeholder": "Esim. noudata virheenkäsittelykäytäntöjämme…"
+      "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…"
     },
     "repos": {
       "unavailable": "Tietovarastot eivät ole käytettävissä. Viimeistele Bitbucketin käyttöönotto osoitteessa kilo.ai.",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Sivuuta havainto",
       "reason": "Syy",
-      "reasonFixStarted": "korjaus on jo aloitettu",
-      "reasonNoBandwidth": "ei vapaita resursseja",
-      "reasonTolerableRisk": "riski on hyväksyttävä",
-      "reasonInaccurate": "havainto on virheellinen",
-      "reasonNotUsed": "haavoittuvaa koodia ei käytetä",
+      "reasonFixStarted": "Korjaus on jo aloitettu",
+      "reasonNoBandwidth": "Ei vapaita resursseja",
+      "reasonTolerableRisk": "Riski on hyväksyttävä",
+      "reasonInaccurate": "Havainto on virheellinen",
+      "reasonNotUsed": "Haavoittuvaa koodia ei käytetä",
       "commentLabel": "Kommentti (valinnainen)",
       "commentAccessibility": "Hylkäyskommentti",
       "commentPlaceholder": "Hylkäyksen lisätiedot…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Merkittävän tietovuodon riski.",
       "mediumDescription": "Rajallinen vaikutus tai hyväksikäyttö vain tietyissä olosuhteissa.",
       "lowDescription": "Vähäinen tietoturvavaikutus.",
-      "invalidDayCount": "Anna päivien määrä kokonaislukuna väliltä 1–365.",
+      "invalidDayCount": "anna päivien määrä kokonaislukuna väliltä 1–365.",
       "remediationDeadlineA11y": "Vakavuus: {{label}}. Korjauksen määräaika päivinä",
       "enterWholeNumber": "Anna kokonaisluku välillä 1–365",
       "permissionNote": "Vain organisaation omistajat ja laskutusvastaavat voivat muuttaa näitä asetuksia.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Istuntoja ei voitu hakea.",
       "completedWillAppear": "Päättyneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
-      "live": "Reaaliajassa",
+      "live": "REAALIAJASSA",
       "updating": "Päivitetään"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Istunnon tunnusta ei voitu kopioida.",
       "untitled": "Nimetön istunto",
       "sessionDeleted": "Istunto poistettu",
-      "needsInput": "Odottaa vastausta",
+      "needsInput": "odottaa vastausta",
       "fromPlatform": "alustalta {{platform}}",
       "cent_one": "sentti",
       "cent": "senttiä",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Instanssiin ei saatu yhteyttä. Sen yhteys on voinut katketa.",
     "remoteSpawnNonRetryable": "Instanssi ei pystynyt käynnistämään istuntoa. Tarkista kone tai päivitä komentorivikäyttöliittymä.",
     "remoteSpawnInstanceDisconnected": "Valitun instanssin yhteys katkesi. Aloita istunto Cloud Agentissa tai valitse toinen instanssi.",
-    "liveCount_one": "{{count}} reaaliajassa",
-    "liveCount_other": "{{count}} reaaliajassa"
+    "liveCount_one": "{{count}} REAALIAJASSA",
+    "liveCount_other": "{{count}} REAALIAJASSA"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Työkalu: {{name}}, {{status}}",
       "noTasks": "Ei tehtäviä.",
       "toolRead": "lue",
-      "toolEdit": "Muokkaa",
+      "toolEdit": "muokkaa",
       "toolWrite": "kirjoita",
       "toolBash": "bash",
       "toolGlob": "tiedostohaku",
       "toolGrep": "sisältöhaku",
       "toolList": "luettele",
       "toolPatch": "käytä korjausta",
-      "toolTask": "Tehtävä",
+      "toolTask": "tehtävä",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
       "linesBadge": "{{displayCount}} riviä",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[syötettä ei voi sarjallistaa]",
-      "errorPrefix": "virhe: {{error}}"
+      "errorPrefix": "Virhe: {{error}}"
     },
     "instancePicker": {
       "runOn": "Suoritusympäristö",
@@ -2291,13 +2291,13 @@
       "provider": "Palveluntarjoaja {{id}}",
       "modelId": "Malli {{id}}",
       "unavailable": "Ei saatavilla",
-      "unavailableState": "Ei saatavilla",
+      "unavailableState": "ei saatavilla",
       "selectedState": "valittu",
       "thinkingEffort": "Päättelyn taso",
       "thinkingEffortAccessibility": "päättelyn taso: {{label}}",
       "thinkingEffortSelected": "päättelyn taso: {{label}}, valittu",
       "thinkingEffortWithModel": "{{model}}, päättelyn taso: {{variant}}",
-      "lockedByAgent": ", agentin \"{{agent}}\" lukitsema",
+      "lockedByAgent": ", Agentin \"{{agent}}\" lukitsema",
       "addToFavorites": "Lisää {{name}} suosikkeihin",
       "removeFromFavorites": "Poista {{name}} suosikeista",
       "thinkingEffortXhigh": "EK",
@@ -2415,7 +2415,7 @@
       "open": "avoin muutospyyntö",
       "closed": "suljettu muutospyyntö",
       "merged": "yhdistetty muutospyyntö",
-      "draft": "Muutospyynnön luonnos",
+      "draft": "muutospyynnön luonnos",
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "Odottaa vastausta"
+    "needsInput": "ODOTTAA VASTAUSTA"
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass ei ole saatavilla sovelluksen sisäisenä ostoksena Androidissa. Hallinnoi sitä verkossa.",
     "webManagementDescription": "Tätä Kilo Pass -tilausta hallinnoidaan verkossa.",
     "legalDisclosure": "Kilo Pass on automaattisesti uusiutuva kuukausitilaus. Maksu veloitetaan Apple ID -tililtäsi, kun vahvistat oston. Tilaus uusiutuu automaattisesti joka kuukausi näytettyyn hintaan, ellet peruuta sitä vähintään 24 tuntia ennen nykyisen tilausjakson päättymistä. Voit hallinnoida tilausta tai peruuttaa sen milloin tahansa App Store -tilisi asetuksissa.",
-    "legalTermsOfUse": "käyttöehdot (EULA)",
+    "legalTermsOfUse": "Käyttöehdot (EULA)",
     "purchaseDifferentAccount": "Tätä App Store -ostosta ei ole liitetty Kilo-tiliisi. Kirjaudu ostoon käytetylle Apple-tilille ja yritä uudelleen.",
     "restoreFailed": "Ostosten palauttaminen epäonnistui. Yritä uudelleen.",
     "purchaseFailed": "Oston viimeistely epäonnistui.",

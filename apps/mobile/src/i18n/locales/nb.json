@@ -38,7 +38,7 @@
     "findings": "Funn",
     "notConnected": "Ikke tilkoblet",
     "notifications": "Varsler",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Kodelagre",
     "securityAgent": "Sikkerhetsagent",
     "unknown": "Ukjent",
@@ -93,7 +93,7 @@
     "email": "E-post",
     "ends": "Utløper {{date}}",
     "failed": "Mislykket",
-    "file": "fil",
+    "file": "Fil",
     "gitlab": "GitLab",
     "goBack": "Gå tilbake",
     "idle": "Ledig",
@@ -110,9 +110,9 @@
     "pending": "Venter",
     "performance": "Ytelse",
     "preferences": "Innstillinger",
-    "privacyPolicy": "personvernerklæring",
+    "privacyPolicy": "Personvernerklæring",
     "profile": "Profil",
-    "reactions": "reaksjoner",
+    "reactions": "Reaksjoner",
     "recent": "Siste",
     "recommended": "Anbefalte",
     "remaining": "Gjenstår",
@@ -169,7 +169,7 @@
     "verifyCode": "Bekreft kode",
     "resendCode": "Send koden på nytt",
     "termsPrefix": "Ved å fortsette godtar du våre",
-    "terms": "vilkår",
+    "terms": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere innloggingsalternativer",
@@ -272,7 +272,7 @@
       "diffTooLarge": "endringsvisningen er for stor",
       "openFile": "Åpne {{path}}",
       "openFileViewed": "Åpne {{path}} (gjennomgått)",
-      "title": "filer"
+      "title": "Filer"
     },
     "fileRows": {
       "markViewed": "Merk {{path}} som gjennomgått",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Endringene er for omfattende til å vises.",
       "openOnGitHub": "Åpne på GitHub",
       "openDiffOnGitHub": "Åpne endringene i denne filen på GitHub",
-      "githubDiff": "endringsvisning på GitHub"
+      "githubDiff": "Endringsvisning på GitHub"
     },
     "floatingActions": {
       "clearSelection": "Fjern markeringen",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Gå til oversiktsfanen"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ Filen mangler linjeskift til slutt.",
+      "noNewlineAtEndOfFile": "⚠️ filen mangler linjeskift til slutt.",
       "emptyDiffColumn": "tom kolonne i endringsvisningen",
       "oldNew": "Før: {{old}} | Etter: {{new}}",
       "oldOnly": "Bare i gammel versjon: {{text}}",
@@ -597,7 +597,7 @@
       "stateOpenReviewRequired": "Åpen · Kodegjennomgang kreves",
       "stateOpen": "Åpne",
       "unknownAuthor": "Ukjent forfatter",
-      "commit_one": "Innsjekking",
+      "commit_one": "innsjekking",
       "commit": "innsjekkinger",
       "commit_other": "innsjekkinger",
       "file_one": "fil",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert, usendt kommentar ved {{location}}",
       "editA11y": "Rediger usendt kommentar ved {{location}}",
-      "staleHint": "PR-en er endret siden du skrev dette.",
+      "staleHint": "pR-en er endret siden du skrev dette.",
       "deleteA11y": "Slett usendt kommentar ved {{location}}",
       "deletedAnnouncement": "Usendt kommentar slettet",
       "noCommentsQueued": "Ingen kommentarer ligger i kø. Kodegjennomgangen sendes inn med bare handlingen som er valgt ovenfor.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Oversikt",
-      "files": "filer",
+      "files": "Filer",
       "discussion": "Diskusjon"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Ta bilde",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "cameraAccessMessage": "Gi appen tilgang til kameraet i Innstillinger for å ta et bilde."
     },
     "typingIndicator": {
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Alle feltene må fylles ut for å koble til {{label}}.",
       "setupGuideFallback": "oppsettsveiledning",
       "setupGuideA11y": "oppsettsveiledning for {{label}}",
-      "setupGuide": "oppsettsveiledning",
+      "setupGuide": "Oppsettsveiledning",
       "saving": "Lagrer…",
       "removing": "Fjerner…",
       "updateToken": "Oppdater tilgangstoken"
@@ -1125,12 +1125,12 @@
       "destroying": "SLETTER",
       "provisioned": "KLARGJORT",
       "restarting": "STARTER PÅ NYTT",
-      "running": "Kjører",
+      "running": "KJØRER",
       "shuttingDown": "AVSLUTTER",
-      "starting": "Starter",
+      "starting": "STARTER",
       "stopped": "STOPPET",
       "stopping": "STOPPER",
-      "unknown": "Ukjent",
+      "unknown": "UKJENT",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Egendefinerte instruksjoner",
       "deprecation": "Funksjonen for egendefinerte instruksjoner skal fases ut. Flytt disse retningslinjene til en REVIEW.md-fil i kodelageret ditt i stedet.",
-      "placeholder": "F.eks. følg reglene våre for feilhåndtering…"
+      "placeholder": "f.eks. følg reglene våre for feilhåndtering…"
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgjengelige. Fullfør Bitbucket-oppsettet på kilo.ai.",
@@ -1252,7 +1252,7 @@
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
-      "tokens": "tokener",
+      "tokens": "Tokener",
       "tokensInOut": "{{input}} inn / {{output}} ut",
       "council": "Vurderingspanel",
       "decision": "Avgjørelse",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Avvis funn",
       "reason": "Årsak",
-      "reasonFixStarted": "retting er allerede i gang",
-      "reasonNoBandwidth": "ingen ledig kapasitet",
-      "reasonTolerableRisk": "risikoen er akseptabel",
-      "reasonInaccurate": "funnet er unøyaktig",
-      "reasonNotUsed": "sårbar kode brukes ikke",
+      "reasonFixStarted": "Retting er allerede i gang",
+      "reasonNoBandwidth": "Ingen ledig kapasitet",
+      "reasonTolerableRisk": "Risikoen er akseptabel",
+      "reasonInaccurate": "Funnet er unøyaktig",
+      "reasonNotUsed": "Sårbar kode brukes ikke",
       "commentLabel": "Kommentar (valgfritt)",
       "commentAccessibility": "Kommentar til avvisningen",
       "commentPlaceholder": "Bakgrunn for avvisningen…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Kan eksponere betydelige mengder data.",
       "mediumDescription": "Har begrensede konsekvenser eller krever bestemte forhold.",
       "lowDescription": "Har minimale konsekvenser for sikkerheten.",
-      "invalidDayCount": "Angi et helt antall dager fra 1 til 365.",
+      "invalidDayCount": "angi et helt antall dager fra 1 til 365.",
       "remediationDeadlineA11y": "Utbedringsfrist i dager for alvorlighetsgrad {{label}}",
       "enterWholeNumber": "Skriv inn et heltall mellom 1 og 365",
       "permissionNote": "Bare organisasjonseiere og faktureringsansvarlige kan endre disse innstillingene.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Kunne ikke laste inn innstillingene for kodelagre.",
-      "githubAppSettings": "innstillinger for GitHub-appen",
+      "githubAppSettings": "Innstillinger for GitHub-appen",
       "manageAccess": "Administrer tilgangen til GitHub-appen",
       "noRepositories": "Ingen kodelagre",
       "noRepositoriesDescription": "Gi Kilos GitHub-app tilgang til kodelagre.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Kunne ikke søke i øktene.",
       "completedWillAppear": "Fullførte økter vises her.",
       "noPastSessions": "Ingen tidligere økter",
-      "live": "Sanntid",
+      "live": "SANNTID",
       "updating": "Oppdaterer"
     },
     "sessionRow": {
@@ -1894,7 +1894,7 @@
       "dollar_other": "dollarer",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Kunne ikke nå instansen. Den kan ha mistet tilkoblingen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte økten. Sjekk maskinen eller oppdater CLI-en.",
     "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans.",
-    "liveCount_one": "{{count}} i sanntid",
-    "liveCount_other": "{{count}} i sanntid"
+    "liveCount_one": "{{count}} I SANNTID",
+    "liveCount_other": "{{count}} I SANNTID"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Verktøyet {{name}}, {{status}}",
       "noTasks": "Det er ingen oppgaver.",
       "toolRead": "les",
-      "toolEdit": "Rediger",
+      "toolEdit": "rediger",
       "toolWrite": "skriv",
       "toolBash": "bash",
       "toolGlob": "filsøk",
       "toolGrep": "tekstsøk",
       "toolList": "list opp",
       "toolPatch": "bruk endringer",
-      "toolTask": "Oppgave",
+      "toolTask": "oppgave",
       "readTodos": "Les oppgavelisten",
       "updateTodos": "Oppdater oppgavelisten",
       "linesBadge": "{{displayCount}} linjer",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[inndata som ikke kan serialiseres]",
-      "errorPrefix": "feil: {{error}}"
+      "errorPrefix": "Feil: {{error}}"
     },
     "instancePicker": {
       "runOn": "Kjør på",
@@ -2291,13 +2291,13 @@
       "provider": "Leverandør {{id}}",
       "modelId": "Modell {{id}}",
       "unavailable": "Utilgjengelig",
-      "unavailableState": "Utilgjengelig",
+      "unavailableState": "utilgjengelig",
       "selectedState": "valgt",
       "thinkingEffort": "Resonneringsinnsats",
       "thinkingEffortAccessibility": "Resonneringsinnsats: {{label}}",
       "thinkingEffortSelected": "Resonneringsinnsats: {{label}}, valgt",
       "thinkingEffortWithModel": "{{model}}, resonneringsinnsats: {{variant}}",
-      "lockedByAgent": ", låst av agenten «{{agent}}»",
+      "lockedByAgent": ", Låst av agenten «{{agent}}»",
       "addToFavorites": "Legg {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "thinkingEffortXhigh": "EH",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne bildevelgeren. Start Kilo på nytt og prøv igjen.",
       "maxFilesAllowed": "Du kan legge til maksimalt {{displayCount}} filer.",
       "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})"
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Åpne PR",
+      "open": "åpne PR",
       "closed": "lukket PR",
       "merged": "sammenslått PR",
-      "draft": "PR-utkast",
+      "draft": "pR-utkast",
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Gå tilbake til forrige skjerm og åpne velgeren på nytt."
   },
   "sessionRow": {
-    "needsInput": "venter på svar"
+    "needsInput": "VENTER PÅ SVAR"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Kunne ikke bekrefte kjøpet ditt. Sjekk tilkoblingen og prøv igjen.",
     "productsCouldNotLoad": "Kunne ikke laste inn Kilo Pass-produktene fra App Store.",
     "tryingAgain": "Prøver igjen...",
-    "kiloPassManagement": "administrasjon av Kilo Pass",
+    "kiloPassManagement": "Administrasjon av Kilo Pass",
     "legalConnectorTerms": " Ved å abonnere godtar du ",
     "legalConnectorPrivacy": " og bekrefter at du har lest ",
     "manageFailed": "Kunne ikke åpne abonnementsinnstillingene i App Store.",
-    "kiloPassSetup": "oppsett av Kilo Pass",
+    "kiloPassSetup": "Oppsett av Kilo Pass",
     "subscriptionHeaderDescription": "Et månedlig abonnement som fyller på Kilo-saldoen din med kreditter til KI-koding i Kilo App: skyagenter, eksterne økter og KiloClaw-chatter.",
     "tierDescription": "Betalte kreditter til en verdi av {{price}} legges til hver måned for bruk i Kilo App.",
     "subscribe": "Abonner",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass er ikke tilgjengelig som et kjøp i appen på Android. Administrer det på nettet.",
     "webManagementDescription": "Dette Kilo Pass-abonnementet administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et månedsabonnement som fornyes automatisk. Betalingen belastes Apple ID-en din når kjøpet bekreftes. Abonnementet fornyes automatisk hver måned til den viste prisen, med mindre du sier det opp minst 24 timer før den gjeldende perioden utløper. Du kan administrere eller si opp abonnementet når som helst i kontoinnstillingene i App Store.",
-    "legalTermsOfUse": "bruksvilkårene (EULA)",
+    "legalTermsOfUse": "Bruksvilkårene (EULA)",
     "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg inn på Apple-kontoen som ble brukt til kjøpet, og prøv igjen.",
     "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
     "purchaseFailed": "Kunne ikke fullføre kjøpet.",
@@ -2907,7 +2907,7 @@
     "signedOut": "Logg på for å se agenter",
     "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
-    "needsInput": "venter på svar",
+    "needsInput": "Venter på svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   }

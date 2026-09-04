@@ -22,7 +22,7 @@
     "copiedToClipboard": "Disalin ke papan keratan",
     "couldNotCopyToClipboard": "Tidak dapat menyalin ke papan keratan.",
     "required": "diperlukan",
-    "error": "Ralat: {{error}}",
+    "error": "ralat: {{error}}",
     "back": "Kembali",
     "somethingWentWrong": "Berlaku ralat.",
     "couldNotOpen": "Tidak dapat membuka {{label}}.",
@@ -38,7 +38,7 @@
     "findings": "Dapatan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repositori",
     "securityAgent": "Ejen keselamatan",
     "unknown": "Tidak diketahui",
@@ -200,7 +200,7 @@
     "signOut": "Log keluar",
     "deleteAccount": "Padam akaun",
     "confirmationCode": "Kod pengesahan",
-    "confirmationCodePlaceholder": "Kod 6 digit",
+    "confirmationCodePlaceholder": "kod 6 digit",
     "confirmDeletion": "Sahkan pemadaman",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka perbezaan kod fail ini di GitHub",
-      "githubDiff": "perbezaan kod GitHub"
+      "githubDiff": "Perbezaan kod GitHub"
     },
     "floatingActions": {
       "clearSelection": "Kosongkan pilihan",
@@ -421,8 +421,8 @@
       "addReaction": "Tambah reaksi",
       "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksi",
-      "reaction": "Reaksi",
-      "reaction_other": "Reaksi",
+      "reaction": "reaksi",
+      "reaction_other": "reaksi",
       "commentActions": "Tindakan komen",
       "reportContent": "Laporkan kandungan",
       "reportUser": "Laporkan pengguna",
@@ -597,17 +597,17 @@
       "stateOpenReviewRequired": "Terbuka · Semakan diperlukan",
       "stateOpen": "Buka",
       "unknownAuthor": "Pengarang tidak diketahui",
-      "commit_one": "Komit",
+      "commit_one": "komit",
       "commit": "komit",
       "commit_other": "komit",
-      "file_one": "Fail",
-      "file": "Fail",
-      "file_other": "Fail"
+      "file_one": "fail",
+      "file": "fail",
+      "file_other": "fail"
     },
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
       "editA11y": "Sunting komen belum dihantar pada {{location}}",
-      "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
+      "staleHint": "pR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
       "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Semua medan mesti diisi untuk menyambungkan {{label}}.",
       "setupGuideFallback": "panduan persediaan",
       "setupGuideA11y": "panduan persediaan {{label}}",
-      "setupGuide": "panduan persediaan",
+      "setupGuide": "Panduan persediaan",
       "saving": "Menyimpan…",
       "removing": "Mengalih keluar…",
       "updateToken": "Kemas kini token"
@@ -980,7 +980,7 @@
       "couldNotLoad": "Tidak dapat memuatkan maklumat versi.",
       "couldNotLoadMore": "Tidak dapat memuatkan lebih banyak versi.",
       "loadMore": "Muatkan lebih banyak versi",
-      "showingLatest": "100 versi terkini dipaparkan.",
+      "showingLatest": "100 Versi terkini dipaparkan.",
       "availableVersions": "Versi tersedia",
       "noVersions": "Tiada versi tersedia",
       "noVersionsDescription": "Versi OpenClaw yang tersedia akan muncul di sini.",
@@ -1125,12 +1125,12 @@
       "destroying": "SEDANG DIPADAM",
       "provisioned": "DISEDIAKAN",
       "restarting": "DIMULAKAN SEMULA",
-      "running": "Sedang berjalan",
+      "running": "SEDANG BERJALAN",
       "shuttingDown": "SEDANG DITUTUP",
-      "starting": "Sedang dimulakan",
+      "starting": "SEDANG DIMULAKAN",
       "stopped": "DIHENTIKAN",
       "stopping": "SEDANG DIHENTIKAN",
-      "unknown": "Tidak diketahui",
+      "unknown": "TIDAK DIKETAHUI",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Arahan tersuai",
       "deprecation": "Ciri arahan tersuai akan dihentikan. Pindahkan garis panduan ini ke dalam fail REVIEW.md dalam repositori anda.",
-      "placeholder": "Contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…"
+      "placeholder": "contohnya, pastikan kod mematuhi konvensyen pengendalian ralat kami…"
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan persediaan Bitbucket di kilo.ai.",
@@ -1339,9 +1339,9 @@
       "activity": "Aktiviti"
     },
     "providerConnect": {
-      "githubApp": "apl GitHub",
+      "githubApp": "Apl GitHub",
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
-      "gitlabAccount": "akaun GitLab",
+      "gitlabAccount": "Akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
       "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
       "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Lihat notis keselamatan di GitHub",
       "statusOpen": "Buka",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Pembetulan telah dimulakan",
-      "reasonNoBandwidth": "Tiada masa atau tenaga kerja",
-      "reasonTolerableRisk": "Risiko boleh diterima",
-      "reasonInaccurate": "Dapatan tidak tepat",
-      "reasonNotUsed": "Kod yang rentan tidak digunakan",
+      "reasonFixStarted": "pembetulan telah dimulakan",
+      "reasonNoBandwidth": "tiada masa atau tenaga kerja",
+      "reasonTolerableRisk": "risiko boleh diterima",
+      "reasonInaccurate": "dapatan tidak tepat",
+      "reasonNotUsed": "kod yang rentan tidak digunakan",
       "reasonAfterReview": "selepas semakan"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Potensi pendedahan data yang ketara.",
       "mediumDescription": "Kesan terhad atau keadaan tertentu.",
       "lowDescription": "Kesan minimum terhadap keselamatan.",
-      "invalidDayCount": "Bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
+      "invalidDayCount": "bilangan hari mesti antara 1 hingga 365, dalam nombor bulat sahaja.",
       "remediationDeadlineA11y": "Tempoh pemulihan {{label}} dalam hari",
       "enterWholeNumber": "Masukkan nombor bulat antara 1 dan 365",
       "permissionNote": "Hanya pemilik organisasi dan pengurus pengebilan boleh menukar tetapan ini.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Tidak dapat memuatkan tetapan repositori.",
-      "githubAppSettings": "tetapan apl GitHub",
+      "githubAppSettings": "Tetapan apl GitHub",
       "manageAccess": "Urus akses apl GitHub",
       "noRepositories": "Tiada repositori",
       "noRepositoriesDescription": "Benarkan apl GitHub Kilo mengakses repositori.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Tidak dapat mencari sesi.",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tiada sesi terdahulu",
-      "live": "Langsung",
+      "live": "LANGSUNG",
       "updating": "Mengemas kini"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa tajuk",
       "sessionDeleted": "Sesi dipadam",
-      "needsInput": "Perlu input",
+      "needsInput": "perlu input",
       "fromPlatform": "daripada {{platform}}",
       "cent_one": "sen",
       "cent": "sen",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Tidak dapat menghubungi tika — sambungannya mungkin telah terputus.",
     "remoteSpawnNonRetryable": "Tika gagal memulakan sesi — semak mesin atau kemas kini CLI.",
     "remoteSpawnInstanceDisconnected": "Sambungan tika yang dipilih telah terputus. Mulakan sesi pada Cloud Agent atau pilih tika lain.",
-    "liveCount_one": "{{count}} langsung",
-    "liveCount_other": "{{count}} langsung"
+    "liveCount_one": "{{count}} LANGSUNG",
+    "liveCount_other": "{{count}} LANGSUNG"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Alat {{name}}, {{status}}",
       "noTasks": "Tiada tugasan.",
       "toolRead": "baca",
-      "toolEdit": "Sunting",
+      "toolEdit": "sunting",
       "toolWrite": "tulis",
       "toolBash": "bash",
       "toolGlob": "cari fail",
       "toolGrep": "cari teks",
       "toolList": "senaraikan",
       "toolPatch": "tampal",
-      "toolTask": "Tugasan",
+      "toolTask": "tugasan",
       "readTodos": "Baca tugasan",
       "updateTodos": "Kemas kini tugasan",
       "linesBadge": "{{displayCount}} baris",
@@ -2291,13 +2291,13 @@
       "provider": "Penyedia {{id}}",
       "modelId": "Model AI {{id}}",
       "unavailable": "Tidak tersedia",
-      "unavailableState": "Tidak tersedia",
+      "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",
       "thinkingEffort": "Tahap pemikiran",
       "thinkingEffortAccessibility": "Tahap pemikiran {{label}}",
       "thinkingEffortSelected": "Tahap pemikiran {{label}}, dipilih",
       "thinkingEffortWithModel": "{{model}}, tahap pemikiran {{variant}}",
-      "lockedByAgent": ", dikunci oleh ejen \"{{agent}}\"",
+      "lockedByAgent": ", Dikunci oleh ejen \"{{agent}}\"",
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
       "thinkingEffortXhigh": "XH",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Aktiviti terdahulu",
       "olderActivityDescription": "Kos yang tidak dikaitkan dengan sejarah yang dimuatkan",
       "ofWindowTokens": "daripada {{window}} token",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Buka PR",
+      "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
       "merged": "permintaan tarik yang digabungkan",
-      "draft": "PR draf",
+      "draft": "pR draf",
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Kembali dan buka semula pemilih ini daripada skrin sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "Perlu input"
+    "needsInput": "PERLU INPUT"
   },
   "voiceInput": {
     "listening": "Mendengar...",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Tidak dapat mengesahkan pembelian anda. Semak sambungan anda dan cuba lagi.",
     "productsCouldNotLoad": "Produk Kilo Pass tidak dapat dimuatkan daripada App Store.",
     "tryingAgain": "Mencuba lagi...",
-    "kiloPassManagement": "pengurusan Kilo Pass",
+    "kiloPassManagement": "Pengurusan Kilo Pass",
     "legalConnectorTerms": " Dengan melanggan, anda bersetuju dengan ",
     "legalConnectorPrivacy": " dan mengambil maklum tentang ",
     "manageFailed": "Gagal membuka pengurusan langganan App Store.",
-    "kiloPassSetup": "persediaan Kilo Pass",
+    "kiloPassSetup": "Persediaan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Kilo App — ejen awan, sesi jauh dan sembang KiloClaw.",
     "tierDescription": "Kredit berbayar bernilai {{price}} ditambah setiap bulan untuk kegunaan Kilo App.",
     "subscribe": "Langgan",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan. Anda boleh mengubahnya pada bila-bila masa dalam Tetapan.",
     "seeFullDetails": "Lihat butiran penuh",
     "privacyPolicyPrefix": "Data anda dikendalikan mengikut",
-    "privacyPolicy": "dasar privasi Kilo",
+    "privacyPolicy": "Dasar privasi Kilo",
     "onDevice": "Pada peranti",
     "couldNotLoadTranscription": "Tidak dapat memuatkan tetapan transkripsi anda.",
     "signInToManageTranscription": "Log masuk untuk mengurus transkripsi dalam talian.",
@@ -2816,7 +2816,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 hari terakhir",
+      "last30Days": "30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },

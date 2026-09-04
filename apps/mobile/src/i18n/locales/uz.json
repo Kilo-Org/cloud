@@ -38,7 +38,7 @@
     "findings": "Aniqlangan muammolar",
     "notConnected": "Ulanmagan",
     "notifications": "Bildirishnomalar",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repozitoriylar",
     "securityAgent": "Xavfsizlik agenti",
     "unknown": "Noma’lum",
@@ -421,8 +421,8 @@
       "addReaction": "Reaksiya qo'shish",
       "reactionPill": "{{emoji}} reaksiyasi, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
-      "reaction": "Reaksiya",
-      "reaction_other": "Reaksiya",
+      "reaction": "reaksiya",
+      "reaction_other": "reaksiya",
       "commentActions": "Izoh bilan amallar",
       "reportContent": "Kontent ustidan shikoyat qilish",
       "reportUser": "Foydalanuvchi ustidan shikoyat qilish",
@@ -545,7 +545,7 @@
       "addTitle": "Izoh qo'shish",
       "unavailableTitle": "Izoh mavjud emas",
       "unavailableMessage": "Bu navbatdagi izoh allaqachon o'chirilgan yoki yuborilgan.",
-      "ok": "Tushunarli",
+      "ok": "TUSHUNARLI",
       "loadFailedTitle": "Izoh yozish oynasini yuklab bo'lmadi.",
       "discardTitle": "Izoh bekor qilinsinmi?",
       "discardMessage": "Qoralamangiz yo'qoladi.",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Ochiq · Ko'rib chiqish kerak",
       "stateOpen": "Ochiq",
       "unknownAuthor": "Noma'lum muallif",
-      "commit_one": "Kommit",
+      "commit_one": "kommit",
       "commit": "kommit",
       "commit_other": "kommit",
-      "file_one": "Fayl",
-      "file": "Fayl",
-      "file_other": "Fayl"
+      "file_one": "fayl",
+      "file": "fayl",
+      "file_other": "fayl"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}dagi eskirgan navbatdagi izohni tahrirlash",
@@ -851,7 +851,7 @@
       "plan": "Reja",
       "finalTermEnds": "Oxirgi davr tugashi",
       "afterFinalTerm": "Oxirgi davrdan keyin",
-      "lessThanOneDay": "1 kundan kam",
+      "lessThanOneDay": "1 Kundan kam",
       "ends": "Tugaydi",
       "expires": "Amal qilish muddati tugaydi",
       "noActivePlan": "Faol tarif yo'q",
@@ -866,7 +866,7 @@
       "renews": "Yangilanadi",
       "standardMonthToMonth": "Standard, oylik to'lov",
       "standardStartsOn": "Standard tarifi {{date}} sanasidan {{price}} narxda boshlanadi.",
-      "yourStandardMonthlyPrice": "Standard tarifingizning oylik narxi",
+      "yourStandardMonthlyPrice": "standard tarifingizning oylik narxi",
       "perMonth": "/oy",
       "earlybirdAccessUntil": "Erta foydalanish muddati {{date}} sanasigacha amal qiladi.",
       "earlybirdEnding": "Erta foydalanish muddati tugashiga {{remaining}} qoldi.",
@@ -968,7 +968,7 @@
       "hide": "{{label}}ni yashirish",
       "show": "{{label}}ni ko'rsatish",
       "allFieldsRequired": "{{label}}ni ulash uchun barcha maydonlar to'ldirilishi shart.",
-      "setupGuideFallback": "Sozlash qo‘llanmasi",
+      "setupGuideFallback": "sozlash qo‘llanmasi",
       "setupGuideA11y": "{{label}}ni sozlash bo'yicha qo'llanma",
       "setupGuide": "Sozlash qo‘llanmasi",
       "saving": "Saqlanmoqda…",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "Hozir nusxangizni sozlashni yakunlab bo'lmadi.",
         "manualReviewBody": "Nusxa yaratishdan oldin hisobingiz holatini tekshirish kerak. kilo.ai saytida davom eting.",
         "manualReviewTitle": "Sozlash uchun mutaxassis tekshiruvi kerak",
-        "openKiloAi": "kilo.ai saytini ochish",
+        "openKiloAi": "Kilo.ai saytini ochish",
         "provisioning": "Resurslarni tayyorlash",
         "review": "Ko‘rib chiqish",
         "identityTitle": "Bot qiyofasi va xarakteri",
@@ -1125,12 +1125,12 @@
       "destroying": "YO'Q QILINMOQDA",
       "provisioned": "TAYYORLANGAN",
       "restarting": "QAYTA ISHGA TUSHIRILMOQDA",
-      "running": "Ishlamoqda",
+      "running": "ISHLAMOQDA",
       "shuttingDown": "O'CHIRILMOQDA",
-      "starting": "Boshlanmoqda",
+      "starting": "BOSHLANMOQDA",
       "stopped": "TO'XTATILGAN",
       "stopping": "TO'XTATILMOQDA",
-      "unknown": "Noma’lum",
+      "unknown": "NOMA’LUM",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1141,19 +1141,19 @@
       "autoModelA11y": "{{label}} avtomatik modeli",
       "currentModel": "Joriy model",
       "browseAllModels": "yoki 500 dan ortiq model orasidan tanlang",
-      "browseAllModelsA11y": "500 dan ortiq modelning barchasini ko'rish"
+      "browseAllModelsA11y": "500 Dan ortiq modelning barchasini ko'rish"
     },
     "accessRequired": {
       "trialExpiredBody": "KiloClawdan foydalanishni davom ettirish uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada obuna bo'lib bo'lmaydi.",
       "subscriptionCanceledTitle": "Saytda obuna bo‘lish",
       "subscriptionCanceledBody": "KiloClawdan foydalanish uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada obuna bo'lib bo'lmaydi.",
-      "subscriptionCanceledCta": "kilo.ai/claw sahifasini ochish",
+      "subscriptionCanceledCta": "Kilo.ai/claw sahifasini ochish",
       "subscriptionPastDueTitle": "Saytda to'lov ma'lumotlarini yangilash",
       "subscriptionPastDueBody": "Oxirgi to'lovingizda muammo yuz berdi. To'lov ma'lumotlarini yangilash uchun brauzerda kilo.ai/claw sahifasini oching. Ilovada to'lovlarni boshqarib bo'lmaydi.",
       "quarantinedTitle": "Nusxani tiklash kerak",
       "quarantinedBody": "KiloClaw nusxangiz karantinda va hozir undan foydalanib bo'lmaydi. Uni tiklash uchun jamoamizning yordami kerak.",
       "multipleCurrentConflictBody": "Hisobingizda bir nechta faol obuna aniqlandi. Sizdan ikki marta to'lov olinmasligi uchun xizmatni vaqtincha to'xtatdik.",
-      "multipleCurrentConflictCta": "kilo.ai saytida davom etish",
+      "multipleCurrentConflictCta": "Kilo.ai saytida davom etish",
       "nonCanonicalEarlybirdTitle": "Eski tarif aniqlandi",
       "nonCanonicalEarlybirdBody": "Erta foydalanish tarifingizni mobil qurilmada ishlatishdan oldin mutaxassis tekshirishi kerak.",
       "iosTitle": "KiloClaw iOSda mavjud emas",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
       "openUnread_other": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
       "openSettings": "{{name}} uchun sozlamalarni ochish",
-      "fixOnKiloAi": "kilo.ai saytida tuzatish: {{label}}"
+      "fixOnKiloAi": "Kilo.ai saytida tuzatish: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
       "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
-      "placeholder": "Masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
+      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
     },
     "repos": {
       "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Tuzatish allaqachon boshlangan",
-      "reasonNoBandwidth": "Vaqt va resurs yetarli emas",
-      "reasonTolerableRisk": "Xavf maqbul darajada",
-      "reasonInaccurate": "Muammo noto‘g‘ri aniqlangan",
-      "reasonNotUsed": "Zaiflik bor kod ishlatilmaydi",
+      "reasonFixStarted": "tuzatish allaqachon boshlangan",
+      "reasonNoBandwidth": "vaqt va resurs yetarli emas",
+      "reasonTolerableRisk": "xavf maqbul darajada",
+      "reasonInaccurate": "muammo noto‘g‘ri aniqlangan",
+      "reasonNotUsed": "zaiflik bor kod ishlatilmaydi",
       "reasonAfterReview": "ko'rib chiqilgach"
     },
     "settingsOverview": {
@@ -1649,9 +1649,9 @@
       "highDescription": "Muhim ma'lumotlarning oshkor bo'lish xavfi.",
       "mediumDescription": "Cheklangan ta'sir yoki muayyan shartlar.",
       "lowDescription": "Xavfsizlikka juda kam ta'sir.",
-      "invalidDayCount": "Kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
+      "invalidDayCount": "kunlar soni 1 dan 365 gacha bo'lgan butun son bo'lishi kerak.",
       "remediationDeadlineA11y": "{{label}} darajasidagi muammoni tuzatish muddati, kun hisobida",
-      "enterWholeNumber": "1 dan 365 gacha bo‘lgan butun sonni kiriting",
+      "enterWholeNumber": "1 Dan 365 gacha bo‘lgan butun sonni kiriting",
       "permissionNote": "Faqat tashkilot egalari va hisob-kitob menejerlari bu sozlamalarni o'zgartira oladi.",
       "enableTracking": "SLA kuzatuvini yoqish",
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi.",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "Oldingi sessiyalar yo'q",
-      "live": "Jonli",
+      "live": "JONLI",
       "updating": "Yangilanmoqda"
     },
     "sessionRow": {
@@ -1884,12 +1884,12 @@
       "couldNotCopyId": "Sessiya identifikatorini nusxalab bo'lmadi.",
       "untitled": "Nomsiz sessiya",
       "sessionDeleted": "Sessiya o'chirildi",
-      "needsInput": "Javob kutilmoqda",
+      "needsInput": "javob kutilmoqda",
       "fromPlatform": "{{platform}}dan",
       "cent_one": "sent",
       "cent": "sent",
       "cent_other": "sent",
-      "dollar_one": "AQSh dollari",
+      "dollar_one": "aQSh dollari",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xarajati {{cost}}",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Nusxaga ulanib bo'lmadi — uning ulanishi uzilgan bo'lishi mumkin.",
     "remoteSpawnNonRetryable": "Nusxa sessiyani ishga tushira olmadi — kompyuterni tekshiring yoki CLI dasturini yangilang.",
     "remoteSpawnInstanceDisconnected": "Tanlangan nusxa bilan ulanish uzildi. Cloud Agentda sessiya boshlang yoki boshqa nusxani tanlang.",
-    "liveCount_one": "{{count}} ta jonli",
-    "liveCount_other": "{{count}} ta jonli"
+    "liveCount_one": "{{count}} TA JONLI",
+    "liveCount_other": "{{count}} TA JONLI"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} vositasi, {{status}}",
       "noTasks": "Vazifalar yo'q.",
       "toolRead": "o'qish",
-      "toolEdit": "Tahrirlash",
+      "toolEdit": "tahrirlash",
       "toolWrite": "yozish",
       "toolBash": "bash",
       "toolGlob": "fayllarni andoza bo'yicha qidirish",
       "toolGrep": "matnni qidirish",
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
-      "toolTask": "Vazifa",
+      "toolTask": "vazifa",
       "readTodos": "Vazifalar ro'yxatini o'qish",
       "updateTodos": "Vazifalar ro'yxatini yangilash",
       "linesBadge": "{{displayCount}} qator",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[serializatsiya qilib bo'lmaydigan kirish ma'lumotlari]",
-      "errorPrefix": "xato: {{error}}"
+      "errorPrefix": "Xato: {{error}}"
     },
     "instancePicker": {
       "runOn": "Ishga tushirish muhiti",
@@ -2291,7 +2291,7 @@
       "provider": "Provayder: {{id}}",
       "modelId": "Model: {{id}}",
       "unavailable": "Mavjud emas",
-      "unavailableState": "Mavjud emas",
+      "unavailableState": "mavjud emas",
       "selectedState": "tanlangan",
       "thinkingEffort": "Fikrlash darajasi",
       "thinkingEffortAccessibility": "fikrlash darajasi: {{label}}",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Oldingi faoliyat",
       "olderActivityDescription": "Yuklangan tarixga tegishli bo'lmagan xarajat",
       "ofWindowTokens": "{{window}} tokendan",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} qadam",
       "stepsCount": "{{steps}} qadam",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Ochiq PR",
+      "open": "ochiq PR",
       "closed": "yopilgan PR",
       "merged": "birlashtirilgan PR",
-      "draft": "Qoralama PR",
+      "draft": "qoralama PR",
       "updating": "Yangilanmoqda, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Oldingi ekranga qayting va tanlash oynasini qayta oching."
   },
   "sessionRow": {
-    "needsInput": "Javob kutilmoqda"
+    "needsInput": "JAVOB KUTILMOQDA"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
@@ -2774,7 +2774,7 @@
       "thresholdLabel": "Ogohlantirish chegarasi (USD)",
       "title": "Balans kamayishi haqida ogohlantirish",
       "emailsError": "Kamida bitta to'g'ri elektron pochta manzilini kiriting. Bir nechta manzilni vergul bilan ajrating.",
-      "thresholdError": "0 dan katta miqdorni kiriting."
+      "thresholdError": "0 Dan katta miqdorni kiriting."
     },
     "memberLimit": {
       "limitLabel": "Limit (USD/kun)",
@@ -2784,7 +2784,7 @@
       "removeLimit": "Limitni olib tashlash",
       "title": "Kunlik foydalanish limiti",
       "blankError": "Miqdor kiriting yoki quyidagi Limitni olib tashlash tugmasini bosing.",
-      "rangeError": "0 va {{max}} oralig'idagi miqdorni kiriting."
+      "rangeError": "0 Va {{max}} oralig'idagi miqdorni kiriting."
     },
     "members": {
       "changeRole": "Rolni o'zgartirish",

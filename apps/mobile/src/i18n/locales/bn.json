@@ -1049,7 +1049,7 @@
         "genericErrorBody": "এই মুহূর্তে আপনার ইনস্ট্যান্সের সেটআপ শেষ করা যায়নি।",
         "manualReviewBody": "ইনস্ট্যান্স তৈরি করার আগে আপনার অ্যাকাউন্টের অবস্থা যাচাই করা প্রয়োজন। বাকি কাজ করতে kilo.ai-এ যান।",
         "manualReviewTitle": "সেটআপে সরাসরি যাচাই প্রয়োজন",
-        "openKiloAi": "kilo.ai খুলুন",
+        "openKiloAi": "Kilo.ai খুলুন",
         "provisioning": "ইনস্ট্যান্স প্রস্তুতি",
         "review": "পর্যালোচনা",
         "identityTitle": "আপনার বটের পরিচয়",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw ব্যবহার চালিয়ে যেতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে সাবস্ক্রাইব করা যায় না।",
       "subscriptionCanceledTitle": "ওয়েবে সাবস্ক্রাইব করুন",
       "subscriptionCanceledBody": "KiloClaw ব্যবহার করতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে সাবস্ক্রাইব করা যায় না।",
-      "subscriptionCanceledCta": "kilo.ai/claw খুলুন",
+      "subscriptionCanceledCta": "Kilo.ai/claw খুলুন",
       "subscriptionPastDueTitle": "ওয়েবে পেমেন্ট আপডেট",
       "subscriptionPastDueBody": "আপনার সর্বশেষ পেমেন্টে সমস্যা হয়েছে। পেমেন্টের তথ্য আপডেট করতে ব্রাউজার থেকে kilo.ai/claw-এ যান। অ্যাপে বিলিং পরিচালনা করা যায় না।",
       "quarantinedTitle": "ইনস্ট্যান্সের সমস্যা সমাধান প্রয়োজন",
       "quarantinedBody": "আপনার KiloClaw ইনস্ট্যান্স কোয়ারেন্টাইনে আছে, তাই এখন ব্যবহার করা যাচ্ছে না। এটি আবার চালু করতে আমাদের দলের সহায়তা প্রয়োজন।",
       "multipleCurrentConflictBody": "আপনার অ্যাকাউন্টে একাধিক সক্রিয় সাবস্ক্রিপশন পাওয়া গেছে। একাধিকবার বিল নেওয়া এড়াতে আমরা আপাতত কার্যক্রম স্থগিত করেছি।",
-      "multipleCurrentConflictCta": "kilo.ai-এ চালিয়ে যান",
+      "multipleCurrentConflictCta": "Kilo.ai-এ চালিয়ে যান",
       "nonCanonicalEarlybirdTitle": "পুরোনো প্ল্যান পাওয়া গেছে",
       "nonCanonicalEarlybirdBody": "মোবাইলে ব্যবহারের আগে আপনার আগাম ব্যবহারের প্ল্যানটি সরাসরি যাচাই করা প্রয়োজন।",
-      "iosTitle": "iOS-এ KiloClaw ব্যবহার করা যাচ্ছে না",
+      "iosTitle": "IOS-এ KiloClaw ব্যবহার করা যাচ্ছে না",
       "iosBody": "এই অ্যাকাউন্টের জন্য KiloClaw অ্যাক্সেস iOS অ্যাপের বাইরে পরিচালিত হয়।",
       "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।"
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} খুলুন, {{displayCount}}টি অপঠিত বার্তা",
       "openUnread_other": "{{name}} খুলুন, {{displayCount}}টি অপঠিত বার্তা",
       "openSettings": "{{name}}-এর সেটিংস খুলুন",
-      "fixOnKiloAi": "kilo.ai-এ সমস্যার সমাধান করুন: {{label}}"
+      "fixOnKiloAi": "Kilo.ai-এ সমস্যার সমাধান করুন: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

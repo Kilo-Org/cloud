@@ -22,7 +22,7 @@
     "copiedToClipboard": "Պատճենվել է սեղմատախտակում",
     "couldNotCopyToClipboard": "Չհաջողվեց պատճենել սեղմատախտակում։",
     "required": "պարտադիր",
-    "error": "Սխալ՝ {{error}}",
+    "error": "սխալ՝ {{error}}",
     "back": "Հետ",
     "somethingWentWrong": "Սխալ առաջացավ։",
     "couldNotOpen": "Չհաջողվեց բացել՝ {{label}}։",
@@ -169,7 +169,7 @@
     "verifyCode": "Ստուգել կոդը",
     "resendCode": "Կրկին ուղարկել կոդը",
     "termsPrefix": "Շարունակելով՝ դու համաձայնում ես մեր",
-    "terms": "պայմաններին",
+    "terms": "Պայմաններին",
     "termsConnector": " և ",
     "termsSuffix": "։",
     "moreSignInOptions": "Մուտքի այլ տարբերակներ",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Անցնել ակնարկի ներդիրին"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ Ֆայլի վերջում նոր տողի նշան չկա։",
+      "noNewlineAtEndOfFile": "⚠️ ֆայլի վերջում նոր տողի նշան չկա։",
       "emptyDiffColumn": "փոփոխությունների դատարկ սյունակ",
       "oldNew": "Հին՝ {{old}} | Նոր՝ {{new}}",
       "oldOnly": "Միայն հին՝ {{text}}",
@@ -421,8 +421,8 @@
       "addReaction": "Ավելացնել արձագանք",
       "reactionPill": "{{emoji}} արձագանք, {{displayCount}} {{countLabel}}",
       "reaction_one": "արձագանք",
-      "reaction": "Արձագանքներ",
-      "reaction_other": "Արձագանքներ",
+      "reaction": "արձագանքներ",
+      "reaction_other": "արձագանքներ",
       "commentActions": "Մեկնաբանության գործողություններ",
       "reportContent": "Բողոքել բովանդակությունից",
       "reportUser": "Բողոքել օգտատիրոջից",
@@ -545,7 +545,7 @@
       "addTitle": "Նոր մեկնաբանություն",
       "unavailableTitle": "Մեկնաբանությունը հասանելի չէ",
       "unavailableMessage": "Այս չուղարկված մեկնաբանությունն արդեն ջնջվել կամ ուղարկվել է։",
-      "ok": "Լավ",
+      "ok": "ԼԱՎ",
       "loadFailedTitle": "Չհաջողվեց բեռնել մեկնաբանության խմբագրիչը։",
       "discardTitle": "Հրաժարվե՞լ մեկնաբանությունից",
       "discardMessage": "Սևագիրդ կկորչի։",
@@ -597,17 +597,17 @@
       "stateOpenReviewRequired": "Բաց · պարտադիր վերանայում",
       "stateOpen": "Բաց",
       "unknownAuthor": "Անհայտ հեղինակ",
-      "commit_one": "Կոմիտ",
+      "commit_one": "կոմիտ",
       "commit": "կոմիտ",
       "commit_other": "կոմիտ",
-      "file_one": "Ֆայլ",
-      "file": "Ֆայլեր",
-      "file_other": "Ֆայլեր"
+      "file_one": "ֆայլ",
+      "file": "ֆայլեր",
+      "file_other": "ֆայլեր"
     },
     "pendingComment": {
       "editOutdatedA11y": "Խմբագրել հնացած չուղարկված մեկնաբանությունը՝ {{location}}",
       "editA11y": "Խմբագրել չուղարկված մեկնաբանությունը՝ {{location}}",
-      "staleHint": "PR-ը փոխվել է այս մեկնաբանությունը գրելուցդ հետո։",
+      "staleHint": "pR-ը փոխվել է այս մեկնաբանությունը գրելուցդ հետո։",
       "deleteA11y": "Ջնջել չուղարկված մեկնաբանությունը՝ {{location}}",
       "deletedAnnouncement": "Չուղարկված մեկնաբանությունը ջնջվել է",
       "noCommentsQueued": "Հերթում մեկնաբանություններ չկան։ Վերանայումը կուղարկվի միայն վերևում ընտրված գործողությամբ։",
@@ -862,11 +862,11 @@
       "finalCommitTermEndsOn": "Commit սակագնիդ վերջին շրջանն ավարտվում է {{date}}-ին։ Շարունակիր Standard սակագնով՝ {{price}} գնով, այլապես հոսթինգը կդադարեցվի։",
       "freeTrial": "Անվճար փորձաշրջան",
       "hostingEnds": "Հոսթինգն ավարտվում է",
-      "lessThanOneDay": "1 օրից պակաս",
+      "lessThanOneDay": "1 Օրից պակաս",
       "renews": "Երկարաձգվում է",
       "standardMonthToMonth": "Standard՝ ամսական վճարմամբ",
       "standardStartsOn": "Standard սակագինը կգործի {{date}}-ից՝ {{price}} գնով։",
-      "yourStandardMonthlyPrice": "Standard սակագնիդ ամսական վճարը",
+      "yourStandardMonthlyPrice": "standard սակագնիդ ամսական վճարը",
       "perMonth": "/ամիս",
       "earlybirdAccessUntil": "Վաղ հասանելիությունը գործում է մինչև {{date}}։",
       "earlybirdEnding": "Վաղ հասանելիության ավարտին մնացել է {{remaining}}։",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "{{label}}-ը միացնելու համար անհրաժեշտ է լրացնել բոլոր դաշտերը։",
       "setupGuideFallback": "կարգավորման ուղեցույց",
       "setupGuideA11y": "{{label}}-ի կարգավորման ուղեցույց",
-      "setupGuide": "կարգավորման ուղեցույց",
+      "setupGuide": "Կարգավորման ուղեցույց",
       "saving": "Պահպանվում է…",
       "removing": "Հեռացվում է…",
       "updateToken": "Թարմացնել մուտքի թոքենը"
@@ -1125,12 +1125,12 @@
       "destroying": "ՈՉՆՉԱՑՎՈՒՄ Է",
       "provisioned": "ՌԵՍՈՒՐՍՆԵՐԸ ՏՐԱՄԱԴՐՎԱԾ ԵՆ",
       "restarting": "ՎԵՐԱԳՈՐԾԱՐԿՎՈՒՄ Է",
-      "running": "Ընթացքում է",
+      "running": "ԸՆԹԱՑՔՈՒՄ Է",
       "shuttingDown": "ԱՆՋԱՏՎՈՒՄ Է",
-      "starting": "Սկսվում է",
+      "starting": "ՍԿՍՎՈՒՄ Է",
       "stopped": "ԿԱՆԳՆԵՑՎԱԾ Է",
       "stopping": "ԿԱՆԳՆԵՑՎՈՒՄ Է",
-      "unknown": "Անհայտ",
+      "unknown": "ԱՆՀԱՅՏ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Անհատական հրահանգներ",
       "deprecation": "Նախատեսվում է դադարեցնել անհատական հրահանգների գործառույթի աջակցությունը։ Փոխարենը տեղափոխիր այս հրահանգները պահոցիդ REVIEW.md ֆայլ։",
-      "placeholder": "Օրինակ՝ հետևել սխալների մշակման մեր կանոններին…"
+      "placeholder": "օրինակ՝ հետևել սխալների մշակման մեր կանոններին…"
     },
     "repos": {
       "unavailable": "Պահոցներն անհասանելի են։ Ավարտիր Bitbucket-ի կարգավորումը kilo.ai-ում։",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Դիտել անվտանգության տեղեկագիրը GitHub-ում",
       "statusOpen": "Բաց",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Ուղղումն արդեն սկսվել է",
-      "reasonNoBandwidth": "Ազատ ռեսուրսներ չկան",
-      "reasonTolerableRisk": "Ռիսկն ընդունելի է",
-      "reasonInaccurate": "Հայտնաբերված խնդիրը սխալ է նկարագրված",
-      "reasonNotUsed": "Խոցելի կոդը չի օգտագործվում",
+      "reasonFixStarted": "ուղղումն արդեն սկսվել է",
+      "reasonNoBandwidth": "ազատ ռեսուրսներ չկան",
+      "reasonTolerableRisk": "ռիսկն ընդունելի է",
+      "reasonInaccurate": "հայտնաբերված խնդիրը սխալ է նկարագրված",
+      "reasonNotUsed": "խոցելի կոդը չի օգտագործվում",
       "reasonAfterReview": "ստուգումից հետո"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Տվյալների զգալի արտահոսքի հավանականություն։",
       "mediumDescription": "Սահմանափակ ազդեցություն կամ հատուկ պայմաններ։",
       "lowDescription": "Նվազագույն ազդեցություն անվտանգության վրա։",
-      "invalidDayCount": "Օրերի քանակը պետք է լինի 1-ից 365 ամբողջ թիվ։",
+      "invalidDayCount": "օրերի քանակը պետք է լինի 1-ից 365 ամբողջ թիվ։",
       "remediationDeadlineA11y": "{{label}} վտանգավորության խնդիրների շտկման վերջնաժամկետը՝ օրերով",
       "enterWholeNumber": "Մուտքագրիր 1-ից 365 միջակայքի ամբողջ թիվ",
       "permissionNote": "Միայն կազմակերպության սեփականատերերը և վճարումների կառավարիչները կարող են փոխել այս կարգավորումները։",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը։",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Նախորդ նիստեր չկան",
-      "live": "Ակտիվ",
+      "live": "ԱԿՏԻՎ",
       "updating": "Թարմացվում է"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Չհաջողվեց պատճենել նիստի ID-ն։",
       "untitled": "Անվերնագիր նիստ",
       "sessionDeleted": "Նիստը ջնջվել է",
-      "needsInput": "Սպասում է պատասխանի",
+      "needsInput": "սպասում է պատասխանի",
       "fromPlatform": "{{platform}}-ից",
       "cent_one": "ցենտ",
       "cent": "ցենտ",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Չհաջողվեց կապվել օրինակի հետ։ Հնարավոր է՝ այն անջատվել է։",
     "remoteSpawnNonRetryable": "Օրինակը չկարողացավ սկսել նիստը։ Ստուգիր համակարգիչը կամ թարմացրու CLI-ն։",
     "remoteSpawnInstanceDisconnected": "Ընտրված օրինակն անջատվել է։ Սկսիր նիստ Cloud Agent-ում կամ ընտրիր այլ օրինակ։",
-    "liveCount_one": "{{count}} ակտիվ",
-    "liveCount_other": "{{count}} ակտիվ"
+    "liveCount_one": "{{count}} ԱԿՏԻՎ",
+    "liveCount_other": "{{count}} ԱԿՏԻՎ"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} գործիք, {{status}}",
       "noTasks": "Առաջադրանքներ չկան։",
       "toolRead": "կարդալ",
-      "toolEdit": "Խմբագրել",
+      "toolEdit": "խմբագրել",
       "toolWrite": "գրել",
       "toolBash": "bash",
       "toolGlob": "ֆայլերի որոնում",
       "toolGrep": "տեքստի որոնում",
       "toolList": "ցուցադրել ցանկը",
       "toolPatch": "կիրառել փոփոխությունները",
-      "toolTask": "Առաջադրանք",
+      "toolTask": "առաջադրանք",
       "readTodos": "Կարդալ անելիքները",
       "updateTodos": "Թարմացնել անելիքները",
       "linesBadge": "{{displayCount}} տող",
@@ -2291,13 +2291,13 @@
       "provider": "Մատակարար {{id}}",
       "modelId": "Մոդել {{id}}",
       "unavailable": "Անհասանելի",
-      "unavailableState": "Անհասանելի",
+      "unavailableState": "անհասանելի",
       "selectedState": "ընտրված",
       "thinkingEffort": "Մտածելու խորություն",
       "thinkingEffortAccessibility": "մտածելու խորություն՝ {{label}}",
       "thinkingEffortSelected": "մտածելու խորություն՝ {{label}}, ընտրված",
       "thinkingEffortWithModel": "{{model}}, մտածելու խորություն՝ {{variant}}",
-      "lockedByAgent": ", կողպված է «{{agent}}» գործակալի կողմից",
+      "lockedByAgent": ", Կողպված է «{{agent}}» գործակալի կողմից",
       "addToFavorites": "Ավելացնել {{name}}-ը նախընտրածներին",
       "removeFromFavorites": "Հեռացնել {{name}}-ը նախընտրածներից",
       "thinkingEffortXhigh": "ՇԲ",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Նախորդ գործողություններ",
       "olderActivityDescription": "Բեռնված պատմության մեջ չներառված արժեքը",
       "ofWindowTokens": "{{window}} տոկենից",
-      "tokens": "Թոքեններ",
+      "tokens": "թոքեններ",
       "tokensWithPercentage": "տոկեն ({{percentage}})",
       "stepsCount_one": "{{steps}} քայլ",
       "stepsCount": "{{steps}} քայլ",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Բաց միավորման հարցում",
+      "open": "բաց միավորման հարցում",
       "closed": "փակված միավորման հարցում",
       "merged": "միավորված միավորման հարցում",
-      "draft": "Միավորման սևագիր հարցում",
+      "draft": "միավորման սևագիր հարցում",
       "updating": "Թարմացվում է, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Վերադարձեք նախորդ էկրան և կրկին բացեք այս ընտրիչը։"
   },
   "sessionRow": {
-    "needsInput": "Սպասում է պատասխանի"
+    "needsInput": "ՍՊԱՍՈՒՄ Է ՊԱՏԱՍԽԱՆԻ"
   },
   "voiceInput": {
     "listening": "Լսում ենք...",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Android-ում Kilo Pass-ը հնարավոր չէ գնել հավելվածի ներսում։ Կառավարիր այն կայքում։",
     "webManagementDescription": "Այս Kilo Pass-ը կառավարվում է կայքում։",
     "legalDisclosure": "Kilo Pass-ն ավտոմատ երկարաձգվող ամսական բաժանորդագրություն է։ Գնումը հաստատելիս գումարը գանձվում է քո Apple ID հաշվից։ Բաժանորդագրությունն ամեն ամիս ավտոմատ երկարաձգվում է նշված գնով, եթե այն չչեղարկես ընթացիկ ժամանակաշրջանի ավարտից առնվազն 24 ժամ առաջ։ Ցանկացած պահի կարող ես կառավարել կամ չեղարկել այն App Store-ի քո հաշվի կարգավորումներում։",
-    "legalTermsOfUse": "օգտագործման պայմաններին (EULA)",
+    "legalTermsOfUse": "Օգտագործման պայմաններին (EULA)",
     "purchaseDifferentAccount": "App Store-ի այս գնումը կապված չէ քո Kilo հաշվի հետ։ Մուտք գործիր գնումը կատարելու համար օգտագործած Apple Account-ը, ապա կրկին փորձիր։",
     "restoreFailed": "Չհաջողվեց վերականգնել գնումները։ Կրկին փորձիր։",
     "purchaseFailed": "Չհաջողվեց ավարտել գնումը։",

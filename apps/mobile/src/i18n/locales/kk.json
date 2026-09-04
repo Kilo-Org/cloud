@@ -421,8 +421,8 @@
       "addReaction": "Реакция қосу",
       "reactionPill": "{{emoji}} реакциясы, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
-      "reaction": "Реакция",
-      "reaction_other": "Реакция",
+      "reaction": "реакция",
+      "reaction_other": "реакция",
       "commentActions": "Пікірге қатысты әрекеттер",
       "reportContent": "Мазмұнға шағымдану",
       "reportUser": "Пайдаланушыға шағымдану",
@@ -545,7 +545,7 @@
       "addTitle": "Пікір қосу",
       "unavailableTitle": "Пікір қолжетімсіз",
       "unavailableMessage": "Бұл жіберілмеген пікір бұрын жойылған немесе жіберілген.",
-      "ok": "Жарайды",
+      "ok": "ЖАРАЙДЫ",
       "loadFailedTitle": "Пікір редакторын жүктеу мүмкін болмады.",
       "discardTitle": "Пікірді сақтамай шығу керек пе?",
       "discardMessage": "Пікірдің нобайы жоғалады.",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Ашық · Кодты тексеру қажет",
       "stateOpen": "Ашу",
       "unknownAuthor": "Белгісіз автор",
-      "commit_one": "Коммит",
-      "commit": "Коммит",
-      "commit_other": "Коммит",
-      "file_one": "Файл",
-      "file": "Файл",
-      "file_other": "Файл"
+      "commit_one": "коммит",
+      "commit": "коммит",
+      "commit_other": "коммит",
+      "file_one": "файл",
+      "file": "файл",
+      "file_other": "файл"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} орнындағы ескірген, жіберілмеген пікірді өңдеу",
@@ -851,7 +851,7 @@
       "plan": "Жоспар",
       "finalTermEnds": "Соңғы кезеңнің аяқталуы",
       "afterFinalTerm": "Соңғы кезеңнен кейін",
-      "lessThanOneDay": "1 күннен аз",
+      "lessThanOneDay": "1 Күннен аз",
       "ends": "Аяқталу күні",
       "expires": "Мерзімінің аяқталуы",
       "noActivePlan": "Белсенді тариф жоқ",
@@ -866,7 +866,7 @@
       "renews": "Жаңарады",
       "standardMonthToMonth": "Ай сайын төленетін Standard тарифі",
       "standardStartsOn": "Standard тарифі {{date}} күні {{price}} бағасымен басталады.",
-      "yourStandardMonthlyPrice": "Standard тарифіңіз бойынша айлық төлем",
+      "yourStandardMonthlyPrice": "standard тарифіңіз бойынша айлық төлем",
       "perMonth": "/ай",
       "earlybirdAccessUntil": "Earlybird тарифі {{date}} күніне дейін қолжетімді.",
       "earlybirdEnding": "Earlybird тарифінің аяқталуына {{remaining}} қалды.",
@@ -968,7 +968,7 @@
       "hide": "Жасыру: {{label}}",
       "show": "Көрсету: {{label}}",
       "allFieldsRequired": "{{label}} қосылымын орнату үшін барлық өрісті толтыру керек.",
-      "setupGuideFallback": "Баптау нұсқаулығы",
+      "setupGuideFallback": "баптау нұсқаулығы",
       "setupGuideA11y": "{{label}} орнату нұсқаулығы",
       "setupGuide": "Баптау нұсқаулығы",
       "saving": "Сақталуда…",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "Қазір данаңызды орнатуды аяқтау мүмкін болмады.",
         "manualReviewBody": "Дана жасау үшін алдымен тіркелгіңіздің күйін тексеру қажет. kilo.ai сайтында жалғастырыңыз.",
         "manualReviewTitle": "Орнатуды маман тексеруі керек",
-        "openKiloAi": "kilo.ai сайтын ашу",
+        "openKiloAi": "Kilo.ai сайтын ашу",
         "provisioning": "Дайындау",
         "review": "Тексеру",
         "identityTitle": "Боттың бейнесін жасау",
@@ -1125,12 +1125,12 @@
       "destroying": "ЖОЙЫЛУДА",
       "provisioned": "ДАЙЫНДАЛДЫ",
       "restarting": "ҚАЙТА ІСКЕ ҚОСЫЛУДА",
-      "running": "Орындалуда",
+      "running": "ОРЫНДАЛУДА",
       "shuttingDown": "ӨШІРІЛУДЕ",
-      "starting": "Басталуда",
+      "starting": "БАСТАЛУДА",
       "stopped": "ТОҚТАТЫЛДЫ",
       "stopping": "ТОҚТАТЫЛУДА",
-      "unknown": "Белгісіз",
+      "unknown": "БЕЛГІСІЗ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1147,13 +1147,13 @@
       "trialExpiredBody": "KiloClaw-ды пайдалануды жалғастыру үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада жазылу мүмкін емес.",
       "subscriptionCanceledTitle": "Сайтта жазылу",
       "subscriptionCanceledBody": "KiloClaw-ды пайдалану үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада жазылу мүмкін емес.",
-      "subscriptionCanceledCta": "kilo.ai/claw бетін ашу",
+      "subscriptionCanceledCta": "Kilo.ai/claw бетін ашу",
       "subscriptionPastDueTitle": "Сайтта төлем деректерін жаңарту",
       "subscriptionPastDueBody": "Соңғы төлеміңізде мәселе болды. Төлем деректерін жаңарту үшін браузерден kilo.ai/claw мекенжайына өтіңіз. Қолданбада төлемді басқару мүмкін емес.",
       "quarantinedTitle": "Дананы қалпына келтіру қажет",
       "quarantinedBody": "KiloClaw данаңыз оқшауланған, сондықтан оны қазір пайдалану мүмкін емес. Оны қалпына келтіру үшін біздің топтың көмегі қажет.",
       "multipleCurrentConflictBody": "Тіркелгіңізден бірнеше белсенді жазылым табылды. Сізден екі рет төлем алынбауы үшін жұмысты уақытша тоқтаттық.",
-      "multipleCurrentConflictCta": "kilo.ai сайтында жалғастыру",
+      "multipleCurrentConflictCta": "Kilo.ai сайтында жалғастыру",
       "nonCanonicalEarlybirdTitle": "Ескі тариф анықталды",
       "nonCanonicalEarlybirdBody": "Ерте қолжетімділік тарифіңізді телефонда пайдалану үшін оны алдымен маман тексеруі керек.",
       "iosTitle": "KiloClaw iOS-та қолжетімсіз",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
       "openUnread_other": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
       "openSettings": "{{name}} баптауларын ашу",
-      "fixOnKiloAi": "kilo.ai сайтында түзету: {{label}}"
+      "fixOnKiloAi": "Kilo.ai сайтында түзету: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Арнайы нұсқаулар",
       "deprecation": "Жеке нұсқаулар мүмкіндігін қолдауды тоқтату жоспарланған. Бұл нұсқауларды репозиторийіңіздегі REVIEW.md файлына көшіріңіз.",
-      "placeholder": "Мысалы, қателерді өңдеу ережелерімізді сақтау…"
+      "placeholder": "мысалы, қателерді өңдеу ережелерімізді сақтау…"
     },
     "repos": {
       "unavailable": "Репозиторийлер қолжетімсіз. Bitbucket қызметін баптауды kilo.ai сайтында аяқтаңыз.",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "GitHub-тағы қауіпсіздік хабарламасын қарау",
       "statusOpen": "Ашу",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Түзету басталып кетті",
-      "reasonNoBandwidth": "Бос ресурс жоқ",
-      "reasonTolerableRisk": "Тәуекел деңгейі қолайлы",
-      "reasonInaccurate": "Мәселе қате анықталған",
-      "reasonNotUsed": "Осал код пайдаланылмайды",
+      "reasonFixStarted": "түзету басталып кетті",
+      "reasonNoBandwidth": "бос ресурс жоқ",
+      "reasonTolerableRisk": "тәуекел деңгейі қолайлы",
+      "reasonInaccurate": "мәселе қате анықталған",
+      "reasonNotUsed": "осал код пайдаланылмайды",
       "reasonAfterReview": "тексеру нәтижесі"
     },
     "settingsOverview": {
@@ -1649,9 +1649,9 @@
       "highDescription": "Маңызды деректердің сыртқа таралу қаупі бар.",
       "mediumDescription": "Әсері шектеулі немесе тек белгілі бір жағдайларда көрінеді.",
       "lowDescription": "Қауіпсіздікке әсері өте аз.",
-      "invalidDayCount": "Күн саны 1 мен 365 аралығындағы бүтін сан болуы керек.",
+      "invalidDayCount": "күн саны 1 мен 365 аралығындағы бүтін сан болуы керек.",
       "remediationDeadlineA11y": "{{label}} деңгейіндегі мәселелерді түзету мерзімі, күнмен",
-      "enterWholeNumber": "1 мен 365 арасындағы бүтін сан енгізіңіз",
+      "enterWholeNumber": "1 Мен 365 арасындағы бүтін сан енгізіңіз",
       "permissionNote": "Бұл баптауларды тек ұйым иелері мен төлем менеджерлері өзгерте алады.",
       "enableTracking": "SLA орындалуын қадағалау",
       "enableTrackingSubtitle": "Мәселенің қауіп деңгейіне қарай түзету мерзімдерін белгілеңіз.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Сеанстарды іздеу мүмкін болмады.",
       "completedWillAppear": "Аяқталған сеанстар осында көрсетіледі.",
       "noPastSessions": "Бұрынғы сеанстар жоқ",
-      "live": "Белсенді",
+      "live": "БЕЛСЕНДІ",
       "updating": "Жаңартылуда"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Сеанс идентификаторын көшіру мүмкін болмады.",
       "untitled": "Атаусыз сеанс",
       "sessionDeleted": "Сеанс жойылды",
-      "needsInput": "Жауап қажет",
+      "needsInput": "жауап қажет",
       "fromPlatform": "{{platform}} платформасынан",
       "cent_one": "цент",
       "cent": "цент",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Данаға қосылу мүмкін болмады — байланыс үзілген болуы мүмкін.",
     "remoteSpawnNonRetryable": "Дана сеансты бастай алмады — компьютерді тексеріңіз немесе CLI құралын жаңартыңыз.",
     "remoteSpawnInstanceDisconnected": "Таңдалған данамен байланыс үзілді. Cloud Agent арқылы сеанс бастаңыз немесе басқа дананы таңдаңыз.",
-    "liveCount_one": "{{count}} белсенді",
-    "liveCount_other": "{{count}} белсенді"
+    "liveCount_one": "{{count}} БЕЛСЕНДІ",
+    "liveCount_other": "{{count}} БЕЛСЕНДІ"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} құралы, {{status}}",
       "noTasks": "Тапсырмалар жоқ.",
       "toolRead": "оқу",
-      "toolEdit": "Өңдеу",
+      "toolEdit": "өңдеу",
       "toolWrite": "жазу",
       "toolBash": "bash",
       "toolGlob": "файл іздеу",
       "toolGrep": "мәтін іздеу",
       "toolList": "тізімдеу",
       "toolPatch": "түзету енгізу",
-      "toolTask": "Тапсырма",
+      "toolTask": "тапсырма",
       "readTodos": "Тапсырмалар тізімін оқу",
       "updateTodos": "Тапсырмалар тізімін жаңарту",
       "linesBadge": "{{displayCount}} жол",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[сериализацияланбайтын кіріс деректері]",
-      "errorPrefix": "қате: {{error}}"
+      "errorPrefix": "Қате: {{error}}"
     },
     "instancePicker": {
       "runOn": "Іске қосу орны",
@@ -2291,7 +2291,7 @@
       "provider": "{{id}} провайдері",
       "modelId": "{{id}} моделі",
       "unavailable": "Қолжетімсіз",
-      "unavailableState": "Қолжетімсіз",
+      "unavailableState": "қолжетімсіз",
       "selectedState": "таңдалған",
       "thinkingEffort": "Ойлау деңгейі",
       "thinkingEffortAccessibility": "Ойлау деңгейі: {{label}}",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Алдыңғы әрекеттер",
       "olderActivityDescription": "Жүктелген тарихқа жатқызылмаған шығын",
       "ofWindowTokens": "барлығы {{window}} токен",
-      "tokens": "Токен",
+      "tokens": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} қадам",
       "stepsCount": "{{steps}} қадам",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Біріктіру сұрауын ашу",
+      "open": "біріктіру сұрауын ашу",
       "closed": "жабылған біріктіру сұрауы",
       "merged": "біріктірілген біріктіру сұрауы",
-      "draft": "Біріктіру сұрауының нобайы",
+      "draft": "біріктіру сұрауының нобайы",
       "updating": "Жаңартылуда, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Артқа қайтып, алдыңғы экраннан бұл таңдау құралын қайта ашыңыз."
   },
   "sessionRow": {
-    "needsInput": "Жауап қажет"
+    "needsInput": "ЖАУАП ҚАЖЕТ"
   },
   "voiceInput": {
     "listening": "Тыңдалуда...",
@@ -2774,7 +2774,7 @@
       "thresholdLabel": "Баланс осы сомадан азайғанда ескерту (USD)",
       "title": "Баланс азайғанда ескерту",
       "emailsError": "Кемінде бір жарамды электрондық пошта мекенжайын енгізіңіз. Бірнеше мекенжайды үтірмен бөліңіз.",
-      "thresholdError": "0-ден үлкен соманы енгізіңіз."
+      "thresholdError": "0-Ден үлкен соманы енгізіңіз."
     },
     "memberLimit": {
       "limitLabel": "Лимит (күніне USD)",
@@ -2784,7 +2784,7 @@
       "removeLimit": "Лимитті алып тастау",
       "title": "Күнделікті пайдалану лимиті",
       "blankError": "Соманы енгізіңіз немесе төмендегі «Лимитті алып тастау» түймесін басыңыз.",
-      "rangeError": "0 мен {{max}} аралығындағы соманы енгізіңіз."
+      "rangeError": "0 Мен {{max}} аралығындағы соманы енгізіңіз."
     },
     "members": {
       "changeRole": "Рөлді өзгерту",

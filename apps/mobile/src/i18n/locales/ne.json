@@ -1049,7 +1049,7 @@
         "genericErrorBody": "हामीले अहिले तपाईंको इन्स्ट्यान्सको सेटअप पूरा गर्न सकेनौँ।",
         "manualReviewBody": "इन्स्ट्यान्स बनाउनुअघि तपाईंको खाताको अवस्था जाँच्नुपर्छ। kilo.ai मा प्रक्रिया जारी राख्नुहोस्।",
         "manualReviewTitle": "सेटअपका लागि टोलीको समीक्षा आवश्यक छ",
-        "openKiloAi": "kilo.ai खोल्नुहोस्",
+        "openKiloAi": "Kilo.ai खोल्नुहोस्",
         "provisioning": "इन्स्ट्यान्स तयार गर्दै",
         "review": "समीक्षा",
         "identityTitle": "तपाईंको बटको पहिचान",
@@ -1147,13 +1147,13 @@
       "trialExpiredBody": "KiloClaw प्रयोग गरिरहन आफ्नो ब्राउजरबाट kilo.ai/claw मा जानुहोस्। एपबाट सदस्यता लिन मिल्दैन।",
       "subscriptionCanceledTitle": "वेबमा सदस्यता लिनुहोस्",
       "subscriptionCanceledBody": "KiloClaw प्रयोग गर्न आफ्नो ब्राउजरबाट kilo.ai/claw मा जानुहोस्। एपबाट सदस्यता लिन मिल्दैन।",
-      "subscriptionCanceledCta": "kilo.ai/claw खोल्नुहोस्",
+      "subscriptionCanceledCta": "Kilo.ai/claw खोल्नुहोस्",
       "subscriptionPastDueTitle": "वेबमा भुक्तानी विवरण अद्यावधिक",
       "subscriptionPastDueBody": "तपाईंको पछिल्लो भुक्तानीमा समस्या आयो। भुक्तानी विवरण अद्यावधिक गर्न आफ्नो ब्राउजरबाट kilo.ai/claw मा जानुहोस्। एपबाट बिलिङ व्यवस्थापन गर्न मिल्दैन।",
       "quarantinedTitle": "इन्स्ट्यान्सको समस्या समाधान गर्नुपर्छ",
       "quarantinedBody": "तपाईंको KiloClaw इन्स्ट्यान्स अलग राखिएको छ र अहिले प्रयोग गर्न मिल्दैन। यसलाई फेरि चलाउन हाम्रो टोलीको मद्दत चाहिन्छ।",
       "multipleCurrentConflictBody": "तपाईंको खातामा एकभन्दा बढी सक्रिय सदस्यता भेटिएकाले दोहोरो शुल्क नलागोस् भनेर हामीले प्रक्रिया रोकेका छौँ।",
-      "multipleCurrentConflictCta": "kilo.ai मा जारी राख्नुहोस्",
+      "multipleCurrentConflictCta": "Kilo.ai मा जारी राख्नुहोस्",
       "nonCanonicalEarlybirdTitle": "पुरानो योजना पत्ता लाग्यो",
       "nonCanonicalEarlybirdBody": "तपाईंको प्रारम्भिक पहुँचको योजना मोबाइलमा प्रयोग गर्नुअघि टोलीले समीक्षा गर्नुपर्छ।",
       "iosTitle": "KiloClaw iOS मा उपलब्ध छैन",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} खोल्नुहोस्, {{displayCount}} नपढिएका सन्देश",
       "openUnread_other": "{{name}} खोल्नुहोस्, {{displayCount}} नपढिएका सन्देश",
       "openSettings": "{{name}} का सेटिङ्स खोल्नुहोस्",
-      "fixOnKiloAi": "kilo.ai मा समाधान गर्नुहोस्: {{label}}"
+      "fixOnKiloAi": "Kilo.ai मा समाधान गर्नुहोस्: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

@@ -169,7 +169,7 @@
     "verifyCode": "Проверить код",
     "resendCode": "Отправить код повторно",
     "termsPrefix": "Продолжая, вы соглашаетесь с нашими",
-    "terms": "условиями использования",
+    "terms": "Условиями использования",
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Другие способы входа",
@@ -554,7 +554,7 @@
       "hide": "Скрыть {{label}}",
       "removing": "Удаление…",
       "saving": "Сохранение…",
-      "setupGuide": "руководство по настройке",
+      "setupGuide": "Руководство по настройке",
       "setupGuideA11y": "Руководство по настройке {{label}}",
       "setupGuideFallback": "руководство по настройке",
       "show": "Показать {{label}}",
@@ -747,12 +747,12 @@
       "destroying": "УДАЛЕНИЕ",
       "provisioned": "ПОДГОТОВЛЕН",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "В работе",
+      "running": "В РАБОТЕ",
       "shuttingDown": "ЗАВЕРШЕНИЕ РАБОТЫ",
-      "starting": "Запуск",
+      "starting": "ЗАПУСК",
       "stopped": "ОСТАНОВЛЕН",
       "stopping": "ОСТАНОВКА",
-      "unknown": "Неизвестно",
+      "unknown": "НЕИЗВЕСТНО",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -804,7 +804,7 @@
     "instructions": {
       "title": "Пользовательские инструкции",
       "deprecation": "Поддержку пользовательских инструкций планируется прекратить. Перенесите эти рекомендации в файл REVIEW.md в вашем репозитории.",
-      "placeholder": "Например: проверять соблюдение наших правил обработки ошибок…"
+      "placeholder": "например: проверять соблюдение наших правил обработки ошибок…"
     },
     "repos": {
       "unavailable": "Репозитории недоступны — завершите настройку Bitbucket на kilo.ai.",
@@ -859,9 +859,9 @@
     },
     "providerConnect": {
       "description": "Настройте подключение Kilo — {{label}} — для автоматической проверки пул-реквестов.",
-      "githubApp": "приложение GitHub",
+      "githubApp": "Приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
-      "gitlabAccount": "аккаунт GitLab",
+      "gitlabAccount": "Аккаунт GitLab",
       "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова.",
       "bitbucketError": "Не удалось открыть настройку Bitbucket. Попробуйте снова."
     },
@@ -1171,11 +1171,11 @@
       "notFoundDescription": "Возможно, уязвимость удалена или у вас больше нет к ней доступа.",
       "notFoundTitle": "Замечание не найдено",
       "reason": "Причина",
-      "reasonFixStarted": "исправление уже начато",
-      "reasonInaccurate": "замечание неточно",
-      "reasonNoBandwidth": "нет ресурсов на исправление",
-      "reasonNotUsed": "уязвимый код не используется",
-      "reasonTolerableRisk": "риск приемлем",
+      "reasonFixStarted": "Исправление уже начато",
+      "reasonInaccurate": "Замечание неточно",
+      "reasonNoBandwidth": "Нет ресурсов на исправление",
+      "reasonNotUsed": "Уязвимый код не используется",
+      "reasonTolerableRisk": "Риск приемлем",
       "title": "Отклонить замечание"
     },
     "findingDetail": {
@@ -1271,7 +1271,7 @@
     },
     "repositories": {
       "couldNotLoad": "Не удалось загрузить настройки репозиториев.",
-      "githubAppSettings": "настройки приложения GitHub",
+      "githubAppSettings": "Настройки приложения GitHub",
       "manageAccess": "Настроить доступ приложения GitHub",
       "noRepositories": "Нет репозиториев",
       "noRepositoriesDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям.",
@@ -1324,7 +1324,7 @@
       "enterWholeNumber": "Введите целое число от 1 до 365",
       "high": "Высокий уровень",
       "highDescription": "Возможна утечка значительного объёма данных.",
-      "invalidDayCount": "Укажите целое число дней от 1 до 365.",
+      "invalidDayCount": "укажите целое число дней от 1 до 365.",
       "low": "Низкий уровень",
       "lowDescription": "Минимальное влияние на безопасность.",
       "medium": "Средний уровень",
@@ -1466,7 +1466,7 @@
       "couldNotSearch": "Не удалось выполнить поиск сеансов.",
       "completedWillAppear": "Завершённые сеансы появятся здесь.",
       "noPastSessions": "Нет завершённых сеансов",
-      "live": "В реальном времени",
+      "live": "В РЕАЛЬНОМ ВРЕМЕНИ",
       "updating": "Обновление"
     },
     "sessionRow": {
@@ -1479,7 +1479,7 @@
       "couldNotCopyId": "Не удалось скопировать идентификатор сеанса.",
       "untitled": "Сеанс без названия",
       "sessionDeleted": "Сеанс удалён",
-      "needsInput": "Ожидание ввода",
+      "needsInput": "ожидание ввода",
       "fromPlatform": "из {{platform}}",
       "cent_one": "цент",
       "cent": "цента",
@@ -1513,8 +1513,8 @@
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
     "remoteSpawnNonRetryable": "Не удалось запустить сеанс на экземпляре. Проверьте компьютер или обновите CLI.",
     "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр.",
-    "liveCount_one": "В реальном времени: {{count}}",
-    "liveCount_other": "В реальном времени: {{count}}",
+    "liveCount_one": "В РЕАЛЬНОМ ВРЕМЕНИ: {{count}}",
+    "liveCount_other": "В РЕАЛЬНОМ ВРЕМЕНИ: {{count}}",
     "liveCount_few": "{{count}} АКТИВНЫХ",
     "liveCount_many": "{{count}} АКТИВНЫХ"
   },
@@ -1622,14 +1622,14 @@
       "accessibilityLabel": "Инструмент «{{name}}», {{status}}",
       "noTasks": "Нет задач.",
       "toolRead": "чтение",
-      "toolEdit": "Редактировать",
+      "toolEdit": "редактировать",
       "toolWrite": "запись",
       "toolBash": "bash",
       "toolGlob": "поиск файлов",
       "toolGrep": "поиск по тексту",
       "toolList": "список файлов",
       "toolPatch": "применение изменений",
-      "toolTask": "Задача",
+      "toolTask": "задача",
       "readTodos": "Чтение списка задач",
       "updateTodos": "Обновление списка задач",
       "linesBadge": "{{displayCount}} стр.",
@@ -1646,7 +1646,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[не удалось сериализовать входные данные]",
-      "errorPrefix": "ошибка: {{error}}"
+      "errorPrefix": "Ошибка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Место запуска",
@@ -1900,13 +1900,13 @@
       "provider": "Провайдер {{id}}",
       "modelId": "Модель {{id}}",
       "unavailable": "Недоступно",
-      "unavailableState": "Недоступно",
+      "unavailableState": "недоступно",
       "selectedState": "выбрано",
       "thinkingEffort": "Уровень рассуждений",
       "thinkingEffortAccessibility": "Уровень рассуждений: {{label}}",
       "thinkingEffortSelected": "Уровень рассуждений: {{label}}, выбрано",
       "thinkingEffortWithModel": "{{model}}, уровень рассуждений: {{variant}}",
-      "lockedByAgent": ", заблокировано агентом «{{agent}}»",
+      "lockedByAgent": ", Заблокировано агентом «{{agent}}»",
       "addToFavorites": "Добавить {{name}} в избранное",
       "removeFromFavorites": "Убрать {{name}} из избранного",
       "thinkingEffortXhigh": "ОЧ. ВЫС.",
@@ -2026,7 +2026,7 @@
       "open": "открытый pull request",
       "closed": "закрытый запрос на слияние",
       "merged": "объединённый запрос на слияние",
-      "draft": "Черновик пул-реквеста",
+      "draft": "черновик пул-реквеста",
       "updating": "Обновление, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2133,7 +2133,7 @@
     "optionsExpiredDescription": "Вернитесь на предыдущий экран и снова откройте список выбора."
   },
   "sessionRow": {
-    "needsInput": "Ожидание ввода"
+    "needsInput": "ОЖИДАНИЕ ВВОДА"
   },
   "voiceInput": {
     "listening": "Говорите…",
@@ -2200,11 +2200,11 @@
     "verifyPurchaseFailed": "Не удалось проверить покупку. Проверьте подключение и попробуйте снова.",
     "productsCouldNotLoad": "Не удалось загрузить тарифы Kilo Pass из App Store.",
     "tryingAgain": "Повторная попытка...",
-    "kiloPassManagement": "управление Kilo Pass",
+    "kiloPassManagement": "Управление Kilo Pass",
     "legalConnectorTerms": " Оформляя подписку, вы соглашаетесь с ",
     "legalConnectorPrivacy": " и подтверждаете ознакомление с ",
     "manageFailed": "Не удалось открыть управление подписками App Store.",
-    "kiloPassSetup": "настройка Kilo Pass",
+    "kiloPassSetup": "Настройка Kilo Pass",
     "subscriptionHeaderDescription": "Ежемесячная подписка пополняет баланс Kilo кредитами для работы над кодом с ИИ в Kilo App: в облачных агентах, удалённых сеансах и чатах KiloClaw.",
     "tierDescription": "Каждый месяц начисляются оплаченные кредиты на сумму {{price}} для использования в Kilo App.",
     "subscribe": "Подписаться",
@@ -2252,7 +2252,7 @@
     "helpImproveDescription": "Разрешите отправлять анонимные данные об использовании приложения и источнике установки. Этот выбор можно изменить в настройках в любой момент.",
     "seeFullDetails": "Подробнее",
     "privacyPolicyPrefix": "Ваши данные обрабатываются в соответствии с",
-    "privacyPolicy": "политикой конфиденциальности Kilo",
+    "privacyPolicy": "Политикой конфиденциальности Kilo",
     "onDevice": "На устройстве",
     "couldNotLoadTranscription": "Не удалось загрузить настройку распознавания речи.",
     "signInToManageTranscription": "Войдите, чтобы настроить распознавание речи через интернет.",
@@ -2663,7 +2663,7 @@
       "editA11y": "Изменить неотправленный комментарий: {{location}}",
       "editOutdatedA11y": "Изменить устаревший неотправленный комментарий: {{location}}",
       "noCommentsQueued": "В очереди нет комментариев. Ревью будет отправлено только с выбранным выше результатом.",
-      "staleHint": "PR изменился после создания этого комментария.",
+      "staleHint": "pR изменился после создания этого комментария.",
       "staleQueueHint": "Комментарии, написанные для старого коммита, не отправляются. Они остаются в очереди, чтобы вы могли изменить или удалить их.",
       "summaryA11y": "Итоговый комментарий к ревью",
       "summaryPlaceholder": "Итоговый комментарий к ревью (необязательно)"

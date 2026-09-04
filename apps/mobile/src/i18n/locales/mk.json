@@ -38,7 +38,7 @@
     "findings": "Наоди",
     "notConnected": "Неповрзано",
     "notifications": "Известувања",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Репозиториуми",
     "securityAgent": "Безбедносен агент",
     "unknown": "Непознато",
@@ -93,7 +93,7 @@
     "email": "Е-пошта",
     "ends": "Завршува на {{date}}",
     "failed": "Неуспешно",
-    "file": "датотека",
+    "file": "Датотека",
     "gitlab": "GitLab",
     "goBack": "Врати се назад",
     "idle": "Во мирување",
@@ -112,7 +112,7 @@
     "preferences": "Лични поставки",
     "privacyPolicy": "Политика за приватност",
     "profile": "Профил",
-    "reactions": "реакции",
+    "reactions": "Реакции",
     "recent": "Неодамнешни",
     "recommended": "Препорачани",
     "remaining": "Преостанато",
@@ -200,7 +200,7 @@
     "signOut": "Одјави се",
     "deleteAccount": "Избриши ја сметката",
     "confirmationCode": "Код за потврда",
-    "confirmationCodePlaceholder": "Код од 6 цифри",
+    "confirmationCodePlaceholder": "код од 6 цифри",
     "confirmDeletion": "Потврди бришење",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успеа вчитувањето на состојбата. Допри за да се обидеш повторно.",
@@ -272,7 +272,7 @@
       "diffTooLarge": "премногу разлики",
       "openFile": "Отвори {{path}}",
       "openFileViewed": "Отвори {{path}} (прегледана)",
-      "title": "датотеки"
+      "title": "Датотеки"
     },
     "fileRows": {
       "markViewed": "Означи {{path}} како прегледана",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Разликите се преголеми за да се прикажат.",
       "openOnGitHub": "Отвори на GitHub",
       "openDiffOnGitHub": "Отвори ги разликите во оваа датотека на GitHub",
-      "githubDiff": "разлики на GitHub"
+      "githubDiff": "Разлики на GitHub"
     },
     "floatingActions": {
       "clearSelection": "Исчисти го изборот",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",
       "editA11y": "Уреди го коментарот на чекање за {{location}}",
-      "staleHint": "PR е ажуриран откако го напиша ова.",
+      "staleHint": "pR е ажуриран откако го напиша ова.",
       "deleteA11y": "Избриши го коментарот на чекање за {{location}}",
       "deletedAnnouncement": "Коментарот на чекање е избришан",
       "noCommentsQueued": "Нема коментари за испраќање. Прегледот ќе се испрати само со дејството избрано погоре.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Општо",
-      "files": "датотеки",
+      "files": "Датотеки",
       "discussion": "Дискусија"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Фотографирај",
       "photoLibrary": "Фототека",
-      "files": "датотеки",
+      "files": "Датотеки",
       "cameraAccessMessage": "Дозволи пристап до камерата во поставките за да фотографираш."
     },
     "typingIndicator": {
@@ -877,7 +877,7 @@
       "planName": {
         "standard": "Standard"
       },
-      "commit": "комит"
+      "commit": "Комит"
     },
     "changelog": {
       "title": "Што има ново",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "За да се поврзе {{label}}, мора да ги пополниш сите полиња.",
       "setupGuideFallback": "водич за поставување",
       "setupGuideA11y": "Водич за поставување на {{label}}",
-      "setupGuide": "водич за поставување",
+      "setupGuide": "Водич за поставување",
       "saving": "Се зачувува…",
       "removing": "Се отстранува…",
       "updateToken": "Ажурирај токен"
@@ -1125,12 +1125,12 @@
       "destroying": "СЕ УНИШТУВА",
       "provisioned": "ПОДГОТВЕНО",
       "restarting": "СЕ РЕСТАРТИРА",
-      "running": "Во тек",
+      "running": "ВО ТЕК",
       "shuttingDown": "СЕ ИСКЛУЧУВА",
-      "starting": "Се стартува",
+      "starting": "СЕ СТАРТУВА",
       "stopped": "ЗАПРЕНО",
       "stopping": "СЕ ЗАПИРА",
-      "unknown": "Непознато",
+      "unknown": "НЕПОЗНАТО",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Прилагодени упатства",
       "deprecation": "Се планира укинување на прилагодените упатства. Наместо тоа, премести ги овие насоки во датотеката REVIEW.md во твоето складиште.",
-      "placeholder": "На пр. примена на нашите правила за обработка на грешки…"
+      "placeholder": "на пр. примена на нашите правила за обработка на грешки…"
     },
     "repos": {
       "unavailable": "Складиштата не се достапни — заврши го поставувањето на Bitbucket на kilo.ai.",
@@ -1252,7 +1252,7 @@
       "showMore": "Прикажи повеќе",
       "created": "Создадено",
       "started": "Започнато",
-      "tokens": "токени",
+      "tokens": "Токени",
       "tokensInOut": "{{input}} влез / {{output}} излез",
       "council": "Совет",
       "decision": "Одлука",
@@ -1339,9 +1339,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "апликација на GitHub",
+      "githubApp": "Апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
-      "gitlabAccount": "сметка на GitLab",
+      "gitlabAccount": "Сметка на GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување.",
       "bitbucketError": "Не можеше да се отвори поставувањето на Bitbucket. Обиди се повторно."
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Отфрли го наодот",
       "reason": "Причина",
-      "reasonFixStarted": "веќе е започната поправка",
-      "reasonNoBandwidth": "нема слободни ресурси",
-      "reasonTolerableRisk": "ризикот е прифатлив",
-      "reasonInaccurate": "наодот е неточен",
-      "reasonNotUsed": "ранливиот код не се користи",
+      "reasonFixStarted": "Веќе е започната поправка",
+      "reasonNoBandwidth": "Нема слободни ресурси",
+      "reasonTolerableRisk": "Ризикот е прифатлив",
+      "reasonInaccurate": "Наодот е неточен",
+      "reasonNotUsed": "Ранливиот код не се користи",
       "commentLabel": "Коментар (незадолжително)",
       "commentAccessibility": "Коментар за отфрлање",
       "commentPlaceholder": "Дополнително објаснување за отфрлањето…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Можност за откривање големо количество податоци.",
       "mediumDescription": "Ограничено влијание или посебни услови.",
       "lowDescription": "Минимално влијание врз безбедноста.",
-      "invalidDayCount": "Внеси од 1 до 365 дена, само со цели броеви.",
+      "invalidDayCount": "внеси од 1 до 365 дена, само со цели броеви.",
       "remediationDeadlineA11y": "Рок за санирање во денови за сериозност: {{label}}",
       "enterWholeNumber": "Внеси цел број помеѓу 1 и 365",
       "permissionNote": "Само сопствениците на организацијата и менаџерите за наплата можат да ги менуваат овие поставки.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Не успеа вчитувањето на поставките за складиштата.",
-      "githubAppSettings": "поставките на апликацијата на GitHub",
+      "githubAppSettings": "Поставките на апликацијата на GitHub",
       "manageAccess": "Управувај со пристапот на апликацијата на GitHub",
       "noRepositories": "Нема складишта",
       "noRepositoriesDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Не успеа пребарувањето на сесиите.",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема претходни сесии",
-      "live": "Во живо",
+      "live": "ВО ЖИВО",
       "updating": "Се ажурира"
     },
     "sessionRow": {
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
     "remoteSpawnNonRetryable": "Инстанцата не успеа да ја започне сесијата — провери го компјутерот или ажурирај го CLI.",
     "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започни сесија на Cloud Agent или избери друга инстанца.",
-    "liveCount_one": "{{count}} во живо",
-    "liveCount_other": "{{count}} во живо"
+    "liveCount_one": "{{count}} ВО ЖИВО",
+    "liveCount_other": "{{count}} ВО ЖИВО"
   },
   "agentChat": {
     "session": {
@@ -2019,7 +2019,7 @@
       "accessibilityLabel": "Алатка {{name}}, {{status}}",
       "noTasks": "Нема задачи.",
       "toolRead": "читање",
-      "toolEdit": "Уреди",
+      "toolEdit": "уреди",
       "toolWrite": "пишување",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[внес што не може да се серијализира]",
-      "errorPrefix": "грешка: {{error}}"
+      "errorPrefix": "Грешка: {{error}}"
     },
     "instancePicker": {
       "runOn": "Место на извршување",
@@ -2217,7 +2217,7 @@
       "modelAccessibility": "Модел: {{modelLabel}}",
       "openHint": "Отвори ја сесијата на подагентот",
       "subagent": "Подагент",
-      "task": "задача",
+      "task": "Задача",
       "waitingForActivity": "Чекање на активност"
     },
     "childSessionSheet": {
@@ -2290,14 +2290,14 @@
     "modelSelector": {
       "provider": "Давател {{id}}",
       "modelId": "Модел {{id}}",
-      "unavailable": "недостапен",
+      "unavailable": "Недостапен",
       "unavailableState": "недостапен",
       "selectedState": "избран",
       "thinkingEffort": "Ниво на размислување",
       "thinkingEffortAccessibility": "Ниво на размислување: {{label}}",
       "thinkingEffortSelected": "Ниво на размислување: {{label}}, избрано",
       "thinkingEffortWithModel": "{{model}}, ниво на размислување: {{variant}}",
-      "lockedByAgent": ", заклучено од агентот „{{agent}}“",
+      "lockedByAgent": ", Заклучено од агентот „{{agent}}“",
       "addToFavorites": "Додај {{name}} во омилени",
       "removeFromFavorites": "Отстрани {{name}} од омилени",
       "thinkingEffortXhigh": "МВ",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Камера",
       "photoLibrary": "Фототека",
-      "files": "датотеки",
+      "files": "Датотеки",
       "couldNotOpenPhotoPicker": "Не успеа отворањето на избирачот на фотографии. Рестартирај го Kilo и обиди се повторно.",
       "maxFilesAllowed": "Дозволени се најмногу {{displayCount}} датотеки.",
       "onlyAddingFiles": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})"
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Отворен PR",
+      "open": "отворен PR",
       "closed": "затворено барање за спојување",
       "merged": "споено барање за спојување",
-      "draft": "PR во нацрт",
+      "draft": "pR во нацрт",
       "updating": "Се ажурира, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Врати се на претходниот екран и повторно отвори го овој избирач."
   },
   "sessionRow": {
-    "needsInput": "чека внес"
+    "needsInput": "ЧЕКА ВНЕС"
   },
   "voiceInput": {
     "listening": "Се слуша...",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Сподели анонимни аналитички податоци за производот и изворот на инсталацијата. Ова можеш да го смениш во секое време во поставките.",
     "seeFullDetails": "Види ги сите детали",
     "privacyPolicyPrefix": "Твоите податоци се обработуваат според",
-    "privacyPolicy": "политиката за приватност на Kilo",
+    "privacyPolicy": "Политиката за приватност на Kilo",
     "onDevice": "На уредот",
     "couldNotLoadTranscription": "Не успеа вчитувањето на твојата поставка за транскрипција.",
     "signInToManageTranscription": "Најави се за да управуваш со онлајн транскрипцијата.",
@@ -2907,7 +2907,7 @@
     "signedOut": "Најави се за да ги видиш агентите",
     "privacy": "Отвори Kilo за да ги видиш агентите",
     "openAgents": "Отвори ги агентите",
-    "needsInput": "чека внес",
+    "needsInput": "Чека внес",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
   }

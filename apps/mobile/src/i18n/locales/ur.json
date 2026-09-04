@@ -1049,7 +1049,7 @@
         "genericErrorBody": "ہم ابھی آپ کی انسٹنس کا سیٹ اپ مکمل نہیں کر سکے۔",
         "manualReviewBody": "انسٹنس بنانے سے پہلے آپ کے اکاؤنٹ کا مسئلہ حل کرنا ضروری ہے۔ kilo.ai پر جاری رکھیں۔",
         "manualReviewTitle": "سیٹ اپ کے لیے انسانی جائزہ درکار",
-        "openKiloAi": "kilo.ai کھولیں",
+        "openKiloAi": "Kilo.ai کھولیں",
         "provisioning": "تیاری جاری",
         "review": "جائزہ",
         "identityTitle": "آپ کے بوٹ کی شناخت",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw استعمال کرتے رہنے کے لیے اپنے براؤزر سے kilo.ai/claw پر جائیں۔ آپ ایپ میں سبسکرائب نہیں کر سکتے۔",
       "subscriptionCanceledTitle": "ویب پر سبسکرائب کریں",
       "subscriptionCanceledBody": "KiloClaw استعمال کرنے کے لیے اپنے براؤزر سے kilo.ai/claw پر جائیں۔ آپ ایپ میں سبسکرائب نہیں کر سکتے۔",
-      "subscriptionCanceledCta": "kilo.ai/claw کھولیں",
+      "subscriptionCanceledCta": "Kilo.ai/claw کھولیں",
       "subscriptionPastDueTitle": "ویب پر ادائیگی کی معلومات کی تازہ کاری",
       "subscriptionPastDueBody": "آپ کی تازہ ترین ادائیگی میں مسئلہ پیش آیا۔ ادائیگی کی معلومات اپ ڈیٹ کرنے کے لیے اپنے براؤزر میں kilo.ai/claw کھولیں۔ آپ ایپ میں بلنگ کا انتظام نہیں کر سکتے۔",
       "quarantinedTitle": "انسٹنس کو بحالی کی ضرورت ہے",
       "quarantinedBody": "آپ کی KiloClaw انسٹنس الگ کر دی گئی ہے اور ابھی استعمال نہیں کی جا سکتی۔ اسے بحال کرنے کے لیے ہماری ٹیم کی مدد ضروری ہے۔",
       "multipleCurrentConflictBody": "آپ کے اکاؤنٹ پر ایک سے زیادہ فعال سبسکرپشنز ملیں۔ آپ سے دو بار رقم وصول ہونے سے بچانے کے لیے ہم نے کارروائی عارضی طور پر روک دی ہے۔",
-      "multipleCurrentConflictCta": "kilo.ai پر جاری رکھیں",
+      "multipleCurrentConflictCta": "Kilo.ai پر جاری رکھیں",
       "nonCanonicalEarlybirdTitle": "پرانا پلان ملا",
       "nonCanonicalEarlybirdBody": "موبائل پر استعمال سے پہلے آپ کے ابتدائی رسائی والے پلان کا انسانی جائزہ ضروری ہے۔",
-      "iosTitle": "iOS پر KiloClaw دستیاب نہیں",
+      "iosTitle": "IOS پر KiloClaw دستیاب نہیں",
       "iosBody": "اس اکاؤنٹ کے لیے KiloClaw تک رسائی کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
       "iosContact": "کوئی سوال ہے؟ hi@kilo.ai پر رابطہ کریں۔"
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} کھولیں، {{displayCount}} ان پڑھے پیغامات",
       "openUnread_other": "{{name}} کھولیں، {{displayCount}} ان پڑھے پیغامات",
       "openSettings": "{{name}} کی ترتیبات کھولیں",
-      "fixOnKiloAi": "kilo.ai پر درست کریں: {{label}}"
+      "fixOnKiloAi": "Kilo.ai پر درست کریں: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram، Discord، Slack",

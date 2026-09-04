@@ -38,7 +38,7 @@
     "findings": "Wykryte problemy",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repozytoria",
     "securityAgent": "Agent bezpieczeństwa",
     "unknown": "Brak danych",
@@ -556,7 +556,7 @@
       "saving": "Zapisywanie…",
       "setupGuide": "Instrukcja konfiguracji",
       "setupGuideA11y": "instrukcja konfiguracji {{label}}",
-      "setupGuideFallback": "Instrukcja konfiguracji",
+      "setupGuideFallback": "instrukcja konfiguracji",
       "show": "Pokaż {{label}}",
       "updateToken": "Zaktualizuj token"
     },
@@ -747,12 +747,12 @@
       "destroying": "TRWAŁE USUWANIE",
       "provisioned": "PRZYGOTOWANA",
       "restarting": "PONOWNE URUCHAMIANIE",
-      "running": "W toku",
+      "running": "W TOKU",
       "shuttingDown": "WYŁĄCZANIE",
-      "starting": "Uruchamianie",
+      "starting": "URUCHAMIANIE",
       "stopped": "ZATRZYMANA",
       "stopping": "ZATRZYMYWANIE",
-      "unknown": "Brak danych",
+      "unknown": "BRAK DANYCH",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -804,7 +804,7 @@
     "instructions": {
       "title": "Własne instrukcje",
       "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
-      "placeholder": "Np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…"
+      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…"
     },
     "repos": {
       "unavailable": "Repozytoria są niedostępne. Dokończ konfigurację Bitbucket na kilo.ai.",
@@ -859,9 +859,9 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
-      "githubApp": "aplikacja GitHub",
+      "githubApp": "Aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
-      "gitlabAccount": "konto GitLab",
+      "gitlabAccount": "Konto GitLab",
       "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie.",
       "bitbucketError": "Nie udało się otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
@@ -1203,11 +1203,11 @@
       "vulnerableVersions": "Podatne wersje",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Naprawa już trwa",
-      "reasonNoBandwidth": "Brak wolnych zasobów",
-      "reasonTolerableRisk": "Ryzyko jest akceptowalne",
-      "reasonInaccurate": "Błędne wykrycie problemu",
-      "reasonNotUsed": "Kod z luką nie jest używany",
+      "reasonFixStarted": "naprawa już trwa",
+      "reasonNoBandwidth": "brak wolnych zasobów",
+      "reasonTolerableRisk": "ryzyko jest akceptowalne",
+      "reasonInaccurate": "błędne wykrycie problemu",
+      "reasonNotUsed": "kod z luką nie jest używany",
       "reasonAfterReview": "po weryfikacji"
     },
     "findingList": {
@@ -1271,7 +1271,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nie udało się wczytać ustawień repozytoriów.",
-      "githubAppSettings": "ustawienia aplikacji GitHub",
+      "githubAppSettings": "Ustawienia aplikacji GitHub",
       "manageAccess": "Zarządzaj dostępem aplikacji GitHub",
       "noRepositories": "Brak repozytoriów",
       "noRepositoriesDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów.",
@@ -1324,7 +1324,7 @@
       "enterWholeNumber": "Wpisz liczbę całkowitą od 1 do 365",
       "high": "Poziom wysoki",
       "highDescription": "Ryzyko poważnego wycieku danych.",
-      "invalidDayCount": "Podaj liczbę dni od 1 do 365, bez części ułamkowej.",
+      "invalidDayCount": "podaj liczbę dni od 1 do 365, bez części ułamkowej.",
       "low": "Poziom niski",
       "lowDescription": "Minimalny wpływ na bezpieczeństwo.",
       "medium": "Poziom średni",
@@ -1466,7 +1466,7 @@
       "couldNotSearch": "Nie udało się wyszukać sesji.",
       "completedWillAppear": "Zakończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
-      "live": "Na żywo",
+      "live": "NA ŻYWO",
       "updating": "Aktualizowanie"
     },
     "sessionRow": {
@@ -1479,7 +1479,7 @@
       "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji.",
       "untitled": "Sesja bez tytułu",
       "sessionDeleted": "Usunięto sesję",
-      "needsInput": "Czeka na odpowiedź",
+      "needsInput": "czeka na odpowiedź",
       "fromPlatform": "z {{platform}}",
       "cent_one": "cent amerykański",
       "cent": "centa",
@@ -1493,7 +1493,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -1513,8 +1513,8 @@
     "remoteSpawnRetryable": "Nie udało się połączyć z instancją — mogła się rozłączyć.",
     "remoteSpawnNonRetryable": "Instancja nie uruchomiła sesji — sprawdź komputer lub zaktualizuj CLI.",
     "remoteSpawnInstanceDisconnected": "Wybrana instancja utraciła połączenie. Uruchom sesję w usłudze Cloud Agent lub wybierz inną instancję.",
-    "liveCount_one": "{{count}} na żywo",
-    "liveCount_other": "{{count}} na żywo",
+    "liveCount_one": "{{count}} NA ŻYWO",
+    "liveCount_other": "{{count}} NA ŻYWO",
     "liveCount_few": "{{count}} AKTYWNE",
     "liveCount_many": "{{count}} AKTYWNYCH"
   },
@@ -1622,14 +1622,14 @@
       "accessibilityLabel": "Narzędzie {{name}}, {{status}}",
       "noTasks": "Brak zadań.",
       "toolRead": "odczyt",
-      "toolEdit": "Edytuj",
+      "toolEdit": "edytuj",
       "toolWrite": "zapis",
       "toolBash": "bash",
       "toolGlob": "wyszukiwanie plików",
       "toolGrep": "wyszukiwanie tekstu",
       "toolList": "lista plików",
       "toolPatch": "poprawka",
-      "toolTask": "Zadanie",
+      "toolTask": "zadanie",
       "readTodos": "Odczytaj zadania",
       "updateTodos": "Zaktualizuj zadania",
       "linesBadge": "wiersze: {{displayCount}}",
@@ -1646,7 +1646,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[dane wejściowe niemożliwe do serializacji]",
-      "errorPrefix": "błąd: {{error}}"
+      "errorPrefix": "Błąd: {{error}}"
     },
     "instancePicker": {
       "runOn": "Miejsce uruchomienia",
@@ -1900,16 +1900,16 @@
       "provider": "Dostawca {{id}}",
       "modelId": "Model AI: {{id}}",
       "unavailable": "Niedostępny",
-      "unavailableState": "Niedostępny",
+      "unavailableState": "niedostępny",
       "selectedState": "wybrany",
       "thinkingEffort": "Poziom rozumowania",
       "thinkingEffortAccessibility": "Poziom rozumowania: {{label}}",
       "thinkingEffortSelected": "Poziom rozumowania: {{label}}, wybrany",
       "thinkingEffortWithModel": "{{model}}, poziom rozumowania: {{variant}}",
-      "lockedByAgent": ", zablokowane przez agenta „{{agent}}”",
+      "lockedByAgent": ", Zablokowane przez agenta „{{agent}}”",
       "addToFavorites": "Dodaj {{name}} do ulubionych",
       "removeFromFavorites": "Usuń {{name}} z ulubionych",
-      "thinkingEffortXhigh": "B. wys.",
+      "thinkingEffortXhigh": "B. WYS.",
       "thinkingEffortMedium": "Śr.",
       "sessionModel": "Model sesji"
     },
@@ -2026,7 +2026,7 @@
       "open": "otwarty PR",
       "closed": "zamknięty PR",
       "merged": "scalony PR",
-      "draft": "Wersja robocza PR",
+      "draft": "wersja robocza PR",
       "updating": "Aktualizowanie, {{label}} #{{number}}",
       "label": "{{label}} nr {{number}}"
     },
@@ -2133,7 +2133,7 @@
     "optionsExpiredDescription": "Wróć do poprzedniego ekranu i ponownie otwórz okno wyboru."
   },
   "sessionRow": {
-    "needsInput": "Czeka na odpowiedź"
+    "needsInput": "CZEKA NA ODPOWIEDŹ"
   },
   "voiceInput": {
     "listening": "Nasłuchiwanie...",
@@ -2200,11 +2200,11 @@
     "verifyPurchaseFailed": "Nie udało się zweryfikować zakupu. Sprawdź połączenie i spróbuj ponownie.",
     "productsCouldNotLoad": "Nie udało się wczytać produktów Kilo Pass z App Store.",
     "tryingAgain": "Ponawianie próby...",
-    "kiloPassManagement": "zarządzanie Kilo Pass",
+    "kiloPassManagement": "Zarządzanie Kilo Pass",
     "legalConnectorTerms": " Wykupując subskrypcję, akceptujesz ",
     "legalConnectorPrivacy": " i potwierdzasz zapoznanie się z dokumentem ",
     "manageFailed": "Nie udało się otworzyć zarządzania subskrypcjami w App Store.",
-    "kiloPassSetup": "konfiguracja Kilo Pass",
+    "kiloPassSetup": "Konfiguracja Kilo Pass",
     "subscriptionHeaderDescription": "Miesięczna subskrypcja zasila twoje saldo Kilo kredytami na programowanie z AI w Kilo App: sesje agentów w chmurze, sesje zdalne i czaty KiloClaw.",
     "tierDescription": "Co miesiąc otrzymujesz płatne kredyty o wartości {{price}} do wykorzystania w Kilo App.",
     "subscribe": "Subskrybuj",
@@ -2252,7 +2252,7 @@
     "helpImproveDescription": "Udostępniaj anonimowe dane o korzystaniu z aplikacji i źródle jej instalacji. Możesz to zmienić w każdej chwili w ustawieniach.",
     "seeFullDetails": "Zobacz szczegóły",
     "privacyPolicyPrefix": "Twoje dane są przetwarzane zgodnie z",
-    "privacyPolicy": "polityką prywatności Kilo",
+    "privacyPolicy": "Polityką prywatności Kilo",
     "onDevice": "Na urządzeniu",
     "couldNotLoadTranscription": "Nie udało się wczytać ustawienia transkrypcji.",
     "signInToManageTranscription": "Zaloguj się, aby zarządzać transkrypcją online.",
@@ -2509,7 +2509,7 @@
       "openDiffOnGitHub": "Otwórz różnice w tym pliku w serwisie GitHub",
       "openOnGitHub": "Otwórz w serwisie GitHub",
       "unmarkViewed": "Usuń oznaczenie przejrzenia pliku {{path}}",
-      "githubDiff": "różnice w serwisie GitHub"
+      "githubDiff": "Różnice w serwisie GitHub"
     },
     "floatingActions": {
       "clear": "Wyczyść",
@@ -2644,7 +2644,7 @@
       "commit_one": "zatwierdzenie",
       "file": "pliku",
       "file_other": "pliku",
-      "file_one": "Plik",
+      "file_one": "plik",
       "stateMerged": "Scalono",
       "stateOpen": "Otwarty",
       "stateOpenApproved": "Otwarty · zatwierdzony",
@@ -2663,7 +2663,7 @@
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
+      "staleHint": "pR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
       "summaryPlaceholder": "Opcjonalne podsumowanie przeglądu"

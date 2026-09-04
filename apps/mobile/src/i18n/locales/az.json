@@ -421,8 +421,8 @@
       "addReaction": "Reaksiya əlavə et",
       "reactionPill": "{{emoji}} reaksiyası, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
-      "reaction": "Reaksiya",
-      "reaction_other": "Reaksiya",
+      "reaction": "reaksiya",
+      "reaction_other": "reaksiya",
       "commentActions": "Şərh əməliyyatları",
       "reportContent": "Məzmundan şikayət et",
       "reportUser": "İstifadəçidən şikayət et",
@@ -545,7 +545,7 @@
       "addTitle": "Yeni şərh",
       "unavailableTitle": "Şərh əlçatan deyil",
       "unavailableMessage": "Bu göndərilməmiş şərh artıq silinib və ya göndərilib.",
-      "ok": "Oldu",
+      "ok": "OLDU",
       "loadFailedTitle": "Şərh redaktorunu yükləmək mümkün olmadı.",
       "discardTitle": "Şərhdən imtina edilsin?",
       "discardMessage": "Qaralaman silinəcək.",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Açıq · Kod baxışı tələb olunur",
       "stateOpen": "Açıq",
       "unknownAuthor": "Naməlum müəllif",
-      "commit_one": "Kommit",
+      "commit_one": "kommit",
       "commit": "kommit",
       "commit_other": "kommit",
-      "file_one": "Fayl",
-      "file": "Fayl",
-      "file_other": "Fayl"
+      "file_one": "fayl",
+      "file": "fayl",
+      "file_other": "fayl"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} yerindəki köhnəlmiş, göndərilməmiş şərhi redaktə et",
@@ -865,7 +865,7 @@
       "renews": "Yenilənmə tarixi",
       "standardMonthToMonth": "Standard aylıq planı",
       "standardStartsOn": "Standard planı {{date}} tarixində {{price}} qiymətinə başlayır.",
-      "yourStandardMonthlyPrice": "Standard planın üzrə aylıq ödənişin",
+      "yourStandardMonthlyPrice": "standard planın üzrə aylıq ödənişin",
       "perMonth": "/ay",
       "earlybirdAccessUntil": "Erkən giriş {{date}} tarixinədək qüvvədədir.",
       "earlybirdEnding": "Erkən girişin bitməsinə qalan vaxt: {{remaining}}",
@@ -873,7 +873,7 @@
       "subscriptionCancels": "Abunəlik {{date}} tarixində ləğv ediləcək.",
       "trialDaysRemaining": "Sınaq müddətinin bitməsinə {{remaining}} qalıb.",
       "trialEndingSoon": "Sınaq müddəti tezliklə bitir. Qalan vaxt: {{remaining}}",
-      "lessThanOneDay": "1 gündən az",
+      "lessThanOneDay": "1 Gündən az",
       "planName": {
         "standard": "Standard"
       },
@@ -968,7 +968,7 @@
       "hide": "{{label}} gizlət",
       "show": "{{label}} göstər",
       "allFieldsRequired": "{{label}} xidmətini qoşmaq üçün bütün sahələri doldurmaq lazımdır.",
-      "setupGuideFallback": "Quraşdırma təlimatı",
+      "setupGuideFallback": "quraşdırma təlimatı",
       "setupGuideA11y": "{{label}} quraşdırma təlimatı",
       "setupGuide": "Quraşdırma təlimatı",
       "saving": "Yadda saxlanılır…",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "İnstansının quraşdırılmasını indi tamamlamaq mümkün olmadı.",
         "manualReviewBody": "İnstans yaratmazdan əvvəl hesabının vəziyyəti yoxlanmalıdır. kilo.ai saytında davam et.",
         "manualReviewTitle": "Quraşdırma mütəxəssis tərəfindən yoxlanmalıdır",
-        "openKiloAi": "kilo.ai-ni aç",
+        "openKiloAi": "Kilo.ai-ni aç",
         "provisioning": "Hazırlıq",
         "review": "Yoxlama",
         "identityTitle": "Botunun kimliyi",
@@ -1125,12 +1125,12 @@
       "destroying": "HƏMİŞƏLİK SİLİNİR",
       "provisioned": "HAZIRLANIB",
       "restarting": "YENİDƏN BAŞLADILIR",
-      "running": "İşləyir",
+      "running": "İŞLƏYİR",
       "shuttingDown": "SÖNDÜRÜLÜR",
-      "starting": "Başladılır",
+      "starting": "BAŞLADILIR",
       "stopped": "DAYANDIRILIB",
       "stopping": "DAYANDIRILIR",
-      "unknown": "Naməlum",
+      "unknown": "NAMƏLUM",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1141,19 +1141,19 @@
       "autoModelA11y": "{{label}} avtomatik modeli",
       "currentModel": "Cari model",
       "browseAllModels": "və ya 500-dən çox model arasından seç",
-      "browseAllModelsA11y": "500-dən çox modelin hamısına bax"
+      "browseAllModelsA11y": "500-Dən çox modelin hamısına bax"
     },
     "accessRequired": {
       "trialExpiredBody": "KiloClaw-dan istifadə etməyə davam etmək üçün brauzerdə kilo.ai/claw ünvanını aç. Tətbiqdən abunə olmaq mümkün deyil.",
       "subscriptionCanceledTitle": "Saytda abunə ol",
       "subscriptionCanceledBody": "KiloClaw-dan istifadə etmək üçün brauzerdə kilo.ai/claw ünvanını aç. Tətbiqdən abunə olmaq mümkün deyil.",
-      "subscriptionCanceledCta": "kilo.ai/claw ünvanını aç",
+      "subscriptionCanceledCta": "Kilo.ai/claw ünvanını aç",
       "subscriptionPastDueTitle": "Ödəniş məlumatlarını saytda yenilə",
       "subscriptionPastDueBody": "Son ödənişində problem yarandı. Ödəniş məlumatlarını yeniləmək üçün brauzerdə kilo.ai/claw ünvanını aç. Ödənişləri tətbiqdən idarə etmək mümkün deyil.",
       "quarantinedTitle": "İnstansın bərpası lazımdır",
       "quarantinedBody": "KiloClaw instansın karantinə alınıb və hazırda ondan istifadə etmək mümkün deyil. Onun bərpası üçün komandamızın köməyi lazımdır.",
       "multipleCurrentConflictBody": "Hesabında birdən çox aktiv abunəlik aşkar etdik. Səndən iki dəfə ödəniş tutulmasın deyə əməliyyatları müvəqqəti dayandırdıq.",
-      "multipleCurrentConflictCta": "kilo.ai saytında davam et",
+      "multipleCurrentConflictCta": "Kilo.ai saytında davam et",
       "nonCanonicalEarlybirdTitle": "Köhnə plan aşkarlandı",
       "nonCanonicalEarlybirdBody": "Erkən giriş planından mobil cihazda istifadə etməzdən əvvəl plan mütəxəssis tərəfindən yoxlanmalıdır.",
       "iosTitle": "KiloClaw iOS-da əlçatan deyil",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
       "openUnread_other": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
       "openSettings": "{{name}} üçün parametrləri aç",
-      "fixOnKiloAi": "kilo.ai saytında düzəlt: {{label}}"
+      "fixOnKiloAi": "Kilo.ai saytında düzəlt: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Xüsusi təlimatlar",
       "deprecation": "Xüsusi təlimatlar funksiyasının istifadədən çıxarılması planlaşdırılır. Bu təlimatları repozitoriyandakı REVIEW.md faylına köçür.",
-      "placeholder": "Məsələn: xətaların emalı qaydalarımıza uyğunluq…"
+      "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…"
     },
     "repos": {
       "unavailable": "Repozitoriyalar əlçatan deyil. Bitbucket quraşdırmasını kilo.ai saytında tamamla.",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Düzəlişə artıq başlanıb",
-      "reasonNoBandwidth": "Vaxt və resurs yoxdur",
-      "reasonTolerableRisk": "Risk məqbuldur",
-      "reasonInaccurate": "Problem səhv müəyyən edilib",
-      "reasonNotUsed": "Boşluq olan koddan istifadə edilmir",
+      "reasonFixStarted": "düzəlişə artıq başlanıb",
+      "reasonNoBandwidth": "vaxt və resurs yoxdur",
+      "reasonTolerableRisk": "risk məqbuldur",
+      "reasonInaccurate": "problem səhv müəyyən edilib",
+      "reasonNotUsed": "boşluq olan koddan istifadə edilmir",
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {
@@ -1649,9 +1649,9 @@
       "highDescription": "Ciddi məlumat sızması ehtimalı.",
       "mediumDescription": "Məhdud təsir və ya xüsusi şərtlər.",
       "lowDescription": "Təhlükəsizliyə minimal təsir.",
-      "invalidDayCount": "Gün sayını 1–365 aralığında tam ədədlə göstər.",
+      "invalidDayCount": "gün sayını 1–365 aralığında tam ədədlə göstər.",
       "remediationDeadlineA11y": "{{label}} üçün düzəliş müddəti, günlə",
-      "enterWholeNumber": "1-dən 365-ə qədər tam ədəd daxil et",
+      "enterWholeNumber": "1-Dən 365-ə qədər tam ədəd daxil et",
       "permissionNote": "Bu parametrləri yalnız təşkilat sahibləri və ödəniş menecerləri dəyişə bilər.",
       "enableTracking": "SLA izləməsini aktivləşdir",
       "enableTrackingSubtitle": "Tapıntıların ciddilik dərəcəsinə görə düzəliş müddətlərini təyin et.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Sessiyaları axtarmaq mümkün olmadı.",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
-      "live": "Canlı",
+      "live": "CANLI",
       "updating": "Yenilənir"
     },
     "sessionRow": {
@@ -1884,12 +1884,12 @@
       "couldNotCopyId": "Sessiya ID-sinin surətini çıxarmaq mümkün olmadı.",
       "untitled": "Adsız sessiya",
       "sessionDeleted": "Sessiya silindi",
-      "needsInput": "Cavab gözləyir",
+      "needsInput": "cavab gözləyir",
       "fromPlatform": "{{platform}} platformasından",
       "cent_one": "sent",
       "cent": "sent",
       "cent_other": "sent",
-      "dollar_one": "ABŞ dolları",
+      "dollar_one": "aBŞ dolları",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xərc: {{cost}}",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "İnstansa qoşulmaq mümkün olmadı — bağlantısı kəsilmiş ola bilər.",
     "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — kompüteri yoxla və ya CLI-ni yenilə.",
     "remoteSpawnInstanceDisconnected": "Seçilmiş instansın bağlantısı kəsildi. Cloud Agent-də sessiya başlat və ya başqa instans seç.",
-    "liveCount_one": "{{count}} canlı",
-    "liveCount_other": "{{count}} canlı"
+    "liveCount_one": "{{count}} CANLI",
+    "liveCount_other": "{{count}} CANLI"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} aləti, {{status}}",
       "noTasks": "Tapşırıq yoxdur.",
       "toolRead": "oxu",
-      "toolEdit": "Redaktə et",
+      "toolEdit": "redaktə et",
       "toolWrite": "yaz",
       "toolBash": "bash",
       "toolGlob": "fayl axtarışı",
       "toolGrep": "mətn axtarışı",
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
-      "toolTask": "Tapşırıq",
+      "toolTask": "tapşırıq",
       "readTodos": "Tapşırıqları oxu",
       "updateTodos": "Tapşırıqları yenilə",
       "linesBadge": "{{displayCount}} sətir",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
-      "errorPrefix": "xəta: {{error}}"
+      "errorPrefix": "Xəta: {{error}}"
     },
     "instancePicker": {
       "runOn": "İcra mühiti",
@@ -2291,7 +2291,7 @@
       "provider": "Təminatçı {{id}}",
       "modelId": "{{id}} modeli",
       "unavailable": "Mövcud deyil",
-      "unavailableState": "Mövcud deyil",
+      "unavailableState": "mövcud deyil",
       "selectedState": "seçilib",
       "thinkingEffort": "Düşünmə səviyyəsi",
       "thinkingEffortAccessibility": "Düşünmə səviyyəsi: {{label}}",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Əvvəlki fəaliyyət",
       "olderActivityDescription": "Yüklənmiş tarixçəyə aid edilməyən xərc",
       "ofWindowTokens": "{{window}} tokendən",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} addım",
       "stepsCount": "{{steps}} addım",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Açıq birləşdirmə sorğusu",
+      "open": "açıq birləşdirmə sorğusu",
       "closed": "bağlanmış birləşdirmə sorğusu",
       "merged": "birləşdirilmiş birləşdirmə sorğusu",
-      "draft": "Qaralama birləşdirmə sorğusu",
+      "draft": "qaralama birləşdirmə sorğusu",
       "updating": "Yenilənir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Geri qayıt və bu seçicini əvvəlki ekrandan yenidən aç."
   },
   "sessionRow": {
-    "needsInput": "Cavab gözləyir"
+    "needsInput": "CAVAB GÖZLƏYİR"
   },
   "voiceInput": {
     "listening": "Dinlənilir...",
@@ -2774,7 +2774,7 @@
       "thresholdLabel": "Xəbərdarlıq həddi (USD)",
       "title": "Aşağı balans xəbərdarlığı",
       "emailsError": "Ən azı bir düzgün e-poçt ünvanı daxil et. Bir neçə ünvanı vergüllə ayır.",
-      "thresholdError": "0-dan böyük məbləğ daxil et."
+      "thresholdError": "0-Dan böyük məbləğ daxil et."
     },
     "memberLimit": {
       "limitLabel": "Gündəlik limit (USD)",
@@ -2784,7 +2784,7 @@
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
-      "rangeError": "0 ilə {{max}} arasında məbləğ daxil et."
+      "rangeError": "0 İlə {{max}} arasında məbləğ daxil et."
     },
     "members": {
       "changeRole": "Rolu dəyiş",

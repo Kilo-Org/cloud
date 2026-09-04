@@ -93,7 +93,7 @@
     "email": "E-poštni naslov",
     "ends": "Konča se {{date}}",
     "failed": "Ni uspelo",
-    "file": "datoteka",
+    "file": "Datoteka",
     "gitlab": "GitLab",
     "goBack": "Nazaj",
     "idle": "Nedejavno",
@@ -112,7 +112,7 @@
     "preferences": "Nastavitve",
     "privacyPolicy": "Politika zasebnosti",
     "profile": "Profil",
-    "reactions": "odzivov",
+    "reactions": "Odzivov",
     "recent": "Nedavno",
     "recommended": "Priporočeno",
     "remaining": "Preostalo",
@@ -272,7 +272,7 @@
       "diffTooLarge": "preobsežne razlike",
       "openFile": "Odpri {{path}}",
       "openFileViewed": "Odpri {{path}} (ogledano)",
-      "title": "datotek"
+      "title": "Datotek"
     },
     "fileRows": {
       "markViewed": "Označi {{path}} kot ogledano",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
       "openOnGitHub": "Odpri na GitHubu",
       "openDiffOnGitHub": "Odpri prikaz razlik te datoteke na GitHubu",
-      "githubDiff": "prikaz razlik na GitHubu"
+      "githubDiff": "Prikaz razlik na GitHubu"
     },
     "floatingActions": {
       "clearSelection": "Počisti izbor",
@@ -553,7 +553,7 @@
       "addTitle": "Nov komentar",
       "unavailableTitle": "Komentar ni na voljo",
       "unavailableMessage": "Ta čakajoči komentar je bil že izbrisan ali poslan.",
-      "ok": "V redu",
+      "ok": "V REDU",
       "loadFailedTitle": "Urejevalnika komentarjev ni bilo mogoče naložiti.",
       "discardTitle": "Zavržem komentar?",
       "discardMessage": "Tvoj osnutek bo izgubljen.",
@@ -621,7 +621,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
       "editA11y": "Uredi čakajoči komentar na {{location}}",
-      "staleHint": "PR se je od nastanka tega komentarja spremenil.",
+      "staleHint": "pR se je od nastanka tega komentarja spremenil.",
       "deleteA11y": "Izbriši čakajoči komentar na {{location}}",
       "deletedAnnouncement": "Čakajoči komentar izbrisan",
       "noCommentsQueued": "Ni čakajočih komentarjev. Pregled bo oddan samo z zgoraj izbrano vrsto pregleda.",
@@ -632,7 +632,7 @@
     },
     "tabs": {
       "overview": "Pregled",
-      "files": "datotek",
+      "files": "Datotek",
       "discussion": "Razprava"
     },
     "fileStatus": {
@@ -835,7 +835,7 @@
     "attachmentPicker": {
       "takePhoto": "Posnemi fotografijo",
       "photoLibrary": "Fotografije",
-      "files": "datotek",
+      "files": "Datotek",
       "cameraAccessMessage": "Za fotografiranje v nastavitvah dovoli dostop do kamere."
     },
     "typingIndicator": {
@@ -893,7 +893,7 @@
       "planName": {
         "standard": "Standard"
       },
-      "commit": "potrditev"
+      "commit": "Potrditev"
     },
     "changelog": {
       "title": "Kaj je novega",
@@ -986,7 +986,7 @@
       "allFieldsRequired": "Za povezavo s storitvijo {{label}} izpolni vsa polja.",
       "setupGuideFallback": "navodila za nastavitev",
       "setupGuideA11y": "navodila za nastavitev storitve {{label}}",
-      "setupGuide": "navodila za nastavitev",
+      "setupGuide": "Navodila za nastavitev",
       "saving": "Shranjevanje…",
       "removing": "Odstranjevanje…",
       "updateToken": "Posodobi žeton"
@@ -1141,12 +1141,12 @@
       "destroying": "UNIČEVANJE",
       "provisioned": "PRIPRAVLJENO",
       "restarting": "PONOVNI ZAGON",
-      "running": "V teku",
+      "running": "V TEKU",
       "shuttingDown": "IZKLOP",
-      "starting": "Zaganjanje",
+      "starting": "ZAGANJANJE",
       "stopped": "USTAVLJENO",
       "stopping": "USTAVLJANJE",
-      "unknown": "Neznano",
+      "unknown": "NEZNANO",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1235,7 +1235,7 @@
     "instructions": {
       "title": "Navodila po meri",
       "deprecation": "Navodila po meri bodo ukinjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
-      "placeholder": "Npr. upoštevanje naših pravil za obravnavo napak…"
+      "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…"
     },
     "repos": {
       "unavailable": "Skladišča niso na voljo. Dokončaj nastavitev povezave s platformo Bitbucket na kilo.ai.",
@@ -1270,7 +1270,7 @@
       "showMore": "Prikaži več",
       "created": "Ustvarjeno",
       "started": "Začeto",
-      "tokens": "žetonov",
+      "tokens": "Žetonov",
       "tokensInOut": "Vhod: {{input}} / izhod: {{output}}",
       "council": "Svet pregledovalnikov",
       "decision": "Odločitev",
@@ -1357,9 +1357,9 @@
       "activity": "Dejavnost"
     },
     "providerConnect": {
-      "githubApp": "aplikacija GitHub",
+      "githubApp": "Aplikacija GitHub",
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
-      "gitlabAccount": "račun GitLab",
+      "gitlabAccount": "Račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
       "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}.",
       "bitbucketError": "Nastavitve povezave s platformo Bitbucket ni bilo mogoče odpreti. Poskusi znova."
@@ -1604,11 +1604,11 @@
       "viewAdvisory": "Prikaži varnostno obvestilo na platformi GitHub",
       "statusOpen": "Odprto",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Odpravljanje že poteka",
-      "reasonNoBandwidth": "Ni časa za odpravljanje",
-      "reasonTolerableRisk": "Tveganje je sprejemljivo",
-      "reasonInaccurate": "Ugotovitev je napačna",
-      "reasonNotUsed": "Ranljiva koda se ne uporablja",
+      "reasonFixStarted": "odpravljanje že poteka",
+      "reasonNoBandwidth": "ni časa za odpravljanje",
+      "reasonTolerableRisk": "tveganje je sprejemljivo",
+      "reasonInaccurate": "ugotovitev je napačna",
+      "reasonNotUsed": "ranljiva koda se ne uporablja",
       "reasonAfterReview": "po pregledu"
     },
     "settingsOverview": {
@@ -1671,7 +1671,7 @@
       "highDescription": "Možnost obsežnega razkritja podatkov.",
       "mediumDescription": "Omejen vpliv ali posebni pogoji.",
       "lowDescription": "Minimalen vpliv na varnost.",
-      "invalidDayCount": "Vnesi celo število dni med 1 in 365.",
+      "invalidDayCount": "vnesi celo število dni med 1 in 365.",
       "remediationDeadlineA11y": "Rok za odpravljanje v dneh, resnost: {{label}}",
       "enterWholeNumber": "Vnesi celo število med 1 in 365",
       "permissionNote": "Te nastavitve lahko spremenijo samo lastniki organizacije in upravitelji obračunavanja.",
@@ -1747,7 +1747,7 @@
     },
     "repositories": {
       "couldNotLoad": "Nastavitev skladišč ni bilo mogoče naložiti.",
-      "githubAppSettings": "nastavitve aplikacije GitHub",
+      "githubAppSettings": "Nastavitve aplikacije GitHub",
       "manageAccess": "Upravljaj dostop aplikacije GitHub",
       "noRepositories": "Ni skladišč",
       "noRepositoriesDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč.",
@@ -1897,7 +1897,7 @@
       "couldNotSearch": "Iskanje sej ni uspelo.",
       "completedWillAppear": "Dokončane seje bodo prikazane tukaj.",
       "noPastSessions": "Ni preteklih sej",
-      "live": "V živo",
+      "live": "V ŽIVO",
       "updating": "Posodabljanje"
     },
     "sessionRow": {
@@ -1910,7 +1910,7 @@
       "couldNotCopyId": "ID-ja seje ni bilo mogoče kopirati.",
       "untitled": "Seja brez naslova",
       "sessionDeleted": "Seja izbrisana",
-      "needsInput": "Čaka na vnos",
+      "needsInput": "čaka na vnos",
       "fromPlatform": "s platforme {{platform}}",
       "cent_one": "stotinka dolarja",
       "cent": "centov",
@@ -1944,8 +1944,8 @@
     "remoteSpawnRetryable": "Primerka ni bilo mogoče doseči — povezava se je morda prekinila.",
     "remoteSpawnNonRetryable": "Primerek ni mogel zagnati seje — preveri računalnik ali posodobi CLI.",
     "remoteSpawnInstanceDisconnected": "Povezava z izbranim primerkom je prekinjena. Začni sejo v Cloud Agent ali izberi drug primerek.",
-    "liveCount_one": "{{count}} v živo",
-    "liveCount_other": "{{count}} v živo",
+    "liveCount_one": "{{count}} V ŽIVO",
+    "liveCount_other": "{{count}} V ŽIVO",
     "liveCount_two": "{{count}} V ŽIVO",
     "liveCount_few": "{{count}} V ŽIVO"
   },
@@ -2053,14 +2053,14 @@
       "accessibilityLabel": "Orodje {{name}}, {{status}}",
       "noTasks": "Ni nalog.",
       "toolRead": "preberi",
-      "toolEdit": "Uredi",
+      "toolEdit": "uredi",
       "toolWrite": "zapiši",
       "toolBash": "bash",
       "toolGlob": "iskanje datotek po vzorcu",
       "toolGrep": "iskanje po vsebini",
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
-      "toolTask": "Naloga",
+      "toolTask": "naloga",
       "readTodos": "Preberi naloge",
       "updateTodos": "Posodobi naloge",
       "linesBadge": "{{displayCount}} vrstic",
@@ -2077,7 +2077,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[vnosa ni mogoče serializirati]",
-      "errorPrefix": "napaka: {{error}}"
+      "errorPrefix": "Napaka: {{error}}"
     },
     "instancePicker": {
       "runOn": "Okolje za zagon",
@@ -2331,13 +2331,13 @@
       "provider": "Ponudnik {{id}}",
       "modelId": "Model z oznako {{id}}",
       "unavailable": "Ni na voljo",
-      "unavailableState": "Ni na voljo",
+      "unavailableState": "ni na voljo",
       "selectedState": "izbran",
       "thinkingEffort": "Stopnja razmišljanja",
       "thinkingEffortAccessibility": "stopnja razmišljanja: {{label}}",
       "thinkingEffortSelected": "stopnja razmišljanja: {{label}}, izbrano",
       "thinkingEffortWithModel": "{{model}}, stopnja razmišljanja: {{variant}}",
-      "lockedByAgent": ", zaklenil agent »{{agent}}«",
+      "lockedByAgent": ", Zaklenil agent »{{agent}}«",
       "addToFavorites": "Dodaj {{name}} med priljubljene",
       "removeFromFavorites": "Odstrani {{name}} s seznama priljubljenih",
       "thinkingEffortXhigh": "ZV",
@@ -2361,7 +2361,7 @@
     "attachmentPicker": {
       "camera": "Fotoaparat",
       "photoLibrary": "Fotografije",
-      "files": "datotek",
+      "files": "Datotek",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
       "maxFilesAllowed": "Dovoljeno število datotek je največ {{displayCount}}.",
       "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})"
@@ -2454,10 +2454,10 @@
       "stepsCount_few": "{{steps}} koraki"
     },
     "prBadge": {
-      "open": "Odprta zahteva za združitev",
+      "open": "odprta zahteva za združitev",
       "closed": "zaprta zahteva za združitev",
       "merged": "združena zahteva za združitev",
-      "draft": "Osnutek zahteve za združitev",
+      "draft": "osnutek zahteve za združitev",
       "updating": "Posodabljanje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2564,7 +2564,7 @@
     "optionsExpiredDescription": "Pojdi nazaj in ponovno odpri ta izbirnik s prejšnjega zaslona."
   },
   "sessionRow": {
-    "needsInput": "Čaka na vnos"
+    "needsInput": "ČAKA NA VNOS"
   },
   "voiceInput": {
     "listening": "Poslušanje...",
@@ -2631,11 +2631,11 @@
     "verifyPurchaseFailed": "Nakupa ni bilo mogoče preveriti. Preveri povezavo in poskusi znova.",
     "productsCouldNotLoad": "Izdelkov Kilo Pass ni bilo mogoče naložiti iz trgovine App Store.",
     "tryingAgain": "Ponovno poskušam...",
-    "kiloPassManagement": "upravljanje naročnine Kilo Pass",
+    "kiloPassManagement": "Upravljanje naročnine Kilo Pass",
     "legalConnectorTerms": " Z naročilom sprejemaš ",
     "legalConnectorPrivacy": " in potrjuješ seznanjenost z dokumentom ",
     "manageFailed": "Upravljanja naročnin v trgovini App Store ni bilo mogoče odpreti.",
-    "kiloPassSetup": "nastavitev naročnine Kilo Pass",
+    "kiloPassSetup": "Nastavitev naročnine Kilo Pass",
     "subscriptionHeaderDescription": "Mesečna naročnina dodaja kredite na tvoj račun Kilo za programiranje z umetno inteligenco v aplikaciji Kilo App: za agente v oblaku, oddaljene seje in klepete KiloClaw.",
     "tierDescription": "Vsak mesec se dodajo plačani krediti v vrednosti {{price}} za uporabo aplikacije Kilo App.",
     "subscribe": "Naroči se",
@@ -2683,7 +2683,7 @@
     "helpImproveDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve. To lahko kadar koli spremeniš v nastavitvah.",
     "seeFullDetails": "Prikaži vse podrobnosti",
     "privacyPolicyPrefix": "Tvoje podatke obdelujemo v skladu s",
-    "privacyPolicy": "politiko zasebnosti podjetja Kilo",
+    "privacyPolicy": "Politiko zasebnosti podjetja Kilo",
     "onDevice": "Na napravi",
     "couldNotLoadTranscription": "Tvoje nastavitve prepisovanja ni bilo mogoče naložiti.",
     "signInToManageTranscription": "Prijavi se za upravljanje spletnega prepisovanja.",

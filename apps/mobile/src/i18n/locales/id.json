@@ -38,7 +38,7 @@
     "findings": "Temuan",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repositori",
     "securityAgent": "Agen keamanan",
     "unknown": "Tidak diketahui",
@@ -169,7 +169,7 @@
     "verifyCode": "Verifikasi kode",
     "resendCode": "Kirim ulang kode",
     "termsPrefix": "Dengan melanjutkan, kamu menyetujui",
-    "terms": "ketentuan",
+    "terms": "Ketentuan",
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Opsi masuk lainnya",
@@ -200,7 +200,7 @@
     "signOut": "Keluar",
     "deleteAccount": "Hapus akun",
     "confirmationCode": "Kode konfirmasi",
-    "confirmationCodePlaceholder": "Kode 6 digit",
+    "confirmationCodePlaceholder": "kode 6 digit",
     "confirmDeletion": "Konfirmasi penghapusan",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
@@ -552,7 +552,7 @@
       "hide": "Sembunyikan {{label}}",
       "removing": "Menghapus…",
       "saving": "Menyimpan…",
-      "setupGuide": "panduan penyiapan",
+      "setupGuide": "Panduan penyiapan",
       "setupGuideA11y": "Panduan penyiapan {{label}}",
       "setupGuideFallback": "panduan penyiapan",
       "show": "Tampilkan {{label}}",
@@ -743,12 +743,12 @@
       "destroying": "SEDANG DIHAPUS",
       "provisioned": "SUDAH DISIAPKAN",
       "restarting": "MEMULAI ULANG",
-      "running": "Berjalan",
+      "running": "BERJALAN",
       "shuttingDown": "SEDANG DIMATIKAN",
-      "starting": "Memulai",
+      "starting": "MEMULAI",
       "stopped": "BERHENTI",
       "stopping": "SEDANG DIHENTIKAN",
-      "unknown": "Tidak diketahui",
+      "unknown": "TIDAK DIKETAHUI",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -800,7 +800,7 @@
     "instructions": {
       "title": "Instruksi kustom",
       "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
-      "placeholder": "Contoh: Terapkan aturan penanganan kesalahan kami…"
+      "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…"
     },
     "repos": {
       "unavailable": "Repositori tidak tersedia — selesaikan penyiapan Bitbucket di kilo.ai.",
@@ -855,9 +855,9 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
-      "githubApp": "aplikasi GitHub",
+      "githubApp": "Aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
-      "gitlabAccount": "akun GitLab",
+      "gitlabAccount": "Akun GitLab",
       "gitlabError": "Tidak dapat membuka penyiapan GitLab. Coba lagi.",
       "bitbucketError": "Tidak dapat membuka penyiapan Bitbucket. Coba lagi."
     },
@@ -1165,11 +1165,11 @@
       "notFoundDescription": "Temuan ini mungkin telah dihapus atau kamu tidak lagi memiliki akses ke temuan ini.",
       "notFoundTitle": "Temuan tidak ditemukan",
       "reason": "Alasan",
-      "reasonFixStarted": "perbaikan sudah dimulai",
-      "reasonInaccurate": "temuannya tidak akurat",
-      "reasonNoBandwidth": "tidak ada kapasitas untuk menangani",
-      "reasonNotUsed": "kode yang rentan tidak digunakan",
-      "reasonTolerableRisk": "risikonya dapat diterima",
+      "reasonFixStarted": "Perbaikan sudah dimulai",
+      "reasonInaccurate": "Temuannya tidak akurat",
+      "reasonNoBandwidth": "Tidak ada kapasitas untuk menangani",
+      "reasonNotUsed": "Kode yang rentan tidak digunakan",
+      "reasonTolerableRisk": "Risikonya dapat diterima",
       "title": "Abaikan temuan"
     },
     "findingDetail": {
@@ -1265,7 +1265,7 @@
     },
     "repositories": {
       "couldNotLoad": "Tidak dapat memuat pengaturan repositori.",
-      "githubAppSettings": "pengaturan aplikasi GitHub",
+      "githubAppSettings": "Pengaturan aplikasi GitHub",
       "manageAccess": "Kelola akses aplikasi GitHub",
       "noRepositories": "Tidak ada repositori",
       "noRepositoriesDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori.",
@@ -1316,7 +1316,7 @@
       "enterWholeNumber": "Masukkan bilangan bulat antara 1 dan 365",
       "high": "Tinggi",
       "highDescription": "Berpotensi menyebabkan kebocoran data yang signifikan.",
-      "invalidDayCount": "Jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
+      "invalidDayCount": "jumlah hari harus berupa bilangan bulat dari 1 hingga 365.",
       "low": "Rendah",
       "lowDescription": "Dampak terhadap keamanan minimal.",
       "medium": "Sedang",
@@ -1454,7 +1454,7 @@
       "couldNotSearch": "Tidak dapat mencari sesi.",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tidak ada sesi sebelumnya",
-      "live": "Langsung",
+      "live": "LANGSUNG",
       "updating": "Memperbarui"
     },
     "sessionRow": {
@@ -1467,7 +1467,7 @@
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa judul",
       "sessionDeleted": "Sesi dihapus",
-      "needsInput": "Perlu masukan",
+      "needsInput": "perlu masukan",
       "fromPlatform": "dari {{platform}}",
       "cent_one": "sen",
       "cent": "sen",
@@ -1477,7 +1477,7 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan aplikasi GitHub. Coba lagi.",
@@ -1497,8 +1497,8 @@
     "remoteSpawnRetryable": "Tidak dapat menghubungi instans. Koneksinya mungkin terputus.",
     "remoteSpawnNonRetryable": "Instans gagal memulai sesi. Periksa mesin atau perbarui CLI.",
     "remoteSpawnInstanceDisconnected": "Koneksi instans yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instans lain.",
-    "liveCount_one": "{{count}} langsung",
-    "liveCount_other": "{{count}} langsung"
+    "liveCount_one": "{{count}} LANGSUNG",
+    "liveCount_other": "{{count}} LANGSUNG"
   },
   "agentChat": {
     "session": {
@@ -1602,14 +1602,14 @@
       "accessibilityLabel": "Alat {{name}}, {{status}}",
       "noTasks": "Tidak ada tugas.",
       "toolRead": "baca",
-      "toolEdit": "Sunting",
+      "toolEdit": "sunting",
       "toolWrite": "tulis",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "tampilkan daftar",
       "toolPatch": "tambal",
-      "toolTask": "Tugas",
+      "toolTask": "tugas",
       "readTodos": "Baca daftar tugas",
       "updateTodos": "Perbarui daftar tugas",
       "linesBadge": "{{displayCount}} baris",
@@ -1626,7 +1626,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[masukan tidak dapat diserialisasi]",
-      "errorPrefix": "kesalahan: {{error}}"
+      "errorPrefix": "Kesalahan: {{error}}"
     },
     "instancePicker": {
       "runOn": "Lokasi eksekusi",
@@ -1874,13 +1874,13 @@
       "provider": "Penyedia {{id}}",
       "modelId": "ID model: {{id}}",
       "unavailable": "Tidak tersedia",
-      "unavailableState": "Tidak tersedia",
+      "unavailableState": "tidak tersedia",
       "selectedState": "dipilih",
       "thinkingEffort": "Tingkat penalaran",
       "thinkingEffortAccessibility": "Tingkat penalaran {{label}}",
       "thinkingEffortSelected": "Tingkat penalaran {{label}}, dipilih",
       "thinkingEffortWithModel": "{{model}}, tingkat penalaran {{variant}}",
-      "lockedByAgent": ", dikunci oleh agen \"{{agent}}\"",
+      "lockedByAgent": ", Dikunci oleh agen \"{{agent}}\"",
       "addToFavorites": "Tambahkan {{name}} ke favorit",
       "removeFromFavorites": "Hapus {{name}} dari favorit",
       "thinkingEffortXhigh": "ST",
@@ -1987,7 +1987,7 @@
       "olderActivity": "Aktivitas sebelumnya",
       "olderActivityDescription": "Biaya di luar riwayat yang dimuat",
       "ofWindowTokens": "dari {{window}} token",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
@@ -1995,10 +1995,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Buka PR",
-      "closed": "PR yang ditutup",
-      "merged": "PR yang digabungkan",
-      "draft": "Draf PR",
+      "open": "buka PR",
+      "closed": "pR yang ditutup",
+      "merged": "pR yang digabungkan",
+      "draft": "draf PR",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2105,7 +2105,7 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "Perlu masukan"
+    "needsInput": "PERLU MASUKAN"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",
@@ -2172,11 +2172,11 @@
     "verifyPurchaseFailed": "Tidak dapat memverifikasi pembelianmu. Periksa koneksimu, lalu coba lagi.",
     "productsCouldNotLoad": "Produk Kilo Pass tidak dapat dimuat dari App Store.",
     "tryingAgain": "Mencoba lagi...",
-    "kiloPassManagement": "pengelolaan Kilo Pass",
+    "kiloPassManagement": "Pengelolaan Kilo Pass",
     "legalConnectorTerms": " Dengan berlangganan, kamu menyetujui ",
     "legalConnectorPrivacy": " dan menyatakan telah membaca ",
     "manageFailed": "Gagal membuka pengelolaan langganan App Store.",
-    "kiloPassSetup": "penyiapan Kilo Pass",
+    "kiloPassSetup": "Penyiapan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambahkan kredit ke saldo Kilo milikmu untuk sesi pemrograman AI di Kilo App: agen cloud, sesi jarak jauh, dan obrolan KiloClaw.",
     "tierDescription": "Kredit berbayar senilai {{price}} ditambahkan setiap bulan untuk penggunaan Kilo App.",
     "subscribe": "Berlangganan",
@@ -2198,7 +2198,7 @@
     "unavailableDescription": "Kilo Pass tidak tersedia sebagai pembelian dalam aplikasi di Android. Kelola di web.",
     "webManagementDescription": "Kilo Pass ini dikelola di web.",
     "legalDisclosure": "Kilo Pass adalah langganan bulanan yang diperpanjang secara otomatis. Biaya dibebankan ke Apple ID milikmu saat pembelian dikonfirmasi. Langganan diperpanjang otomatis setiap bulan dengan harga yang ditampilkan, kecuali dibatalkan setidaknya 24 jam sebelum periode berjalan berakhir. Kelola atau batalkan kapan saja melalui pengaturan akun App Store milikmu.",
-    "legalTermsOfUse": "ketentuan penggunaan (EULA)",
+    "legalTermsOfUse": "Ketentuan penggunaan (EULA)",
     "purchaseDifferentAccount": "Pembelian App Store ini tidak tertaut ke akun Kilo milikmu. Masuk ke Apple Account yang digunakan untuk pembelian, lalu coba lagi.",
     "restoreFailed": "Gagal memulihkan pembelian. Coba lagi.",
     "purchaseFailed": "Gagal menyelesaikan pembelian.",
@@ -2224,7 +2224,7 @@
     "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di Pengaturan.",
     "seeFullDetails": "Lihat detail lengkap",
     "privacyPolicyPrefix": "Datamu dikelola sesuai dengan",
-    "privacyPolicy": "kebijakan privasi Kilo",
+    "privacyPolicy": "Kebijakan privasi Kilo",
     "onDevice": "Di perangkat",
     "couldNotLoadTranscription": "Tidak dapat memuat pengaturan transkripsimu.",
     "signInToManageTranscription": "Masuk untuk mengelola transkripsi daring.",
@@ -2378,8 +2378,8 @@
       "outdated": "Usang",
       "quotedDiffSnippet": "Cuplikan perbedaan kode yang dikutip",
       "reactionPill": "reaksi {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction": "Reaksi",
-      "reaction_other": "Reaksi",
+      "reaction": "reaksi",
+      "reaction_other": "reaksi",
       "reaction_one": "reaksi",
       "replyBadRequest": "Balasan ini tidak dapat dikirim. Utasnya mungkin sudah berubah.",
       "replyBody": "Isi balasan",
@@ -2477,7 +2477,7 @@
       "openDiffOnGitHub": "Buka perbedaan kode file ini di GitHub",
       "openOnGitHub": "Buka di GitHub",
       "unmarkViewed": "Hapus tanda sudah dilihat pada {{path}}",
-      "githubDiff": "perbedaan kode di GitHub"
+      "githubDiff": "Perbedaan kode di GitHub"
     },
     "floatingActions": {
       "clear": "Batalkan",
@@ -2603,12 +2603,12 @@
     "noFilesChanged": "Tidak ada file yang diubah",
     "noFilesChangedDescription": "Tidak ada perubahan file dalam PR ini.",
     "overview": {
-      "commit": "Commit",
-      "commit_other": "Commit",
-      "commit_one": "Commit",
-      "file": "Berkas",
-      "file_other": "Berkas",
-      "file_one": "Berkas",
+      "commit": "commit",
+      "commit_other": "commit",
+      "commit_one": "commit",
+      "file": "berkas",
+      "file_other": "berkas",
+      "file_one": "berkas",
       "stateMerged": "Digabungkan",
       "stateOpen": "Buka",
       "stateOpenApproved": "Terbuka · Disetujui",
@@ -2623,7 +2623,7 @@
       "editA11y": "Ubah komentar dalam antrean di {{location}}",
       "editOutdatedA11y": "Ubah komentar dalam antrean yang sudah tidak sesuai di {{location}}",
       "noCommentsQueued": "Tidak ada komentar dalam antrean. Tinjauan akan dikirim hanya dengan jenis tinjauan yang dipilih di atas.",
-      "staleHint": "PR sudah berubah sejak kamu menulis komentar ini.",
+      "staleHint": "pR sudah berubah sejak kamu menulis komentar ini.",
       "staleQueueHint": "Komentar yang merujuk ke commit lama tidak dikirim. Komentar tersebut tetap ada di antreanmu agar bisa kamu ubah atau hapus.",
       "summaryA11y": "Ringkasan tinjauan",
       "summaryPlaceholder": "Ringkasan opsional untuk tinjauan"
@@ -2815,7 +2815,7 @@
     },
     "usageStats": {
       "inputTokens": "Token masukan",
-      "last30Days": "30 hari terakhir",
+      "last30Days": "30 Hari terakhir",
       "outputTokens": "Token keluaran",
       "requests": "Permintaan"
     },

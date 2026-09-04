@@ -38,7 +38,7 @@
     "findings": "கண்டறிந்த சிக்கல்கள்",
     "notConnected": "இணைக்கப்படவில்லை",
     "notifications": "அறிவிப்புகள்",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "களஞ்சியங்கள்",
     "securityAgent": "பாதுகாப்பு முகவர்",
     "unknown": "தெரியவில்லை",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "இப்போது உங்கள் இன்ஸ்டன்ஸை அமைத்து முடிக்க முடியவில்லை.",
         "manualReviewBody": "இன்ஸ்டன்ஸை உருவாக்குவதற்கு முன் உங்கள் கணக்கின் நிலையைச் சரிபார்க்க வேண்டும். kilo.ai-இல் தொடரவும்.",
         "manualReviewTitle": "அமைப்பிற்கு நேரடி மதிப்பாய்வு தேவை",
-        "openKiloAi": "kilo.ai-ஐத் திறக்கவும்",
+        "openKiloAi": "Kilo.ai-ஐத் திறக்கவும்",
         "provisioning": "வளங்களைத் தயார்செய்தல்",
         "review": "மதிப்பாய்வு",
         "identityTitle": "உங்கள் பாட் அடையாளம்",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw-ஐத் தொடர்ந்து பயன்படுத்த, உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் சந்தா பெற முடியாது.",
       "subscriptionCanceledTitle": "வலைத்தளத்தில் சந்தா பெறவும்",
       "subscriptionCanceledBody": "KiloClaw-ஐப் பயன்படுத்த, உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் சந்தா பெற முடியாது.",
-      "subscriptionCanceledCta": "kilo.ai/claw தளத்தைத் திறக்கவும்",
+      "subscriptionCanceledCta": "Kilo.ai/claw தளத்தைத் திறக்கவும்",
       "subscriptionPastDueTitle": "இணையதளத்தில் கட்டண விவரங்களைப் புதுப்பித்தல்",
       "subscriptionPastDueBody": "நீங்கள் கடைசியாகச் செலுத்திய கட்டணத்தில் சிக்கல் ஏற்பட்டது. கட்டண விவரங்களைப் புதுப்பிக்க உங்கள் உலாவியில் kilo.ai/claw-க்குச் செல்லவும். செயலியில் கட்டணங்களை நிர்வகிக்க முடியாது.",
       "quarantinedTitle": "இன்ஸ்டன்ஸைச் சரிசெய்ய வேண்டும்",
       "quarantinedBody": "உங்கள் KiloClaw இன்ஸ்டன்ஸ் தனிமைப்படுத்தப்பட்டுள்ளதால் இப்போது அதைப் பயன்படுத்த முடியாது. அதை மீட்டெடுக்க எங்கள் குழுவின் உதவி தேவை.",
       "multipleCurrentConflictBody": "உங்கள் கணக்கில் ஒன்றுக்கு மேற்பட்ட சந்தாக்கள் செயலில் உள்ளன. இருமுறை கட்டணம் வசூலிப்பதைத் தவிர்க்கச் செயல்பாடுகளை இடைநிறுத்தியுள்ளோம்.",
-      "multipleCurrentConflictCta": "kilo.ai தளத்தில் தொடரவும்",
+      "multipleCurrentConflictCta": "Kilo.ai தளத்தில் தொடரவும்",
       "nonCanonicalEarlybirdTitle": "பழைய திட்டம் கண்டறியப்பட்டது",
       "nonCanonicalEarlybirdBody": "உங்கள் முன்கூட்டிய அணுகல் திட்டத்தை மொபைலில் பயன்படுத்துவதற்கு முன் நேரடி மதிப்பாய்வு தேவை.",
-      "iosTitle": "iOS-இல் KiloClaw கிடைக்கவில்லை",
+      "iosTitle": "IOS-இல் KiloClaw கிடைக்கவில்லை",
       "iosBody": "இந்தக் கணக்கிற்கான KiloClaw அணுகல் iOS செயலிக்கு வெளியே நிர்வகிக்கப்படுகிறது.",
       "iosContact": "கேள்விகள் உள்ளனவா? hi@kilo.ai-க்கு மின்னஞ்சல் அனுப்பவும்."
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} என்பதைத் திறக்கவும், {{displayCount}} படிக்காத செய்திகள்",
       "openUnread_other": "{{name}} என்பதைத் திறக்கவும், {{displayCount}} படிக்காத செய்திகள்",
       "openSettings": "{{name}} அமைப்புகளைத் திறக்கவும்",
-      "fixOnKiloAi": "kilo.ai-இல் சரிசெய்யவும்: {{label}}"
+      "fixOnKiloAi": "Kilo.ai-இல் சரிசெய்யவும்: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -2412,7 +2412,7 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "PR திறப்பு",
+      "open": "pR திறப்பு",
       "closed": "மூடப்பட்ட PR",
       "merged": "இணைக்கப்பட்ட PR",
       "draft": "வரைவு PR",

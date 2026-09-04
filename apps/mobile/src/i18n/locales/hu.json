@@ -38,7 +38,7 @@
     "findings": "Találatok",
     "notConnected": "Nincs csatlakoztatva",
     "notifications": "Értesítések",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Adattárak",
     "securityAgent": "Biztonsági ügynök",
     "unknown": "Ismeretlen",
@@ -169,7 +169,7 @@
     "verifyCode": "Kód ellenőrzése",
     "resendCode": "Kód újraküldése",
     "termsPrefix": "A folytatással elfogadod a",
-    "terms": "felhasználási feltételeket",
+    "terms": "Felhasználási feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
@@ -421,8 +421,8 @@
       "addReaction": "Reakció hozzáadása",
       "reactionPill": "{{emoji}} reakció, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakció",
-      "reaction": "Reakció",
-      "reaction_other": "Reakció",
+      "reaction": "reakció",
+      "reaction_other": "reakció",
       "commentActions": "Hozzászólás műveletei",
       "reportContent": "Tartalom jelentése",
       "reportUser": "Felhasználó jelentése",
@@ -545,7 +545,7 @@
       "addTitle": "Hozzászólás hozzáadása",
       "unavailableTitle": "A hozzászólás nem érhető el",
       "unavailableMessage": "Ezt a függőben lévő hozzászólást már törölték vagy elküldték.",
-      "ok": "Rendben",
+      "ok": "RENDBEN",
       "loadFailedTitle": "Nem sikerült betölteni a hozzászólásszerkesztőt.",
       "discardTitle": "Elveted a hozzászólást?",
       "discardMessage": "A piszkozatod elvész.",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Nyitva · Kódellenőrzés szükséges",
       "stateOpen": "Megnyitás",
       "unknownAuthor": "Ismeretlen szerző",
-      "commit_one": "Commit",
+      "commit_one": "commit",
       "commit": "commit",
       "commit_other": "commit",
-      "file_one": "Fájl",
-      "file": "Fájl",
-      "file_other": "Fájl"
+      "file_one": "fájl",
+      "file": "fájl",
+      "file_other": "fájl"
     },
     "pendingComment": {
       "editOutdatedA11y": "Elavult, függőben lévő hozzászólás szerkesztése: {{location}}",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "A csatlakoztatáshoz minden mezőt ki kell töltened: {{label}}.",
       "setupGuideFallback": "beállítási útmutató",
       "setupGuideA11y": "beállítási útmutató: {{label}}",
-      "setupGuide": "beállítási útmutató",
+      "setupGuide": "Beállítási útmutató",
       "saving": "Mentés…",
       "removing": "Eltávolítás…",
       "updateToken": "Token frissítése"
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "Most nem sikerült befejeznünk a példányod beállítását.",
         "manualReviewBody": "A példány létrehozása előtt rendezned kell a fiókod állapotát. Folytasd a kilo.ai oldalon.",
         "manualReviewTitle": "A beállítás kézi felülvizsgálatot igényel",
-        "openKiloAi": "kilo.ai megnyitása",
+        "openKiloAi": "Kilo.ai megnyitása",
         "provisioning": "Létrehozás",
         "review": "Ellenőrzés",
         "identityTitle": "A bot személyisége",
@@ -1125,12 +1125,12 @@
       "destroying": "VÉGLEGES TÖRLÉS",
       "provisioned": "LÉTREHOZVA",
       "restarting": "ÚJRAINDÍTÁS",
-      "running": "Fut",
+      "running": "FUT",
       "shuttingDown": "LEÁLLÍTÁS",
-      "starting": "Indítás",
+      "starting": "INDÍTÁS",
       "stopped": "LEÁLLÍTVA",
       "stopping": "LEÁLLÍTÁS",
-      "unknown": "Ismeretlen",
+      "unknown": "ISMERETLEN",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1147,7 +1147,7 @@
       "trialExpiredBody": "A KiloClaw további használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
       "subscriptionCanceledTitle": "Előfizetés a weboldalon",
       "subscriptionCanceledBody": "A KiloClaw használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
-      "subscriptionCanceledCta": "kilo.ai/claw megnyitása",
+      "subscriptionCanceledCta": "Kilo.ai/claw megnyitása",
       "subscriptionPastDueTitle": "Fizetési adatok frissítése a weben",
       "subscriptionPastDueBody": "Probléma merült fel a legutóbbi fizetéseddel. A fizetési adatok frissítéséhez nyisd meg a kilo.ai/claw oldalt a böngésződben. Az alkalmazásban nem kezelhető a számlázás.",
       "quarantinedTitle": "A példány helyreállítást igényel",
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Egyéni utasítások",
       "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
-      "placeholder": "Pl. a hibakezelési szabályaink betartása…"
+      "placeholder": "pl. a hibakezelési szabályaink betartása…"
     },
     "repos": {
       "unavailable": "A kódtárak nem érhetők el. Fejezd be a Bitbucket beállítását a kilo.ai oldalon.",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Találat elvetése",
       "reason": "Indok",
-      "reasonFixStarted": "a javítás már folyamatban van",
-      "reasonNoBandwidth": "nincs szabad kapacitás",
-      "reasonTolerableRisk": "a kockázat elfogadható",
-      "reasonInaccurate": "a találat pontatlan",
-      "reasonNotUsed": "a sérülékeny kód nincs használatban",
+      "reasonFixStarted": "A javítás már folyamatban van",
+      "reasonNoBandwidth": "Nincs szabad kapacitás",
+      "reasonTolerableRisk": "A kockázat elfogadható",
+      "reasonInaccurate": "A találat pontatlan",
+      "reasonNotUsed": "A sérülékeny kód nincs használatban",
       "commentLabel": "Megjegyzés (nem kötelező)",
       "commentAccessibility": "Megjegyzés az elvetéshez",
       "commentPlaceholder": "További részletek az elvetés okáról…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Jelentős adatkiszivárgás veszélye.",
       "mediumDescription": "Korlátozott hatás vagy speciális feltételek.",
       "lowDescription": "Minimális biztonsági hatás.",
-      "invalidDayCount": "Adj meg egy egész számot 1 és 365 között a napok számához.",
+      "invalidDayCount": "adj meg egy egész számot 1 és 365 között a napok számához.",
       "remediationDeadlineA11y": "{{label}}: hibajavítási határidő napokban",
       "enterWholeNumber": "Adj meg egy 1 és 365 közötti egész számot",
       "permissionNote": "Csak a szervezet tulajdonosai és a számlázásért felelős kezelők módosíthatják ezeket a beállításokat.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Nem sikerült keresni a munkamenetek között.",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
-      "live": "Élő",
+      "live": "ÉLŐ",
       "updating": "Frissítés"
     },
     "sessionRow": {
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet. Ellenőrizd a gépet, vagy frissítsd a CLI-t.",
     "remoteSpawnInstanceDisconnected": "Megszakadt a kapcsolat a kiválasztott példánnyal. Indíts munkamenetet a Cloud Agent szolgáltatásban, vagy válassz másik példányt.",
-    "liveCount_one": "{{count}} élő",
-    "liveCount_other": "{{count}} élő"
+    "liveCount_one": "{{count}} ÉLŐ",
+    "liveCount_other": "{{count}} ÉLŐ"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} eszköz, {{status}}",
       "noTasks": "Nincs feladat.",
       "toolRead": "olvasás",
-      "toolEdit": "Szerkesztés",
+      "toolEdit": "szerkesztés",
       "toolWrite": "írás",
       "toolBash": "bash",
       "toolGlob": "fájlkeresés",
       "toolGrep": "szövegkeresés",
       "toolList": "listázás",
       "toolPatch": "módosítás",
-      "toolTask": "Feladat",
+      "toolTask": "feladat",
       "readTodos": "Teendők olvasása",
       "updateTodos": "Teendők frissítése",
       "linesBadge": "{{displayCount}} sor",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[nem szerializálható bemenet]",
-      "errorPrefix": "hiba: {{error}}"
+      "errorPrefix": "Hiba: {{error}}"
     },
     "instancePicker": {
       "runOn": "Futtatás helye",
@@ -2291,13 +2291,13 @@
       "provider": "Szolgáltató: {{id}}",
       "modelId": "Modell: {{id}}",
       "unavailable": "Nem elérhető",
-      "unavailableState": "Nem elérhető",
+      "unavailableState": "nem elérhető",
       "selectedState": "kijelölve",
       "thinkingEffort": "Gondolkodás szintje",
       "thinkingEffortAccessibility": "Gondolkodás szintje: {{label}}",
       "thinkingEffortSelected": "Gondolkodás szintje: {{label}}, kijelölve",
       "thinkingEffortWithModel": "{{model}}, gondolkodás szintje: {{variant}}",
-      "lockedByAgent": ", zároló ügynök: „{{agent}}”",
+      "lockedByAgent": ", Zároló ügynök: „{{agent}}”",
       "addToFavorites": "{{name}} hozzáadása a kedvencekhez",
       "removeFromFavorites": "{{name}} eltávolítása a kedvencekből",
       "thinkingEffortXhigh": "XH",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Korábbi tevékenység",
       "olderActivityDescription": "A betöltött előzményekhez nem rendelt költség",
       "ofWindowTokens": "az összesen {{window}} tokenből",
-      "tokens": "Token",
+      "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} lépés",
       "stepsCount": "{{steps}} lépés",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "PR megnyitása",
+      "open": "pR megnyitása",
       "closed": "lezárt PR",
       "merged": "beolvasztott PR",
-      "draft": "PR-piszkozat",
+      "draft": "pR-piszkozat",
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Lépj vissza az előző képernyőre, és nyisd meg újra a választóablakot."
   },
   "sessionRow": {
-    "needsInput": "válaszra vár"
+    "needsInput": "VÁLASZRA VÁR"
   },
   "voiceInput": {
     "listening": "Beszéd figyelése…",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Androidon nem vásárolhatsz Kilo Pass előfizetést az alkalmazáson belül. Az előfizetést a weben kezelheted.",
     "webManagementDescription": "Ez a Kilo Pass a weben kezelhető.",
     "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A vásárlás megerősítésekor az Apple ID-fiókodat terheljük meg. Az előfizetés minden hónapban automatikusan megújul a feltüntetett áron, kivéve, ha legalább 24 órával az aktuális időszak vége előtt lemondod. Az előfizetést bármikor kezelheted vagy lemondhatod az App Store-fiókod beállításaiban.",
-    "legalTermsOfUse": "felhasználási feltételeket (EULA)",
+    "legalTermsOfUse": "Felhasználási feltételeket (EULA)",
     "purchaseDifferentAccount": "Ez az App Store-vásárlás nem kapcsolódik a Kilo-fiókodhoz. Jelentkezz be a vásárláshoz használt Apple Account-fiókkal, majd próbáld újra.",
     "restoreFailed": "Nem sikerült visszaállítani a vásárlásokat. Próbáld újra.",
     "purchaseFailed": "Nem sikerült befejezni a vásárlást.",
@@ -2907,7 +2907,7 @@
     "signedOut": "Jelentkezz be az ügynökök megtekintéséhez",
     "privacy": "Nyisd meg a Kilo alkalmazást az ügynökök megtekintéséhez",
     "openAgents": "Ügynökök megnyitása",
-    "needsInput": "válaszra vár",
+    "needsInput": "Válaszra vár",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   }

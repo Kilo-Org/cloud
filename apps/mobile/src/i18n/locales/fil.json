@@ -38,7 +38,7 @@
     "findings": "Mga natukoy na isyu",
     "notConnected": "Hindi nakakonekta",
     "notifications": "Mga abiso",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Mga repositoryo",
     "securityAgent": "Ahente sa seguridad",
     "unknown": "Hindi alam",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
       "openOnGitHub": "Buksan sa GitHub",
       "openDiffOnGitHub": "Buksan ang pagkakaiba ng file na ito sa GitHub",
-      "githubDiff": "pagkakaiba sa GitHub"
+      "githubDiff": "Pagkakaiba sa GitHub"
     },
     "floatingActions": {
       "clearSelection": "Alisin ang pagkakapili",
@@ -421,8 +421,8 @@
       "addReaction": "Magdagdag ng reaksiyon",
       "reactionPill": "reaksiyong {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiyon",
-      "reaction": "Mga reaksyon",
-      "reaction_other": "Mga reaksyon",
+      "reaction": "mga reaksyon",
+      "reaction_other": "mga reaksyon",
       "commentActions": "Mga aksiyon sa komento",
       "reportContent": "Iulat ang nilalaman",
       "reportUser": "Iulat ang user",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Bukas · Kailangang suriin",
       "stateOpen": "Bukas",
       "unknownAuthor": "Hindi kilalang may-akda",
-      "commit_one": "Commit",
+      "commit_one": "commit",
       "commit": "na commit",
       "commit_other": "na commit",
-      "file_one": "Payl",
-      "file": "Mga payl",
-      "file_other": "Mga payl"
+      "file_one": "payl",
+      "file": "mga payl",
+      "file_other": "mga payl"
     },
     "pendingComment": {
       "editOutdatedA11y": "I-edit ang nakabinbing komento sa lumang bersyon ng {{location}}",
@@ -968,7 +968,7 @@
       "hide": "Itago ang {{label}}",
       "show": "Ipakita ang {{label}}",
       "allFieldsRequired": "Punan ang lahat ng field para ikonekta ang {{label}}.",
-      "setupGuideFallback": "Gabay sa pag-setup",
+      "setupGuideFallback": "gabay sa pag-setup",
       "setupGuideA11y": "gabay sa pag-setup ng {{label}}",
       "setupGuide": "Gabay sa pag-setup",
       "saving": "Sine-save…",
@@ -1125,12 +1125,12 @@
       "destroying": "BINUBURA",
       "provisioned": "NAIHANDA",
       "restarting": "NIRE-RESTART",
-      "running": "Tumatakbo",
+      "running": "TUMATAKBO",
       "shuttingDown": "PINAPATAY",
-      "starting": "Sinisimulan",
+      "starting": "SINISIMULAN",
       "stopped": "NAKAHINTO",
       "stopping": "HINIHINTO",
-      "unknown": "Hindi alam",
+      "unknown": "HINDI ALAM",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Mga sariling tagubilin",
       "deprecation": "Planong ihinto ang suporta sa mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
-      "placeholder": "Hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…"
+      "placeholder": "hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…"
     },
     "repos": {
       "unavailable": "Hindi makuha ang mga repository. Tapusin ang setup ng Bitbucket sa kilo.ai.",
@@ -1341,7 +1341,7 @@
     "providerConnect": {
       "githubApp": "GitHub App",
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
-      "gitlabAccount": "account sa GitLab",
+      "gitlabAccount": "Account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
       "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
       "bitbucketError": "Hindi mabuksan ang setup ng Bitbucket. Pakisubukang muli."
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Tingnan ang abiso sa GitHub",
       "statusOpen": "Bukas",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Sinimulan na ang pag-aayos",
-      "reasonNoBandwidth": "Walang sapat na oras o tauhan",
-      "reasonTolerableRisk": "Katanggap-tanggap ang panganib",
-      "reasonInaccurate": "Hindi tumpak ang natukoy na isyu",
-      "reasonNotUsed": "Hindi ginagamit ang code na may kahinaan",
+      "reasonFixStarted": "sinimulan na ang pag-aayos",
+      "reasonNoBandwidth": "walang sapat na oras o tauhan",
+      "reasonTolerableRisk": "katanggap-tanggap ang panganib",
+      "reasonInaccurate": "hindi tumpak ang natukoy na isyu",
+      "reasonNotUsed": "hindi ginagamit ang code na may kahinaan",
       "reasonAfterReview": "pagkatapos ng pagsusuri"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Maaaring malantad ang malaking halaga ng data.",
       "mediumDescription": "Limitado ang epekto o kailangan ng mga partikular na kondisyon.",
       "lowDescription": "Napakaliit ng epekto sa seguridad.",
-      "invalidDayCount": "Maglagay ng 1–365 araw gamit ang buong bilang lang.",
+      "invalidDayCount": "maglagay ng 1–365 araw gamit ang buong bilang lang.",
       "remediationDeadlineA11y": "Bilang ng araw bago ang takdang petsa ng pag-aayos para sa {{label}}",
       "enterWholeNumber": "Maglagay ng buong bilang mula 1 hanggang 365",
       "permissionNote": "Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magbago ng mga setting na ito.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Hindi ma-load ang mga setting ng repository.",
-      "githubAppSettings": "mga setting ng GitHub App",
+      "githubAppSettings": "Mga setting ng GitHub App",
       "manageAccess": "Pamahalaan ang access sa GitHub App",
       "noRepositories": "Walang repository",
       "noRepositoriesDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Hindi mahanap ang mga session.",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
-      "live": "Aktibo",
+      "live": "AKTIBO",
       "updating": "Ina-update"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Hindi makopya ang ID ng session.",
       "untitled": "Session na walang pamagat",
       "sessionDeleted": "Nabura ang session",
-      "needsInput": "Naghihintay ng sagot",
+      "needsInput": "naghihintay ng sagot",
       "fromPlatform": "mula sa {{platform}}",
       "cent_one": "sentimo",
       "cent": "sentimo",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
     "remoteSpawnNonRetryable": "Hindi masimulan ng instance ang session — suriin ang computer o i-update ang CLI.",
     "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance.",
-    "liveCount_one": "{{count}} na aktibo",
-    "liveCount_other": "{{count}} na aktibo"
+    "liveCount_one": "{{count}} NA AKTIBO",
+    "liveCount_other": "{{count}} NA AKTIBO"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Kagamitang {{name}}, {{status}}",
       "noTasks": "Walang gawain.",
       "toolRead": "basahin",
-      "toolEdit": "I-edit",
+      "toolEdit": "i-edit",
       "toolWrite": "isulat",
       "toolBash": "bash",
       "toolGlob": "maghanap ng file",
       "toolGrep": "maghanap ng teksto",
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
-      "toolTask": "Gawain",
+      "toolTask": "gawain",
       "readTodos": "Basahin ang listahan ng gagawin",
       "updateTodos": "I-update ang listahan ng gagawin",
       "linesBadge": "{{displayCount}} na linya",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[input na hindi ma-serialize]",
-      "errorPrefix": "problema: {{error}}"
+      "errorPrefix": "Problema: {{error}}"
     },
     "instancePicker": {
       "runOn": "Patakbuhin sa",
@@ -2291,7 +2291,7 @@
       "provider": "Tagapagbigay ng serbisyo {{id}}",
       "modelId": "Modelo {{id}}",
       "unavailable": "Hindi magagamit",
-      "unavailableState": "Hindi magagamit",
+      "unavailableState": "hindi magagamit",
       "selectedState": "napili",
       "thinkingEffort": "Antas ng pag-iisip",
       "thinkingEffortAccessibility": "antas ng pag-iisip: {{label}}",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Mas naunang aktibidad",
       "olderActivityDescription": "Gastos na hindi nakaugnay sa na-load na kasaysayan",
       "ofWindowTokens": "sa {{window}} na token",
-      "tokens": "Mga token",
+      "tokens": "mga token",
       "tokensWithPercentage": "token ({{percentage}})",
       "stepsCount_one": "{{steps}} hakbang",
       "stepsCount": "{{steps}} na hakbang",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Buksan ang PR",
+      "open": "buksan ang PR",
       "closed": "nakasarang pull request",
       "merged": "na-merge na pull request",
-      "draft": "Burador na PR",
+      "draft": "burador na PR",
       "updating": "Ina-update, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Bumalik sa naunang screen at muling buksan ang pagpipiliang ito."
   },
   "sessionRow": {
-    "needsInput": "Naghihintay ng sagot"
+    "needsInput": "NAGHIHINTAY NG SAGOT"
   },
   "voiceInput": {
     "listening": "Nakikinig...",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Hindi mapatunayan ang pagbili mo. Suriin ang koneksyon mo at subukang muli.",
     "productsCouldNotLoad": "Hindi ma-load mula sa App Store ang mga produkto ng Kilo Pass.",
     "tryingAgain": "Sinusubukang muli...",
-    "kiloPassManagement": "pamamahala ng Kilo Pass",
+    "kiloPassManagement": "Pamamahala ng Kilo Pass",
     "legalConnectorTerms": " Sa pag-subscribe, sumasang-ayon ka sa ",
     "legalConnectorPrivacy": " at kinikilala mo ang ",
     "manageFailed": "Hindi mabuksan ang pamamahala ng subscription sa App Store.",
-    "kiloPassSetup": "pag-set up ng Kilo Pass",
+    "kiloPassSetup": "Pag-set up ng Kilo Pass",
     "subscriptionHeaderDescription": "Nagdaragdag ang buwanang subscription ng kredito sa balanse mo sa Kilo para sa mga sesyon ng pag-code gamit ang AI sa Kilo App — Cloud Agents, mga remote na sesyon, at mga chat sa KiloClaw.",
     "tierDescription": "Buwan-buwang nagdaragdag ng bayad na kreditong nagkakahalaga ng {{price}} para sa paggamit ng Kilo App.",
     "subscribe": "Mag-subscribe",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa mga setting.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",
     "privacyPolicyPrefix": "Pinangangasiwaan ang iyong datos ayon sa",
-    "privacyPolicy": "patakaran sa pagkapribado ng Kilo",
+    "privacyPolicy": "Patakaran sa pagkapribado ng Kilo",
     "onDevice": "Sa device",
     "couldNotLoadTranscription": "Hindi ma-load ang iyong setting sa pagsasalin ng boses sa teksto.",
     "signInToManageTranscription": "Mag-sign in para pamahalaan ang pagsasalin ng boses sa teksto online.",

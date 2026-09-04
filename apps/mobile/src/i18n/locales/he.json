@@ -38,7 +38,7 @@
     "findings": "ממצאים",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "מאגרים",
     "securityAgent": "סוכן אבטחה",
     "unknown": "לא ידוע",
@@ -2009,7 +2009,7 @@
       "stepsCount_two": "{{steps}} שלבים"
     },
     "prBadge": {
-      "open": "PR פתוח",
+      "open": "pR פתוח",
       "closed": "בקשת משיכה שנסגרה",
       "merged": "בקשת משיכה שמוזגה",
       "draft": "טיוטת PR",

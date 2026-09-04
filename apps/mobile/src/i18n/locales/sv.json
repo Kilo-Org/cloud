@@ -38,7 +38,7 @@
     "findings": "Anmärkningar",
     "notConnected": "Inte ansluten",
     "notifications": "Aviseringar",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Kodarkiv",
     "securityAgent": "Säkerhetsagent",
     "unknown": "Okänd",
@@ -93,7 +93,7 @@
     "email": "E-post",
     "ends": "Upphör {{date}}",
     "failed": "Misslyckades",
-    "file": "fil",
+    "file": "Fil",
     "gitlab": "GitLab",
     "goBack": "Gå tillbaka",
     "idle": "Väntar",
@@ -110,9 +110,9 @@
     "pending": "Väntar",
     "performance": "Prestanda",
     "preferences": "Inställningar",
-    "privacyPolicy": "integritetspolicy",
+    "privacyPolicy": "Integritetspolicy",
     "profile": "Profil",
-    "reactions": "reaktioner",
+    "reactions": "Reaktioner",
     "recent": "Senaste",
     "recommended": "Rekommenderade",
     "remaining": "Kvar",
@@ -169,7 +169,7 @@
     "verifyCode": "Verifiera kod",
     "resendCode": "Skicka koden igen",
     "termsPrefix": "Genom att fortsätta godkänner du våra",
-    "terms": "villkor",
+    "terms": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fler inloggningsalternativ",
@@ -272,7 +272,7 @@
       "diffTooLarge": "för stor diff",
       "openFile": "Öppna {{path}}",
       "openFileViewed": "Öppna {{path}} (visad)",
-      "title": "filer"
+      "title": "Filer"
     },
     "fileRows": {
       "markViewed": "Markera {{path}} som visad",
@@ -597,7 +597,7 @@
       "stateOpenReviewRequired": "Öppen · granskning krävs",
       "stateOpen": "Öppna",
       "unknownAuthor": "Okänd författare",
-      "commit_one": "Incheckning",
+      "commit_one": "incheckning",
       "commit": "incheckningar",
       "commit_other": "incheckningar",
       "file_one": "fil",
@@ -607,7 +607,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Redigera inaktuell oskickad kommentar vid {{location}}",
       "editA11y": "Redigera oskickad kommentar vid {{location}}",
-      "staleHint": "PR:en har uppdaterats sedan du skrev kommentaren.",
+      "staleHint": "pR:en har uppdaterats sedan du skrev kommentaren.",
       "deleteA11y": "Ta bort oskickad kommentar vid {{location}}",
       "deletedAnnouncement": "Oskickad kommentar borttagen",
       "noCommentsQueued": "Det finns inga kommentarer i kön. Granskningen skickas enbart med den typ du har valt ovan.",
@@ -618,7 +618,7 @@
     },
     "tabs": {
       "overview": "Översikt",
-      "files": "filer",
+      "files": "Filer",
       "discussion": "Diskussion"
     },
     "fileStatus": {
@@ -821,7 +821,7 @@
     "attachmentPicker": {
       "takePhoto": "Ta en bild",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "cameraAccessMessage": "Tillåt åtkomst till kameran i Inställningar för att ta en bild."
     },
     "typingIndicator": {
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Alla fält måste fyllas i för att ansluta {{label}}.",
       "setupGuideFallback": "konfigurationsguide",
       "setupGuideA11y": "guide för att konfigurera {{label}}",
-      "setupGuide": "konfigurationsguide",
+      "setupGuide": "Konfigurationsguide",
       "saving": "Sparar…",
       "removing": "Tar bort…",
       "updateToken": "Uppdatera token"
@@ -1125,12 +1125,12 @@
       "destroying": "RADERAS",
       "provisioned": "SKAPAD",
       "restarting": "STARTAR OM",
-      "running": "Körs",
+      "running": "KÖRS",
       "shuttingDown": "STÄNGS AV",
-      "starting": "Startar",
+      "starting": "STARTAR",
       "stopped": "STOPPAD",
       "stopping": "STOPPAR",
-      "unknown": "Okänd",
+      "unknown": "OKÄND",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Anpassade instruktioner",
       "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
-      "placeholder": "T.ex. följ våra regler för felhantering…"
+      "placeholder": "t.ex. följ våra regler för felhantering…"
     },
     "repos": {
       "unavailable": "Kodarkiven är inte tillgängliga. Slutför konfigurationen av Bitbucket på kilo.ai.",
@@ -1252,7 +1252,7 @@
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
-      "tokens": "token",
+      "tokens": "Token",
       "tokensInOut": "{{input}} in / {{output}} ut",
       "council": "Granskningsråd",
       "decision": "Beslut",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Avskriv anmärkning",
       "reason": "Orsak",
-      "reasonFixStarted": "en åtgärd har redan påbörjats",
-      "reasonNoBandwidth": "det finns inga resurser",
-      "reasonTolerableRisk": "risken är acceptabel",
-      "reasonInaccurate": "anmärkningen är felaktig",
-      "reasonNotUsed": "sårbar kod används inte",
+      "reasonFixStarted": "En åtgärd har redan påbörjats",
+      "reasonNoBandwidth": "Det finns inga resurser",
+      "reasonTolerableRisk": "Risken är acceptabel",
+      "reasonInaccurate": "Anmärkningen är felaktig",
+      "reasonNotUsed": "Sårbar kod används inte",
       "commentLabel": "Kommentar (valfritt)",
       "commentAccessibility": "Kommentar till avskrivningen",
       "commentPlaceholder": "Bakgrund till avskrivningen…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Risk för att stora mängder data röjs.",
       "mediumDescription": "Begränsad påverkan eller särskilda villkor för att kunna utnyttjas.",
       "lowDescription": "Minimal påverkan på säkerheten.",
-      "invalidDayCount": "Ange 1–365 dagar, endast heltal.",
+      "invalidDayCount": "ange 1–365 dagar, endast heltal.",
       "remediationDeadlineA11y": "Tidsfrist för åtgärd i dagar, {{label}}",
       "enterWholeNumber": "Ange ett heltal mellan 1 och 365",
       "permissionNote": "Endast organisationsägare och faktureringsansvariga kan ändra dessa inställningar.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Kunde inte läsa in inställningarna för kodarkiv.",
-      "githubAppSettings": "inställningarna för GitHub-appen",
+      "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
       "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Kunde inte söka bland sessionerna.",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
-      "live": "I realtid",
+      "live": "I REALTID",
       "updating": "Uppdaterar"
     },
     "sessionRow": {
@@ -1884,17 +1884,17 @@
       "couldNotCopyId": "Kunde inte kopiera sessions-ID.",
       "untitled": "Namnlös session",
       "sessionDeleted": "Session borttagen",
-      "needsInput": "Väntar på svar",
+      "needsInput": "väntar på svar",
       "fromPlatform": "från {{platform}}",
       "cent_one": "dollarcent",
       "cent": "cent",
       "cent_other": "cent",
-      "dollar_one": "US-dollar",
+      "dollar_one": "uS-dollar",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen. Kontrollera datorn eller uppdatera CLI-verktyget.",
     "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans.",
-    "liveCount_one": "{{count}} i realtid",
-    "liveCount_other": "{{count}} i realtid"
+    "liveCount_one": "{{count}} I REALTID",
+    "liveCount_other": "{{count}} I REALTID"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Verktyget {{name}}, {{status}}",
       "noTasks": "Det finns inga uppgifter.",
       "toolRead": "läs",
-      "toolEdit": "Redigera",
+      "toolEdit": "redigera",
       "toolWrite": "skriv",
       "toolBash": "bash",
       "toolGlob": "filsökning",
       "toolGrep": "textsökning",
       "toolList": "lista",
       "toolPatch": "tillämpa ändringar",
-      "toolTask": "Uppgift",
+      "toolTask": "uppgift",
       "readTodos": "Läs uppgiftslistan",
       "updateTodos": "Uppdatera uppgiftslistan",
       "linesBadge": "{{displayCount}} rader",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[indata som inte kan serialiseras]",
-      "errorPrefix": "fel: {{error}}"
+      "errorPrefix": "Fel: {{error}}"
     },
     "instancePicker": {
       "runOn": "Kör på",
@@ -2291,13 +2291,13 @@
       "provider": "Leverantör {{id}}",
       "modelId": "Modell {{id}}",
       "unavailable": "Inte tillgänglig",
-      "unavailableState": "Inte tillgänglig",
+      "unavailableState": "inte tillgänglig",
       "selectedState": "vald",
       "thinkingEffort": "Resonemangsnivå",
       "thinkingEffortAccessibility": "Resonemangsnivå: {{label}}",
       "thinkingEffortSelected": "Resonemangsnivå: {{label}}, vald",
       "thinkingEffortWithModel": "{{model}}, resonemangsnivå: {{variant}}",
-      "lockedByAgent": ", låst av agenten ”{{agent}}”",
+      "lockedByAgent": ", Låst av agenten ”{{agent}}”",
       "addToFavorites": "Lägg till {{name}} i favoriter",
       "removeFromFavorites": "Ta bort {{name}} från favoriter",
       "thinkingEffortXhigh": "EH",
@@ -2321,7 +2321,7 @@
     "attachmentPicker": {
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
-      "files": "filer",
+      "files": "Filer",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna bildväljaren. Starta om Kilo och försök igen.",
       "maxFilesAllowed": "Du kan lägga till högst {{displayCount}} filer.",
       "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Öppna PR",
+      "open": "öppna PR",
       "closed": "stängd PR",
       "merged": "sammanslagen PR",
-      "draft": "PR-utkast",
+      "draft": "pR-utkast",
       "updating": "Uppdaterar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna väljaren igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "Väntar på svar"
+    "needsInput": "VÄNTAR PÅ SVAR"
   },
   "voiceInput": {
     "listening": "Lyssnar…",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Kunde inte verifiera ditt köp. Kontrollera anslutningen och försök igen.",
     "productsCouldNotLoad": "Kilo Pass-produkter kunde inte läsas in från App Store.",
     "tryingAgain": "Försöker igen…",
-    "kiloPassManagement": "hantering av Kilo Pass",
+    "kiloPassManagement": "Hantering av Kilo Pass",
     "legalConnectorTerms": " Genom att prenumerera godkänner du ",
     "legalConnectorPrivacy": " och bekräftar att du har tagit del av ",
     "manageFailed": "Kunde inte öppna prenumerationshanteringen i App Store.",
-    "kiloPassSetup": "konfiguration av Kilo Pass",
+    "kiloPassSetup": "Konfiguration av Kilo Pass",
     "subscriptionHeaderDescription": "Med en månadsprenumeration fylls ditt Kilo-saldo på med krediter för programmering med AI i Kilo-appen: molnagenter, fjärrsessioner och KiloClaw-chattar.",
     "tierDescription": "Varje månad får du betalda krediter värda {{price}} att använda i Kilo-appen.",
     "subscribe": "Prenumerera",
@@ -2615,7 +2615,7 @@
     "unavailableDescription": "Kilo Pass är inte tillgängligt som köp i appen på Android. Hantera det på webben.",
     "webManagementDescription": "Detta Kilo Pass hanteras på webben.",
     "legalDisclosure": "Kilo Pass är en månadsprenumeration som förnyas automatiskt. Ditt Apple-ID debiteras när köpet bekräftas. Prenumerationen förnyas automatiskt varje månad till det pris som visas, om du inte säger upp den minst 24 timmar innan den aktuella perioden löper ut. Du kan hantera eller säga upp prenumerationen när som helst i kontoinställningarna för App Store.",
-    "legalTermsOfUse": "användarvillkor (EULA)",
+    "legalTermsOfUse": "Användarvillkor (EULA)",
     "purchaseDifferentAccount": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Logga in på det Apple-konto som användes för köpet och försök sedan igen.",
     "restoreFailed": "Det gick inte att återställa köpen. Försök igen.",
     "purchaseFailed": "Det gick inte att slutföra köpet.",

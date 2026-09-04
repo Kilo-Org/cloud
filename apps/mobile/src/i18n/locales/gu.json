@@ -1049,7 +1049,7 @@
         "genericErrorBody": "અત્યારે તમારા ઇન્સ્ટન્સનું સેટઅપ પૂરું કરી શકાયું નહીં.",
         "manualReviewBody": "ઇન્સ્ટન્સ બનાવતાં પહેલાં તમારા એકાઉન્ટની સ્થિતિ તપાસવી જરૂરી છે. kilo.ai પર આગળ વધો.",
         "manualReviewTitle": "સેટઅપની સમીક્ષા જાતે કરવી જરૂરી છે",
-        "openKiloAi": "kilo.ai ખોલો",
+        "openKiloAi": "Kilo.ai ખોલો",
         "provisioning": "ઇન્સ્ટન્સની તૈયારી",
         "review": "સમીક્ષા",
         "identityTitle": "તમારા બોટની ઓળખ",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClaw વાપરવાનું ચાલુ રાખવા તમારા બ્રાઉઝરમાં kilo.ai/claw ખોલો. એપમાં સબ્સ્ક્રાઇબ કરી શકાતું નથી.",
       "subscriptionCanceledTitle": "વેબ પર સબ્સ્ક્રાઇબ કરો",
       "subscriptionCanceledBody": "KiloClaw વાપરવા માટે તમારા બ્રાઉઝરમાં kilo.ai/claw ખોલો. એપમાં સબ્સ્ક્રાઇબ કરી શકાતું નથી.",
-      "subscriptionCanceledCta": "kilo.ai/claw ખોલો",
+      "subscriptionCanceledCta": "Kilo.ai/claw ખોલો",
       "subscriptionPastDueTitle": "વેબ પર ચુકવણીની વિગતો અપડેટ કરો",
       "subscriptionPastDueBody": "તમારી છેલ્લી ચુકવણીમાં સમસ્યા આવી હતી. ચુકવણીની વિગતો અપડેટ કરવા તમારા બ્રાઉઝરમાં kilo.ai/claw ખોલો. એપમાં બિલિંગનું સંચાલન કરી શકાતું નથી.",
       "quarantinedTitle": "ઇન્સ્ટન્સની સમસ્યા ઉકેલવી જરૂરી છે",
       "quarantinedBody": "તમારું KiloClaw ઇન્સ્ટન્સ અલગ રાખવામાં આવ્યું છે અને હમણાં તેનો ઉપયોગ કરી શકાતો નથી. તેને ફરી કાર્યરત કરવા અમારી ટીમની મદદ જરૂરી છે.",
       "multipleCurrentConflictBody": "તમારા એકાઉન્ટ પર એકથી વધુ સક્રિય સબ્સ્ક્રિપ્શન મળ્યાં છે. તમારી પાસેથી બે વાર ચાર્જ ન લેવાય તે માટે અમે પ્રક્રિયા થોભાવી છે.",
-      "multipleCurrentConflictCta": "kilo.ai પર ચાલુ રાખો",
+      "multipleCurrentConflictCta": "Kilo.ai પર ચાલુ રાખો",
       "nonCanonicalEarlybirdTitle": "જૂનો પ્લાન મળ્યો",
       "nonCanonicalEarlybirdBody": "તમારો પ્રારંભિક ઍક્સેસનો પ્લાન મોબાઇલ પર વાપરી શકાય તે પહેલાં તેની સમીક્ષા જાતે કરવી જરૂરી છે.",
-      "iosTitle": "iOSમાં KiloClaw ઉપલબ્ધ નથી",
+      "iosTitle": "IOSમાં KiloClaw ઉપલબ્ધ નથી",
       "iosBody": "આ એકાઉન્ટ માટે KiloClawના ઍક્સેસનું સંચાલન iOS એપની બહાર થાય છે.",
       "iosContact": "પ્રશ્નો છે? hi@kilo.ai પર સંપર્ક કરો."
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}} ખોલો, {{displayCount}} ન વાંચેલા સંદેશા",
       "openUnread_other": "{{name}} ખોલો, {{displayCount}} ન વાંચેલા સંદેશા",
       "openSettings": "{{name}} માટે સેટિંગ્સ ખોલો",
-      "fixOnKiloAi": "kilo.ai પર ઠીક કરો: {{label}}"
+      "fixOnKiloAi": "Kilo.ai પર ઠીક કરો: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

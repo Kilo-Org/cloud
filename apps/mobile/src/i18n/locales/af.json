@@ -110,7 +110,7 @@
     "pending": "Hangend",
     "performance": "Werkverrigting",
     "preferences": "Voorkeure",
-    "privacyPolicy": "privaatheidsbeleid",
+    "privacyPolicy": "Privaatheidsbeleid",
     "profile": "Profiel",
     "reactions": "Reaksies",
     "recent": "Onlangse items",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
       "openOnGitHub": "Maak op GitHub oop",
       "openDiffOnGitHub": "Maak hierdie lêer se verskille op GitHub oop",
-      "githubDiff": "verskille op GitHub"
+      "githubDiff": "Verskille op GitHub"
     },
     "floatingActions": {
       "clearSelection": "Hef die keuse op",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Gaan na die oorsigoortjie"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "⚠️ Die lêer eindig nie met 'n reëleinde nie.",
+      "noNewlineAtEndOfFile": "⚠️ die lêer eindig nie met 'n reëleinde nie.",
       "emptyDiffColumn": "leë kolom in die verskille",
       "oldNew": "Oud: {{old}} | Nuut: {{new}}",
       "oldOnly": "Slegs in die ou weergawe: {{text}}",
@@ -421,8 +421,8 @@
       "addReaction": "Voeg reaksie by",
       "reactionPill": "{{emoji}}-reaksie, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksie",
-      "reaction": "Reaksies",
-      "reaction_other": "Reaksies",
+      "reaction": "reaksies",
+      "reaction_other": "reaksies",
       "commentActions": "Kommentaaraksies",
       "reportContent": "Rapporteer inhoud",
       "reportUser": "Rapporteer gebruiker",
@@ -597,12 +597,12 @@
       "stateOpenReviewRequired": "Oop · hersiening vereis",
       "stateOpen": "Oop",
       "unknownAuthor": "Onbekende outeur",
-      "commit_one": "Vaslegging",
+      "commit_one": "vaslegging",
       "commit": "vasleggings",
       "commit_other": "vasleggings",
-      "file_one": "Lêer",
-      "file": "Lêers",
-      "file_other": "Lêers"
+      "file_one": "lêer",
+      "file": "lêers",
+      "file_other": "lêers"
     },
     "pendingComment": {
       "editOutdatedA11y": "Wysig verouderde hangende kommentaar op {{location}}",
@@ -781,7 +781,7 @@
       "classificationUnreadable": "Hierdie lêer kon nie gelees word nie.",
       "announceUploaded": "Aanhegsel opgelaai",
       "cantUpload": "Hierdie lêer kan nie opgelaai word nie.",
-      "networkError": "'n Netwerkfout het voorgekom.",
+      "networkError": "'N Netwerkfout het voorgekom.",
       "uploadFailed": "Die oplaai het misluk.",
       "failedToUploadFile": "Die lêer kon nie opgelaai word nie: {{reason}}",
       "nothingToPaste": "Daar is niks om te plak nie.",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Alle velde is verpligtend om {{label}} te koppel.",
       "setupGuideFallback": "opstelgids",
       "setupGuideA11y": "opstelgids vir {{label}}",
-      "setupGuide": "opstelgids",
+      "setupGuide": "Opstelgids",
       "saving": "Besig om te stoor…",
       "removing": "Besig om te verwyder…",
       "updateToken": "Werk toegangsteken by"
@@ -1125,12 +1125,12 @@
       "destroying": "WORD VERNIETIG",
       "provisioned": "VOORBEREI",
       "restarting": "HERBEGIN TANS",
-      "running": "Aktief",
+      "running": "AKTIEF",
       "shuttingDown": "SLUIT AF",
-      "starting": "Begin tans",
+      "starting": "BEGIN TANS",
       "stopped": "GESTAAK",
       "stopping": "WORD GESTAAK",
-      "unknown": "Onbekend",
+      "unknown": "ONBEKEND",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Pasgemaakte instruksies",
       "deprecation": "Pasgemaakte instruksies sal uitgefaseer word. Skuif hierdie riglyne eerder na 'n REVIEW.md-lêer in jou bewaarplek.",
-      "placeholder": "Bv. Pas ons konvensies vir foutafhandeling toe…"
+      "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…"
     },
     "repos": {
       "unavailable": "Die bewaarplekke is nie beskikbaar nie. Voltooi die Bitbucket-opstelling op kilo.ai.",
@@ -1267,15 +1267,15 @@
       "transcriptLive": "Regstreeks",
       "agentIdle": "Agent onaktief",
       "agentWorking": "Agent werk...",
-      "anErrorOccurred": "'n Fout het voorgekom",
-      "errorWithMessage": "'n Fout het voorgekom: {{message}}",
+      "anErrorOccurred": "'N Fout het voorgekom",
+      "errorWithMessage": "'N Fout het voorgekom: {{message}}",
       "executionStarted": "Uitvoering het begin",
       "reviewCompleted": "Hersiening voltooi",
       "reviewInterrupted": "Hersiening onderbreek",
       "sessionError": "Die sessie het 'n fout opgelewer: {{error}}",
       "statusWithValue": "Huidige status: {{status}}",
       "toolName": "Hulpmiddel: {{name}}",
-      "toolNameError": "'n Fout het by die hulpmiddel {{name}} voorgekom."
+      "toolNameError": "'N Fout het by die hulpmiddel {{name}} voorgekom."
     },
     "reviewMemory": {
       "title": "Hersieningsgeheue",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "Bekyk sekuriteitskennisgewing op GitHub",
       "statusOpen": "Oop",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Regstelling reeds begin",
-      "reasonNoBandwidth": "Geen kapasiteit beskikbaar nie",
-      "reasonTolerableRisk": "Die risiko is aanvaarbaar",
-      "reasonInaccurate": "Die bevinding is onjuis",
-      "reasonNotUsed": "Kwesbare kode word nie gebruik nie",
+      "reasonFixStarted": "regstelling reeds begin",
+      "reasonNoBandwidth": "geen kapasiteit beskikbaar nie",
+      "reasonTolerableRisk": "die risiko is aanvaarbaar",
+      "reasonInaccurate": "die bevinding is onjuis",
+      "reasonNotUsed": "kwesbare kode word nie gebruik nie",
       "reasonAfterReview": "na hersiening"
     },
     "settingsOverview": {
@@ -1649,7 +1649,7 @@
       "highDescription": "Moontlike beduidende datablootstelling.",
       "mediumDescription": "Beperkte impak of spesifieke voorwaardes.",
       "lowDescription": "Minimale sekuriteitsimpak.",
-      "invalidDayCount": "Voer 1–365 dae in, slegs heelgetalle.",
+      "invalidDayCount": "voer 1–365 dae in, slegs heelgetalle.",
       "remediationDeadlineA11y": "Regstellingsperdatum in dae vir ernsgraad {{label}}",
       "enterWholeNumber": "Voer 'n heelgetal tussen 1 en 365 in",
       "permissionNote": "Slegs organisasie-eienaars en faktureringsbestuurders kan hierdie instellings verander.",
@@ -1742,7 +1742,7 @@
       "reauthorizeTitle": "Bykomende toestemmings vereis",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
-    "queuedActionUntracked": "'n Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",
+    "queuedActionUntracked": "'N Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",
     "initialSyncAdmissionFailed": "Die Sekuriteitsagent is geaktiveer, maar die eerste sinkronisasie kon nie in die tou geplaas word nie. Sinkroniseer weer.",
     "commands": {
       "findingAlreadyDismissed": "Bevinding is reeds verwerp",
@@ -1754,8 +1754,8 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Die sekuriteitsdiens is nie opgestel nie. Herindiening kan nie slaag voordat dit reggestel is nie.",
-      "syncMayNotHaveCompleted": "'n Sinkronisasie is dalk nie voltooi nie. Probeer weer om die status daarvan na te gaan en by te werk, of laat vaar dit.",
-      "syncInProgress": "'n Sekuriteitsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
+      "syncMayNotHaveCompleted": "'N Sinkronisasie is dalk nie voltooi nie. Probeer weer om die status daarvan na te gaan en by te werk, of laat vaar dit.",
+      "syncInProgress": "'N Sekuriteitsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
       "dismissalInProgress": "Hierdie verwerping is reeds aan die gang. Probeer asseblief weer.",
       "couldNotReadPendingSyncs": "Kon nie hangende sinkronisasies lees nie. Probeer weer."
     },
@@ -1829,8 +1829,8 @@
       "monitorRequired": "Die ontleding beveel monitering aan eerder as om 'n PR oop te maak.",
       "triageOnly": "Slegs die aanvanklike beoordeling is voltooi. Ontleed die kodebasis voordat jy met die regstelling begin.",
       "actionNotConcrete": "Geen spesifieke regstelling vir 'n afhanklikheid of voorgestelde oplossing is beskikbaar nie.",
-      "remediationActive": "'n Regstellingspoging is reeds aktief.",
-      "prAlreadyOpened": "'n Regstellings-PR is reeds oop.",
+      "remediationActive": "'N Regstellingspoging is reeds aktief.",
+      "prAlreadyOpened": "'N Regstellings-PR is reeds oop.",
       "duplicateAnalysisResult": "Hierdie ontledingsresultaat het reeds regstellingswerk opgelewer.",
       "retryNotAllowed": "Hierdie poging kan nie weer probeer word nie.",
       "securityAgentDisabled": "Die Sekuriteitsagent is vir hierdie eienaar gedeaktiveer.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Kon nie die sessies deursoek nie.",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
-      "live": "Regstreeks",
+      "live": "REGSTREEKS",
       "updating": "Besig om op te dateer"
     },
     "sessionRow": {
@@ -1884,12 +1884,12 @@
       "couldNotCopyId": "Kon nie die sessie-ID kopieer nie.",
       "untitled": "Naamlose sessie",
       "sessionDeleted": "Sessie geskrap",
-      "needsInput": "Wag op invoer",
+      "needsInput": "wag op invoer",
       "fromPlatform": "vanaf {{platform}}",
       "cent_one": "sent",
       "cent": "sent",
       "cent_other": "sent",
-      "dollar_one": "Amerikaanse dollar",
+      "dollar_one": "amerikaanse dollar",
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "koste {{cost}}",
@@ -1902,7 +1902,7 @@
       "installedTitle": "GitHub-toep geïnstalleer",
       "installedMessage": "Jou bewaarplekke is nou gekoppel.",
       "pendingTitle": "Wag op goedkeuring deur 'n administrateur",
-      "pendingMessage": "'n Administrateur van die organisasie moet die installasieversoek goedkeur.",
+      "pendingMessage": "'N Administrateur van die organisasie moet die installasieversoek goedkeur.",
       "accountMismatchTitle": "Rekeninge stem nie ooreen nie",
       "accountMismatchMessage": "Hierdie verbinding is vanuit die Kilo App begin terwyl jy met 'n ander rekening aangemeld was. Meld met daardie rekening op die web aan of begin weer vanuit die toep.",
       "cannotCompleteTitle": "Kan installasie nie voltooi nie",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Kon nie die instansie bereik nie — dit het moontlik ontkoppel.",
     "remoteSpawnNonRetryable": "Die instansie kon nie die sessie begin nie — kontroleer die masjien of dateer die CLI op.",
     "remoteSpawnInstanceDisconnected": "Die gekose instansie het ontkoppel. Begin 'n sessie op Cloud Agent of kies 'n ander instansie.",
-    "liveCount_one": "{{count}} regstreeks",
-    "liveCount_other": "{{count}} regstreeks"
+    "liveCount_one": "{{count}} REGSTREEKS",
+    "liveCount_other": "{{count}} REGSTREEKS"
   },
   "agentChat": {
     "session": {
@@ -1953,7 +1953,7 @@
       "exitMessage": "Dit stop die aktiewe sessie, maar behou die geskiedenis daarvan.",
       "keepSessionRunning": "Laat sessie aanhou loop",
       "exitSession": "Sluit sessie",
-      "restartExitFailed": "'n Nuwe sessie is begin. Die vorige sessie is nog oop.",
+      "restartExitFailed": "'N Nuwe sessie is begin. Die vorige sessie is nog oop.",
       "exitNotSupported": "Die huidige sessie ondersteun nie sluiting op afstand nie.",
       "exitUnavailable": "Die huidige sessie kan nie op afstand gesluit word nie.",
       "exitNeedsNewerCli": "Skuinsstreepopdragte op afstand vereis 'n nuwer weergawe van Kilo CLI. Werk Kilo CLI by en koppel weer."
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "Nutsmiddel {{name}}, {{status}}",
       "noTasks": "Daar is geen take nie.",
       "toolRead": "lees",
-      "toolEdit": "Wysig",
+      "toolEdit": "wysig",
       "toolWrite": "skryf",
       "toolBash": "bash",
       "toolGlob": "lêerpatroon",
       "toolGrep": "tekssoektog",
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
-      "toolTask": "Taak",
+      "toolTask": "taak",
       "readTodos": "Lees taaklys",
       "updateTodos": "Werk taaklys by",
       "linesBadge": "{{displayCount}} reëls",
@@ -2043,7 +2043,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[nie-serialiseerbare invoer]",
-      "errorPrefix": "fout: {{error}}"
+      "errorPrefix": "Fout: {{error}}"
     },
     "instancePicker": {
       "runOn": "Voer uit op",
@@ -2143,7 +2143,7 @@
       "loadingImage": "Laai afbeelding",
       "imageUnavailableRetry": "Afbeelding onbeskikbaar, probeer weer om dit te laai",
       "imageUnavailableWithAlt": "Die afbeelding is nie beskikbaar nie: {{alt}}.",
-      "imagePreviewUnavailableInSession": "'n Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
+      "imagePreviewUnavailableInSession": "'N Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
       "viewImage": "Bekyk afbeelding",
       "viewImageWithAlt": "Bekyk afbeelding {{alt}}",
       "imageOutput": "Afbeeldinguitset",
@@ -2244,7 +2244,7 @@
     "olderMessages": {
       "arrived": "Vroeëre boodskappe gelaai",
       "retryHint": "Probeer weer om vroeëre boodskappe vir hierdie sessie te laai.",
-      "omitted_one": "'n Vroeëre item uit hierdie sessie kon nie vertoon word nie.",
+      "omitted_one": "'N Vroeëre item uit hierdie sessie kon nie vertoon word nie.",
       "omitted": "{{displayCount}} vroeëre items uit hierdie sessie kon nie vertoon word nie.",
       "omitted_other": "{{displayCount}} vroeëre items uit hierdie sessie kon nie vertoon word nie.",
       "couldNotLoad": "Vroeëre boodskappe kon nie gelaai word nie.",
@@ -2291,13 +2291,13 @@
       "provider": "Verskaffer {{id}}",
       "modelId": "Model-ID: {{id}}",
       "unavailable": "Onbeskikbaar",
-      "unavailableState": "Onbeskikbaar",
+      "unavailableState": "onbeskikbaar",
       "selectedState": "gekies",
       "thinkingEffort": "Denkinspanning",
       "thinkingEffortAccessibility": "Denkinspanning: {{label}}",
       "thinkingEffortSelected": "Denkinspanning: {{label}}, gekies",
       "thinkingEffortWithModel": "{{model}}, denkinspanning: {{variant}}",
-      "lockedByAgent": ", vergrendel deur agent \"{{agent}}\"",
+      "lockedByAgent": ", Vergrendel deur agent \"{{agent}}\"",
       "addToFavorites": "Voeg {{name}} by gunstelinge",
       "removeFromFavorites": "Verwyder {{name}} uit gunstelinge",
       "thinkingEffortXhigh": "EH",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Ouer aktiwiteit",
       "olderActivityDescription": "Koste wat nie aan die gelaaide geskiedenis toegeskryf is nie",
       "ofWindowTokens": "van {{window}} tekens",
-      "tokens": "Tekseenhede",
+      "tokens": "tekseenhede",
       "tokensWithPercentage": "tekens ({{percentage}})",
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Oop trekversoek",
+      "open": "oop trekversoek",
       "closed": "geslote trekversoek",
       "merged": "saamgevoegde trekversoek",
-      "draft": "Konseptrekversoek",
+      "draft": "konseptrekversoek",
       "updating": "Word bygewerk, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2475,7 +2475,7 @@
   },
   "forceUpdate": {
     "couldNotOpenStore": "Kon nie die toepwinkel oopmaak nie.",
-    "description": "'n Nuwe weergawe van Kilo is beskikbaar. Dateer asseblief op om voort te gaan.",
+    "description": "'N Nuwe weergawe van Kilo is beskikbaar. Dateer asseblief op om voort te gaan.",
     "title": "Opdatering vereis",
     "updateNow": "Dateer nou op",
     "appStorePage": "bladsy in die toepwinkel"
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Gaan terug en maak hierdie kieser weer vanaf die vorige skerm oop."
   },
   "sessionRow": {
-    "needsInput": "Wag op invoer"
+    "needsInput": "WAG OP INVOER"
   },
   "voiceInput": {
     "listening": "Luister...",

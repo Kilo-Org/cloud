@@ -587,7 +587,7 @@
     "accessRequired": {
       "iosBody": "此账号的 KiloClaw 使用权限需在 iOS 应用外管理。",
       "iosContact": "如有疑问，请联系 hi@kilo.ai。",
-      "iosTitle": "iOS 暂不支持使用 KiloClaw",
+      "iosTitle": "IOS 暂不支持使用 KiloClaw",
       "multipleCurrentConflictBody": "我们发现你的账号有多个有效订阅，已暂停服务，避免重复扣费。",
       "multipleCurrentConflictCta": "前往 kilo.ai 继续",
       "nonCanonicalEarlybirdBody": "你的抢先体验套餐需要通过人工审核后，才能在手机上使用。",

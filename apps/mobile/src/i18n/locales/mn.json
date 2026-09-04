@@ -22,7 +22,7 @@
     "copiedToClipboard": "Хуулах санах ойд хуулсан",
     "couldNotCopyToClipboard": "Хуулах санах ойд хуулж чадсангүй.",
     "required": "шаардлагатай",
-    "error": "Алдаа: {{error}}",
+    "error": "алдаа: {{error}}",
     "back": "Буцах",
     "somethingWentWrong": "Алдаа гарлаа.",
     "couldNotOpen": "{{label}} нээж чадсангүй.",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Тойм табыг нээх"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Файлын төгсгөлд шинэ мөрийн тэмдэгт байхгүй.",
+      "noNewlineAtEndOfFile": "файлын төгсгөлд шинэ мөрийн тэмдэгт байхгүй.",
       "emptyDiffColumn": "өөрчлөлтийн харьцуулалтын хоосон багана",
       "oldNew": "Хуучин: {{old}} | Шинэ: {{new}}",
       "oldOnly": "Зөвхөн хуучин: {{text}}",
@@ -421,8 +421,8 @@
       "addReaction": "Хариу үйлдэл нэмэх",
       "reactionPill": "{{emoji}} хариу үйлдэл, {{displayCount}} {{countLabel}}",
       "reaction_one": "хариу үйлдэл",
-      "reaction": "Хариу үйлдэл",
-      "reaction_other": "Хариу үйлдэл",
+      "reaction": "хариу үйлдэл",
+      "reaction_other": "хариу үйлдэл",
       "commentActions": "Сэтгэгдлийн үйлдлүүд",
       "reportContent": "Агуулгын талаар гомдол гаргах",
       "reportUser": "Хэрэглэгчийн талаар гомдол гаргах",
@@ -545,7 +545,7 @@
       "addTitle": "Сэтгэгдэл нэмэх",
       "unavailableTitle": "Сэтгэгдлийг нээх боломжгүй",
       "unavailableMessage": "Илгээхээр хүлээж байсан энэ сэтгэгдлийг аль хэдийн устгасан эсвэл илгээсэн байна.",
-      "ok": "За",
+      "ok": "ЗА",
       "loadFailedTitle": "Сэтгэгдэл бичих хэсгийг ачаалж чадсангүй.",
       "discardTitle": "Сэтгэгдлийг хадгалахгүй орхих уу?",
       "discardMessage": "Таны ноорог устна.",
@@ -597,17 +597,17 @@
       "stateOpenReviewRequired": "Нээлттэй · Хяналт шаардлагатай",
       "stateOpen": "Нээлттэй",
       "unknownAuthor": "Зохиогч тодорхойгүй",
-      "commit_one": "Коммит",
+      "commit_one": "коммит",
       "commit": "коммит",
       "commit_other": "коммит",
-      "file_one": "Файл",
-      "file": "Файл",
-      "file_other": "Файл"
+      "file_one": "файл",
+      "file": "файл",
+      "file_other": "файл"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} дээрх хуучирсан, илгээгээгүй сэтгэгдлийг засах",
       "editA11y": "{{location}} дээрх илгээгээгүй сэтгэгдлийг засах",
-      "staleHint": "Таныг үүнийг бичсэнээс хойш PR шинэчлэгдсэн.",
+      "staleHint": "таныг үүнийг бичсэнээс хойш PR шинэчлэгдсэн.",
       "deleteA11y": "{{location}} дээрх илгээгээгүй сэтгэгдлийг устгах",
       "deletedAnnouncement": "Илгээгээгүй сэтгэгдлийг устгасан",
       "noCommentsQueued": "Илгээх жагсаалтад сэтгэгдэл байхгүй. Хяналтыг зөвхөн дээр сонгосон үйлдлээр илгээнэ.",
@@ -851,7 +851,7 @@
       "plan": "Төлөвлөгөө",
       "finalTermEnds": "Сүүлийн гэрээт хугацаа дуусах өдөр",
       "afterFinalTerm": "Сүүлийн гэрээт хугацааны дараа",
-      "lessThanOneDay": "1 хоногоос бага",
+      "lessThanOneDay": "1 Хоногоос бага",
       "ends": "Дуусах өдөр",
       "expires": "Хүчинтэй хугацаа дуусах өдөр",
       "noActivePlan": "Идэвхтэй багц байхгүй",
@@ -968,7 +968,7 @@
       "hide": "{{label}}-г нуух",
       "show": "{{label}}-г харуулах",
       "allFieldsRequired": "{{label}} холболтыг үүсгэхийн тулд бүх талбарыг бөглөх шаардлагатай.",
-      "setupGuideFallback": "Тохируулах заавар",
+      "setupGuideFallback": "тохируулах заавар",
       "setupGuideA11y": "{{label}} тохируулах заавар",
       "setupGuide": "Тохируулах заавар",
       "saving": "Хадгалж байна…",
@@ -1049,7 +1049,7 @@
         "genericErrorBody": "Таны инстанцын тохиргоог одоогоор дуусгаж чадсангүй.",
         "manualReviewBody": "Инстанц үүсгэхээс өмнө таны бүртгэлийн төлөвийг шалгах шаардлагатай. kilo.ai дээр үргэлжлүүлнэ үү.",
         "manualReviewTitle": "Тохиргоог ажилтан шалгах шаардлагатай",
-        "openKiloAi": "kilo.ai-г нээх",
+        "openKiloAi": "Kilo.ai-г нээх",
         "provisioning": "Бэлтгэж байна",
         "review": "Шалгалт",
         "identityTitle": "Ботын нэр, дүр төрх",
@@ -1125,12 +1125,12 @@
       "destroying": "УСТГАЖ БАЙНА",
       "provisioned": "БЭЛТГЭСЭН",
       "restarting": "ДАХИН ЭХЛҮҮЛЖ БАЙНА",
-      "running": "Ажиллаж байна",
+      "running": "АЖИЛЛАЖ БАЙНА",
       "shuttingDown": "УНТРААЖ БАЙНА",
-      "starting": "Эхэлж байна",
+      "starting": "ЭХЭЛЖ БАЙНА",
       "stopped": "ЗОГССОН",
       "stopping": "ЗОГСООЖ БАЙНА",
-      "unknown": "Тодорхойгүй",
+      "unknown": "ТОДОРХОЙГҮЙ",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1147,13 +1147,13 @@
       "trialExpiredBody": "KiloClaw-г үргэлжлүүлэн ашиглахын тулд хөтчөөсөө kilo.ai/claw руу очно уу. Апп дотор захиалах боломжгүй.",
       "subscriptionCanceledTitle": "Вэб сайтаас захиалга авах",
       "subscriptionCanceledBody": "KiloClaw ашиглахын тулд хөтчөөсөө kilo.ai/claw руу очно уу. Апп дотор захиалах боломжгүй.",
-      "subscriptionCanceledCta": "kilo.ai/claw-г нээх",
+      "subscriptionCanceledCta": "Kilo.ai/claw-г нээх",
       "subscriptionPastDueTitle": "Төлбөрийн мэдээллийг вэбээр шинэчлэх",
       "subscriptionPastDueBody": "Таны сүүлийн төлбөрт асуудал гарсан. Төлбөрийн мэдээллээ шинэчлэхийн тулд хөтчөөсөө kilo.ai/claw руу орно уу. Апп дотроос төлбөрийг удирдах боломжгүй.",
       "quarantinedTitle": "Инстанцыг сэргээх шаардлагатай",
       "quarantinedBody": "Таны KiloClaw инстанцыг тусгаарласан тул одоогоор ашиглах боломжгүй. Манай баг үүнийг сэргээхэд туслах шаардлагатай.",
       "multipleCurrentConflictBody": "Таны бүртгэлд нэгээс олон идэвхтэй захиалга байна. Давхар төлбөр авахгүйн тулд үйлчилгээг түр зогсоосон.",
-      "multipleCurrentConflictCta": "kilo.ai дээр үргэлжлүүлэх",
+      "multipleCurrentConflictCta": "Kilo.ai дээр үргэлжлүүлэх",
       "nonCanonicalEarlybirdTitle": "Хуучин багц илэрсэн",
       "nonCanonicalEarlybirdBody": "Таны эрт бүртгүүлсний багцыг гар утсанд ашиглахаас өмнө ажилтан шалгах шаардлагатай.",
       "iosTitle": "KiloClaw-ыг iOS дээр ашиглах боломжгүй",
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}}-г нээх, {{displayCount}} уншаагүй мессеж",
       "openUnread_other": "{{name}}-г нээх, {{displayCount}} уншаагүй мессеж",
       "openSettings": "{{name}}-ийн тохиргоог нээх",
-      "fixOnKiloAi": "kilo.ai дээр засах: {{label}}"
+      "fixOnKiloAi": "Kilo.ai дээр засах: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Тусгай заавар",
       "deprecation": "Тусгай зааврын дэмжлэгийг зогсоохоор төлөвлөсөн. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
-      "placeholder": "Жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…"
+      "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…"
     },
     "repos": {
       "unavailable": "Репозиториудад хандах боломжгүй байна. kilo.ai дээр Bitbucket-ийг тохируулж дуусгана уу.",
@@ -1584,11 +1584,11 @@
       "viewAdvisory": "GitHub дээр аюулгүй байдлын зөвлөмжийг үзэх",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Засвар аль хэдийн эхэлсэн",
-      "reasonNoBandwidth": "Цаг, нөөц хүрэлцэхгүй",
-      "reasonTolerableRisk": "Эрсдэлийг хүлээн зөвшөөрөх боломжтой",
-      "reasonInaccurate": "Асуудлыг буруу илрүүлсэн",
-      "reasonNotUsed": "Эмзэг кодыг ашигладаггүй",
+      "reasonFixStarted": "засвар аль хэдийн эхэлсэн",
+      "reasonNoBandwidth": "цаг, нөөц хүрэлцэхгүй",
+      "reasonTolerableRisk": "эрсдэлийг хүлээн зөвшөөрөх боломжтой",
+      "reasonInaccurate": "асуудлыг буруу илрүүлсэн",
+      "reasonNotUsed": "эмзэг кодыг ашигладаггүй",
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
@@ -1649,9 +1649,9 @@
       "highDescription": "Их хэмжээний өгөгдөл задрах эрсдэлтэй.",
       "mediumDescription": "Нөлөө нь хязгаарлагдмал эсвэл зөвхөн тодорхой нөхцөлд илэрнэ.",
       "lowDescription": "Аюулгүй байдалд маш бага нөлөөтэй.",
-      "invalidDayCount": "Хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
+      "invalidDayCount": "хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
       "remediationDeadlineA11y": "{{label}} зэргийн асуудлыг засах хугацаа, хоногоор",
-      "enterWholeNumber": "1-ээс 365 хүртэлх бүхэл тоог оруулна уу",
+      "enterWholeNumber": "1-Ээс 365 хүртэлх бүхэл тоог оруулна уу",
       "permissionNote": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер эдгээр тохиргоог өөрчлөх эрхтэй.",
       "enableTracking": "SLA хяналтыг идэвхжүүлэх",
       "enableTrackingSubtitle": "Илэрсэн асуудлын ноцтой байдлын зэрэгт үндэслэн засварын эцсийн хугацааг тогтооно.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Сессүүдийг хайж чадсангүй.",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
-      "live": "Шууд",
+      "live": "ШУУД",
       "updating": "Шинэчилж байна"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Сессийн ID-г хуулж чадсангүй.",
       "untitled": "Гарчиггүй сесс",
       "sessionDeleted": "Сесс устгагдсан",
-      "needsInput": "Хариу хүлээж байна",
+      "needsInput": "хариу хүлээж байна",
       "fromPlatform": "{{platform}}-аас",
       "cent_one": "цент",
       "cent": "цент",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Инстанцтай холбогдож чадсангүй. Холболт нь тасарсан байж болзошгүй.",
     "remoteSpawnNonRetryable": "Инстанц сессийг эхлүүлж чадсангүй. Компьютерыг шалгах эсвэл CLI-г шинэчилнэ үү.",
     "remoteSpawnInstanceDisconnected": "Сонгосон инстанцын холболт тасарсан. Cloud Agent дээр сесс эхлүүлэх эсвэл өөр инстанц сонгоно уу.",
-    "liveCount_one": "{{count}} шууд",
-    "liveCount_other": "{{count}} шууд"
+    "liveCount_one": "{{count}} ШУУД",
+    "liveCount_other": "{{count}} ШУУД"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "{{name}} хэрэгсэл, {{status}}",
       "noTasks": "Даалгавар байхгүй.",
       "toolRead": "унших",
-      "toolEdit": "Засварлах",
+      "toolEdit": "засварлах",
       "toolWrite": "бичих",
       "toolBash": "bash",
       "toolGlob": "файлын нэрээр хайх",
       "toolGrep": "агуулгаас хайх",
       "toolList": "жагсаах",
       "toolPatch": "засвар оруулах",
-      "toolTask": "Даалгавар",
+      "toolTask": "даалгавар",
       "readTodos": "Хийх ажлын жагсаалтыг унших",
       "updateTodos": "Хийх ажлын жагсаалтыг шинэчлэх",
       "linesBadge": "{{displayCount}} мөр",
@@ -2291,7 +2291,7 @@
       "provider": "Үйлчилгээ үзүүлэгч {{id}}",
       "modelId": "Загвар {{id}}",
       "unavailable": "Ашиглах боломжгүй",
-      "unavailableState": "Ашиглах боломжгүй",
+      "unavailableState": "ашиглах боломжгүй",
       "selectedState": "сонгогдсон",
       "thinkingEffort": "Бодох түвшин",
       "thinkingEffortAccessibility": "Бодох түвшин: {{label}}",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Өмнөх үйлдлүүд",
       "olderActivityDescription": "Ачаалагдсан түүхэд хамаарахгүй зардал",
       "ofWindowTokens": "{{window}} токеноос",
-      "tokens": "Токен",
+      "tokens": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
       "stepsCount_one": "{{steps}} алхам",
       "stepsCount": "{{steps}} алхам",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Нэгтгэх хүсэлт нээх",
+      "open": "нэгтгэх хүсэлт нээх",
       "closed": "хаасан өөрчлөлт нэгтгэх хүсэлт",
       "merged": "нэгтгэсэн өөрчлөлт нэгтгэх хүсэлт",
-      "draft": "Ноорог нэгтгэх хүсэлт",
+      "draft": "ноорог нэгтгэх хүсэлт",
       "updating": "Шинэчилж байна, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Өмнөх дэлгэц рүү буцаад энэ сонгох цонхыг дахин нээнэ үү."
   },
   "sessionRow": {
-    "needsInput": "Хариу хүлээж байна"
+    "needsInput": "ХАРИУ ХҮЛЭЭЖ БАЙНА"
   },
   "voiceInput": {
     "listening": "Сонсож байна...",
@@ -2774,7 +2774,7 @@
       "thresholdLabel": "Энэ дүнгээс доош бол анхааруулах (USD)",
       "title": "Үлдэгдэл багасах анхааруулга",
       "emailsError": "Дор хаяж нэг зөв имэйл хаяг оруулна уу. Олон хаягийг таслалаар тусгаарлана уу.",
-      "thresholdError": "0-ээс их дүн оруулна уу."
+      "thresholdError": "0-Ээс их дүн оруулна уу."
     },
     "memberLimit": {
       "limitLabel": "Хязгаар (USD/өдөр)",
@@ -2784,7 +2784,7 @@
       "removeLimit": "Хязгаарыг арилгах",
       "title": "Өдрийн хэрэглээний хязгаар",
       "blankError": "Дүн оруулна уу. Эсвэл доорх «Хязгаарыг арилгах» товчийг товшино уу.",
-      "rangeError": "0-ээс {{max}} хүртэлх дүн оруулна уу."
+      "rangeError": "0-Ээс {{max}} хүртэлх дүн оруулна уу."
     },
     "members": {
       "changeRole": "Эрхийн түвшнийг өөрчлөх",

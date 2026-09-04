@@ -38,7 +38,7 @@
     "findings": "Problemas",
     "notConnected": "Não conectado",
     "notifications": "Notificações",
-    "pullRequest": "PR",
+    "pullRequest": "pR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -200,7 +200,7 @@
     "signOut": "Sair",
     "deleteAccount": "Excluir conta",
     "confirmationCode": "Código de confirmação",
-    "confirmationCodePlaceholder": "Código de 6 dígitos",
+    "confirmationCodePlaceholder": "código de 6 dígitos",
     "confirmDeletion": "Confirmar exclusão",
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
@@ -535,7 +535,7 @@
       "hide": "Ocultar {{label}}",
       "removing": "Removendo…",
       "saving": "Salvando…",
-      "setupGuide": "guia de configuração",
+      "setupGuide": "Guia de configuração",
       "setupGuideA11y": "Guia de configuração de {{label}}",
       "setupGuideFallback": "guia de configuração",
       "show": "Mostrar {{label}}",
@@ -727,12 +727,12 @@
       "destroying": "DESTRUINDO",
       "provisioned": "PROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "Em execução",
+      "running": "EM EXECUÇÃO",
       "shuttingDown": "DESLIGANDO",
-      "starting": "Iniciando",
+      "starting": "INICIANDO",
       "stopped": "PARADO",
       "stopping": "PARANDO",
-      "unknown": "Desconhecido",
+      "unknown": "DESCONHECIDO",
       "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
@@ -784,7 +784,7 @@
     "instructions": {
       "title": "Instruções personalizadas",
       "deprecation": "Está prevista a descontinuação das instruções personalizadas. Transfira essas orientações para um arquivo REVIEW.md no seu repositório.",
-      "placeholder": "Ex.: seguir nossas convenções de tratamento de erros…"
+      "placeholder": "ex.: seguir nossas convenções de tratamento de erros…"
     },
     "repos": {
       "unavailable": "Repositórios indisponíveis — conclua a configuração do Bitbucket em kilo.ai.",
@@ -839,9 +839,9 @@
     },
     "providerConnect": {
       "description": "Conecte {{label}} ao Kilo para revisar PRs automaticamente.",
-      "githubApp": "app do GitHub",
+      "githubApp": "App do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tente novamente.",
-      "gitlabAccount": "conta do GitLab",
+      "gitlabAccount": "Conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tente novamente.",
       "bitbucketError": "Não foi possível abrir a configuração do Bitbucket. Tente novamente."
     },
@@ -1182,11 +1182,11 @@
       "vulnerableVersions": "Versões vulneráveis",
       "statusOpen": "Abrir",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "Correção já iniciada",
-      "reasonNoBandwidth": "Sem tempo disponível",
-      "reasonTolerableRisk": "Risco tolerável",
-      "reasonInaccurate": "Problema identificado incorretamente",
-      "reasonNotUsed": "Código vulnerável sem uso",
+      "reasonFixStarted": "correção já iniciada",
+      "reasonNoBandwidth": "sem tempo disponível",
+      "reasonTolerableRisk": "risco tolerável",
+      "reasonInaccurate": "problema identificado incorretamente",
+      "reasonNotUsed": "código vulnerável sem uso",
       "reasonAfterReview": "após a revisão"
     },
     "findingList": {
@@ -1250,7 +1250,7 @@
     },
     "repositories": {
       "couldNotLoad": "Não foi possível carregar as configurações dos repositórios.",
-      "githubAppSettings": "configurações do app do GitHub",
+      "githubAppSettings": "Configurações do app do GitHub",
       "manageAccess": "Gerenciar acesso do app do GitHub",
       "noRepositories": "Nenhum repositório",
       "noRepositoriesDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios.",
@@ -1302,7 +1302,7 @@
       "enterWholeNumber": "Digite um número inteiro entre 1 e 365",
       "high": "Nível alto",
       "highDescription": "Possível exposição significativa de dados.",
-      "invalidDayCount": "Informe um número inteiro de dias entre 1 e 365.",
+      "invalidDayCount": "informe um número inteiro de dias entre 1 e 365.",
       "low": "Nível baixo",
       "lowDescription": "Impacto mínimo na segurança.",
       "medium": "Nível médio",
@@ -1442,7 +1442,7 @@
       "couldNotSearch": "Não foi possível pesquisar as sessões.",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Nenhuma sessão anterior",
-      "live": "Em tempo real",
+      "live": "EM TEMPO REAL",
       "updating": "Atualizando"
     },
     "sessionRow": {
@@ -1455,7 +1455,7 @@
       "couldNotCopyId": "Não foi possível copiar o ID da sessão.",
       "untitled": "Sessão sem título",
       "sessionDeleted": "Sessão excluída",
-      "needsInput": "Aguardando resposta",
+      "needsInput": "aguardando resposta",
       "fromPlatform": "de {{platform}}",
       "cent_one": "centavo",
       "cent": "centavos",
@@ -1467,7 +1467,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "pR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Não foi possível iniciar a configuração do aplicativo para GitHub. Tente novamente.",
@@ -1487,8 +1487,8 @@
     "remoteSpawnRetryable": "Não foi possível acessar a instância — ela pode ter se desconectado.",
     "remoteSpawnNonRetryable": "A instância não conseguiu iniciar a sessão — verifique a máquina ou atualize a CLI.",
     "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância.",
-    "liveCount_one": "{{count}} em tempo real",
-    "liveCount_other": "{{count}} em tempo real",
+    "liveCount_one": "{{count}} EM TEMPO REAL",
+    "liveCount_other": "{{count}} EM TEMPO REAL",
     "liveCount_many": "{{count}} ATIVOS"
   },
   "agentChat": {
@@ -1594,14 +1594,14 @@
       "accessibilityLabel": "Ferramenta {{name}}, {{status}}",
       "noTasks": "Não há tarefas.",
       "toolRead": "ler",
-      "toolEdit": "Editar",
+      "toolEdit": "editar",
       "toolWrite": "escrever",
       "toolBash": "bash",
       "toolGlob": "buscar arquivos",
       "toolGrep": "grep",
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
-      "toolTask": "Tarefa",
+      "toolTask": "tarefa",
       "readTodos": "Ler tarefas",
       "updateTodos": "Atualizar tarefas",
       "linesBadge": "{{displayCount}} linhas",
@@ -1618,7 +1618,7 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[entrada não serializável]",
-      "errorPrefix": "erro: {{error}}"
+      "errorPrefix": "Erro: {{error}}"
     },
     "instancePicker": {
       "runOn": "Local de execução",
@@ -1869,13 +1869,13 @@
       "provider": "Provedor {{id}}",
       "modelId": "Modelo {{id}}",
       "unavailable": "Indisponível",
-      "unavailableState": "Indisponível",
+      "unavailableState": "indisponível",
       "selectedState": "selecionado",
       "thinkingEffort": "Esforço de raciocínio",
       "thinkingEffortAccessibility": "Esforço de raciocínio: {{label}}",
       "thinkingEffortSelected": "Esforço de raciocínio: {{label}}, selecionado",
       "thinkingEffortWithModel": "{{model}}, esforço de raciocínio: {{variant}}",
-      "lockedByAgent": ", bloqueado pelo agente \"{{agent}}\"",
+      "lockedByAgent": ", Bloqueado pelo agente \"{{agent}}\"",
       "addToFavorites": "Adicionar {{name}} aos favoritos",
       "removeFromFavorites": "Remover {{name}} dos favoritos",
       "thinkingEffortXhigh": "MA",
@@ -1982,7 +1982,7 @@
       "olderActivity": "Atividade anterior",
       "olderActivityDescription": "Custo não atribuído ao histórico carregado",
       "ofWindowTokens": "de {{window}} tokens",
-      "tokens": "Unidades de texto",
+      "tokens": "unidades de texto",
       "tokensWithPercentage": "tokens usados ({{percentage}})",
       "stepsCount_one": "{{steps}} etapa",
       "stepsCount": "{{steps}} etapas",
@@ -1991,10 +1991,10 @@
       "stepsCount_many": "{{steps}} etapas"
     },
     "prBadge": {
-      "open": "Abrir PR",
-      "closed": "PR fechado",
-      "merged": "PR mesclado",
-      "draft": "PR em rascunho",
+      "open": "abrir PR",
+      "closed": "pR fechado",
+      "merged": "pR mesclado",
+      "draft": "pR em rascunho",
       "updating": "Atualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2119,7 +2119,7 @@
     "optionsExpiredDescription": "Volte e reabra este seletor na tela anterior."
   },
   "sessionRow": {
-    "needsInput": "Aguardando resposta"
+    "needsInput": "AGUARDANDO RESPOSTA"
   },
   "voiceInput": {
     "listening": "Ouvindo...",
@@ -2186,11 +2186,11 @@
     "verifyPurchaseFailed": "Não foi possível verificar sua compra. Verifique sua conexão e tente novamente.",
     "productsCouldNotLoad": "Não foi possível carregar os produtos do Kilo Pass da App Store.",
     "tryingAgain": "Tentando novamente...",
-    "kiloPassManagement": "gerenciamento do Kilo Pass",
+    "kiloPassManagement": "Gerenciamento do Kilo Pass",
     "legalConnectorTerms": " Ao assinar, você concorda com os ",
     "legalConnectorPrivacy": " e declara estar ciente da ",
     "manageFailed": "Não foi possível abrir o gerenciamento de assinaturas da App Store.",
-    "kiloPassSetup": "configuração do Kilo Pass",
+    "kiloPassSetup": "Configuração do Kilo Pass",
     "subscriptionHeaderDescription": "Uma assinatura mensal que adiciona créditos ao seu saldo do Kilo para programar com IA no Kilo App: agentes na nuvem, sessões remotas e conversas do KiloClaw.",
     "tierDescription": "{{price}} em créditos pagos adicionados mensalmente para uso do Kilo App.",
     "subscribe": "Assinar",
@@ -2238,7 +2238,7 @@
     "helpImproveDescription": "Compartilhe dados anônimos de uso do produto e a origem da instalação. Você pode alterar essa opção a qualquer momento em Ajustes.",
     "seeFullDetails": "Ver detalhes completos",
     "privacyPolicyPrefix": "Seus dados são tratados conforme a",
-    "privacyPolicy": "política de privacidade do Kilo",
+    "privacyPolicy": "Política de privacidade do Kilo",
     "onDevice": "No dispositivo",
     "couldNotLoadTranscription": "Não foi possível carregar sua configuração de transcrição.",
     "signInToManageTranscription": "Entre para gerenciar a transcrição online.",
@@ -2392,8 +2392,8 @@
       "outdated": "Desatualizado",
       "quotedDiffSnippet": "Trecho citado da comparação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",
-      "reaction": "Reações",
-      "reaction_other": "Reações",
+      "reaction": "reações",
+      "reaction_other": "reações",
       "reaction_one": "reação",
       "replyBadRequest": "Não é possível publicar esta resposta. A conversa pode ter sido alterada.",
       "replyBody": "Texto da resposta",
@@ -2493,7 +2493,7 @@
       "openDiffOnGitHub": "Abrir a comparação deste arquivo no GitHub",
       "openOnGitHub": "Abrir no GitHub",
       "unmarkViewed": "Desmarcar {{path}} como visualizado",
-      "githubDiff": "comparação no GitHub"
+      "githubDiff": "Comparação no GitHub"
     },
     "floatingActions": {
       "clear": "Limpar",
@@ -2623,10 +2623,10 @@
     "overview": {
       "commit": "alterações registradas",
       "commit_other": "alterações registradas",
-      "commit_one": "Commit",
-      "file": "Arquivos",
-      "file_other": "Arquivos",
-      "file_one": "Arquivo",
+      "commit_one": "commit",
+      "file": "arquivos",
+      "file_other": "arquivos",
+      "file_one": "arquivo",
       "stateMerged": "Mesclado",
       "stateOpen": "Abrir",
       "stateOpenApproved": "Aberto · Aprovado",
@@ -2664,7 +2664,7 @@
       "emptyDiffColumn": "coluna vazia na comparação",
       "emptyDiffRow": "Linha vazia na comparação",
       "newOnly": "Apenas na nova versão: {{text}}",
-      "noNewlineAtEndOfFile": "Não há quebra de linha no final do arquivo.",
+      "noNewlineAtEndOfFile": "não há quebra de linha no final do arquivo.",
       "oldNew": "Antigo: {{old}} | Novo: {{new}}",
       "oldOnly": "Apenas na versão anterior: {{text}}"
     },

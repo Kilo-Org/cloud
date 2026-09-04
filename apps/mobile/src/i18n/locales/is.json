@@ -22,7 +22,7 @@
     "copiedToClipboard": "Afritað á klippiborð",
     "couldNotCopyToClipboard": "Ekki tókst að afrita á klippiborð.",
     "required": "áskilið",
-    "error": "Villa: {{error}}",
+    "error": "villa: {{error}}",
     "back": "Til baka",
     "somethingWentWrong": "Eitthvað fór úrskeiðis.",
     "couldNotOpen": "Ekki tókst að opna {{label}}.",
@@ -169,7 +169,7 @@
     "verifyCode": "Staðfesta kóða",
     "resendCode": "Senda kóða aftur",
     "termsPrefix": "Með því að halda áfram samþykkir þú",
-    "terms": "skilmála",
+    "terms": "Skilmála",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",
@@ -282,7 +282,7 @@
       "diffTooLarge": "Breytingarnar eru of umfangsmiklar til að birta.",
       "openOnGitHub": "Opna á GitHub",
       "openDiffOnGitHub": "Opna breytingasamanburð skrárinnar á GitHub",
-      "githubDiff": "breytingasamanburður á GitHub"
+      "githubDiff": "Breytingasamanburður á GitHub"
     },
     "floatingActions": {
       "clearSelection": "Hreinsa val",
@@ -324,7 +324,7 @@
       "goToOverviewTab": "Fara á yfirlitsflipann"
     },
     "sideBySide": {
-      "noNewlineAtEndOfFile": "Engin línuskil eru í lok skrárinnar.",
+      "noNewlineAtEndOfFile": "engin línuskil eru í lok skrárinnar.",
       "emptyDiffColumn": "tómur dálkur í breytingasamanburði",
       "oldNew": "Gamalt: {{old}} | Nýtt: {{new}}",
       "oldOnly": "Aðeins gamalt: {{text}}",
@@ -421,8 +421,8 @@
       "addReaction": "Bæta við viðbrögðum",
       "reactionPill": "{{emoji}} viðbrögð, {{displayCount}} {{countLabel}}",
       "reaction_one": "viðbrögð",
-      "reaction": "Viðbrögð",
-      "reaction_other": "Viðbrögð",
+      "reaction": "viðbrögð",
+      "reaction_other": "viðbrögð",
       "commentActions": "Aðgerðir fyrir athugasemd",
       "reportContent": "Tilkynna efni",
       "reportUser": "Tilkynna notanda",
@@ -545,7 +545,7 @@
       "addTitle": "Ný athugasemd",
       "unavailableTitle": "Athugasemd ótiltæk",
       "unavailableMessage": "Þessari athugasemd í bið hefur þegar verið eytt eða hún send.",
-      "ok": "Í lagi",
+      "ok": "Í LAGI",
       "loadFailedTitle": "Ekki tókst að opna athugasemdaritilinn.",
       "discardTitle": "Fleygja athugasemd?",
       "discardMessage": "Drögin þín tapast.",
@@ -597,17 +597,17 @@
       "stateOpenReviewRequired": "Opin · Yfirferðar krafist",
       "stateOpen": "Opna",
       "unknownAuthor": "Óþekktur höfundur",
-      "commit_one": "Breytingafærsla",
+      "commit_one": "breytingafærsla",
       "commit": "breytingafærslur",
       "commit_other": "breytingafærslur",
-      "file_one": "Skrá",
-      "file": "Skrár",
-      "file_other": "Skrár"
+      "file_one": "skrá",
+      "file": "skrár",
+      "file_other": "skrár"
     },
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri athugasemd í bið við {{location}}",
       "editA11y": "Breyta athugasemd í bið við {{location}}",
-      "staleHint": "PR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
+      "staleHint": "pR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
       "deleteA11y": "Eyða athugasemd í bið við {{location}}",
       "deletedAnnouncement": "Athugasemd í bið eytt",
       "noCommentsQueued": "Engar athugasemdir eru í bið. Yfirferðin verður send með þeirri tegund sem valin er hér að ofan, án athugasemda.",
@@ -970,7 +970,7 @@
       "allFieldsRequired": "Fylla þarf út alla reiti til að tengja {{label}}.",
       "setupGuideFallback": "uppsetningarleiðbeiningar",
       "setupGuideA11y": "Uppsetningarleiðbeiningar fyrir {{label}}",
-      "setupGuide": "uppsetningarleiðbeiningar",
+      "setupGuide": "Uppsetningarleiðbeiningar",
       "saving": "Vista…",
       "removing": "Fjarlægi…",
       "updateToken": "Uppfæra aðgangsteikn"
@@ -1111,7 +1111,7 @@
       }
     },
     "status": {
-      "cpu": "Örgjörvi",
+      "cpu": "ÖRGJÖRVI",
       "exitCode": "Lokakóði {{code}}",
       "gatewayProcess": "GÁTTARFERLI",
       "lastExit": "Síðustu keyrslulok",
@@ -1125,12 +1125,12 @@
       "destroying": "EYÐING Í GANGI",
       "provisioned": "UNDIRBÚIÐ",
       "restarting": "ENDURRÆSING",
-      "running": "Í gangi",
+      "running": "Í GANGI",
       "shuttingDown": "SLEKKUR Á SÉR",
-      "starting": "Ræsing í gangi",
+      "starting": "RÆSING Í GANGI",
       "stopped": "STÖÐVAÐ",
       "stopping": "STÖÐVUN Í GANGI",
-      "unknown": "Óþekkt",
+      "unknown": "ÓÞEKKT",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
@@ -1217,7 +1217,7 @@
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
       "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
-      "placeholder": "T.d. fylgja reglum okkar um villumeðhöndlun…"
+      "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…"
     },
     "repos": {
       "unavailable": "Geymslur eru ekki tiltækar. Ljúktu uppsetningu Bitbucket á kilo.ai.",
@@ -1548,11 +1548,11 @@
     "dismiss": {
       "title": "Vísa niðurstöðu frá",
       "reason": "Ástæða",
-      "reasonFixStarted": "lagfæring er þegar hafin",
-      "reasonNoBandwidth": "enginn tími er til ráðstöfunar",
-      "reasonTolerableRisk": "áhættan er ásættanleg",
-      "reasonInaccurate": "niðurstaðan er ónákvæm",
-      "reasonNotUsed": "kóði með veikleikanum er ekki notaður",
+      "reasonFixStarted": "Lagfæring er þegar hafin",
+      "reasonNoBandwidth": "Enginn tími er til ráðstöfunar",
+      "reasonTolerableRisk": "Áhættan er ásættanleg",
+      "reasonInaccurate": "Niðurstaðan er ónákvæm",
+      "reasonNotUsed": "Kóði með veikleikanum er ekki notaður",
       "commentLabel": "Athugasemd (valfrjáls)",
       "commentAccessibility": "Athugasemd við frávísun",
       "commentPlaceholder": "Nánari skýring á frávísun…",
@@ -1649,7 +1649,7 @@
       "highDescription": "Hætta á verulegum gagnaleka.",
       "mediumDescription": "Takmörkuð áhrif eða sérstök skilyrði.",
       "lowDescription": "Óveruleg áhrif á öryggi.",
-      "invalidDayCount": "Fjöldi daga verður að vera heil tala frá 1 til 365.",
+      "invalidDayCount": "fjöldi daga verður að vera heil tala frá 1 til 365.",
       "remediationDeadlineA11y": "Úrbótafrestur í dögum fyrir {{label}}",
       "enterWholeNumber": "Sláðu inn heila tölu milli 1 og 365",
       "permissionNote": "Aðeins eigendur fyrirtækisins og greiðslustjórar geta breytt þessum stillingum.",
@@ -1725,7 +1725,7 @@
     },
     "repositories": {
       "couldNotLoad": "Ekki tókst að sækja geymslustillingar.",
-      "githubAppSettings": "stillingar GitHub-forritsins",
+      "githubAppSettings": "Stillingar GitHub-forritsins",
       "manageAccess": "Stjórna aðgangi GitHub-forritsins",
       "noRepositories": "Engar geymslur",
       "noRepositoriesDescription": "Veittu GitHub-forriti Kilo aðgang að geymslum.",
@@ -1871,7 +1871,7 @@
       "couldNotSearch": "Ekki tókst að leita í lotum.",
       "completedWillAppear": "Hér birtast lotur sem er lokið.",
       "noPastSessions": "Engar fyrri lotur",
-      "live": "Í rauntíma",
+      "live": "Í RAUNTÍMA",
       "updating": "Uppfæri"
     },
     "sessionRow": {
@@ -1884,7 +1884,7 @@
       "couldNotCopyId": "Ekki tókst að afrita lotukennið.",
       "untitled": "Ónefnd lota",
       "sessionDeleted": "Lotu eytt",
-      "needsInput": "Bíður eftir svari",
+      "needsInput": "bíður eftir svari",
       "fromPlatform": "frá {{platform}}",
       "cent_one": "sent",
       "cent": "cent",
@@ -1914,8 +1914,8 @@
     "remoteSpawnRetryable": "Ekki náðist samband við tilvikið — það gæti hafa aftengst.",
     "remoteSpawnNonRetryable": "Tilvikinu tókst ekki að ræsa lotuna — athugaðu vélina eða uppfærðu CLI.",
     "remoteSpawnInstanceDisconnected": "Valda tilvikið aftengdist. Byrjaðu lotu á Cloud Agent eða veldu annað tilvik.",
-    "liveCount_one": "{{count}} í rauntíma",
-    "liveCount_other": "{{count}} í rauntíma"
+    "liveCount_one": "{{count}} Í RAUNTÍMA",
+    "liveCount_other": "{{count}} Í RAUNTÍMA"
   },
   "agentChat": {
     "session": {
@@ -2019,14 +2019,14 @@
       "accessibilityLabel": "tól: {{name}}, {{status}}",
       "noTasks": "Engin verkefni eru á listanum.",
       "toolRead": "lesa",
-      "toolEdit": "Breyta",
+      "toolEdit": "breyta",
       "toolWrite": "skrifa",
       "toolBash": "bash",
       "toolGlob": "skráaleit",
       "toolGrep": "textaleit",
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
-      "toolTask": "Verkefni",
+      "toolTask": "verkefni",
       "readTodos": "Lesa verkefnalista",
       "updateTodos": "Uppfæra verkefnalista",
       "linesBadge": "{{displayCount}} línur",
@@ -2291,13 +2291,13 @@
       "provider": "Veitandi {{id}}",
       "modelId": "Líkan {{id}}",
       "unavailable": "Ekki tiltækt",
-      "unavailableState": "Ekki tiltækt",
+      "unavailableState": "ekki tiltækt",
       "selectedState": "valið",
       "thinkingEffort": "Dýpt rökhugsunar",
       "thinkingEffortAccessibility": "dýpt rökhugsunar: {{label}}",
       "thinkingEffortSelected": "dýpt rökhugsunar: {{label}}, valið",
       "thinkingEffortWithModel": "{{model}}, dýpt rökhugsunar: {{variant}}",
-      "lockedByAgent": ", læst af fulltrúanum „{{agent}}“",
+      "lockedByAgent": ", Læst af fulltrúanum „{{agent}}“",
       "addToFavorites": "Bæta {{name}} við eftirlæti",
       "removeFromFavorites": "Fjarlægja {{name}} úr eftirlæti",
       "thinkingEffortXhigh": "XH",
@@ -2404,7 +2404,7 @@
       "olderActivity": "Eldri virkni",
       "olderActivityDescription": "Kostnaður sem tengist ekki ferlinum sem hefur verið hlaðið",
       "ofWindowTokens": "af {{window}} tókum",
-      "tokens": "Tókar",
+      "tokens": "tókar",
       "tokensWithPercentage": "tókar ({{percentage}})",
       "stepsCount_one": "{{steps}} skref",
       "stepsCount": "{{steps}} skref",
@@ -2412,10 +2412,10 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "Opna samrunabeiðni",
+      "open": "opna samrunabeiðni",
       "closed": "lokuð samrunabeiðni",
       "merged": "sameinuð samrunabeiðni",
-      "draft": "Drög að samrunabeiðni",
+      "draft": "drög að samrunabeiðni",
       "updating": "Uppfærir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2522,7 +2522,7 @@
     "optionsExpiredDescription": "Farðu til baka á fyrri skjá og opnaðu valgluggann aftur."
   },
   "sessionRow": {
-    "needsInput": "Bíður eftir svari"
+    "needsInput": "BÍÐUR EFTIR SVARI"
   },
   "voiceInput": {
     "listening": "Hlusta…",
@@ -2589,11 +2589,11 @@
     "verifyPurchaseFailed": "Ekki tókst að staðfesta kaupin þín. Athugaðu tenginguna og reyndu aftur.",
     "productsCouldNotLoad": "Ekki tókst að sækja Kilo Pass-vörur úr App Store.",
     "tryingAgain": "Reyni aftur…",
-    "kiloPassManagement": "umsjón með Kilo Pass",
+    "kiloPassManagement": "Umsjón með Kilo Pass",
     "legalConnectorTerms": " Með áskrift samþykkir þú ",
     "legalConnectorPrivacy": " og staðfestir að þú hafir kynnt þér ",
     "manageFailed": "Ekki tókst að opna áskriftarstjórnun í App Store.",
-    "kiloPassSetup": "uppsetning Kilo Pass",
+    "kiloPassSetup": "Uppsetning Kilo Pass",
     "subscriptionHeaderDescription": "Mánaðarleg áskrift sem bætir við Kilo-inneignina þína fyrir forritunarlotur með gervigreind í Kilo App: skýjaaðstoðarmenn, fjarlotur og KiloClaw-spjall.",
     "tierDescription": "Greidd inneign að upphæð {{price}} bætist við mánaðarlega til notkunar í Kilo App.",
     "subscribe": "Gerast áskrifandi",
@@ -2641,7 +2641,7 @@
     "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í stillingum.",
     "seeFullDetails": "Sjá allar upplýsingar",
     "privacyPolicyPrefix": "Farið er með gögnin þín samkvæmt",
-    "privacyPolicy": "persónuverndarstefnu Kilo",
+    "privacyPolicy": "Persónuverndarstefnu Kilo",
     "onDevice": "Í tækinu",
     "couldNotLoadTranscription": "Ekki tókst að hlaða umritunarstillingunni þinni.",
     "signInToManageTranscription": "Skráðu þig inn til að stjórna netumritun.",

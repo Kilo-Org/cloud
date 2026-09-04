@@ -1049,7 +1049,7 @@
         "genericErrorBody": "ప్రస్తుతం మీ ఇన్‌స్టాన్స్ సెటప్‌ను పూర్తి చేయలేకపోయాము.",
         "manualReviewBody": "ఇన్‌స్టాన్స్‌ను సృష్టించే ముందు మీ ఖాతా స్థితిని సరిచూడాలి. kilo.aiలో కొనసాగించండి.",
         "manualReviewTitle": "సెటప్‌కు సిబ్బంది సమీక్ష అవసరం",
-        "openKiloAi": "kilo.ai తెరవండి",
+        "openKiloAi": "Kilo.ai తెరవండి",
         "provisioning": "వనరుల కేటాయింపు",
         "review": "సమీక్ష",
         "identityTitle": "మీ బాట్ గుర్తింపు",
@@ -1147,16 +1147,16 @@
       "trialExpiredBody": "KiloClawను వాడటం కొనసాగించడానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో చందా తీసుకోలేరు.",
       "subscriptionCanceledTitle": "వెబ్‌సైట్‌లో చందా తీసుకోండి",
       "subscriptionCanceledBody": "KiloClawను వాడటానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో చందా తీసుకోలేరు.",
-      "subscriptionCanceledCta": "kilo.ai/claw తెరవండి",
+      "subscriptionCanceledCta": "Kilo.ai/claw తెరవండి",
       "subscriptionPastDueTitle": "వెబ్‌లో చెల్లింపు వివరాల నవీకరణ",
       "subscriptionPastDueBody": "మీ తాజా చెల్లింపులో సమస్య వచ్చింది. చెల్లింపు వివరాలను నవీకరించడానికి మీ బ్రౌజర్‌లో kilo.ai/clawకు వెళ్లండి. యాప్‌లో బిల్లింగ్‌ను నిర్వహించలేరు.",
       "quarantinedTitle": "ఇన్‌స్టాన్స్‌లో సమస్యను పరిష్కరించాలి",
       "quarantinedBody": "మీ KiloClaw ఇన్‌స్టాన్స్‌ను విడిగా నిలిపివేశాము. ప్రస్తుతం దాన్ని వాడలేరు. దాన్ని పునరుద్ధరించడానికి మా బృందం సహాయం అవసరం.",
       "multipleCurrentConflictBody": "మీ ఖాతాలో ఒకటి కంటే ఎక్కువ చందాలు అమలులో ఉన్నాయి. మీకు రెండుసార్లు బిల్లు రాకుండా సేవలను తాత్కాలికంగా నిలిపివేశాము.",
-      "multipleCurrentConflictCta": "kilo.aiలో కొనసాగించండి",
+      "multipleCurrentConflictCta": "Kilo.aiలో కొనసాగించండి",
       "nonCanonicalEarlybirdTitle": "పాత ప్లాన్‌ను గుర్తించాము",
       "nonCanonicalEarlybirdBody": "మీ ముందస్తు వినియోగ ప్లాన్‌ను మొబైల్‌లో వాడే ముందు సిబ్బంది సమీక్షించాలి.",
-      "iosTitle": "iOSలో KiloClaw అందుబాటులో లేదు",
+      "iosTitle": "IOSలో KiloClaw అందుబాటులో లేదు",
       "iosBody": "ఈ ఖాతా KiloClaw వినియోగ అనుమతులను iOS యాప్ వెలుపల నిర్వహిస్తాము.",
       "iosContact": "ప్రశ్నలు ఉన్నాయా? hi@kilo.aiకు ఇమెయిల్ చేయండి."
     },
@@ -1166,7 +1166,7 @@
       "openUnread": "{{name}}ను తెరవండి, చదవని సందేశాలు {{displayCount}}",
       "openUnread_other": "{{name}}ను తెరవండి, చదవని సందేశాలు {{displayCount}}",
       "openSettings": "{{name}} సెట్టింగ్‌లను తెరవండి",
-      "fixOnKiloAi": "kilo.aiలో పరిష్కరించండి: {{label}}"
+      "fixOnKiloAi": "Kilo.aiలో పరిష్కరించండి: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",

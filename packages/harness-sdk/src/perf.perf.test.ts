@@ -188,9 +188,10 @@ it('streams a token for under 90 us end to end', async () => {
 it('costs no more per token on a long answer than on a short one', async () => {
   /* The answer is built up a delta at a time, so a copy of the whole answer
      per delta would be quadratic and would only show on a long one. It is not:
-     measured 19.6 us per token over 200 and 7.0 over 5000, because the fixed
-     cost of opening the session is spread over more tokens. The comparison is
-     the guard, not either figure, and the two are 2.8 times apart. */
+     the median of five rounds is 13.4 us per token over 200 and 7.1 over 5000,
+     because the fixed cost of opening the session is spread over more tokens.
+     The comparison is the guard, not either figure, and the two are 1.9 times
+     apart. */
   const short = await perToken(200, 20);
   const long = await perToken(5000, 4);
 

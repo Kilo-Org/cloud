@@ -24,6 +24,7 @@ import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/provid
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
+import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
@@ -198,6 +199,26 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   return sortedModels;
 }
 
+function removeUpstreamEnkrypt(response: unknown): unknown {
+  if (
+    !response ||
+    typeof response !== 'object' ||
+    !('data' in response) ||
+    !Array.isArray(response.data)
+  ) {
+    return response;
+  }
+  return {
+    ...response,
+    data: response.data.map((model: unknown) => {
+      if (!model || typeof model !== 'object' || !('enkrypt' in model)) return model;
+      const sanitized: Record<string, unknown> = { ...model };
+      delete sanitized.enkrypt;
+      return sanitized;
+    }),
+  };
+}
+
 /**
  * Fetch raw, unfiltered models from OpenRouter API
  * Use this for syncing model stats where you need complete data including :free variants
@@ -224,7 +245,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     throw new Error('Failed to fetch models from OpenRouter API');
   }
 
-  const data = await response.json();
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 
@@ -257,7 +278,9 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  return { data: await enhancedModelList(rawResponse.data) };
+  const models = await enhancedModelList(rawResponse.data);
+  const snapshot = await getEnkryptBenchmarks();
+  return { data: publishEnkryptModels(models, snapshot) };
 }
 /**
  * Fetch speech-to-text models from the OpenRouter API.
@@ -284,7 +307,7 @@ export async function getOpenRouterTranscriptionModels(): Promise<OpenRouterMode
     throw new Error('Failed to fetch transcription models from OpenRouter API');
   }
 
-  const data = await response.json();
+  const data = removeUpstreamEnkrypt(await response.json());
 
   const parseResult = OpenRouterModelsResponseSchema.safeParse(data);
 

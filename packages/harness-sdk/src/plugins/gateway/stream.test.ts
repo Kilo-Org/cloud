@@ -1,4 +1,4 @@
-import { Effect, Stream } from 'effect';
+import { Effect, Either, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { ApiKind } from '../../core/catalog.js';
 import { fakeFetch, type Reply, sampleRequest, sse } from './fake.js';
@@ -169,4 +169,49 @@ it('fails the stream when the provider reports an error part way through it', as
   );
 
   expect(result).toMatchObject({ left: { reason: 'stream' } });
+});
+
+/** The responses shape puts its failure one level down, inside `response`. */
+const responsesEnding = async (ending: unknown) => {
+  const reply: Reply = {
+    ok: true,
+    status: 200,
+    body: '',
+    chunks: sse({ type: 'response.output_text.delta', delta: 'half an ans' }, ending),
+  };
+  const { fetch } = fakeFetch([reply]);
+  return ModelClient.pipe(
+    Effect.map(client => client.stream(sampleRequest())),
+    Stream.unwrap,
+    Stream.runCollect,
+    Effect.either,
+    Effect.provide(testGateway({ fetch, kinds: ['responses'] })),
+    Effect.runPromise
+  );
+};
+
+it('fails the stream when the responses shape reports a failed response', async () => {
+  /* `response.failed` carries its reason as `response.error`, so the frame has
+     no top-level `error` to read. Letting it pass ends the stream on a `done`
+     that says `unknown`, and the fragment is stored as a whole answer. */
+  const result = await responsesEnding({
+    type: 'response.failed',
+    response: { status: 'failed', error: { code: 'server_error', message: 'went wrong' } },
+  });
+
+  expect(result).toMatchObject({ left: { reason: 'stream' } });
+});
+
+it('lets a completed response through, error and all', async () => {
+  /* This shape carries `error: null` inside `response` on every call that
+     worked. A reader that takes the key for the failure marks every reply a
+     failure. The frame is parsed from text because that is how it arrives, and
+     because the package writes no `null` of its own. */
+  const completed: unknown = JSON.parse(
+    '{"type":"response.completed","response":{"status":"completed","error":null,' +
+      '"usage":{"input_tokens":1,"output_tokens":1}}}'
+  );
+  const result = await responsesEnding(completed);
+
+  expect(Either.isRight(result)).toBe(true);
 });

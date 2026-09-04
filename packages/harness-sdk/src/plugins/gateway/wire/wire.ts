@@ -59,13 +59,16 @@ const stopFrom =
  * been streamed. Letting the frame pass ends the stream on `done` and stores a
  * fragment as a whole answer.
  *
- * Only a top-level `error` object counts. A shape that reports `error: null`
- * on a frame that succeeded, as the responses shape does inside `response`,
- * does not match.
+ * The responses shape is the exception: it carries the failure one level down,
+ * as `response.error` on a `response.failed` frame, so both places are read.
+ *
+ * Only an `error` object counts. That shape reports `error: null` inside
+ * `response` on every call that worked, and null is not an object, so a reply
+ * that succeeded does not match.
  */
-interface FailureEvent {
-  error: { message?: string; type?: string };
-}
+type FailureEvent =
+  | { error: { message?: string; type?: string } }
+  | { response: { error: { message?: string; code?: string } } };
 
 const isFailure = createIs<FailureEvent>();
 

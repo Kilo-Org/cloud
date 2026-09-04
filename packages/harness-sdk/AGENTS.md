@@ -464,6 +464,11 @@ one compaction, and a summary that opens `- Vault code: 4417`. The run reads the
 summary itself, not just the answer, because the model could reach the answer
 another way.
 
+It also adds up the `done` events. Those are what the caller's own questions
+cost, so `session.usage` has to come out above them — the difference is the
+summary call, which the caller never asked for and is billed for anyway. The
+same run: 70 output tokens against 37 the questions account for.
+
 ### Many models, a longer conversation
 
 `pnpm test:e2e:models` holds a five turn conversation with each of the ten most

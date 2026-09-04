@@ -408,22 +408,33 @@ another way.
 used models on OpenRouter. The last question can only be answered from the
 history, so the run proves the prompt actually carries the conversation.
 
-Measured on 2026-09-03, five questions each, the Kilo organization:
+Measured on 2026-09-04, five questions each, the Kilo organization. `first` is
+the median wait for the first piece of an answer, `whole` for all of it:
 
-| Model | Shape | Recalled | Cache read | Input | Ratio |
-|---|---|---|---:|---:|---:|
-| `openai/gpt-5.6-luna` | messages | yes | 45018 | 15 | 0.9997 |
-| `deepseek/deepseek-v4-flash` | messages | yes | 56320 | 324 | 0.9943 |
-| `minimax/minimax-m3` | messages | yes | 45702 | 11382 | 0.8006 |
-| `xiaomi/mimo-v2.5` | messages | yes | 46080 | 11714 | 0.7973 |
-| `deepseek/deepseek-v4-flash-0731` | messages | yes | 45056 | 11588 | 0.7954 |
-| `tencent/hy3` | messages | yes | 44608 | 11691 | 0.7923 |
-| `z-ai/glm-5.3-flash` | messages | yes | 27648 | 28666 | 0.4910 |
-| `google/gemini-3.7-flash` | messages | yes | 24436 | 34203 | 0.4167 |
-| `nvidia/nemotron-3-ultra-550b-a55b` | messages | yes | 8192 | 50667 | 0.1392 |
-| `tencent/hy4-preview` | — | — | — | — | 404, not allowed for the team |
+| Model | Recalled | First | Whole | Cache read | Input | Ratio |
+|---|---|---:|---:|---:|---:|---:|
+| `openai/gpt-5.6-luna` | yes | 1221 ms | 1484 ms | 56324 | 15 | 0.9997 |
+| `qwen/qwen3.8-flash` | yes | 1893 ms | 1921 ms | 47162 | 30 | 0.9994 |
+| `xiaomi/mimo-v2.5` | yes | 20028 ms | 20776 ms | 57600 | 194 | 0.9966 |
+| `deepseek/deepseek-v4-flash` | yes | 3906 ms | 3908 ms | 54528 | 2116 | 0.9626 |
+| `deepseek/deepseek-v4-flash-0731` | yes | 3605 ms | 3618 ms | 53504 | 3140 | 0.9446 |
+| `minimax/minimax-m3` | yes | 3022 ms | 3050 ms | 45702 | 11382 | 0.8006 |
+| `tencent/hy3` | yes | 2857 ms | 2974 ms | 44608 | 11691 | 0.7923 |
+| `z-ai/glm-5.3-flash` | yes | 1360 ms | 1556 ms | 34560 | 21754 | 0.6137 |
+| `nvidia/nemotron-3-ultra-550b-a55b` | yes | 945 ms | 958 ms | 8192 | 50667 | 0.1392 |
+| `google/gemini-3.7-flash` | yes | 2162 ms | 2374 ms | 8137 | 50502 | 0.1388 |
 
-Nine of ten answered every turn from the history.
+Ten of ten answered every turn from the history. Every one used the `messages`
+shape.
+
+`tencent/hy4-preview` was in this list and is not served to this team — a 404
+reading `model_not_allowed` — so `qwen/qwen3.8-flash` took its place.
+
+The waits are the provider's, not the package's: building a whole request
+costs 48 us on this side, against a first piece between 945 ms and 20 s. The
+same model varies by a factor of ten between runs — `xiaomi/mimo-v2.5` took
+1419 ms on one run and 20 s on the next — so read one column of one run as
+weather, and the ratios, which are stable per model across runs, as climate.
 
 These ratios are lower than the ones recorded before the usage merge was
 fixed, and the lower ones are the honest ones. The earlier table had

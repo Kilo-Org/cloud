@@ -1901,6 +1901,7 @@ export const OpenRouterBaseModel = z.object({
 export type OpenRouterEndpoint = z.infer<typeof OpenRouterEndpoint>;
 export const OpenRouterEndpoint = z.object({
   provider_display_name: z.string(),
+  variant: z.string().nullish(),
   is_free: z.boolean(),
   pricing: OpenRouterPricing,
   data_policy: z

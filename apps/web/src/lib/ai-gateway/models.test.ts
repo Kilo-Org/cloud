@@ -219,11 +219,11 @@ describe('isFreeModel', () => {
       });
     });
 
-    test('weights every Auto Free model equally', () => {
+    test('weights Step three times as heavily as each other Auto Free model', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': 1,
+        'stepfun/step-3.7-flash:free': 3,
         'poolside/laguna-s-2.1:free': 1,
         'minimax/minimax-m3:free': 1,
       });

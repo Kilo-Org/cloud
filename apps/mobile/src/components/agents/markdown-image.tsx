@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
-import { AlertCircle, Download } from '@/components/ui/icons';
+import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -98,7 +98,7 @@ function UnconfirmedImageChip({
   const { t } = useTranslation();
   const host = imageHostDisplay(uri);
   return (
-    <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+    <View className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
       <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
         {host ?? t('agentChat.markdownImage.httpsOnly')}
       </Text>
@@ -116,9 +116,12 @@ function UnconfirmedImageChip({
             onShowLinkActions?.();
           }
         }}
-        className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
+        className="min-h-11 min-w-11 shrink-0 flex-row items-center justify-center gap-1 px-2 active:opacity-70"
       >
         <Download size={16} color={colors.mutedForeground} />
+        <Text className="text-xs font-medium text-foreground">
+          {t('agentChat.markdownImage.load')}
+        </Text>
       </Pressable>
     </View>
   );
@@ -205,7 +208,7 @@ export function MarkdownImage({
             setAttempt(prev => prev + 1);
           }}
           onLongPress={onShowLinkActions}
-          className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
           accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
@@ -216,11 +219,13 @@ export function MarkdownImage({
           }}
         >
           <AlertCircle size={14} color={colors.mutedForeground} />
-          <Text className="text-xs text-muted-foreground">
+          <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
             {alt
               ? t('agentChat.filePart.imageUnavailableWithAlt', { alt })
               : t('agentChat.filePart.imageUnavailable')}
           </Text>
+          <RotateCcw size={14} color={colors.foreground} />
+          <Text className="shrink-0 text-xs font-medium text-foreground">{t('common.retry')}</Text>
         </Pressable>
       </FixedImageSlot>
     );

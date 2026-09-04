@@ -9,13 +9,17 @@ import { clearMarkdownImageConfirmMemory, confirmMarkdownImage } from './markdow
 import { MarkdownImage } from './markdown-image';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
-vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Download: 'Download' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  Download: 'Download',
+  RotateCcw: 'RotateCcw',
+}));
 vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#666666' }),
+  useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#666666' }),
 }));
 
 beforeEach(() => {
@@ -98,6 +102,7 @@ describe('MarkdownImage inert-until-load', () => {
   it('stays inert for HTTPS until Load, then mounts the Image', async () => {
     const renderer = await mount('https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('Load');
 
     const loadButtons = findLoadButtons(renderer.root, 'https://example.com/a.png');
     expect(loadButtons).toHaveLength(1);
@@ -164,6 +169,7 @@ describe('MarkdownImage inert-until-load', () => {
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
     expect(texts(renderer.root)).toContain('Image unavailable shot');
+    expect(texts(renderer.root)).toContain('Retry');
 
     const retryButtons = renderer.root.findAll(
       node =>

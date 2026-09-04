@@ -74,16 +74,56 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns a sanitized 503 without minting when shared tokens are disabled', async () => {
-    const sign = jest.spyOn(jwt, 'sign');
+  it('preserves the existing personal token while shared tokens are disabled', async () => {
+    mockRows.push({
+      id: 'user-1',
+      api_token_pepper: 'pepper',
+      blocked_at: null,
+      blocked_reason: null,
+    });
     const res = await POST(
       createRequest({ userId: 'user-1' }, { authorization: 'Bearer internal-secret' })
     );
 
-    expect(res.status).toBe(503);
-    await expect(res.json()).resolves.toEqual({ error: 'Service unavailable' });
-    expect(sign).not.toHaveBeenCalled();
-    sign.mockRestore();
+    expect(res.status).toBe(200);
+    const { token } = (await res.json()) as { token: string };
+    const claims = jwt.verify(token, 'benchmark-token-secret') as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      apiTokenPepper: 'pepper',
+      tokenSource: 'auto-routing-benchmark',
+    });
+    expect(claims).not.toHaveProperty('aud');
+    expect(claims).not.toHaveProperty('tokenPurpose');
+    expect(claims).not.toHaveProperty('organizationId');
+  });
+
+  it('preserves the existing organization token and role while shared tokens are disabled', async () => {
+    mockRows.push({
+      id: 'user-1',
+      api_token_pepper: 'pepper',
+      blocked_at: null,
+      blocked_reason: null,
+    });
+    mockMembershipRows.push({ role: 'billing_manager' });
+
+    const res = await POST(
+      createRequest(
+        { userId: 'user-1', organizationId: 'org-1' },
+        { authorization: 'Bearer internal-secret' }
+      )
+    );
+
+    expect(res.status).toBe(200);
+    const { token } = (await res.json()) as { token: string };
+    const claims = jwt.verify(token, 'benchmark-token-secret') as jwt.JwtPayload;
+    expect(claims).toMatchObject({
+      organizationId: 'org-1',
+      organizationRole: 'billing_manager',
+      tokenSource: 'auto-routing-benchmark',
+    });
+    expect(claims).not.toHaveProperty('aud');
+    expect(claims).not.toHaveProperty('tokenPurpose');
+    expect(claims).not.toHaveProperty('credentialExchange');
   });
 
   it('mints one pepper-bound personal CLI token accepted by API and gateway audiences', async () => {
@@ -125,15 +165,39 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     ).toMatch(/^Invalid token \([a-f0-9-]+\)$/);
   });
 
-  it('mints a dual-audience token with the exact eligible organization claims', async () => {
+  it.each(['owner', 'member'] as const)(
+    'mints a dual-audience token with the exact eligible %s organization claims',
+    async role => {
+      mockSharedResourceTokens.enabled = true;
+      mockRows.push({
+        id: 'user-1',
+        api_token_pepper: 'pepper',
+        blocked_at: null,
+        blocked_reason: null,
+      });
+      mockMembershipRows.push({ role });
+
+      const res = await POST(
+        createRequest(
+          { userId: 'user-1', organizationId: 'org-1' },
+          { authorization: 'Bearer internal-secret' }
+        )
+      );
+
+      expect(res.status).toBe(200);
+      const { token } = (await res.json()) as { token: string };
+      expect(jwt.verify(token, 'benchmark-token-secret')).toMatchObject({
+        aud: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+        organizationId: 'org-1',
+        organizationRole: role,
+        credentialExchange: false,
+      });
+    }
+  );
+
+  it('rejects an ineligible organization user before membership lookup', async () => {
     mockSharedResourceTokens.enabled = true;
-    mockRows.push({
-      id: 'user-1',
-      api_token_pepper: 'pepper',
-      blocked_at: null,
-      blocked_reason: null,
-    });
-    mockMembershipRows.push({ role: 'member' });
+    mockRows.push({ id: 'user-1', api_token_pepper: null, blocked_at: null, blocked_reason: null });
 
     const res = await POST(
       createRequest(
@@ -142,14 +206,8 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
       )
     );
 
-    expect(res.status).toBe(200);
-    const { token } = (await res.json()) as { token: string };
-    expect(jwt.verify(token, 'benchmark-token-secret')).toMatchObject({
-      aud: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
-      organizationId: 'org-1',
-      organizationRole: 'member',
-      credentialExchange: false,
-    });
+    expect(res.status).toBe(403);
+    expect(mockSelectCallCount).toBe(1);
   });
 
   it('does not mint a token for a user without an API token pepper', async () => {

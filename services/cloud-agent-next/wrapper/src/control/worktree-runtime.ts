@@ -40,6 +40,7 @@ type WorktreeKiloFailure = {
 };
 
 export type WorktreeKiloRuntime = {
+  readonly identity: SessionRequestIdentity;
   readonly scopeId: string;
   readonly runtimeId: string;
   readonly directory: string;
@@ -104,6 +105,7 @@ type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
 };
 
 type RuntimeEntry = {
+  identity: SessionRequestIdentity;
   kilo: WorktreeKiloAuth;
   directory: string;
   env: Record<string, string>;
@@ -348,24 +350,11 @@ export function createWorktreeKiloRuntimes(options: {
     observedVersion = observedVersion === undefined || observedVersion === version ? version : null;
   }
 
+  const identityKey = (identity: SessionRequestIdentity): string =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
+
   function findRoot(identity: SessionRequestIdentity): RootAttachment | undefined {
-    for (const root of roots.values()) {
-      if (
-        root.identity.kiloSessionId !== identity.kiloSessionId &&
-        root.identity.sessionId !== identity.sessionId
-      ) {
-        continue;
-      }
-      if (
-        root.identity.sessionId !== identity.sessionId ||
-        root.identity.kiloSessionId !== identity.kiloSessionId ||
-        root.identity.directory !== identity.directory
-      ) {
-        throw new WorktreeKiloRuntimeError('unauthorized', 'Session identity mismatch', false);
-      }
-      return root;
-    }
-    return undefined;
+    return roots.get(identityKey(identity));
   }
 
   function cleanupDeadline(entry: RuntimeEntry, requested?: number): number {
@@ -516,6 +505,7 @@ export function createWorktreeKiloRuntimes(options: {
       };
       entry.kiloClient = runtimeKiloClient;
       const runtime: WorktreeKiloRuntime = entry.runtime ?? {
+        identity: { ...entry.identity },
         scopeId: entry.kilo.scopeId,
         get runtimeId() {
           return entry.runtimeId;
@@ -748,7 +738,7 @@ export function createWorktreeKiloRuntimes(options: {
       }
       if (!entry) {
         const homeId = createHash('sha256')
-          .update(kilo.scopeId)
+          .update(key)
           .update('\0')
           .update(directory)
           .digest('hex');
@@ -757,6 +747,7 @@ export function createWorktreeKiloRuntimes(options: {
           homeId
         );
         entry = {
+          identity: { ...identity },
           kilo: { ...kilo, targets: { ...kilo.targets } },
           directory,
           env: buildWorktreeKiloEnvironment(
@@ -787,7 +778,7 @@ export function createWorktreeKiloRuntimes(options: {
           attached: false,
           pending: new Set(),
         };
-        roots.set(identity.kiloSessionId, root);
+        roots.set(key, root);
         entry.roots.add(root);
         rememberAttachedRoot(identity.kiloSessionId, directory);
       }
@@ -831,7 +822,6 @@ export function createWorktreeKiloRuntimes(options: {
     },
     async deleteDirectory(directory) {
       deletedDirectories.add(directory);
-      const entry = entries.get(directory);
       for (const root of roots.values()) {
         if (root.identity.directory === directory) removeRoot(root);
       }
@@ -888,6 +878,23 @@ export function createWorktreeKiloRuntimes(options: {
           (entry.runtime === undefined || entry.feed?.prepareForNewWork() === true))
       );
     },
+    getAll(directory) {
+      return [...entries.values()]
+        .flatMap(entry => {
+          const runtime = entry.starting ? undefined : entry.runtime;
+          return !closed && runtime && !runtime.signal.aborted && entry.feed?.isFresh()
+            ? [runtime]
+            : [];
+        })
+        .filter(runtime => runtime.directory === directory);
+    },
+    isCurrent(runtime) {
+      return (
+        !closed &&
+        entries.get(identityKey(runtime.identity))?.runtime === runtime &&
+        !runtime.signal.aborted
+      );
+    },
     isHealthy() {
       const healthy = [...entries.values()].some(
         entry =>
@@ -902,7 +909,6 @@ export function createWorktreeKiloRuntimes(options: {
       closed = true;
       for (const root of roots.values()) removeRoot(root);
       for (const entry of entries.values()) void retire(entry);
-      directoriesByScope.clear();
     },
   };
 }

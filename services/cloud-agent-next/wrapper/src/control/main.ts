@@ -63,7 +63,12 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         sessionId: eventKiloSessionId(event.properties),
         runtimeDirectory: runtime.directory,
       });
-      if (!identity?.rootKiloSessionId) return;
+      if (
+        !identity?.rootKiloSessionId ||
+        runtime.identity === undefined ||
+        identity.rootKiloSessionId !== runtime.identity.kiloSessionId
+      )
+        return;
       updateSessionSnapshots(event, deps.sessions);
       deps.activity?.observeEvent(
         event.type,
@@ -123,7 +128,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
     ? createControlTerminalRuntime({
         controlUrl: controlConfig.SANDBOX_CONTROL_URL,
         wrapperInstanceId: controlConfig.wrapperInstanceId,
-        getKiloRuntime: directory => kiloRuntimes.get(directory),
+        getKiloRuntime: identity => kiloRuntimes.get(identity),
       })
     : undefined;
   const deps = createControlHandlerDeps({

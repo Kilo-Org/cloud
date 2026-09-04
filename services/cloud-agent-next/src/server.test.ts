@@ -6,9 +6,7 @@ import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './a
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 import {
   createRuntimeProxyGrant,
-  createWorktreeRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
-  issueWorktreeRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import {
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -853,6 +851,86 @@ describe('server runtime credential proxy', () => {
     }
   });
 
+  it('does not let one root handle access a sibling path or body-bound ingest request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const firstHandle = await handle();
+    const secondHandle = await issueRuntimeCredentialProxyHandle(
+      { NEXTAUTH_SECRET: secret } as never,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: '22222222-2222-4222-8222-222222222222',
+        sessionId: 'agent_sibling',
+        kiloSessionId: 'kilo_sibling',
+        userId: 'usr_proxy',
+        mode: 'contained',
+        allocationId: 'allocation_proxy',
+        providerInstanceId: 'provider_proxy',
+        connectionId: 'connection_proxy',
+        wrapperInstanceId: 'wrapper_proxy',
+        leaseExpiresAt: Date.now() + 60_000,
+        state: 'active',
+      })
+    );
+    const firstResolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    const secondResolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '22222222-2222-4222-8222-222222222222',
+        resourceId: 'agent_sibling',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.idFromName.mockImplementation((name: string) => name);
+    env.CLOUD_AGENT_SESSION.get.mockImplementation((id: string) =>
+      id === 'usr_proxy:agent_proxy'
+        ? { resolveRuntimeCredentialProxyGrant: firstResolve }
+        : { resolveRuntimeCredentialProxyGrant: secondResolve }
+    );
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      for (const [path, body] of [
+        ['/api/session/kilo_sibling/export', undefined],
+        ['/api/session', '{"sessionId":"kilo_sibling"}'],
+      ] as const) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method: body === undefined ? 'GET' : 'POST',
+            headers: {
+              Authorization: `Bearer ${firstHandle}`,
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            ...(body === undefined ? {} : { body }),
+          }),
+          env
+        );
+        expect(response.status).toBe(404);
+      }
+      expect(upstream).not.toHaveBeenCalled();
+
+      firstResolve.mockResolvedValue(null);
+
+      const surviving = await fetchWorker(
+        new Request('https://worker.test/api/session/kilo_sibling/export', {
+          headers: { Authorization: `Bearer ${secondHandle}` },
+        }),
+        env
+      );
+      expect(surviving.status).toBe(200);
+      expect(secondResolve).toHaveBeenCalledOnce();
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('recognizes only paths under a safe configured facade prefix', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test/runtime' });
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
@@ -1151,116 +1229,6 @@ describe('server runtime credential proxy', () => {
 
     expect(response.status).toBe(200);
     expect(upstream).toHaveBeenCalledOnce();
-    vi.unstubAllGlobals();
-  });
-
-  it('uses a later active worktree member when the first member is revoked', async () => {
-    const env = createEnv();
-    const worktreeHandle = await issueWorktreeRuntimeCredentialProxyHandle(
-      { NEXTAUTH_SECRET: secret } as never,
-      createWorktreeRuntimeProxyGrant({
-        sandboxId: 'sandbox_proxy',
-        scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
-        directory: '/workspace/worktree',
-        userId: 'usr_proxy',
-        leaseExpiresAt: Date.now() + 60_000,
-        state: 'active',
-        allocationId: 'allocation_proxy',
-        providerInstanceId: 'provider_proxy',
-        connectionId: 'connection_proxy',
-        wrapperInstanceId: 'wrapper_proxy',
-      })
-    );
-    const candidates = [
-      { sessionId: 'agent_revoked', kiloSessionId: 'kilo_revoked', handle: 'revoked-handle' },
-      { sessionId: 'agent_active', kiloSessionId: 'kilo_active', handle: 'active-handle' },
-    ];
-    const resolveMembers = vi.fn().mockResolvedValue(candidates);
-    const resolveCredential = vi
-      .fn()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        token: jwt.sign({ exp: 4_000_000_000 }, secret),
-        runtimeAuthorization: {
-          userId: 'usr_proxy',
-          authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
-        },
-      });
-    env.SANDBOX_CONTROL.getByName.mockReturnValue({
-      resolveWorktreeRuntimeCredentialProxyGrant: resolveMembers,
-    });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: resolveCredential,
-    });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok')));
-
-    const response = await fetchWorker(
-      new Request(
-        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${worktreeHandle}` },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sandbox_proxy');
-    expect(resolveMembers).toHaveBeenCalledWith({ handle: worktreeHandle });
-    expect(resolveCredential).toHaveBeenNthCalledWith(1, 'revoked-handle');
-    expect(resolveCredential).toHaveBeenNthCalledWith(2, 'active-handle');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenNthCalledWith(
-      1,
-      'usr_proxy:agent_revoked'
-    );
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenNthCalledWith(2, 'usr_proxy:agent_active');
-    vi.unstubAllGlobals();
-  });
-
-  it('denies generic worktree access when every routed member fails validation', async () => {
-    const env = createEnv();
-    const worktreeHandle = await issueWorktreeRuntimeCredentialProxyHandle(
-      { NEXTAUTH_SECRET: secret } as never,
-      createWorktreeRuntimeProxyGrant({
-        sandboxId: 'sandbox_proxy',
-        scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
-        directory: '/workspace/worktree',
-        userId: 'usr_proxy',
-        leaseExpiresAt: Date.now() + 60_000,
-        state: 'active',
-        allocationId: 'allocation_proxy',
-        providerInstanceId: 'provider_proxy',
-        connectionId: 'connection_proxy',
-        wrapperInstanceId: 'wrapper_proxy',
-      })
-    );
-    env.SANDBOX_CONTROL.getByName.mockReturnValue({
-      resolveWorktreeRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue([
-        { sessionId: 'agent_one', kiloSessionId: 'kilo_one', handle: 'invalid-one' },
-        { sessionId: 'agent_two', kiloSessionId: 'kilo_two', handle: 'invalid-two' },
-      ]),
-    });
-    const resolveCredential = vi.fn().mockResolvedValue(null);
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      resolveRuntimeCredentialProxyGrant: resolveCredential,
-    });
-    const upstream = vi.fn();
-    vi.stubGlobal('fetch', upstream);
-
-    const response = await fetchWorker(
-      new Request(
-        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
-        { method: 'POST', headers: { Authorization: `Bearer ${worktreeHandle}` } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(401);
-    await expect(response.text()).resolves.toBe('Unauthorized');
-    expect(resolveCredential).toHaveBeenCalledTimes(2);
-    expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 

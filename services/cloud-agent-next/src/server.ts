@@ -472,7 +472,6 @@ async function forwardRuntimeCredentialProxy(
   path: string
 ): Promise<Response> {
   if (!claims) return c.text('Unauthorized', 401);
-  const isWorktreeHandle = 'kind' in claims && claims.kind === 'worktree';
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
@@ -483,54 +482,12 @@ async function forwardRuntimeCredentialProxy(
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
   } | null;
-  let selectedWorktreeMember: { sessionId: string; kiloSessionId: string; handle: string } | null =
-    null;
   try {
-    if (isWorktreeHandle) {
-      const candidates = await withDORetry(
-        () => getSandboxControlStub(c.env, claims.sandboxId),
-        control => control.resolveWorktreeRuntimeCredentialProxyGrant({ handle }),
-        'resolveWorktreeRuntimeCredentialProxyGrant'
-      );
-      credential = null;
-      const rootedKiloSessionId =
-        /^\/api\/session\/([A-Za-z0-9_-]+)\/(?:export|ingest|title)$/.exec(path)?.[1];
-      let sessionIdFromBody: string | undefined;
-      if (route === 'ingest' && path === '/api/session' && bodyText) {
-        try {
-          const body: unknown = JSON.parse(bodyText);
-          if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
-            const value = (body as Record<string, unknown>).sessionId;
-            if (typeof value === 'string') sessionIdFromBody = value;
-          }
-        } catch {
-          return c.text('Not found', 404);
-        }
-      }
-      const eligible = rootedKiloSessionId ?? sessionIdFromBody;
-      const members = eligible
-        ? candidates.filter(member => member.kiloSessionId === eligible)
-        : candidates;
-      for (const member of members) {
-        const resolved = await withDORetry(
-          () => resolveSessionStub(c.env, claims.userId, member.sessionId),
-          session => session.resolveRuntimeCredentialProxyGrant(member.handle),
-          'resolveRuntimeCredentialProxyMember'
-        );
-        if (resolved) {
-          selectedWorktreeMember = member;
-          credential = resolved;
-          break;
-        }
-      }
-    } else {
-      if (!('sessionId' in claims)) return c.text('Unauthorized', 401);
-      credential = await withDORetry(
-        () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
-        session => session.resolveRuntimeCredentialProxyGrant(handle),
-        'resolveRuntimeCredentialProxyGrant'
-      );
-    }
+    credential = await withDORetry(
+      () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
+      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      'resolveRuntimeCredentialProxyGrant'
+    );
   } catch {
     return c.text('Credential unavailable', 503);
   }
@@ -543,9 +500,7 @@ async function forwardRuntimeCredentialProxy(
     c.req.method,
     path,
     new URL(c.req.url).search,
-    'kiloSessionId' in claims
-      ? claims.kiloSessionId
-      : (selectedWorktreeMember?.kiloSessionId ?? ''),
+    claims.kiloSessionId,
     credential.organizationId,
     c.req.header('content-type'),
     bodyText

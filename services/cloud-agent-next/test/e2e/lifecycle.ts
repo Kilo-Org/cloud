@@ -818,20 +818,36 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       prompt: fakeDirective(`read-edit-then-gate:${siblingTag}:${filename}:${replacementContents}`),
     });
     await requireWorktreeGate(config, siblingTag, 40_000, streamB);
+    const siblingRuntime = await waitForControlPlaneKiloRuntime(
+      rootB.kiloSessionId,
+      Math.min(timeoutMs, 40_000)
+    );
+    if (
+      !siblingRuntime ||
+      siblingRuntime.container.id !== runtime.container.id ||
+      siblingRuntime.directory !== runtime.directory ||
+      siblingRuntime.processId === runtime.processId ||
+      siblingRuntime.home === runtime.home
+    ) {
+      throw new Error(
+        'siblings did not resolve to distinct Kilo processes and homes in one worktree'
+      );
+    }
     const [gateA, gateB, inspectedA, inspectedB, writerStatus, readerStatus] = await Promise.all([
       waitForGateEngaged(config, initialTag, 500),
       waitForGateEngaged(config, siblingTag, 500),
       inspectControlPlaneKiloRoot(runtime, rootA.kiloSessionId),
-      inspectControlPlaneKiloRoot(runtime, rootB.kiloSessionId),
+      inspectControlPlaneKiloRoot(siblingRuntime, rootB.kiloSessionId),
       fetchFakeScenarioStatus(config.fakeLlmUrl, initialTag),
       fetchFakeScenarioStatus(config.fakeLlmUrl, siblingTag),
     ]);
     if (
       !gateA ||
       !gateB ||
-      inspectedA.processId !== inspectedB.processId ||
+      inspectedA.processId === inspectedB.processId ||
       inspectedA.processId !== runtime.processId ||
       inspectedA.directory !== inspectedB.directory ||
+      inspectedA.home === inspectedB.home ||
       writerStatus.toolCalls.write < 1 ||
       writerStatus.toolResults.write < 1 ||
       readerStatus.toolCalls.read < 1 ||
@@ -840,13 +856,13 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
       readerStatus.toolResults.edit < 1
     ) {
       throw new Error(
-        'siblings did not simultaneously execute genuine file tools in one Kilo process'
+        'siblings did not simultaneously execute genuine file tools in isolated Kilo processes'
       );
     }
     const [activeA, activeB, editedFile] = await Promise.all([
       getSessionSnapshot(config, rootA.cloudAgentSessionId),
       getSessionSnapshot(config, rootB.cloudAgentSessionId),
-      inspectControlPlaneWorkspaceFile(runtime, {
+      inspectControlPlaneWorkspaceFile(siblingRuntime, {
         kiloSessionId: rootB.kiloSessionId,
         filePath: filename,
       }),
@@ -862,7 +878,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
     }
 
     await releaseOwned(siblingTag);
-    await waitForOwnedCompletion(runtime, rootB, siblingMessage.messageId, siblingMarker);
+    await waitForOwnedCompletion(siblingRuntime, rootB, siblingMessage.messageId, siblingMarker);
     if (!(await waitForGateEngaged(config, initialTag, 500))) {
       throw new Error('completing the sibling unexpectedly interrupted the first chat');
     }
@@ -923,7 +939,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
     let questionCoverage = 'unsupported-tool-schema';
     let questionRefresh = 'unsupported';
     if (pendingQuestion !== 'unsupported') {
-      const questionVisibility = await inspectControlPlaneQuestions(runtime, {
+      const questionVisibility = await inspectControlPlaneQuestions(siblingRuntime, {
         kiloSessionId: rootB.kiloSessionId,
         questionId: pendingQuestion.id,
       });
@@ -975,7 +991,7 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
         throw new Error('the owning sibling could not resolve its real Kilo question');
       }
       await waitForOwnedCompletion(
-        runtime,
+        siblingRuntime,
         rootB,
         questionMessage.messageId,
         questionMarker,

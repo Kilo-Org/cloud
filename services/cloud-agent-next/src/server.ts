@@ -50,10 +50,13 @@ import {
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
+  runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
+  type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -216,6 +219,35 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
     logger.info('Handling request');
     await next();
   });
+});
+
+// Kilo 7.4.20 and current releases both append their own `/api/...` route to
+// configured targets. Only a verified opaque handle may turn that otherwise
+// ordinary Worker path into a facade request.
+app.use('*', async (c: Context<HonoContext>, next: Next) => {
+  const facadeBase = c.env.WORKER_URL
+    ? runtimeCredentialProxyFacadeBaseUrl(c.env.WORKER_URL)
+    : null;
+  if (!facadeBase) return next();
+  const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
+  const requestPath = new URL(c.req.url).pathname;
+  const path = facadePath
+    ? requestPath.startsWith(`${facadePath}/`)
+      ? requestPath.slice(facadePath.length)
+      : null
+    : requestPath;
+  if (!path) return next();
+  // This route remains available for already-issued configurations. A prefixed
+  // deployment never supported it because Hono registers the legacy route at
+  // the Worker root; root deployments retain the transition behavior.
+  if (path.startsWith('/api/runtime-credential-proxy/')) return next();
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return next();
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return next();
+  const route = inferRuntimeCredentialProxyRoute(path);
+  if (!route) return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
 
 app.get('/health', (c: Context<HonoContext>) => {
@@ -429,10 +461,18 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
   if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
     return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+}
+
+async function forwardRuntimeCredentialProxy(
+  c: Context<HonoContext>,
+  handle: string,
+  claims: RuntimeProxyHandleClaims,
+  route: 'backend' | 'provider' | 'ingest',
+  path: string
+): Promise<Response> {
+  if (!claims) return c.text('Unauthorized', 401);
   const isWorktreeHandle = 'kind' in claims && claims.kind === 'worktree';
-  // Root-addressed ingest is authorized by a member handle after the native
-  // Vercel policy rewrites the static process capability.
-  if (isWorktreeHandle && route === 'ingest') return c.text('Not found', 404);
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
@@ -453,7 +493,25 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
         'resolveWorktreeRuntimeCredentialProxyGrant'
       );
       credential = null;
-      for (const member of candidates) {
+      const rootedKiloSessionId =
+        /^\/api\/session\/([A-Za-z0-9_-]+)\/(?:export|ingest|title)$/.exec(path)?.[1];
+      let sessionIdFromBody: string | undefined;
+      if (route === 'ingest' && path === '/api/session' && bodyText) {
+        try {
+          const body: unknown = JSON.parse(bodyText);
+          if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+            const value = (body as Record<string, unknown>).sessionId;
+            if (typeof value === 'string') sessionIdFromBody = value;
+          }
+        } catch {
+          return c.text('Not found', 404);
+        }
+      }
+      const eligible = rootedKiloSessionId ?? sessionIdFromBody;
+      const members = eligible
+        ? candidates.filter(member => member.kiloSessionId === eligible)
+        : candidates;
+      for (const member of members) {
         const resolved = await withDORetry(
           () => resolveSessionStub(c.env, claims.userId, member.sessionId),
           session => session.resolveRuntimeCredentialProxyGrant(member.handle),

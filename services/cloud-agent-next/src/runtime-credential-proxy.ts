@@ -329,6 +329,60 @@ export function runtimeCredentialProxyBaseUrl(workerUrl: string): string | null 
   }
 }
 
+/**
+ * The backwards-compatible facade is deliberately an origin (with an optional
+ * deployment prefix), never an API route. Older Kilo releases append their own
+ * `/api/...` paths while newer releases normalize configured bases first.
+ */
+export function runtimeCredentialProxyFacadeBaseUrl(workerUrl: string): string | null {
+  if (hasUnsafeFacadePathEncoding(workerUrl)) return null;
+  try {
+    const url = new URL(workerUrl);
+    const prefix = url.pathname.replace(/\/+$/, '');
+    const segments = prefix.split('/').filter(Boolean);
+    if (
+      url.protocol !== 'https:' ||
+      url.port ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      prefix.includes('\\') ||
+      prefix.includes('//') ||
+      segments.some(segment => segment === 'api' || segment === '.' || segment === '..')
+    ) {
+      return null;
+    }
+    return `${url.origin}${prefix}`;
+  } catch {
+    return null;
+  }
+}
+
+function hasUnsafeFacadePathEncoding(value: string): boolean {
+  let decoded = value;
+  for (let depth = 0; depth < 8; depth++) {
+    if (
+      decoded.includes('\\') ||
+      /%(?:2f|5c)/i.test(decoded) ||
+      /(?:^|\/)(?:\.|%2e){1,2}(?=\/|[?#]|$)/i.test(decoded) ||
+      [...decoded].some(
+        character => character.charCodeAt(0) <= 0x20 || character.charCodeAt(0) === 0x7f
+      )
+    ) {
+      return true;
+    }
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return false;
+      decoded = next;
+    } catch {
+      return true;
+    }
+  }
+  return true;
+}
+
 export function runtimeCredentialProxyUpstream(
   targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string },
   route: RuntimeCredentialProxyRoute,

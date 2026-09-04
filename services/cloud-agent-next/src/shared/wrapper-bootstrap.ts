@@ -271,13 +271,13 @@ function isRuntimeCredentialProxyConfig(
   ) {
     return false;
   }
-  const routes = {
-    backendBaseUrl: 'backend',
-    providerBaseUrl: 'provider',
-    sessionIngestBaseUrl: 'ingest',
-  } as const;
-  return Object.entries(routes).every(([key, route]) => {
-    if (!hasString(targets, key)) return false;
+  const targetKeys = ['backendBaseUrl', 'providerBaseUrl', 'sessionIngestBaseUrl'] as const;
+  if (!targetKeys.every(key => Object.hasOwn(targets, key) && hasString(targets, key))) {
+    return false;
+  }
+  const values = Object.values(targets);
+  if (new Set(values).size !== 1) return false;
+  return targetKeys.every(key => {
     try {
       const target = new URL(targets[key] as string);
       return (
@@ -286,7 +286,8 @@ function isRuntimeCredentialProxyConfig(
         !target.password &&
         !target.search &&
         !target.hash &&
-        target.pathname.endsWith(`/api/runtime-credential-proxy/${route}`)
+        !target.port &&
+        !target.pathname.split('/').filter(Boolean).includes('api')
       );
     } catch {
       return false;

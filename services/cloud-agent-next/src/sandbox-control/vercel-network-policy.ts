@@ -4,6 +4,7 @@ import type {
   VercelSandboxNetworkPolicy,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloSandboxTargets } from '../kilo/kilo-targets.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 
 export type VercelCredentialPolicyInput = {
   kilo?: {
@@ -232,6 +233,14 @@ function runtimeProxyInjectionRules(
     invalidPolicy();
   }
   const [backend, provider, ingest] = targets;
+  if (
+    backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
+    backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
+    runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !==
+      backend.toString().replace(/\/+$/, '')
+  ) {
+    invalidPolicy();
+  }
   const authorization = `Bearer ${worktreeHandle}`;
   const rules: VercelSandboxInjectionRule[] = [];
   const add = (target: URL, path: string, methods: string[], injected = authorization) =>
@@ -269,10 +278,16 @@ function runtimeProxyInjectionRules(
     ['/responses', ['POST']],
     ['/embeddings', ['POST']],
   ] as const) {
-    add(provider, `${basePath(provider)}/api/openrouter${path}`, [...methods]);
+    for (const prefix of ['/api/openrouter', '/api/gateway']) {
+      add(provider, `${basePath(provider)}${prefix}${path}`, [...methods]);
+    }
   }
-  // Session creation has no trustworthy root path to select a member. It is
-  // intentionally not exposed through a shared worktree capability.
+  for (const path of ['/v1/chat/completions', '/v1/responses']) {
+    add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST']);
+  }
+  // `/api/session` selects the exact member from its strict JSON body in the
+  // Worker. Rooted routes can be rewritten directly to that member handle.
+  add(ingest, `${basePath(ingest)}/api/session`, ['POST']);
   for (const member of input.members ?? []) {
     const sessionId = member.kiloSessionId;
     for (const [suffix, methods] of [

@@ -8,6 +8,7 @@ import {
   matchesRuntimeProxyGrant,
   runtimeProxyGrantSchema,
   runtimeCredentialProxyBaseUrl,
+  runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
@@ -262,6 +263,26 @@ describe('runtime credential proxy', () => {
     ).toBeNull();
   });
 
+  it.each([
+    ['origin', 'https://worker.example.test', 'https://worker.example.test'],
+    ['safe prefix', 'https://worker.example.test/runtime', 'https://worker.example.test/runtime'],
+    [
+      'trailing slash',
+      'https://worker.example.test/runtime/',
+      'https://worker.example.test/runtime',
+    ],
+    ['api prefix', 'https://worker.example.test/runtime/api', null],
+    ['non-default port', 'https://worker.example.test:8443/runtime', null],
+    ['HTTP', 'http://worker.example.test/runtime', null],
+    ['credentials', 'https://user@worker.example.test/runtime', null],
+    ['query', 'https://worker.example.test/runtime?next=x', null],
+    ['fragment', 'https://worker.example.test/runtime#next', null],
+    ['traversal', 'https://worker.example.test/runtime/../other', null],
+    ['encoded traversal', 'https://worker.example.test/runtime/%252e%252e/other', null],
+  ])('accepts only a safe facade %s', (_name, workerUrl, expected) => {
+    expect(runtimeCredentialProxyFacadeBaseUrl(workerUrl)).toBe(expected);
+  });
+
   it('requires exact identity and strict JSON for session creation', () => {
     expect(
       resolveRuntimeCredentialProxyRoute({
@@ -300,7 +321,6 @@ describe('runtime credential proxy', () => {
     for (const pathname of [
       '/api/openrouter',
       '/chat/completions',
-      '/api/gateway/chat/completions',
       '/api/organizations/allowed/models',
       '/api/openrouter/unknown',
       '/api/openrouter/chat%2fcompletions',
@@ -318,6 +338,46 @@ describe('runtime credential proxy', () => {
         })
       ).toBeNull();
     }
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets,
+        route: 'provider',
+        method: 'POST',
+        pathname: '/api/gateway/chat/completions',
+        search: '',
+        kiloSessionId: 'kilo_1',
+      })?.toString()
+    ).toBe('https://provider.example.test/api/openrouter/chat/completions');
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets: { ...targets, providerBaseUrl: 'https://api.kilo.ai' },
+        route: 'provider',
+        method: 'POST',
+        pathname: '/api/gateway/v1/chat/completions',
+        search: '',
+        kiloSessionId: 'kilo_1',
+      })?.toString()
+    ).toBe('https://api.kilo.ai/api/gateway/v1/chat/completions');
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets,
+        route: 'provider',
+        method: 'POST',
+        pathname: '/api/gateway/v1/responses',
+        search: '',
+        kiloSessionId: 'kilo_1',
+      })?.toString()
+    ).toBe('https://provider.example.test/api/openrouter/v1/responses');
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets,
+        route: 'provider',
+        method: 'GET',
+        pathname: '/api/gateway/v1/chat/completions',
+        search: '',
+        kiloSessionId: 'kilo_1',
+      })
+    ).toBeNull();
     expect(
       resolveRuntimeCredentialProxyRoute({
         targets: { ...targets, providerBaseUrl: 'https://api.kilo.ai' },

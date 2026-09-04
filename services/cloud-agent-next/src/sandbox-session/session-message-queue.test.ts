@@ -2227,9 +2227,9 @@ describe('SandboxSession orchestration', () => {
           scopeId: SESSION_ID,
           token: expect.stringMatching(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
           targets: {
-            backendBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/backend',
-            providerBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/provider',
-            sessionIngestBaseUrl: 'https://worker.example.test/api/runtime-credential-proxy/ingest',
+            backendBaseUrl: 'https://worker.example.test',
+            providerBaseUrl: 'https://worker.example.test',
+            sessionIngestBaseUrl: 'https://worker.example.test',
           },
         },
       },

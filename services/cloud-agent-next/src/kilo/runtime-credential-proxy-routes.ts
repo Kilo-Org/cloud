@@ -92,15 +92,41 @@ function isAllowedProviderRoute(method: string, path: string): boolean {
   if (path === '/models/validate') return method === 'POST';
   return (
     method === 'POST' &&
-    ['/chat/completions', '/messages', '/responses', '/embeddings'].includes(path)
+    [
+      '/chat/completions',
+      '/messages',
+      '/responses',
+      '/embeddings',
+      '/v1/chat/completions',
+      '/v1/responses',
+    ].includes(path)
   );
 }
 
 function logicalProviderPath(pathname: string): string | null {
-  const prefix = '/api/openrouter';
-  if (!pathname.startsWith(`${prefix}/`)) return null;
+  const prefix = ['/api/openrouter', '/api/gateway'].find(value =>
+    pathname.startsWith(`${value}/`)
+  );
+  if (!prefix) return null;
   const path = pathname.slice(prefix.length);
+  if (path.startsWith('/v1/') && prefix !== '/api/gateway') return null;
   return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
+}
+
+/** Identifies the facade plane only; the route resolver still enforces its allowlist. */
+export function inferRuntimeCredentialProxyRoute(
+  pathname: string
+): RuntimeCredentialProxyRoute | null {
+  if (pathname.startsWith('/api/openrouter/') || pathname.startsWith('/api/gateway/')) {
+    return 'provider';
+  }
+  if (
+    pathname === '/api/session' ||
+    /^\/api\/session\/[A-Za-z0-9_-]+\/(?:export|ingest|title)$/.test(pathname)
+  ) {
+    return 'ingest';
+  }
+  return pathname.startsWith('/api/') ? 'backend' : null;
 }
 
 function providerTargetUrl(base: string, path: string, search: string): URL | null {

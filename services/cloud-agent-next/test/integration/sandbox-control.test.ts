@@ -3670,9 +3670,9 @@ describe('SandboxControl native worktree containment', () => {
     try {
       const [prepared] = await storedGrants(control);
       const proxyTargets = {
-        backendBaseUrl: 'https://worker.test/api/runtime-credential-proxy/backend',
-        providerBaseUrl: 'https://worker.test/api/runtime-credential-proxy/provider',
-        sessionIngestBaseUrl: 'https://worker.test/api/runtime-credential-proxy/ingest',
+        backendBaseUrl: 'https://worker.test',
+        providerBaseUrl: 'https://worker.test',
+        sessionIngestBaseUrl: 'https://worker.test',
       };
       await runInDurableObject(control, async (_instance, state) => {
         await saveSessionCredentialGrants(state.storage, [

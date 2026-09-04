@@ -17,7 +17,7 @@ import {
   resolvePersistedRuntimeProxyCredential,
 } from '../runtime-credential-proxy-rpc.js';
 import {
-  runtimeCredentialProxyBaseUrl,
+  runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
   verifyRuntimeCredentialProxyHandle,
@@ -1931,7 +1931,7 @@ export class SandboxSession extends DurableObject<Env> {
           | undefined;
         if (authorization.success && authorization.data.state === 'active') {
           const proxyBaseUrl = this.env.WORKER_URL
-            ? runtimeCredentialProxyBaseUrl(this.env.WORKER_URL)
+            ? runtimeCredentialProxyFacadeBaseUrl(this.env.WORKER_URL)
             : null;
           if (!proxyBaseUrl) throw new Error('Runtime credential proxy is unavailable');
           const handle = await wait(
@@ -1961,9 +1961,9 @@ export class SandboxSession extends DurableObject<Env> {
             ...status.attachment.kilo,
             token: handle,
             targets: {
-              backendBaseUrl: `${proxyBaseUrl}/backend`,
-              providerBaseUrl: `${proxyBaseUrl}/provider`,
-              sessionIngestBaseUrl: `${proxyBaseUrl}/ingest`,
+              backendBaseUrl: proxyBaseUrl,
+              providerBaseUrl: proxyBaseUrl,
+              sessionIngestBaseUrl: proxyBaseUrl,
             },
           };
           if (getSandboxProvider(metadata) === 'vercel') {

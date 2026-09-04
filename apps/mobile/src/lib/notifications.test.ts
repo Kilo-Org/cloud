@@ -606,9 +606,9 @@ describe('glanceable app badge sink', () => {
     });
   });
 
-  it('owns foreground glanceable counts and disables ordinary push badges', async () => {
+  it('applies foreground glanceable counts and disables ordinary push badges', async () => {
     const { loaded } = await loadBadgeSink();
-    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot());
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
     mockSecureStoreKeys();
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
@@ -632,6 +632,22 @@ describe('glanceable app badge sink', () => {
     expect(ordinary.shouldSetBadge).toBe(false);
     expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
 
+    const stale = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2025-12-31T00:00:00.000Z',
+            needsInput: 9,
+          }),
+        },
+      },
+    });
+    expect(stale.shouldSetBadge).toBe(false);
+    expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(2);
+    mocks.setBadgeCountAsync.mockClear();
+
     const badgeWrite = deferred();
     mocks.setBadgeCountAsync.mockImplementation(async () => {
       await badgeWrite.promise;
@@ -652,7 +668,7 @@ describe('glanceable app badge sink', () => {
     badgeWrite.resolve();
     const glanceable = await handling;
 
-    expect(glanceable.shouldSetBadge).toBe(false);
+    expect(glanceable.shouldSetBadge).toBe(true);
     expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
     expect(completedBeforeWrite).toBeNull();
   });

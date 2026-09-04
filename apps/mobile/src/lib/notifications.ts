@@ -279,8 +279,13 @@ export function setupNotificationHandler() {
         // The aggregate glanceable push is a data carrier for the ongoing
         // notification/widgets, never a visible banner: the local ongoing owns
         // the display. Apply it to the sinks regardless of the discard outcome.
-        await applyGlanceablePushData(data);
-        return suppressed;
+        const applied = await applyGlanceablePushData(data);
+        if (!applied) {
+          setTimeout(() => {
+            appBadgeWrite = setAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+          }, 0);
+        }
+        return { ...suppressed, shouldSetBadge: applied };
       }
 
       if (

@@ -115,6 +115,7 @@ describe('MarkdownImage inert-until-load', () => {
       (loadButton.props.onPress as () => void)();
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
+    expect(ofType(renderer.root, 'Image')[0]?.props.recyclingKey).toBe('https://example.com/a.png');
 
     await unmount(renderer);
   });
@@ -202,7 +203,7 @@ describe('MarkdownImage inert-until-load', () => {
       (image.props.onError as () => void)();
     });
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
-    expect(texts(renderer.root)).toContain('Image unavailable shot');
+    expect(texts(renderer.root)).toContain('Image unavailable\nshot');
     expect(texts(renderer.root)).toContain('Retry');
 
     const retryButtons = renderer.root.findAll(
@@ -389,14 +390,14 @@ describe('MarkdownImage inert-until-load', () => {
       (image.props.onError as () => void)();
     });
     // Old URI shows the retry chip.
-    expect(texts(renderer.root)).toContain('Image unavailable shot');
+    expect(texts(renderer.root)).toContain('Image unavailable\nshot');
 
     // Recycle to a new, unconfirmed URI: it must show Load, never the old chip.
     await act(async () => {
       await Promise.resolve();
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
     });
-    expect(texts(renderer.root)).not.toContain('Image unavailable shot');
+    expect(texts(renderer.root)).not.toContain('Image unavailable\nshot');
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
     expect(findLoadButtons(renderer.root, 'https://example.com/b.png')).toHaveLength(1);
 

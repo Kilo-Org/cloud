@@ -66,6 +66,54 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
   };
 }
 
+export function getMarkdownHeadingStyles(palette: MarkdownPalette) {
+  const { textColor } = palette;
+  return {
+    h1: {
+      color: textColor,
+      fontSize: 22,
+      fontWeight: '700' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    h2: {
+      color: textColor,
+      fontSize: 20,
+      fontWeight: '700' as const,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    h3: {
+      color: textColor,
+      fontSize: 18,
+      fontWeight: '700' as const,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    h4: {
+      color: textColor,
+      fontSize: 16,
+      fontWeight: '700' as const,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    h5: {
+      color: textColor,
+      fontSize: 15,
+      fontWeight: '700' as const,
+      marginTop: 4,
+      marginBottom: 2,
+    },
+    h6: {
+      color: textColor,
+      fontSize: 14,
+      fontWeight: '700' as const,
+      marginTop: 4,
+      marginBottom: 2,
+    },
+  };
+}
+
 // `react-native-marked`'s `useMarkdown` takes an inline styles map rather than
 // `className`, so we cannot use NativeWind here. Centralizing style creation
 // keeps both variants in sync and makes the color choices reviewable.
@@ -78,12 +126,7 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
     strong: { color: textColor, fontWeight: '700' },
     em: { color: textColor, fontStyle: 'italic' },
     link: { color: textColor, fontStyle: 'normal', textDecorationLine: 'underline' },
-    h1: { color: textColor, fontSize: 22, fontWeight: '700', marginTop: 8, marginBottom: 4 },
-    h2: { color: textColor, fontSize: 20, fontWeight: '700', marginTop: 8, marginBottom: 4 },
-    h3: { color: textColor, fontSize: 18, fontWeight: '700', marginTop: 6, marginBottom: 4 },
-    h4: { color: textColor, fontSize: 16, fontWeight: '700', marginTop: 6, marginBottom: 4 },
-    h5: { color: textColor, fontSize: 15, fontWeight: '700', marginTop: 4, marginBottom: 2 },
-    h6: { color: textColor, fontSize: 14, fontWeight: '700', marginTop: 4, marginBottom: 2 },
+    ...getMarkdownHeadingStyles(palette),
     // Override the library defaults that set italic + light weight on codespan.
     codespan: {
       color: textColor,

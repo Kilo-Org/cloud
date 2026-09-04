@@ -21,7 +21,7 @@ import { isSupportedScheme } from './markdown-html-image';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
-import { type MarkdownPalette } from './markdown-palette';
+import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
 import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
@@ -155,6 +155,7 @@ export function MarkdownHtml({
     () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
     [palette]
   );
+  const tagsStyles = useMemo(() => getMarkdownHeadingStyles(palette), [palette]);
   const renderersProps = useMemo<Partial<RenderersProps>>(
     () => ({
       a: {
@@ -252,6 +253,7 @@ export function MarkdownHtml({
       renderers={renderers}
       renderersProps={renderersProps}
       source={source}
+      tagsStyles={tagsStyles}
     />
   );
 }

@@ -2399,7 +2399,6 @@
       "loadingImage": "ပုံ ဖွင့်နေသည်",
       "imageUnavailableRetry": "ပုံ မရရှိနိုင်၊ ဖွင့်ရန် ထပ်ကြိုးစားပါ",
       "imageUnavailable": "ပုံ မရနိုင်ပါ",
-      "imageUnavailableWithAlt": "ပုံ မရရှိနိုင် {{alt}}",
       "imagePreviewUnavailableInSession": "ဤစက်ရှင်တွင် ပုံ အစမ်းကြည့်ရှုမှု မရရှိနိုင်ပါ။",
       "viewImage": "ပုံ ကြည့်ရှုပါ",
       "viewImageWithAlt": "ပုံ ကြည့်ရှုပါ {{alt}}",

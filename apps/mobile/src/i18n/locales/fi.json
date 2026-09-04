@@ -2399,7 +2399,6 @@
       "loadingImage": "Ladataan kuvaa",
       "imageUnavailableRetry": "Kuva ei käytettävissä, yritä latausta uudelleen",
       "imageUnavailable": "Kuva ei käytettävissä",
-      "imageUnavailableWithAlt": "Kuva ei käytettävissä {{alt}}",
       "imagePreviewUnavailableInSession": "Kuvan esikatselu ei käytettävissä tässä istunnossa.",
       "viewImage": "Näytä kuva",
       "viewImageWithAlt": "Näytä kuva {{alt}}",

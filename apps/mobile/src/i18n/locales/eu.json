@@ -2399,7 +2399,6 @@
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
       "imageUnavailable": "Irudia ez dago eskuragarri",
-      "imageUnavailableWithAlt": "Irudia ez dago erabilgarri {{alt}}",
       "imagePreviewUnavailableInSession": "Aurreikuspena ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia {{alt}}",

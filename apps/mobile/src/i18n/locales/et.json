@@ -2399,7 +2399,6 @@
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
       "imageUnavailable": "Pilt pole saadaval",
-      "imageUnavailableWithAlt": "Pilt pole saadaval {{alt}}",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",

@@ -2433,7 +2433,6 @@
       "loadingImage": "Kraunamas paveikslėlis",
       "imageUnavailableRetry": "Paveikslėlis nepasiekiamas, bandyti įkelti iš naujo",
       "imageUnavailable": "Paveikslėlis nepasiekiamas",
-      "imageUnavailableWithAlt": "Paveikslėlis nepasiekiamas {{alt}}",
       "imagePreviewUnavailableInSession": "Paveikslėlio peržiūra šioje sesijoje nepasiekiama.",
       "viewImage": "Peržiūrėti paveikslėlį",
       "viewImageWithAlt": "Peržiūrėti paveikslėlį {{alt}}",

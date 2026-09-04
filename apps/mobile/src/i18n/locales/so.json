@@ -2399,7 +2399,6 @@
       "loadingImage": "Sawirka waa la shubayaa",
       "imageUnavailableRetry": "Sawirku ma heli karo, mar kale isku day inaad shubto",
       "imageUnavailable": "Sawirka lama heli karo",
-      "imageUnavailableWithAlt": "Sawirku ma heli karo {{alt}}",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka kalfadhigan ma heli karo.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",

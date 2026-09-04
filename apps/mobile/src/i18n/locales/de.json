@@ -1930,7 +1930,6 @@
       "loadingImage": "Bild wird geladen",
       "imageUnavailableRetry": "Bild nicht verfügbar, Laden erneut versuchen",
       "imageUnavailable": "Bild nicht verfügbar",
-      "imageUnavailableWithAlt": "Bild nicht verfügbar {{alt}}",
       "imagePreviewUnavailableInSession": "Bildvorschau in dieser Sitzung nicht verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild ansehen {{alt}}",

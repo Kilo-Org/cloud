@@ -2399,7 +2399,6 @@
       "loadingImage": "Cargando imaxe",
       "imageUnavailableRetry": "Imaxe non dispoñible, reintentar a carga",
       "imageUnavailable": "Imaxe non dispoñible",
-      "imageUnavailableWithAlt": "Imaxe non dispoñible {{alt}}",
       "imagePreviewUnavailableInSession": "Vista previa da imaxe non dispoñible nesta sesión.",
       "viewImage": "Ver imaxe",
       "viewImageWithAlt": "Ver imaxe {{alt}}",

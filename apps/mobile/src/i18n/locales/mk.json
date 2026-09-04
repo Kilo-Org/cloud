@@ -2399,7 +2399,6 @@
       "loadingImage": "Вчитување слика",
       "imageUnavailableRetry": "Сликата е недостапна, обиди се повторно со вчитување",
       "imageUnavailable": "Сликата е недостапна",
-      "imageUnavailableWithAlt": "Сликата е недостапна {{alt}}",
       "imagePreviewUnavailableInSession": "Прегледот на сликата е недостапен во оваа сесија.",
       "viewImage": "Погледни ја сликата",
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",

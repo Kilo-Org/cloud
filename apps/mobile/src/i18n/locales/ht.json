@@ -2399,7 +2399,6 @@
       "loadingImage": "Ap chaje imaj",
       "imageUnavailableRetry": "Imaj pa disponib, rekòmanse chaje",
       "imageUnavailable": "Imaj pa disponib",
-      "imageUnavailableWithAlt": "Imaj pa disponib {{alt}}",
       "imagePreviewUnavailableInSession": "Aperçu imaj pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj",
       "viewImageWithAlt": "Gade imaj {{alt}}",

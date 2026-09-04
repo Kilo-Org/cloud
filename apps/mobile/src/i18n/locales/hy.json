@@ -2399,7 +2399,6 @@
       "loadingImage": "Նկարի բեռնում",
       "imageUnavailableRetry": "Նկարն անհասանելի է, կրկին փորձեք բեռնել",
       "imageUnavailable": "Պատկերը հասանելի չէ",
-      "imageUnavailableWithAlt": "Նկարն անհասանելի է {{alt}}",
       "imagePreviewUnavailableInSession": "Նկարի նախադիտումն անհասանելի է այս նիստում։",
       "viewImage": "Դիտել նկարը",
       "viewImageWithAlt": "Դիտել նկարը {{alt}}",

@@ -2399,7 +2399,6 @@
       "loadingImage": "ছবি লোড হচ্ছে",
       "imageUnavailableRetry": "ছবি অনুপলব্ধ, লোড আবার চেষ্টা করুন",
       "imageUnavailable": "ছবি অনুপলব্ধ",
-      "imageUnavailableWithAlt": "ছবি অনুপলব্ধ {{alt}}",
       "imagePreviewUnavailableInSession": "এই সেশনে ছবির প্রিভিউ অনুপলব্ধ।",
       "viewImage": "ছবি দেখুন",
       "viewImageWithAlt": "ছবি দেখুন {{alt}}",

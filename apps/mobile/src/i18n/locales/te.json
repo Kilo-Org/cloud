@@ -2399,7 +2399,6 @@
       "loadingImage": "చిత్రాన్ని లోడ్ చేస్తోంది",
       "imageUnavailableRetry": "చిత్రం అందుబాటులో లేదు, లోడింగ్ మళ్ళీ ప్రయత్నించండి",
       "imageUnavailable": "చిత్రం అందుబాటులో లేదు",
-      "imageUnavailableWithAlt": "చిత్రం అందుబాటులో లేదు {{alt}}",
       "imagePreviewUnavailableInSession": "ఈ సెషన్‌లో చిత్రం ప్రివ్యూ అందుబాటులో లేదు.",
       "viewImage": "చిత్రాన్ని చూడండి",
       "viewImageWithAlt": "చిత్రాన్ని చూడండి {{alt}}",

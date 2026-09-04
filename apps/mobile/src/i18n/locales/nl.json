@@ -1930,7 +1930,6 @@
       "loadingImage": "Afbeelding laden",
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
       "imageUnavailable": "Afbeelding niet beschikbaar",
-      "imageUnavailableWithAlt": "Afbeelding niet beschikbaar {{alt}}",
       "imagePreviewUnavailableInSession": "Afbeeldingsvoorbeeld niet beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken {{alt}}",

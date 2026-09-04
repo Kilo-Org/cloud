@@ -2399,7 +2399,6 @@
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm mavjud emas, yuklashni qayta urinish",
       "imageUnavailable": "Rasm mavjud emas",
-      "imageUnavailableWithAlt": "Rasm mavjud emas {{alt}}",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasm ko'rinishi mavjud emas.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "Rasmni ko'rish {{alt}}",

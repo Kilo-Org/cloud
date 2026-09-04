@@ -1850,7 +1850,6 @@
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
       "imageUnavailable": "Image indisponible",
-      "imageUnavailableWithAlt": "Image indisponible {{alt}}",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
       "viewImageWithAlt": "Voir l'image {{alt}}",

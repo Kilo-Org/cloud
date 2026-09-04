@@ -1930,7 +1930,6 @@
       "loadingImage": "Memuat gambar",
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
       "imageUnavailable": "Gambar tidak tersedia",
-      "imageUnavailableWithAlt": "Gambar tidak tersedia {{alt}}",
       "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",

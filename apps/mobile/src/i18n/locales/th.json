@@ -2399,7 +2399,6 @@
       "loadingImage": "กำลังโหลดรูปภาพ",
       "imageUnavailableRetry": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่",
       "imageUnavailable": "รูปภาพไม่พร้อมใช้งาน",
-      "imageUnavailableWithAlt": "รูปภาพไม่พร้อมใช้งาน {{alt}}",
       "imagePreviewUnavailableInSession": "ไม่มีตัวอย่างรูปภาพใน session นี้",
       "viewImage": "ดูรูปภาพ",
       "viewImageWithAlt": "ดูรูปภาพ {{alt}}",

@@ -2399,7 +2399,6 @@
       "loadingImage": "Şəkil yüklənir",
       "imageUnavailableRetry": "Şəkil mövcud deyil, yükləməni yenidən cəhd et",
       "imageUnavailable": "Şəkil mövcud deyil",
-      "imageUnavailableWithAlt": "Şəkil mövcud deyil {{alt}}",
       "imagePreviewUnavailableInSession": "Bu sessiyada şəkil önizləməsi mövcud deyil.",
       "viewImage": "Şəkilə bax",
       "viewImageWithAlt": "Şəkilə bax {{alt}}",

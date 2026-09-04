@@ -1950,7 +1950,6 @@
       "loadingImage": "Ładowanie obrazu",
       "imageUnavailableRetry": "Obraz niedostępny, spróbuj załadować ponownie",
       "imageUnavailable": "Obraz niedostępny",
-      "imageUnavailableWithAlt": "Obraz niedostępny {{alt}}",
       "imagePreviewUnavailableInSession": "Podgląd obrazu niedostępny w tej sesji.",
       "viewImage": "Wyświetl obraz",
       "viewImageWithAlt": "Wyświetl obraz {{alt}}",

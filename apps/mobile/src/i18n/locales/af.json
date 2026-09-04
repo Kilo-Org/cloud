@@ -2399,7 +2399,6 @@
       "loadingImage": "Laai beeld",
       "imageUnavailableRetry": "Beeld onbeskikbaar, probeer weer laai",
       "imageUnavailable": "Beeld onbeskikbaar",
-      "imageUnavailableWithAlt": "Beeld onbeskikbaar {{alt}}",
       "imagePreviewUnavailableInSession": "Beeldvoorskou onbeskikbaar in hierdie sessie.",
       "viewImage": "Bekyk beeld",
       "viewImageWithAlt": "Bekyk beeld {{alt}}",

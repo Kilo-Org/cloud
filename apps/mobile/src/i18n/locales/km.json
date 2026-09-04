@@ -2399,7 +2399,6 @@
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "រូបភាពមិនមាន ព្យាយាមផ្ទុកម្តងទៀត",
       "imageUnavailable": "រូបភាពមិនអាចប្រើបាន",
-      "imageUnavailableWithAlt": "រូបភាពមិនមាន {{alt}}",
       "imagePreviewUnavailableInSession": "ការមើលជាមុនរបស់រូបភាពមិនមានក្នុងវគ្គនេះទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",

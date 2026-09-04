@@ -1940,7 +1940,6 @@
       "loadingImage": "Cargando imagen",
       "imageUnavailableRetry": "Imagen no disponible, reintenta la carga",
       "imageUnavailable": "Imagen no disponible",
-      "imageUnavailableWithAlt": "Imagen no disponible {{alt}}",
       "imagePreviewUnavailableInSession": "Vista previa de imagen no disponible en esta sesión.",
       "viewImage": "Ver imagen",
       "viewImageWithAlt": "Ver imagen {{alt}}",

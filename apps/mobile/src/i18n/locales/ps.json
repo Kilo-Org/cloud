@@ -2399,7 +2399,6 @@
       "loadingImage": "انځور بارول",
       "imageUnavailableRetry": "انځور شتون نلري، بیا بارولو هڅه وکړئ",
       "imageUnavailable": "انځور شتون نلري",
-      "imageUnavailableWithAlt": "انځور شتون نلري {{alt}}",
       "imagePreviewUnavailableInSession": "په دې ناسته کې د انځور مخکتنه شتون نلري.",
       "viewImage": "انځور وګورئ",
       "viewImageWithAlt": "انځور وګورئ {{alt}}",

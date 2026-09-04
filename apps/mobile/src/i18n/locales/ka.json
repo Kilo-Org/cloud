@@ -2399,7 +2399,6 @@
       "loadingImage": "სურათის ჩატვირთვა",
       "imageUnavailableRetry": "სურათი მიუწვდომელია, ჩატვირთვის ხელახლა ცდა",
       "imageUnavailable": "სურათი მიუწვდომელია",
-      "imageUnavailableWithAlt": "სურათი მიუწვდომელია {{alt}}",
       "imagePreviewUnavailableInSession": "სურათის წინასწარი ნახვა მიუწვდომელია ამ სესიაში.",
       "viewImage": "სურათის ნახვა",
       "viewImageWithAlt": "სურათის ნახვა {{alt}}",

@@ -2433,7 +2433,6 @@
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nedostupný, skúsiť znova načítať",
       "imageUnavailable": "Obrázok nie je dostupný",
-      "imageUnavailableWithAlt": "Obrázok nedostupný {{alt}}",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tomto sedení dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",

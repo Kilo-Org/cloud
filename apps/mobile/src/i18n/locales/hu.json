@@ -2399,7 +2399,6 @@
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "Kép nem érhető el, a betöltés újrapróbálása",
       "imageUnavailable": "A kép nem érhető el",
-      "imageUnavailableWithAlt": "Kép nem érhető el {{alt}}",
       "imagePreviewUnavailableInSession": "Kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése {{alt}}",

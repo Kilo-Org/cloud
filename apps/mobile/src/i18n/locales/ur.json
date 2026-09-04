@@ -2399,7 +2399,6 @@
       "loadingImage": "تصویر لوڈ ہو رہی ہے",
       "imageUnavailableRetry": "تصویر دستیاب نہیں، لوڈنگ دوبارہ آزمائیں",
       "imageUnavailable": "تصویر دستیاب نہیں",
-      "imageUnavailableWithAlt": "تصویر دستیاب نہیں {{alt}}",
       "imagePreviewUnavailableInSession": "اس سیشن میں تصویر کا پیش نظارہ دستیاب نہیں۔",
       "viewImage": "تصویر دیکھیں",
       "viewImageWithAlt": "تصویر دیکھیں {{alt}}",

@@ -2399,7 +2399,6 @@
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",
       "imageUnavailableRetry": "ചിത്രം ലഭ്യമല്ല, ലോഡിംഗ് വീണ്ടും ശ്രമിക്കുക",
       "imageUnavailable": "ചിത്രം ലഭ്യമല്ല",
-      "imageUnavailableWithAlt": "ചിത്രം ലഭ്യമല്ല {{alt}}",
       "imagePreviewUnavailableInSession": "ഈ സെഷനിൽ ചിത്ര പ്രിവ്യൂ ലഭ്യമല്ല.",
       "viewImage": "ചിത്രം കാണുക",
       "viewImageWithAlt": "ചിത്രം കാണുക {{alt}}",

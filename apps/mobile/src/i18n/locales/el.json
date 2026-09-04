@@ -2399,7 +2399,6 @@
       "loadingImage": "Φόρτωση εικόνας",
       "imageUnavailableRetry": "Η εικόνα δεν είναι διαθέσιμη, επανάληψη φόρτωσης",
       "imageUnavailable": "Η εικόνα δεν είναι διαθέσιμη",
-      "imageUnavailableWithAlt": "Η εικόνα δεν είναι διαθέσιμη {{alt}}",
       "imagePreviewUnavailableInSession": "Η προεπισκόπηση εικόνας δεν είναι διαθέσιμη σε αυτή τη συνεδρία.",
       "viewImage": "Προβολή εικόνας",
       "viewImageWithAlt": "Προβολή εικόνας {{alt}}",

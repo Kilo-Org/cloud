@@ -2399,7 +2399,6 @@
       "loadingImage": "Зургийг ачаалж байна",
       "imageUnavailableRetry": "Зураг боломжгүй, ачаалалтыг дахин оролдох",
       "imageUnavailable": "Зураг боломжгүй",
-      "imageUnavailableWithAlt": "Зураг боломжгүй {{alt}}",
       "imagePreviewUnavailableInSession": "Энэ сессэд зургийн урьдчилсан харагдац боломжгүй.",
       "viewImage": "Зургийг үзэх",
       "viewImageWithAlt": "Зургийг үзэх {{alt}}",

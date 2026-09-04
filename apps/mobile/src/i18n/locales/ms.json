@@ -2399,7 +2399,6 @@
       "loadingImage": "Memuatkan imej",
       "imageUnavailableRetry": "Imej tidak tersedia, cuba muatkan semula",
       "imageUnavailable": "Imej tidak tersedia",
-      "imageUnavailableWithAlt": "Imej tidak tersedia {{alt}}",
       "imagePreviewUnavailableInSession": "Pratonton imej tidak tersedia dalam sesi ini.",
       "viewImage": "Lihat imej",
       "viewImageWithAlt": "Lihat imej {{alt}}",

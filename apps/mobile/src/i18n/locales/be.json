@@ -2433,7 +2433,6 @@
       "loadingImage": "Загрузка выявы",
       "imageUnavailableRetry": "Выява недаступна, паўтарыць загрузку",
       "imageUnavailable": "Выява недаступная",
-      "imageUnavailableWithAlt": "Выява недаступна {{alt}}",
       "imagePreviewUnavailableInSession": "Папярэдні прагляд выявы недаступны ў гэтым сеансе.",
       "viewImage": "Паглядзець выяву",
       "viewImageWithAlt": "Паглядзець выяву {{alt}}",

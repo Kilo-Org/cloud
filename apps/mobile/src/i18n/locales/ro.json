@@ -2416,7 +2416,6 @@
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
       "imageUnavailable": "Imagine indisponibilă",
-      "imageUnavailableWithAlt": "Imagine indisponibilă {{alt}}",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vizualizează imaginea",
       "viewImageWithAlt": "Vizualizează imaginea {{alt}}",

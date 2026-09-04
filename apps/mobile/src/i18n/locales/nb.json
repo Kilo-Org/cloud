@@ -2399,7 +2399,6 @@
       "loadingImage": "Laster bilde",
       "imageUnavailableRetry": "Bilde utilgjengelig, prøv å laste på nytt",
       "imageUnavailable": "Bilde utilgjengelig",
-      "imageUnavailableWithAlt": "Bilde utilgjengelig {{alt}}",
       "imagePreviewUnavailableInSession": "Bildeforhåndsvisning utilgjengelig i denne økten.",
       "viewImage": "Vis bilde",
       "viewImageWithAlt": "Vis bilde {{alt}}",

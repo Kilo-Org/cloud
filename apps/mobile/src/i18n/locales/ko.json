@@ -1930,7 +1930,6 @@
       "loadingImage": "이미지 로드 중",
       "imageUnavailableRetry": "이미지를 사용할 수 없습니다. 다시 로드하세요",
       "imageUnavailable": "이미지를 사용할 수 없습니다",
-      "imageUnavailableWithAlt": "이미지를 사용할 수 없습니다 {{alt}}",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
       "viewImageWithAlt": "이미지 보기 {{alt}}",

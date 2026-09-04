@@ -2399,7 +2399,6 @@
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
       "imageUnavailable": "Picha haipatikani",
-      "imageUnavailableWithAlt": "Picha haipatikani {{alt}}",
       "imagePreviewUnavailableInSession": "Onyesho la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",

@@ -1903,7 +1903,6 @@
       "loadingImage": "छवि लोड हो रही है",
       "imageUnavailableRetry": "छवि उपलब्ध नहीं, फिर से लोड करें",
       "imageUnavailable": "छवि उपलब्ध नहीं",
-      "imageUnavailableWithAlt": "छवि उपलब्ध नहीं {{alt}}",
       "viewImage": "छवि देखें",
       "viewImageWithAlt": "छवि देखें {{alt}}",
       "imageOutput": "छवि आउटपुट",

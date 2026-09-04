@@ -2399,7 +2399,6 @@
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi available ang larawan, subukang muli i-load",
       "imageUnavailable": "Hindi available ang larawan",
-      "imageUnavailableWithAlt": "Hindi available ang larawan {{alt}}",
       "imagePreviewUnavailableInSession": "Hindi available ang preview ng larawan sa session na ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan {{alt}}",

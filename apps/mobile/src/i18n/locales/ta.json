@@ -2399,7 +2399,6 @@
       "loadingImage": "படத்தை ஏற்றுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை, ஏற்றுவதை மீண்டும் முயற்சி செய்",
       "imageUnavailable": "படம் கிடைக்கவில்லை",
-      "imageUnavailableWithAlt": "படம் கிடைக்கவில்லை {{alt}}",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்",
       "viewImageWithAlt": "படத்தைப் பார் {{alt}}",

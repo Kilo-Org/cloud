@@ -1920,7 +1920,6 @@
       "loadingImage": "Caricamento immagine",
       "imageUnavailableRetry": "Immagine non disponibile, riprova a caricare",
       "imageUnavailable": "Immagine non disponibile",
-      "imageUnavailableWithAlt": "Immagine non disponibile {{alt}}",
       "imagePreviewUnavailableInSession": "Anteprima immagine non disponibile in questa sessione.",
       "viewImage": "Visualizza immagine",
       "viewImageWithAlt": "Visualizza immagine {{alt}}",

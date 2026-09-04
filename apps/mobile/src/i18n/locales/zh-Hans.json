@@ -1930,7 +1930,6 @@
       "loadingImage": "正在加载图片",
       "imageUnavailableRetry": "图片不可用，重试加载",
       "imageUnavailable": "图片不可用",
-      "imageUnavailableWithAlt": "图片不可用 {{alt}}",
       "imagePreviewUnavailableInSession": "此会话中图片预览不可用。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",

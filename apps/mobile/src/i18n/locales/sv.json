@@ -2399,7 +2399,6 @@
       "loadingImage": "Läser in bild",
       "imageUnavailableRetry": "Bild otillgänglig, försök läsa in igen",
       "imageUnavailable": "Bilden är inte tillgänglig",
-      "imageUnavailableWithAlt": "Bild otillgänglig {{alt}}",
       "imagePreviewUnavailableInSession": "Bildförhandsvisning otillgänglig i den här sessionen.",
       "viewImage": "Visa bild",
       "viewImageWithAlt": "Visa bild {{alt}}",

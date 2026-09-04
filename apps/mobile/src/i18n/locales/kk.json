@@ -2399,7 +2399,6 @@
       "loadingImage": "Сурет жүктелуде",
       "imageUnavailableRetry": "Сурет қолжетімсіз, жүктеуді қайталаңыз",
       "imageUnavailable": "Сурет қолжетімсіз",
-      "imageUnavailableWithAlt": "Сурет қолжетімсіз {{alt}}",
       "imagePreviewUnavailableInSession": "Бұл сессияда сурет алдын ала қарауы қолжетімсіз.",
       "viewImage": "Суді қарау",
       "viewImageWithAlt": "{{alt}} суретін қарау",

@@ -2399,7 +2399,6 @@
       "loadingImage": "Iyathanda isithombe",
       "imageUnavailableRetry": "Isithombe asitholakali, zama ukuyilayisha futhi",
       "imageUnavailable": "Isithombe asitholakali",
-      "imageUnavailableWithAlt": "Isithombe asitholakali {{alt}}",
       "imagePreviewUnavailableInSession": "Ukubonwa kwesithombe akutholakali kulesi seshini.",
       "viewImage": "Buka isithombe",
       "viewImageWithAlt": "Buka isithombe {{alt}}",

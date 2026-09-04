@@ -2450,7 +2450,6 @@
       "loadingImage": "Qed titgħabba l-immaġni",
       "imageUnavailableRetry": "L-immaġni mhix disponibbli, erġa' pprova tgħabbiha",
       "imageUnavailable": "L-immaġni mhix disponibbli",
-      "imageUnavailableWithAlt": "L-immaġni mhix disponibbli {{alt}}",
       "imagePreviewUnavailableInSession": "Il-preview tal-immaġni mhix disponibbli f'din is-sessjoni.",
       "viewImage": "Ara l-immaġni",
       "viewImageWithAlt": "Ara l-immaġni {{alt}}",

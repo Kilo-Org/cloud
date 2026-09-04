@@ -1950,7 +1950,6 @@
       "loadingImage": "Загрузка изображения",
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
       "imageUnavailable": "Изображение недоступно",
-      "imageUnavailableWithAlt": "Изображение недоступно {{alt}}",
       "imagePreviewUnavailableInSession": "Предпросмотр изображения недоступен в этом сеансе.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",

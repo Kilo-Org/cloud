@@ -2433,7 +2433,6 @@
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi znova naložiti",
       "imageUnavailable": "Slika ni na voljo",
-      "imageUnavailableWithAlt": "Slika ni na voljo {{alt}}",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",

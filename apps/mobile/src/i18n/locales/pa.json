@@ -2399,7 +2399,6 @@
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
       "imageUnavailableRetry": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ, ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "imageUnavailable": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ",
-      "imageUnavailableWithAlt": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ {{alt}}",
       "imagePreviewUnavailableInSession": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਚਿੱਤਰ ਪੂਰਵ-ਦ੍ਰਿਸ਼ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "viewImage": "ਚਿੱਤਰ ਦੇਖੋ",
       "viewImageWithAlt": "ਚਿੱਤਰ ਦੇਖੋ {{alt}}",

@@ -2416,7 +2416,6 @@
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģini ielādēt vēlreiz",
       "imageUnavailable": "Attēls nav pieejams",
-      "imageUnavailableWithAlt": "Attēls nav pieejams {{alt}}",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",

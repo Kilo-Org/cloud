@@ -2416,7 +2416,6 @@
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo učitavanje",
       "imageUnavailable": "Slika nije dostupna",
-      "imageUnavailableWithAlt": "Slika nije dostupna {{alt}}",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",

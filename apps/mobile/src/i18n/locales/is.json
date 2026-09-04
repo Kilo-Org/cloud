@@ -2399,7 +2399,6 @@
       "loadingImage": "Hleður mynd",
       "imageUnavailableRetry": "Mynd ekki tiltæk, reyndu að hlaða aftur",
       "imageUnavailable": "Mynd ótiltæk",
-      "imageUnavailableWithAlt": "Mynd ekki tiltæk {{alt}}",
       "imagePreviewUnavailableInSession": "Myndsýn ekki tiltæk í þessari lotu.",
       "viewImage": "Skoða mynd",
       "viewImageWithAlt": "Skoða mynd {{alt}}",

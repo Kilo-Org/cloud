@@ -2399,7 +2399,6 @@
       "loadingImage": "छवि लोड गर्दै",
       "imageUnavailableRetry": "छवि उपलब्ध छैन, लोड गर्न पुनः प्रयास गर्नुहोस्",
       "imageUnavailable": "छवि उपलब्ध छैन",
-      "imageUnavailableWithAlt": "छवि उपलब्ध छैन {{alt}}",
       "imagePreviewUnavailableInSession": "यो सत्रमा छवि पूर्वावलोकन उपलब्ध छैन।",
       "viewImage": "छवि हेर्नुहोस्",
       "viewImageWithAlt": "छवि हेर्नुहोस् {{alt}}",

@@ -1930,7 +1930,6 @@
       "loadingImage": "Đang tải hình ảnh",
       "imageUnavailableRetry": "Hình ảnh không khả dụng, thử tải lại",
       "imageUnavailable": "Hình ảnh không khả dụng",
-      "imageUnavailableWithAlt": "Hình ảnh không khả dụng {{alt}}",
       "imagePreviewUnavailableInSession": "Xem trước hình ảnh không khả dụng trong phiên này.",
       "viewImage": "Xem hình ảnh",
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",

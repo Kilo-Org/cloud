@@ -2399,7 +2399,6 @@
       "loadingImage": "Ana loda hoto",
       "imageUnavailableRetry": "Hoto ba ya samuwa, sake gwada loda",
       "imageUnavailable": "Hoton ba ya samuwa",
-      "imageUnavailableWithAlt": "Hoto ba ya samuwa {{alt}}",
       "imagePreviewUnavailableInSession": "Nunin hoton ba ya samuwa a cikin wannan zaman.",
       "viewImage": "Duba hoto",
       "viewImageWithAlt": "Duba hoto {{alt}}",

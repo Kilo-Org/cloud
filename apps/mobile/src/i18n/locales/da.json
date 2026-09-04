@@ -2399,7 +2399,6 @@
       "loadingImage": "Indlæser billede",
       "imageUnavailableRetry": "Billede utilgængeligt, prøv at indlæse igen",
       "imageUnavailable": "Billede utilgængeligt",
-      "imageUnavailableWithAlt": "Billede utilgængeligt {{alt}}",
       "imagePreviewUnavailableInSession": "Billedforhåndsvisning utilgængelig i denne session.",
       "viewImage": "Vis billede",
       "viewImageWithAlt": "Vis billede {{alt}}",

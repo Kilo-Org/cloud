@@ -1970,7 +1970,6 @@
       "loadingImage": "جارٍ تحميل الصورة",
       "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
       "imageUnavailable": "الصورة غير متاحة",
-      "imageUnavailableWithAlt": "الصورة غير متاحة {{alt}}",
       "imagePreviewUnavailableInSession": "معاينة الصورة غير متاحة في هذه الجلسة.",
       "viewImage": "عرض الصورة",
       "viewImageWithAlt": "عرض الصورة {{alt}}",

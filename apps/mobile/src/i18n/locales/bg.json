@@ -2399,7 +2399,6 @@
       "loadingImage": "Зареждане на изображението",
       "imageUnavailableRetry": "Изображението е недостъпно, опитай зареждането отново",
       "imageUnavailable": "Изображението е недостъпно",
-      "imageUnavailableWithAlt": "Изображението е недостъпно {{alt}}",
       "imagePreviewUnavailableInSession": "Прегледът на изображението е недостъпен в тази сесия.",
       "viewImage": "Прегледай изображението",
       "viewImageWithAlt": "Прегледай изображението {{alt}}",

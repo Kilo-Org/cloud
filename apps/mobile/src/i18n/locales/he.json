@@ -1940,7 +1940,6 @@
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, נסה שוב לטעון",
       "imageUnavailable": "התמונה אינה זמינה",
-      "imageUnavailableWithAlt": "התמונה אינה זמינה {{alt}}",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונה אינה זמינה בהפעלה זו.",
       "viewImage": "צפה בתמונה",
       "viewImageWithAlt": "צפה בתמונה {{alt}}",

@@ -2399,7 +2399,6 @@
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ຮູບພາບບໍ່ສາມາດໃຊ້ໄດ້, ລອງໂຫຼດໃໝ່",
       "imageUnavailable": "ຮູບພາບບໍ່ສາມາດໃຊ້ໄດ້",
-      "imageUnavailableWithAlt": "ຮູບພາບບໍ່ສາມາດໃຊ້ໄດ້ {{alt}}",
       "imagePreviewUnavailableInSession": "ການເບິ່ງຕົວຢ່າງຮູບພາບບໍ່ສາມາດໃຊ້ໄດ້ໃນເຊດຊັນນີ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
       "viewImageWithAlt": "ເບິ່ງຮູບພາບ {{alt}}",

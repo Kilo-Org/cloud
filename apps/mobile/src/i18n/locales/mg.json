@@ -2399,7 +2399,6 @@
       "loadingImage": "Mampiditra sary",
       "imageUnavailableRetry": "Tsy misy ny sary, andramo indray ny fampidirana",
       "imageUnavailable": "Tsy misy ny sary",
-      "imageUnavailableWithAlt": "Tsy misy ny sary {{alt}}",
       "imagePreviewUnavailableInSession": "Tsy misy ny fijerena sary mialoha amin'ity session ity.",
       "viewImage": "Jereo ny sary",
       "viewImageWithAlt": "Jereo ny sary {{alt}}",

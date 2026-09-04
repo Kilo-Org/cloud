@@ -2399,7 +2399,6 @@
       "loadingImage": "Duke u ngarkuar imazhi",
       "imageUnavailableRetry": "Imazhi i padisponueshëm, provo përsëri ngarkimin",
       "imageUnavailable": "Imazhi i padisponueshëm",
-      "imageUnavailableWithAlt": "Imazhi i padisponueshëm {{alt}}",
       "imagePreviewUnavailableInSession": "Parashikimi i imazhit i padisponueshëm në këtë seancë.",
       "viewImage": "Shiko imazhin",
       "viewImageWithAlt": "Shiko imazhin {{alt}}",

@@ -2467,7 +2467,6 @@
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Delwedd ar goll, ailgeisio llwytho",
       "imageUnavailable": "Delwedd heb fod ar gael",
-      "imageUnavailableWithAlt": "Delwedd ar goll {{alt}}",
       "imagePreviewUnavailableInSession": "Rhagolwg delwedd ar goll yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",

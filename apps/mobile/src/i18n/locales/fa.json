@@ -2399,7 +2399,6 @@
       "loadingImage": "در حال بارگذاری تصویر",
       "imageUnavailableRetry": "تصویر در دسترس نیست، تلاش دوباره برای بارگذاری",
       "imageUnavailable": "تصویر در دسترس نیست",
-      "imageUnavailableWithAlt": "تصویر در دسترس نیست {{alt}}",
       "imagePreviewUnavailableInSession": "پیشنمایش تصویر در این نشست در دسترس نیست.",
       "viewImage": "مشاهده تصویر",
       "viewImageWithAlt": "مشاهده تصویر {{alt}}",

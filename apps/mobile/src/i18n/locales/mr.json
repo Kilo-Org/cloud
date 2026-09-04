@@ -2399,7 +2399,6 @@
       "loadingImage": "प्रतिमा लोड करत आहे",
       "imageUnavailableRetry": "प्रतिमा अनुपलब्ध, लोड करणे पुन्हा प्रयत्न करा",
       "imageUnavailable": "प्रतिमा अनुपलब्ध",
-      "imageUnavailableWithAlt": "प्रतिमा अनुपलब्ध {{alt}}",
       "imagePreviewUnavailableInSession": "या सत्रात प्रतिमा पूर्वावलोकन अनुपलब्ध.",
       "viewImage": "प्रतिमा पहा",
       "viewImageWithAlt": "प्रतिमा पहा {{alt}}",

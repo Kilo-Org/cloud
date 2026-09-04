@@ -2450,7 +2450,6 @@
       "loadingImage": "Ag lódáil íomhá",
       "imageUnavailableRetry": "Íomhá gan fáil, bain triail as an lódáil arís",
       "imageUnavailable": "Íomhá gan fáil",
-      "imageUnavailableWithAlt": "Íomhá gan fáil {{alt}}",
       "imagePreviewUnavailableInSession": "Réamhamharc íomhá gan fáil sa seisiún seo.",
       "viewImage": "Féach ar íomhá",
       "viewImageWithAlt": "Féach ar íomhá {{alt}}",

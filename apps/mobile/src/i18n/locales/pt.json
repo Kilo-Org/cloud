@@ -2416,7 +2416,6 @@
       "loadingImage": "A carregar imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
       "imageUnavailable": "Imagem indisponível",
-      "imageUnavailableWithAlt": "Imagem indisponível {{alt}}",
       "imagePreviewUnavailableInSession": "Pré-visualização da imagem indisponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",

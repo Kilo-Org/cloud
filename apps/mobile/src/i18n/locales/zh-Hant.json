@@ -1930,7 +1930,6 @@
       "loadingImage": "正在載入圖片",
       "imageUnavailableRetry": "圖片無法使用，重試載入",
       "imageUnavailable": "圖片無法使用",
-      "imageUnavailableWithAlt": "圖片無法使用 {{alt}}",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片 {{alt}}",

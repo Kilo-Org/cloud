@@ -1930,7 +1930,6 @@
       "loadingImage": "Görüntü yükleniyor",
       "imageUnavailableRetry": "Görüntü kullanılamıyor, yüklemeyi tekrar dene",
       "imageUnavailable": "Görüntü kullanılamıyor",
-      "imageUnavailableWithAlt": "Görüntü kullanılamıyor {{alt}}",
       "imagePreviewUnavailableInSession": "Görüntü önizlemesi bu oturumda kullanılamıyor.",
       "viewImage": "Görüntüyü görüntüle",
       "viewImageWithAlt": "Görüntüyü görüntüle {{alt}}",

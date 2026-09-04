@@ -2399,7 +2399,6 @@
       "loadingImage": "ಚಿತ್ರವನ್ನು ಲೋಡ್ ಮಾಡುತ್ತಿದೆ",
       "imageUnavailableRetry": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ, ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "imageUnavailable": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ",
-      "imageUnavailableWithAlt": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ {{alt}}",
       "imagePreviewUnavailableInSession": "ಈ ಸೆಶನ್ನಲ್ಲಿ ಚಿತ್ರ ಮುನ್ನೋಟ ಲಭ್ಯವಿಲ್ಲ.",
       "viewImage": "ಚಿತ್ರ ನೋಡಿ",
       "viewImageWithAlt": "ಚಿತ್ರ ನೋಡಿ {{alt}}",

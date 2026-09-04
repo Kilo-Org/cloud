@@ -2416,7 +2416,6 @@
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "Imatge no disponible, torna a provar de carregar",
       "imageUnavailable": "Imatge no disponible",
-      "imageUnavailableWithAlt": "Imatge no disponible {{alt}}",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Veure la imatge",
       "viewImageWithAlt": "Veure la imatge {{alt}}",

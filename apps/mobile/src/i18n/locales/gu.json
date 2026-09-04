@@ -2399,7 +2399,6 @@
       "loadingImage": "છબી લોડ થઈ રહી છે",
       "imageUnavailableRetry": "છબી ઉપલબ્ધ નથી, લોડ કરવા ફરી પ્રયાસ કરો",
       "imageUnavailable": "છબી ઉપલબ્ધ નથી",
-      "imageUnavailableWithAlt": "છબી ઉપલબ્ધ નથી {{alt}}",
       "imagePreviewUnavailableInSession": "આ સત્રમાં ઇમેજ પ્રિવ્યુ ઉપલબ્ધ નથી.",
       "viewImage": "છબી જુઓ",
       "viewImageWithAlt": "છબી જુઓ {{alt}}",

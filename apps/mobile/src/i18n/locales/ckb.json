@@ -2399,7 +2399,6 @@
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنە بەردەست نییە، دووبارە بارکردنەوە",
       "imageUnavailable": "وێنە بەردەست نییە",
-      "imageUnavailableWithAlt": "وێنە بەردەست نییە {{alt}}",
       "imagePreviewUnavailableInSession": "پێشبینینی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنە {{alt}}",

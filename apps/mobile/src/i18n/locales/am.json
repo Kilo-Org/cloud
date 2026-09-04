@@ -2399,7 +2399,6 @@
       "loadingImage": "ምስልን በመጫን ላይ",
       "imageUnavailableRetry": "ምስሉ አይገኝም፣ መጫን እንደገና ይሞክሩ",
       "imageUnavailable": "ምስል አይገኝም",
-      "imageUnavailableWithAlt": "ምስሉ አይገኝም {{alt}}",
       "imagePreviewUnavailableInSession": "በዚህ ክፍለ ጊዜ ውስጥ የምስል ቅድመ-እይታ አይገኝም።",
       "viewImage": "ምስሉን ይመልከቱ",
       "viewImageWithAlt": "ምስሉን ይመልከቱ {{alt}}",

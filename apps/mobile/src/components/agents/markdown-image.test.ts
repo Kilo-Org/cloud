@@ -552,7 +552,7 @@ describe('MarkdownImage inert-until-load', () => {
     await unmount(renderer);
   });
 
-  it('uses the linked destination as the loaded image action and label', async () => {
+  it('keeps the image description when a confirmed linked image remounts', async () => {
     confirmMarkdownImage('https://example.com/a.png');
     const onPress = vi.fn<() => void>();
     const renderer = await mount('https://example.com/a.png', 'shot', {
@@ -563,7 +563,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Example'
+        node.props.accessibilityLabel === 'View image shot and Example'
     );
     expect(imageLink.props.accessibilityRole).toBe('link');
 

@@ -7,6 +7,7 @@ import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import {
@@ -147,7 +148,7 @@ export function MarkdownImage({
   onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [loaded, setLoaded] = useState(false);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
@@ -169,6 +170,9 @@ export function MarkdownImage({
 
   const filename =
     alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
+  const imageAccessibilityLabel = alt
+    ? t('agentChat.filePart.viewImageWithAlt', { alt })
+    : t('agentChat.filePart.viewImage');
 
   const kind = classifyUri(uri);
   const confirmed = useSyncExternalStore(subscribeMarkdownImageConfirmMemory, () =>
@@ -246,10 +250,9 @@ export function MarkdownImage({
           className="h-full w-full active:opacity-80"
           accessibilityRole={onPress ? 'link' : 'button'}
           accessibilityLabel={
-            accessibilityLabel ??
-            (alt
-              ? t('agentChat.filePart.viewImageWithAlt', { alt })
-              : t('agentChat.filePart.viewImage'))
+            accessibilityLabel && accessibilityLabel !== alt
+              ? formatList([imageAccessibilityLabel, accessibilityLabel], i18n.language)
+              : imageAccessibilityLabel
           }
           accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
           onAccessibilityAction={event => {

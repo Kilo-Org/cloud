@@ -44,6 +44,7 @@ const functions = [
   'textOf',
   'questionTool',
   'subagentTool',
+  'timeTool',
 ] as const;
 
 /** What has an entry point of its own, and must not be reachable from the root. */

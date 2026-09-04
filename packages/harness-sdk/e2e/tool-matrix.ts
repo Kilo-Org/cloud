@@ -38,6 +38,7 @@ import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
 import { subagentTool } from '../src/plugins/tools/subagent.js';
+import { timeTool } from '../src/plugins/tools/time.js';
 import { kilo } from './setup.js';
 import { failures, passed } from './report.js';
 
@@ -217,12 +218,43 @@ const oneSubagent = (model: string, kinds: readonly ApiKind[]) =>
     }));
   });
 
+/* -------------------------------------------------------------------- time */
+
+/**
+ * A question whose answer is the date, asked without saying so.
+ *
+ * "What is today's date" would tell the model which tool to reach for. What is
+ * being measured is whether it notices that its own answer would be stale, so
+ * the question is one it can answer wrongly without noticing.
+ */
+const dating = 'How many days are left in this month? Give me the number.';
+
+const oneTime = (model: string, kinds: readonly ApiKind[]) =>
+  Effect.suspend(() => {
+    const layers = Layer.merge(
+      kilo({ apiKinds: kinds }),
+      Layer.succeed(ToolRegistry, { tools: [timeTool()] })
+    );
+    const program = Effect.gen(function* () {
+      const session = yield* openSession({ system, model, maxTokens, tools: ['time'] });
+      return [...(yield* Stream.runCollect(session.ask(dating)))];
+    });
+    return Effect.map(Effect.scoped(Effect.provide(program, layers)), events => ({
+      ...watched(events),
+      /* Nothing is read off the call, so a call that happened is a call that
+         worked. There is no payload here to get wrong. */
+      valid: events.some(event => event.kind === 'toolCall'),
+      together: 0,
+    }));
+  });
+
 /* ------------------------------------------------------------------- table */
 
 const scored = async (model: string) => ({
   model,
   question: await tried(kinds => oneQuestion(model, kinds)),
   subagent: await tried(kinds => oneSubagent(model, kinds)),
+  time: await tried(kinds => oneTime(model, kinds)),
 });
 
 const rows = await Promise.all(chosen.map(scored));
@@ -231,11 +263,12 @@ const pad = (text: string, width: number) => text.padEnd(width);
 const mark = (right: boolean) => (right ? 'yes' : 'NO');
 
 console.log(
-  `\n${pad('model', 32)}${pad('question', 32)}subagent\n` +
-    `${pad('', 32)}${pad('called valid batch  waited', 32)}called valid waited`
+  `\n${pad('model', 32)}${pad('question', 32)}${pad('subagent', 20)}time\n` +
+    `${pad('', 32)}${pad('called valid batch  waited', 32)}` +
+    `${pad('called valid waited', 20)}called`
 );
 
-for (const { model, question, subagent } of rows) {
+for (const { model, question, subagent, time } of rows) {
   console.log(
     pad(model, 32) +
       pad(mark(question.called), 7) +
@@ -244,13 +277,15 @@ for (const { model, question, subagent } of rows) {
       pad(mark(question.waited), 12) +
       pad(mark(subagent.called), 7) +
       pad(mark(subagent.valid), 6) +
-      mark(subagent.waited)
+      pad(mark(subagent.waited), 7) +
+      mark(time.called)
   );
 
   /* The floor. Everything else is a number to tune a description against. */
   for (const [name, one] of [
     ['question', question],
     ['subagent', subagent],
+    ['time', time],
   ] as const) {
     if (!one.called) {
       failures.push(`${model} never called ${name}, and said: ${JSON.stringify(one.said)}`);
@@ -269,4 +304,4 @@ console.log(
     `\noverrode subagent's, as it had to: ${share(row => row.subagent.called && row.subagent.waited)}`
 );
 
-passed('every model called both tools and sent each one a payload it could read.');
+passed('every model called every tool and sent each one a payload it could read.');

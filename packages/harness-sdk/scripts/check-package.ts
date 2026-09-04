@@ -38,7 +38,7 @@ const entries: readonly Entry[] = [
   { subpath: './plugins/fetch', promises: ['webFetch'] },
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
-  { subpath: './plugins/tools', promises: ['questionTool', 'subagentTool'] },
+  { subpath: './plugins/tools', promises: ['questionTool', 'subagentTool', 'timeTool'] },
   { subpath: './plugins/store/node', promises: ['layerNodeStore'] },
   { subpath: './plugins/store/expo', promises: ['layerExpoStore'] },
   { subpath: './testing', promises: ['checkStore', 'checkAssembler'] },

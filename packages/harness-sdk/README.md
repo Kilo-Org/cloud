@@ -362,10 +362,26 @@ its own tools. The counts do not: they belong to the session that spent them, so
 cost. A store does cross, because a session reads it from the context it runs
 in — the subagent writes to the same database under a session of its own.
 
+### The time tool
+
+A model does not know what time it is. It knows roughly when it was trained,
+says that date as confidently as it says everything else, and is wrong by
+however long it has been since.
+
+```ts
+import { timeTool } from '@kilocode/harness-sdk/plugins/tools';
+
+const tools = [timeTool({ zone: 'Europe/Amsterdam' })];
+```
+
+It takes no arguments: there is nothing about the current time for a model to
+choose. UTC and the weekday always come back; `zone` adds the local time as
+well, and is the harness's to set rather than the model's, because a model
+naming its own zone is guessing.
+
 ### The question tool
 
-The package ships one tool, because no harness can do without it and none can
-write it for itself. Everything about the question is the model's — how many,
+No harness can do without this one and none can write it for itself. Everything about the question is the model's — how many,
 what each says, what may be picked, one answer or several, whether it may be
 skipped. Everything about the asking is yours, in one function.
 
@@ -553,7 +569,7 @@ Each of these is a `Context.Tag`, and each ships a default the package owns.
 | Point | What it decides | This package ships |
 |---|---|---|
 | `ModelClient` | How a request leaves and a reply comes back | `layerKiloGateway` |
-| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool`, `subagentTool` |
+| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool`, `subagentTool`, `timeTool` |
 | `PromptAssembler` | What the prompt looks like, and where the breakpoints go | `layerAssembler` |
 | `ModelCatalog` | Which shapes a model speaks, its output limit, its window | `layerTableCatalog` |
 | `SessionStore` | Where the conversation is kept | `layerNodeStore`, `layerExpoStore` |

@@ -1123,14 +1123,19 @@ did.
 The models are the ten of `pnpm test:e2e:models` plus `anthropic/claude-haiku-4.5`,
 which is the one lab that list leaves out.
 
-Measured on 2026-09-04, eleven models, both shipped tools:
+Measured on 2026-09-04, eleven models, every shipped tool:
 
-| | question | subagent |
-|---|---:|---:|
-| Called the tool | 11 of 11 | 11 of 11 |
-| Sent a payload the schema accepted | 11 of 11 | 11 of 11 |
-| Asked everything in one call | 11 of 11 | — |
-| Waited | 11 of 11 | 7 of 11 |
+| | question | subagent | time |
+|---|---:|---:|---:|
+| Called the tool | 11 of 11 | 11 of 11 | 11 of 11 |
+| Sent a payload the schema accepted | 11 of 11 | 11 of 11 | — |
+| Asked everything in one call | 11 of 11 | — | — |
+| Waited | 11 of 11 | 6 of 11 | — |
+
+`time` takes no arguments and reads nothing off the call, so there is no payload
+to be wrong and nothing to wait on. What its column asks is whether a model
+notices its own answer would be stale: asked how many days are left in the
+month, without being told to check, all eleven called it.
 
 There is no right answer to the waiting column, which is why `Tool.wait` is a
 default and not a rule. Both scenarios block — a deployment nobody has answered
@@ -1140,7 +1145,8 @@ reads the field: `question` defaults to waiting and every model kept it,
 `subagent` defaults to not and seven of eleven overrode it. A model that never
 overrode would be a model ignoring the field.
 
-The question tool was clean on the first run and was not touched. The subagent
+The question and time tools were clean on their first run and were not
+touched. The subagent
 description was not, and what it cost is the point of keeping this run:
 
 | Description | Delegated |
